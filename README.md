@@ -8,7 +8,7 @@
 
     $ kubectl create -f github.com/coreos/etcd/hack/kubernetes-deploy/etcd.yaml
     
-### Run operator
+### Run operator (outside kubernetes cluster)
     
     $ go run main.go
     
