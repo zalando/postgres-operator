@@ -1,0 +1,18 @@
+apiVersion: "acid.zalan.do/v1"
+kind: Spilo
+
+metadata:
+  name: testcluster
+
+spec:
+  etcd_host: etcd-client.default.svc.cluster.local:2379
+  volume_size: 100 # GB
+  resource_cpu: 111m
+  resource_memory: 222Mi
+  number_of_instances: 3
+  docker_image: registry.opensource.zalan.do/acid/spilotest-9.6:1.1-p10  # put the spilo image here
+  postgres_configuration:
+  - param: "max_connections"
+    value: "10"
+  - param: "shared_buffers"
+    value: "500MB"

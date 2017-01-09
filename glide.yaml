@@ -1,0 +1,28 @@
+package: github.bus.zalan.do/mkabilov/postgres-operator
+import:
+- package: github.com/coreos/etcd
+  version: ^3.1.0-rc.1
+  subpackages:
+  - client
+- package: github.com/spf13/pflag
+- package: golang.org/x/net
+  subpackages:
+  - context
+- package: k8s.io/client-go
+  version: ^2.0.0-alpha.1
+  subpackages:
+  - kubernetes
+  - pkg/api
+  - pkg/api/meta
+  - pkg/api/resource
+  - pkg/api/unversioned
+  - pkg/api/v1
+  - pkg/apis/apps/v1beta1
+  - pkg/apis/extensions/v1beta1
+  - pkg/fields
+  - pkg/runtime
+  - pkg/runtime/serializer
+  - pkg/util/intstr
+  - rest
+  - tools/cache
+  - tools/clientcmd
