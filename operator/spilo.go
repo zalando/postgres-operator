@@ -17,7 +17,7 @@ type SpiloOperator struct {
 	ClientSet   *kubernetes.Clientset
 	SpiloClient *rest.RESTClient
 
-	SpiloZooKeeper *PgZooKeeper
+	SpiloZooKeeper *SpiloZooKeeper
 }
 
 func New(options Options) *SpiloOperator {

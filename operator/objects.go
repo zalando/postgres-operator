@@ -8,7 +8,7 @@ import (
 	"log"
 )
 
-func (z *PgZooKeeper) CreateStatefulSet(spilo *Spilo) {
+func (z *SpiloZooKeeper) CreateStatefulSet(spilo *Spilo) {
 	ns := (*spilo).Metadata.Namespace
 
 	statefulSet := z.createSetFromSpilo(spilo)
@@ -21,7 +21,7 @@ func (z *PgZooKeeper) CreateStatefulSet(spilo *Spilo) {
 	}
 }
 
-func (z *PgZooKeeper) createSetFromSpilo(spilo *Spilo) v1beta1.StatefulSet {
+func (z *SpiloZooKeeper) createSetFromSpilo(spilo *Spilo) v1beta1.StatefulSet {
 	clusterName := (*spilo).Metadata.Name
 
 	envVars := []v1.EnvVar{
@@ -166,7 +166,7 @@ func (z *PgZooKeeper) createSetFromSpilo(spilo *Spilo) v1beta1.StatefulSet {
 	}
 }
 
-func (z *PgZooKeeper) CreateSecrets(ns, name string) {
+func (z *SpiloZooKeeper) CreateSecrets(ns, name string) {
 	secret := v1.Secret{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,
@@ -191,7 +191,7 @@ func (z *PgZooKeeper) CreateSecrets(ns, name string) {
 	}
 }
 
-func (z *PgZooKeeper) CreateService(ns, name string) {
+func (z *SpiloZooKeeper) CreateService(ns, name string) {
 	service := v1.Service{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,
@@ -214,7 +214,7 @@ func (z *PgZooKeeper) CreateService(ns, name string) {
 	}
 }
 
-func (z *PgZooKeeper) CreateEndPoint(ns, name string) {
+func (z *SpiloZooKeeper) CreateEndPoint(ns, name string) {
 	endPoint := v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,

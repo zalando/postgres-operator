@@ -34,7 +34,7 @@ type podWatcher struct {
 	subscribe     bool
 }
 
-type PgZooKeeper struct {
+type SpiloZooKeeper struct {
 	podEvents   chan podEvent
 	podWatchers chan podWatcher
 	SpiloClient *rest.RESTClient
@@ -49,8 +49,8 @@ func podsListWatch(client *kubernetes.Clientset) *cache.ListWatch {
 	return cache.NewListWatchFromClient(client.Core().RESTClient(), "pods", api.NamespaceAll, fields.Everything())
 }
 
-func newZookeeper(spiloClient *rest.RESTClient, clientset *kubernetes.Clientset) *PgZooKeeper {
-	pgZooKeeper := &PgZooKeeper{
+func newZookeeper(spiloClient *rest.RESTClient, clientset *kubernetes.Clientset) *SpiloZooKeeper {
+	spiloZooKeeper := &SpiloZooKeeper{
 		SpiloClient: spiloClient,
 		Clientset:   clientset,
 	}
@@ -63,9 +63,9 @@ func newZookeeper(spiloClient *rest.RESTClient, clientset *kubernetes.Clientset)
 	)
 
 	spiloInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    pgZooKeeper.spiloAdd,
-		UpdateFunc: pgZooKeeper.spiloUpdate,
-		DeleteFunc: pgZooKeeper.spiloDelete,
+		AddFunc:    spiloZooKeeper.spiloAdd,
+		UpdateFunc: spiloZooKeeper.spiloUpdate,
+		DeleteFunc: spiloZooKeeper.spiloDelete,
 	})
 
 	podInformer := cache.NewSharedIndexInformer(
@@ -76,13 +76,13 @@ func newZookeeper(spiloClient *rest.RESTClient, clientset *kubernetes.Clientset)
 	)
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    pgZooKeeper.podAdd,
-		UpdateFunc: pgZooKeeper.podUpdate,
-		DeleteFunc: pgZooKeeper.podDelete,
+		AddFunc:    spiloZooKeeper.podAdd,
+		UpdateFunc: spiloZooKeeper.podUpdate,
+		DeleteFunc: spiloZooKeeper.podDelete,
 	})
 
-	pgZooKeeper.spiloInformer = spiloInformer
-	pgZooKeeper.podInformer = podInformer
+	spiloZooKeeper.spiloInformer = spiloInformer
+	spiloZooKeeper.podInformer = podInformer
 
 	cfg := etcdclient.Config{
 		Endpoints:               []string{etcdHostOutside},
@@ -95,13 +95,13 @@ func newZookeeper(spiloClient *rest.RESTClient, clientset *kubernetes.Clientset)
 		log.Fatal(err)
 	}
 
-	pgZooKeeper.etcdApiClient = etcdclient.NewKeysAPI(c)
-	pgZooKeeper.podEvents = make(chan podEvent)
+	spiloZooKeeper.etcdApiClient = etcdclient.NewKeysAPI(c)
+	spiloZooKeeper.podEvents = make(chan podEvent)
 
-	return pgZooKeeper
+	return spiloZooKeeper
 }
 
-func (d *PgZooKeeper) podAdd(obj interface{}) {
+func (d *SpiloZooKeeper) podAdd(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	d.podEvents <- podEvent{
 		namespace:  pod.Namespace,
@@ -110,7 +110,7 @@ func (d *PgZooKeeper) podAdd(obj interface{}) {
 	}
 }
 
-func (d *PgZooKeeper) podDelete(obj interface{}) {
+func (d *SpiloZooKeeper) podDelete(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	d.podEvents <- podEvent{
 		namespace:  pod.Namespace,
@@ -119,7 +119,7 @@ func (d *PgZooKeeper) podDelete(obj interface{}) {
 	}
 }
 
-func (d *PgZooKeeper) podUpdate(old, cur interface{}) {
+func (d *SpiloZooKeeper) podUpdate(old, cur interface{}) {
 	oldPod := old.(*v1.Pod)
 	d.podEvents <- podEvent{
 		namespace:  oldPod.Namespace,
@@ -128,7 +128,7 @@ func (d *PgZooKeeper) podUpdate(old, cur interface{}) {
 	}
 }
 
-func (z *PgZooKeeper) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+func (z *SpiloZooKeeper) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	wg.Add(1)
 
@@ -143,7 +143,7 @@ func (z *PgZooKeeper) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	<-stopCh
 }
 
-func (z *PgZooKeeper) spiloAdd(obj interface{}) {
+func (z *SpiloZooKeeper) spiloAdd(obj interface{}) {
 	spilo := obj.(*Spilo)
 
 	clusterName := (*spilo).Metadata.Name
@@ -155,7 +155,7 @@ func (z *PgZooKeeper) spiloAdd(obj interface{}) {
 	z.CreateStatefulSet(spilo)
 }
 
-func (z *PgZooKeeper) spiloUpdate(old, cur interface{}) {
+func (z *SpiloZooKeeper) spiloUpdate(old, cur interface{}) {
 	oldSpilo := old.(*Spilo)
 	curSpilo := cur.(*Spilo)
 
@@ -170,7 +170,7 @@ func (z *PgZooKeeper) spiloUpdate(old, cur interface{}) {
 	log.Printf("Update spilo old: %+v cur: %+v", *oldSpilo, *curSpilo)
 }
 
-func (z *PgZooKeeper) spiloDelete(obj interface{}) {
+func (z *SpiloZooKeeper) spiloDelete(obj interface{}) {
 	spilo := obj.(*Spilo)
 
 	err := z.DeleteStatefulSet(spilo.Metadata.Namespace, spilo.Metadata.Name)
@@ -179,7 +179,7 @@ func (z *PgZooKeeper) spiloDelete(obj interface{}) {
 	}
 }
 
-func (z *PgZooKeeper) DeleteStatefulSet(ns, clusterName string) error {
+func (z *SpiloZooKeeper) DeleteStatefulSet(ns, clusterName string) error {
 	orphanDependents := false
 	deleteOptions := v1.DeleteOptions{
 		OrphanDependents: &orphanDependents,
@@ -231,7 +231,7 @@ func (z *PgZooKeeper) DeleteStatefulSet(ns, clusterName string) error {
 	return nil
 }
 
-func (z *PgZooKeeper) UpdateStatefulSet(spilo *Spilo) {
+func (z *SpiloZooKeeper) UpdateStatefulSet(spilo *Spilo) {
 	ns := (*spilo).Metadata.Namespace
 
 	statefulSet := z.createSetFromSpilo(spilo)
@@ -242,7 +242,7 @@ func (z *PgZooKeeper) UpdateStatefulSet(spilo *Spilo) {
 	}
 }
 
-func (z *PgZooKeeper) UpdateStatefulSetImage(spilo *Spilo) {
+func (z *SpiloZooKeeper) UpdateStatefulSetImage(spilo *Spilo) {
 	ns := (*spilo).Metadata.Namespace
 
 	z.UpdateStatefulSet(spilo)
@@ -295,7 +295,7 @@ func (z *PgZooKeeper) UpdateStatefulSetImage(spilo *Spilo) {
 	}
 }
 
-func (z *PgZooKeeper) podWatcher(stopCh <-chan struct{}) {
+func (z *SpiloZooKeeper) podWatcher(stopCh <-chan struct{}) {
 	watchers := make(map[string]chan podEvent)
 	for {
 		select {
