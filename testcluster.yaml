@@ -10,7 +10,7 @@ spec:
   resource_cpu: 111m
   resource_memory: 222Mi
   number_of_instances: 3
-  docker_image: registry.opensource.zalan.do/acid/spilotest-9.6:1.1-p10  # put the spilo image here
+  docker_image: registry.opensource.zalan.do/acid/spilo-9.6:1.2-p5  # put the spilo image here
   postgres_configuration:
   - param: "max_connections"
     value: "10"
