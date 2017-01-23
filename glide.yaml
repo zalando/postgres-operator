@@ -1,4 +1,4 @@
-package: github.bus.zalan.do/mkabilov/postgres-operator
+package: github.bus.zalan.do/acid/postgres-operator
 import:
 - package: github.com/coreos/etcd
   version: ^3.1.0-rc.1
