@@ -6,8 +6,27 @@
 
 ### Deploy etcd
 
-    $ kubectl create -f github.com/coreos/etcd/hack/kubernetes-deploy/etcd.yaml
+    $ kubectl create -f https://github.com/coreos/etcd/blob/master/hack/kubernetes-deploy/etcd.yaml
+
+##  Set your go path and put the sources so that go build finds them
+
+    $ export GOPATH=~/git/go/src/github.bus.zalan.do/acid/
+    $ mkdir -p ~/git/go/src/github.bus.zalan.do/acid/
+    $ cd ~/git/go/src/github.bus.zalan.do/acid/ && git clone https://github.bus.zalan.do/acid/postgres-operator -b prototype
     
+### Install Glide on OS X
+
+    $ brew install glide
+
+### Install Glide on Ubuntu
+
+    # sudo add-apt-repository ppa:masterminds/glide && sudo apt-get update
+    # sudo apt-get install glide
+
+### Install dependencies with Glide
+
+   $ glide update && glide install
+
 ### Run operator (outside kubernetes cluster)
     
     $ go run main.go
