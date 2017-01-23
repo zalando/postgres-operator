@@ -10,9 +10,9 @@
 
 ##  Set your go path and put the sources so that go build finds them
 
-    $ export GOPATH=~/git/go/src/github.bus.zalan.do/acid/
-    $ mkdir -p ~/git/go/src/github.bus.zalan.do/acid/
-    $ cd ~/git/go/src/github.bus.zalan.do/acid/ && git clone https://github.bus.zalan.do/acid/postgres-operator -b prototype
+    $ export GOPATH=~/git/go
+    $ mkdir -p ${GOPATH}/src/github.bus.zalan.do/acid/
+    $ cd ${GOPATH}/src/github.bus.zalan.do/acid/ && git clone https://github.bus.zalan.do/acid/postgres-operator -b prototype
     
 ### Install Glide on OS X
 
