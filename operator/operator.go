@@ -5,8 +5,11 @@ import (
 	"log"
 	"time"
 
+    "net/http"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
+    apierrors "k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
@@ -100,12 +103,19 @@ func newKubernetesSpiloClient(c *rest.Config) (*rest.RESTClient, error) {
 	return rest.RESTClientFor(c)
 }
 
-func EnsureSpiloThirdPartyResource(client *kubernetes.Clientset) error {
-	_, err := client.ExtensionsV1beta1().ThirdPartyResources().Get(fmt.Sprintf("spilo.%s", VENDOR))
-	if err == nil {
-		return err
-	}
+//TODO: Move to separate package
+func IsKubernetesResourceNotFoundError(err error) bool {
+    se, ok := err.(*apierrors.StatusError)
+    if !ok {
+        return false
+    }
+    if se.Status().Code == http.StatusNotFound && se.Status().Reason == unversioned.StatusReasonNotFound {
+        return true
+    }
+    return false
+}
 
+func EnsureSpiloThirdPartyResource(client *kubernetes.Clientset) error {
 	// The resource doesn't exist, so we create it.
 	tpr := v1beta1.ThirdPartyResource{
 		ObjectMeta: v1.ObjectMeta{
@@ -117,7 +127,11 @@ func EnsureSpiloThirdPartyResource(client *kubernetes.Clientset) error {
 		},
 	}
 
-	_, err = client.ExtensionsV1beta1().ThirdPartyResources().Create(&tpr)
+	_, err := client.ExtensionsV1beta1().ThirdPartyResources().Create(&tpr)
 
-	return err
+    if IsKubernetesResourceNotFoundError(err) {
+        return err
+    }
+
+    return nil
 }
