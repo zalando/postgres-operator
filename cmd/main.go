@@ -8,11 +8,11 @@ import (
 	"sync"
 	"syscall"
 
-	"github.bus.zalan.do/acid/postgres-operator/operator"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/controller"
 	"github.com/spf13/pflag"
 )
 
-var options operator.Options
+var options controller.Options
 
 func init() {
 	pflag.StringVar(&options.KubeConfig, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
@@ -31,7 +31,7 @@ func main() {
 
 	wg := &sync.WaitGroup{} // Goroutines can add themselves to this to be waited on
 
-	spiloOperator := operator.New(options)
+	spiloOperator := controller.New(options)
 	spiloOperator.Run(stop, wg)
 
 	sig := <-sigs // Wait for signals (this hangs until a signal arrives)

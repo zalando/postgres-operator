@@ -1,4 +1,4 @@
-package operator
+package controller
 
 import (
 	"k8s.io/client-go/pkg/api/resource"

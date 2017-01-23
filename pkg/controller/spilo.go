@@ -1,4 +1,4 @@
-package operator
+package controller
 
 import (
 	"encoding/json"
@@ -44,10 +44,10 @@ func New(options Options) *SpiloOperator {
 	}
 
 	operator := &SpiloOperator{
-		Options:        options,
-		ClientSet:      clientSet,
-		Client:    spiloClient,
-		Supervisor: newSupervisor(spiloClient, clientSet),
+		Options:     options,
+		ClientSet:   clientSet,
+		Client:      spiloClient,
+		Supervisor:  newSupervisor(spiloClient, clientSet),
 	}
 
 	return operator

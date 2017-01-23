@@ -29,11 +29,11 @@
 
 ### Build dependencies
 
-    $ go build -i -v
+    $ go build -i -v cmd
 
 ### Run operator (outside kubernetes cluster)
     
-    $ go run main.go
+    $ go run cmd/main.go
     
 ### Check if ThirdPartyResource has been registered
 
