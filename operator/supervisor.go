@@ -160,9 +160,9 @@ func (z *SpiloSupervisor) spiloUpdate(old, cur interface{}) {
 	oldSpilo := old.(*Spilo)
 	curSpilo := cur.(*Spilo)
 
-	//if oldSpilo.Spec.NumberOfInstances != curSpilo.Spec.NumberOfInstances {
-	//	z.UpdateStatefulSet(curSpilo)
-	//}
+	if oldSpilo.Spec.NumberOfInstances != curSpilo.Spec.NumberOfInstances {
+		z.UpdateStatefulSet(curSpilo)
+	}
 
 	if oldSpilo.Spec.DockerImage != curSpilo.Spec.DockerImage {
         log.Printf("Updating DockerImage: %s.%s",
@@ -172,7 +172,7 @@ func (z *SpiloSupervisor) spiloUpdate(old, cur interface{}) {
 		z.UpdateStatefulSetImage(curSpilo)
 	}
 
-	log.Printf("Update spilo old: %+v cur: %+v", *oldSpilo, *curSpilo)
+	log.Printf("Update spilo old: %+v\ncurrent: %+v", *oldSpilo, *curSpilo)
 }
 
 func (z *SpiloSupervisor) spiloDelete(obj interface{}) {
