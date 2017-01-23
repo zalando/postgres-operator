@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-func (z *SpiloZooKeeper) DeleteEtcdKey(clusterName string) error {
+func (z *SpiloSupervisor) DeleteEtcdKey(clusterName string) error {
 	options := client.DeleteOptions{
 		Recursive: true,
 	}

@@ -9,15 +9,17 @@ import (
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/rest"
+    "net/url"
+	"fmt"
+    "strings"
 )
 
 type SpiloOperator struct {
 	Options
 
-	ClientSet   *kubernetes.Clientset
-	SpiloClient *rest.RESTClient
-
-	SpiloZooKeeper *SpiloZooKeeper
+	ClientSet  *kubernetes.Clientset
+	Client     *rest.RESTClient
+	Supervisor *SpiloSupervisor
 }
 
 func New(options Options) *SpiloOperator {
@@ -28,6 +30,14 @@ func New(options Options) *SpiloOperator {
 		log.Fatalf("Couldn't create Kubernetes client: %s", err)
 	}
 
+    etcdService, _ := clientSet.Services("default").Get("etcd-client")
+    if len(etcdService.Spec.Ports) != 1 {
+        log.Fatalln("Can't find Etcd cluster")
+    }
+    ports := etcdService.Spec.Ports[0]
+	nodeurl, _ := url.Parse(config.Host)
+	etcdHostOutside = fmt.Sprintf("http://%s:%d", strings.Split(nodeurl.Host, ":")[0], ports.NodePort)
+
 	spiloClient, err := newKubernetesSpiloClient(config)
 	if err != nil {
 		log.Fatalf("Couldn't create Spilo client: %s", err)
@@ -36,8 +46,8 @@ func New(options Options) *SpiloOperator {
 	operator := &SpiloOperator{
 		Options:        options,
 		ClientSet:      clientSet,
-		SpiloClient:    spiloClient,
-		SpiloZooKeeper: newZookeeper(spiloClient, clientSet),
+		Client:    spiloClient,
+		Supervisor: newSupervisor(spiloClient, clientSet),
 	}
 
 	return operator
@@ -46,7 +56,7 @@ func New(options Options) *SpiloOperator {
 func (o *SpiloOperator) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	log.Printf("Spilo operator %v\n", VERSION)
 
-	go o.SpiloZooKeeper.Run(stopCh, wg)
+	go o.Supervisor.Run(stopCh, wg)
 
 	log.Println("Started working in background")
 }
