@@ -36,6 +36,11 @@ func New(options Options) *SpiloOperator {
     }
     ports := etcdService.Spec.Ports[0]
 	nodeurl, _ := url.Parse(config.Host)
+
+    if ports.NodePort == 0 {
+        log.Fatalln("Etcd port is not exposed")
+    }
+
 	etcdHostOutside := fmt.Sprintf("http://%s:%d", strings.Split(nodeurl.Host, ":")[0], ports.NodePort)
 
 	spiloClient, err := newKubernetesSpiloClient(config)
