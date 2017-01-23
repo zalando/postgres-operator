@@ -1,11 +1,11 @@
-apiVersion: "zalan.do/v1"
-kind: "Spilo"
+apiVersion: "acid.zalan.do/v1"
+kind: Spilo
 
 metadata:
   name: testcluster
 
 spec:
-  docker_image: registry.opensource.zalan.do/acid/spilo-9.6:1.2-p5
+  docker_image: registry.opensource.zalan.do/acid/spilo-9.6:1.2-p9
   etcd_host: etcd-client.default.svc.cluster.local:2379
   volume_size: 100 # GB
   resource_cpu: 100m
