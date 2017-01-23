@@ -6,7 +6,7 @@
 
 ### Deploy etcd
 
-    $ kubectl create -f https://github.com/coreos/etcd/blob/master/hack/kubernetes-deploy/etcd.yaml
+    $ kubectl create -f https://raw.githubusercontent.com/coreos/etcd/master/hack/kubernetes-deploy/etcd.yml
 
 ##  Set your go path and put the sources so that go build finds them
 
