@@ -27,6 +27,10 @@
 
    $ glide update && glide install
 
+### Build dependencies
+
+    $ go build -i -v
+
 ### Run operator (outside kubernetes cluster)
     
     $ go run main.go
