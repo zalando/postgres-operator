@@ -1,17 +1,16 @@
 package controller
 
 import (
-	"encoding/json"
 	"log"
 	"sync"
+	"net/url"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/rest"
-    "net/url"
-	"fmt"
-    "strings"
+
+    "github.bus.zalan.do/acid/postgres-operator/pkg/etcd"
 )
 
 type SpiloOperator struct {
@@ -19,7 +18,8 @@ type SpiloOperator struct {
 
 	ClientSet  *kubernetes.Clientset
 	Client     *rest.RESTClient
-	Supervisor *SpiloSupervisor
+	Controller *SpiloController
+    EtcdClient *etcd.EtcdClient
 }
 
 func New(options Options) *SpiloOperator {
@@ -36,18 +36,20 @@ func New(options Options) *SpiloOperator {
     }
     ports := etcdService.Spec.Ports[0]
 	nodeurl, _ := url.Parse(config.Host)
-	etcdHostOutside = fmt.Sprintf("http://%s:%d", strings.Split(nodeurl.Host, ":")[0], ports.NodePort)
+	etcdHostOutside := fmt.Sprintf("http://%s:%d", strings.Split(nodeurl.Host, ":")[0], ports.NodePort)
 
 	spiloClient, err := newKubernetesSpiloClient(config)
 	if err != nil {
 		log.Fatalf("Couldn't create Spilo client: %s", err)
 	}
 
+    etcdClient := etcd.NewEctdClient(etcdHostOutside)
+
 	operator := &SpiloOperator{
 		Options:     options,
 		ClientSet:   clientSet,
 		Client:      spiloClient,
-		Supervisor:  newSupervisor(spiloClient, clientSet),
+		Controller:  newController(spiloClient, clientSet, etcdClient),
 	}
 
 	return operator
@@ -56,54 +58,7 @@ func New(options Options) *SpiloOperator {
 func (o *SpiloOperator) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	log.Printf("Spilo operator %v\n", VERSION)
 
-	go o.Supervisor.Run(stopCh, wg)
+	go o.Controller.Run(stopCh, wg)
 
 	log.Println("Started working in background")
-}
-
-// The code below is used only to work around a known problem with third-party
-// resources and ugorji. If/when these issues are resolved, the code below
-// should no longer be required.
-//
-
-func (s *Spilo) GetObjectKind() unversioned.ObjectKind {
-	return &s.TypeMeta
-}
-
-func (s *Spilo) GetObjectMeta() meta.Object {
-	return &s.Metadata
-}
-func (sl *SpiloList) GetObjectKind() unversioned.ObjectKind {
-	return &sl.TypeMeta
-}
-
-func (sl *SpiloList) GetListMeta() unversioned.List {
-	return &sl.Metadata
-}
-
-type SpiloListCopy SpiloList
-type SpiloCopy Spilo
-
-func (e *Spilo) UnmarshalJSON(data []byte) error {
-	tmp := SpiloCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := Spilo(tmp)
-	*e = tmp2
-
-	return nil
-}
-
-func (el *SpiloList) UnmarshalJSON(data []byte) error {
-	tmp := SpiloListCopy{}
-	err := json.Unmarshal(data, &tmp)
-	if err != nil {
-		return err
-	}
-	tmp2 := SpiloList(tmp)
-	*el = tmp2
-
-	return nil
 }

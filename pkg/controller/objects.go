@@ -1,14 +1,17 @@
 package controller
 
 import (
+    "log"
+
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
-	"log"
+
+    "github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 )
 
-func (z *SpiloSupervisor) CreateStatefulSet(spilo *Spilo) {
+func (z *SpiloController) CreateStatefulSet(spilo *spec.Spilo) {
 	ns := (*spilo).Metadata.Namespace
 
 	statefulSet := z.createSetFromSpilo(spilo)
@@ -21,7 +24,7 @@ func (z *SpiloSupervisor) CreateStatefulSet(spilo *Spilo) {
 	}
 }
 
-func (z *SpiloSupervisor) createSetFromSpilo(spilo *Spilo) v1beta1.StatefulSet {
+func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.StatefulSet {
 	clusterName := (*spilo).Metadata.Name
 
 	envVars := []v1.EnvVar{
@@ -166,7 +169,7 @@ func (z *SpiloSupervisor) createSetFromSpilo(spilo *Spilo) v1beta1.StatefulSet {
 	}
 }
 
-func (z *SpiloSupervisor) CreateSecrets(ns, name string) {
+func (z *SpiloController) CreateSecrets(ns, name string) {
 	secret := v1.Secret{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,
@@ -191,7 +194,7 @@ func (z *SpiloSupervisor) CreateSecrets(ns, name string) {
 	}
 }
 
-func (z *SpiloSupervisor) CreateService(ns, name string) {
+func (z *SpiloController) CreateService(ns, name string) {
 	service := v1.Service{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,
@@ -214,7 +217,7 @@ func (z *SpiloSupervisor) CreateService(ns, name string) {
 	}
 }
 
-func (z *SpiloSupervisor) CreateEndPoint(ns, name string) {
+func (z *SpiloController) CreateEndPoint(ns, name string) {
 	endPoint := v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,

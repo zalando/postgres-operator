@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
-	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
+    "github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+    "github.bus.zalan.do/acid/postgres-operator/pkg/etcd"
 )
 
 const (
@@ -34,38 +35,39 @@ type podWatcher struct {
 	subscribe     bool
 }
 
-type SpiloSupervisor struct {
-	podEvents   chan podEvent
-	podWatchers chan podWatcher
-	SpiloClient *rest.RESTClient
-	Clientset   *kubernetes.Clientset
+type SpiloController struct {
+	podEvents     chan podEvent
+	podWatchers   chan podWatcher
+	SpiloClient   *rest.RESTClient
+	Clientset     *kubernetes.Clientset
+    etcdApiClient *etcd.EtcdClient
 
 	spiloInformer cache.SharedIndexInformer
 	podInformer   cache.SharedIndexInformer
-	etcdApiClient etcdclient.KeysAPI
 }
 
 func podsListWatch(client *kubernetes.Clientset) *cache.ListWatch {
-	return cache.NewListWatchFromClient(client.Core().RESTClient(), "pods", api.NamespaceAll, fields.Everything())
+	return cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "pods", api.NamespaceAll, fields.Everything())
 }
 
-func newSupervisor(spiloClient *rest.RESTClient, clientset *kubernetes.Clientset) *SpiloSupervisor {
-	spiloSupervisor := &SpiloSupervisor{
-		SpiloClient: spiloClient,
-		Clientset:   clientset,
+func newController(spiloClient *rest.RESTClient, clientset *kubernetes.Clientset, etcdClient *etcd.EtcdClient) *SpiloController {
+	spiloController := &SpiloController{
+		SpiloClient:   spiloClient,
+		Clientset:     clientset,
+        etcdApiClient: etcdClient,
 	}
 
 	spiloInformer := cache.NewSharedIndexInformer(
 		cache.NewListWatchFromClient(spiloClient, "spilos", api.NamespaceAll, fields.Everything()),
-		&Spilo{},
+		&spec.Spilo{},
 		resyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	spiloInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    spiloSupervisor.spiloAdd,
-		UpdateFunc: spiloSupervisor.spiloUpdate,
-		DeleteFunc: spiloSupervisor.spiloDelete,
+		AddFunc:    spiloController.spiloAdd,
+		UpdateFunc: spiloController.spiloUpdate,
+		DeleteFunc: spiloController.spiloDelete,
 	})
 
 	podInformer := cache.NewSharedIndexInformer(
@@ -76,32 +78,20 @@ func newSupervisor(spiloClient *rest.RESTClient, clientset *kubernetes.Clientset
 	)
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    spiloSupervisor.podAdd,
-		UpdateFunc: spiloSupervisor.podUpdate,
-		DeleteFunc: spiloSupervisor.podDelete,
+		AddFunc:    spiloController.podAdd,
+		UpdateFunc: spiloController.podUpdate,
+		DeleteFunc: spiloController.podDelete,
 	})
 
-	spiloSupervisor.spiloInformer = spiloInformer
-	spiloSupervisor.podInformer = podInformer
+	spiloController.spiloInformer = spiloInformer
+	spiloController.podInformer = podInformer
 
-	cfg := etcdclient.Config{
-		Endpoints:               []string{etcdHostOutside},
-		Transport:               etcdclient.DefaultTransport,
-		HeaderTimeoutPerRequest: time.Second,
-	}
+	spiloController.podEvents = make(chan podEvent)
 
-	c, err := etcdclient.New(cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	spiloSupervisor.etcdApiClient = etcdclient.NewKeysAPI(c)
-	spiloSupervisor.podEvents = make(chan podEvent)
-
-	return spiloSupervisor
+	return spiloController
 }
 
-func (d *SpiloSupervisor) podAdd(obj interface{}) {
+func (d *SpiloController) podAdd(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	d.podEvents <- podEvent{
 		namespace:  pod.Namespace,
@@ -110,7 +100,7 @@ func (d *SpiloSupervisor) podAdd(obj interface{}) {
 	}
 }
 
-func (d *SpiloSupervisor) podDelete(obj interface{}) {
+func (d *SpiloController) podDelete(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	d.podEvents <- podEvent{
 		namespace:  pod.Namespace,
@@ -119,7 +109,7 @@ func (d *SpiloSupervisor) podDelete(obj interface{}) {
 	}
 }
 
-func (d *SpiloSupervisor) podUpdate(old, cur interface{}) {
+func (d *SpiloController) podUpdate(old, cur interface{}) {
 	oldPod := old.(*v1.Pod)
 	d.podEvents <- podEvent{
 		namespace:  oldPod.Namespace,
@@ -128,7 +118,7 @@ func (d *SpiloSupervisor) podUpdate(old, cur interface{}) {
 	}
 }
 
-func (z *SpiloSupervisor) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+func (z *SpiloController) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	wg.Add(1)
 
@@ -143,8 +133,8 @@ func (z *SpiloSupervisor) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	<-stopCh
 }
 
-func (z *SpiloSupervisor) spiloAdd(obj interface{}) {
-	spilo := obj.(*Spilo)
+func (z *SpiloController) spiloAdd(obj interface{}) {
+	spilo := obj.(*spec.Spilo)
 
 	clusterName := (*spilo).Metadata.Name
 	ns := (*spilo).Metadata.Namespace
@@ -156,9 +146,9 @@ func (z *SpiloSupervisor) spiloAdd(obj interface{}) {
 	z.CreateStatefulSet(spilo)
 }
 
-func (z *SpiloSupervisor) spiloUpdate(old, cur interface{}) {
-	oldSpilo := old.(*Spilo)
-	curSpilo := cur.(*Spilo)
+func (z *SpiloController) spiloUpdate(old, cur interface{}) {
+	oldSpilo := old.(*spec.Spilo)
+	curSpilo := cur.(*spec.Spilo)
 
 	if oldSpilo.Spec.NumberOfInstances != curSpilo.Spec.NumberOfInstances {
 		z.UpdateStatefulSet(curSpilo)
@@ -175,8 +165,8 @@ func (z *SpiloSupervisor) spiloUpdate(old, cur interface{}) {
 	log.Printf("Update spilo old: %+v\ncurrent: %+v", *oldSpilo, *curSpilo)
 }
 
-func (z *SpiloSupervisor) spiloDelete(obj interface{}) {
-	spilo := obj.(*Spilo)
+func (z *SpiloController) spiloDelete(obj interface{}) {
+	spilo := obj.(*spec.Spilo)
 
 	err := z.DeleteStatefulSet(spilo.Metadata.Namespace, spilo.Metadata.Name)
 	if err != nil {
@@ -184,7 +174,7 @@ func (z *SpiloSupervisor) spiloDelete(obj interface{}) {
 	}
 }
 
-func (z *SpiloSupervisor) DeleteStatefulSet(ns, clusterName string) error {
+func (z *SpiloController) DeleteStatefulSet(ns, clusterName string) error {
 	orphanDependents := false
 	deleteOptions := v1.DeleteOptions{
 		OrphanDependents: &orphanDependents,
@@ -231,12 +221,12 @@ func (z *SpiloSupervisor) DeleteStatefulSet(ns, clusterName string) error {
 		log.Printf("Service %s.%s has been deleted\n", service.Namespace, service.Name)
 	}
 
-	z.DeleteEtcdKey(clusterName)
+    z.etcdApiClient.DeleteEtcdKey(clusterName)
 
 	return nil
 }
 
-func (z *SpiloSupervisor) UpdateStatefulSet(spilo *Spilo) {
+func (z *SpiloController) UpdateStatefulSet(spilo *spec.Spilo) {
 	ns := (*spilo).Metadata.Namespace
 
 	statefulSet := z.createSetFromSpilo(spilo)
@@ -247,7 +237,7 @@ func (z *SpiloSupervisor) UpdateStatefulSet(spilo *Spilo) {
 	}
 }
 
-func (z *SpiloSupervisor) UpdateStatefulSetImage(spilo *Spilo) {
+func (z *SpiloController) UpdateStatefulSetImage(spilo *spec.Spilo) {
 	ns := (*spilo).Metadata.Namespace
 
 	z.UpdateStatefulSet(spilo)
@@ -313,7 +303,7 @@ func (z *SpiloSupervisor) UpdateStatefulSetImage(spilo *Spilo) {
 	}
 }
 
-func (z *SpiloSupervisor) podWatcher(stopCh <-chan struct{}) {
+func (z *SpiloController) podWatcher(stopCh <-chan struct{}) {
 	//TODO: mind the namespace of the pod
 
 	watchers := make(map[string] podWatcher)

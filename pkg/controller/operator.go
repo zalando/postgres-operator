@@ -17,47 +17,18 @@ import (
 	"k8s.io/client-go/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+    "github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 )
 
 var (
-	etcdHostOutside string
-
 	VENDOR       = "acid.zalan.do"
 	VERSION      = "0.0.1.dev"
 	resyncPeriod = 5 * time.Minute
-
-	etcdKeyTemplate = "/service/%s"
 )
 
 type Options struct {
-	KubeConfig string
-}
-
-type Pgconf struct {
-	Parameter string `json:"param"`
-	Value     string `json:"value"`
-}
-
-type SpiloSpec struct {
-	EtcdHost              string   `json:"etcd_host"`
-	VolumeSize            int      `json:"volume_size"`
-	NumberOfInstances     int32    `json:"number_of_instances"`
-	DockerImage           string   `json:"docker_image"`
-	PostgresConfiguration []Pgconf `json:"postgres_configuration"`
-	ResourceCPU           string   `json:"resource_cpu"`
-	ResourceMemory        string   `json:"resource_memory"`
-}
-
-type Spilo struct {
-	unversioned.TypeMeta `json:",inline"`
-	Metadata             api.ObjectMeta `json:"metadata"`
-	Spec                 SpiloSpec      `json:"spec"`
-}
-
-type SpiloList struct {
-	unversioned.TypeMeta `json:",inline"`
-	Metadata             unversioned.ListMeta `json:"metadata"`
-	Items                []Spilo              `json:"items"`
+    KubeConfig string
 }
 
 func KubernetesConfig(options Options) *rest.Config {
@@ -69,8 +40,6 @@ func KubernetesConfig(options Options) *rest.Config {
 	}
 
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig()
-
-	etcdHostOutside = config.Host
 
 	if err != nil {
 		log.Fatalf("Couldn't get Kubernetes default config: %s", err)
@@ -91,8 +60,8 @@ func newKubernetesSpiloClient(c *rest.Config) (*rest.RESTClient, error) {
 		func(scheme *runtime.Scheme) error {
 			scheme.AddKnownTypes(
 				*c.GroupVersion,
-				&Spilo{},
-				&SpiloList{},
+				&spec.Spilo{},
+				&spec.SpiloList{},
 				&api.ListOptions{},
 				&api.DeleteOptions{},
 			)
