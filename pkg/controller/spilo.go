@@ -23,26 +23,26 @@ type SpiloOperator struct {
 }
 
 
-func getEtcdServiceName(cls *kubernetes.Clientset, config *rest.Config, isInCluster bool) (etcdServiceName string) {
+func getEtcdServiceName(cls *kubernetes.Clientset, config *rest.Config, outOfCluster bool) (etcdServiceName string) {
 	etcdService, _ := cls.Services("default").Get("etcd-client")
-	if isInCluster {
-		if len(etcdService.Spec.Ports) != 1 {
-			log.Fatal("Can't find Etcd service named 'etcd-client'")
-		}
-		etcdServiceName = fmt.Sprintf("%s.%s.svc.cluster.local", etcdService.Name, etcdService.Namespace)
-	} else {
+	if outOfCluster {
 		ports := etcdService.Spec.Ports[0]
 		if ports.NodePort == 0 {
 			log.Fatal("Etcd port is not exposed\nHint: add NodePort to your Etcd service")
 		}
 		nodeurl, _ := url.Parse(config.Host)
 		etcdServiceName = fmt.Sprintf("http://%s:%d", strings.Split(nodeurl.Host, ":")[0], ports.NodePort)
+	} else {
+		if len(etcdService.Spec.Ports) != 1 {
+			log.Fatal("Can't find Etcd service named 'etcd-client'")
+		}
+		etcdServiceName = fmt.Sprintf("%s.%s.svc.cluster.local", etcdService.Name, etcdService.Namespace)
 	}
 	return
 }
 
 func New(options Options) *SpiloOperator {
-	config, isInCluster := KubernetesConfig(options)
+	config := KubernetesConfig(options)
 
 	spiloClient, err := newKubernetesSpiloClient(config)
 	if err != nil {
@@ -54,7 +54,7 @@ func New(options Options) *SpiloOperator {
 		log.Fatalf("Couldn't create Kubernetes client: %s", err)
 	}
 
-	etcdClient := etcd.NewEctdClient(getEtcdServiceName(clientSet, config, isInCluster))
+	etcdClient := etcd.NewEctdClient(getEtcdServiceName(clientSet, config, options.OutOfCluster))
 
 	operator := &SpiloOperator{
 		Options:     options,

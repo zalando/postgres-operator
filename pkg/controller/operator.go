@@ -28,13 +28,13 @@ var (
 )
 
 type Options struct {
-    KubeConfig string
+    KubeConfig    string
+    OutOfCluster  bool
 }
 
-func KubernetesConfig(options Options) (config *rest.Config, isInCluster bool) {
+func KubernetesConfig(options Options) (config *rest.Config) {
 	var err     error
-	isInCluster = (options.KubeConfig == "")
-	if !isInCluster {
+	if options.OutOfCluster {
 		/* out-of-cluster process */
 		rules := clientcmd.NewDefaultClientConfigLoadingRules()
 		overrides := &clientcmd.ConfigOverrides{}

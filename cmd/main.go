@@ -16,6 +16,7 @@ var options controller.Options
 
 func init() {
 	pflag.StringVar(&options.KubeConfig, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
+	pflag.BoolVar(&options.OutOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
 }
 
 func main() {
