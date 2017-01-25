@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: postgres-operator
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: postgres-operator
+    spec:
+      containers:
+      - name: postgres-operator
+        image: postgres-operator:0.1
+        env:
+        - name: MY_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace

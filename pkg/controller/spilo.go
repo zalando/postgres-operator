@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-    "github.bus.zalan.do/acid/postgres-operator/pkg/etcd"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/etcd"
 )
 
 type SpiloOperator struct {
@@ -19,36 +19,42 @@ type SpiloOperator struct {
 	ClientSet  *kubernetes.Clientset
 	Client     *rest.RESTClient
 	Controller *SpiloController
-    EtcdClient *etcd.EtcdClient
+	EtcdClient *etcd.EtcdClient
+}
+
+
+func getEtcdServiceName(cls *kubernetes.Clientset, config *rest.Config, is_in_cluster bool) (etcdServiceName string) {
+	etcdService, _ := cls.Services("default").Get("etcd-client")
+	if is_in_cluster {
+		if len(etcdService.Spec.Ports) != 1 {
+			log.Fatal("Can't find Etcd service named 'etcd-client'")
+		}
+		etcdServiceName = fmt.Sprintf("%s.%s.svc.cluster.local", etcdService.Name, etcdService.Namespace)
+	} else {
+		ports := etcdService.Spec.Ports[0]
+		if ports.NodePort == 0 {
+			log.Fatal("Etcd port is not exposed\nHint: add NodePort to your Etcd service")
+		}
+		nodeurl, _ := url.Parse(config.Host)
+		etcdServiceName = fmt.Sprintf("http://%s:%d", strings.Split(nodeurl.Host, ":")[0], ports.NodePort)
+	}
+	return
 }
 
 func New(options Options) *SpiloOperator {
-	config := KubernetesConfig(options)
-
-	clientSet, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatalf("Couldn't create Kubernetes client: %s", err)
-	}
-
-    etcdService, _ := clientSet.Services("default").Get("etcd-client")
-    if len(etcdService.Spec.Ports) != 1 {
-        log.Fatalln("Can't find Etcd cluster")
-    }
-    ports := etcdService.Spec.Ports[0]
-	nodeurl, _ := url.Parse(config.Host)
-
-    if ports.NodePort == 0 {
-        log.Fatalln("Etcd port is not exposed")
-    }
-
-	etcdHostOutside := fmt.Sprintf("http://%s:%d", strings.Split(nodeurl.Host, ":")[0], ports.NodePort)
+	config, is_in_cluster := KubernetesConfig(options)
 
 	spiloClient, err := newKubernetesSpiloClient(config)
 	if err != nil {
 		log.Fatalf("Couldn't create Spilo client: %s", err)
 	}
 
-    etcdClient := etcd.NewEctdClient(etcdHostOutside)
+	clientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("Couldn't create Kubernetes client: %s", err)
+	}
+
+	etcdClient := etcd.NewEctdClient(getEtcdServiceName(clientSet, config, is_in_cluster))
 
 	operator := &SpiloOperator{
 		Options:     options,

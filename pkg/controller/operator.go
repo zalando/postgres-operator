@@ -31,21 +31,23 @@ type Options struct {
     KubeConfig string
 }
 
-func KubernetesConfig(options Options) *rest.Config {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	overrides := &clientcmd.ConfigOverrides{}
-
-	if options.KubeConfig != "" {
+func KubernetesConfig(options Options) (config *rest.Config, is_in_cluster bool) {
+	var err     error
+	is_in_cluster = (options.KubeConfig == "")
+	if !is_in_cluster {
+		/* out-of-cluster process */
+		rules := clientcmd.NewDefaultClientConfigLoadingRules()
+		overrides := &clientcmd.ConfigOverrides{}
 		rules.ExplicitPath = options.KubeConfig
+		config, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig()
+	} else {
+		/* in-cluster pod */
+		config, err = rest.InClusterConfig()
 	}
-
-	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig()
-
 	if err != nil {
 		log.Fatalf("Couldn't get Kubernetes default config: %s", err)
 	}
-
-	return config
+	return
 }
 
 func newKubernetesSpiloClient(c *rest.Config) (*rest.RESTClient, error) {
