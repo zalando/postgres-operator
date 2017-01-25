@@ -23,9 +23,9 @@ type SpiloOperator struct {
 }
 
 
-func getEtcdServiceName(cls *kubernetes.Clientset, config *rest.Config, is_in_cluster bool) (etcdServiceName string) {
+func getEtcdServiceName(cls *kubernetes.Clientset, config *rest.Config, isInCluster bool) (etcdServiceName string) {
 	etcdService, _ := cls.Services("default").Get("etcd-client")
-	if is_in_cluster {
+	if isInCluster {
 		if len(etcdService.Spec.Ports) != 1 {
 			log.Fatal("Can't find Etcd service named 'etcd-client'")
 		}
@@ -42,7 +42,7 @@ func getEtcdServiceName(cls *kubernetes.Clientset, config *rest.Config, is_in_cl
 }
 
 func New(options Options) *SpiloOperator {
-	config, is_in_cluster := KubernetesConfig(options)
+	config, isInCluster := KubernetesConfig(options)
 
 	spiloClient, err := newKubernetesSpiloClient(config)
 	if err != nil {
@@ -54,7 +54,7 @@ func New(options Options) *SpiloOperator {
 		log.Fatalf("Couldn't create Kubernetes client: %s", err)
 	}
 
-	etcdClient := etcd.NewEctdClient(getEtcdServiceName(clientSet, config, is_in_cluster))
+	etcdClient := etcd.NewEctdClient(getEtcdServiceName(clientSet, config, isInCluster))
 
 	operator := &SpiloOperator{
 		Options:     options,
