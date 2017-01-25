@@ -12,8 +12,3 @@ spec:
       containers:
       - name: postgres-operator
         image: postgres-operator:0.1
-        env:
-        - name: MY_POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
