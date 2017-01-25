@@ -31,10 +31,10 @@ type Options struct {
     KubeConfig string
 }
 
-func KubernetesConfig(options Options) (config *rest.Config, is_in_cluster bool) {
+func KubernetesConfig(options Options) (config *rest.Config, isInCluster bool) {
 	var err     error
-	is_in_cluster = (options.KubeConfig == "")
-	if !is_in_cluster {
+	isInCluster = (options.KubeConfig == "")
+	if !isInCluster {
 		/* out-of-cluster process */
 		rules := clientcmd.NewDefaultClientConfigLoadingRules()
 		overrides := &clientcmd.ConfigOverrides{}
