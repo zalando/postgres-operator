@@ -30,7 +30,7 @@ build/linux/${BINARY}: ${SOURCES}
 build/macos/${BINARY}: ${SOURCES}
 	GOOS=darwin GOARCH=amd64 go build -o $@ ${BUILD_FLAGS} $^
 
-docker: ${DOCKERFILE} scm-source.json linux
+docker: ${DOCKERFILE} clean scm-source.json linux
 	docker build --rm -t "$(IMAGE):$(TAG)" -f $< .
 
 push:
