@@ -15,7 +15,7 @@ IMAGE ?= pierone.example.com/acid/$(BINARY)
 default: local
 
 clean:
-	rm -rf build
+	rm -rf build scm-source.json
 
 local: build/${BINARY}
 linux: build/linux/${BINARY}
