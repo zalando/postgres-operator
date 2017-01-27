@@ -1,5 +1,8 @@
 FROM alpine
-ADD postgres-operator /usr/local/bin
+MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
 
-CMD ["/usr/local/bin/postgres-operator"] 
+ADD build/linux/postgres-operator /postgres-operator
+ADD scm-source.json /
+
+ENTRYPOINT ["/postres-operator"]
 
