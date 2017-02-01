@@ -1,5 +1,5 @@
-hash: c45b505f8cf3c9b967a7244e0a675ae11c158d0168496bed18a43270e2cebfe9
-updated: 2017-01-09T11:28:31.075588565+01:00
+hash: 19831a9408f172d009617c781ea65141606a216aa8e238797e102c511f4afb1f
+updated: 2017-01-27T13:24:40.647376238+01:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -9,7 +9,7 @@ imports:
 - name: github.com/blang/semver
   version: 31b736133b98f26d5e078ec9eb591666edfd091f
 - name: github.com/coreos/etcd
-  version: 3d5ba43211beec7fbb1472634a9c3b464581658a
+  version: 8ba2897a21e4fc51b298ca553d251318425f93ae
   subpackages:
   - client
   - pkg/pathutil
@@ -25,7 +25,6 @@ imports:
 - name: github.com/coreos/pkg
   version: fa29b1d70f0beaddd4c7021607cc3c3be8ce94b8
   subpackages:
-  - capnslog
   - health
   - httputil
   - timeutil
@@ -54,16 +53,15 @@ imports:
 - name: github.com/go-openapi/swag
   version: 1d0bd113de87027671077d3c71eb3ac5d7dbba72
 - name: github.com/gogo/protobuf
-  version: 8d70fb3182befc465c4a1eac8ad4d38ff49778e2
+  version: e18d7aa8f8c624c915db340349aad4c49b10d173
   subpackages:
   - proto
   - sortkeys
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/golang/protobuf
-  version: 4bd1920723d7b7c925de087aa32e2187708897f7
+  version: 8616e8ee5e20a1704615e6c8d7afcdac06087a67
   subpackages:
-  - jsonpb
   - proto
 - name: github.com/google/gofuzz
   version: bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5
@@ -72,7 +70,7 @@ imports:
 - name: github.com/imdario/mergo
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/jonboulle/clockwork
-  version: 2eee05ed794112d45db504eb05aa693efd2b8b09
+  version: 72f9bd7c4e0c2a40055ab3d0f09654f730cce982
 - name: github.com/mailru/easyjson
   version: d5b7844b561a7bc640052f1b935f7b800330d7e0
   subpackages:
@@ -92,19 +90,18 @@ imports:
   subpackages:
   - codec
 - name: golang.org/x/crypto
-  version: 1351f936d976c60a0a48d728281922cf63eafb8d
+  version: 1f22c0103821b9390939b6776727195525381532
   subpackages:
-  - bcrypt
-  - blowfish
   - ssh/terminal
 - name: golang.org/x/net
-  version: 6acef71eb69611914f7a30939ea9f6e194c78172
+  version: e90d6d0afc4c315a0d87a568ae68577cc15149a0
   subpackages:
   - context
   - context/ctxhttp
   - http2
   - http2/hpack
   - idna
+  - lex/httplex
 - name: golang.org/x/oauth2
   version: 3c3a985cb79f52a3190fbc056984415ca6763d01
   subpackages:

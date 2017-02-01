@@ -67,8 +67,6 @@ func New(options Options) *SpiloOperator {
 }
 
 func (o *SpiloOperator) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
-	log.Printf("Spilo operator %v\n", VERSION)
-
 	go o.Controller.Run(stopCh, wg)
 
 	log.Println("Started working in background")

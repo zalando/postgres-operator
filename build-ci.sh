@@ -9,5 +9,4 @@ mkdir -p "$team_repo"
 ln -s "$PWD" "$project_dir"
 cd "$project_dir"
 
-glide install
-make clean docker push
+make deps clean docker push

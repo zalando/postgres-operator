@@ -13,27 +13,25 @@
     $ export GOPATH=~/git/go
     $ mkdir -p ${GOPATH}/src/github.bus.zalan.do/acid/
     $ cd ${GOPATH}/src/github.bus.zalan.do/acid/ && git clone https://github.bus.zalan.do/acid/postgres-operator -b prototype
-    
-### Install Glide on OS X
 
-    $ brew install glide
+### Install Glide and Staticcheck
 
-### Install Glide on Ubuntu
-
-    # sudo add-apt-repository ppa:masterminds/glide && sudo apt-get update
-    # sudo apt-get install glide
+    $ make tools 
 
 ### Install dependencies with Glide
 
-   $ glide update && glide install
+    $ make deps
 
 ### Build dependencies
 
     $ go build -i -v cmd
 
-### Run operator (outside kubernetes cluster)
-    
-    $ go run cmd/main.go
+## Run operator (as a pod)
+
+    $ docker build -t postgres-operator:0.1 .
+    $ kubectl create -f postgres-operator.yaml
+
+    If you are building docker image by yourself on OS X make sure postgres-operator is compiled with GOOS=linux flag
     
 ### Check if ThirdPartyResource has been registered
 
@@ -45,7 +43,7 @@
 
 ### Create a new spilo cluster
 
-    $ kubectl create -f testcluster.yaml
+    $ kubectl create -f manifests/testspilo.yaml
     
 ### Watch Pods being created
 

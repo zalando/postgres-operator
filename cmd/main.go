@@ -13,6 +13,7 @@ import (
 )
 
 var options controller.Options
+var version string
 
 func init() {
 	pflag.StringVar(&options.KubeConfig, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
@@ -22,6 +23,7 @@ func init() {
 func main() {
 	// Set logging output to standard console out
 	log.SetOutput(os.Stdout)
+	log.Printf("Spilo operator %s\n", version)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
@@ -32,8 +34,8 @@ func main() {
 
 	wg := &sync.WaitGroup{} // Goroutines can add themselves to this to be waited on
 
-	spiloOperator := controller.New(options)
-	spiloOperator.Run(stop, wg)
+	c := controller.New(options)
+	c.Run(stop, wg)
 
 	sig := <-sigs // Wait for signals (this hangs until a signal arrives)
 	log.Printf("Shutting down... %+v", sig)
