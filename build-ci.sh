@@ -10,4 +10,4 @@ ln -s $PWD $project_dir
 cd $project_dir
 
 glide install
-make docker push
+make scm-source.json linux
