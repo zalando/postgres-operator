@@ -2,7 +2,7 @@
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -i
-DOCKERFILE = Dockerfile
+DOCKERFILE = docker/Dockerfile
 IMAGE ?= pierone.example.com/acid/$(BINARY)
 TAG ?= $(VERSION)
 GITHEAD = $(shell git rev-parse --short HEAD)
@@ -30,8 +30,12 @@ build/linux/${BINARY}: ${SOURCES}
 build/macos/${BINARY}: ${SOURCES}
 	GOOS=darwin GOARCH=amd64 go build -o $@ ${BUILD_FLAGS} $^
 
-docker: ${DOCKERFILE} scm-source.json linux
-	docker build --rm -t "$(IMAGE):$(TAG)" -f $< .
+docker-context: scm-source.json linux
+	mkdir -p docker/build/
+	cp build/linux/${BINARY} scm-source.json docker/build/
+
+docker: ${DOCKERFILE} docker-context
+	cd docker && docker build --rm -t "$(IMAGE):$(TAG)" .
 
 push:
 	docker push "$(IMAGE):$(TAG)"
