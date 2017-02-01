@@ -19,6 +19,9 @@ IMAGE ?= pierone.example.com/acid/$(BINARY)
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
 
+PATH := $(GOPATH)/bin:$(PATH)
+SHELL := env PATH=$(PATH) $(SHELL)
+
 default: local
 
 clean:
@@ -59,7 +62,7 @@ fmt:
 
 vet:
 	@go vet $(PKG)
-	@$(GOPATH)/bin/staticcheck $(PKG)
+	@staticcheck $(PKG)
 
 deps:
-	@$(GOPATH)/bin/glide install
+	@glide install
