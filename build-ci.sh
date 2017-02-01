@@ -6,7 +6,7 @@ project_dir=$team_repo/postgres-operator
 
 mkdir -p $team_repo
 
-ln -s $project_dir $PWD
+ln -s $PWD $project_dir
 cd $project_dir
 
 glade install
