@@ -5,7 +5,8 @@ ifeq ($(RACE),1)
 endif
 
 BINARY ?= postgres-operator
-BUILD_FLAGS ?= -i -v
+BUILD_FLAGS ?= -v
+LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS) -i
 LDFLAGS ?= -X=main.version=$(VERSION)
 DOCKERFILE = docker/Dockerfile
 IMAGE ?= pierone.example.com/acid/$(BINARY)
@@ -32,10 +33,10 @@ linux: build/linux/${BINARY}
 macos: build/macos/${BINARY}
 
 build/${BINARY}: ${SOURCES}
-	go build -o $@ $(BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
+	go build -o $@ $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
 
 build/linux/${BINARY}: ${SOURCES}
-	GOOS=linux GOARCH=amd64 go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
 
 build/macos/${BINARY}: ${SOURCES}
 	GOOS=darwin GOARCH=amd64 go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
