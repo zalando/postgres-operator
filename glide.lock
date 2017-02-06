@@ -1,5 +1,5 @@
-hash: 19831a9408f172d009617c781ea65141606a216aa8e238797e102c511f4afb1f
-updated: 2017-01-27T13:24:40.647376238+01:00
+hash: 1ffee26a74225c382e3b5503ef187c46d5132732c3da5bb25909ad40409d197d
+updated: 2017-02-03T12:58:01.868568623+01:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -8,12 +8,6 @@ imports:
   - internal
 - name: github.com/blang/semver
   version: 31b736133b98f26d5e078ec9eb591666edfd091f
-- name: github.com/coreos/etcd
-  version: 8ba2897a21e4fc51b298ca553d251318425f93ae
-  subpackages:
-  - client
-  - pkg/pathutil
-  - pkg/types
 - name: github.com/coreos/go-oidc
   version: 5644a2f50e2d2d5ba0b474bc5bc55fea1925936d
   subpackages:
@@ -83,6 +77,8 @@ imports:
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
+- name: github.com/Sirupsen/logrus
+  version: d26492970760ca5d33129d2d799e34be5c4782eb
 - name: github.com/spf13/pflag
   version: 5ccb023bc27df288a957c5e994cd44fd19619465
 - name: github.com/ugorji/go

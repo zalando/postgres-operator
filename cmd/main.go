@@ -9,24 +9,50 @@ import (
 	"syscall"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/controller"
-	"github.com/spf13/pflag"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 )
 
-var options controller.Options
-var version string
+var (
+	KubeConfigFile string
+	Namespace      string
+	OutOfCluster   bool
+	version        string
+)
 
 func init() {
-	pflag.StringVar(&options.KubeConfig, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
-	pflag.BoolVar(&options.OutOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
+	flag.StringVar(&KubeConfigFile, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
+	flag.BoolVar(&OutOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
+	flag.Parse()
+
+	Namespace = os.Getenv("MY_POD_NAMESPACE")
+	if len(Namespace) == 0 {
+		Namespace = "default"
+	}
+}
+
+func ControllerConfig() *controller.Config {
+	restConfig, err := k8sutil.RestConfig(KubeConfigFile, OutOfCluster)
+	if err != nil {
+		log.Fatalf("Can't get REST config: %s", err)
+	}
+
+	client, err := k8sutil.KubernetesClient(restConfig)
+	if err != nil {
+		log.Fatalf("Can't create client: %s", err)
+	}
+
+	restClient, err := k8sutil.KubernetesRestClient(restConfig)
+
+	return &controller.Config{
+		Namespace:  Namespace,
+		KubeClient: client,
+		RestClient: restClient,
+	}
 }
 
 func main() {
-	// Set logging output to standard console out
 	log.SetOutput(os.Stdout)
 	log.Printf("Spilo operator %s\n", version)
-
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
 
 	sigs := make(chan os.Signal, 1)
 	stop := make(chan struct{})
@@ -34,10 +60,12 @@ func main() {
 
 	wg := &sync.WaitGroup{} // Goroutines can add themselves to this to be waited on
 
-	c := controller.New(options)
+	cfg := ControllerConfig()
+
+	c := controller.New(cfg)
 	c.Run(stop, wg)
 
-	sig := <-sigs // Wait for signals (this hangs until a signal arrives)
+	sig := <-sigs
 	log.Printf("Shutting down... %+v", sig)
 
 	close(stop) // Tell goroutines to stop themselves

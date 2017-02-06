@@ -36,14 +36,14 @@
 ### Check if ThirdPartyResource has been registered
 
     $ kubectl get thirdpartyresources
-    
-    NAME                  DESCRIPTION                             VERSION(S)
-    spilo.acid.zalan.do   A specification of Spilo StatefulSets   v1
-    
+
+    NAME                       DESCRIPTION                   VERSION(S)
+    postgresql.acid.zalan.do   Managed PostgreSQL clusters   v1
+
 
 ### Create a new spilo cluster
 
-    $ kubectl create -f manifests/testspilo.yaml
+    $ kubectl create -f manifests/testpostgresql.yaml
     
 ### Watch Pods being created
 

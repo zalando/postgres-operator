@@ -1,31 +1,16 @@
-package controller
+package cluster
 
 import (
-    "log"
-
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
 
-    "github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 )
 
-func (z *SpiloController) CreateStatefulSet(spilo *spec.Spilo) {
-	ns := (*spilo).Metadata.Namespace
-
-	statefulSet := z.createSetFromSpilo(spilo)
-
-	_, err := z.Clientset.StatefulSets(ns).Create(&statefulSet)
-	if err != nil {
-		log.Printf("Petset error: %+v", err)
-	} else {
-		log.Printf("Petset created: %+v", statefulSet)
-	}
-}
-
-func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.StatefulSet {
-	clusterName := (*spilo).Metadata.Name
+func (c *Cluster) createStatefulSet() {
+	clusterName := (*c.cluster).Metadata.Name
 
 	envVars := []v1.EnvVar{
 		{
@@ -38,7 +23,7 @@ func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.Stateful
 		},
 		{
 			Name:  "ETCD_HOST",
-			Value: spilo.Spec.EtcdHost,
+			Value: c.etcdHost,
 		},
 		{
 			Name: "POD_IP",
@@ -65,7 +50,7 @@ func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.Stateful
 					LocalObjectReference: v1.LocalObjectReference{
 						Name: clusterName,
 					},
-					Key: "superuser-password",
+					Key: secretUserKey("superuser"),
 				},
 			},
 		},
@@ -76,7 +61,7 @@ func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.Stateful
 					LocalObjectReference: v1.LocalObjectReference{
 						Name: clusterName,
 					},
-					Key: "admin-password",
+					Key: secretUserKey("admin"),
 				},
 			},
 		},
@@ -87,7 +72,7 @@ func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.Stateful
 					LocalObjectReference: v1.LocalObjectReference{
 						Name: clusterName,
 					},
-					Key: "replication-password",
+					Key: secretUserKey("replication"),
 				},
 			},
 		},
@@ -95,17 +80,17 @@ func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.Stateful
 
 	resourceList := v1.ResourceList{}
 
-	if (*spilo).Spec.ResourceCPU != "" {
-		resourceList[v1.ResourceCPU] = resource.MustParse((*spilo).Spec.ResourceCPU)
+	if cpu := (*c.cluster).Spec.Resources.Cpu; cpu != "" {
+		resourceList[v1.ResourceCPU] = resource.MustParse(cpu)
 	}
 
-	if (*spilo).Spec.ResourceMemory != "" {
-		resourceList[v1.ResourceMemory] = resource.MustParse((*spilo).Spec.ResourceMemory)
+	if memory := (*c.cluster).Spec.Resources.Memory; memory != "" {
+		resourceList[v1.ResourceMemory] = resource.MustParse(memory)
 	}
 
 	container := v1.Container{
 		Name:            clusterName,
-		Image:           spilo.Spec.DockerImage,
+		Image:           c.dockerImage,
 		ImagePullPolicy: v1.PullAlways,
 		Resources: v1.ResourceRequirements{
 			Requests: resourceList,
@@ -123,7 +108,7 @@ func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.Stateful
 		VolumeMounts: []v1.VolumeMount{
 			{
 				Name:      "pgdata",
-				MountPath: "/home/postgres/pgdata",
+				MountPath: "/home/postgres/pgdata", //TODO: fetch from manifesto
 			},
 		},
 		Env: envVars,
@@ -153,7 +138,7 @@ func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.Stateful
 		Spec: podSpec,
 	}
 
-	return v1beta1.StatefulSet{
+	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: v1.ObjectMeta{
 			Name: clusterName,
 			Labels: map[string]string{
@@ -162,45 +147,67 @@ func (z *SpiloController) createSetFromSpilo(spilo *spec.Spilo) v1beta1.Stateful
 			},
 		},
 		Spec: v1beta1.StatefulSetSpec{
-			Replicas:    &spilo.Spec.NumberOfInstances,
+			Replicas:    &c.cluster.Spec.NumberOfInstances,
 			ServiceName: clusterName,
 			Template:    template,
 		},
 	}
+
+	c.config.KubeClient.StatefulSets(c.config.Namespace).Create(statefulSet)
 }
 
-func (z *SpiloController) CreateSecrets(ns, name string) {
+func (c *Cluster) applySecrets() {
+	clusterName := (*c.cluster).Metadata.Name
+	secrets := make(map[string][]byte, len(c.pgUsers))
+	for _, user := range c.pgUsers {
+		secrets[user.secretKey] = user.password
+	}
+
 	secret := v1.Secret{
 		ObjectMeta: v1.ObjectMeta{
-			Name: name,
+			Name: clusterName,
 			Labels: map[string]string{
 				"application":   "spilo",
-				"spilo-cluster": name,
+				"spilo-cluster": clusterName,
 			},
 		},
 		Type: v1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"superuser-password":   []byte("emFsYW5kbw=="),
-			"replication-password": []byte("cmVwLXBhc3M="),
-			"admin-password":       []byte("YWRtaW4="),
-		},
+		Data: secrets,
 	}
 
-	_, err := z.Clientset.Secrets(ns).Create(&secret)
-	if err != nil {
-		log.Printf("Secret error: %+v", err)
+	_, err := c.config.KubeClient.Secrets(c.config.Namespace).Get(clusterName)
+
+	//TODO: possible race condition (as well as while creating the other objects)
+	if !k8sutil.ResourceNotFound(err) {
+		_, err = c.config.KubeClient.Secrets(c.config.Namespace).Update(&secret)
 	} else {
-		log.Printf("Secret created: %+v", secret)
+		_, err = c.config.KubeClient.Secrets(c.config.Namespace).Create(&secret)
 	}
+
+	if err != nil {
+		c.logger.Errorf("Error while creating or updating secret: %+v", err)
+	} else {
+		c.logger.Infof("Secret created: %+v", secret)
+	}
+
+	//TODO: remove secrets of the deleted users
 }
 
-func (z *SpiloController) CreateService(ns, name string) {
+func (c *Cluster) createService() {
+	clusterName := (*c.cluster).Metadata.Name
+
+	_, err := c.config.KubeClient.Services(c.config.Namespace).Get(clusterName)
+	if !k8sutil.ResourceNotFound(err) {
+		c.logger.Infof("Service '%s' already exists", clusterName)
+		return
+	}
+
 	service := v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name: name,
+			Name: clusterName,
 			Labels: map[string]string{
 				"application":   "spilo",
-				"spilo-cluster": name,
+				"spilo-cluster": clusterName,
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -209,29 +216,37 @@ func (z *SpiloController) CreateService(ns, name string) {
 		},
 	}
 
-	_, err := z.Clientset.Services(ns).Create(&service)
+	_, err = c.config.KubeClient.Services(c.config.Namespace).Create(&service)
 	if err != nil {
-		log.Printf("Service error: %+v", err)
+		c.logger.Errorf("Error while creating service: %+v", err)
 	} else {
-		log.Printf("Service created: %+v", service)
+		c.logger.Infof("Service created: %+v", service)
 	}
 }
 
-func (z *SpiloController) CreateEndPoint(ns, name string) {
+func (c *Cluster) createEndPoint() {
+	clusterName := (*c.cluster).Metadata.Name
+
+	_, err := c.config.KubeClient.Endpoints(c.config.Namespace).Get(clusterName)
+	if !k8sutil.ResourceNotFound(err) {
+		c.logger.Infof("Endpoint '%s' already exists", clusterName)
+		return
+	}
+
 	endPoint := v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
-			Name: name,
+			Name: clusterName,
 			Labels: map[string]string{
 				"application":   "spilo",
-				"spilo-cluster": name,
+				"spilo-cluster": clusterName,
 			},
 		},
 	}
 
-	_, err := z.Clientset.Endpoints(ns).Create(&endPoint)
+	_, err = c.config.KubeClient.Endpoints(c.config.Namespace).Create(&endPoint)
 	if err != nil {
-		log.Printf("Endpoint error: %+v", err)
+		c.logger.Errorf("Error while creating endpoint: %+v", err)
 	} else {
-		log.Printf("Endpoint created: %+v", endPoint)
+		c.logger.Infof("Endpoint created: %+v", endPoint)
 	}
 }
