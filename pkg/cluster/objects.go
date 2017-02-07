@@ -48,20 +48,9 @@ func (c *Cluster) createStatefulSet() {
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: clusterName,
+						Name: c.credentialSecretName("superuser"),
 					},
-					Key: secretUserKey("superuser"),
-				},
-			},
-		},
-		{
-			Name: "PGPASSWORD_ADMIN",
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: clusterName,
-					},
-					Key: secretUserKey("admin"),
+					Key: "password",
 				},
 			},
 		},
@@ -70,9 +59,9 @@ func (c *Cluster) createStatefulSet() {
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: clusterName,
+						Name: c.credentialSecretName("replication"),
 					},
-					Key: secretUserKey("replication"),
+					Key: "password",
 				},
 			},
 		},
@@ -129,10 +118,7 @@ func (c *Cluster) createStatefulSet() {
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: v1.ObjectMeta{
-			Labels: map[string]string{
-				"application":   "spilo",
-				"spilo-cluster": clusterName,
-			},
+			Labels:      c.labels(),
 			Annotations: map[string]string{"pod.alpha.kubernetes.io/initialized": "true"},
 		},
 		Spec: podSpec,
@@ -140,11 +126,8 @@ func (c *Cluster) createStatefulSet() {
 
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: v1.ObjectMeta{
-			Name: clusterName,
-			Labels: map[string]string{
-				"application":   "spilo",
-				"spilo-cluster": clusterName,
-			},
+			Name:   clusterName,
+			Labels: c.labels(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:    &c.cluster.Spec.NumberOfInstances,
@@ -157,37 +140,34 @@ func (c *Cluster) createStatefulSet() {
 }
 
 func (c *Cluster) applySecrets() {
-	clusterName := (*c.cluster).Metadata.Name
-	secrets := make(map[string][]byte, len(c.pgUsers))
+	var err error
 	for _, user := range c.pgUsers {
-		secrets[user.secretKey] = user.password
-	}
-
-	secret := v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name: clusterName,
-			Labels: map[string]string{
-				"application":   "spilo",
-				"spilo-cluster": clusterName,
+		secret := v1.Secret{
+			ObjectMeta: v1.ObjectMeta{
+				Name:   c.credentialSecretName(string(user.username)),
+				Labels: c.labels(),
 			},
-		},
-		Type: v1.SecretTypeOpaque,
-		Data: secrets,
-	}
-
-	_, err := c.config.KubeClient.Secrets(c.config.Namespace).Get(clusterName)
-
-	//TODO: possible race condition (as well as while creating the other objects)
-	if !k8sutil.ResourceNotFound(err) {
-		_, err = c.config.KubeClient.Secrets(c.config.Namespace).Update(&secret)
-	} else {
+			Type: v1.SecretTypeOpaque,
+			Data: map[string][]byte{
+				"username": user.username,
+				"password": user.password,
+			},
+		}
 		_, err = c.config.KubeClient.Secrets(c.config.Namespace).Create(&secret)
-	}
-
-	if err != nil {
-		c.logger.Errorf("Error while creating or updating secret: %+v", err)
-	} else {
-		c.logger.Infof("Secret created: %+v", secret)
+		if k8sutil.IsKubernetesResourceAlreadyExistError(err) {
+			_, err = c.config.KubeClient.Secrets(c.config.Namespace).Update(&secret)
+			if err != nil {
+				c.logger.Errorf("Error while updating secret: %+v", err)
+			} else {
+				c.logger.Infof("Secret updated: %+v", secret)
+			}
+		} else {
+			if err != nil {
+				c.logger.Errorf("Error while creating secret: %+v", err)
+			} else {
+				c.logger.Infof("Secret created: %+v", secret)
+			}
+		}
 	}
 
 	//TODO: remove secrets of the deleted users
@@ -204,11 +184,8 @@ func (c *Cluster) createService() {
 
 	service := v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name: clusterName,
-			Labels: map[string]string{
-				"application":   "spilo",
-				"spilo-cluster": clusterName,
-			},
+			Name:   clusterName,
+			Labels: c.labels(),
 		},
 		Spec: v1.ServiceSpec{
 			Type:  v1.ServiceTypeClusterIP,
@@ -235,11 +212,8 @@ func (c *Cluster) createEndPoint() {
 
 	endPoint := v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
-			Name: clusterName,
-			Labels: map[string]string{
-				"application":   "spilo",
-				"spilo-cluster": clusterName,
-			},
+			Name:   clusterName,
+			Labels: c.labels(),
 		},
 	}
 

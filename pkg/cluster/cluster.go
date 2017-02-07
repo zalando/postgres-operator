@@ -15,7 +15,7 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
-var patroniUsers = []string{"superuser", "replication", "admin"}
+var patroniUsers = []string{"superuser", "replication"}
 
 //TODO: remove struct duplication
 type Config struct {
@@ -34,10 +34,9 @@ type Cluster struct {
 }
 
 type pgUser struct {
-	username string
-	secretKey string
+	username []byte
 	password []byte
-	flags []string
+	flags    []string
 }
 
 func New(cfg Config, spec *spec.Postgresql) *Cluster {
@@ -58,15 +57,26 @@ func New(cfg Config, spec *spec.Postgresql) *Cluster {
 	return cluster
 }
 
-func secretUserKey(userName string) string {
-	return fmt.Sprintf("%s-password", userName)
+func (c *Cluster) labels() map[string]string {
+	return map[string]string{
+		"application":   "spilo",
+		"spilo-cluster": (*c.cluster).Metadata.Name,
+	}
+}
+
+func (c *Cluster) credentialSecretName(userName string) string {
+	return fmt.Sprintf(
+		"%s.%s.credentials.%s.%s",
+		userName,
+		(*c.cluster).Metadata.Name,
+		constants.TPRName,
+		constants.TPRVendor)
 }
 
 func (c *Cluster) init() {
 	for _, userName := range patroniUsers {
 		user := pgUser{
-			username: userName,
-			secretKey: secretUserKey(userName),
+			username: []byte(userName),
 			password: util.RandomPasswordBytes(constants.PasswordLength),
 		}
 		c.pgUsers = append(c.pgUsers, user)
@@ -74,12 +84,11 @@ func (c *Cluster) init() {
 
 	for userName, userFlags := range (*c.cluster.Spec).Users {
 		user := pgUser{
-			username: userName,
-			secretKey: secretUserKey(userName),
+			username: []byte(userName),
 			password: util.RandomPasswordBytes(constants.PasswordLength),
-			flags: userFlags,
+			flags:    userFlags,
 		}
-	 	c.pgUsers = append(c.pgUsers, user)
+		c.pgUsers = append(c.pgUsers, user)
 	}
 }
 
@@ -145,9 +154,19 @@ func (c *Cluster) Delete() error {
 		c.logger.Infof("Service %s.%s has been deleted\n", service.Namespace, service.Name)
 	}
 
-	err = kubeClient.Secrets(nameSpace).Delete(clusterName, deleteOptions)
+	secretsList, err := kubeClient.Secrets(nameSpace).List(listOptions)
 	if err != nil {
-		c.logger.Errorf("Error while deleting Secret %s: %+v", clusterName, err)
+		return err
+	}
+	for _, secret := range secretsList.Items {
+		err = kubeClient.Secrets(nameSpace).Delete(secret.Name, deleteOptions)
+		if err != nil {
+			c.logger.Errorf("Error while deleting Secret %s: %+v", secret.Name, err)
+
+			return err
+		}
+
+		c.logger.Infof("Secret %s.%s has been deleted\n", secret.Namespace, secret.Name)
 	}
 
 	//TODO: delete key from etcd

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*=")
+var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$^&*=")
 
 func init() {
 	rand.Seed(int64(time.Now().Unix()))
