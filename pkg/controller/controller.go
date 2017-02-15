@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	v1beta1extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
@@ -22,16 +23,18 @@ type Config struct {
 	Namespace  string
 	KubeClient *kubernetes.Clientset
 	RestClient *rest.RESTClient
+	EtcdClient etcdclient.KeysAPI
 }
 
 type Controller struct {
-	Config
+	config Config
 
-	logger             *logrus.Entry
-	events             chan *Event
-	clusters           map[string]*cluster.Cluster
-	stopChMap          map[string]chan struct{}
-	waitCluster        sync.WaitGroup
+	logger      *logrus.Entry
+	events      chan *Event
+	clusters    map[string]*cluster.Cluster
+	stopChMap   map[string]chan struct{}
+	waitCluster sync.WaitGroup
+
 	postgresqlInformer cache.SharedIndexInformer
 }
 
@@ -42,10 +45,10 @@ type Event struct {
 
 func New(cfg *Config) *Controller {
 	return &Controller{
-		Config:    *cfg,
+		config:    *cfg,
 		logger:    logrus.WithField("pkg", "controller"),
 		clusters:  make(map[string]*cluster.Cluster),
-		stopChMap: map[string]chan struct{}{},
+		stopChMap: make(map[string]chan struct{}),
 	}
 }
 
@@ -54,21 +57,20 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	wg.Add(1)
 
 	c.initController()
+	err := c.initEtcdClient()
+	if err != nil {
+		c.logger.Errorf("Can't get etcd client: %s", err)
+
+		return
+	}
 
 	go c.watchTpr(stopCh)
-	go c.watchTprEvents(stopCh)
 
 	c.logger.Info("Started working in background")
 }
 
 func (c *Controller) watchTpr(stopCh <-chan struct{}) {
 	go c.postgresqlInformer.Run(stopCh)
-
-	<-stopCh
-}
-
-func (c *Controller) watchTprEvents(stopCh <-chan struct{}) {
-	//fmt.Println("Watching tpr events")
 
 	<-stopCh
 }
@@ -84,26 +86,29 @@ func (c *Controller) createTPR() error {
 		Description: constants.TPRDescription,
 	}
 
-	_, err := c.KubeClient.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
+	_, err := c.config.KubeClient.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
 
 	if err != nil {
 		if !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 			return err
 		} else {
-			c.logger.Info("ThirdPartyResource already registered")
+			c.logger.Info("ThirdPartyResource is already registered")
 		}
+	} else {
+		c.logger.Info("ThirdPartyResource has been registered")
 	}
 
-	restClient := c.RestClient
+	restClient := c.config.RestClient
 
-	return k8sutil.WaitTPRReady(restClient, constants.TPRReadyWaitInterval, constants.TPRReadyWaitTimeout, c.Namespace)
+	return k8sutil.WaitTPRReady(restClient, constants.TPRReadyWaitInterval, constants.TPRReadyWaitTimeout, c.config.Namespace)
 }
 
 func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
-		Namespace:  c.Namespace,
-		KubeClient: c.KubeClient,
-		RestClient: c.RestClient,
+		Namespace:  c.config.Namespace,
+		KubeClient: c.config.KubeClient,
+		RestClient: c.config.RestClient,
+		EtcdClient: c.config.EtcdClient,
 	}
 }
 
@@ -114,7 +119,7 @@ func (c *Controller) initController() {
 	}
 
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(c.RestClient, constants.ResourceName, v1.NamespaceAll, fields.Everything()),
+		cache.NewListWatchFromClient(c.config.RestClient, constants.ResourceName, v1.NamespaceAll, fields.Everything()),
 		&spec.Postgresql{},
 		constants.ResyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
@@ -129,14 +134,23 @@ func (c *Controller) initController() {
 func (c *Controller) clusterAdd(obj interface{}) {
 	pg := obj.(*spec.Postgresql)
 
+	//TODO: why do we need to have this check
 	if pg.Spec == nil {
 		return
 	}
 
-	cluster := cluster.New(c.makeClusterConfig(), pg)
-	cluster.Create()
+	clusterName := (*pg).Metadata.Name
 
-	c.logger.Infof("Add: %+v", cluster)
+	cl := cluster.New(c.makeClusterConfig(), pg)
+	err := cl.Create()
+	if err != nil {
+		c.logger.Errorf("Can't create cluster: %s", err)
+		return
+	}
+	c.stopChMap[clusterName] = make(chan struct{})
+	c.clusters[clusterName] = cl
+
+	c.logger.Infof("Postgresql cluster %s.%s has been created", clusterName, (*pg).Metadata.Namespace)
 }
 
 func (c *Controller) clusterUpdate(prev, cur interface{}) {
@@ -146,8 +160,11 @@ func (c *Controller) clusterUpdate(prev, cur interface{}) {
 	if pgPrev.Spec == nil || pgCur.Spec == nil {
 		return
 	}
+	if pgPrev.Metadata.ResourceVersion == pgCur.Metadata.ResourceVersion {
+		return
+	}
 
-	c.logger.Infof("Update: %+v -> %+v", *pgPrev.Spec, *pgCur.Spec)
+	c.logger.Infof("Update: %+v -> %+v", *pgPrev, *pgCur)
 }
 
 func (c *Controller) clusterDelete(obj interface{}) {
@@ -155,9 +172,17 @@ func (c *Controller) clusterDelete(obj interface{}) {
 	if pg.Spec == nil {
 		return
 	}
+	clusterName := (*pg).Metadata.Name
 
 	cluster := cluster.New(c.makeClusterConfig(), pg)
-	cluster.Delete()
+	err := cluster.Delete()
+	if err != nil {
+		c.logger.Errorf("Can't delete cluster '%s.%s': %s", clusterName, (*pg).Metadata.Namespace, err)
+		return
+	}
 
-	c.logger.Infof("Delete: %+v", *pg.Spec)
+	close(c.stopChMap[clusterName])
+	delete(c.clusters, clusterName)
+
+	c.logger.Infof("Cluster delete: %s", (*pg).Metadata.Name)
 }

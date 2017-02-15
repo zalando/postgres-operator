@@ -50,9 +50,12 @@ type PostgresSpec struct {
 	PostgresqlParam `json:"postgresql"`
 	Volume          `json:"volume,omitempty"`
 
-	NumberOfInstances  int32                `json:"numberOfInstances"`
-	Users              map[string]UserFlags `json:"users"`
-	MaintenanceWindows []string             `json:"maintenanceWindows,omitempty"`
+	TeamId              string               `json:"teamId"`
+	AllowedSourceRanges []string             `json:"allowedSourceRanges"`
+	NumberOfInstances   int32                `json:"numberOfInstances"`
+	Users               map[string]UserFlags `json:"users"`
+	MaintenanceWindows  []string             `json:"maintenanceWindows,omitempty"`
+	PamUsersSecret      string               `json:"pamUsersSecret",omitempty`
 
 	EtcdHost    string
 	DockerImage string

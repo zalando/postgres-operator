@@ -6,8 +6,23 @@ import (
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
 
+	"fmt"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"strings"
 )
+
+var createUserSQL = `DO $$
+BEGIN
+    SET local synchronous_commit = 'local';
+    PERFORM * FROM pg_authid WHERE rolname = '%s';
+    IF FOUND THEN
+        ALTER ROLE "%s" WITH %s PASSWORD '%s';
+    ELSE
+        CREATE ROLE "%s" WITH %s PASSWORD '%s';
+    END IF;
+END;
+$$`
 
 func (c *Cluster) createStatefulSet() {
 	clusterName := (*c.cluster).Metadata.Name
@@ -65,6 +80,24 @@ func (c *Cluster) createStatefulSet() {
 				},
 			},
 		},
+		{
+			Name:  "PAM_OAUTH2",                                                                                 //TODO: get from the operator tpr spec
+			Value: "https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees", //space before uid is obligatory
+		},
+		{
+			Name: "SPILO_CONFIGURATION", //TODO: get from the operator tpr spec
+			Value: fmt.Sprintf(`
+postgresql:
+  bin_dir: /usr/lib/postgresql/%s/bin
+bootstrap:
+  initdb:
+  - auth-host: md5
+  - auth-local: trust
+  pg_hba:
+  - hostnossl all all all reject
+  - hostssl   all +%s all pam
+  - hostssl   all all all md5`, (*c.cluster.Spec).Version, constants.PamRoleName),
+		},
 	}
 
 	resourceList := v1.ResourceList{}
@@ -118,7 +151,7 @@ func (c *Cluster) createStatefulSet() {
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: v1.ObjectMeta{
-			Labels:      c.labels(),
+			Labels:      c.labelsSet(),
 			Annotations: map[string]string{"pod.alpha.kubernetes.io/initialized": "true"},
 		},
 		Spec: podSpec,
@@ -127,7 +160,7 @@ func (c *Cluster) createStatefulSet() {
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: v1.ObjectMeta{
 			Name:   clusterName,
-			Labels: c.labels(),
+			Labels: c.labelsSet(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:    &c.cluster.Spec.NumberOfInstances,
@@ -140,32 +173,46 @@ func (c *Cluster) createStatefulSet() {
 }
 
 func (c *Cluster) applySecrets() {
+	//TODO: do not override current secrets
+
 	var err error
-	for _, user := range c.pgUsers {
+	for userName, pgUser := range c.pgUsers {
 		secret := v1.Secret{
 			ObjectMeta: v1.ObjectMeta{
-				Name:   c.credentialSecretName(string(user.username)),
-				Labels: c.labels(),
+				Name:   c.credentialSecretName(userName),
+				Labels: c.labelsSet(),
 			},
 			Type: v1.SecretTypeOpaque,
 			Data: map[string][]byte{
-				"username": user.username,
-				"password": user.password,
+				"username": []byte(pgUser.name),
+				"password": []byte(pgUser.password),
 			},
 		}
 		_, err = c.config.KubeClient.Secrets(c.config.Namespace).Create(&secret)
 		if k8sutil.IsKubernetesResourceAlreadyExistError(err) {
-			_, err = c.config.KubeClient.Secrets(c.config.Namespace).Update(&secret)
+			c.logger.Infof("Skipping update of '%s'", secret.Name)
+
+			curSecrets, err := c.config.KubeClient.Secrets(c.config.Namespace).Get(c.credentialSecretName(userName))
 			if err != nil {
-				c.logger.Errorf("Error while updating secret: %+v", err)
-			} else {
-				c.logger.Infof("Secret updated: %+v", secret)
+				c.logger.Errorf("Can't get current secret: %s", err)
 			}
+			user := pgUser
+			user.password = string(curSecrets.Data["password"])
+			c.pgUsers[userName] = user
+			c.logger.Infof("Password fetched for user '%s' from the secrets", userName)
+
+			continue
+			//_, err = c.config.KubeClient.Secrets(c.config.Namespace).Update(&secret)
+			//if err != nil {
+			//	c.logger.Errorf("Error while updating secret: %+v", err)
+			//} else {
+			//	c.logger.Infof("Secret updated: %+v", secret)
+			//}
 		} else {
 			if err != nil {
 				c.logger.Errorf("Error while creating secret: %+v", err)
 			} else {
-				c.logger.Infof("Secret created: %+v", secret)
+				c.logger.Infof("Secret created: %s", secret.Name)
 			}
 		}
 	}
@@ -185,11 +232,12 @@ func (c *Cluster) createService() {
 	service := v1.Service{
 		ObjectMeta: v1.ObjectMeta{
 			Name:   clusterName,
-			Labels: c.labels(),
+			Labels: c.labelsSet(),
 		},
 		Spec: v1.ServiceSpec{
-			Type:  v1.ServiceTypeClusterIP,
+			Type:  v1.ServiceTypeLoadBalancer,
 			Ports: []v1.ServicePort{{Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			LoadBalancerSourceRanges: (*c.cluster).Spec.AllowedSourceRanges,
 		},
 	}
 
@@ -197,7 +245,7 @@ func (c *Cluster) createService() {
 	if err != nil {
 		c.logger.Errorf("Error while creating service: %+v", err)
 	} else {
-		c.logger.Infof("Service created: %+v", service)
+		c.logger.Infof("Service created: %s", service.Name)
 	}
 }
 
@@ -213,7 +261,7 @@ func (c *Cluster) createEndPoint() {
 	endPoint := v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
 			Name:   clusterName,
-			Labels: c.labels(),
+			Labels: c.labelsSet(),
 		},
 	}
 
@@ -221,6 +269,43 @@ func (c *Cluster) createEndPoint() {
 	if err != nil {
 		c.logger.Errorf("Error while creating endpoint: %+v", err)
 	} else {
-		c.logger.Infof("Endpoint created: %+v", endPoint)
+		c.logger.Infof("Endpoint created: %s", endPoint.Name)
 	}
+}
+
+func (c *Cluster) createUser(user pgUser) {
+	var userType string
+	var flags []string = user.flags
+
+	if user.password == "" {
+		userType = "human"
+		flags = append(flags, fmt.Sprintf("IN ROLE '%s'", constants.PamRoleName))
+	} else {
+		userType = "app"
+	}
+
+	userFlags := strings.Join(flags, " ")
+	query := fmt.Sprintf(createUserSQL,
+		user.name,
+		user.name, userFlags, user.password,
+		user.name, userFlags, user.password)
+
+	_, err := c.pgDb.Query(query)
+	if err != nil {
+		c.logger.Errorf("Can't create %s user '%s': %s", user.name, err)
+	} else {
+		c.logger.Infof("%s user '%s' with flags %s has been created", userType, user.name, flags)
+	}
+}
+
+func (c *Cluster) createUsers() error {
+	for userName, user := range c.pgUsers {
+		if userName == superUsername || userName == replicationUsername {
+			continue
+		}
+
+		c.createUser(user)
+	}
+
+	return nil
 }
