@@ -1,20 +1,29 @@
 package: github.bus.zalan.do/acid/postgres-operator
 import:
 - package: github.com/Sirupsen/logrus
-  version: ^0.11.0
+  version: ^0.11.2
+- package: github.com/coreos/etcd
+  version: ^3.1.0
+  subpackages:
+  - client
+- package: github.com/lib/pq
 - package: k8s.io/client-go
-  version: ^2.0.0-alpha.1
+  version: ^2.0.0
   subpackages:
   - kubernetes
   - pkg/api
   - pkg/api/errors
   - pkg/api/meta
+  - pkg/api/resource
   - pkg/api/unversioned
   - pkg/api/v1
+  - pkg/apis/apps/v1beta1
   - pkg/apis/extensions/v1beta1
   - pkg/fields
+  - pkg/labels
   - pkg/runtime
   - pkg/runtime/serializer
+  - pkg/util/intstr
   - rest
   - tools/cache
   - tools/clientcmd
