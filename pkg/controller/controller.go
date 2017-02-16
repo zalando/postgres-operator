@@ -15,20 +15,22 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/cluster"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
 type Config struct {
-	Namespace  string
-	KubeClient *kubernetes.Clientset
-	RestClient *rest.RESTClient
-	EtcdClient etcdclient.KeysAPI
+	Namespace      string
+	KubeClient     *kubernetes.Clientset
+	RestClient     *rest.RESTClient
+	EtcdClient     etcdclient.KeysAPI
+	TeamsAPIClient *teams.TeamsAPI
 }
 
 type Controller struct {
-	config Config
-
+	config      Config
 	logger      *logrus.Entry
 	events      chan *Event
 	clusters    map[string]*cluster.Cluster
@@ -60,7 +62,6 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	err := c.initEtcdClient()
 	if err != nil {
 		c.logger.Errorf("Can't get etcd client: %s", err)
-
 		return
 	}
 
@@ -76,9 +77,10 @@ func (c *Controller) watchTpr(stopCh <-chan struct{}) {
 }
 
 func (c *Controller) createTPR() error {
+	TPRName := fmt.Sprintf("%s.%s", constants.TPRName, constants.TPRVendor)
 	tpr := &v1beta1extensions.ThirdPartyResource{
 		ObjectMeta: v1.ObjectMeta{
-			Name: fmt.Sprintf("%s.%s", constants.TPRName, constants.TPRVendor),
+			Name: TPRName,
 		},
 		Versions: []v1beta1extensions.APIVersion{
 			{Name: constants.TPRApiVersion},
@@ -87,15 +89,14 @@ func (c *Controller) createTPR() error {
 	}
 
 	_, err := c.config.KubeClient.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
-
 	if err != nil {
 		if !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 			return err
 		} else {
-			c.logger.Info("ThirdPartyResource is already registered")
+			c.logger.Infof("ThirdPartyResource '%s' is already registered", TPRName)
 		}
 	} else {
-		c.logger.Info("ThirdPartyResource has been registered")
+		c.logger.Infof("ThirdPartyResource '%s' has been registered", TPRName)
 	}
 
 	restClient := c.config.RestClient
@@ -105,10 +106,11 @@ func (c *Controller) createTPR() error {
 
 func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
-		Namespace:  c.config.Namespace,
-		KubeClient: c.config.KubeClient,
-		RestClient: c.config.RestClient,
-		EtcdClient: c.config.EtcdClient,
+		Namespace:      c.config.Namespace,
+		KubeClient:     c.config.KubeClient,
+		RestClient:     c.config.RestClient,
+		EtcdClient:     c.config.EtcdClient,
+		TeamsAPIClient: c.config.TeamsAPIClient,
 	}
 }
 
@@ -150,7 +152,7 @@ func (c *Controller) clusterAdd(obj interface{}) {
 	c.stopChMap[clusterName] = make(chan struct{})
 	c.clusters[clusterName] = cl
 
-	c.logger.Infof("Postgresql cluster %s.%s has been created", clusterName, (*pg).Metadata.Namespace)
+	c.logger.Infof("Postgresql cluster '%s' has been created", util.FullObjectNameFromMeta((*pg).Metadata))
 }
 
 func (c *Controller) clusterUpdate(prev, cur interface{}) {
@@ -177,12 +179,12 @@ func (c *Controller) clusterDelete(obj interface{}) {
 	cluster := cluster.New(c.makeClusterConfig(), pg)
 	err := cluster.Delete()
 	if err != nil {
-		c.logger.Errorf("Can't delete cluster '%s.%s': %s", clusterName, (*pg).Metadata.Namespace, err)
+		c.logger.Errorf("Can't delete cluster '%s': %s", util.FullObjectNameFromMeta((*pg).Metadata), err)
 		return
 	}
 
 	close(c.stopChMap[clusterName])
 	delete(c.clusters, clusterName)
 
-	c.logger.Infof("Cluster delete: %s", (*pg).Metadata.Name)
+	c.logger.Infof("Cluster has been deleted: '%s'", util.FullObjectNameFromMeta((*pg).Metadata))
 }

@@ -21,10 +21,11 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/retryutil"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
 var (
-	superUsername       = "superuser"
+	superuserName       = "postgres"
 	replicationUsername = "replication"
 
 	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z0-9]*$")
@@ -32,10 +33,11 @@ var (
 
 //TODO: remove struct duplication
 type Config struct {
-	Namespace  string
-	KubeClient *kubernetes.Clientset //TODO: move clients to the better place?
-	RestClient *rest.RESTClient
-	EtcdClient etcdclient.KeysAPI
+	Namespace      string
+	KubeClient     *kubernetes.Clientset //TODO: move clients to the better place?
+	RestClient     *rest.RESTClient
+	EtcdClient     etcdclient.KeysAPI
+	TeamsAPIClient *teams.TeamsAPI
 }
 
 type pgUser struct {
@@ -45,15 +47,15 @@ type pgUser struct {
 }
 
 type Cluster struct {
-	logger      *logrus.Entry
 	config      Config
+	logger      *logrus.Entry
 	etcdHost    string
 	dockerImage string
 	cluster     *spec.Postgresql
 	pgUsers     map[string]pgUser
 
-	pgDb        *sql.DB
-	mu          sync.Mutex
+	pgDb *sql.DB
+	mu   sync.Mutex
 }
 
 func New(cfg Config, spec *spec.Postgresql) *Cluster {
@@ -71,6 +73,37 @@ func New(cfg Config, spec *spec.Postgresql) *Cluster {
 	return cluster
 }
 
+func (c *Cluster) getReadonlyToken() (string, error) {
+	credentialsSecret, err := c.config.KubeClient.Secrets(c.config.Namespace).Get("postgresql-operator")
+
+	if err != nil {
+		return "", fmt.Errorf("Can't get credentials secret: %s", err)
+	}
+	data := credentialsSecret.Data
+
+	if string(data["read-only-token-type"]) != "Bearer" {
+		return "", fmt.Errorf("Wrong token type: %s", data["read-only-token-type"])
+	}
+
+	return string(data["read-only-token-secret"]), nil
+
+}
+
+func (c *Cluster) getTeamMembers() ([]string, error) {
+	token, err := c.getReadonlyToken()
+	if err != nil {
+		return nil, fmt.Errorf("Can't get oauth token: %s", err)
+	}
+
+	c.config.TeamsAPIClient.OauthToken = token
+	teamInfo, err := c.config.TeamsAPIClient.TeamInfo((*c.cluster.Spec).TeamId)
+	if err != nil {
+		return nil, fmt.Errorf("Can't get team info: %s", err)
+	}
+
+	return teamInfo.Members, nil
+}
+
 func (c *Cluster) labelsSet() labels.Set {
 	return labels.Set{
 		"application":   "spilo",
@@ -78,10 +111,10 @@ func (c *Cluster) labelsSet() labels.Set {
 	}
 }
 
-func (c *Cluster) credentialSecretName(userName string) string {
+func (c *Cluster) credentialSecretName(username string) string {
 	return fmt.Sprintf(
 		"%s.%s.credentials.%s.%s",
-		userName,
+		username,
 		(*c.cluster).Metadata.Name,
 		constants.TPRName,
 		constants.TPRVendor)
@@ -91,7 +124,7 @@ func isValidUsername(username string) bool {
 	return alphaNumericRegexp.MatchString(username)
 }
 
-func validateUserFlags(userFlags []string) (flags []string, err error) {
+func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 	uniqueFlags := make(map[string]bool)
 
 	for _, flag := range userFlags {
@@ -106,10 +139,6 @@ func validateUserFlags(userFlags []string) (flags []string, err error) {
 		}
 	}
 
-	if _, ok := uniqueFlags["NOLOGIN"]; !ok {
-		uniqueFlags["LOGIN"] = true
-	}
-
 	flags = []string{}
 	for k := range uniqueFlags {
 		flags = append(flags, k)
@@ -122,8 +151,8 @@ func (c *Cluster) init() {
 	users := (*c.cluster.Spec).Users
 	c.pgUsers = make(map[string]pgUser, len(users)+2) // + [superuser and replication]
 
-	c.pgUsers[superUsername] = pgUser{
-		name:     superUsername,
+	c.pgUsers[superuserName] = pgUser{
+		name:     superuserName,
 		password: util.RandomPassword(constants.PasswordLength),
 	}
 
@@ -132,27 +161,35 @@ func (c *Cluster) init() {
 		password: util.RandomPassword(constants.PasswordLength),
 	}
 
-	for userName, userFlags := range users {
-		if !isValidUsername(userName) {
-			c.logger.Warningf("Invalid '%s' username", userName)
+	for username, userFlags := range users {
+		if !isValidUsername(username) {
+			c.logger.Warningf("Invalid username: '%s'", username)
 			continue
 		}
 
-		flags, err := validateUserFlags(userFlags)
+		flags, err := normalizeUserFlags(userFlags)
 		if err != nil {
-			c.logger.Warningf("Invalid flags for user '%s': %s", userName, err)
+			c.logger.Warningf("Invalid flags for user '%s': %s", username, err)
 		}
 
-		c.pgUsers[userName] = pgUser{
-			name:     userName,
+		c.pgUsers[username] = pgUser{
+			name:     username,
 			password: util.RandomPassword(constants.PasswordLength),
 			flags:    flags,
 		}
 	}
+
+	teamMembers, err := c.getTeamMembers()
+	if err != nil {
+		c.logger.Errorf("Can't get list of team members: %s", err)
+	} else {
+		for _, username := range teamMembers {
+			c.pgUsers[username] = pgUser{name: username}
+		}
+	}
 }
 
-
-func (c *Cluster) waitPodsDestroy() error {
+func (c *Cluster) waitPodDelete() error {
 	ls := c.labelsSet()
 
 	listOptions := v1.ListOptions{
@@ -227,7 +264,7 @@ func (c *Cluster) waitPodLabelsReady() error {
 }
 
 func (c *Cluster) Create() error {
-	c.createEndPoint()
+	c.createEndpoint()
 	c.createService()
 	c.applySecrets()
 	c.createStatefulSet()
@@ -268,7 +305,7 @@ func (c *Cluster) waitClusterReady() error {
 
 func (c *Cluster) Delete() error {
 	clusterName := (*c.cluster).Metadata.Name
-	nameSpace := c.config.Namespace
+	namespace := c.config.Namespace
 	orphanDependents := false
 	deleteOptions := &v1.DeleteOptions{
 		OrphanDependents: &orphanDependents,
@@ -280,54 +317,54 @@ func (c *Cluster) Delete() error {
 
 	kubeClient := c.config.KubeClient
 
-	podList, err := kubeClient.Pods(nameSpace).List(listOptions)
+	podList, err := kubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get list of pods: %s", err)
 	}
 
-	err = kubeClient.StatefulSets(nameSpace).Delete(clusterName, deleteOptions)
+	err = kubeClient.StatefulSets(namespace).Delete(clusterName, deleteOptions)
 	if err != nil {
 		return fmt.Errorf("Can't delete statefulset: %s", err)
 	}
-	c.logger.Infof("StatefulSet %s.%s has been deleted", nameSpace, clusterName)
+	c.logger.Infof("Statefulset '%s' has been deleted", util.FullObjectName(namespace, clusterName))
 
 	for _, pod := range podList.Items {
-		err = kubeClient.Pods(nameSpace).Delete(pod.Name, deleteOptions)
+		err = kubeClient.Pods(namespace).Delete(pod.Name, deleteOptions)
 		if err != nil {
-			return fmt.Errorf("Error while deleting pod %s.%s: %s", pod.Name, pod.Namespace, err)
+			return fmt.Errorf("Error while deleting pod '%s': %s", util.FullObjectName(pod.Namespace, pod.Name), err)
 		}
 
-		c.logger.Infof("Pod %s.%s has been deleted", pod.Name, pod.Namespace)
+		c.logger.Infof("Pod '%s' has been deleted", util.FullObjectName(pod.Namespace, pod.Name))
 	}
 
-	serviceList, err := kubeClient.Services(nameSpace).List(listOptions)
+	serviceList, err := kubeClient.Services(namespace).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get list of the services: %s", err)
 	}
 
 	for _, service := range serviceList.Items {
-		err = kubeClient.Services(nameSpace).Delete(service.Name, deleteOptions)
+		err = kubeClient.Services(namespace).Delete(service.Name, deleteOptions)
 		if err != nil {
-			return fmt.Errorf("Can't delete service %s.%s: %s", service.Name, service.Namespace, err)
+			return fmt.Errorf("Can't delete service '%s': %s", util.FullObjectName(service.Namespace, service.Name), err)
 		}
 
-		c.logger.Infof("Service %s.%s has been deleted", service.Name, service.Namespace)
+		c.logger.Infof("Service '%s' has been deleted", util.FullObjectName(service.Namespace, service.Name))
 	}
 
-	secretsList, err := kubeClient.Secrets(nameSpace).List(listOptions)
+	secretsList, err := kubeClient.Secrets(namespace).List(listOptions)
 	if err != nil {
 		return err
 	}
 	for _, secret := range secretsList.Items {
-		err = kubeClient.Secrets(nameSpace).Delete(secret.Name, deleteOptions)
+		err = kubeClient.Secrets(namespace).Delete(secret.Name, deleteOptions)
 		if err != nil {
-			return fmt.Errorf("Can't delete secret %s.%s: %s", secret.Name, secret.Namespace, err)
+			return fmt.Errorf("Can't delete secret '%s': %s", util.FullObjectName(secret.Namespace, secret.Name), err)
 		}
 
-		c.logger.Infof("Secret %s.%s has been deleted", secret.Name, secret.Namespace)
+		c.logger.Infof("Secret '%s' has been deleted", util.FullObjectName(secret.Namespace, secret.Name))
 	}
 
-	c.waitPodsDestroy()
+	c.waitPodDelete()
 
 	etcdKey := fmt.Sprintf("/service/%s", clusterName)
 

@@ -1,8 +1,11 @@
 package util
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
+
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
@@ -18,4 +21,17 @@ func RandomPassword(n int) string {
 	}
 
 	return string(b)
+}
+
+func FullObjectNameFromMeta(meta v1.ObjectMeta) string {
+	return FullObjectName(meta.Namespace, meta.Name)
+}
+
+//TODO: Remove in favour of FullObjectNameFromMeta
+func FullObjectName(ns, name string) string {
+	if ns == "" {
+		ns = "default"
+	}
+
+	return fmt.Sprintf("%s / %s", ns, name)
 }

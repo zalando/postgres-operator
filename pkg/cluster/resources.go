@@ -1,26 +1,23 @@
 package cluster
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
 
-	"fmt"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
-	"strings"
 )
 
 var createUserSQL = `DO $$
 BEGIN
-    SET local synchronous_commit = 'local';
-    PERFORM * FROM pg_authid WHERE rolname = '%s';
-    IF FOUND THEN
-        ALTER ROLE "%s" WITH %s PASSWORD '%s';
-    ELSE
-        CREATE ROLE "%s" WITH %s PASSWORD '%s';
-    END IF;
+    SET LOCAL synchronous_commit = 'local';
+    CREATE ROLE "%s" %s PASSWORD %s;
 END;
 $$`
 
@@ -63,7 +60,7 @@ func (c *Cluster) createStatefulSet() {
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: c.credentialSecretName("superuser"),
+						Name: c.credentialSecretName(superuserName),
 					},
 					Key: "password",
 				},
@@ -74,15 +71,15 @@ func (c *Cluster) createStatefulSet() {
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: c.credentialSecretName("replication"),
+						Name: c.credentialSecretName(replicationUsername),
 					},
 					Key: "password",
 				},
 			},
 		},
 		{
-			Name:  "PAM_OAUTH2",                                                                                 //TODO: get from the operator tpr spec
-			Value: "https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees", //space before uid is obligatory
+			Name:  "PAM_OAUTH2",               //TODO: get from the operator tpr spec
+			Value: constants.PamConfiguration, //space before uid is obligatory
 		},
 		{
 			Name: "SPILO_CONFIGURATION", //TODO: get from the operator tpr spec
@@ -93,10 +90,16 @@ bootstrap:
   initdb:
   - auth-host: md5
   - auth-local: trust
+  users:
+    %s:
+      password: NULL
+      options:
+        - createdb
+        - nologin
   pg_hba:
   - hostnossl all all all reject
   - hostssl   all +%s all pam
-  - hostssl   all all all md5`, (*c.cluster.Spec).Version, constants.PamRoleName),
+  - hostssl   all all all md5`, (*c.cluster.Spec).Version, constants.PamRoleName, constants.PamRoleName),
 		},
 	}
 
@@ -169,17 +172,24 @@ bootstrap:
 		},
 	}
 
-	c.config.KubeClient.StatefulSets(c.config.Namespace).Create(statefulSet)
+	_, err := c.config.KubeClient.StatefulSets(c.config.Namespace).Create(statefulSet)
+	if err != nil {
+		c.logger.Errorf("Can't create statefulset: %s", err)
+	} else {
+		c.logger.Infof("Statefulset has been created: '%s'", util.FullObjectNameFromMeta(statefulSet.ObjectMeta))
+	}
 }
 
 func (c *Cluster) applySecrets() {
-	//TODO: do not override current secrets
-
 	var err error
-	for userName, pgUser := range c.pgUsers {
+	for username, pgUser := range c.pgUsers {
+		//Skip users with no password i.e. human users (they'll be authenticated using pam)
+		if pgUser.password == "" {
+			continue
+		}
 		secret := v1.Secret{
 			ObjectMeta: v1.ObjectMeta{
-				Name:   c.credentialSecretName(userName),
+				Name:   c.credentialSecretName(username),
 				Labels: c.labelsSet(),
 			},
 			Type: v1.SecretTypeOpaque,
@@ -192,32 +202,24 @@ func (c *Cluster) applySecrets() {
 		if k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 			c.logger.Infof("Skipping update of '%s'", secret.Name)
 
-			curSecrets, err := c.config.KubeClient.Secrets(c.config.Namespace).Get(c.credentialSecretName(userName))
+			curSecrets, err := c.config.KubeClient.Secrets(c.config.Namespace).Get(c.credentialSecretName(username))
 			if err != nil {
 				c.logger.Errorf("Can't get current secret: %s", err)
 			}
 			user := pgUser
 			user.password = string(curSecrets.Data["password"])
-			c.pgUsers[userName] = user
-			c.logger.Infof("Password fetched for user '%s' from the secrets", userName)
+			c.pgUsers[username] = user
+			c.logger.Infof("Password fetched for user '%s' from the secrets", username)
 
 			continue
-			//_, err = c.config.KubeClient.Secrets(c.config.Namespace).Update(&secret)
-			//if err != nil {
-			//	c.logger.Errorf("Error while updating secret: %+v", err)
-			//} else {
-			//	c.logger.Infof("Secret updated: %+v", secret)
-			//}
 		} else {
 			if err != nil {
-				c.logger.Errorf("Error while creating secret: %+v", err)
+				c.logger.Errorf("Error while creating secret: %s", err)
 			} else {
-				c.logger.Infof("Secret created: %s", secret.Name)
+				c.logger.Infof("Secret created: '%s'", util.FullObjectNameFromMeta(secret.ObjectMeta))
 			}
 		}
 	}
-
-	//TODO: remove secrets of the deleted users
 }
 
 func (c *Cluster) createService() {
@@ -245,11 +247,11 @@ func (c *Cluster) createService() {
 	if err != nil {
 		c.logger.Errorf("Error while creating service: %+v", err)
 	} else {
-		c.logger.Infof("Service created: %s", service.Name)
+		c.logger.Infof("Service created: '%s'", util.FullObjectNameFromMeta(service.ObjectMeta))
 	}
 }
 
-func (c *Cluster) createEndPoint() {
+func (c *Cluster) createEndpoint() {
 	clusterName := (*c.cluster).Metadata.Name
 
 	_, err := c.config.KubeClient.Endpoints(c.config.Namespace).Get(clusterName)
@@ -258,18 +260,18 @@ func (c *Cluster) createEndPoint() {
 		return
 	}
 
-	endPoint := v1.Endpoints{
+	endpoint := v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
 			Name:   clusterName,
 			Labels: c.labelsSet(),
 		},
 	}
 
-	_, err = c.config.KubeClient.Endpoints(c.config.Namespace).Create(&endPoint)
+	_, err = c.config.KubeClient.Endpoints(c.config.Namespace).Create(&endpoint)
 	if err != nil {
 		c.logger.Errorf("Error while creating endpoint: %+v", err)
 	} else {
-		c.logger.Infof("Endpoint created: %s", endPoint.Name)
+		c.logger.Infof("Endpoint created: %s", endpoint.Name)
 	}
 }
 
@@ -279,28 +281,40 @@ func (c *Cluster) createUser(user pgUser) {
 
 	if user.password == "" {
 		userType = "human"
-		flags = append(flags, fmt.Sprintf("IN ROLE '%s'", constants.PamRoleName))
+		flags = append(flags, fmt.Sprintf("IN ROLE \"%s\"", constants.PamRoleName))
 	} else {
 		userType = "app"
 	}
 
+	addLoginFlag := true
+	for _, v := range flags {
+		if v == "NOLOGIN" {
+			addLoginFlag = false
+			break
+		}
+	}
+	if addLoginFlag {
+		flags = append(flags, "LOGIN")
+	}
+
 	userFlags := strings.Join(flags, " ")
-	query := fmt.Sprintf(createUserSQL,
-		user.name,
-		user.name, userFlags, user.password,
-		user.name, userFlags, user.password)
+	userPassword := fmt.Sprintf("'%s'", user.password)
+	if user.password == "" {
+		userPassword = "NULL"
+	}
+	query := fmt.Sprintf(createUserSQL, user.name, userFlags, userPassword)
 
 	_, err := c.pgDb.Query(query)
 	if err != nil {
 		c.logger.Errorf("Can't create %s user '%s': %s", user.name, err)
 	} else {
-		c.logger.Infof("%s user '%s' with flags %s has been created", userType, user.name, flags)
+		c.logger.Infof("Created %s user '%s' with %s flags", userType, user.name, flags)
 	}
 }
 
 func (c *Cluster) createUsers() error {
-	for userName, user := range c.pgUsers {
-		if userName == superUsername || userName == replicationUsername {
+	for username, user := range c.pgUsers {
+		if username == superuserName || username == replicationUsername {
 			continue
 		}
 

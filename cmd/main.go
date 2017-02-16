@@ -9,7 +9,9 @@ import (
 	"syscall"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/controller"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
 var (
@@ -43,10 +45,12 @@ func ControllerConfig() *controller.Config {
 
 	restClient, err := k8sutil.KubernetesRestClient(restConfig)
 
+	teamsApi := teams.NewTeamsAPI(constants.TeamsAPIUrl)
 	return &controller.Config{
-		Namespace:  Namespace,
-		KubeClient: client,
-		RestClient: restClient,
+		Namespace:      Namespace,
+		KubeClient:     client,
+		RestClient:     restClient,
+		TeamsAPIClient: teamsApi,
 	}
 }
 

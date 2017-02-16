@@ -3,9 +3,9 @@ package spec
 import (
 	"encoding/json"
 
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 type MaintenanceWindow struct {
@@ -55,7 +55,7 @@ type PostgresSpec struct {
 	NumberOfInstances   int32                `json:"numberOfInstances"`
 	Users               map[string]UserFlags `json:"users"`
 	MaintenanceWindows  []string             `json:"maintenanceWindows,omitempty"`
-	PamUsersSecret      string               `json:"pamUsersSecret",omitempty`
+	PamUsersSecret      string               `json:"pamUsersSecret,omitempty"`
 
 	EtcdHost    string
 	DockerImage string
@@ -81,7 +81,7 @@ type PostgresStatus struct {
 // PostgreSQL Third Party (resource) Object
 type Postgresql struct {
 	unversioned.TypeMeta `json:",inline"`
-	Metadata             api.ObjectMeta `json:"metadata"`
+	Metadata             v1.ObjectMeta `json:"metadata"`
 
 	Spec   *PostgresSpec   `json:"spec"`
 	Status *PostgresStatus `json:"status"`

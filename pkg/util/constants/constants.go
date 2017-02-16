@@ -15,9 +15,12 @@ const (
 	ResourceName = TPRName + "s"
 	ResyncPeriod = 5 * time.Minute
 
-	EtcdHost    = "etcd-client.default.svc.cluster.local:2379" //TODO: move to the operator spec
-	SpiloImage  = "registry.opensource.zalan.do/acid/spilo-9.6:1.2-p11"
-	PamRoleName = "zalandos"
+	//TODO: move to the operator spec
+	EtcdHost         = "etcd-client.default.svc.cluster.local:2379"
+	SpiloImage       = "registry.opensource.zalan.do/acid/spilo-9.6:1.2-p12"
+	PamRoleName      = "zalandos"
+	PamConfiguration = "https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"
 
 	PasswordLength = 64
+	TeamsAPIUrl    = "https://teams.example.com/api/"
 )
