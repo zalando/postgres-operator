@@ -3,6 +3,7 @@ kind: "Postgresql"
 
 metadata:
   name: testcluster
+  namespace: acid
 
 spec:
   teamId: "50051320"

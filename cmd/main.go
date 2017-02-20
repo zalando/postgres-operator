@@ -16,7 +16,7 @@ import (
 
 var (
 	KubeConfigFile string
-	Namespace      string
+	podNamespace   string
 	OutOfCluster   bool
 	version        string
 )
@@ -26,9 +26,9 @@ func init() {
 	flag.BoolVar(&OutOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
 	flag.Parse()
 
-	Namespace = os.Getenv("MY_POD_NAMESPACE")
-	if len(Namespace) == 0 {
-		Namespace = "default"
+	podNamespace = os.Getenv("MY_POD_NAMESPACE")
+	if len(podNamespace) == 0 {
+		podNamespace = "default"
 	}
 }
 
@@ -47,7 +47,7 @@ func ControllerConfig() *controller.Config {
 
 	teamsApi := teams.NewTeamsAPI(constants.TeamsAPIUrl)
 	return &controller.Config{
-		Namespace:      Namespace,
+		PodNamespace:   podNamespace,
 		KubeClient:     client,
 		RestClient:     restClient,
 		TeamsAPIClient: teamsApi,

@@ -22,7 +22,7 @@ import (
 )
 
 type Config struct {
-	Namespace      string
+	PodNamespace   string
 	KubeClient     *kubernetes.Clientset
 	RestClient     *rest.RESTClient
 	EtcdClient     etcdclient.KeysAPI
@@ -81,6 +81,7 @@ func (c *Controller) createTPR() error {
 	tpr := &v1beta1extensions.ThirdPartyResource{
 		ObjectMeta: v1.ObjectMeta{
 			Name: TPRName,
+			//PodNamespace: c.config.PodNamespace, //ThirdPartyResources are cluster-wide
 		},
 		Versions: []v1beta1extensions.APIVersion{
 			{Name: constants.TPRApiVersion},
@@ -101,16 +102,16 @@ func (c *Controller) createTPR() error {
 
 	restClient := c.config.RestClient
 
-	return k8sutil.WaitTPRReady(restClient, constants.TPRReadyWaitInterval, constants.TPRReadyWaitTimeout, c.config.Namespace)
+	return k8sutil.WaitTPRReady(restClient, constants.TPRReadyWaitInterval, constants.TPRReadyWaitTimeout, c.config.PodNamespace)
 }
 
 func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
-		Namespace:      c.config.Namespace,
-		KubeClient:     c.config.KubeClient,
-		RestClient:     c.config.RestClient,
-		EtcdClient:     c.config.EtcdClient,
-		TeamsAPIClient: c.config.TeamsAPIClient,
+		ControllerNamespace: c.config.PodNamespace,
+		KubeClient:          c.config.KubeClient,
+		RestClient:          c.config.RestClient,
+		EtcdClient:          c.config.EtcdClient,
+		TeamsAPIClient:      c.config.TeamsAPIClient,
 	}
 }
 

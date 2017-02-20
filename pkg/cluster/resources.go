@@ -22,12 +22,12 @@ END;
 $$`
 
 func (c *Cluster) createStatefulSet() {
-	clusterName := (*c.cluster).Metadata.Name
+	meta := (*c.cluster).Metadata
 
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
-			Value: clusterName,
+			Value: meta.Name,
 		},
 		{
 			Name:  "PGROOT",
@@ -114,7 +114,7 @@ bootstrap:
 	}
 
 	container := v1.Container{
-		Name:            clusterName,
+		Name:            meta.Name,
 		Image:           c.dockerImage,
 		ImagePullPolicy: v1.PullAlways,
 		Resources: v1.ResourceRequirements{
@@ -155,6 +155,7 @@ bootstrap:
 	template := v1.PodTemplateSpec{
 		ObjectMeta: v1.ObjectMeta{
 			Labels:      c.labelsSet(),
+			Namespace:   meta.Namespace,
 			Annotations: map[string]string{"pod.alpha.kubernetes.io/initialized": "true"},
 		},
 		Spec: podSpec,
@@ -162,17 +163,18 @@ bootstrap:
 
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: v1.ObjectMeta{
-			Name:   clusterName,
-			Labels: c.labelsSet(),
+			Name:      meta.Name,
+			Namespace: meta.Namespace,
+			Labels:    c.labelsSet(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:    &c.cluster.Spec.NumberOfInstances,
-			ServiceName: clusterName,
+			ServiceName: meta.Name,
 			Template:    template,
 		},
 	}
 
-	_, err := c.config.KubeClient.StatefulSets(c.config.Namespace).Create(statefulSet)
+	_, err := c.config.KubeClient.StatefulSets(meta.Namespace).Create(statefulSet)
 	if err != nil {
 		c.logger.Errorf("Can't create statefulset: %s", err)
 	} else {
@@ -182,6 +184,7 @@ bootstrap:
 
 func (c *Cluster) applySecrets() {
 	var err error
+	namespace := (*c.cluster).Metadata.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
 		if pgUser.password == "" {
@@ -189,8 +192,9 @@ func (c *Cluster) applySecrets() {
 		}
 		secret := v1.Secret{
 			ObjectMeta: v1.ObjectMeta{
-				Name:   c.credentialSecretName(username),
-				Labels: c.labelsSet(),
+				Name:      c.credentialSecretName(username),
+				Namespace: namespace,
+				Labels:    c.labelsSet(),
 			},
 			Type: v1.SecretTypeOpaque,
 			Data: map[string][]byte{
@@ -198,11 +202,11 @@ func (c *Cluster) applySecrets() {
 				"password": []byte(pgUser.password),
 			},
 		}
-		_, err = c.config.KubeClient.Secrets(c.config.Namespace).Create(&secret)
+		_, err = c.config.KubeClient.Secrets(namespace).Create(&secret)
 		if k8sutil.IsKubernetesResourceAlreadyExistError(err) {
 			c.logger.Infof("Skipping update of '%s'", secret.Name)
 
-			curSecrets, err := c.config.KubeClient.Secrets(c.config.Namespace).Get(c.credentialSecretName(username))
+			curSecrets, err := c.config.KubeClient.Secrets(namespace).Get(c.credentialSecretName(username))
 			if err != nil {
 				c.logger.Errorf("Can't get current secret: %s", err)
 			}
@@ -223,18 +227,19 @@ func (c *Cluster) applySecrets() {
 }
 
 func (c *Cluster) createService() {
-	clusterName := (*c.cluster).Metadata.Name
+	meta := (*c.cluster).Metadata
 
-	_, err := c.config.KubeClient.Services(c.config.Namespace).Get(clusterName)
+	_, err := c.config.KubeClient.Services(meta.Namespace).Get(meta.Name)
 	if !k8sutil.ResourceNotFound(err) {
-		c.logger.Infof("Service '%s' already exists", clusterName)
+		c.logger.Infof("Service '%s' already exists", meta.Name)
 		return
 	}
 
 	service := v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name:   clusterName,
-			Labels: c.labelsSet(),
+			Name:      meta.Name,
+			Namespace: meta.Namespace,
+			Labels:    c.labelsSet(),
 		},
 		Spec: v1.ServiceSpec{
 			Type:  v1.ServiceTypeLoadBalancer,
@@ -243,7 +248,7 @@ func (c *Cluster) createService() {
 		},
 	}
 
-	_, err = c.config.KubeClient.Services(c.config.Namespace).Create(&service)
+	_, err = c.config.KubeClient.Services(meta.Namespace).Create(&service)
 	if err != nil {
 		c.logger.Errorf("Error while creating service: %+v", err)
 	} else {
@@ -252,22 +257,23 @@ func (c *Cluster) createService() {
 }
 
 func (c *Cluster) createEndpoint() {
-	clusterName := (*c.cluster).Metadata.Name
+	meta := (*c.cluster).Metadata
 
-	_, err := c.config.KubeClient.Endpoints(c.config.Namespace).Get(clusterName)
+	_, err := c.config.KubeClient.Endpoints(meta.Namespace).Get(meta.Name)
 	if !k8sutil.ResourceNotFound(err) {
-		c.logger.Infof("Endpoint '%s' already exists", clusterName)
+		c.logger.Infof("Endpoint '%s' already exists", meta.Name)
 		return
 	}
 
 	endpoint := v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
-			Name:   clusterName,
-			Labels: c.labelsSet(),
+			Name:      meta.Name,
+			Namespace: meta.Namespace,
+			Labels:    c.labelsSet(),
 		},
 	}
 
-	_, err = c.config.KubeClient.Endpoints(c.config.Namespace).Create(&endpoint)
+	_, err = c.config.KubeClient.Endpoints(meta.Namespace).Create(&endpoint)
 	if err != nil {
 		c.logger.Errorf("Error while creating endpoint: %+v", err)
 	} else {

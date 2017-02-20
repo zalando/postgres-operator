@@ -33,11 +33,11 @@ var (
 
 //TODO: remove struct duplication
 type Config struct {
-	Namespace      string
-	KubeClient     *kubernetes.Clientset //TODO: move clients to the better place?
-	RestClient     *rest.RESTClient
-	EtcdClient     etcdclient.KeysAPI
-	TeamsAPIClient *teams.TeamsAPI
+	ControllerNamespace string
+	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
+	RestClient          *rest.RESTClient
+	EtcdClient          etcdclient.KeysAPI
+	TeamsAPIClient      *teams.TeamsAPI
 }
 
 type pgUser struct {
@@ -74,7 +74,8 @@ func New(cfg Config, spec *spec.Postgresql) *Cluster {
 }
 
 func (c *Cluster) getReadonlyToken() (string, error) {
-	credentialsSecret, err := c.config.KubeClient.Secrets(c.config.Namespace).Get("postgresql-operator")
+	// for some reason PlatformCredentialsSet creates secrets only in the default namespace
+	credentialsSecret, err := c.config.KubeClient.Secrets(v1.NamespaceDefault).Get("postgresql-operator")
 
 	if err != nil {
 		return "", fmt.Errorf("Can't get credentials secret: %s", err)
@@ -198,7 +199,7 @@ func (c *Cluster) waitPodDelete() error {
 	return retryutil.Retry(
 		constants.ResourceCheckInterval, int(constants.ResourceCheckTimeout/constants.ResourceCheckInterval),
 		func() (bool, error) {
-			pods, err := c.config.KubeClient.Pods(c.config.Namespace).List(listOptions)
+			pods, err := c.config.KubeClient.Pods((*c.cluster).Metadata.Namespace).List(listOptions)
 			if err != nil {
 				return false, err
 			}
@@ -213,7 +214,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 			listOptions := v1.ListOptions{
 				LabelSelector: c.labelsSet().String(),
 			}
-			ss, err := c.config.KubeClient.StatefulSets(c.config.Namespace).List(listOptions)
+			ss, err := c.config.KubeClient.StatefulSets((*c.cluster).Metadata.Namespace).List(listOptions)
 			if err != nil {
 				return false, err
 			}
@@ -228,6 +229,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 
 func (c *Cluster) waitPodLabelsReady() error {
 	ls := c.labelsSet()
+	namespace := (*c.cluster).Metadata.Namespace
 
 	listOptions := v1.ListOptions{
 		LabelSelector: ls.String(),
@@ -238,7 +240,7 @@ func (c *Cluster) waitPodLabelsReady() error {
 	replicaListOption := v1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": "replica"}).String(),
 	}
-	pods, err := c.config.KubeClient.Pods(c.config.Namespace).List(listOptions)
+	pods, err := c.config.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
 		return err
 	}
@@ -247,11 +249,11 @@ func (c *Cluster) waitPodLabelsReady() error {
 	return retryutil.Retry(
 		constants.ResourceCheckInterval, int(constants.ResourceCheckTimeout/constants.ResourceCheckInterval),
 		func() (bool, error) {
-			masterPods, err := c.config.KubeClient.Pods(c.config.Namespace).List(masterListOption)
+			masterPods, err := c.config.KubeClient.Pods(namespace).List(masterListOption)
 			if err != nil {
 				return false, err
 			}
-			replicaPods, err := c.config.KubeClient.Pods(c.config.Namespace).List(replicaListOption)
+			replicaPods, err := c.config.KubeClient.Pods(namespace).List(replicaListOption)
 			if err != nil {
 				return false, err
 			}
@@ -305,7 +307,7 @@ func (c *Cluster) waitClusterReady() error {
 
 func (c *Cluster) Delete() error {
 	clusterName := (*c.cluster).Metadata.Name
-	namespace := c.config.Namespace
+	namespace := (*c.cluster).Metadata.Namespace
 	orphanDependents := false
 	deleteOptions := &v1.DeleteOptions{
 		OrphanDependents: &orphanDependents,
