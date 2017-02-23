@@ -10,6 +10,7 @@ spec:
       labels:
         name: postgres-operator
     spec:
+      serviceAccountName: operator
       containers:
       - name: postgres-operator
         image: postgres-operator:0.1
