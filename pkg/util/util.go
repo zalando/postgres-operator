@@ -1,11 +1,12 @@
 package util
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
+	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/types"
 )
 
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
@@ -23,15 +24,22 @@ func RandomPassword(n int) string {
 	return string(b)
 }
 
-func FullObjectNameFromMeta(meta v1.ObjectMeta) string {
-	return FullObjectName(meta.Namespace, meta.Name)
-}
-
-//TODO: Remove in favour of FullObjectNameFromMeta
-func FullObjectName(ns, name string) string {
-	if ns == "" {
-		ns = "default"
+func NameFromMeta(meta v1.ObjectMeta) types.NamespacedName {
+	obj := types.NamespacedName{
+		Namespace: meta.Namespace,
+		Name:      meta.Name,
 	}
 
-	return fmt.Sprintf("%s / %s", ns, name)
+	return obj
+}
+
+func PodClusterName(pod *v1.Pod) spec.ClusterName {
+	if name, ok := pod.Labels["spilo-cluster"]; ok {
+		return spec.ClusterName{
+			Namespace: pod.Namespace,
+			Name:      name,
+		}
+	}
+
+	return spec.ClusterName{}
 }

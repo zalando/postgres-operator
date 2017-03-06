@@ -21,7 +21,6 @@ spec:
   - 127.0.0.1/32
 
 #Expert section
-  pamUsersSecret: human-users
   postgresql:
     version: "9.6"
     parameters:

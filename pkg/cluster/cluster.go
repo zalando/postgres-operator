@@ -3,32 +3,32 @@ package cluster
 // Postgres ThirdPartyResource object i.e. Spilo
 
 import (
-	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
-	"strings"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
 	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/rest"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/retryutil"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
 var (
-	superuserName       = "postgres"
-	replicationUsername = "replication"
-
-	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z0-9]*$")
+	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
 )
 
 //TODO: remove struct duplication
@@ -40,351 +40,279 @@ type Config struct {
 	TeamsAPIClient      *teams.TeamsAPI
 }
 
-type pgUser struct {
-	name     string
-	password string
-	flags    []string
+type KubeResources struct {
+	Services     map[types.UID]*v1.Service
+	Endpoints    map[types.UID]*v1.Endpoints
+	Secrets      map[types.UID]*v1.Secret
+	Statefulsets map[types.UID]*v1beta1.StatefulSet
+	//Pods are treated separately
 }
 
 type Cluster struct {
-	config      Config
-	logger      *logrus.Entry
-	etcdHost    string
-	dockerImage string
-	cluster     *spec.Postgresql
-	pgUsers     map[string]pgUser
-
-	pgDb *sql.DB
-	mu   sync.Mutex
+	KubeResources
+	spec.Postgresql
+	config         Config
+	logger         *logrus.Entry
+	etcdHost       string
+	dockerImage    string
+	pgUsers        map[string]spec.PgUser
+	podEvents      chan spec.PodEvent
+	podSubscribers map[spec.PodName]chan spec.PodEvent
+	pgDb           *sql.DB
+	mu             sync.Mutex
 }
 
-func New(cfg Config, spec *spec.Postgresql) *Cluster {
-	lg := logrus.WithField("pkg", "cluster").WithField("cluster-name", spec.Metadata.Name)
+func New(cfg Config, pgSpec spec.Postgresql) *Cluster {
+	lg := logrus.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
+	kubeResources := KubeResources{
+		Services:     make(map[types.UID]*v1.Service),
+		Endpoints:    make(map[types.UID]*v1.Endpoints),
+		Secrets:      make(map[types.UID]*v1.Secret),
+		Statefulsets: make(map[types.UID]*v1beta1.StatefulSet),
+	}
 
 	cluster := &Cluster{
-		config:      cfg,
-		cluster:     spec,
-		logger:      lg,
-		etcdHost:    constants.EtcdHost,
-		dockerImage: constants.SpiloImage,
+		config:         cfg,
+		Postgresql:     pgSpec,
+		logger:         lg,
+		etcdHost:       constants.EtcdHost,
+		dockerImage:    constants.SpiloImage,
+		pgUsers:        make(map[string]spec.PgUser),
+		podEvents:      make(chan spec.PodEvent),
+		podSubscribers: make(map[spec.PodName]chan spec.PodEvent),
+		KubeResources:  kubeResources,
 	}
-	cluster.init()
 
 	return cluster
 }
 
-func (c *Cluster) getReadonlyToken() (string, error) {
-	// for some reason PlatformCredentialsSet creates secrets only in the default namespace
-	credentialsSecret, err := c.config.KubeClient.Secrets(v1.NamespaceDefault).Get("postgresql-operator")
+func (c *Cluster) ClusterName() spec.ClusterName {
+	return spec.ClusterName{
+		Name:      c.Metadata.Name,
+		Namespace: c.Metadata.Namespace,
+	}
+}
+
+func (c *Cluster) Run(stopCh <-chan struct{}) {
+	go c.podEventsDispatcher(stopCh)
+
+	<-stopCh
+}
+
+func (c *Cluster) NeedsRollingUpdate(otherSpec *spec.Postgresql) bool {
+	//TODO: add more checks
+	if c.Spec.Version != otherSpec.Spec.Version {
+		return true
+	}
+
+	if !reflect.DeepEqual(c.Spec.Resources, otherSpec.Spec.Resources) {
+		return true
+	}
+
+	return false
+}
+
+func (c *Cluster) MustSetStatus(status spec.PostgresStatus) {
+	b, err := json.Marshal(status)
+	if err != nil {
+		c.logger.Fatalf("Can't marshal status: %s", err)
+	}
+	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
+
+	_, err = c.config.RestClient.Patch(api.MergePatchType).
+		RequestURI(c.Metadata.GetSelfLink()).
+		Body(request).
+		DoRaw()
+
+	if k8sutil.ResourceNotFound(err) {
+		c.logger.Warningf("Can't set status for the non-existing cluster")
+		return
+	}
 
 	if err != nil {
-		return "", fmt.Errorf("Can't get credentials secret: %s", err)
+		c.logger.Fatalf("Can't set status for cluster '%s': %s", c.ClusterName(), err)
 	}
-	data := credentialsSecret.Data
-
-	if string(data["read-only-token-type"]) != "Bearer" {
-		return "", fmt.Errorf("Wrong token type: %s", data["read-only-token-type"])
-	}
-
-	return string(data["read-only-token-secret"]), nil
-
-}
-
-func (c *Cluster) getTeamMembers() ([]string, error) {
-	token, err := c.getReadonlyToken()
-	if err != nil {
-		return nil, fmt.Errorf("Can't get oauth token: %s", err)
-	}
-
-	c.config.TeamsAPIClient.OauthToken = token
-	teamInfo, err := c.config.TeamsAPIClient.TeamInfo((*c.cluster.Spec).TeamId)
-	if err != nil {
-		return nil, fmt.Errorf("Can't get team info: %s", err)
-	}
-
-	return teamInfo.Members, nil
-}
-
-func (c *Cluster) labelsSet() labels.Set {
-	return labels.Set{
-		"application":   "spilo",
-		"spilo-cluster": (*c.cluster).Metadata.Name,
-	}
-}
-
-func (c *Cluster) credentialSecretName(username string) string {
-	return fmt.Sprintf(
-		"%s.%s.credentials.%s.%s",
-		username,
-		(*c.cluster).Metadata.Name,
-		constants.TPRName,
-		constants.TPRVendor)
-}
-
-func isValidUsername(username string) bool {
-	return alphaNumericRegexp.MatchString(username)
-}
-
-func normalizeUserFlags(userFlags []string) (flags []string, err error) {
-	uniqueFlags := make(map[string]bool)
-
-	for _, flag := range userFlags {
-		if !alphaNumericRegexp.MatchString(flag) {
-			err = fmt.Errorf("User flag '%s' is not alphanumeric", flag)
-			return
-		} else {
-			flag = strings.ToUpper(flag)
-			if _, ok := uniqueFlags[flag]; !ok {
-				uniqueFlags[flag] = true
-			}
-		}
-	}
-
-	flags = []string{}
-	for k := range uniqueFlags {
-		flags = append(flags, k)
-	}
-
-	return
-}
-
-func (c *Cluster) init() {
-	users := (*c.cluster.Spec).Users
-	c.pgUsers = make(map[string]pgUser, len(users)+2) // + [superuser and replication]
-
-	c.pgUsers[superuserName] = pgUser{
-		name:     superuserName,
-		password: util.RandomPassword(constants.PasswordLength),
-	}
-
-	c.pgUsers[replicationUsername] = pgUser{
-		name:     replicationUsername,
-		password: util.RandomPassword(constants.PasswordLength),
-	}
-
-	for username, userFlags := range users {
-		if !isValidUsername(username) {
-			c.logger.Warningf("Invalid username: '%s'", username)
-			continue
-		}
-
-		flags, err := normalizeUserFlags(userFlags)
-		if err != nil {
-			c.logger.Warningf("Invalid flags for user '%s': %s", username, err)
-		}
-
-		c.pgUsers[username] = pgUser{
-			name:     username,
-			password: util.RandomPassword(constants.PasswordLength),
-			flags:    flags,
-		}
-	}
-
-	teamMembers, err := c.getTeamMembers()
-	if err != nil {
-		c.logger.Errorf("Can't get list of team members: %s", err)
-	} else {
-		for _, username := range teamMembers {
-			c.pgUsers[username] = pgUser{name: username}
-		}
-	}
-}
-
-func (c *Cluster) waitPodDelete() error {
-	ls := c.labelsSet()
-
-	listOptions := v1.ListOptions{
-		LabelSelector: ls.String(),
-	}
-	return retryutil.Retry(
-		constants.ResourceCheckInterval, int(constants.ResourceCheckTimeout/constants.ResourceCheckInterval),
-		func() (bool, error) {
-			pods, err := c.config.KubeClient.Pods((*c.cluster).Metadata.Namespace).List(listOptions)
-			if err != nil {
-				return false, err
-			}
-
-			return len(pods.Items) == 0, nil
-		})
-}
-
-func (c *Cluster) waitStatefulsetReady() error {
-	return retryutil.Retry(constants.ResourceCheckInterval, int(constants.ResourceCheckTimeout/constants.ResourceCheckInterval),
-		func() (bool, error) {
-			listOptions := v1.ListOptions{
-				LabelSelector: c.labelsSet().String(),
-			}
-			ss, err := c.config.KubeClient.StatefulSets((*c.cluster).Metadata.Namespace).List(listOptions)
-			if err != nil {
-				return false, err
-			}
-
-			if len(ss.Items) != 1 {
-				return false, fmt.Errorf("StatefulSet is not found")
-			}
-
-			return *ss.Items[0].Spec.Replicas == ss.Items[0].Status.Replicas, nil
-		})
-}
-
-func (c *Cluster) waitPodLabelsReady() error {
-	ls := c.labelsSet()
-	namespace := (*c.cluster).Metadata.Namespace
-
-	listOptions := v1.ListOptions{
-		LabelSelector: ls.String(),
-	}
-	masterListOption := v1.ListOptions{
-		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": "master"}).String(),
-	}
-	replicaListOption := v1.ListOptions{
-		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": "replica"}).String(),
-	}
-	pods, err := c.config.KubeClient.Pods(namespace).List(listOptions)
-	if err != nil {
-		return err
-	}
-	podsNumber := len(pods.Items)
-
-	return retryutil.Retry(
-		constants.ResourceCheckInterval, int(constants.ResourceCheckTimeout/constants.ResourceCheckInterval),
-		func() (bool, error) {
-			masterPods, err := c.config.KubeClient.Pods(namespace).List(masterListOption)
-			if err != nil {
-				return false, err
-			}
-			replicaPods, err := c.config.KubeClient.Pods(namespace).List(replicaListOption)
-			if err != nil {
-				return false, err
-			}
-			if len(masterPods.Items) > 1 {
-				return false, fmt.Errorf("Too many masters")
-			}
-
-			return len(masterPods.Items)+len(replicaPods.Items) == podsNumber, nil
-		})
 }
 
 func (c *Cluster) Create() error {
-	c.createEndpoint()
-	c.createService()
-	c.applySecrets()
-	c.createStatefulSet()
+	//TODO: service will create endpoint implicitly
+	ep, err := c.createEndpoint()
+	if err != nil {
+		return fmt.Errorf("Can't create endpoint: %s", err)
+	}
+	c.logger.Infof("Endpoint '%s' has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+
+	service, err := c.createService()
+	if err != nil {
+		return fmt.Errorf("Can't create service: %s", err)
+	} else {
+		c.logger.Infof("Service '%s' has been successfully created", util.NameFromMeta(service.ObjectMeta))
+	}
+
+	c.initSystemUsers()
+	err = c.initRobotUsers()
+	if err != nil {
+		return fmt.Errorf("Can't init robot users: %s", err)
+	}
+
+	err = c.initHumanUsers()
+	if err != nil {
+		return fmt.Errorf("Can't init human users: %s", err)
+	}
+
+	err = c.applySecrets()
+	if err != nil {
+		return fmt.Errorf("Can't create secrets: %s", err)
+	} else {
+		c.logger.Infof("Secrets have been successfully created")
+	}
+
+	ss, err := c.createStatefulSet()
+	if err != nil {
+		return fmt.Errorf("Can't create StatefulSet: %s", err)
+	} else {
+		c.logger.Infof("StatefulSet '%s' has been successfully created", util.NameFromMeta(ss.ObjectMeta))
+	}
 
 	c.logger.Info("Waiting for cluster being ready")
-	err := c.waitClusterReady()
+	err = c.waitClusterReady()
 	if err != nil {
 		c.logger.Errorf("Failed to create cluster: %s", err)
 		return err
 	}
-	c.logger.Info("Cluster is ready")
 
 	err = c.initDbConn()
 	if err != nil {
-		return fmt.Errorf("Failed to init db connection: %s", err)
+		return fmt.Errorf("Can't init db connection: %s", err)
 	}
 
-	c.createUsers()
+	err = c.createUsers()
+	if err != nil {
+		return fmt.Errorf("Can't create users: %s", err)
+	} else {
+		c.logger.Infof("Users have been successfully created")
+	}
+
+	c.ListResources()
 
 	return nil
 }
 
-func (c *Cluster) waitClusterReady() error {
-	// TODO: wait for the first Pod only
-	err := c.waitStatefulsetReady()
+func (c *Cluster) Update(newSpec *spec.Postgresql, rollingUpdate bool) error {
+	nSpec := newSpec.Spec
+	clusterName := c.ClusterName()
+	resourceList := resources.ResourceList(nSpec.Resources)
+	template := resources.PodTemplate(clusterName, resourceList, c.dockerImage, nSpec.Version, c.etcdHost)
+	statefulSet := resources.StatefulSet(clusterName, template, nSpec.NumberOfInstances)
+
+	//TODO: mind the case of updating allowedSourceRanges
+	err := c.updateStatefulSet(statefulSet)
 	if err != nil {
-		return fmt.Errorf("Statuful set error: %s", err)
+		return fmt.Errorf("Can't upate cluster: %s", err)
 	}
 
-	// TODO: wait only for master
-	err = c.waitPodLabelsReady()
-	if err != nil {
-		return fmt.Errorf("Pod labels error: %s", err)
+	if rollingUpdate {
+		err = c.recreatePods()
+		// TODO: wait for actual streaming to the replica
+		if err != nil {
+			return fmt.Errorf("Can't recreate pods: %s", err)
+		}
 	}
 
 	return nil
 }
 
 func (c *Cluster) Delete() error {
-	clusterName := (*c.cluster).Metadata.Name
-	namespace := (*c.cluster).Metadata.Namespace
-	orphanDependents := false
-	deleteOptions := &v1.DeleteOptions{
-		OrphanDependents: &orphanDependents,
-	}
-
-	listOptions := v1.ListOptions{
-		LabelSelector: c.labelsSet().String(),
-	}
-
-	kubeClient := c.config.KubeClient
-
-	podList, err := kubeClient.Pods(namespace).List(listOptions)
-	if err != nil {
-		return fmt.Errorf("Can't get list of pods: %s", err)
-	}
-
-	err = kubeClient.StatefulSets(namespace).Delete(clusterName, deleteOptions)
-	if err != nil {
-		return fmt.Errorf("Can't delete statefulset: %s", err)
-	}
-	c.logger.Infof("Statefulset '%s' has been deleted", util.FullObjectName(namespace, clusterName))
-
-	for _, pod := range podList.Items {
-		err = kubeClient.Pods(namespace).Delete(pod.Name, deleteOptions)
+	for _, obj := range c.Statefulsets {
+		err := c.deleteStatefulSet(obj)
 		if err != nil {
-			return fmt.Errorf("Error while deleting pod '%s': %s", util.FullObjectName(pod.Namespace, pod.Name), err)
+			c.logger.Errorf("Can't delete StatefulSet: %s", err)
+		} else {
+			c.logger.Infof("StatefulSet '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
+		}
+	}
+
+	for _, obj := range c.Secrets {
+		err := c.deleteSecret(obj)
+		if err != nil {
+			c.logger.Errorf("Can't delete secret: %s", err)
+		} else {
+			c.logger.Infof("Secret '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
+		}
+	}
+
+	for _, obj := range c.Endpoints {
+		err := c.deleteEndpoint(obj)
+		if err != nil {
+			c.logger.Errorf("Can't delete endpoint: %s", err)
+		} else {
+			c.logger.Infof("Endpoint '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
+		}
+	}
+
+	for _, obj := range c.Services {
+		err := c.deleteService(obj)
+		if err != nil {
+			c.logger.Errorf("Can't delete service: %s", err)
+		} else {
+			c.logger.Infof("Service '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
+		}
+	}
+
+	err := c.deletePods()
+	if err != nil {
+		return fmt.Errorf("Can't delete pods: %s", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
+	c.podEvents <- event
+}
+
+func (c *Cluster) initSystemUsers() {
+	c.pgUsers[constants.SuperuserName] = spec.PgUser{
+		Name:     constants.SuperuserName,
+		Password: util.RandomPassword(constants.PasswordLength),
+	}
+
+	c.pgUsers[constants.ReplicationUsername] = spec.PgUser{
+		Name:     constants.ReplicationUsername,
+		Password: util.RandomPassword(constants.PasswordLength),
+	}
+}
+
+func (c *Cluster) initRobotUsers() error {
+	for username, userFlags := range c.Spec.Users {
+		if !isValidUsername(username) {
+			return fmt.Errorf("Invalid username: '%s'", username)
 		}
 
-		c.logger.Infof("Pod '%s' has been deleted", util.FullObjectName(pod.Namespace, pod.Name))
-	}
-
-	serviceList, err := kubeClient.Services(namespace).List(listOptions)
-	if err != nil {
-		return fmt.Errorf("Can't get list of the services: %s", err)
-	}
-
-	for _, service := range serviceList.Items {
-		err = kubeClient.Services(namespace).Delete(service.Name, deleteOptions)
+		flags, err := normalizeUserFlags(userFlags)
 		if err != nil {
-			return fmt.Errorf("Can't delete service '%s': %s", util.FullObjectName(service.Namespace, service.Name), err)
+			return fmt.Errorf("Invalid flags for user '%s': %s", username, err)
 		}
 
-		c.logger.Infof("Service '%s' has been deleted", util.FullObjectName(service.Namespace, service.Name))
-	}
-
-	secretsList, err := kubeClient.Secrets(namespace).List(listOptions)
-	if err != nil {
-		return err
-	}
-	for _, secret := range secretsList.Items {
-		err = kubeClient.Secrets(namespace).Delete(secret.Name, deleteOptions)
-		if err != nil {
-			return fmt.Errorf("Can't delete secret '%s': %s", util.FullObjectName(secret.Namespace, secret.Name), err)
+		c.pgUsers[username] = spec.PgUser{
+			Name:     username,
+			Password: util.RandomPassword(constants.PasswordLength),
+			Flags:    flags,
 		}
-
-		c.logger.Infof("Secret '%s' has been deleted", util.FullObjectName(secret.Namespace, secret.Name))
 	}
 
-	c.waitPodDelete()
+	return nil
+}
 
-	etcdKey := fmt.Sprintf("/service/%s", clusterName)
-
-	resp, err := c.config.EtcdClient.Delete(context.Background(),
-		etcdKey,
-		&etcdclient.DeleteOptions{Recursive: true})
-
+func (c *Cluster) initHumanUsers() error {
+	teamMembers, err := c.getTeamMembers()
 	if err != nil {
-		return fmt.Errorf("Can't delete etcd key: %s", err)
+		return fmt.Errorf("Can't get list of team members: %s", err)
+	} else {
+		for _, username := range teamMembers {
+			c.pgUsers[username] = spec.PgUser{Name: username}
+		}
 	}
-
-	if resp == nil {
-		c.logger.Warningf("No response from etcd cluster")
-	}
-
-	c.logger.Infof("Etcd key '%s' has been deleted", etcdKey)
-
-	//TODO: Ensure objects are deleted
 
 	return nil
 }

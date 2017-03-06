@@ -57,6 +57,7 @@ func ControllerConfig() *controller.Config {
 func main() {
 	log.SetOutput(os.Stdout)
 	log.Printf("Spilo operator %s\n", version)
+	log.Printf("MY_POD_NAMESPACE=%s\n", podNamespace)
 
 	sigs := make(chan os.Signal, 1)
 	stop := make(chan struct{})

@@ -13,4 +13,13 @@ spec:
       serviceAccountName: operator
       containers:
       - name: postgres-operator
-        image: postgres-operator:0.1
+        image: pierone.example.com/acid/postgres-operator:0.1
+        env:
+        - name: MY_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name

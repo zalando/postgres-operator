@@ -2,20 +2,24 @@ package spec
 
 import (
 	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
 
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+var alphaRegexp = regexp.MustCompile("^[a-zA-Z]*$")
+
 type MaintenanceWindow struct {
-	StartTime string
-	EndTime   string
-	//StartTime     time.Time      // Start time
-	//StartWeekday  time.Weekday   // Start weekday
-	//
-	//EndTime       time.Time      // End time
-	//EndWeekday    time.Weekday   // End weekday
+	StartTime    time.Time    // Start time
+	StartWeekday time.Weekday // Start weekday
+
+	EndTime    time.Time    // End time
+	EndWeekday time.Weekday // End weekday
 }
 
 type Volume struct {
@@ -44,47 +48,37 @@ type Patroni struct {
 
 type UserFlags []string
 
-type PostgresSpec struct {
-	Resources       `json:"resources,omitempty"`
-	Patroni         `json:"patroni,omitempty"`
-	PostgresqlParam `json:"postgresql"`
-	Volume          `json:"volume,omitempty"`
+type PostgresStatus string
 
-	TeamId              string               `json:"teamId"`
-	AllowedSourceRanges []string             `json:"allowedSourceRanges"`
-	NumberOfInstances   int32                `json:"numberOfInstances"`
-	Users               map[string]UserFlags `json:"users"`
-	MaintenanceWindows  []string             `json:"maintenanceWindows,omitempty"`
-	PamUsersSecret      string               `json:"pamUsersSecret,omitempty"`
-
-	EtcdHost    string
-	DockerImage string
-}
-
-type PostgresStatus struct {
-	// Phase is the cluster running phase
-	Phase  string `json:"phase"`
-	Reason string `json:"reason"`
-
-	// ControlPuased indicates the operator pauses the control of the cluster.
-	ControlPaused bool `json:"controlPaused"`
-
-	// Size is the current size of the cluster
-	Size int `json:"size"`
-	// CurrentVersion is the current cluster version
-	CurrentVersion string `json:"currentVersion"`
-	// TargetVersion is the version the cluster upgrading to.
-	// If the cluster is not upgrading, TargetVersion is empty.
-	TargetVersion string `json:"targetVersion"`
-}
+const (
+	ClusterStatusUnknown      PostgresStatus = ""
+	ClusterStatusCreating                    = "Creating"
+	ClusterStatusUpdating                    = "Updating"
+	ClusterStatusUpdateFailed                = "UpdateFailed"
+	ClusterStatusAddFailed                   = "CreateFailed"
+	ClusterStatusRunning                     = "Running"
+)
 
 // PostgreSQL Third Party (resource) Object
 type Postgresql struct {
 	unversioned.TypeMeta `json:",inline"`
 	Metadata             v1.ObjectMeta `json:"metadata"`
 
-	Spec   *PostgresSpec   `json:"spec"`
-	Status *PostgresStatus `json:"status"`
+	Spec   PostgresSpec   `json:"spec"`
+	Status PostgresStatus `json:"status"`
+}
+
+type PostgresSpec struct {
+	PostgresqlParam `json:"postgresql"`
+	Volume          `json:"volume,omitempty"`
+	Patroni         `json:"patroni,omitempty"`
+	Resources       `json:"resources,omitempty"`
+
+	TeamId              string               `json:"teamId"`
+	AllowedSourceRanges []string             `json:"allowedSourceRanges"`
+	NumberOfInstances   int32                `json:"numberOfInstances"`
+	Users               map[string]UserFlags `json:"users"`
+	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
 }
 
 type PostgresqlList struct {
@@ -92,6 +86,85 @@ type PostgresqlList struct {
 	Metadata             unversioned.ListMeta `json:"metadata"`
 
 	Items []Postgresql `json:"items"`
+}
+
+func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
+	var timeLayout string
+
+	parts := strings.Split(s, ":")
+	if len(parts) == 3 {
+		if len(parts[0]) != 3 || !alphaRegexp.MatchString(parts[0]) {
+			err = fmt.Errorf("Weekday must be 3 characters length")
+			return
+		}
+		timeLayout = "Mon:15:04"
+		wdProvided = true
+	} else {
+		wdProvided = false
+		timeLayout = "15:04"
+	}
+
+	tp, err := time.Parse(timeLayout, s)
+	if err != nil {
+		return
+	}
+
+	wd = tp.Weekday()
+	t = tp.UTC()
+
+	return
+}
+
+func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
+	var startWd, endWd string
+	if m.StartWeekday == time.Sunday && m.EndWeekday == time.Saturday {
+		startWd = ""
+		endWd = ""
+	} else {
+		startWd = m.StartWeekday.String()[:3] + ":"
+		endWd = m.EndWeekday.String()[:3] + ":"
+	}
+
+	return []byte(fmt.Sprintf("\"%s%s-%s%s\"",
+		startWd, m.StartTime.Format("15:04"),
+		endWd, m.EndTime.Format("15:04"))), nil
+}
+
+func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
+	var (
+		got                 MaintenanceWindow
+		weekdayProvidedFrom bool
+		weekdayProvidedTo   bool
+		err                 error
+	)
+
+	parts := strings.Split(string(data[1:len(data)-1]), "-")
+	if len(parts) != 2 {
+		return fmt.Errorf("Incorrect maintenance window format")
+	}
+
+	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = parseTime(parts[0])
+	if err != nil {
+		return err
+	}
+
+	got.EndTime, got.EndWeekday, weekdayProvidedTo, err = parseTime(parts[1])
+	if err != nil {
+		return err
+	}
+
+	if got.EndTime.Before(got.StartTime) {
+		return fmt.Errorf("'From' time must be prior to the 'To' time.")
+	}
+
+	if !weekdayProvidedFrom || !weekdayProvidedTo {
+		got.StartWeekday = time.Sunday
+		got.EndWeekday = time.Saturday
+	}
+
+	*m = got
+
+	return nil
 }
 
 func (p *Postgresql) GetObjectKind() unversioned.ObjectKind {

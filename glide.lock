@@ -1,5 +1,5 @@
 hash: 8ffa20f78f1084d76efd6765df697e41edbe154a139a22292563cfc0eb50cd51
-updated: 2017-02-16T18:54:58.087728447+01:00
+updated: 2017-02-27T16:30:41.210217992+01:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -9,7 +9,7 @@ imports:
 - name: github.com/blang/semver
   version: 31b736133b98f26d5e078ec9eb591666edfd091f
 - name: github.com/coreos/etcd
-  version: 8ba2897a21e4fc51b298ca553d251318425f93ae
+  version: 714e7ec8db7f8398880197be10771fe89c480ee5
   subpackages:
   - client
   - pkg/pathutil
@@ -92,7 +92,7 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/Sirupsen/logrus
-  version: c078b1e43f58d563c74cebe63c85789e76ddb627
+  version: 0208149b40d863d2c1a2f8fe5753096a9cf2cc8b
 - name: github.com/spf13/pflag
   version: 08b1a584251b5b62f458943640fc8ebd4d50aaa5
 - name: github.com/ugorji/go

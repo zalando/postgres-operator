@@ -38,7 +38,7 @@ type Team struct {
 type TeamsAPI struct {
 	url        string
 	httpClient *http.Client
-	OauthToken string
+	OAuthToken string
 }
 
 func NewTeamsAPI(url string) *TeamsAPI {
@@ -57,7 +57,7 @@ func (t *TeamsAPI) TeamInfo(teamId string) (*Team, error) {
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", "Bearer "+t.OauthToken)
+	req.Header.Add("Authorization", "Bearer "+t.OAuthToken)
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return nil, err

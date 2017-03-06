@@ -2,9 +2,10 @@ package controller
 
 import (
 	"fmt"
+	"time"
+
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	etcdclient "github.com/coreos/etcd/client"
-	"time"
 )
 
 func (c *Controller) initEtcdClient() error {

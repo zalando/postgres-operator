@@ -2,330 +2,258 @@ package cluster
 
 import (
 	"fmt"
-	"strings"
 
-	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 )
 
-var createUserSQL = `DO $$
-BEGIN
-    SET LOCAL synchronous_commit = 'local';
-    CREATE ROLE "%s" %s PASSWORD %s;
-END;
-$$`
-
-func (c *Cluster) createStatefulSet() {
-	meta := (*c.cluster).Metadata
-
-	envVars := []v1.EnvVar{
-		{
-			Name:  "SCOPE",
-			Value: meta.Name,
-		},
-		{
-			Name:  "PGROOT",
-			Value: "/home/postgres/pgdata/pgroot",
-		},
-		{
-			Name:  "ETCD_HOST",
-			Value: c.etcdHost,
-		},
-		{
-			Name: "POD_IP",
-			ValueFrom: &v1.EnvVarSource{
-				FieldRef: &v1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "status.podIP",
-				},
-			},
-		},
-		{
-			Name: "POD_NAMESPACE",
-			ValueFrom: &v1.EnvVarSource{
-				FieldRef: &v1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.namespace",
-				},
-			},
-		},
-		{
-			Name: "PGPASSWORD_SUPERUSER",
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: c.credentialSecretName(superuserName),
-					},
-					Key: "password",
-				},
-			},
-		},
-		{
-			Name: "PGPASSWORD_STANDBY",
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: c.credentialSecretName(replicationUsername),
-					},
-					Key: "password",
-				},
-			},
-		},
-		{
-			Name:  "PAM_OAUTH2",               //TODO: get from the operator tpr spec
-			Value: constants.PamConfiguration, //space before uid is obligatory
-		},
-		{
-			Name: "SPILO_CONFIGURATION", //TODO: get from the operator tpr spec
-			Value: fmt.Sprintf(`
-postgresql:
-  bin_dir: /usr/lib/postgresql/%s/bin
-bootstrap:
-  initdb:
-  - auth-host: md5
-  - auth-local: trust
-  users:
-    %s:
-      password: NULL
-      options:
-        - createdb
-        - nologin
-  pg_hba:
-  - hostnossl all all all reject
-  - hostssl   all +%s all pam
-  - hostssl   all all all md5`, (*c.cluster.Spec).Version, constants.PamRoleName, constants.PamRoleName),
-		},
-	}
-
-	resourceList := v1.ResourceList{}
-
-	if cpu := (*c.cluster).Spec.Resources.Cpu; cpu != "" {
-		resourceList[v1.ResourceCPU] = resource.MustParse(cpu)
-	}
-
-	if memory := (*c.cluster).Spec.Resources.Memory; memory != "" {
-		resourceList[v1.ResourceMemory] = resource.MustParse(memory)
-	}
-
-	container := v1.Container{
-		Name:            meta.Name,
-		Image:           c.dockerImage,
-		ImagePullPolicy: v1.PullAlways,
-		Resources: v1.ResourceRequirements{
-			Requests: resourceList,
-		},
-		Ports: []v1.ContainerPort{
-			{
-				ContainerPort: 8008,
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				ContainerPort: 5432,
-				Protocol:      v1.ProtocolTCP,
-			},
-		},
-		VolumeMounts: []v1.VolumeMount{
-			{
-				Name:      "pgdata",
-				MountPath: "/home/postgres/pgdata", //TODO: fetch from manifesto
-			},
-		},
-		Env: envVars,
-	}
-
-	terminateGracePeriodSeconds := int64(30)
-
-	podSpec := v1.PodSpec{
-		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
-		Volumes: []v1.Volume{
-			{
-				Name:         "pgdata",
-				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
-			},
-		},
-		Containers: []v1.Container{container},
-	}
-
-	template := v1.PodTemplateSpec{
-		ObjectMeta: v1.ObjectMeta{
-			Labels:      c.labelsSet(),
-			Namespace:   meta.Namespace,
-			Annotations: map[string]string{"pod.alpha.kubernetes.io/initialized": "true"},
-		},
-		Spec: podSpec,
-	}
-
-	statefulSet := &v1beta1.StatefulSet{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      meta.Name,
-			Namespace: meta.Namespace,
-			Labels:    c.labelsSet(),
-		},
-		Spec: v1beta1.StatefulSetSpec{
-			Replicas:    &c.cluster.Spec.NumberOfInstances,
-			ServiceName: meta.Name,
-			Template:    template,
-		},
-	}
-
-	_, err := c.config.KubeClient.StatefulSets(meta.Namespace).Create(statefulSet)
-	if err != nil {
-		c.logger.Errorf("Can't create statefulset: %s", err)
-	} else {
-		c.logger.Infof("Statefulset has been created: '%s'", util.FullObjectNameFromMeta(statefulSet.ObjectMeta))
-	}
+var orphanDependents = false
+var deleteOptions = &v1.DeleteOptions{
+	OrphanDependents: &orphanDependents,
 }
 
-func (c *Cluster) applySecrets() {
-	var err error
-	namespace := (*c.cluster).Metadata.Namespace
-	for username, pgUser := range c.pgUsers {
-		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		if pgUser.password == "" {
+func (c *Cluster) LoadResources() error {
+	ns := c.Metadata.Namespace
+	listOptions := v1.ListOptions{
+		LabelSelector: c.labelsSet().String(),
+	}
+
+	services, err := c.config.KubeClient.Services(ns).List(listOptions)
+	if err != nil {
+		return fmt.Errorf("Can't get list of services: %s", err)
+	}
+	for i, service := range services.Items {
+		if _, ok := c.Services[service.UID]; ok {
 			continue
 		}
-		secret := v1.Secret{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      c.credentialSecretName(username),
-				Namespace: namespace,
-				Labels:    c.labelsSet(),
-			},
-			Type: v1.SecretTypeOpaque,
-			Data: map[string][]byte{
-				"username": []byte(pgUser.name),
-				"password": []byte(pgUser.password),
-			},
-		}
-		_, err = c.config.KubeClient.Secrets(namespace).Create(&secret)
-		if k8sutil.IsKubernetesResourceAlreadyExistError(err) {
-			c.logger.Infof("Skipping update of '%s'", secret.Name)
+		c.Services[service.UID] = &services.Items[i]
+	}
 
-			curSecrets, err := c.config.KubeClient.Secrets(namespace).Get(c.credentialSecretName(username))
-			if err != nil {
-				c.logger.Errorf("Can't get current secret: %s", err)
-			}
-			user := pgUser
-			user.password = string(curSecrets.Data["password"])
-			c.pgUsers[username] = user
-			c.logger.Infof("Password fetched for user '%s' from the secrets", username)
-
+	endpoints, err := c.config.KubeClient.Endpoints(ns).List(listOptions)
+	if err != nil {
+		return fmt.Errorf("Can't get list of endpoints: %s", err)
+	}
+	for i, endpoint := range endpoints.Items {
+		if _, ok := c.Endpoints[endpoint.UID]; ok {
 			continue
-		} else {
-			if err != nil {
-				c.logger.Errorf("Error while creating secret: %s", err)
-			} else {
-				c.logger.Infof("Secret created: '%s'", util.FullObjectNameFromMeta(secret.ObjectMeta))
-			}
 		}
-	}
-}
-
-func (c *Cluster) createService() {
-	meta := (*c.cluster).Metadata
-
-	_, err := c.config.KubeClient.Services(meta.Namespace).Get(meta.Name)
-	if !k8sutil.ResourceNotFound(err) {
-		c.logger.Infof("Service '%s' already exists", meta.Name)
-		return
+		c.Endpoints[endpoint.UID] = &endpoints.Items[i]
+		c.logger.Debugf("Endpoint loaded, uid: %s", endpoint.UID)
 	}
 
-	service := v1.Service{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      meta.Name,
-			Namespace: meta.Namespace,
-			Labels:    c.labelsSet(),
-		},
-		Spec: v1.ServiceSpec{
-			Type:  v1.ServiceTypeLoadBalancer,
-			Ports: []v1.ServicePort{{Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			LoadBalancerSourceRanges: (*c.cluster).Spec.AllowedSourceRanges,
-		},
-	}
-
-	_, err = c.config.KubeClient.Services(meta.Namespace).Create(&service)
+	secrets, err := c.config.KubeClient.Secrets(ns).List(listOptions)
 	if err != nil {
-		c.logger.Errorf("Error while creating service: %+v", err)
-	} else {
-		c.logger.Infof("Service created: '%s'", util.FullObjectNameFromMeta(service.ObjectMeta))
+		return fmt.Errorf("Can't get list of secrets: %s", err)
 	}
-}
-
-func (c *Cluster) createEndpoint() {
-	meta := (*c.cluster).Metadata
-
-	_, err := c.config.KubeClient.Endpoints(meta.Namespace).Get(meta.Name)
-	if !k8sutil.ResourceNotFound(err) {
-		c.logger.Infof("Endpoint '%s' already exists", meta.Name)
-		return
-	}
-
-	endpoint := v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      meta.Name,
-			Namespace: meta.Namespace,
-			Labels:    c.labelsSet(),
-		},
-	}
-
-	_, err = c.config.KubeClient.Endpoints(meta.Namespace).Create(&endpoint)
-	if err != nil {
-		c.logger.Errorf("Error while creating endpoint: %+v", err)
-	} else {
-		c.logger.Infof("Endpoint created: %s", endpoint.Name)
-	}
-}
-
-func (c *Cluster) createUser(user pgUser) {
-	var userType string
-	var flags []string = user.flags
-
-	if user.password == "" {
-		userType = "human"
-		flags = append(flags, fmt.Sprintf("IN ROLE \"%s\"", constants.PamRoleName))
-	} else {
-		userType = "app"
-	}
-
-	addLoginFlag := true
-	for _, v := range flags {
-		if v == "NOLOGIN" {
-			addLoginFlag = false
-			break
+	for i, secret := range secrets.Items {
+		if _, ok := c.Secrets[secret.UID]; ok {
+			continue
 		}
-	}
-	if addLoginFlag {
-		flags = append(flags, "LOGIN")
+		c.Secrets[secret.UID] = &secrets.Items[i]
+		c.logger.Debugf("Secret loaded, uid: %s", secret.UID)
 	}
 
-	userFlags := strings.Join(flags, " ")
-	userPassword := fmt.Sprintf("'%s'", user.password)
-	if user.password == "" {
-		userPassword = "NULL"
-	}
-	query := fmt.Sprintf(createUserSQL, user.name, userFlags, userPassword)
-
-	_, err := c.pgDb.Query(query)
+	statefulSets, err := c.config.KubeClient.StatefulSets(ns).List(listOptions)
 	if err != nil {
-		c.logger.Errorf("Can't create %s user '%s': %s", user.name, err)
-	} else {
-		c.logger.Infof("Created %s user '%s' with %s flags", userType, user.name, flags)
+		return fmt.Errorf("Can't get list of stateful sets: %s", err)
 	}
+	for i, statefulSet := range statefulSets.Items {
+		if _, ok := c.Statefulsets[statefulSet.UID]; ok {
+			continue
+		}
+		c.Statefulsets[statefulSet.UID] = &statefulSets.Items[i]
+		c.logger.Debugf("StatefulSet loaded, uid: %s", statefulSet.UID)
+	}
+
+	return nil
+}
+
+func (c *Cluster) ListResources() error {
+	for _, obj := range c.Statefulsets {
+		c.logger.Infof("StatefulSet: %s", util.NameFromMeta(obj.ObjectMeta))
+	}
+
+	for _, obj := range c.Secrets {
+		c.logger.Infof("Secret: %s", util.NameFromMeta(obj.ObjectMeta))
+	}
+
+	for _, obj := range c.Endpoints {
+		c.logger.Infof("Endpoint: %s", util.NameFromMeta(obj.ObjectMeta))
+	}
+
+	for _, obj := range c.Services {
+		c.logger.Infof("Service: %s", util.NameFromMeta(obj.ObjectMeta))
+	}
+
+	pods, err := c.clusterPods()
+	if err != nil {
+		return fmt.Errorf("Can't get pods: %s", err)
+	}
+
+	for _, obj := range pods {
+		c.logger.Infof("Pod: %s", util.NameFromMeta(obj.ObjectMeta))
+	}
+
+	return nil
+}
+
+func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
+	cSpec := c.Spec
+	clusterName := c.ClusterName()
+	resourceList := resources.ResourceList(cSpec.Resources)
+	template := resources.PodTemplate(clusterName, resourceList, c.dockerImage, cSpec.Version, c.etcdHost)
+	statefulSet := resources.StatefulSet(clusterName, template, cSpec.NumberOfInstances)
+
+	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSet.Namespace).Create(statefulSet)
+	if k8sutil.ResourceAlreadyExists(err) {
+		return nil, fmt.Errorf("StatefulSet '%s' already exists", util.NameFromMeta(statefulSet.ObjectMeta))
+	}
+	if err != nil {
+		return nil, err
+	}
+	c.Statefulsets[statefulSet.UID] = statefulSet
+	c.logger.Debugf("Created new StatefulSet, uid: %s", statefulSet.UID)
+
+	return statefulSet, nil
+}
+
+func (c *Cluster) updateStatefulSet(statefulSet *v1beta1.StatefulSet) error {
+	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSet.Namespace).Update(statefulSet)
+	if err != nil {
+		c.Statefulsets[statefulSet.UID] = statefulSet
+	}
+
+	return err
+}
+
+func (c *Cluster) deleteStatefulSet(statefulSet *v1beta1.StatefulSet) error {
+	err := c.config.KubeClient.
+		StatefulSets(statefulSet.Namespace).
+		Delete(statefulSet.Name, deleteOptions)
+
+	if err != nil {
+		return err
+	}
+	delete(c.Statefulsets, statefulSet.UID)
+
+	return nil
+}
+
+func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
+	endpoint := resources.Endpoint(c.ClusterName())
+
+	endpoint, err := c.config.KubeClient.Endpoints(endpoint.Namespace).Create(endpoint)
+	if k8sutil.ResourceAlreadyExists(err) {
+		return nil, fmt.Errorf("Endpoint '%s' already exists", util.NameFromMeta(endpoint.ObjectMeta))
+	}
+	if err != nil {
+		return nil, err
+	}
+	c.Endpoints[endpoint.UID] = endpoint
+	c.logger.Debugf("Created new endpoint, uid: %s", endpoint.UID)
+
+	return endpoint, nil
+}
+
+func (c *Cluster) deleteEndpoint(endpoint *v1.Endpoints) error {
+	err := c.config.KubeClient.Endpoints(endpoint.Namespace).Delete(endpoint.Name, deleteOptions)
+	if err != nil {
+		return err
+	}
+	delete(c.Endpoints, endpoint.UID)
+
+	return nil
+}
+
+func (c *Cluster) createService() (*v1.Service, error) {
+	service := resources.Service(c.ClusterName(), c.Spec.AllowedSourceRanges)
+
+	service, err := c.config.KubeClient.Services(service.Namespace).Create(service)
+	if k8sutil.ResourceAlreadyExists(err) {
+		return nil, fmt.Errorf("Service '%s' already exists", util.NameFromMeta(service.ObjectMeta))
+	}
+	if err != nil {
+		return nil, err
+	}
+	c.Services[service.UID] = service
+	c.logger.Debugf("Created new service, uid: %s", service.UID)
+
+	return service, nil
+}
+
+func (c *Cluster) deleteService(service *v1.Service) error {
+	err := c.config.KubeClient.Services(service.Namespace).Delete(service.Name, deleteOptions)
+	if err != nil {
+		return err
+	}
+	delete(c.Services, service.UID)
+
+	return nil
 }
 
 func (c *Cluster) createUsers() error {
 	for username, user := range c.pgUsers {
-		if username == superuserName || username == replicationUsername {
+		if username == constants.SuperuserName || username == constants.ReplicationUsername {
 			continue
 		}
 
-		c.createUser(user)
+		isHuman, err := c.createPgUser(user)
+		var userType string
+		if isHuman {
+			userType = "human"
+		} else {
+			userType = "robot"
+		}
+		if err != nil {
+			return fmt.Errorf("Can't create %s user '%s': %s", userType, username, err)
+		}
 	}
 
 	return nil
+}
+
+func (c *Cluster) applySecrets() error {
+	secrets, err := resources.UserSecrets(c.ClusterName(), c.pgUsers)
+
+	if err != nil {
+		return fmt.Errorf("Can't get user secrets")
+	}
+
+	for username, secret := range secrets {
+		secret, err := c.config.KubeClient.Secrets(secret.Namespace).Create(secret)
+		if k8sutil.ResourceAlreadyExists(err) {
+			curSecrets, err := c.config.KubeClient.Secrets(secret.Namespace).Get(secret.Name)
+			if err != nil {
+				return fmt.Errorf("Can't get current secret: %s", err)
+			}
+			pwdUser := c.pgUsers[username]
+			pwdUser.Password = string(curSecrets.Data["password"])
+			c.pgUsers[username] = pwdUser
+
+			continue
+		} else {
+			if err != nil {
+				return fmt.Errorf("Can't create secret for user '%s': %s", username, err)
+			}
+			c.Secrets[secret.UID] = secret
+			c.logger.Debugf("Created new secret, uid: %s", secret.UID)
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) deleteSecret(secret *v1.Secret) error {
+	err := c.config.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, deleteOptions)
+	if err != nil {
+		return err
+	}
+	delete(c.Secrets, secret.UID)
+
+	return err
 }

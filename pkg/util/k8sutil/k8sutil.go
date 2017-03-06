@@ -33,7 +33,7 @@ func KubernetesClient(config *rest.Config) (client *kubernetes.Clientset, err er
 	return kubernetes.NewForConfig(config)
 }
 
-func IsKubernetesResourceAlreadyExistError(err error) bool {
+func ResourceAlreadyExists(err error) bool {
 	return apierrors.IsAlreadyExists(err)
 }
 

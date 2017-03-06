@@ -1,23 +1,18 @@
 package controller
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
 	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
-	v1beta1extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/cluster"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
@@ -32,25 +27,23 @@ type Config struct {
 type Controller struct {
 	config      Config
 	logger      *logrus.Entry
-	events      chan *Event
-	clusters    map[string]*cluster.Cluster
-	stopChMap   map[string]chan struct{}
+	clusters    map[spec.ClusterName]*cluster.Cluster
+	stopChMap   map[spec.ClusterName]chan struct{}
 	waitCluster sync.WaitGroup
 
 	postgresqlInformer cache.SharedIndexInformer
-}
+	podInformer        cache.SharedIndexInformer
 
-type Event struct {
-	Type   string
-	Object *spec.Postgresql
+	podCh chan spec.PodEvent
 }
 
 func New(cfg *Config) *Controller {
 	return &Controller{
 		config:    *cfg,
 		logger:    logrus.WithField("pkg", "controller"),
-		clusters:  make(map[string]*cluster.Cluster),
-		stopChMap: make(map[string]chan struct{}),
+		clusters:  make(map[spec.ClusterName]*cluster.Cluster),
+		stopChMap: make(map[spec.ClusterName]chan struct{}),
+		podCh:     make(chan spec.PodEvent),
 	}
 }
 
@@ -65,54 +58,10 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 		return
 	}
 
-	go c.watchTpr(stopCh)
+	c.logger.Infof("'%s' namespace will be watched", c.config.PodNamespace)
+	go c.runInformers(stopCh)
 
 	c.logger.Info("Started working in background")
-}
-
-func (c *Controller) watchTpr(stopCh <-chan struct{}) {
-	go c.postgresqlInformer.Run(stopCh)
-
-	<-stopCh
-}
-
-func (c *Controller) createTPR() error {
-	TPRName := fmt.Sprintf("%s.%s", constants.TPRName, constants.TPRVendor)
-	tpr := &v1beta1extensions.ThirdPartyResource{
-		ObjectMeta: v1.ObjectMeta{
-			Name: TPRName,
-			//PodNamespace: c.config.PodNamespace, //ThirdPartyResources are cluster-wide
-		},
-		Versions: []v1beta1extensions.APIVersion{
-			{Name: constants.TPRApiVersion},
-		},
-		Description: constants.TPRDescription,
-	}
-
-	_, err := c.config.KubeClient.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
-	if err != nil {
-		if !k8sutil.IsKubernetesResourceAlreadyExistError(err) {
-			return err
-		} else {
-			c.logger.Infof("ThirdPartyResource '%s' is already registered", TPRName)
-		}
-	} else {
-		c.logger.Infof("ThirdPartyResource '%s' has been registered", TPRName)
-	}
-
-	restClient := c.config.RestClient
-
-	return k8sutil.WaitTPRReady(restClient, constants.TPRReadyWaitInterval, constants.TPRReadyWaitTimeout, c.config.PodNamespace)
-}
-
-func (c *Controller) makeClusterConfig() cluster.Config {
-	return cluster.Config{
-		ControllerNamespace: c.config.PodNamespace,
-		KubeClient:          c.config.KubeClient,
-		RestClient:          c.config.RestClient,
-		EtcdClient:          c.config.EtcdClient,
-		TeamsAPIClient:      c.config.TeamsAPIClient,
-	}
 }
 
 func (c *Controller) initController() {
@@ -121,71 +70,53 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("Can't register ThirdPartyResource: %s", err)
 	}
 
+	token, err := c.getOAuthToken()
+	if err != nil {
+		c.logger.Errorf("Can't get OAuth token: %s", err)
+	} else {
+		c.config.TeamsAPIClient.OAuthToken = token
+	}
+
+	// Postgresqls
+	clusterLw := &cache.ListWatch{
+		ListFunc:  c.clusterListFunc,
+		WatchFunc: c.clusterWatchFunc,
+	}
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
-		cache.NewListWatchFromClient(c.config.RestClient, constants.ResourceName, v1.NamespaceAll, fields.Everything()),
+		clusterLw,
 		&spec.Postgresql{},
-		constants.ResyncPeriod,
+		constants.ResyncPeriodTPR,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.clusterAdd,
-		UpdateFunc: c.clusterUpdate,
-		DeleteFunc: c.clusterDelete,
+		AddFunc:    c.postgresqlAdd,
+		UpdateFunc: c.postgresqlUpdate,
+		DeleteFunc: c.postgresqlDelete,
+	})
+
+	// Pods
+	podLw := &cache.ListWatch{
+		ListFunc:  c.podListFunc,
+		WatchFunc: c.podWatchFunc,
+	}
+
+	c.podInformer = cache.NewSharedIndexInformer(
+		podLw,
+		&v1.Pod{},
+		constants.ResyncPeriodPod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.podAdd,
+		UpdateFunc: c.podUpdate,
+		DeleteFunc: c.podDelete,
 	})
 }
 
-func (c *Controller) clusterAdd(obj interface{}) {
-	pg := obj.(*spec.Postgresql)
+func (c *Controller) runInformers(stopCh <-chan struct{}) {
+	go c.postgresqlInformer.Run(stopCh)
+	go c.podInformer.Run(stopCh)
+	go c.podEventsDispatcher(stopCh)
 
-	//TODO: why do we need to have this check
-	if pg.Spec == nil {
-		return
-	}
-
-	clusterName := (*pg).Metadata.Name
-
-	cl := cluster.New(c.makeClusterConfig(), pg)
-	err := cl.Create()
-	if err != nil {
-		c.logger.Errorf("Can't create cluster: %s", err)
-		return
-	}
-	c.stopChMap[clusterName] = make(chan struct{})
-	c.clusters[clusterName] = cl
-
-	c.logger.Infof("Postgresql cluster '%s' has been created", util.FullObjectNameFromMeta((*pg).Metadata))
-}
-
-func (c *Controller) clusterUpdate(prev, cur interface{}) {
-	pgPrev := prev.(*spec.Postgresql)
-	pgCur := cur.(*spec.Postgresql)
-
-	if pgPrev.Spec == nil || pgCur.Spec == nil {
-		return
-	}
-	if pgPrev.Metadata.ResourceVersion == pgCur.Metadata.ResourceVersion {
-		return
-	}
-
-	c.logger.Infof("Update: %+v -> %+v", *pgPrev, *pgCur)
-}
-
-func (c *Controller) clusterDelete(obj interface{}) {
-	pg := obj.(*spec.Postgresql)
-	if pg.Spec == nil {
-		return
-	}
-	clusterName := (*pg).Metadata.Name
-
-	cluster := cluster.New(c.makeClusterConfig(), pg)
-	err := cluster.Delete()
-	if err != nil {
-		c.logger.Errorf("Can't delete cluster '%s': %s", util.FullObjectNameFromMeta((*pg).Metadata), err)
-		return
-	}
-
-	close(c.stopChMap[clusterName])
-	delete(c.clusters, clusterName)
-
-	c.logger.Infof("Cluster has been deleted: '%s'", util.FullObjectNameFromMeta((*pg).Metadata))
+	<-stopCh
 }
