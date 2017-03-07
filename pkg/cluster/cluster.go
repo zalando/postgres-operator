@@ -23,7 +23,6 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
@@ -199,15 +198,7 @@ func (c *Cluster) Create() error {
 }
 
 func (c *Cluster) Update(newSpec *spec.Postgresql, rollingUpdate bool) error {
-	nSpec := newSpec.Spec
-	cSpec := c.Spec
-	clusterName := c.ClusterName()
-	volumeSize := cSpec.Volume.Size
-	volumeStorageClass := cSpec.Volume.StorageClass
-	resourceList := resources.ResourceList(nSpec.Resources)
-	template := resources.PodTemplate(clusterName, resourceList, c.dockerImage, nSpec.Version, c.etcdHost)
-	volumeClaimTemplate := resources.VolumeClaimTemplate(volumeSize, volumeStorageClass)
-	statefulSet := resources.StatefulSet(clusterName, template, volumeClaimTemplate, nSpec.NumberOfInstances)
+	statefulSet := getStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
 
 	//TODO: mind the case of updating allowedSourceRanges
 	err := c.updateStatefulSet(statefulSet)

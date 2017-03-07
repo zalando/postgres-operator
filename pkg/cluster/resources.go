@@ -6,15 +6,26 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
+	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 )
 
-var orphanDependents = false
-var deleteOptions = &v1.DeleteOptions{
-	OrphanDependents: &orphanDependents,
+var (
+	deleteOptions    = &v1.DeleteOptions{OrphanDependents: &orphanDependents}
+	orphanDependents = false
+)
+
+func getStatefulSet(clusterName spec.ClusterName, cSpec spec.PostgresSpec, etcdHost, dockerImage string) *v1beta1.StatefulSet {
+	volumeSize := cSpec.Volume.Size
+	volumeStorageClass := cSpec.Volume.StorageClass
+	resourceList := resources.ResourceList(cSpec.Resources)
+	template := resources.PodTemplate(clusterName, resourceList, dockerImage, cSpec.Version, etcdHost)
+	volumeClaimTemplate := resources.VolumeClaimTemplate(volumeSize, volumeStorageClass)
+
+	return resources.StatefulSet(clusterName, template, volumeClaimTemplate, cSpec.NumberOfInstances)
 }
 
 func (c *Cluster) LoadResources() error {
@@ -103,14 +114,7 @@ func (c *Cluster) ListResources() error {
 }
 
 func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
-	cSpec := c.Spec
-	volumeSize := cSpec.Volume.Size
-	volumeStorageClass := cSpec.Volume.StorageClass
-	clusterName := c.ClusterName()
-	resourceList := resources.ResourceList(cSpec.Resources)
-	template := resources.PodTemplate(clusterName, resourceList, c.dockerImage, cSpec.Version, c.etcdHost)
-	volumeClaimTemplate := resources.VolumeClaimTemplate(volumeSize, volumeStorageClass)
-	statefulSetSpec := resources.StatefulSet(clusterName, template, volumeClaimTemplate, cSpec.NumberOfInstances)
+	statefulSetSpec := getStatefulSet(c.ClusterName(), c.Spec, c.etcdHost, c.dockerImage)
 	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSetSpec.Namespace).Create(statefulSetSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
 		return nil, fmt.Errorf("StatefulSet '%s' already exists", util.NameFromMeta(statefulSetSpec.ObjectMeta))
