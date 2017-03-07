@@ -14,19 +14,11 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
-func RestConfig(kubeConfig string, outOfCluster bool) (config *rest.Config, err error) {
+func RestConfig(kubeConfig string, outOfCluster bool) (*rest.Config, error) {
 	if outOfCluster {
-		/* out-of-cluster process */
-		rules := clientcmd.NewDefaultClientConfigLoadingRules()
-		overrides := &clientcmd.ConfigOverrides{}
-		rules.ExplicitPath = kubeConfig
-		config, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig()
-	} else {
-		/* in-cluster pod */
-		config, err = rest.InClusterConfig()
+		return clientcmd.BuildConfigFromFlags("", kubeConfig)
 	}
-
-	return
+	return rest.InClusterConfig()
 }
 
 func KubernetesClient(config *rest.Config) (client *kubernetes.Clientset, err error) {
