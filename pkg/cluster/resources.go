@@ -104,10 +104,13 @@ func (c *Cluster) ListResources() error {
 
 func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	cSpec := c.Spec
+	volumeSize := cSpec.Volume.Size
+	volumeStorageClass := cSpec.Volume.StorageClass
 	clusterName := c.ClusterName()
 	resourceList := resources.ResourceList(cSpec.Resources)
 	template := resources.PodTemplate(clusterName, resourceList, c.dockerImage, cSpec.Version, c.etcdHost)
-	statefulSet := resources.StatefulSet(clusterName, template, cSpec.NumberOfInstances)
+	volumeClaimTemplate := resources.VolumeClaimTemplate(volumeSize, volumeStorageClass)
+	statefulSet := resources.StatefulSet(clusterName, template, volumeClaimTemplate, cSpec.NumberOfInstances)
 
 	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSet.Namespace).Create(statefulSet)
 	if k8sutil.ResourceAlreadyExists(err) {
@@ -145,11 +148,11 @@ func (c *Cluster) deleteStatefulSet(statefulSet *v1beta1.StatefulSet) error {
 }
 
 func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
-	endpoint := resources.Endpoint(c.ClusterName())
+	endpointSpec := resources.Endpoint(c.ClusterName())
 
-	endpoint, err := c.config.KubeClient.Endpoints(endpoint.Namespace).Create(endpoint)
+	endpoint, err := c.config.KubeClient.Endpoints(endpointSpec.Namespace).Create(endpointSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
-		return nil, fmt.Errorf("Endpoint '%s' already exists", util.NameFromMeta(endpoint.ObjectMeta))
+		return nil, fmt.Errorf("Endpoint '%s' already exists", util.NameFromMeta(endpointSpec.ObjectMeta))
 	}
 	if err != nil {
 		return nil, err

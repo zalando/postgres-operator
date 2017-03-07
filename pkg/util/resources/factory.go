@@ -17,6 +17,7 @@ import (
 const (
 	superuserName       = "postgres"
 	replicationUsername = "replication"
+	dataVolumeName      = "pgdata"
 )
 
 func credentialSecretName(clusterName, username string) string {
@@ -147,7 +148,7 @@ bootstrap:
 		},
 		VolumeMounts: []v1.VolumeMount{
 			{
-				Name:      "pgdata",
+				Name:      dataVolumeName,
 				MountPath: "/home/postgres/pgdata", //TODO: fetch from manifesto
 			},
 		},
@@ -158,13 +159,7 @@ bootstrap:
 	podSpec := v1.PodSpec{
 		ServiceAccountName:            constants.ServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
-		Volumes: []v1.Volume{
-			{
-				Name:         "pgdata",
-				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
-			},
-		},
-		Containers: []v1.Container{container},
+		Containers:                    []v1.Container{container},
 	}
 
 	template := v1.PodTemplateSpec{
@@ -179,7 +174,33 @@ bootstrap:
 	return &template
 }
 
-func StatefulSet(cluster spec.ClusterName, podTemplate *v1.PodTemplateSpec, numberOfInstances int32) *v1beta1.StatefulSet {
+func VolumeClaimTemplate(volumeSize, volumeStorageClass string) *v1.PersistentVolumeClaim {
+	metadata := v1.ObjectMeta{
+		Name: dataVolumeName,
+	}
+	if volumeStorageClass != "" {
+		// TODO: check if storage class exists
+		metadata.Annotations = map[string]string{"volume.beta.kubernetes.io/storage-class": volumeStorageClass}
+	} else {
+		metadata.Annotations = map[string]string{"volume.alpha.kubernetes.io/storage-class": "default"}
+	}
+
+	volumeClaim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metadata,
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: resource.MustParse(volumeSize),
+				},
+			},
+		},
+	}
+	return volumeClaim
+}
+
+func StatefulSet(cluster spec.ClusterName, podTemplate *v1.PodTemplateSpec,
+	persistenVolumeClaim *v1.PersistentVolumeClaim, numberOfInstances int32) *v1beta1.StatefulSet {
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      cluster.Name,
@@ -187,9 +208,10 @@ func StatefulSet(cluster spec.ClusterName, podTemplate *v1.PodTemplateSpec, numb
 			Labels:    labelsSet(cluster.Name),
 		},
 		Spec: v1beta1.StatefulSetSpec{
-			Replicas:    &numberOfInstances,
-			ServiceName: cluster.Name,
-			Template:    *podTemplate,
+			Replicas:             &numberOfInstances,
+			ServiceName:          cluster.Name,
+			Template:             *podTemplate,
+			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*persistenVolumeClaim},
 		},
 	}
 

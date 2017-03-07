@@ -200,10 +200,14 @@ func (c *Cluster) Create() error {
 
 func (c *Cluster) Update(newSpec *spec.Postgresql, rollingUpdate bool) error {
 	nSpec := newSpec.Spec
+	cSpec := c.Spec
 	clusterName := c.ClusterName()
+	volumeSize := cSpec.Volume.Size
+	volumeStorageClass := cSpec.Volume.StorageClass
 	resourceList := resources.ResourceList(nSpec.Resources)
 	template := resources.PodTemplate(clusterName, resourceList, c.dockerImage, nSpec.Version, c.etcdHost)
-	statefulSet := resources.StatefulSet(clusterName, template, nSpec.NumberOfInstances)
+	volumeClaimTemplate := resources.VolumeClaimTemplate(volumeSize, volumeStorageClass)
+	statefulSet := resources.StatefulSet(clusterName, template, volumeClaimTemplate, nSpec.NumberOfInstances)
 
 	//TODO: mind the case of updating allowedSourceRanges
 	err := c.updateStatefulSet(statefulSet)
