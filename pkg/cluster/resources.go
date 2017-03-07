@@ -110,11 +110,10 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	resourceList := resources.ResourceList(cSpec.Resources)
 	template := resources.PodTemplate(clusterName, resourceList, c.dockerImage, cSpec.Version, c.etcdHost)
 	volumeClaimTemplate := resources.VolumeClaimTemplate(volumeSize, volumeStorageClass)
-	statefulSet := resources.StatefulSet(clusterName, template, volumeClaimTemplate, cSpec.NumberOfInstances)
-
-	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSet.Namespace).Create(statefulSet)
+	statefulSetSpec := resources.StatefulSet(clusterName, template, volumeClaimTemplate, cSpec.NumberOfInstances)
+	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSetSpec.Namespace).Create(statefulSetSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
-		return nil, fmt.Errorf("StatefulSet '%s' already exists", util.NameFromMeta(statefulSet.ObjectMeta))
+		return nil, fmt.Errorf("StatefulSet '%s' already exists", util.NameFromMeta(statefulSetSpec.ObjectMeta))
 	}
 	if err != nil {
 		return nil, err
@@ -174,11 +173,11 @@ func (c *Cluster) deleteEndpoint(endpoint *v1.Endpoints) error {
 }
 
 func (c *Cluster) createService() (*v1.Service, error) {
-	service := resources.Service(c.ClusterName(), c.Spec.AllowedSourceRanges)
+	serviceSpec := resources.Service(c.ClusterName(), c.Spec.AllowedSourceRanges)
 
-	service, err := c.config.KubeClient.Services(service.Namespace).Create(service)
+	service, err := c.config.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
-		return nil, fmt.Errorf("Service '%s' already exists", util.NameFromMeta(service.ObjectMeta))
+		return nil, fmt.Errorf("Service '%s' already exists", util.NameFromMeta(serviceSpec.ObjectMeta))
 	}
 	if err != nil {
 		return nil, err
@@ -227,21 +226,21 @@ func (c *Cluster) applySecrets() error {
 		return fmt.Errorf("Can't get user secrets")
 	}
 
-	for username, secret := range secrets {
-		secret, err := c.config.KubeClient.Secrets(secret.Namespace).Create(secret)
+	for secretUsername, secretSpec := range secrets {
+		secret, err := c.config.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
 		if k8sutil.ResourceAlreadyExists(err) {
-			curSecrets, err := c.config.KubeClient.Secrets(secret.Namespace).Get(secret.Name)
+			curSecrets, err := c.config.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
 			if err != nil {
 				return fmt.Errorf("Can't get current secret: %s", err)
 			}
-			pwdUser := c.pgUsers[username]
+			pwdUser := c.pgUsers[secretUsername]
 			pwdUser.Password = string(curSecrets.Data["password"])
-			c.pgUsers[username] = pwdUser
+			c.pgUsers[secretUsername] = pwdUser
 
 			continue
 		} else {
 			if err != nil {
-				return fmt.Errorf("Can't create secret for user '%s': %s", username, err)
+				return fmt.Errorf("Can't create secret for user '%s': %s", secretUsername, err)
 			}
 			c.Secrets[secret.UID] = secret
 			c.logger.Debugf("Created new secret, uid: %s", secret.UID)
