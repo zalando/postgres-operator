@@ -258,6 +258,10 @@ func (c *Cluster) Delete() error {
 	if err != nil {
 		return fmt.Errorf("Can't delete pods: %s", err)
 	}
+	err = c.deletePersistenVolumeClaims()
+	if err != nil {
+		return fmt.Errorf("Can't delete PersistentVolumeClains: %s", err)
+	}
 
 	return nil
 }

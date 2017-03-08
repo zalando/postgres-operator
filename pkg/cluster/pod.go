@@ -41,6 +41,33 @@ func (c *Cluster) deletePods() error {
 	return nil
 }
 
+func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, error) {
+	ns := c.Metadata.Namespace
+	listOptions := v1.ListOptions{
+		LabelSelector: c.labelsSet().String(),
+	}
+
+	pvcs, err := c.config.KubeClient.PersistentVolumeClaims(ns).List(listOptions)
+	if err != nil {
+		return nil, fmt.Errorf("Can't get list of PersistentVolumeClaims: %s", err)
+	}
+	return pvcs.Items, nil
+}
+
+func (c *Cluster) deletePersistenVolumeClaims() error {
+	ns := c.Metadata.Namespace
+	pvcs, err := c.listPersistentVolumeClaims()
+	if err != nil {
+		return err
+	}
+	for _, pvc := range pvcs {
+		if err := c.config.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, deleteOptions); err != nil {
+			c.logger.Warningf("Can't delete PersistentVolumeClaim: %s", err)
+		}
+	}
+	return nil
+}
+
 func (c *Cluster) deletePod(pod *v1.Pod) error {
 	podName := spec.PodName{
 		Namespace: pod.Namespace,
