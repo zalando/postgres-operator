@@ -32,11 +32,10 @@ var (
 
 //TODO: remove struct duplication
 type Config struct {
-	ControllerNamespace string
-	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
-	RestClient          *rest.RESTClient
-	EtcdClient          etcdclient.KeysAPI
-	TeamsAPIClient      *teams.TeamsAPI
+	KubeClient     *kubernetes.Clientset //TODO: move clients to the better place?
+	RestClient     *rest.RESTClient
+	EtcdClient     etcdclient.KeysAPI
+	TeamsAPIClient *teams.TeamsAPI
 }
 
 type KubeResources struct {

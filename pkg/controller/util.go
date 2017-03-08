@@ -12,11 +12,10 @@ import (
 
 func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
-		ControllerNamespace: c.config.PodNamespace,
-		KubeClient:          c.config.KubeClient,
-		RestClient:          c.config.RestClient,
-		EtcdClient:          c.config.EtcdClient,
-		TeamsAPIClient:      c.config.TeamsAPIClient,
+		KubeClient:     c.config.KubeClient,
+		RestClient:     c.config.RestClient,
+		EtcdClient:     c.config.EtcdClient,
+		TeamsAPIClient: c.config.TeamsAPIClient,
 	}
 }
 
