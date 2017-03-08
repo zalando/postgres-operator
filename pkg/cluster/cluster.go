@@ -23,6 +23,7 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
@@ -93,7 +94,7 @@ func (c *Cluster) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (c *Cluster) NeedsRollingUpdate(otherSpec *spec.Postgresql) bool {
+func (c *Cluster) needsRollingUpdate(otherSpec *spec.Postgresql) bool {
 	//TODO: add more checks
 	if c.Spec.Version != otherSpec.Spec.Version {
 		return true
@@ -124,7 +125,7 @@ func (c *Cluster) MustSetStatus(status spec.PostgresStatus) {
 	}
 
 	if err != nil {
-		c.logger.Fatalf("Can't set status for cluster '%s': %s", c.ClusterName(), err)
+		c.logger.Warningf("Can't set status for cluster '%s': %s", c.ClusterName(), err)
 	}
 }
 
@@ -132,13 +133,13 @@ func (c *Cluster) Create() error {
 	//TODO: service will create endpoint implicitly
 	ep, err := c.createEndpoint()
 	if err != nil {
-		return fmt.Errorf("Can't create endpoint: %s", err)
+		return fmt.Errorf("Can't create Endpoint: %s", err)
 	}
 	c.logger.Infof("Endpoint '%s' has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
 	service, err := c.createService()
 	if err != nil {
-		return fmt.Errorf("Can't create service: %s", err)
+		return fmt.Errorf("Can't create Service: %s", err)
 	} else {
 		c.logger.Infof("Service '%s' has been successfully created", util.NameFromMeta(service.ObjectMeta))
 	}
@@ -187,8 +188,26 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
-func (c *Cluster) Update(newSpec *spec.Postgresql, rollingUpdate bool) error {
+func (c *Cluster) Update(newSpec *spec.Postgresql) error {
+	c.logger.Infof("Cluster update from version %s to %s",
+		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
+
+	rollingUpdate := c.needsRollingUpdate(newSpec)
+	if rollingUpdate {
+		c.logger.Infof("Pods need to be recreated")
+	}
+
 	newStatefulSet := getStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
+
+	newService := resources.Service(c.ClusterName(), newSpec.Spec.AllowedSourceRanges)
+	if !servicesEqual(newService, c.Service) {
+		c.logger.Infof("Service needs to be upated")
+		if err := c.updateService(newService); err != nil {
+			return fmt.Errorf("Can't update Service: %s", err)
+		} else {
+			c.logger.Infof("Service has been updated")
+		}
+	}
 
 	if !reflect.DeepEqual(newSpec.Spec.Volume, c.Spec.Volume) {
 		//TODO: update PVC
@@ -196,13 +215,13 @@ func (c *Cluster) Update(newSpec *spec.Postgresql, rollingUpdate bool) error {
 
 	//TODO: mind the case of updating allowedSourceRanges
 	if err := c.updateStatefulSet(newStatefulSet); err != nil {
-		return fmt.Errorf("Can't upate cluster: %s", err)
+		return fmt.Errorf("Can't upate StatefulSet: %s", err)
 	}
 
 	if rollingUpdate {
 		// TODO: wait for actual streaming to the replica
 		if err := c.recreatePods(); err != nil {
-			return fmt.Errorf("Can't recreate pods: %s", err)
+			return fmt.Errorf("Can't recreate Pods: %s", err)
 		}
 	}
 
@@ -211,13 +230,13 @@ func (c *Cluster) Update(newSpec *spec.Postgresql, rollingUpdate bool) error {
 
 func (c *Cluster) Delete() error {
 	if err := c.deleteEndpoint(); err != nil {
-		c.logger.Errorf("Can't delete endpoint: %s", err)
+		c.logger.Errorf("Can't delete Endpoint: %s", err)
 	} else {
 		c.logger.Infof("Endpoint '%s' has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
 	}
 
 	if err := c.deleteService(); err != nil {
-		c.logger.Errorf("Can't delete service: %s", err)
+		c.logger.Errorf("Can't delete Service: %s", err)
 	} else {
 		c.logger.Infof("Service '%s' has been deleted", util.NameFromMeta(c.Service.ObjectMeta))
 	}
@@ -230,14 +249,14 @@ func (c *Cluster) Delete() error {
 
 	for _, obj := range c.Secrets {
 		if err := c.deleteSecret(obj); err != nil {
-			c.logger.Errorf("Can't delete secret: %s", err)
+			c.logger.Errorf("Can't delete Secret: %s", err)
 		} else {
 			c.logger.Infof("Secret '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
 		}
 	}
 
 	if err := c.deletePods(); err != nil {
-		c.logger.Errorf("Can't delete pods: %s", err)
+		c.logger.Errorf("Can't delete Pods: %s", err)
 	} else {
 		c.logger.Infof("Pods have been deleted")
 	}

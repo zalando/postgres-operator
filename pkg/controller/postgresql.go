@@ -132,28 +132,19 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 		return
 	}
 	pgCluster := c.clusters[clusterName] // current
-
 	if reflect.DeepEqual(pgPrev.Spec, pgNew.Spec) {
 		c.logger.Infof("Skipping update with no spec change")
 		return
 	}
 
-	c.logger.Infof("Cluster update: %s(version: %s) -> %s(version: %s)",
-		util.NameFromMeta(pgPrev.Metadata), pgPrev.Metadata.ResourceVersion,
-		util.NameFromMeta(pgNew.Metadata), pgNew.Metadata.ResourceVersion)
-
-	rollingUpdate := pgCluster.NeedsRollingUpdate(pgNew)
-	if rollingUpdate {
-		c.logger.Infof("Pods need to be recreated")
-	}
-
 	pgCluster.MustSetStatus(spec.ClusterStatusUpdating)
-	if err := pgCluster.Update(pgNew, rollingUpdate); err != nil {
+	if err := pgCluster.Update(pgNew); err != nil {
 		pgCluster.MustSetStatus(spec.ClusterStatusUpdateFailed)
 		c.logger.Errorf("Can't update cluster: %s", err)
 	} else {
 		c.logger.Infof("Cluster has been updated")
 	}
+	pgCluster.MustSetStatus(spec.ClusterStatusRunning)
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {

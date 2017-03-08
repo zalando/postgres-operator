@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -183,4 +184,13 @@ func (c *Cluster) deleteEtcdKey() error {
 	}
 
 	return nil
+}
+
+func servicesEqual(svc1, svc2 *v1.Service) bool {
+	//TODO: improve me
+	if reflect.DeepEqual(svc1.Spec.LoadBalancerSourceRanges, svc2.Spec.LoadBalancerSourceRanges) {
+		return true
+	}
+
+	return false
 }
