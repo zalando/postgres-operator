@@ -137,16 +137,14 @@ func (c *Cluster) waitPodLabelsReady() error {
 		})
 }
 
-func (c *Cluster) waitClusterReady() error {
+func (c *Cluster) waitStatefulsetPodsReady() error {
 	// TODO: wait for the first Pod only
-	err := c.waitStatefulsetReady()
-	if err != nil {
+	if err := c.waitStatefulsetReady(); err != nil {
 		return fmt.Errorf("Statuful set error: %s", err)
 	}
 
 	// TODO: wait only for master
-	err = c.waitPodLabelsReady()
-	if err != nil {
+	if err := c.waitPodLabelsReady(); err != nil {
 		return fmt.Errorf("Pod labels error: %s", err)
 	}
 

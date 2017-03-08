@@ -40,11 +40,12 @@ type Config struct {
 }
 
 type KubeResources struct {
-	Services     map[types.UID]*v1.Service
-	Endpoints    map[types.UID]*v1.Endpoints
-	Secrets      map[types.UID]*v1.Secret
-	Statefulsets map[types.UID]*v1beta1.StatefulSet
+	Service     *v1.Service
+	Endpoint    *v1.Endpoints
+	Secrets     map[types.UID]*v1.Secret
+	Statefulset *v1beta1.StatefulSet
 	//Pods are treated separately
+	//PVCs are treated separately
 }
 
 type Cluster struct {
@@ -63,12 +64,7 @@ type Cluster struct {
 
 func New(cfg Config, pgSpec spec.Postgresql) *Cluster {
 	lg := logrus.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
-	kubeResources := KubeResources{
-		Services:     make(map[types.UID]*v1.Service),
-		Endpoints:    make(map[types.UID]*v1.Endpoints),
-		Secrets:      make(map[types.UID]*v1.Secret),
-		Statefulsets: make(map[types.UID]*v1beta1.StatefulSet),
-	}
+	kubeResources := KubeResources{Secrets: make(map[types.UID]*v1.Secret)}
 
 	cluster := &Cluster{
 		config:         cfg,
@@ -149,18 +145,15 @@ func (c *Cluster) Create() error {
 	}
 
 	c.initSystemUsers()
-	err = c.initRobotUsers()
-	if err != nil {
+	if err := c.initRobotUsers(); err != nil {
 		return fmt.Errorf("Can't init robot users: %s", err)
 	}
 
-	err = c.initHumanUsers()
-	if err != nil {
+	if err := c.initHumanUsers(); err != nil {
 		return fmt.Errorf("Can't init human users: %s", err)
 	}
 
-	err = c.applySecrets()
-	if err != nil {
+	if err := c.applySecrets(); err != nil {
 		return fmt.Errorf("Can't create secrets: %s", err)
 	} else {
 		c.logger.Infof("Secrets have been successfully created")
@@ -174,19 +167,17 @@ func (c *Cluster) Create() error {
 	}
 
 	c.logger.Info("Waiting for cluster being ready")
-	err = c.waitClusterReady()
+	err = c.waitStatefulsetPodsReady()
 	if err != nil {
 		c.logger.Errorf("Failed to create cluster: %s", err)
 		return err
 	}
 
-	err = c.initDbConn()
-	if err != nil {
+	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("Can't init db connection: %s", err)
 	}
 
-	err = c.createUsers()
-	if err != nil {
+	if err := c.createUsers(); err != nil {
 		return fmt.Errorf("Can't create users: %s", err)
 	} else {
 		c.logger.Infof("Users have been successfully created")
@@ -198,18 +189,20 @@ func (c *Cluster) Create() error {
 }
 
 func (c *Cluster) Update(newSpec *spec.Postgresql, rollingUpdate bool) error {
-	statefulSet := getStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
+	newStatefulSet := getStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
+
+	if !reflect.DeepEqual(newSpec.Spec.Volume, c.Spec.Volume) {
+		//TODO: update PVC
+	}
 
 	//TODO: mind the case of updating allowedSourceRanges
-	err := c.updateStatefulSet(statefulSet)
-	if err != nil {
+	if err := c.updateStatefulSet(newStatefulSet); err != nil {
 		return fmt.Errorf("Can't upate cluster: %s", err)
 	}
 
 	if rollingUpdate {
-		err = c.recreatePods()
 		// TODO: wait for actual streaming to the replica
-		if err != nil {
+		if err := c.recreatePods(); err != nil {
 			return fmt.Errorf("Can't recreate pods: %s", err)
 		}
 	}
@@ -218,45 +211,36 @@ func (c *Cluster) Update(newSpec *spec.Postgresql, rollingUpdate bool) error {
 }
 
 func (c *Cluster) Delete() error {
-	for _, obj := range c.Statefulsets {
-		err := c.deleteStatefulSet(obj)
-		if err != nil {
-			c.logger.Errorf("Can't delete StatefulSet: %s", err)
-		} else {
-			c.logger.Infof("StatefulSet '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
-		}
+	if err := c.deleteEndpoint(); err != nil {
+		c.logger.Errorf("Can't delete endpoint: %s", err)
+	} else {
+		c.logger.Infof("Endpoint '%s' has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
+	}
+
+	if err := c.deleteService(); err != nil {
+		c.logger.Errorf("Can't delete service: %s", err)
+	} else {
+		c.logger.Infof("Service '%s' has been deleted", util.NameFromMeta(c.Service.ObjectMeta))
+	}
+
+	if err := c.deleteStatefulSet(); err != nil {
+		c.logger.Errorf("Can't delete StatefulSet: %s", err)
+	} else {
+		c.logger.Infof("StatefulSet '%s' has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	}
 
 	for _, obj := range c.Secrets {
-		err := c.deleteSecret(obj)
-		if err != nil {
+		if err := c.deleteSecret(obj); err != nil {
 			c.logger.Errorf("Can't delete secret: %s", err)
 		} else {
 			c.logger.Infof("Secret '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
 		}
 	}
 
-	for _, obj := range c.Endpoints {
-		err := c.deleteEndpoint(obj)
-		if err != nil {
-			c.logger.Errorf("Can't delete endpoint: %s", err)
-		} else {
-			c.logger.Infof("Endpoint '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
-		}
-	}
-
-	for _, obj := range c.Services {
-		err := c.deleteService(obj)
-		if err != nil {
-			c.logger.Errorf("Can't delete service: %s", err)
-		} else {
-			c.logger.Infof("Service '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
-		}
-	}
-
-	err := c.deletePods()
-	if err != nil {
-		return fmt.Errorf("Can't delete pods: %s", err)
+	if err := c.deletePods(); err != nil {
+		c.logger.Errorf("Can't delete pods: %s", err)
+	} else {
+		c.logger.Infof("Pods have been deleted")
 	}
 	err = c.deletePersistenVolumeClaims()
 	if err != nil {

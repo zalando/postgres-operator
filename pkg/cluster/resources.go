@@ -38,24 +38,19 @@ func (c *Cluster) LoadResources() error {
 	if err != nil {
 		return fmt.Errorf("Can't get list of services: %s", err)
 	}
-	for i, service := range services.Items {
-		if _, ok := c.Services[service.UID]; ok {
-			continue
-		}
-		c.Services[service.UID] = &services.Items[i]
+	if len(services.Items) > 1 {
+		return fmt.Errorf("Too many(%d) Services for a cluster", len(services.Items))
 	}
+	c.Service = &services.Items[0]
 
 	endpoints, err := c.config.KubeClient.Endpoints(ns).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get list of endpoints: %s", err)
 	}
-	for i, endpoint := range endpoints.Items {
-		if _, ok := c.Endpoints[endpoint.UID]; ok {
-			continue
-		}
-		c.Endpoints[endpoint.UID] = &endpoints.Items[i]
-		c.logger.Debugf("Endpoint loaded, uid: %s", endpoint.UID)
+	if len(endpoints.Items) > 1 {
+		return fmt.Errorf("Too many(%d) Endpoints for a cluster", len(endpoints.Items))
 	}
+	c.Endpoint = &endpoints.Items[0]
 
 	secrets, err := c.config.KubeClient.Secrets(ns).List(listOptions)
 	if err != nil {
@@ -73,33 +68,23 @@ func (c *Cluster) LoadResources() error {
 	if err != nil {
 		return fmt.Errorf("Can't get list of stateful sets: %s", err)
 	}
-	for i, statefulSet := range statefulSets.Items {
-		if _, ok := c.Statefulsets[statefulSet.UID]; ok {
-			continue
-		}
-		c.Statefulsets[statefulSet.UID] = &statefulSets.Items[i]
-		c.logger.Debugf("StatefulSet loaded, uid: %s", statefulSet.UID)
+	if len(statefulSets.Items) > 1 {
+		return fmt.Errorf("Too many(%d) StatefulSets for a cluster", len(statefulSets.Items))
 	}
+	c.Statefulset = &statefulSets.Items[0]
 
 	return nil
 }
 
 func (c *Cluster) ListResources() error {
-	for _, obj := range c.Statefulsets {
-		c.logger.Infof("StatefulSet: %s", util.NameFromMeta(obj.ObjectMeta))
-	}
+	c.logger.Infof("StatefulSet: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 
 	for _, obj := range c.Secrets {
-		c.logger.Infof("Secret: %s", util.NameFromMeta(obj.ObjectMeta))
+		c.logger.Infof("Secret: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
-	for _, obj := range c.Endpoints {
-		c.logger.Infof("Endpoint: %s", util.NameFromMeta(obj.ObjectMeta))
-	}
-
-	for _, obj := range c.Services {
-		c.logger.Infof("Service: %s", util.NameFromMeta(obj.ObjectMeta))
-	}
+	c.logger.Infof("Endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
+	c.logger.Infof("Service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
 
 	pods, err := c.clusterPods()
 	if err != nil {
@@ -107,13 +92,16 @@ func (c *Cluster) ListResources() error {
 	}
 
 	for _, obj := range pods {
-		c.logger.Infof("Pod: %s", util.NameFromMeta(obj.ObjectMeta))
+		c.logger.Infof("Pod: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	return nil
 }
 
 func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
+	if c.Statefulset != nil {
+		return nil, fmt.Errorf("StatefulSet already exists in the cluster")
+	}
 	statefulSetSpec := getStatefulSet(c.ClusterName(), c.Spec, c.etcdHost, c.dockerImage)
 	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSetSpec.Namespace).Create(statefulSetSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
@@ -122,61 +110,44 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.Statefulsets[statefulSet.UID] = statefulSet
+	c.Statefulset = statefulSet
 	c.logger.Debugf("Created new StatefulSet, uid: %s", statefulSet.UID)
 
 	return statefulSet, nil
 }
 
-func (c *Cluster) updateStatefulSet(statefulSet *v1beta1.StatefulSet) error {
-	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSet.Namespace).Update(statefulSet)
-	if err != nil {
-		c.Statefulsets[statefulSet.UID] = statefulSet
+func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+	if c.Statefulset == nil {
+		return fmt.Errorf("There is no StatefulSet in the cluster")
 	}
-
-	return err
-}
-
-func (c *Cluster) deleteStatefulSet(statefulSet *v1beta1.StatefulSet) error {
-	err := c.config.KubeClient.
-		StatefulSets(statefulSet.Namespace).
-		Delete(statefulSet.Name, deleteOptions)
-
+	statefulSet, err := c.config.KubeClient.StatefulSets(newStatefulSet.Namespace).Update(newStatefulSet)
 	if err != nil {
 		return err
 	}
-	delete(c.Statefulsets, statefulSet.UID)
+
+	c.Statefulset = statefulSet
 
 	return nil
 }
 
-func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
-	endpointSpec := resources.Endpoint(c.ClusterName())
-
-	endpoint, err := c.config.KubeClient.Endpoints(endpointSpec.Namespace).Create(endpointSpec)
-	if k8sutil.ResourceAlreadyExists(err) {
-		return nil, fmt.Errorf("Endpoint '%s' already exists", util.NameFromMeta(endpointSpec.ObjectMeta))
+func (c *Cluster) deleteStatefulSet() error {
+	if c.Statefulset == nil {
+		return fmt.Errorf("There is no StatefulSet in the cluster")
 	}
-	if err != nil {
-		return nil, err
-	}
-	c.Endpoints[endpoint.UID] = endpoint
-	c.logger.Debugf("Created new endpoint, uid: %s", endpoint.UID)
 
-	return endpoint, nil
-}
-
-func (c *Cluster) deleteEndpoint(endpoint *v1.Endpoints) error {
-	err := c.config.KubeClient.Endpoints(endpoint.Namespace).Delete(endpoint.Name, deleteOptions)
+	err := c.config.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(c.Statefulset.Name, deleteOptions)
 	if err != nil {
 		return err
 	}
-	delete(c.Endpoints, endpoint.UID)
+	c.Statefulset = nil
 
 	return nil
 }
 
 func (c *Cluster) createService() (*v1.Service, error) {
+	if c.Service != nil {
+		return nil, fmt.Errorf("Service already exists in the cluster")
+	}
 	serviceSpec := resources.Service(c.ClusterName(), c.Spec.AllowedSourceRanges)
 
 	service, err := c.config.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
@@ -186,39 +157,73 @@ func (c *Cluster) createService() (*v1.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.Services[service.UID] = service
-	c.logger.Debugf("Created new service, uid: %s", service.UID)
+	c.Service = service
 
 	return service, nil
 }
 
-func (c *Cluster) deleteService(service *v1.Service) error {
-	err := c.config.KubeClient.Services(service.Namespace).Delete(service.Name, deleteOptions)
+func (c *Cluster) updateService(newService *v1.Service) error {
+	if c.Service == nil {
+		return fmt.Errorf("There is no Service in the cluster")
+	}
+	newService.ObjectMeta = c.Service.ObjectMeta
+	newService.Spec.ClusterIP = c.Service.Spec.ClusterIP
+
+	svc, err := c.config.KubeClient.Services(newService.Namespace).Update(newService)
 	if err != nil {
 		return err
 	}
-	delete(c.Services, service.UID)
+	c.Service = svc
 
 	return nil
 }
 
-func (c *Cluster) createUsers() error {
-	for username, user := range c.pgUsers {
-		if username == constants.SuperuserName || username == constants.ReplicationUsername {
-			continue
-		}
-
-		isHuman, err := c.createPgUser(user)
-		var userType string
-		if isHuman {
-			userType = "human"
-		} else {
-			userType = "robot"
-		}
-		if err != nil {
-			return fmt.Errorf("Can't create %s user '%s': %s", userType, username, err)
-		}
+func (c *Cluster) deleteService() error {
+	if c.Service == nil {
+		return fmt.Errorf("There is no Service in the cluster")
 	}
+	err := c.config.KubeClient.Services(c.Service.Namespace).Delete(c.Service.Name, deleteOptions)
+	if err != nil {
+		return err
+	}
+	c.Service = nil
+
+	return nil
+}
+
+func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
+	if c.Endpoint != nil {
+		return nil, fmt.Errorf("Endpoint already exists in the cluster")
+	}
+	endpointSpec := resources.Endpoint(c.ClusterName())
+
+	endpoint, err := c.config.KubeClient.Endpoints(endpointSpec.Namespace).Create(endpointSpec)
+	if k8sutil.ResourceAlreadyExists(err) {
+		return nil, fmt.Errorf("Endpoint '%s' already exists", util.NameFromMeta(endpointSpec.ObjectMeta))
+	}
+	if err != nil {
+		return nil, err
+	}
+	c.Endpoint = endpoint
+
+	return endpoint, nil
+}
+
+func (c *Cluster) updateEndpoint(newEndpoint *v1.Endpoints) error {
+	//TODO: to be implemented
+
+	return nil
+}
+
+func (c *Cluster) deleteEndpoint() error {
+	if c.Endpoint == nil {
+		return fmt.Errorf("There is no Endpoint in the cluster")
+	}
+	err := c.config.KubeClient.Endpoints(c.Endpoint.Namespace).Delete(c.Endpoint.Name, deleteOptions)
+	if err != nil {
+		return err
+	}
+	c.Endpoint = nil
 
 	return nil
 }
@@ -262,4 +267,25 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 	delete(c.Secrets, secret.UID)
 
 	return err
+}
+
+func (c *Cluster) createUsers() error {
+	for username, user := range c.pgUsers {
+		if username == constants.SuperuserName || username == constants.ReplicationUsername {
+			continue
+		}
+
+		isHuman, err := c.createPgUser(user)
+		var userType string
+		if isHuman {
+			userType = "human"
+		} else {
+			userType = "robot"
+		}
+		if err != nil {
+			return fmt.Errorf("Can't create %s user '%s': %s", userType, username, err)
+		}
+	}
+
+	return nil
 }

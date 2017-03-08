@@ -52,9 +52,8 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		c.stopChMap[clusterName] = stopCh
 		c.clusters[clusterName] = cl
 		cl.LoadResources()
-		cl.ListResources()
-
 		go cl.Run(stopCh)
+		cl.ListResources()
 	}
 	if len(c.clusters) > 0 {
 		c.logger.Infof("There are %d clusters currently running", len(c.clusters))
@@ -96,8 +95,7 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 	c.logger.Infof("Creation of a new Postgresql cluster '%s' started", clusterName)
 	cl := cluster.New(c.makeClusterConfig(), *pg)
 	cl.MustSetStatus(spec.ClusterStatusCreating)
-	err := cl.Create()
-	if err != nil {
+	if err := cl.Create(); err != nil {
 		c.logger.Errorf("Can't create cluster: %s", err)
 		cl.MustSetStatus(spec.ClusterStatusAddFailed)
 		return
@@ -150,8 +148,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	}
 
 	pgCluster.MustSetStatus(spec.ClusterStatusUpdating)
-	err := pgCluster.Update(pgNew, rollingUpdate)
-	if err != nil {
+	if err := pgCluster.Update(pgNew, rollingUpdate); err != nil {
 		pgCluster.MustSetStatus(spec.ClusterStatusUpdateFailed)
 		c.logger.Errorf("Can't update cluster: %s", err)
 	} else {
@@ -176,8 +173,7 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 	}
 
 	c.logger.Infof("Cluster delete: %s", util.NameFromMeta(pgCur.Metadata))
-	err := pgCluster.Delete()
-	if err != nil {
+	if err := pgCluster.Delete(); err != nil {
 		c.logger.Errorf("Can't delete cluster '%s': %s", clusterName, err)
 		return
 	}

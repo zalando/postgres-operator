@@ -52,8 +52,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	wg.Add(1)
 
 	c.initController()
-	err := c.initEtcdClient()
-	if err != nil {
+	if err := c.initEtcdClient(); err != nil {
 		c.logger.Errorf("Can't get etcd client: %s", err)
 		return
 	}
@@ -65,8 +64,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 }
 
 func (c *Controller) initController() {
-	err := c.createTPR()
-	if err != nil {
+	if err := c.createTPR(); err != nil {
 		c.logger.Fatalf("Can't register ThirdPartyResource: %s", err)
 	}
 

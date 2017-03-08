@@ -30,8 +30,7 @@ func (c *Cluster) deletePods() error {
 	}
 
 	for _, obj := range pods {
-		err := c.deletePod(&obj)
-		if err != nil {
+		if err := c.deletePod(&obj); err != nil {
 			c.logger.Errorf("Can't delete pod: %s", err)
 		} else {
 			c.logger.Infof("Pod '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
@@ -84,13 +83,11 @@ func (c *Cluster) deletePod(pod *v1.Pod) error {
 		delete(c.podSubscribers, podName)
 	}()
 
-	err := c.config.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
-	if err != nil {
+	if err := c.config.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
 		return err
 	}
 
-	err = c.waitForPodDeletion(ch)
-	if err != nil {
+	if err := c.waitForPodDeletion(ch); err != nil {
 		return err
 	}
 
@@ -118,16 +115,14 @@ func (c *Cluster) recreatePod(pod v1.Pod, spiloRole string) error {
 		delete(c.podSubscribers, podName)
 	}()
 
-	err := c.config.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
-	if err != nil {
+	if err := c.config.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
 		return fmt.Errorf("Can't delete pod: %s", err)
 	}
-	err = c.waitForPodDeletion(ch)
-	if err != nil {
+
+	if err := c.waitForPodDeletion(ch); err != nil {
 		return err
 	}
-	err = c.waitForPodLabel(ch, spiloRole)
-	if err != nil {
+	if err := c.waitForPodLabel(ch, spiloRole); err != nil {
 		return err
 	}
 	c.logger.Infof("Pod '%s' is ready", podName)
@@ -161,7 +156,7 @@ func (c *Cluster) recreatePods() error {
 	}
 	pods, err := c.config.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of pods: %s", err)
+		return fmt.Errorf("Can't get the list of the pods: %s", err)
 	} else {
 		c.logger.Infof("There are %d pods in the cluster to recreate", len(pods.Items))
 	}
@@ -187,8 +182,8 @@ func (c *Cluster) recreatePods() error {
 	//TODO: do manual failover
 	//TODO: specify master, leave new master empty
 	c.logger.Infof("Recreating master pod '%s'", util.NameFromMeta(masterPod.ObjectMeta))
-	err = c.recreatePod(masterPod, "replica")
-	if err != nil {
+
+	if err := c.recreatePod(masterPod, "replica"); err != nil {
 		return fmt.Errorf("Can't recreate master pod '%s': %s", util.NameFromMeta(masterPod.ObjectMeta), err)
 	}
 
