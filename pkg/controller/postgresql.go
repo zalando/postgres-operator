@@ -94,13 +94,13 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 
 	c.logger.Infof("Creation of a new Postgresql cluster '%s' started", clusterName)
 	cl := cluster.New(c.makeClusterConfig(), *pg)
-	cl.MustSetStatus(spec.ClusterStatusCreating)
+	cl.SetStatus(spec.ClusterStatusCreating)
 	if err := cl.Create(); err != nil {
 		c.logger.Errorf("Can't create cluster: %s", err)
-		cl.MustSetStatus(spec.ClusterStatusAddFailed)
+		cl.SetStatus(spec.ClusterStatusAddFailed)
 		return
 	}
-	cl.MustSetStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
+	cl.SetStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
 
 	stopCh := make(chan struct{})
 	c.stopChMap[clusterName] = stopCh
@@ -137,14 +137,14 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 		return
 	}
 
-	pgCluster.MustSetStatus(spec.ClusterStatusUpdating)
+	pgCluster.SetStatus(spec.ClusterStatusUpdating)
 	if err := pgCluster.Update(pgNew); err != nil {
-		pgCluster.MustSetStatus(spec.ClusterStatusUpdateFailed)
+		pgCluster.SetStatus(spec.ClusterStatusUpdateFailed)
 		c.logger.Errorf("Can't update cluster: %s", err)
 	} else {
 		c.logger.Infof("Cluster has been updated")
 	}
-	pgCluster.MustSetStatus(spec.ClusterStatusRunning)
+	pgCluster.SetStatus(spec.ClusterStatusRunning)
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {

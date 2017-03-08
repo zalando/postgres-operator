@@ -107,7 +107,7 @@ func (c *Cluster) needsRollingUpdate(otherSpec *spec.Postgresql) bool {
 	return false
 }
 
-func (c *Cluster) MustSetStatus(status spec.PostgresStatus) {
+func (c *Cluster) SetStatus(status spec.PostgresStatus) {
 	b, err := json.Marshal(status)
 	if err != nil {
 		c.logger.Fatalf("Can't marshal status: %s", err)
