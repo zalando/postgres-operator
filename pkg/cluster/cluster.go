@@ -88,7 +88,8 @@ func (c *Cluster) ClusterName() spec.ClusterName {
 	}
 }
 
-func (c *Cluster) ClusterTeamName() string {
+func (c *Cluster) TeamName() string {
+	// TODO: check Teams API for the actual name (in case the user passes an integer Id).
 	return c.Spec.TeamId
 }
 
@@ -203,7 +204,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 
 	newStatefulSet := getStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
 
-	newService := resources.Service(c.ClusterName(), c.ClusterTeamName(), newSpec.Spec.AllowedSourceRanges)
+	newService := resources.Service(c.ClusterName(), c.TeamName(), newSpec.Spec.AllowedSourceRanges)
 	if !servicesEqual(newService, c.Service) {
 		c.logger.Infof("Service needs to be upated")
 		if err := c.updateService(newService); err != nil {
