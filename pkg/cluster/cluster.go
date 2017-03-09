@@ -88,6 +88,10 @@ func (c *Cluster) ClusterName() spec.ClusterName {
 	}
 }
 
+func (c *Cluster) ClusterTeamName() string {
+	return c.Spec.TeamId
+}
+
 func (c *Cluster) Run(stopCh <-chan struct{}) {
 	go c.podEventsDispatcher(stopCh)
 
@@ -199,7 +203,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 
 	newStatefulSet := getStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
 
-	newService := resources.Service(c.ClusterName(), newSpec.Spec.AllowedSourceRanges)
+	newService := resources.Service(c.ClusterName(), c.ClusterTeamName(), newSpec.Spec.AllowedSourceRanges)
 	if !servicesEqual(newService, c.Service) {
 		c.logger.Infof("Service needs to be upated")
 		if err := c.updateService(newService); err != nil {

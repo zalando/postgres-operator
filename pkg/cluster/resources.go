@@ -148,7 +148,7 @@ func (c *Cluster) createService() (*v1.Service, error) {
 	if c.Service != nil {
 		return nil, fmt.Errorf("Service already exists in the cluster")
 	}
-	serviceSpec := resources.Service(c.ClusterName(), c.Spec.AllowedSourceRanges)
+	serviceSpec := resources.Service(c.ClusterName(), c.ClusterTeamName(), c.Spec.AllowedSourceRanges)
 
 	service, err := c.config.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
 	if k8sutil.ResourceAlreadyExists(err) {

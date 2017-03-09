@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"time"
 
+	"fmt"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
@@ -42,4 +43,8 @@ func PodClusterName(pod *v1.Pod) spec.ClusterName {
 	}
 
 	return spec.ClusterName{}
+}
+
+func ClusterDNSName(clusterName, teamName, hostedZone string) string {
+	return fmt.Sprintf("%s.%s.%s", clusterName, teamName, hostedZone)
 }

@@ -11,13 +11,17 @@ import (
 	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
 const (
-	superuserName       = "postgres"
-	replicationUsername = "replication"
-	dataVolumeName      = "pgdata"
+	superuserName            = "postgres"
+	replicationUsername      = "replication"
+	dataVolumeName           = "pgdata"
+	zalandoDnsNameAnnotation = "zalando.org/dnsname"
+	// TODO: move DbHostedZone to operator configuration
+	DbHostedZone = "db.example.com"
 )
 
 func credentialSecretName(clusterName, username string) string {
@@ -248,12 +252,13 @@ func UserSecrets(cluster spec.ClusterName, pgUsers map[string]spec.PgUser) (secr
 	return
 }
 
-func Service(cluster spec.ClusterName, allowedSourceRanges []string) *v1.Service {
+func Service(cluster spec.ClusterName, teamName string, allowedSourceRanges []string) *v1.Service {
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
-			Labels:    labelsSet(cluster.Name),
+			Name:        cluster.Name,
+			Namespace:   cluster.Namespace,
+			Labels:      labelsSet(cluster.Name),
+			Annotations: map[string]string{zalandoDnsNameAnnotation: util.ClusterDNSName(cluster.Name, teamName, DbHostedZone)},
 		},
 		Spec: v1.ServiceSpec{
 			Type:  v1.ServiceTypeLoadBalancer,
