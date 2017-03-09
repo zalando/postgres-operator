@@ -3,8 +3,8 @@ package util
 import (
 	"math/rand"
 	"time"
-
 	"fmt"
+
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
