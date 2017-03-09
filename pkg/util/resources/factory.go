@@ -15,15 +15,6 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
-const (
-	superuserName            = "postgres"
-	replicationUsername      = "replication"
-	dataVolumeName           = "pgdata"
-	zalandoDnsNameAnnotation = "zalando.org/dnsname"
-	// TODO: move DbHostedZone to operator configuration
-	DbHostedZone = "db.example.com"
-)
-
 func credentialSecretName(clusterName, username string) string {
 	return fmt.Sprintf(
 		constants.UserSecretTemplate,
@@ -90,7 +81,7 @@ func PodTemplate(cluster spec.ClusterName, resourceList *v1.ResourceList, docker
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: credentialSecretName(cluster.Name, superuserName),
+						Name: credentialSecretName(cluster.Name, constants.SuperuserName),
 					},
 					Key: "password",
 				},
@@ -101,7 +92,7 @@ func PodTemplate(cluster spec.ClusterName, resourceList *v1.ResourceList, docker
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: credentialSecretName(cluster.Name, replicationUsername),
+						Name: credentialSecretName(cluster.Name, constants.ReplicationUsername),
 					},
 					Key: "password",
 				},
@@ -156,7 +147,7 @@ bootstrap:
 		},
 		VolumeMounts: []v1.VolumeMount{
 			{
-				Name:      dataVolumeName,
+				Name:      constants.DataVolumeName,
 				MountPath: "/home/postgres/pgdata", //TODO: fetch from manifesto
 			},
 		},
@@ -184,7 +175,7 @@ bootstrap:
 
 func VolumeClaimTemplate(volumeSize, volumeStorageClass string) *v1.PersistentVolumeClaim {
 	metadata := v1.ObjectMeta{
-		Name: dataVolumeName,
+		Name: constants.DataVolumeName,
 	}
 	if volumeStorageClass != "" {
 		// TODO: check if storage class exists
@@ -255,10 +246,12 @@ func UserSecrets(cluster spec.ClusterName, pgUsers map[string]spec.PgUser) (secr
 func Service(cluster spec.ClusterName, teamName string, allowedSourceRanges []string) *v1.Service {
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        cluster.Name,
-			Namespace:   cluster.Namespace,
-			Labels:      labelsSet(cluster.Name),
-			Annotations: map[string]string{zalandoDnsNameAnnotation: util.ClusterDNSName(cluster.Name, teamName, DbHostedZone)},
+			Name:      cluster.Name,
+			Namespace: cluster.Namespace,
+			Labels:    labelsSet(cluster.Name),
+			Annotations: map[string]string{
+				constants.ZalandoDnsNameAnnotation: util.ClusterDNSName(cluster.Name, teamName, constants.DbHostedZone),
+			},
 		},
 		Spec: v1.ServiceSpec{
 			Type:  v1.ServiceTypeLoadBalancer,

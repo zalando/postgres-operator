@@ -31,6 +31,10 @@ const (
 	TeamsAPIUrl        = "https://teams.example.com/api/"
 	UserSecretTemplate = "%s.%s.credentials.%s.%s"
 
-	OAuthTokenSecretName = "postgresql-operator"
-	ServiceAccountName   = "operator"
+	OAuthTokenSecretName     = "postgresql-operator"
+	ServiceAccountName       = "operator"
+	DataVolumeName           = "pgdata"
+	ZalandoDnsNameAnnotation = "zalando.org/dnsname"
+	// TODO: move DbHostedZone to operator configuration
+	DbHostedZone = "db.example.com"
 )
