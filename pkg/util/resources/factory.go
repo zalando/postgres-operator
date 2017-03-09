@@ -145,6 +145,10 @@ bootstrap:
 				ContainerPort: 5432,
 				Protocol:      v1.ProtocolTCP,
 			},
+			{
+				ContainerPort: 8080,
+				Protocol:      v1.ProtocolTCP,
+			},
 		},
 		VolumeMounts: []v1.VolumeMount{
 			{
