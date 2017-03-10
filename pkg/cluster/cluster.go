@@ -260,7 +260,7 @@ func (c *Cluster) Delete() error {
 	}
 	err = c.deletePersistenVolumeClaims()
 	if err != nil {
-		return fmt.Errorf("Can't delete PersistentVolumeClains: %s", err)
+		return fmt.Errorf("Can't delete PersistentVolumeClaims %s", err)
 	}
 
 	return nil
