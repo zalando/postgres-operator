@@ -270,6 +270,7 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 }
 
 func (c *Cluster) createUsers() error {
+	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
 	for username, user := range c.pgUsers {
 		if username == constants.SuperuserName || username == constants.ReplicationUsername {
 			continue
@@ -283,7 +284,7 @@ func (c *Cluster) createUsers() error {
 			userType = "robot"
 		}
 		if err != nil {
-			return fmt.Errorf("Can't create %s user '%s': %s", userType, username, err)
+			c.logger.Warnf("Can't create %s user '%s': %s", userType, username, err)
 		}
 	}
 

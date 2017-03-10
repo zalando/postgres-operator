@@ -50,6 +50,7 @@ func (c *Cluster) createPgUser(user spec.PgUser) (isHuman bool, err error) {
 
 	if user.Password == "" {
 		isHuman = true
+		flags = append(flags, "SUPERUSER")
 		flags = append(flags, fmt.Sprintf("IN ROLE \"%s\"", constants.PamRoleName))
 	} else {
 		isHuman = false
