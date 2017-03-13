@@ -94,6 +94,24 @@ func (c *Cluster) deletePod(pod *v1.Pod) error {
 	return nil
 }
 
+func (c *Cluster) unregisterPodSubscriber(podName spec.PodName) {
+	if _, ok := c.podSubscribers[podName]; !ok {
+		panic("Subscriber for Pod '" + podName.String() + "' is not found")
+	}
+
+	close(c.podSubscribers[podName])
+	delete(c.podSubscribers, podName)
+}
+
+func (c *Cluster) registerPodSubscriber(podName spec.PodName) chan spec.PodEvent {
+	ch := make(chan spec.PodEvent)
+	if _, ok := c.podSubscribers[podName]; ok {
+		panic("Pod '" + podName.String() + "' is already subscribed")
+	}
+	c.podSubscribers[podName] = ch
+	return ch
+}
+
 func (c *Cluster) recreatePod(pod v1.Pod, spiloRole string) error {
 	podName := spec.PodName{
 		Namespace: pod.Namespace,
@@ -105,15 +123,8 @@ func (c *Cluster) recreatePod(pod v1.Pod, spiloRole string) error {
 		OrphanDependents: &orphanDependents,
 	}
 
-	ch := make(chan spec.PodEvent)
-	if _, ok := c.podSubscribers[podName]; ok {
-		panic("Pod '" + podName.String() + "' is already subscribed")
-	}
-	c.podSubscribers[podName] = ch
-	defer func() {
-		close(ch)
-		delete(c.podSubscribers, podName)
-	}()
+	ch := c.registerPodSubscriber(podName)
+	defer c.unregisterPodSubscriber(podName)
 
 	if err := c.config.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
 		return fmt.Errorf("Can't delete Pod: %s", err)

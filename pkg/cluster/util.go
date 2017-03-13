@@ -136,7 +136,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, spiloRole string
 		select {
 		case podEvent := <-podEvents:
 			role := util.PodSpiloRole(podEvent.CurPod)
-			if role == spiloRole {
+			if role == spiloRole { // TODO: newly-created Pods are always replicas => check against empty string only
 				return nil
 			}
 		case <-time.After(constants.PodLabelWaitTimeout):

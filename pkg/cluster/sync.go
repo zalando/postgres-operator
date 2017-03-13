@@ -5,6 +5,7 @@ import (
 
 	"k8s.io/client-go/pkg/api/v1"
 
+	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 )
@@ -136,16 +137,33 @@ func (c *Cluster) syncPods() error {
 		return fmt.Errorf("Can't get list of Pods: %s", err)
 	}
 	if int32(len(pods.Items)) != *curSs.Spec.Replicas {
+		//TODO: wait for Pods being created by StatefulSet
 		return fmt.Errorf("Number of existing Pods does not match number of replicas of the StatefulSet")
+	}
+
+	//First check if we have left overs from the previous rolling update
+	for _, pod := range pods.Items {
+		podRole := util.PodSpiloRole(&pod)
+		podName := spec.PodName{
+			Namespace: pod.Namespace,
+			Name:      pod.Name,
+		}
+
+		if podMatchesTemplate(&pod, curSs) && pod.Status.Phase == v1.PodPending {
+			c.logger.Infof("Waiting for left over Pod '%s'", podName)
+			ch := c.registerPodSubscriber(podName)
+			c.waitForPodLabel(ch, podRole)
+			c.unregisterPodSubscriber(podName)
+		}
 	}
 
 	for _, pod := range pods.Items {
 		if podMatchesTemplate(&pod, curSs) {
 			c.logger.Infof("Pod '%s' matches StatefulSet pod template", util.NameFromMeta(pod.ObjectMeta))
 			continue
+		} else {
+			c.logger.Infof("Pod '%s' does not match StatefulSet pod template. Pod needs to be recreated", util.NameFromMeta(pod.ObjectMeta))
 		}
-
-		c.logger.Infof("Pod '%s' does not match StatefulSet pod template and needs to be deleted.", util.NameFromMeta(pod.ObjectMeta))
 
 		if util.PodSpiloRole(&pod) == "master" {
 			//TODO: do manual failover first
