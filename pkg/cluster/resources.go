@@ -18,7 +18,7 @@ var (
 	orphanDependents = false
 )
 
-func getStatefulSet(clusterName spec.ClusterName, cSpec spec.PostgresSpec, etcdHost, dockerImage string) *v1beta1.StatefulSet {
+func genStatefulSet(clusterName spec.ClusterName, cSpec spec.PostgresSpec, etcdHost, dockerImage string) *v1beta1.StatefulSet {
 	volumeSize := cSpec.Volume.Size
 	volumeStorageClass := cSpec.Volume.StorageClass
 	resourceList := resources.ResourceList(cSpec.Resources)
@@ -36,7 +36,7 @@ func (c *Cluster) LoadResources() error {
 
 	services, err := c.config.KubeClient.Services(ns).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of services: %s", err)
+		return fmt.Errorf("Can't get list of Services: %s", err)
 	}
 	if len(services.Items) > 1 {
 		return fmt.Errorf("Too many(%d) Services for a cluster", len(services.Items))
@@ -45,7 +45,7 @@ func (c *Cluster) LoadResources() error {
 
 	endpoints, err := c.config.KubeClient.Endpoints(ns).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of endpoints: %s", err)
+		return fmt.Errorf("Can't get list of Endpoints: %s", err)
 	}
 	if len(endpoints.Items) > 1 {
 		return fmt.Errorf("Too many(%d) Endpoints for a cluster", len(endpoints.Items))
@@ -54,7 +54,7 @@ func (c *Cluster) LoadResources() error {
 
 	secrets, err := c.config.KubeClient.Secrets(ns).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of secrets: %s", err)
+		return fmt.Errorf("Can't get list of Secrets: %s", err)
 	}
 	for i, secret := range secrets.Items {
 		if _, ok := c.Secrets[secret.UID]; ok {
@@ -66,7 +66,7 @@ func (c *Cluster) LoadResources() error {
 
 	statefulSets, err := c.config.KubeClient.StatefulSets(ns).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of stateful sets: %s", err)
+		return fmt.Errorf("Can't get list of StatefulSets: %s", err)
 	}
 	if len(statefulSets.Items) > 1 {
 		return fmt.Errorf("Too many(%d) StatefulSets for a cluster", len(statefulSets.Items))
@@ -86,13 +86,22 @@ func (c *Cluster) ListResources() error {
 	c.logger.Infof("Endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
 	c.logger.Infof("Service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
 
-	pods, err := c.clusterPods()
+	pods, err := c.listPods()
 	if err != nil {
-		return fmt.Errorf("Can't get pods: %s", err)
+		return fmt.Errorf("Can't get the list of Pods: %s", err)
 	}
 
 	for _, obj := range pods {
 		c.logger.Infof("Pod: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+	}
+
+	pvcs, err := c.listPersistentVolumeClaims()
+	if err != nil {
+		return fmt.Errorf("Can't get the list of PVCs: %s", err)
+	}
+
+	for _, obj := range pvcs {
+		c.logger.Infof("PVC: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	return nil
@@ -102,7 +111,7 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	if c.Statefulset != nil {
 		return nil, fmt.Errorf("StatefulSet already exists in the cluster")
 	}
-	statefulSetSpec := getStatefulSet(c.ClusterName(), c.Spec, c.etcdHost, c.dockerImage)
+	statefulSetSpec := genStatefulSet(c.ClusterName(), c.Spec, c.etcdHost, c.dockerImage)
 	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSetSpec.Namespace).Create(statefulSetSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
 		return nil, fmt.Errorf("StatefulSet '%s' already exists", util.NameFromMeta(statefulSetSpec.ObjectMeta))
@@ -232,7 +241,7 @@ func (c *Cluster) applySecrets() error {
 	secrets, err := resources.UserSecrets(c.ClusterName(), c.pgUsers)
 
 	if err != nil {
-		return fmt.Errorf("Can't get user secrets")
+		return fmt.Errorf("Can't get user Secrets")
 	}
 
 	for secretUsername, secretSpec := range secrets {
@@ -240,7 +249,7 @@ func (c *Cluster) applySecrets() error {
 		if k8sutil.ResourceAlreadyExists(err) {
 			curSecrets, err := c.config.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
 			if err != nil {
-				return fmt.Errorf("Can't get current secret: %s", err)
+				return fmt.Errorf("Can't get current Secret: %s", err)
 			}
 			pwdUser := c.pgUsers[secretUsername]
 			pwdUser.Password = string(curSecrets.Data["password"])
@@ -249,10 +258,10 @@ func (c *Cluster) applySecrets() error {
 			continue
 		} else {
 			if err != nil {
-				return fmt.Errorf("Can't create secret for user '%s': %s", secretUsername, err)
+				return fmt.Errorf("Can't create Secret for user '%s': %s", secretUsername, err)
 			}
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("Created new secret, uid: %s", secret.UID)
+			c.logger.Debugf("Created new Secret, uid: %s", secret.UID)
 		}
 	}
 

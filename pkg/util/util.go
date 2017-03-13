@@ -45,6 +45,10 @@ func PodClusterName(pod *v1.Pod) spec.ClusterName {
 	return spec.ClusterName{}
 }
 
+func PodSpiloRole(pod *v1.Pod) string {
+	return pod.Labels["spilo-role"]
+}
+
 func ClusterDNSName(clusterName, teamName, hostedZone string) string {
 	return fmt.Sprintf("%s.%s.%s", clusterName, teamName, hostedZone)
 }

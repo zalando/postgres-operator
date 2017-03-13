@@ -9,7 +9,7 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 )
 
-func (c *Cluster) clusterPods() ([]v1.Pod, error) {
+func (c *Cluster) listPods() ([]v1.Pod, error) {
 	ns := c.Metadata.Namespace
 	listOptions := v1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
@@ -17,27 +17,10 @@ func (c *Cluster) clusterPods() ([]v1.Pod, error) {
 
 	pods, err := c.config.KubeClient.Pods(ns).List(listOptions)
 	if err != nil {
-		return nil, fmt.Errorf("Can't get list of pods: %s", err)
+		return nil, fmt.Errorf("Can't get list of Pods: %s", err)
 	}
 
 	return pods.Items, nil
-}
-
-func (c *Cluster) deletePods() error {
-	pods, err := c.clusterPods()
-	if err != nil {
-		return err
-	}
-
-	for _, obj := range pods {
-		if err := c.deletePod(&obj); err != nil {
-			c.logger.Errorf("Can't delete pod: %s", err)
-		} else {
-			c.logger.Infof("Pod '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
-		}
-	}
-
-	return nil
 }
 
 func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, error) {
@@ -51,6 +34,23 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 		return nil, fmt.Errorf("Can't get list of PersistentVolumeClaims: %s", err)
 	}
 	return pvcs.Items, nil
+}
+
+func (c *Cluster) deletePods() error {
+	pods, err := c.listPods()
+	if err != nil {
+		return err
+	}
+
+	for _, obj := range pods {
+		if err := c.deletePod(&obj); err != nil {
+			c.logger.Errorf("Can't delete Pod: %s", err)
+		} else {
+			c.logger.Infof("Pod '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
+		}
+	}
+
+	return nil
 }
 
 func (c *Cluster) deletePersistenVolumeClaims() error {
@@ -116,7 +116,7 @@ func (c *Cluster) recreatePod(pod v1.Pod, spiloRole string) error {
 	}()
 
 	if err := c.config.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
-		return fmt.Errorf("Can't delete pod: %s", err)
+		return fmt.Errorf("Can't delete Pod: %s", err)
 	}
 
 	if err := c.waitForPodDeletion(ch); err != nil {
@@ -136,10 +136,10 @@ func (c *Cluster) podEventsDispatcher(stopCh <-chan struct{}) {
 		select {
 		case event := <-c.podEvents:
 			if subscriber, ok := c.podSubscribers[event.PodName]; ok {
-				c.logger.Debugf("New event for '%s' pod", event.PodName)
+				c.logger.Debugf("New event for '%s' Pod", event.PodName)
 				go func() { subscriber <- event }() //TODO: is it a right way to do nonblocking send to the channel?
 			} else {
-				c.logger.Debugf("Skipping event for an unwatched pod '%s'", event.PodName)
+				c.logger.Debugf("Skipping event for an unwatched Pod '%s'", event.PodName)
 			}
 		case <-stopCh:
 			return
@@ -156,15 +156,15 @@ func (c *Cluster) recreatePods() error {
 	}
 	pods, err := c.config.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get the list of the pods: %s", err)
+		return fmt.Errorf("Can't get the list of Pods: %s", err)
 	} else {
-		c.logger.Infof("There are %d pods in the cluster to recreate", len(pods.Items))
+		c.logger.Infof("There are %d Pods in the cluster to recreate", len(pods.Items))
 	}
 
 	var masterPod v1.Pod
 	for _, pod := range pods.Items {
-		role, ok := pod.Labels["spilo-role"]
-		if !ok {
+		role := util.PodSpiloRole(&pod)
+		if role == "" {
 			continue
 		}
 
@@ -175,16 +175,19 @@ func (c *Cluster) recreatePods() error {
 
 		err = c.recreatePod(pod, "replica")
 		if err != nil {
-			return fmt.Errorf("Can't recreate replica pod '%s': %s", util.NameFromMeta(pod.ObjectMeta), err)
+			return fmt.Errorf("Can't recreate replica Pod '%s': %s", util.NameFromMeta(pod.ObjectMeta), err)
 		}
+	}
+	if masterPod.Name == "" {
+		c.logger.Warningln("No master Pod in the cluster")
 	}
 
 	//TODO: do manual failover
 	//TODO: specify master, leave new master empty
-	c.logger.Infof("Recreating master pod '%s'", util.NameFromMeta(masterPod.ObjectMeta))
+	c.logger.Infof("Recreating master Pod '%s'", util.NameFromMeta(masterPod.ObjectMeta))
 
 	if err := c.recreatePod(masterPod, "replica"); err != nil {
-		return fmt.Errorf("Can't recreate master pod '%s': %s", util.NameFromMeta(masterPod.ObjectMeta), err)
+		return fmt.Errorf("Can't recreate master Pod '%s': %s", util.NameFromMeta(masterPod.ObjectMeta), err)
 	}
 
 	return nil

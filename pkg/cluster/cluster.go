@@ -109,6 +109,11 @@ func (c *Cluster) needsRollingUpdate(otherSpec *spec.Postgresql) bool {
 		return true
 	}
 
+	newSs := genStatefulSet(c.ClusterName(), otherSpec.Spec, c.etcdHost, c.dockerImage)
+	diff, res := statefulsetsEqual(c.Statefulset, newSs)
+	if diff && res {
+		return true
+	}
 	return false
 }
 
@@ -159,7 +164,7 @@ func (c *Cluster) Create() error {
 	}
 
 	if err := c.applySecrets(); err != nil {
-		return fmt.Errorf("Can't create secrets: %s", err)
+		return fmt.Errorf("Can't create Secrets: %s", err)
 	} else {
 		c.logger.Infof("Secrets have been successfully created")
 	}
@@ -172,8 +177,8 @@ func (c *Cluster) Create() error {
 	}
 
 	c.logger.Info("Waiting for cluster being ready")
-	err = c.waitStatefulsetPodsReady()
-	if err != nil {
+
+	if err := c.waitStatefulsetPodsReady(); err != nil {
 		c.logger.Errorf("Failed to create cluster: %s", err)
 		return err
 	}
@@ -202,7 +207,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logger.Infof("Pods need to be recreated")
 	}
 
-	newStatefulSet := getStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
+	newStatefulSet := genStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
 
 	newService := resources.Service(c.ClusterName(), c.TeamName(), newSpec.Spec.AllowedSourceRanges)
 	if !servicesEqual(newService, c.Service) {
@@ -234,22 +239,25 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 }
 
 func (c *Cluster) Delete() error {
+	epName := util.NameFromMeta(c.Endpoint.ObjectMeta)
 	if err := c.deleteEndpoint(); err != nil {
 		c.logger.Errorf("Can't delete Endpoint: %s", err)
 	} else {
-		c.logger.Infof("Endpoint '%s' has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
+		c.logger.Infof("Endpoint '%s' has been deleted", epName)
 	}
 
+	svcName := util.NameFromMeta(c.Service.ObjectMeta)
 	if err := c.deleteService(); err != nil {
 		c.logger.Errorf("Can't delete Service: %s", err)
 	} else {
-		c.logger.Infof("Service '%s' has been deleted", util.NameFromMeta(c.Service.ObjectMeta))
+		c.logger.Infof("Service '%s' has been deleted", svcName)
 	}
 
+	ssName := util.NameFromMeta(c.Statefulset.ObjectMeta)
 	if err := c.deleteStatefulSet(); err != nil {
 		c.logger.Errorf("Can't delete StatefulSet: %s", err)
 	} else {
-		c.logger.Infof("StatefulSet '%s' has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
+		c.logger.Infof("StatefulSet '%s' has been deleted", ssName)
 	}
 
 	for _, obj := range c.Secrets {
@@ -265,8 +273,8 @@ func (c *Cluster) Delete() error {
 	} else {
 		c.logger.Infof("Pods have been deleted")
 	}
-	err := c.deletePersistenVolumeClaims()
-	if err != nil {
+
+	if err := c.deletePersistenVolumeClaims(); err != nil {
 		return fmt.Errorf("Can't delete PersistentVolumeClaims: %s", err)
 	}
 

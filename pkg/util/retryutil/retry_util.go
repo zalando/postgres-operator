@@ -5,24 +5,14 @@ import (
 	"time"
 )
 
-type RetryError struct {
-	n int
-}
-
-func (e *RetryError) Error() string {
-	return fmt.Sprintf("still failing after %d retries", e.n)
-}
-
 type ConditionFunc func() (bool, error)
 
-// Retry retries f every interval until after maxRetries.
-// The interval won't be affected by how long f takes.
-// For example, if interval is 3s, f takes 1s, another f will be called 2s later.
-// However, if f takes longer than interval, it will be delayed.
-func Retry(interval time.Duration, maxRetries int, f ConditionFunc) error {
-	if maxRetries <= 0 {
-		return fmt.Errorf("maxRetries (%d) should be > 0", maxRetries)
+func Retry(interval time.Duration, timeout time.Duration, f ConditionFunc) error {
+	//TODO: make the retry exponential
+	if timeout < interval {
+		return fmt.Errorf("timout(%s) should be greater than interval(%s)", timeout, interval)
 	}
+	maxRetries := int(timeout / interval)
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 
@@ -39,5 +29,5 @@ func Retry(interval time.Duration, maxRetries int, f ConditionFunc) error {
 		}
 		<-tick.C
 	}
-	return &RetryError{maxRetries}
+	return fmt.Errorf("Still failing after %d retries", maxRetries)
 }

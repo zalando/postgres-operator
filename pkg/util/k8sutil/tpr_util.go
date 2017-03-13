@@ -15,7 +15,7 @@ func listClustersURI(ns string) string {
 }
 
 func WaitTPRReady(restclient rest.Interface, interval, timeout time.Duration, ns string) error {
-	return retryutil.Retry(interval, int(timeout/interval), func() (bool, error) {
+	return retryutil.Retry(interval, timeout, func() (bool, error) {
 		_, err := restclient.Get().RequestURI(listClustersURI(ns)).DoRaw()
 		if err != nil {
 			if ResourceNotFound(err) { // not set up yet. wait more.

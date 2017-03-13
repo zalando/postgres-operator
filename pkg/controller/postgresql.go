@@ -53,7 +53,9 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		c.clusters[clusterName] = cl
 		cl.LoadResources()
 		go cl.Run(stopCh)
+
 		cl.ListResources()
+		cl.SyncCluster()
 	}
 	if len(c.clusters) > 0 {
 		c.logger.Infof("There are %d clusters currently running", len(c.clusters))

@@ -29,12 +29,13 @@ const (
 	PamConfiguration   = "https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"
 	PasswordLength     = 64
 	TeamsAPIUrl        = "https://teams.example.com/api/"
-	UserSecretTemplate = "%s.%s.credentials.%s.%s"
+	UserSecretTemplate = "%s.%s.credentials.%s.%s" // Username, ClusterName, TPRName, TPRVendor
 
 	OAuthTokenSecretName     = "postgresql-operator"
 	ServiceAccountName       = "operator"
 	DataVolumeName           = "pgdata"
 	ZalandoDnsNameAnnotation = "zalando.org/dnsname"
+
 	// TODO: move DbHostedZone to operator configuration
 	DbHostedZone = "db.example.com"
 )

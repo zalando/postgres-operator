@@ -117,15 +117,15 @@ func (c *Controller) podDelete(obj interface{}) {
 }
 
 func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}) {
-	c.logger.Infof("Watching all pod events")
+	c.logger.Infof("Watching all Pod events")
 	for {
 		select {
 		case event := <-c.podCh:
 			if subscriber, ok := c.clusters[event.ClusterName]; ok {
-				c.logger.Debugf("Sending %s event of pod '%s' to the '%s' cluster channel", event.EventType, event.PodName, event.ClusterName)
+				c.logger.Debugf("Sending %s event of Pod '%s' to the '%s' cluster channel", event.EventType, event.PodName, event.ClusterName)
 				go subscriber.ReceivePodEvent(event)
 			} else {
-				c.logger.Debugf("Skipping pods unrelated to clusters: %s", event.PodName)
+				c.logger.Debugf("Skipping Pods unrelated to clusters: %s", event.PodName)
 			}
 		case <-stopCh:
 			return
