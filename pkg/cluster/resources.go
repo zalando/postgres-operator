@@ -40,8 +40,9 @@ func (c *Cluster) LoadResources() error {
 	}
 	if len(services.Items) > 1 {
 		return fmt.Errorf("Too many(%d) Services for a cluster", len(services.Items))
+	} else if len(services.Items) == 1 {
+		c.Service = &services.Items[0]
 	}
-	c.Service = &services.Items[0]
 
 	endpoints, err := c.config.KubeClient.Endpoints(ns).List(listOptions)
 	if err != nil {
@@ -49,8 +50,9 @@ func (c *Cluster) LoadResources() error {
 	}
 	if len(endpoints.Items) > 1 {
 		return fmt.Errorf("Too many(%d) Endpoints for a cluster", len(endpoints.Items))
+	} else if len(endpoints.Items) == 1 {
+		c.Endpoint = &endpoints.Items[0]
 	}
-	c.Endpoint = &endpoints.Items[0]
 
 	secrets, err := c.config.KubeClient.Secrets(ns).List(listOptions)
 	if err != nil {
@@ -70,21 +72,29 @@ func (c *Cluster) LoadResources() error {
 	}
 	if len(statefulSets.Items) > 1 {
 		return fmt.Errorf("Too many(%d) StatefulSets for a cluster", len(statefulSets.Items))
+	} else if len(statefulSets.Items) == 1 {
+		c.Statefulset = &statefulSets.Items[0]
 	}
-	c.Statefulset = &statefulSets.Items[0]
 
 	return nil
 }
 
 func (c *Cluster) ListResources() error {
-	c.logger.Infof("StatefulSet: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
+	if c.Statefulset != nil {
+		c.logger.Infof("StatefulSet: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
+	}
 
 	for _, obj := range c.Secrets {
 		c.logger.Infof("Secret: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
-	c.logger.Infof("Endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
-	c.logger.Infof("Service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
+	if c.Endpoint != nil {
+		c.logger.Infof("Endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
+	}
+
+	if c.Service != nil {
+		c.logger.Infof("Service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
+	}
 
 	pods, err := c.listPods()
 	if err != nil {
