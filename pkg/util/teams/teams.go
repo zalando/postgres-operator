@@ -36,9 +36,9 @@ type Team struct {
 }
 
 type TeamsAPI struct {
-	url        string
-	httpClient *http.Client
-	OAuthToken string
+	url                string
+	httpClient         *http.Client
+	RefreshTokenAction func() (string, error)
 }
 
 func NewTeamsAPI(url string) *TeamsAPI {
@@ -51,13 +51,18 @@ func NewTeamsAPI(url string) *TeamsAPI {
 }
 
 func (t *TeamsAPI) TeamInfo(teamId string) (*Team, error) {
+	// TODO: avoid getting a new token on every call to the Teams API.
+	token, err := t.RefreshTokenAction()
+	if err != nil {
+		return nil, err
+	}
 	url := fmt.Sprintf("%s/teams/%s", t.url, teamId)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", "Bearer "+t.OAuthToken)
+	req.Header.Add("Authorization", "Bearer "+token)
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return nil, err

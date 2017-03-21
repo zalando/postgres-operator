@@ -68,12 +68,7 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("Can't register ThirdPartyResource: %s", err)
 	}
 
-	token, err := c.getOAuthToken()
-	if err != nil {
-		c.logger.Errorf("Can't get OAuth token: %s", err)
-	} else {
-		c.config.TeamsAPIClient.OAuthToken = token
-	}
+	c.config.TeamsAPIClient.RefreshTokenAction = c.getOAuthToken
 
 	// Postgresqls
 	clusterLw := &cache.ListWatch{
