@@ -8,10 +8,11 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
-var createUserSQL = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s PASSWORD %s;`
+var createUserSQL = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s %s;`
 
 func (c *Cluster) pgConnectionString() string {
 	hostname := fmt.Sprintf("%s.%s.svc.cluster.local", c.Metadata.Name, c.Metadata.Namespace)
@@ -68,9 +69,9 @@ func (c *Cluster) createPgUser(user spec.PgUser) (isHuman bool, err error) {
 	}
 
 	userFlags := strings.Join(flags, " ")
-	userPassword := fmt.Sprintf("'%s'", user.Password)
+	userPassword := fmt.Sprintf("ENCRYPTED PASSWORD '%s'", util.PGUserPassword(user))
 	if user.Password == "" {
-		userPassword = "NULL"
+		userPassword = "PASSWORD NULL"
 	}
 	query := fmt.Sprintf(createUserSQL, user.Name, userFlags, userPassword)
 

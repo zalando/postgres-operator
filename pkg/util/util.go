@@ -1,6 +1,8 @@
 package util
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"time"
@@ -51,4 +53,10 @@ func PodSpiloRole(pod *v1.Pod) string {
 
 func ClusterDNSName(clusterName, teamName, hostedZone string) string {
 	return fmt.Sprintf("%s.%s.%s", clusterName, teamName, hostedZone)
+}
+
+func PGUserPassword(user spec.PgUser) string {
+	s := md5.Sum([]byte(user.Password + user.Name))
+
+	return "md5" + hex.EncodeToString(s[:])
 }
