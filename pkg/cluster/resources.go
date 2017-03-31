@@ -22,7 +22,7 @@ func genStatefulSet(clusterName spec.ClusterName, cSpec spec.PostgresSpec, etcdH
 	volumeSize := cSpec.Volume.Size
 	volumeStorageClass := cSpec.Volume.StorageClass
 	resourceList := resources.ResourceList(cSpec.Resources)
-	template := resources.PodTemplate(clusterName, resourceList, dockerImage, cSpec.Version, etcdHost)
+	template := resources.PodTemplate(clusterName, resourceList, cSpec.PgVersion, dockerImage, etcdHost)
 	volumeClaimTemplate := resources.VolumeClaimTemplate(volumeSize, volumeStorageClass)
 
 	return resources.StatefulSet(clusterName, template, volumeClaimTemplate, cSpec.NumberOfInstances)

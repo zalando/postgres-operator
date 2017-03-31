@@ -44,7 +44,7 @@ func ResourceList(resources spec.Resources) *v1.ResourceList {
 	return &resourceList
 }
 
-func PodTemplate(cluster spec.ClusterName, resourceList *v1.ResourceList, dockerImage, pgVersion, etcdHost string) *v1.PodTemplateSpec {
+func PodTemplate(cluster spec.ClusterName, resourceList *v1.ResourceList, pgVersion string, dockerImage, etcdHost string) *v1.PodTemplateSpec {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",

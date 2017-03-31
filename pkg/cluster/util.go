@@ -45,59 +45,6 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 	return
 }
 
-func statefulsetsEqual(ss1, ss2 *v1beta1.StatefulSet) (equal bool, needsRollUpdate bool) {
-	equal = true
-	needsRollUpdate = false
-	//TODO: improve me
-	if *ss1.Spec.Replicas != *ss2.Spec.Replicas {
-		equal = false
-	}
-	if len(ss1.Spec.Template.Spec.Containers) != len(ss1.Spec.Template.Spec.Containers) {
-		equal = false
-		needsRollUpdate = true
-		return
-	}
-	if len(ss1.Spec.Template.Spec.Containers) == 0 {
-		return
-	}
-
-	container1 := ss1.Spec.Template.Spec.Containers[0]
-	container2 := ss2.Spec.Template.Spec.Containers[0]
-	if container1.Image != container2.Image {
-		equal = false
-		needsRollUpdate = true
-		return
-	}
-
-	if !reflect.DeepEqual(container1.Ports, container2.Ports) {
-		equal = false
-		needsRollUpdate = true
-		return
-	}
-
-	if !reflect.DeepEqual(container1.Resources, container2.Resources) {
-		equal = false
-		needsRollUpdate = true
-		return
-	}
-	if !reflect.DeepEqual(container1.Env, container2.Env) {
-		equal = false
-		needsRollUpdate = true
-	}
-
-	return
-}
-
-func servicesEqual(svc1, svc2 *v1.Service) bool {
-	//TODO: check of Ports
-	//TODO: improve me
-	if reflect.DeepEqual(svc1.Spec.LoadBalancerSourceRanges, svc2.Spec.LoadBalancerSourceRanges) {
-		return true
-	}
-
-	return false
-}
-
 func podMatchesTemplate(pod *v1.Pod, ss *v1beta1.StatefulSet) bool {
 	//TODO: improve me
 	if len(pod.Spec.Containers) != 1 {

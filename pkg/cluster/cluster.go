@@ -99,24 +99,6 @@ func (c *Cluster) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (c *Cluster) needsRollingUpdate(otherSpec *spec.Postgresql) bool {
-	//TODO: add more checks
-	if c.Spec.Version != otherSpec.Spec.Version {
-		return true
-	}
-
-	if !reflect.DeepEqual(c.Spec.Resources, otherSpec.Spec.Resources) {
-		return true
-	}
-
-	newSs := genStatefulSet(c.ClusterName(), otherSpec.Spec, c.etcdHost, c.dockerImage)
-	diff, res := statefulsetsEqual(c.Statefulset, newSs)
-	if diff && res {
-		return true
-	}
-	return false
-}
-
 func (c *Cluster) SetStatus(status spec.PostgresStatus) {
 	b, err := json.Marshal(status)
 	if err != nil {
@@ -198,41 +180,113 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
+func (c Cluster) sameServiceWith(service *v1.Service) bool {
+	//TODO: improve comparison
+	return reflect.DeepEqual(c.Service.Spec.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
+}
+
+func (c Cluster) sameVolumeWith(volume spec.Volume) bool {
+	return reflect.DeepEqual(c.Spec.Volume, volume)
+}
+
+func (c Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (equal, needsRollUpdate bool) {
+	equal = true
+	needsRollUpdate = false
+	//TODO: improve me
+	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
+		equal = false
+	}
+	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
+		equal = false
+		needsRollUpdate = true
+		return
+	}
+	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
+		c.logger.Warnf("StatefulSet '%s' has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
+		return
+	}
+
+	container1 := c.Statefulset.Spec.Template.Spec.Containers[0]
+	container2 := statefulSet.Spec.Template.Spec.Containers[0]
+	if container1.Image != container2.Image {
+		equal = false
+		needsRollUpdate = true
+		return
+	}
+
+	if !reflect.DeepEqual(container1.Ports, container2.Ports) {
+		equal = false
+		needsRollUpdate = true
+		return
+	}
+
+	if !reflect.DeepEqual(container1.Resources, container2.Resources) {
+		equal = false
+		needsRollUpdate = true
+		return
+	}
+	if !reflect.DeepEqual(container1.Env, container2.Env) {
+		equal = false
+		needsRollUpdate = true
+	}
+
+	return
+}
+
 func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	c.logger.Infof("Cluster update from version %s to %s",
 		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
 
-	rollingUpdate := c.needsRollingUpdate(newSpec)
-	if rollingUpdate {
-		c.logger.Infof("Pods need to be recreated")
-	}
-
-	newStatefulSet := genStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
-
 	newService := resources.Service(c.ClusterName(), c.TeamName(), newSpec.Spec.AllowedSourceRanges)
-	if !servicesEqual(newService, c.Service) {
-		c.logger.Infof("Service needs to be upated")
+	if !c.sameServiceWith(newService) {
+		c.logger.Infof("LoadBalancer configuration has changed for Service '%s': %+v -> %+v",
+			util.NameFromMeta(c.Service.ObjectMeta),
+			c.Service.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges,
+		)
 		if err := c.updateService(newService); err != nil {
 			return fmt.Errorf("Can't update Service: %s", err)
 		} else {
-			c.logger.Infof("Service has been updated")
+			c.logger.Infof("Service '%s' has been updated", util.NameFromMeta(c.Service.ObjectMeta))
 		}
 	}
 
-	if !reflect.DeepEqual(newSpec.Spec.Volume, c.Spec.Volume) {
+	if !c.sameVolumeWith(newSpec.Spec.Volume) {
+		c.logger.Infof("Volume specification has been changed")
 		//TODO: update PVC
 	}
 
-	//TODO: mind the case of updating allowedSourceRanges
-	if err := c.updateStatefulSet(newStatefulSet); err != nil {
-		return fmt.Errorf("Can't upate StatefulSet: %s", err)
+	newStatefulSet := genStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
+	sameSS, rollingUpdate := c.compareStatefulSetWith(newStatefulSet)
+
+	if !sameSS {
+		c.logger.Infof("StatefulSet '%s' has been changed: %+v -> %+v",
+			util.NameFromMeta(c.Statefulset.ObjectMeta),
+			c.Statefulset.Spec, newStatefulSet.Spec,
+		)
+		//TODO: mind the case of updating allowedSourceRanges
+		if err := c.updateStatefulSet(newStatefulSet); err != nil {
+			return fmt.Errorf("Can't upate StatefulSet: %s", err)
+		}
+		c.logger.Infof("StatefulSet '%s' has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
+	}
+
+	if c.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
+		c.logger.Warnf("Postgresql version change(%s -> %s) is not allowed",
+			c.Spec.PgVersion, newSpec.Spec.PgVersion)
+		//TODO: rewrite pg version in tpr spec
+	}
+
+	if !reflect.DeepEqual(c.Spec.Resources, newSpec.Spec.Resources) { // Kubernetes resources: cpu, mem
+		rollingUpdate = true
 	}
 
 	if rollingUpdate {
+		c.logger.Infof("Rolling update is needed")
 		// TODO: wait for actual streaming to the replica
 		if err := c.recreatePods(); err != nil {
 			return fmt.Errorf("Can't recreate Pods: %s", err)
 		}
+		c.logger.Infof("Rolling update has been finished")
 	}
 
 	return nil

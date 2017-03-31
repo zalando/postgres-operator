@@ -56,7 +56,7 @@ func (c *Cluster) syncService() error {
 	}
 
 	desiredSvc := resources.Service(c.ClusterName(), c.Spec.TeamId, cSpec.AllowedSourceRanges)
-	if servicesEqual(c.Service, desiredSvc) {
+	if c.sameServiceWith(desiredSvc) {
 		return nil
 	}
 	c.logger.Infof("Service '%s' needs to be updated", util.NameFromMeta(desiredSvc.ObjectMeta))
@@ -100,7 +100,7 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	desiredSS := genStatefulSet(c.ClusterName(), cSpec, c.etcdHost, c.dockerImage)
-	equalSS, rollUpdate := statefulsetsEqual(c.Statefulset, desiredSS)
+	equalSS, rollUpdate := c.compareStatefulSetWith(desiredSS)
 	if equalSS {
 		return nil
 	}

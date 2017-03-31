@@ -130,7 +130,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	//TODO: Do not update cluster which is currently creating
 
 	if pgPrev.Metadata.ResourceVersion == pgNew.Metadata.ResourceVersion {
-		c.logger.Debugf("Skipping update with no resource version change")
+		c.logger.Infof("Skipping update with no resource version change")
 		return
 	}
 	pgCluster := c.clusters[clusterName] // current
