@@ -28,7 +28,7 @@ type Volume struct {
 }
 
 type PostgresqlParam struct {
-	PgVersion    string `json:"version"`
+	PgVersion  string            `json:"version"`
 	Parameters map[string]string `json:"parameters"`
 }
 

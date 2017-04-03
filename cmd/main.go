@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/controller"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/config"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
@@ -19,6 +19,7 @@ var (
 	podNamespace   string
 	OutOfCluster   bool
 	version        string
+	cfg            *config.Config
 )
 
 func init() {
@@ -30,6 +31,8 @@ func init() {
 	if len(podNamespace) == 0 {
 		podNamespace = "default"
 	}
+
+	cfg = config.LoadFromEnv()
 }
 
 func ControllerConfig() *controller.Config {
@@ -45,7 +48,7 @@ func ControllerConfig() *controller.Config {
 
 	restClient, err := k8sutil.KubernetesRestClient(restConfig)
 
-	teamsApi := teams.NewTeamsAPI(constants.TeamsAPIUrl)
+	teamsApi := teams.NewTeamsAPI(cfg.TeamsAPIUrl)
 	return &controller.Config{
 		PodNamespace:   podNamespace,
 		KubeClient:     client,
@@ -57,7 +60,7 @@ func ControllerConfig() *controller.Config {
 func main() {
 	log.SetOutput(os.Stdout)
 	log.Printf("Spilo operator %s\n", version)
-	log.Printf("MY_POD_NAMESPACE=%s\n", podNamespace)
+	log.Printf("ServiceAccountName: %s\n", cfg.ServiceAccountName)
 
 	sigs := make(chan os.Signal, 1)
 	stop := make(chan struct{})
@@ -65,9 +68,9 @@ func main() {
 
 	wg := &sync.WaitGroup{} // Goroutines can add themselves to this to be waited on
 
-	cfg := ControllerConfig()
+	controllerConfig := ControllerConfig()
 
-	c := controller.New(cfg)
+	c := controller.New(controllerConfig, cfg)
 	c.Run(stop, wg)
 
 	sig := <-sigs

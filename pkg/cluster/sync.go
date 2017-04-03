@@ -7,7 +7,6 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 )
 
 func (c *Cluster) SyncCluster() {
@@ -55,7 +54,7 @@ func (c *Cluster) syncService() error {
 		return nil
 	}
 
-	desiredSvc := resources.Service(c.ClusterName(), c.Spec.TeamId, cSpec.AllowedSourceRanges)
+	desiredSvc := c.genService(cSpec.AllowedSourceRanges)
 	if c.sameServiceWith(desiredSvc) {
 		return nil
 	}
@@ -99,7 +98,7 @@ func (c *Cluster) syncStatefulSet() error {
 		return nil
 	}
 
-	desiredSS := genStatefulSet(c.ClusterName(), cSpec, c.etcdHost, c.dockerImage)
+	desiredSS := c.genStatefulSet(cSpec)
 	equalSS, rollUpdate := c.compareStatefulSetWith(desiredSS)
 	if equalSS {
 		return nil
@@ -132,7 +131,7 @@ func (c *Cluster) syncPods() error {
 	listOptions := v1.ListOptions{
 		LabelSelector: ls.String(),
 	}
-	pods, err := c.config.KubeClient.Pods(namespace).List(listOptions)
+	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get list of Pods: %s", err)
 	}

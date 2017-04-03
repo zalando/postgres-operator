@@ -21,9 +21,9 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/config"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
@@ -37,6 +37,7 @@ type Config struct {
 	RestClient     *rest.RESTClient
 	EtcdClient     etcdclient.KeysAPI
 	TeamsAPIClient *teams.TeamsAPI
+	OpConfig       *config.Config
 }
 
 type KubeResources struct {
@@ -51,10 +52,8 @@ type KubeResources struct {
 type Cluster struct {
 	KubeResources
 	spec.Postgresql
-	config         Config
+	Config
 	logger         *logrus.Entry
-	etcdHost       string
-	dockerImage    string
 	pgUsers        map[string]spec.PgUser
 	podEvents      chan spec.PodEvent
 	podSubscribers map[spec.PodName]chan spec.PodEvent
@@ -67,11 +66,9 @@ func New(cfg Config, pgSpec spec.Postgresql) *Cluster {
 	kubeResources := KubeResources{Secrets: make(map[types.UID]*v1.Secret)}
 
 	cluster := &Cluster{
-		config:         cfg,
+		Config:         cfg,
 		Postgresql:     pgSpec,
 		logger:         lg,
-		etcdHost:       constants.EtcdHost,
-		dockerImage:    constants.SpiloImage,
 		pgUsers:        make(map[string]spec.PgUser),
 		podEvents:      make(chan spec.PodEvent),
 		podSubscribers: make(map[spec.PodName]chan spec.PodEvent),
@@ -106,7 +103,7 @@ func (c *Cluster) SetStatus(status spec.PostgresStatus) {
 	}
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 
-	_, err = c.config.RestClient.Patch(api.MergePatchType).
+	_, err = c.RestClient.Patch(api.MergePatchType).
 		RequestURI(c.Metadata.GetSelfLink()).
 		Body(request).
 		DoRaw()
@@ -237,7 +234,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	c.logger.Infof("Cluster update from version %s to %s",
 		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
 
-	newService := resources.Service(c.ClusterName(), c.TeamName(), newSpec.Spec.AllowedSourceRanges)
+	newService := c.genService(newSpec.Spec.AllowedSourceRanges)
 	if !c.sameServiceWith(newService) {
 		c.logger.Infof("LoadBalancer configuration has changed for Service '%s': %+v -> %+v",
 			util.NameFromMeta(c.Service.ObjectMeta),
@@ -255,7 +252,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		//TODO: update PVC
 	}
 
-	newStatefulSet := genStatefulSet(c.ClusterName(), newSpec.Spec, c.etcdHost, c.dockerImage)
+	newStatefulSet := c.genStatefulSet(newSpec.Spec)
 	sameSS, rollingUpdate := c.compareStatefulSetWith(newStatefulSet)
 
 	if !sameSS {
@@ -340,13 +337,13 @@ func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
 }
 
 func (c *Cluster) initSystemUsers() {
-	c.pgUsers[constants.SuperuserName] = spec.PgUser{
-		Name:     constants.SuperuserName,
+	c.pgUsers[c.OpConfig.SuperUsername] = spec.PgUser{
+		Name:     c.OpConfig.SuperUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
 
-	c.pgUsers[constants.ReplicationUsername] = spec.PgUser{
-		Name:     constants.ReplicationUsername,
+	c.pgUsers[c.OpConfig.ReplicationUsername] = spec.PgUser{
+		Name:     c.OpConfig.ReplicationUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
 }

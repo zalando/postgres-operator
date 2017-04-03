@@ -6,11 +6,8 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
 )
 
 var (
@@ -18,15 +15,6 @@ var (
 	orphanDependents = false
 )
 
-func genStatefulSet(clusterName spec.ClusterName, cSpec spec.PostgresSpec, etcdHost, dockerImage string) *v1beta1.StatefulSet {
-	volumeSize := cSpec.Volume.Size
-	volumeStorageClass := cSpec.Volume.StorageClass
-	resourceList := resources.ResourceList(cSpec.Resources)
-	template := resources.PodTemplate(clusterName, resourceList, cSpec.PgVersion, dockerImage, etcdHost)
-	volumeClaimTemplate := resources.VolumeClaimTemplate(volumeSize, volumeStorageClass)
-
-	return resources.StatefulSet(clusterName, template, volumeClaimTemplate, cSpec.NumberOfInstances)
-}
 
 func (c *Cluster) LoadResources() error {
 	ns := c.Metadata.Namespace
@@ -34,7 +22,7 @@ func (c *Cluster) LoadResources() error {
 		LabelSelector: c.labelsSet().String(),
 	}
 
-	services, err := c.config.KubeClient.Services(ns).List(listOptions)
+	services, err := c.KubeClient.Services(ns).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get list of Services: %s", err)
 	}
@@ -44,7 +32,7 @@ func (c *Cluster) LoadResources() error {
 		c.Service = &services.Items[0]
 	}
 
-	endpoints, err := c.config.KubeClient.Endpoints(ns).List(listOptions)
+	endpoints, err := c.KubeClient.Endpoints(ns).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get list of Endpoints: %s", err)
 	}
@@ -54,7 +42,7 @@ func (c *Cluster) LoadResources() error {
 		c.Endpoint = &endpoints.Items[0]
 	}
 
-	secrets, err := c.config.KubeClient.Secrets(ns).List(listOptions)
+	secrets, err := c.KubeClient.Secrets(ns).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get list of Secrets: %s", err)
 	}
@@ -66,7 +54,7 @@ func (c *Cluster) LoadResources() error {
 		c.logger.Debugf("Secret loaded, uid: %s", secret.UID)
 	}
 
-	statefulSets, err := c.config.KubeClient.StatefulSets(ns).List(listOptions)
+	statefulSets, err := c.KubeClient.StatefulSets(ns).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get list of StatefulSets: %s", err)
 	}
@@ -121,8 +109,8 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	if c.Statefulset != nil {
 		return nil, fmt.Errorf("StatefulSet already exists in the cluster")
 	}
-	statefulSetSpec := genStatefulSet(c.ClusterName(), c.Spec, c.etcdHost, c.dockerImage)
-	statefulSet, err := c.config.KubeClient.StatefulSets(statefulSetSpec.Namespace).Create(statefulSetSpec)
+	statefulSetSpec := c.genStatefulSet(c.Spec)
+	statefulSet, err := c.KubeClient.StatefulSets(statefulSetSpec.Namespace).Create(statefulSetSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
 		return nil, fmt.Errorf("StatefulSet '%s' already exists", util.NameFromMeta(statefulSetSpec.ObjectMeta))
 	}
@@ -139,7 +127,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	if c.Statefulset == nil {
 		return fmt.Errorf("There is no StatefulSet in the cluster")
 	}
-	statefulSet, err := c.config.KubeClient.StatefulSets(newStatefulSet.Namespace).Update(newStatefulSet)
+	statefulSet, err := c.KubeClient.StatefulSets(newStatefulSet.Namespace).Update(newStatefulSet)
 	if err != nil {
 		return err
 	}
@@ -154,7 +142,7 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("There is no StatefulSet in the cluster")
 	}
 
-	err := c.config.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(c.Statefulset.Name, deleteOptions)
+	err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(c.Statefulset.Name, deleteOptions)
 	if err != nil {
 		return err
 	}
@@ -167,9 +155,9 @@ func (c *Cluster) createService() (*v1.Service, error) {
 	if c.Service != nil {
 		return nil, fmt.Errorf("Service already exists in the cluster")
 	}
-	serviceSpec := resources.Service(c.ClusterName(), c.TeamName(), c.Spec.AllowedSourceRanges)
+	serviceSpec := c.genService(c.Spec.AllowedSourceRanges)
 
-	service, err := c.config.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
+	service, err := c.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
 		return nil, fmt.Errorf("Service '%s' already exists", util.NameFromMeta(serviceSpec.ObjectMeta))
 	}
@@ -188,7 +176,7 @@ func (c *Cluster) updateService(newService *v1.Service) error {
 	newService.ObjectMeta = c.Service.ObjectMeta
 	newService.Spec.ClusterIP = c.Service.Spec.ClusterIP
 
-	svc, err := c.config.KubeClient.Services(newService.Namespace).Update(newService)
+	svc, err := c.KubeClient.Services(newService.Namespace).Update(newService)
 	if err != nil {
 		return err
 	}
@@ -201,7 +189,7 @@ func (c *Cluster) deleteService() error {
 	if c.Service == nil {
 		return fmt.Errorf("There is no Service in the cluster")
 	}
-	err := c.config.KubeClient.Services(c.Service.Namespace).Delete(c.Service.Name, deleteOptions)
+	err := c.KubeClient.Services(c.Service.Namespace).Delete(c.Service.Name, deleteOptions)
 	if err != nil {
 		return err
 	}
@@ -214,18 +202,18 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 	if c.Endpoint != nil {
 		return nil, fmt.Errorf("Endpoint already exists in the cluster")
 	}
-	endpointSpec := resources.Endpoint(c.ClusterName())
+	endpointsSpec := c.genEndpoints()
 
-	endpoint, err := c.config.KubeClient.Endpoints(endpointSpec.Namespace).Create(endpointSpec)
+	endpoints, err := c.KubeClient.Endpoints(endpointsSpec.Namespace).Create(endpointsSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
-		return nil, fmt.Errorf("Endpoint '%s' already exists", util.NameFromMeta(endpointSpec.ObjectMeta))
+		return nil, fmt.Errorf("Endpoint '%s' already exists", util.NameFromMeta(endpointsSpec.ObjectMeta))
 	}
 	if err != nil {
 		return nil, err
 	}
-	c.Endpoint = endpoint
+	c.Endpoint = endpoints
 
-	return endpoint, nil
+	return endpoints, nil
 }
 
 func (c *Cluster) updateEndpoint(newEndpoint *v1.Endpoints) error {
@@ -238,7 +226,7 @@ func (c *Cluster) deleteEndpoint() error {
 	if c.Endpoint == nil {
 		return fmt.Errorf("There is no Endpoint in the cluster")
 	}
-	err := c.config.KubeClient.Endpoints(c.Endpoint.Namespace).Delete(c.Endpoint.Name, deleteOptions)
+	err := c.KubeClient.Endpoints(c.Endpoint.Namespace).Delete(c.Endpoint.Name, deleteOptions)
 	if err != nil {
 		return err
 	}
@@ -248,16 +236,16 @@ func (c *Cluster) deleteEndpoint() error {
 }
 
 func (c *Cluster) applySecrets() error {
-	secrets, err := resources.UserSecrets(c.ClusterName(), c.pgUsers)
+	secrets, err := c.genUserSecrets()
 
 	if err != nil {
 		return fmt.Errorf("Can't get user Secrets")
 	}
 
 	for secretUsername, secretSpec := range secrets {
-		secret, err := c.config.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
+		secret, err := c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
 		if k8sutil.ResourceAlreadyExists(err) {
-			curSecrets, err := c.config.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
+			curSecrets, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
 			if err != nil {
 				return fmt.Errorf("Can't get current Secret: %s", err)
 			}
@@ -279,7 +267,7 @@ func (c *Cluster) applySecrets() error {
 }
 
 func (c *Cluster) deleteSecret(secret *v1.Secret) error {
-	err := c.config.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, deleteOptions)
+	err := c.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, deleteOptions)
 	if err != nil {
 		return err
 	}
@@ -291,7 +279,7 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 func (c *Cluster) createUsers() error {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
 	for username, user := range c.pgUsers {
-		if username == constants.SuperuserName || username == constants.ReplicationUsername {
+		if username == c.OpConfig.SuperUsername || username == c.OpConfig.ReplicationUsername {
 			continue
 		}
 

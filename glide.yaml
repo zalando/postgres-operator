@@ -27,3 +27,4 @@ import:
   - rest
   - tools/cache
   - tools/clientcmd
+- package: github.com/kelseyhightower/envconfig

@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	etcdclient "github.com/coreos/etcd/client"
 )
 
-func (c *Controller) initEtcdClient() error {
-	etcdUrl := fmt.Sprintf("http://%s", constants.EtcdHost)
+func (c *Controller) initEtcdClient(etcdHost string) error {
+	etcdUrl := fmt.Sprintf("http://%s", etcdHost)
 
 	cfg, err := etcdclient.New(etcdclient.Config{
 		Endpoints:               []string{etcdUrl},
@@ -20,7 +19,7 @@ func (c *Controller) initEtcdClient() error {
 		return err
 	}
 
-	c.config.EtcdClient = etcdclient.NewKeysAPI(cfg)
+	c.EtcdClient = etcdclient.NewKeysAPI(cfg)
 
 	return nil
 }

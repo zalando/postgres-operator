@@ -15,7 +15,7 @@ func (c *Cluster) listPods() ([]v1.Pod, error) {
 		LabelSelector: c.labelsSet().String(),
 	}
 
-	pods, err := c.config.KubeClient.Pods(ns).List(listOptions)
+	pods, err := c.KubeClient.Pods(ns).List(listOptions)
 	if err != nil {
 		return nil, fmt.Errorf("Can't get list of Pods: %s", err)
 	}
@@ -29,7 +29,7 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 		LabelSelector: c.labelsSet().String(),
 	}
 
-	pvcs, err := c.config.KubeClient.PersistentVolumeClaims(ns).List(listOptions)
+	pvcs, err := c.KubeClient.PersistentVolumeClaims(ns).List(listOptions)
 	if err != nil {
 		return nil, fmt.Errorf("Can't get list of PersistentVolumeClaims: %s", err)
 	}
@@ -60,7 +60,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 		return err
 	}
 	for _, pvc := range pvcs {
-		if err := c.config.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, deleteOptions); err != nil {
+		if err := c.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, deleteOptions); err != nil {
 			c.logger.Warningf("Can't delete PersistentVolumeClaim: %s", err)
 		}
 	}
@@ -83,7 +83,7 @@ func (c *Cluster) deletePod(pod *v1.Pod) error {
 		delete(c.podSubscribers, podName)
 	}()
 
-	if err := c.config.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
 		return err
 	}
 
@@ -126,7 +126,7 @@ func (c *Cluster) recreatePod(pod v1.Pod, spiloRole string) error {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
-	if err := c.config.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
 		return fmt.Errorf("Can't delete Pod: %s", err)
 	}
 
@@ -165,7 +165,7 @@ func (c *Cluster) recreatePods() error {
 	listOptions := v1.ListOptions{
 		LabelSelector: ls.String(),
 	}
-	pods, err := c.config.KubeClient.Pods(namespace).List(listOptions)
+	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get the list of Pods: %s", err)
 	} else {

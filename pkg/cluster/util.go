@@ -70,7 +70,7 @@ func podMatchesTemplate(pod *v1.Pod, ss *v1beta1.StatefulSet) bool {
 }
 
 func (c *Cluster) getTeamMembers() ([]string, error) {
-	teamInfo, err := c.config.TeamsAPIClient.TeamInfo(c.Spec.TeamId)
+	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamId)
 	if err != nil {
 		return nil, fmt.Errorf("Can't get team info: %s", err)
 	}
@@ -87,7 +87,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, spiloRole string
 			if role == spiloRole { // TODO: newly-created Pods are always replicas => check against empty string only
 				return nil
 			}
-		case <-time.After(constants.PodLabelWaitTimeout):
+		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
 			return fmt.Errorf("Pod label wait timeout")
 		}
 	}
@@ -100,19 +100,19 @@ func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
 			if podEvent.EventType == spec.PodEventDelete {
 				return nil
 			}
-		case <-time.After(constants.PodDeletionWaitTimeout):
+		case <-time.After(c.OpConfig.PodDeletionWaitTimeout):
 			return fmt.Errorf("Pod deletion wait timeout")
 		}
 	}
 }
 
 func (c *Cluster) waitStatefulsetReady() error {
-	return retryutil.Retry(constants.ResourceCheckInterval, constants.ResourceCheckTimeout,
+	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
 			listOptions := v1.ListOptions{
 				LabelSelector: c.labelsSet().String(),
 			}
-			ss, err := c.config.KubeClient.StatefulSets(c.Metadata.Namespace).List(listOptions)
+			ss, err := c.KubeClient.StatefulSets(c.Metadata.Namespace).List(listOptions)
 			if err != nil {
 				return false, err
 			}
@@ -138,19 +138,19 @@ func (c *Cluster) waitPodLabelsReady() error {
 	replicaListOption := v1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": "replica"}).String(),
 	}
-	pods, err := c.config.KubeClient.Pods(namespace).List(listOptions)
+	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
 		return err
 	}
 	podsNumber := len(pods.Items)
 
-	return retryutil.Retry(constants.ResourceCheckInterval, constants.ResourceCheckTimeout,
+	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
-			masterPods, err := c.config.KubeClient.Pods(namespace).List(masterListOption)
+			masterPods, err := c.KubeClient.Pods(namespace).List(masterListOption)
 			if err != nil {
 				return false, err
 			}
-			replicaPods, err := c.config.KubeClient.Pods(namespace).List(replicaListOption)
+			replicaPods, err := c.KubeClient.Pods(namespace).List(replicaListOption)
 			if err != nil {
 				return false, err
 			}
@@ -198,7 +198,7 @@ func (c *Cluster) deleteEtcdKey() error {
 	etcdKey := fmt.Sprintf("/service/%s", c.Metadata.Name)
 
 	//TODO: retry multiple times
-	resp, err := c.config.EtcdClient.Delete(context.Background(),
+	resp, err := c.EtcdClient.Delete(context.Background(),
 		etcdKey,
 		&etcdclient.DeleteOptions{Recursive: true})
 

@@ -3,25 +3,28 @@ package controller
 import (
 	"fmt"
 
+	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
+	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+
 	"github.bus.zalan.do/acid/postgres-operator/pkg/cluster"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/resources"
-	"k8s.io/client-go/pkg/api"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
-		KubeClient:     c.config.KubeClient,
-		RestClient:     c.config.RestClient,
-		EtcdClient:     c.config.EtcdClient,
-		TeamsAPIClient: c.config.TeamsAPIClient,
+		KubeClient:     c.KubeClient,
+		RestClient:     c.RestClient,
+		EtcdClient:     c.EtcdClient,
+		TeamsAPIClient: c.TeamsAPIClient,
+		OpConfig:       c.opConfig,
 	}
 }
 
 func (c *Controller) getOAuthToken() (string, error) {
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
-	credentialsSecret, err := c.config.KubeClient.Secrets(api.NamespaceDefault).Get(constants.OAuthTokenSecretName)
+	credentialsSecret, err := c.KubeClient.Secrets(api.NamespaceDefault).Get(c.opConfig.OAuthTokenSecretName)
 
 	if err != nil {
 		return "", fmt.Errorf("Can't get credentials Secret: %s", err)
@@ -35,11 +38,24 @@ func (c *Controller) getOAuthToken() (string, error) {
 	return string(data["read-only-token-secret"]), nil
 }
 
+func thirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
+	return &extv1beta.ThirdPartyResource{
+		ObjectMeta: v1.ObjectMeta{
+			//ThirdPartyResources are cluster-wide
+			Name: TPRName,
+		},
+		Versions: []extv1beta.APIVersion{
+			{Name: constants.TPRApiVersion},
+		},
+		Description: constants.TPRDescription,
+	}
+}
+
 func (c *Controller) createTPR() error {
 	TPRName := fmt.Sprintf("%s.%s", constants.TPRName, constants.TPRVendor)
-	tpr := resources.ThirdPartyResource(TPRName)
+	tpr := thirdPartyResource(TPRName)
 
-	_, err := c.config.KubeClient.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
+	_, err := c.KubeClient.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
 	if err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return err
@@ -50,7 +66,7 @@ func (c *Controller) createTPR() error {
 		c.logger.Infof("ThirdPartyResource '%s' has been registered", TPRName)
 	}
 
-	restClient := c.config.RestClient
+	restClient := c.RestClient
 
-	return k8sutil.WaitTPRReady(restClient, constants.TPRReadyWaitInterval, constants.TPRReadyWaitTimeout, c.config.PodNamespace)
+	return k8sutil.WaitTPRReady(restClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.PodNamespace)
 }

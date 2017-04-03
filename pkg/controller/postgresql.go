@@ -18,8 +18,8 @@ import (
 
 func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
 	c.logger.Info("Getting list of currently running clusters")
-	object, err := c.config.RestClient.Get().
-		Namespace(c.config.PodNamespace).
+	object, err := c.RestClient.Get().
+		Namespace(c.PodNamespace).
 		Resource(constants.ResourceName).
 		VersionedParams(&options, api.ParameterCodec).
 		FieldsSelectorParam(fields.Everything()).
@@ -67,9 +67,9 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 }
 
 func (c *Controller) clusterWatchFunc(options api.ListOptions) (watch.Interface, error) {
-	return c.config.RestClient.Get().
+	return c.RestClient.Get().
 		Prefix("watch").
-		Namespace(c.config.PodNamespace).
+		Namespace(c.PodNamespace).
 		Resource(constants.ResourceName).
 		VersionedParams(&options, api.ParameterCodec).
 		FieldsSelectorParam(fields.Everything()).
@@ -128,7 +128,6 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	}
 
 	//TODO: Do not update cluster which is currently creating
-
 	if pgPrev.Metadata.ResourceVersion == pgNew.Metadata.ResourceVersion {
 		c.logger.Infof("Skipping update with no resource version change")
 		return

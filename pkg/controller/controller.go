@@ -12,7 +12,7 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/cluster"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/config"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
 )
 
@@ -25,7 +25,8 @@ type Config struct {
 }
 
 type Controller struct {
-	config      Config
+	Config
+	opConfig    *config.Config
 	logger      *logrus.Entry
 	clusters    map[spec.ClusterName]*cluster.Cluster
 	stopChMap   map[spec.ClusterName]chan struct{}
@@ -37,9 +38,10 @@ type Controller struct {
 	podCh chan spec.PodEvent
 }
 
-func New(cfg *Config) *Controller {
+func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 	return &Controller{
-		config:    *cfg,
+		Config:    *controllerConfig,
+		opConfig:  operatorConfig,
 		logger:    logrus.WithField("pkg", "controller"),
 		clusters:  make(map[spec.ClusterName]*cluster.Cluster),
 		stopChMap: make(map[spec.ClusterName]chan struct{}),
@@ -52,12 +54,12 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	wg.Add(1)
 
 	c.initController()
-	if err := c.initEtcdClient(); err != nil {
+	if err := c.initEtcdClient(c.opConfig.EtcdHost); err != nil {
 		c.logger.Errorf("Can't get etcd client: %s", err)
 		return
 	}
 
-	c.logger.Infof("'%s' namespace will be watched", c.config.PodNamespace)
+	c.logger.Infof("'%s' namespace will be watched", c.PodNamespace)
 	go c.runInformers(stopCh)
 
 	c.logger.Info("Started working in background")
@@ -68,7 +70,7 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("Can't register ThirdPartyResource: %s", err)
 	}
 
-	c.config.TeamsAPIClient.RefreshTokenAction = c.getOAuthToken
+	c.TeamsAPIClient.RefreshTokenAction = c.getOAuthToken
 
 	// Postgresqls
 	clusterLw := &cache.ListWatch{
@@ -78,7 +80,7 @@ func (c *Controller) initController() {
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
 		clusterLw,
 		&spec.Postgresql{},
-		constants.ResyncPeriodTPR,
+		c.opConfig.ResyncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -96,7 +98,7 @@ func (c *Controller) initController() {
 	c.podInformer = cache.NewSharedIndexInformer(
 		podLw,
 		&v1.Pod{},
-		constants.ResyncPeriodPod,
+		c.opConfig.ResyncPeriodPod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{

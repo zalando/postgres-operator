@@ -1,4 +1,4 @@
-package resources
+package cluster
 
 import (
 	"fmt"
@@ -6,8 +6,6 @@ import (
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	"k8s.io/client-go/pkg/labels"
 	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
@@ -15,23 +13,7 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
-func credentialSecretName(clusterName, username string) string {
-	return fmt.Sprintf(
-		constants.UserSecretTemplate,
-		username,
-		clusterName,
-		constants.TPRName,
-		constants.TPRVendor)
-}
-
-func labelsSet(clusterName string) labels.Set {
-	return labels.Set{
-		"application":   "spilo",
-		"spilo-cluster": clusterName,
-	}
-}
-
-func ResourceList(resources spec.Resources) *v1.ResourceList {
+func resourceList(resources spec.Resources) *v1.ResourceList {
 	resourceList := v1.ResourceList{}
 	if resources.Cpu != "" {
 		resourceList[v1.ResourceCPU] = resource.MustParse(resources.Cpu)
@@ -44,11 +26,11 @@ func ResourceList(resources spec.Resources) *v1.ResourceList {
 	return &resourceList
 }
 
-func PodTemplate(cluster spec.ClusterName, resourceList *v1.ResourceList, pgVersion string, dockerImage, etcdHost string) *v1.PodTemplateSpec {
+func (c *Cluster) genPodTemplate(resourceList *v1.ResourceList, pgVersion string) *v1.PodTemplateSpec {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
-			Value: cluster.Name,
+			Value: c.Metadata.Name,
 		},
 		{
 			Name:  "PGROOT",
@@ -56,7 +38,7 @@ func PodTemplate(cluster spec.ClusterName, resourceList *v1.ResourceList, pgVers
 		},
 		{
 			Name:  "ETCD_HOST",
-			Value: etcdHost,
+			Value: c.OpConfig.EtcdHost,
 		},
 		{
 			Name: "POD_IP",
@@ -81,7 +63,7 @@ func PodTemplate(cluster spec.ClusterName, resourceList *v1.ResourceList, pgVers
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: credentialSecretName(cluster.Name, constants.SuperuserName),
+						Name: c.credentialSecretName(c.OpConfig.SuperUsername),
 					},
 					Key: "password",
 				},
@@ -92,18 +74,18 @@ func PodTemplate(cluster spec.ClusterName, resourceList *v1.ResourceList, pgVers
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: credentialSecretName(cluster.Name, constants.ReplicationUsername),
+						Name: c.credentialSecretName(c.OpConfig.ReplicationUsername),
 					},
 					Key: "password",
 				},
 			},
 		},
 		{
-			Name:  "PAM_OAUTH2",               //TODO: get from the operator tpr spec
-			Value: constants.PamConfiguration, //space before uid is obligatory
+			Name:  "PAM_OAUTH2",
+			Value: c.OpConfig.PamConfiguration,
 		},
 		{
-			Name: "SPILO_CONFIGURATION", //TODO: get from the operator tpr spec
+			Name: "SPILO_CONFIGURATION",
 			Value: fmt.Sprintf(`
 postgresql:
   bin_dir: /usr/lib/postgresql/%s/bin
@@ -120,13 +102,13 @@ bootstrap:
   pg_hba:
   - hostnossl all all all reject
   - hostssl   all +%s all pam
-  - hostssl   all all all md5`, pgVersion, constants.PamRoleName, constants.PamRoleName),
+  - hostssl   all all all md5`, pgVersion, c.OpConfig.PamRoleName, c.OpConfig.PamRoleName),
 		},
 	}
 
 	container := v1.Container{
-		Name:            cluster.Name,
-		Image:           dockerImage,
+		Name:            c.Metadata.Name,
+		Image:           c.OpConfig.DockerImage,
 		ImagePullPolicy: v1.PullAlways,
 		Resources: v1.ResourceRequirements{
 			Requests: *resourceList,
@@ -156,16 +138,15 @@ bootstrap:
 	terminateGracePeriodSeconds := int64(30)
 
 	podSpec := v1.PodSpec{
-		ServiceAccountName:            constants.ServiceAccountName,
+		ServiceAccountName:            c.OpConfig.ServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
 	}
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: v1.ObjectMeta{
-			Labels:      labelsSet(cluster.Name),
-			Namespace:   cluster.Namespace,
-			Annotations: map[string]string{"pod.alpha.kubernetes.io/initialized": "true"},
+			Labels:    c.labelsSet(),
+			Namespace: c.Metadata.Name,
 		},
 		Spec: podSpec,
 	}
@@ -173,7 +154,29 @@ bootstrap:
 	return &template
 }
 
-func VolumeClaimTemplate(volumeSize, volumeStorageClass string) *v1.PersistentVolumeClaim {
+func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) *v1beta1.StatefulSet {
+	resourceList := resourceList(spec.Resources)
+	podTemplate := c.genPodTemplate(resourceList, spec.PgVersion)
+	volumeClaimTemplate := persistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
+
+	statefulSet := &v1beta1.StatefulSet{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      c.Metadata.Name,
+			Namespace: c.Metadata.Namespace,
+			Labels:    c.labelsSet(),
+		},
+		Spec: v1beta1.StatefulSetSpec{
+			Replicas:             &spec.NumberOfInstances,
+			ServiceName:          c.Metadata.Name,
+			Template:             *podTemplate,
+			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
+		},
+	}
+
+	return statefulSet
+}
+
+func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) *v1.PersistentVolumeClaim {
 	metadata := v1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
@@ -198,38 +201,19 @@ func VolumeClaimTemplate(volumeSize, volumeStorageClass string) *v1.PersistentVo
 	return volumeClaim
 }
 
-func StatefulSet(cluster spec.ClusterName, podTemplate *v1.PodTemplateSpec,
-	persistenVolumeClaim *v1.PersistentVolumeClaim, numberOfInstances int32) *v1beta1.StatefulSet {
-	statefulSet := &v1beta1.StatefulSet{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
-			Labels:    labelsSet(cluster.Name),
-		},
-		Spec: v1beta1.StatefulSetSpec{
-			Replicas:             &numberOfInstances,
-			ServiceName:          cluster.Name,
-			Template:             *podTemplate,
-			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*persistenVolumeClaim},
-		},
-	}
-
-	return statefulSet
-}
-
-func UserSecrets(cluster spec.ClusterName, pgUsers map[string]spec.PgUser) (secrets map[string]*v1.Secret, err error) {
-	secrets = make(map[string]*v1.Secret, len(pgUsers))
-	namespace := cluster.Namespace
-	for username, pgUser := range pgUsers {
+func (c *Cluster) genUserSecrets() (secrets map[string]*v1.Secret, err error) {
+	secrets = make(map[string]*v1.Secret, len(c.pgUsers))
+	namespace := c.Metadata.Namespace
+	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
 		if pgUser.Password == "" {
 			continue
 		}
 		secret := v1.Secret{
 			ObjectMeta: v1.ObjectMeta{
-				Name:      credentialSecretName(cluster.Name, username),
+				Name:      c.credentialSecretName(username),
 				Namespace: namespace,
-				Labels:    labelsSet(cluster.Name),
+				Labels:    c.labelsSet(),
 			},
 			Type: v1.SecretTypeOpaque,
 			Data: map[string][]byte{
@@ -243,14 +227,14 @@ func UserSecrets(cluster spec.ClusterName, pgUsers map[string]spec.PgUser) (secr
 	return
 }
 
-func Service(cluster spec.ClusterName, teamName string, allowedSourceRanges []string) *v1.Service {
+func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
-			Labels:    labelsSet(cluster.Name),
+			Name:      c.Metadata.Name,
+			Namespace: c.Metadata.Namespace,
+			Labels:    c.labelsSet(),
 			Annotations: map[string]string{
-				constants.ZalandoDnsNameAnnotation: util.ClusterDNSName(cluster.Name, teamName, constants.DbHostedZone),
+				constants.ZalandoDnsNameAnnotation: util.ClusterDNSName(c.Metadata.Name, c.TeamName(), c.OpConfig.DbHostedZone),
 			},
 		},
 		Spec: v1.ServiceSpec{
@@ -263,27 +247,14 @@ func Service(cluster spec.ClusterName, teamName string, allowedSourceRanges []st
 	return service
 }
 
-func Endpoint(cluster spec.ClusterName) *v1.Endpoints {
+func (c *Cluster) genEndpoints() *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
-			Labels:    labelsSet(cluster.Name),
+			Name:      c.Metadata.Name,
+			Namespace: c.Metadata.Namespace,
+			Labels:    c.labelsSet(),
 		},
 	}
 
 	return endpoints
-}
-
-func ThirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
-	return &extv1beta.ThirdPartyResource{
-		ObjectMeta: v1.ObjectMeta{
-			//ThirdPartyResources are cluster-wide
-			Name: TPRName,
-		},
-		Versions: []extv1beta.APIVersion{
-			{Name: constants.TPRApiVersion},
-		},
-		Description: constants.TPRDescription,
-	}
 }

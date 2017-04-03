@@ -9,18 +9,17 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
 var createUserSQL = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s %s;`
 
 func (c *Cluster) pgConnectionString() string {
 	hostname := fmt.Sprintf("%s.%s.svc.cluster.local", c.Metadata.Name, c.Metadata.Namespace)
-	password := c.pgUsers[constants.SuperuserName].Password
+	password := c.pgUsers[c.OpConfig.SuperUsername].Password
 
 	return fmt.Sprintf("host='%s' dbname=postgres sslmode=require user='%s' password='%s'",
 		hostname,
-		constants.SuperuserName,
+		c.OpConfig.SuperUsername,
 		strings.Replace(password, "$", "\\$", -1))
 }
 
@@ -52,7 +51,7 @@ func (c *Cluster) createPgUser(user spec.PgUser) (isHuman bool, err error) {
 	if user.Password == "" {
 		isHuman = true
 		flags = append(flags, "SUPERUSER")
-		flags = append(flags, fmt.Sprintf("IN ROLE \"%s\"", constants.PamRoleName))
+		flags = append(flags, fmt.Sprintf("IN ROLE \"%s\"", c.OpConfig.PamRoleName))
 	} else {
 		isHuman = false
 	}
