@@ -3,20 +3,15 @@ kind: "Postgresql"
 
 metadata:
   name: testcluster
-  namespace: default
-
 spec:
-  teamId: "50051320"
+  teamId: "ACID"
   volume:
-    size: 10Gi
-    storageClass: standard
-  numberOfInstances: 3
+    size: 5Gi
+  numberOfInstances: 2
   users: #Application/Robot users
-    jdoe:
+    zalando:
     - superuser
     - createdb
-    rmiles:
-    rroe:
   allowedSourceRanges: #Load balancer source ranges
   - 127.0.0.1/32
 
@@ -24,12 +19,12 @@ spec:
   postgresql:
     version: "9.6"
     parameters:
-      shared_buffers: "500MB"
+      shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
   resources:
     cpu: 10m
-    memory: 20Mi
+    memory: 100Mi
   patroni:
     initdb:
       encoding: "UTF8"
