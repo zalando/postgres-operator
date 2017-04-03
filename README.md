@@ -9,7 +9,7 @@ One the operator is running, it performs the following actions:
 * watches for new cluster postgres manifests and deploys corresponding clusters.
 * watches for updates to existing manifests and changes corresponding properties of the running clusters.
 * watches for deletes of the existing manifests and deletes corresponding database clusters.
-* watches for updates to the operator definition itself and changes the running clusters when necessary.
+* acts on an update to the operator definition itself and changes the running clusters when necessary (i.e. when the docker image inside the operator definition has been updated.)
 * checks running clusters against the manifests and acts on the differences found.
 
 For instance, when the user creates a new custom object of type postgresql by submitting a new manifest with kubectl, the operator fetches that object and creates the corresponding kubernetes structures (statefulsets, services, secrets) according to its definition.
