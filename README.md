@@ -1,16 +1,16 @@
 # postgres operator prototype (WIP)
 
-Postgres operator manages Postgres clustes in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html)
+Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html)
 During the initial run it registers the [third-party-resource (TPR)](https://kubernetes.io/docs/user-guide/thirdpartyresources/) for Postgres.
 The Postgres TPR is essentially a schema that describes the contents of the manifests for deploying individual clusters.
 
-One the operator is running, it performs the following actions:
+Once the operator is running, it performs the following actions:
 
-* watches for new cluster postgres manifests and deploys corresponding clusters.
+* watches for new postgres cluster manifests and deploys corresponding clusters.
 * watches for updates to existing manifests and changes corresponding properties of the running clusters.
 * watches for deletes of the existing manifests and deletes corresponding database clusters.
 * acts on an update to the operator definition itself and changes the running clusters when necessary (i.e. when the docker image inside the operator definition has been updated.)
-* checks running clusters against the manifests and acts on the differences found.
+* periodically checks running clusters against the manifests and acts on the differences found.
 
 For instance, when the user creates a new custom object of type postgresql by submitting a new manifest with kubectl, the operator fetches that object and creates the corresponding kubernetes structures (statefulsets, services, secrets) according to its definition.
 
@@ -104,7 +104,7 @@ will get you the docker image built and deployed.
     $ make docker
     $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" -e "/serviceAccountName/d" manifests/postgres-operator.yaml|kubectl create  -f -
     
-The last line changes the docker image tag in the maniest to the one the operator image has been built with and removes
+The last line changes the docker image tag in the manifest to the one the operator image has been built with and removes
 the serviceAccountName definition, as the service account is not defined in minikube (neither it should, as one has admin
 permissions there).
 
