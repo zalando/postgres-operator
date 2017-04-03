@@ -1,8 +1,8 @@
 # postgres operator prototype (WIP)
 
 Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html)
-During the initial run it registers the [third-party-resource (TPR)](https://kubernetes.io/docs/user-guide/thirdpartyresources/) for Postgres.
-The Postgres TPR is essentially a schema that describes the contents of the manifests for deploying individual clusters.
+During the initial run it registers the [Third Party Resource (TPR)](https://kubernetes.io/docs/user-guide/thirdpartyresources/) for Postgres.
+The Postgres TPR is essentially the schema that describes the contents of the manifests for deploying individual Postgres clusters.
 
 Once the operator is running, it performs the following actions:
 
@@ -12,11 +12,11 @@ Once the operator is running, it performs the following actions:
 * acts on an update to the operator definition itself and changes the running clusters when necessary (i.e. when the docker image inside the operator definition has been updated.)
 * periodically checks running clusters against the manifests and acts on the differences found.
 
-For instance, when the user creates a new custom object of type postgresql by submitting a new manifest with kubectl, the operator fetches that object and creates the corresponding kubernetes structures (statefulsets, services, secrets) according to its definition.
+For instance, when the user creates a new custom object of type postgresql by submitting a new manifest with kubectl, the operator fetches that object and creates the corresponding kubernetes structures (StatefulSets, Services, Secrets) according to its definition.
 
-Another example is changing the docker image inside the operator. In this case, the operator first goes to all statefulsets
-it manages and updates them with the new docker images; afterwards, all pods from each statefulset are killed one by one
-(rolling upgrade) and the replacements are spawned automatically by the statefulsets with the new docker image.
+Another example is changing the docker image inside the operator. In this case, the operator first goes to all Statefulsets
+it manages and updates them with the new docker images; afterwards, all pods from each Statefulset are killed one by one
+(rolling upgrade) and the replacements are spawned automatically by each Statefulset with the new docker image.
 
 ## Setting up Go.
 
@@ -24,7 +24,7 @@ Postgres operator is written in Go. Use the [installation instructions](https://
 You won't be able to compile the operator with Go older than 1.7. We recommend installing [the latest one](https://golang.org/dl/).
 
 Go projects expect their source code and all the dependencies to be located under the [GOPATH](https://github.com/golang/go/wiki/GOPATH).
-Normally, one would use a single GOPATH, by creating a directory (i.e. ~/go) and placing the source code under the ~/go/src subdirectories.
+Normally, one would create a directory for the GOPATH (i.e. ~/go) and place the source code under the ~/go/src subdirectories.
 
 Given the schema above, the postgres operator source code located at `github.bus.zalan.do/acid/postgres-operator` should be put at
 `~/go/src/github.bus.zalan.do/acid/postgres-operator`.
@@ -84,8 +84,8 @@ Note: if you use multiple kubernetes clusters, you can switch to minikube with `
 
 
 Before the operator is deployed, you need to tell your minikube cluster the OAuth2 secret token in order to communicate
-with the teams API. For a Live Zalando cluster, the token is populated in a secret described by `manifests/platform-credentials.yaml`
-via the infrastructure created by the Teapot team. The operator expects that secret (with the name set by the `oauth_token_secret_name
+with the teams API. For a Live Zalando cluster, the token is populated in a Secret described by `manifests/platform-credentials.yaml`
+via the infrastructure created by the Teapot team. The operator expects that Secret (with the name set by the `oauth_token_secret_name
 variable to be present). That token is not present in minikube, but one can copy it from the production cluster:
 
     $ zkubectl --context kube_db_zalan_do get secret postgresql-operator -o yaml| kubectl --context minikube create -f -  
@@ -105,7 +105,7 @@ will get you the docker image built and deployed.
     $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" -e "/serviceAccountName/d" manifests/postgres-operator.yaml|kubectl create  -f -
     
 The last line changes the docker image tag in the manifest to the one the operator image has been built with and removes
-the serviceAccountName definition, as the service account is not defined in minikube (neither it should, as one has admin
+the serviceAccountName definition, as the ServiceAccount is not defined in minikube (neither it should, as one has admin
 permissions there).
 
 ### Deploy etcd
