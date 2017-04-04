@@ -1,5 +1,5 @@
-hash: 8ffa20f78f1084d76efd6765df697e41edbe154a139a22292563cfc0eb50cd51
-updated: 2017-02-27T16:30:41.210217992+01:00
+hash: c70c822b335a0c7f52d5bb65290c5d4c11ba51430d70ccf03f436b92c37c1d7e
+updated: 2017-04-04T13:03:04.490298759+02:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -9,7 +9,7 @@ imports:
 - name: github.com/blang/semver
   version: 31b736133b98f26d5e078ec9eb591666edfd091f
 - name: github.com/coreos/etcd
-  version: 714e7ec8db7f8398880197be10771fe89c480ee5
+  version: 20490caaf0dcd96bb4a95e40625559def8ef5b04
   subpackages:
   - client
   - pkg/pathutil
@@ -75,6 +75,8 @@ imports:
   version: 2eee05ed794112d45db504eb05aa693efd2b8b09
 - name: github.com/juju/ratelimit
   version: 77ed1c8a01217656d2080ad51981f6e99adaa177
+- name: github.com/kelseyhightower/envconfig
+  version: 8bf4bbfc795e2c7c8a5ea47b707453ed019e2ad4
 - name: github.com/lib/pq
   version: 0477eb88c5ca4009cb281f13c90633375b6a9987
   subpackages:
@@ -92,7 +94,7 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/Sirupsen/logrus
-  version: 0208149b40d863d2c1a2f8fe5753096a9cf2cc8b
+  version: ba1b36c82c5e05c4f912a88eab0dcd91a171688f
 - name: github.com/spf13/pflag
   version: 08b1a584251b5b62f458943640fc8ebd4d50aaa5
 - name: github.com/ugorji/go
