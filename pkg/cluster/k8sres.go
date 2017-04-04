@@ -105,7 +105,7 @@ bootstrap:
   - hostssl   all all all md5`, pgVersion, c.OpConfig.PamRoleName, c.OpConfig.PamRoleName),
 		},
 	}
-
+	privilegedMode := bool(true)
 	container := v1.Container{
 		Name:            c.Metadata.Name,
 		Image:           c.OpConfig.DockerImage,
@@ -134,6 +134,9 @@ bootstrap:
 			},
 		},
 		Env: envVars,
+		SecurityContext: &v1.SecurityContext{
+			Privileged: &privilegedMode,
+		},
 	}
 	terminateGracePeriodSeconds := int64(30)
 
