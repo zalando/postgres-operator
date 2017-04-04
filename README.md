@@ -67,6 +67,7 @@ The best way to test the operator is to run it in minikube. Minikube is a tool t
 
 See [minikube installation guide](https://github.com/kubernetes/minikube/releases)
 
+Make sure you use Minikube 1.7.
 After the installation, issue the
 
     $ minikube start
@@ -78,54 +79,3 @@ One you have it started successfully, use [the quickstart guide](https://github.
 to test your that your setup is working.
 
 Note: if you use multiple kubernetes clusters, you can switch to minikube with `kubectl config use-context minikube`
-
-
-### Deploying the operator
-
-
-Before the operator is deployed, you need to tell your minikube cluster the OAuth2 secret token in order to communicate
-with the teams API. For a Live Zalando cluster, the token is populated in a Secret described by `manifests/platform-credentials.yaml`
-via the infrastructure created by the Teapot team. The operator expects that Secret (with the name set by the `oauth_token_secret_name
-variable to be present). That token is not present in minikube, but one can copy it from the production cluster:
-
-    $ zkubectl --context kube_db_zalan_do get secret postgresql-operator -o yaml| kubectl --context minikube create -f -  
-
-Note that the token normally expires after ~ 30 minutes, therefore, you should fetch the new one(and delete the old one):
-
-    $ kubectl --context minikube delete secret postgresql-operator
-    $ zkubectl --context kube_db_zalan_do get secret postgresql-operator -o yaml| kubectl --context minikube create -f -
-
-The fastest way to run your docker image locally is to reuse the docker from minikube. That way, there is no need to
-pull docker images from pierone or push them, as the image is essentially there once you build it. The following steps
-will get you the docker image built and deployed.
-
-    $ eval $(minikube docker-env)
-    $ export TAG=$(git describe --tags --always --dirty)
-    $ make docker
-    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" -e "/serviceAccountName/d" manifests/postgres-operator.yaml|kubectl create  -f -
-    
-The last line changes the docker image tag in the manifest to the one the operator image has been built with and removes
-the serviceAccountName definition, as the ServiceAccount is not defined in minikube (neither it should, as one has admin
-permissions there).
-
-### Deploy etcd
-
-Etcd is required to deploy the operator.
-
-    $ kubectl create -f https://raw.githubusercontent.com/coreos/etcd/master/hack/kubernetes-deploy/etcd.yml
-
-### Check if ThirdPartyResource has been registered
-
-    $ kubectl get thirdpartyresources
-
-    NAME                       DESCRIPTION                   VERSION(S)
-    postgresql.acid.zalan.do   Managed PostgreSQL clusters   v1
-
-
-### Create a new spilo cluster
-
-    $ kubectl create -f manifests/testpostgresql.yaml
-    
-### Watch Pods being created
-
-    $ kubectl get pods -w
