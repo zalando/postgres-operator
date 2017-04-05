@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"time"
+	"encoding/json"
 
 	"github.com/kelseyhightower/envconfig"
 )
@@ -48,4 +49,13 @@ func LoadFromEnv() *Config {
 	}
 
 	return &cfg
+}
+
+func (c Config) MustMarshal() string {
+	b, err := json.MarshalIndent(c, "", "\t")
+	if err != nil {
+		panic(err)
+	}
+
+	return string(b)
 }
