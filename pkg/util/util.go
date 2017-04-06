@@ -64,7 +64,7 @@ func PGUserPassword(user spec.PgUser) string {
 	return "md5" + hex.EncodeToString(s[:])
 }
 
-func Pretty(x interface {}) (f fmt.Formatter) {
+func Pretty(x interface{}) (f fmt.Formatter) {
 	return pretty.Formatter(x)
 }
 

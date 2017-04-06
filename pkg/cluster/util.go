@@ -89,8 +89,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("Current %# v\nnew %# v\ndiff %s\n",
-		util.Pretty(old.Spec), util.Pretty(new.Spec), util.PrettyDiff(old.Spec, new.Spec))
+	c.logger.Debugf("diff %s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
@@ -107,8 +106,7 @@ func (c *Cluster) logServiceChanges(old, new *v1.Service, isUpdate bool, reason 
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("Current %# v\nnew %# v\ndiff %s\n",
-		util.Pretty(old.Spec), util.Pretty(new.Spec), util.PrettyDiff(old.Spec, new.Spec))
+	c.logger.Debugf("diff %s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
@@ -117,18 +115,22 @@ func (c *Cluster) logServiceChanges(old, new *v1.Service, isUpdate bool, reason 
 
 func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
 	c.logger.Infof("Volume specification has been changed")
-	c.logger.Debugf("Current %# v\nnew %# v\ndiff %s\n",
-		util.Pretty(old), util.Pretty(new), util.PrettyDiff(old, new))
+	c.logger.Debugf("diff %s\n", util.PrettyDiff(old, new))
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
 	}
 }
 
 func (c *Cluster) logPodChanges(pod *v1.Pod, statefulset *v1beta1.StatefulSet, reason string) {
-	c.logger.Infof("Pod'%s does not match StatefulSet pod template and needs to be recreated",
+	c.logger.Infof("Pod'%s does not match the StatefulSet's Pod template and needs to be recreated",
 		util.NameFromMeta(pod.ObjectMeta),
 	)
-	c.logger.Debugf("Pod: %# v\nstatefulset %# v\n", util.Pretty(pod.Spec), util.Pretty(statefulset.Spec))
+
+	if len(pod.Spec.Containers) == 1 {
+		podContainer := pod.Spec.Containers[0]
+		templateContainer := statefulset.Spec.Template.Spec.Containers[0]
+		c.logger.Debugf("diff %s", util.PrettyDiff(podContainer, templateContainer))
+	}
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
 	}
