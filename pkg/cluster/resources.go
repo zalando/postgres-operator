@@ -248,6 +248,7 @@ func (c *Cluster) applySecrets() error {
 			if err != nil {
 				return fmt.Errorf("Can't get current Secret: %s", err)
 			}
+			c.logger.Debugf("Secret '%s' already exists, fetching it's password", util.NameFromMeta(secret.ObjectMeta))
 			pwdUser := c.pgUsers[secretUsername]
 			pwdUser.Password = string(curSecrets.Data["password"])
 			c.pgUsers[secretUsername] = pwdUser

@@ -10,22 +10,27 @@ import (
 )
 
 func (c *Cluster) SyncCluster() {
+	c.logger.Debugf("Syncing Secrets")
 	if err := c.syncSecrets(); err != nil {
 		c.logger.Infof("Can't sync Secrets: %s", err)
 	}
 
+	c.logger.Debugf("Syncing Endpoints")
 	if err := c.syncEndpoint(); err != nil {
 		c.logger.Errorf("Can't sync Endpoints: %s", err)
 	}
 
+	c.logger.Debugf("Syncing Services")
 	if err := c.syncService(); err != nil {
 		c.logger.Errorf("Can't sync Services: %s", err)
 	}
 
+	c.logger.Debugf("Syncing StatefulSets")
 	if err := c.syncStatefulSet(); err != nil {
 		c.logger.Errorf("Can't sync StatefulSets: %s", err)
 	}
 
+	c.logger.Debugf("Syncing Pods")
 	if err := c.syncPods(); err != nil {
 		c.logger.Errorf("Can't sync Pods: %s", err)
 	}
@@ -33,6 +38,10 @@ func (c *Cluster) SyncCluster() {
 
 func (c *Cluster) syncSecrets() error {
 	//TODO: mind the secrets of the deleted/new users
+	if err := c.initUsers(); err != nil {
+		return err
+	}
+
 	err := c.applySecrets()
 	if err != nil {
 		return err

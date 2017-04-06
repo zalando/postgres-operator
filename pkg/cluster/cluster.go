@@ -118,6 +118,19 @@ func (c *Cluster) SetStatus(status spec.PostgresStatus) {
 	}
 }
 
+func (c *Cluster) initUsers() error {
+	c.initSystemUsers()
+	if err := c.initRobotUsers(); err != nil {
+		return fmt.Errorf("Can't init robot users: %s", err)
+	}
+
+	if err := c.initHumanUsers(); err != nil {
+		return fmt.Errorf("Can't init human users: %s", err)
+	}
+
+	return nil
+}
+
 func (c *Cluster) Create() error {
 	//TODO: service will create endpoint implicitly
 	ep, err := c.createEndpoint()
@@ -133,13 +146,10 @@ func (c *Cluster) Create() error {
 		c.logger.Infof("Service '%s' has been successfully created", util.NameFromMeta(service.ObjectMeta))
 	}
 
-	c.initSystemUsers()
-	if err := c.initRobotUsers(); err != nil {
-		return fmt.Errorf("Can't init robot users: %s", err)
-	}
-
-	if err := c.initHumanUsers(); err != nil {
-		return fmt.Errorf("Can't init human users: %s", err)
+	if err := c.initUsers(); err != nil {
+		return err
+	} else {
+		c.logger.Infof("User secrets have been initialized")
 	}
 
 	if err := c.applySecrets(); err != nil {
