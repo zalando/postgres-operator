@@ -89,7 +89,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("diff %s\n", util.PrettyDiff(old.Spec, new.Spec))
+	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
@@ -106,7 +106,7 @@ func (c *Cluster) logServiceChanges(old, new *v1.Service, isUpdate bool, reason 
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("diff %s\n", util.PrettyDiff(old.Spec, new.Spec))
+	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
@@ -115,7 +115,7 @@ func (c *Cluster) logServiceChanges(old, new *v1.Service, isUpdate bool, reason 
 
 func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
 	c.logger.Infof("Volume specification has been changed")
-	c.logger.Debugf("diff %s\n", util.PrettyDiff(old, new))
+	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
 	}
@@ -129,7 +129,7 @@ func (c *Cluster) logPodChanges(pod *v1.Pod, statefulset *v1beta1.StatefulSet, r
 	if len(pod.Spec.Containers) == 1 {
 		podContainer := pod.Spec.Containers[0]
 		templateContainer := statefulset.Spec.Template.Spec.Containers[0]
-		c.logger.Debugf("diff %s", util.PrettyDiff(podContainer, templateContainer))
+		c.logger.Debugf("diff\n%s", util.PrettyDiff(podContainer, templateContainer))
 	}
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)

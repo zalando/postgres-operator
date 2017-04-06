@@ -3,7 +3,6 @@ package util
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
+	"strings"
 )
 
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
@@ -70,11 +70,5 @@ func Pretty(x interface{}) (f fmt.Formatter) {
 
 func PrettyDiff(a, b interface{}) (result string) {
 	diff := pretty.Diff(a, b)
-	json, err := json.MarshalIndent(diff, "", " ")
-	if err != nil {
-		result = fmt.Sprintf("%v", diff)
-	} else {
-		result = string(json)
-	}
-	return
+	return strings.Join(diff, "\n")
 }
