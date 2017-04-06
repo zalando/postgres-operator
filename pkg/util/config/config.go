@@ -1,9 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
-	"encoding/json"
 
 	"github.com/kelseyhightower/envconfig"
 )
