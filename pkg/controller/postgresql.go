@@ -46,7 +46,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 			Name:      pg.Metadata.Name,
 		}
 
-		cl := cluster.New(clusterConfig, *pg)
+		cl := cluster.New(clusterConfig, *pg, c.logger.Logger)
 
 		stopCh := make(chan struct{})
 		c.stopChMap[clusterName] = stopCh
@@ -95,7 +95,7 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 	}
 
 	c.logger.Infof("Creation of a new Postgresql cluster '%s' started", clusterName)
-	cl := cluster.New(c.makeClusterConfig(), *pg)
+	cl := cluster.New(c.makeClusterConfig(), *pg, c.logger.Logger)
 	cl.SetStatus(spec.ClusterStatusCreating)
 	if err := cl.Create(); err != nil {
 		c.logger.Errorf("Can't create cluster: %s", err)

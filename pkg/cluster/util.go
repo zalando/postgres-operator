@@ -129,7 +129,7 @@ func (c *Cluster) logPodChanges(pod *v1.Pod, statefulset *v1beta1.StatefulSet, r
 	if len(pod.Spec.Containers) == 1 {
 		podContainer := pod.Spec.Containers[0]
 		templateContainer := statefulset.Spec.Template.Spec.Containers[0]
-		c.logger.Debugf("diff\n%s", util.PrettyDiff(podContainer, templateContainer))
+		c.logger.Debugf("diff pod <-> statefulset\n%s", util.PrettyDiff(podContainer, templateContainer))
 	}
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)

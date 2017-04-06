@@ -61,8 +61,8 @@ type Cluster struct {
 	mu             sync.Mutex
 }
 
-func New(cfg Config, pgSpec spec.Postgresql) *Cluster {
-	lg := logrus.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
+func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
+	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
 	kubeResources := KubeResources{Secrets: make(map[types.UID]*v1.Secret)}
 
 	cluster := &Cluster{

@@ -39,15 +39,16 @@ type Controller struct {
 }
 
 func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
+	logger := logrus.New()
+
 	if operatorConfig.DebugLogging {
-		logrus.SetLevel(logrus.DebugLevel)
+		logger.Level = logrus.DebugLevel
 	}
-	logger := logrus.WithField("pkg", "controller")
-	logger.Debugf("Debug output enabled")
+
 	return &Controller{
 		Config:    *controllerConfig,
 		opConfig:  operatorConfig,
-		logger:    logger,
+		logger:    logger.WithField("pkg", "controller"),
 		clusters:  make(map[spec.ClusterName]*cluster.Cluster),
 		stopChMap: make(map[spec.ClusterName]chan struct{}),
 		podCh:     make(chan spec.PodEvent),
