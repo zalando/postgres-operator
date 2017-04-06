@@ -55,10 +55,11 @@ func (c *Cluster) syncService() error {
 	}
 
 	desiredSvc := c.genService(cSpec.AllowedSourceRanges)
-	if c.sameServiceWith(desiredSvc) {
+	if match, reason := c.sameServiceWith(desiredSvc); match {
 		return nil
+	} else {
+		c.logServiceChanges(c.Service, desiredSvc, false, reason)
 	}
-	c.logger.Infof("Service '%s' needs to be updated", util.NameFromMeta(desiredSvc.ObjectMeta))
 
 	if err := c.updateService(desiredSvc); err != nil {
 		return fmt.Errorf("Can't update Service to match desired state: %s", err)
@@ -99,11 +100,11 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	desiredSS := c.genStatefulSet(cSpec)
-	equalSS, rollUpdate := c.compareStatefulSetWith(desiredSS)
-	if equalSS {
+	match, rollUpdate, reason := c.compareStatefulSetWith(desiredSS)
+	if match {
 		return nil
 	}
-	c.logger.Infof("StatefulSet '%s' is not in the desired state", util.NameFromMeta(c.Statefulset.ObjectMeta))
+	c.logStatefulSetChanges(c.Statefulset, desiredSS, false, reason)
 
 	if err := c.updateStatefulSet(desiredSS); err != nil {
 		return fmt.Errorf("Can't update StatefulSet: %s", err)
@@ -147,8 +148,8 @@ func (c *Cluster) syncPods() error {
 			Namespace: pod.Namespace,
 			Name:      pod.Name,
 		}
-
-		if podMatchesTemplate(&pod, curSs) && pod.Status.Phase == v1.PodPending {
+		match, _ := podMatchesTemplate(&pod, curSs)
+		if match && pod.Status.Phase == v1.PodPending {
 			c.logger.Infof("Waiting for left over Pod '%s'", podName)
 			ch := c.registerPodSubscriber(podName)
 			c.waitForPodLabel(ch, podRole)
@@ -157,11 +158,11 @@ func (c *Cluster) syncPods() error {
 	}
 
 	for _, pod := range pods.Items {
-		if podMatchesTemplate(&pod, curSs) {
+		if match, reason := podMatchesTemplate(&pod, curSs); match {
 			c.logger.Infof("Pod '%s' matches StatefulSet pod template", util.NameFromMeta(pod.ObjectMeta))
 			continue
 		} else {
-			c.logger.Infof("Pod '%s' does not match StatefulSet pod template. Pod needs to be recreated", util.NameFromMeta(pod.ObjectMeta))
+			c.logPodChanges(&pod, curSs, reason)
 		}
 
 		if util.PodSpiloRole(&pod) == "master" {

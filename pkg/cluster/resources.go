@@ -15,7 +15,6 @@ var (
 	orphanDependents = false
 )
 
-
 func (c *Cluster) LoadResources() error {
 	ns := c.Metadata.Namespace
 	listOptions := v1.ListOptions{

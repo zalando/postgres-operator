@@ -38,6 +38,7 @@ type Config struct {
 	DockerImage        string `split_words:"true",default:"registry.opensource.zalan.do/acid/spilo-9.6:1.2-p12"`
 	ServiceAccountName string `split_words:"true",default:"operator"`
 	DbHostedZone       string `split_words:"true",default:"db.example.com"`
+	DebugLogging       bool   `split_words:"true",default:"false"`
 }
 
 func LoadFromEnv() *Config {

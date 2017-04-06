@@ -3,9 +3,12 @@ package util
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
+
+	"github.com/kr/pretty"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"k8s.io/client-go/pkg/api/v1"
@@ -59,4 +62,19 @@ func PGUserPassword(user spec.PgUser) string {
 	s := md5.Sum([]byte(user.Password + user.Name))
 
 	return "md5" + hex.EncodeToString(s[:])
+}
+
+func Pretty(x interface {}) (f fmt.Formatter) {
+	return pretty.Formatter(x)
+}
+
+func PrettyDiff(a, b interface{}) (result string) {
+	diff := pretty.Diff(a, b)
+	json, err := json.MarshalIndent(diff, "", " ")
+	if err != nil {
+		result = fmt.Sprintf("%v", diff)
+	} else {
+		result = string(json)
+	}
+	return
 }

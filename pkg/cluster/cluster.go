@@ -177,25 +177,42 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
-func (c Cluster) sameServiceWith(service *v1.Service) bool {
+func (c Cluster) sameServiceWith(service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
-	return reflect.DeepEqual(c.Service.Spec.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
+	reason = ""
+	match = false
+	if !reflect.DeepEqual(c.Service.Spec.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges) {
+		reason = "new service's LoadBalancerSourceRange doesn't match the current one"
+	} else {
+		match = true
+	}
+	return
 }
 
-func (c Cluster) sameVolumeWith(volume spec.Volume) bool {
-	return reflect.DeepEqual(c.Spec.Volume, volume)
+func (c Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string) {
+	reason = ""
+	match = false
+	if !reflect.DeepEqual(c.Spec.Volume, volume) {
+		reason = "new volume's specification doesn't match the current one"
+	} else {
+		match = true
+	}
+	return
 }
 
-func (c Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (equal, needsRollUpdate bool) {
-	equal = true
+func (c Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match, needsRollUpdate bool, reason string) {
+	match = true
 	needsRollUpdate = false
+	reason = ""
 	//TODO: improve me
 	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
-		equal = false
+		match = false
+		reason = "new statefulset's number of replicas doesn't match the current one"
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
-		equal = false
+		match = false
 		needsRollUpdate = true
+		reason = "new statefulset's container specification doesn't match the current one"
 		return
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
@@ -206,25 +223,29 @@ func (c Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (equal
 	container1 := c.Statefulset.Spec.Template.Spec.Containers[0]
 	container2 := statefulSet.Spec.Template.Spec.Containers[0]
 	if container1.Image != container2.Image {
-		equal = false
+		match = false
 		needsRollUpdate = true
+		reason = "new statefulset's container image doesn't match the current one"
 		return
 	}
 
 	if !reflect.DeepEqual(container1.Ports, container2.Ports) {
-		equal = false
+		match = false
 		needsRollUpdate = true
+		reason = "new statefulset's container ports don't match the current one"
 		return
 	}
 
 	if !reflect.DeepEqual(container1.Resources, container2.Resources) {
-		equal = false
+		match = false
 		needsRollUpdate = true
+		reason = "new statefulset's container resources don't match the current ones"
 		return
 	}
 	if !reflect.DeepEqual(container1.Env, container2.Env) {
-		equal = false
+		match = false
 		needsRollUpdate = true
+		reason = "new statefulset's container environment doesn't match the current one"
 	}
 
 	return
@@ -235,11 +256,8 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
 
 	newService := c.genService(newSpec.Spec.AllowedSourceRanges)
-	if !c.sameServiceWith(newService) {
-		c.logger.Infof("LoadBalancer configuration has changed for Service '%s': %+v -> %+v",
-			util.NameFromMeta(c.Service.ObjectMeta),
-			c.Service.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges,
-		)
+	if match, reason := c.sameServiceWith(newService); !match {
+		c.logServiceChanges(c.Service, newService, true, reason)
 		if err := c.updateService(newService); err != nil {
 			return fmt.Errorf("Can't update Service: %s", err)
 		} else {
@@ -247,19 +265,16 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		}
 	}
 
-	if !c.sameVolumeWith(newSpec.Spec.Volume) {
-		c.logger.Infof("Volume specification has been changed")
+	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
+		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
 		//TODO: update PVC
 	}
 
 	newStatefulSet := c.genStatefulSet(newSpec.Spec)
-	sameSS, rollingUpdate := c.compareStatefulSetWith(newStatefulSet)
+	sameSS, rollingUpdate, reason := c.compareStatefulSetWith(newStatefulSet)
 
 	if !sameSS {
-		c.logger.Infof("StatefulSet '%s' has been changed: %+v -> %+v",
-			util.NameFromMeta(c.Statefulset.ObjectMeta),
-			c.Statefulset.Spec, newStatefulSet.Spec,
-		)
+		c.logStatefulSetChanges(c.Statefulset, newStatefulSet, true, reason)
 		//TODO: mind the case of updating allowedSourceRanges
 		if err := c.updateStatefulSet(newStatefulSet); err != nil {
 			return fmt.Errorf("Can't upate StatefulSet: %s", err)

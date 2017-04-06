@@ -45,28 +45,93 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 	return
 }
 
-func podMatchesTemplate(pod *v1.Pod, ss *v1beta1.StatefulSet) bool {
+func podMatchesTemplate(pod *v1.Pod, ss *v1beta1.StatefulSet) (match bool, reason string) {
 	//TODO: improve me
+	match = false
+	reason = ""
 	if len(pod.Spec.Containers) != 1 {
-		return false
+		reason = "new pod defines more than one container"
+		return
 	}
 	container := pod.Spec.Containers[0]
 	ssContainer := ss.Spec.Template.Spec.Containers[0]
 
-	if container.Image != ssContainer.Image {
-		return false
+	switch {
+	case container.Image != ssContainer.Image:
+		{
+			reason = "new pod's container image doesn't match the current one"
+		}
+	case !reflect.DeepEqual(container.Env, ssContainer.Env):
+		{
+			reason = "new pod's container environment doesn't match the current one"
+		}
+	case !reflect.DeepEqual(container.Ports, ssContainer.Ports):
+		{
+			reason = "new pod's container ports don't match the current ones"
+		}
+	case !reflect.DeepEqual(container.Resources, ssContainer.Resources):
+		{
+			reason = "new pod's container resources don't match the current ones"
+		}
+	default:
+		match = true
 	}
-	if !reflect.DeepEqual(container.Env, ssContainer.Env) {
-		return false
-	}
-	if !reflect.DeepEqual(container.Ports, ssContainer.Ports) {
-		return false
-	}
-	if !reflect.DeepEqual(container.Resources, ssContainer.Resources) {
-		return false
-	}
+	return
+}
 
-	return true
+func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reason string) {
+	if isUpdate {
+		c.logger.Infof("StatefulSet '%s' has been changed",
+			util.NameFromMeta(old.ObjectMeta),
+		)
+	} else {
+		c.logger.Infof("StatefulSet '%s' is not in the desired state and needs to be updated",
+			util.NameFromMeta(old.ObjectMeta),
+		)
+	}
+	c.logger.Debugf("Current %# v\nnew %# v\ndiff %s\n",
+		util.Pretty(old.Spec), util.Pretty(new.Spec), util.PrettyDiff(old.Spec, new.Spec))
+
+	if reason != "" {
+		c.logger.Infof("Reason: %s", reason)
+	}
+}
+
+func (c *Cluster) logServiceChanges(old, new *v1.Service, isUpdate bool, reason string) {
+	if isUpdate {
+		c.logger.Infof("Service '%s' has been changed",
+			util.NameFromMeta(old.ObjectMeta),
+		)
+	} else {
+		c.logger.Infof("Service '%s  is not in the desired state and needs to be updated",
+			util.NameFromMeta(old.ObjectMeta),
+		)
+	}
+	c.logger.Debugf("Current %# v\nnew %# v\ndiff %s\n",
+		util.Pretty(old.Spec), util.Pretty(new.Spec), util.PrettyDiff(old.Spec, new.Spec))
+
+	if reason != "" {
+		c.logger.Infof("Reason: %s", reason)
+	}
+}
+
+func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
+	c.logger.Infof("Volume specification has been changed")
+	c.logger.Debugf("Current %# v\nnew %# v\ndiff %s\n",
+		util.Pretty(old), util.Pretty(new), util.PrettyDiff(old, new))
+	if reason != "" {
+		c.logger.Infof("Reason: %s", reason)
+	}
+}
+
+func (c *Cluster) logPodChanges(pod *v1.Pod, statefulset *v1beta1.StatefulSet, reason string) {
+	c.logger.Infof("Pod'%s does not match StatefulSet pod template and needs to be recreated",
+		util.NameFromMeta(pod.ObjectMeta),
+	)
+	c.logger.Debugf("Pod: %# v\nstatefulset %# v\n", util.Pretty(pod.Spec), util.Pretty(statefulset.Spec))
+	if reason != "" {
+		c.logger.Infof("Reason: %s", reason)
+	}
 }
 
 func (c *Cluster) getTeamMembers() ([]string, error) {
