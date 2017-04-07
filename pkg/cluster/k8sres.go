@@ -106,7 +106,7 @@ bootstrap:
 		},
 	}
 	if c.OpConfig.WALES3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name:  "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 	}
 	privilegedMode := bool(true)
 	container := v1.Container{
