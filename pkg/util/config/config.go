@@ -41,7 +41,7 @@ type Config struct {
 	ServiceAccountName string `split_words:"true" default:"operator"`
 	DbHostedZone       string `split_words:"true" default:"db.example.com"`
 	EtcdScope          string `split_words:"true" default:"service"`
-	WALES3Bucket       string `envconfig: "wale_s3_bucket"`
+	WALES3Bucket       string `envconfig: "wal_s3_bucket"`
 	KubeIAMRole  	   string `envconfig: "kube_iam_role"`
 	DebugLogging       bool   `split_words:"true" default:"false"`
 }
