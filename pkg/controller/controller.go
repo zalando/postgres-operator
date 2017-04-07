@@ -60,10 +60,6 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	wg.Add(1)
 
 	c.initController()
-	if err := c.initEtcdClient(c.opConfig.EtcdHost); err != nil {
-		c.logger.Errorf("Can't get etcd client: %s", err)
-		return
-	}
 
 	c.logger.Infof("'%s' namespace will be watched", c.PodNamespace)
 	go c.runInformers(stopCh)
@@ -112,6 +108,10 @@ func (c *Controller) initController() {
 		UpdateFunc: c.podUpdate,
 		DeleteFunc: c.podDelete,
 	})
+
+	if err := c.initEtcdClient(c.opConfig.EtcdHost); err != nil {
+		c.logger.Fatalf("Can't get etcd client: %s", err)
+	}
 }
 
 func (c *Controller) runInformers(stopCh <-chan struct{}) {

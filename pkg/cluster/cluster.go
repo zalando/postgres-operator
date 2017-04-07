@@ -12,6 +12,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	etcdclient "github.com/coreos/etcd/client"
+	"golang.org/x/net/context"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
@@ -131,7 +132,26 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
+func (c *Cluster) etcdKeyExists(keyName string) (bool, error) {
+	options := etcdclient.GetOptions{}
+	resp, err := c.EtcdClient.Get(context.Background(), keyName, &options)
+	if err != nil {
+		if err.(etcdclient.Error).Code == etcdclient.ErrorCodeKeyNotFound {
+			return false, nil
+		}
+	}
+
+	return resp != nil, err
+}
+
 func (c *Cluster) Create() error {
+	keyExist, err := c.etcdKeyExists(fmt.Sprintf("/%s/%s", c.OpConfig.EtcdScope, c.Metadata.Name))
+	if err != nil {
+		return fmt.Errorf("Can't check etcd key: %s", err)
+	}
+	if keyExist {
+		return fmt.Errorf("Etcd key for the cluster already exists")
+	}
 	//TODO: service will create endpoint implicitly
 	ep, err := c.createEndpoint()
 	if err != nil {
