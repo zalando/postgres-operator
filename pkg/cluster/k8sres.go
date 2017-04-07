@@ -105,6 +105,9 @@ bootstrap:
   - hostssl   all all all md5`, pgVersion, c.OpConfig.PamRoleName, c.OpConfig.PamRoleName),
 		},
 	}
+	if c.OpConfig.WALES3Bucket != "" {
+		envVars = append(envVars, v1.EnvVar{Name:  "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+	}
 	privilegedMode := bool(true)
 	container := v1.Container{
 		Name:            c.Metadata.Name,
@@ -152,6 +155,9 @@ bootstrap:
 			Namespace: c.Metadata.Name,
 		},
 		Spec: podSpec,
+	}
+	if c.OpConfig.KubeIAMRole != "" {
+		template.Annotations = map[string]string{constants.KubeIAmAnnotation: c.OpConfig.KubeIAMRole}
 	}
 
 	return &template

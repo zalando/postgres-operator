@@ -10,5 +10,6 @@ const (
 	PasswordLength           = 64
 	UserSecretTemplate       = "%s.%s.credentials.%s.%s" // Username, ClusterName, TPRName, TPRVendor
 	ZalandoDnsNameAnnotation = "zalando.org/dnsname"
+	KubeIAmAnnotation 		 = "iam.amazonaws.com/role"
 	ResourceName             = TPRName + "s"
 )
