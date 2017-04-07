@@ -147,10 +147,10 @@ func (c *Cluster) etcdKeyExists(keyName string) (bool, error) {
 func (c *Cluster) Create() error {
 	keyExist, err := c.etcdKeyExists(fmt.Sprintf("/%s/%s", c.OpConfig.EtcdScope, c.Metadata.Name))
 	if err != nil {
-		return fmt.Errorf("Can't check etcd key: %s", err)
+		return fmt.Warnln("Can't check etcd key: %s", err)
 	}
 	if keyExist {
-		return fmt.Errorf("Etcd key for the cluster already exists")
+		return fmt.Warnln("Etcd key for the cluster already exists")
 	}
 	//TODO: service will create endpoint implicitly
 	ep, err := c.createEndpoint()
