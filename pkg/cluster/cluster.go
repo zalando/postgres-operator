@@ -189,8 +189,6 @@ func (c *Cluster) Create() error {
 
 func (c Cluster) sameServiceWith(service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
-	reason = ""
-	match = false
 	if !reflect.DeepEqual(c.Service.Spec.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges) {
 		reason = "new service's LoadBalancerSourceRange doesn't match the current one"
 	} else {
@@ -200,8 +198,6 @@ func (c Cluster) sameServiceWith(service *v1.Service) (match bool, reason string
 }
 
 func (c Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string) {
-	reason = ""
-	match = false
 	if !reflect.DeepEqual(c.Spec.Volume, volume) {
 		reason = "new volume's specification doesn't match the current one"
 	} else {
@@ -212,8 +208,6 @@ func (c Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string) 
 
 func (c Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match, needsRollUpdate bool, reason string) {
 	match = true
-	needsRollUpdate = false
-	reason = ""
 	//TODO: improve me
 	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
 		match = false
