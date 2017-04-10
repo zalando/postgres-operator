@@ -137,6 +137,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 }
 
 func (c *Cluster) deleteStatefulSet() error {
+	c.logger.Debugln("Deleting StatefulSet")
 	if c.Statefulset == nil {
 		return fmt.Errorf("There is no StatefulSet in the cluster")
 	}
@@ -145,7 +146,16 @@ func (c *Cluster) deleteStatefulSet() error {
 	if err != nil {
 		return err
 	}
+	c.logger.Infof("StatefulSet '%s' has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	c.Statefulset = nil
+
+	if err := c.deletePods(); err != nil {
+		return fmt.Errorf("Can't delete Pods: %s", err)
+	}
+
+	if err := c.deletePersistenVolumeClaims(); err != nil {
+		return fmt.Errorf("Can't delete PersistentVolumeClaims: %s", err)
+	}
 
 	return nil
 }
@@ -185,6 +195,8 @@ func (c *Cluster) updateService(newService *v1.Service) error {
 }
 
 func (c *Cluster) deleteService() error {
+	c.logger.Debugln("Deleting Service")
+
 	if c.Service == nil {
 		return fmt.Errorf("There is no Service in the cluster")
 	}
@@ -192,6 +204,7 @@ func (c *Cluster) deleteService() error {
 	if err != nil {
 		return err
 	}
+	c.logger.Infof("Service '%s' has been deleted", util.NameFromMeta(c.Service.ObjectMeta))
 	c.Service = nil
 
 	return nil
@@ -222,6 +235,7 @@ func (c *Cluster) updateEndpoint(newEndpoint *v1.Endpoints) error {
 }
 
 func (c *Cluster) deleteEndpoint() error {
+	c.logger.Debugln("Deleting Endpoint")
 	if c.Endpoint == nil {
 		return fmt.Errorf("There is no Endpoint in the cluster")
 	}
@@ -229,6 +243,7 @@ func (c *Cluster) deleteEndpoint() error {
 	if err != nil {
 		return err
 	}
+	c.logger.Infof("Endpoint '%s' has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
 	c.Endpoint = nil
 
 	return nil
@@ -267,10 +282,12 @@ func (c *Cluster) applySecrets() error {
 }
 
 func (c *Cluster) deleteSecret(secret *v1.Secret) error {
+	c.logger.Debugf("Deleting Secret '%s'", util.NameFromMeta(secret.ObjectMeta))
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, deleteOptions)
 	if err != nil {
 		return err
 	}
+	c.logger.Infof("Secret '%s' has been deleted", util.NameFromMeta(secret.ObjectMeta))
 	delete(c.Secrets, secret.UID)
 
 	return err

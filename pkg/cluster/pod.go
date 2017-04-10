@@ -38,6 +38,7 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 }
 
 func (c *Cluster) deletePods() error {
+	c.logger.Debugln("Deleting Pods")
 	pods, err := c.listPods()
 	if err != nil {
 		return err
@@ -51,11 +52,17 @@ func (c *Cluster) deletePods() error {
 			c.logger.Infof("Pod '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
 		}
 	}
+	if len(pods) > 0 {
+		c.logger.Debugln("Pods have been deleted")
+	} else {
+		c.logger.Debugln("No Pods to delete")
+	}
 
 	return nil
 }
 
 func (c *Cluster) deletePersistenVolumeClaims() error {
+	c.logger.Debugln("Deleting PVCs")
 	ns := c.Metadata.Namespace
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {
@@ -67,6 +74,12 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 			c.logger.Warningf("Can't delete PersistentVolumeClaim: %s", err)
 		}
 	}
+	if len(pvcs) > 0 {
+		c.logger.Debugln("PVCs have been deleted")
+	} else {
+		c.logger.Debugln("No PVCs to delete")
+	}
+
 	return nil
 }
 

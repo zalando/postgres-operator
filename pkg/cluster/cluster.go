@@ -317,10 +317,6 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		//TODO: rewrite pg version in tpr spec
 	}
 
-	if !reflect.DeepEqual(c.Spec.Resources, newSpec.Spec.Resources) { // Kubernetes resources: cpu, mem
-		rollingUpdate = true
-	}
-
 	if rollingUpdate {
 		c.logger.Infof("Rolling update is needed")
 		// TODO: wait for actual streaming to the replica
@@ -334,58 +330,22 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 }
 
 func (c *Cluster) Delete() error {
-	if c.Endpoint != nil {
-		c.logger.Debugln("Deleting Endpoints")
-		epName := util.NameFromMeta(c.Endpoint.ObjectMeta)
-		if err := c.deleteEndpoint(); err != nil {
-			c.logger.Errorf("Can't delete Endpoint: %s", err)
-		} else {
-			c.logger.Infof("Endpoint '%s' has been deleted", epName)
+	if err := c.deleteEndpoint(); err != nil {
+		c.logger.Errorf("Can't delete Endpoint: %s", err)
+	}
+
+	if err := c.deleteService(); err != nil {
+		c.logger.Errorf("Can't delete Service: %s", err)
+	}
+
+	if err := c.deleteStatefulSet(); err != nil {
+		c.logger.Errorf("Can't delete StatefulSet: %s", err)
+	}
+
+	for _, obj := range c.Secrets {
+		if err := c.deleteSecret(obj); err != nil {
+			c.logger.Errorf("Can't delete Secret: %s", err)
 		}
-	}
-
-	if c.Service != nil {
-		c.logger.Debugln("Deleting Service")
-		svcName := util.NameFromMeta(c.Service.ObjectMeta)
-		if err := c.deleteService(); err != nil {
-			c.logger.Errorf("Can't delete Service: %s", err)
-		} else {
-			c.logger.Infof("Service '%s' has been deleted", svcName)
-		}
-	}
-
-	if c.Statefulset != nil {
-		c.logger.Debugln("Deleting StatefulSet")
-		ssName := util.NameFromMeta(c.Statefulset.ObjectMeta)
-		if err := c.deleteStatefulSet(); err != nil {
-			c.logger.Errorf("Can't delete StatefulSet: %s", err)
-		} else {
-			c.logger.Infof("StatefulSet '%s' has been deleted", ssName)
-		}
-	}
-
-	if c.Secrets != nil {
-		c.logger.Debugln("Deleting Secrets")
-		for _, obj := range c.Secrets {
-			c.logger.Debugf("Deleting Secret '%s'", util.NameFromMeta(obj.ObjectMeta))
-			if err := c.deleteSecret(obj); err != nil {
-				c.logger.Errorf("Can't delete Secret: %s", err)
-			} else {
-				c.logger.Infof("Secret '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
-			}
-		}
-	}
-
-	c.logger.Debugln("Deleting Pods")
-	if err := c.deletePods(); err != nil {
-		c.logger.Errorf("Can't delete Pods: %s", err)
-	} else {
-		c.logger.Infof("Pods have been deleted")
-	}
-
-	c.logger.Debugln("Deleting PVCs")
-	if err := c.deletePersistenVolumeClaims(); err != nil {
-		return fmt.Errorf("Can't delete PersistentVolumeClaims: %s", err)
 	}
 
 	return nil
