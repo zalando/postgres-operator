@@ -96,6 +96,9 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 
 	c.logger.Infof("Creation of a new Postgresql cluster '%s' started", clusterName)
 	cl := cluster.New(c.makeClusterConfig(), *pg, c.logger.Logger)
+
+	c.clusters[clusterName] = cl
+
 	cl.SetStatus(spec.ClusterStatusCreating)
 	if err := cl.Create(); err != nil {
 		c.logger.Errorf("Can't create cluster: %s", err)
@@ -103,10 +106,8 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 		return
 	}
 	cl.SetStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
-
 	stopCh := make(chan struct{})
 	c.stopChMap[clusterName] = stopCh
-	c.clusters[clusterName] = cl
 	go cl.Run(stopCh)
 
 	c.logger.Infof("Postgresql cluster '%s' has been created", clusterName)
