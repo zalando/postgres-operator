@@ -44,6 +44,7 @@ func (c *Cluster) deletePods() error {
 	}
 
 	for _, obj := range pods {
+		c.logger.Debugf("Deleting Pod '%s'", util.NameFromMeta(obj.ObjectMeta))
 		if err := c.deletePod(&obj); err != nil {
 			c.logger.Errorf("Can't delete Pod: %s", err)
 		} else {
@@ -61,6 +62,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 		return err
 	}
 	for _, pvc := range pvcs {
+		c.logger.Debugf("Deleting PVC '%s'", util.NameFromMeta(pvc.ObjectMeta))
 		if err := c.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, deleteOptions); err != nil {
 			c.logger.Warningf("Can't delete PersistentVolumeClaim: %s", err)
 		}
@@ -148,7 +150,6 @@ func (c *Cluster) podEventsDispatcher(stopCh <-chan struct{}) {
 		select {
 		case event := <-c.podEvents:
 			if subscriber, ok := c.podSubscribers[event.PodName]; ok {
-				c.logger.Debugf("New event for '%s' Pod", event.PodName)
 				go func() { subscriber <- event }() //TODO: is it a right way to do nonblocking send to the channel?
 			} else {
 				c.logger.Debugf("Skipping event for an unwatched Pod '%s'", event.PodName)

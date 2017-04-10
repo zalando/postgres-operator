@@ -98,6 +98,8 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 	cl := cluster.New(c.makeClusterConfig(), *pg, c.logger.Logger)
 
 	c.clusters[clusterName] = cl
+	stopCh := make(chan struct{})
+	c.stopChMap[clusterName] = stopCh
 
 	cl.SetStatus(spec.ClusterStatusCreating)
 	if err := cl.Create(); err != nil {
@@ -106,8 +108,6 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 		return
 	}
 	cl.SetStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
-	stopCh := make(chan struct{})
-	c.stopChMap[clusterName] = stopCh
 	go cl.Run(stopCh)
 
 	c.logger.Infof("Postgresql cluster '%s' has been created", clusterName)
@@ -165,7 +165,7 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 		return
 	}
 
-	c.logger.Infof("Cluster delete: %s", util.NameFromMeta(pgCur.Metadata))
+	c.logger.Infof("Starting deletion of the '%s' cluster", util.NameFromMeta(pgCur.Metadata))
 	if err := pgCluster.Delete(); err != nil {
 		c.logger.Errorf("Can't delete cluster '%s': %s", clusterName, err)
 		return

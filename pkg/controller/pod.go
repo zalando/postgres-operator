@@ -125,7 +125,7 @@ func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}) {
 				c.logger.Debugf("Sending %s event of Pod '%s' to the '%s' cluster channel", event.EventType, event.PodName, event.ClusterName)
 				go subscriber.ReceivePodEvent(event)
 			} else {
-				c.logger.Debugf("Skipping Pods unrelated to clusters: %s", event.PodName)
+				c.logger.Debugf("Skipping %s event of the '%s' pod", event.EventType, event.PodName)
 			}
 		case <-stopCh:
 			return

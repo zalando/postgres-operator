@@ -98,6 +98,7 @@ func (c *Cluster) Run(stopCh <-chan struct{}) {
 }
 
 func (c *Cluster) SetStatus(status spec.PostgresStatus) {
+	c.Status = status
 	b, err := json.Marshal(status)
 	if err != nil {
 		c.logger.Fatalf("Can't marshal status: %s", err)
@@ -136,7 +137,11 @@ func (c *Cluster) etcdKeyExists(keyName string) (bool, error) {
 	options := etcdclient.GetOptions{}
 	resp, err := c.EtcdClient.Get(context.Background(), keyName, &options)
 	if err != nil {
-		if err.(etcdclient.Error).Code == etcdclient.ErrorCodeKeyNotFound {
+		etcdErr, ok := err.(etcdclient.Error)
+		if !ok {
+			return false, err
+		}
+		if etcdErr.Code == etcdclient.ErrorCodeKeyNotFound {
 			return false, nil
 		}
 	}
@@ -329,41 +334,56 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 }
 
 func (c *Cluster) Delete() error {
-	epName := util.NameFromMeta(c.Endpoint.ObjectMeta)
-	if err := c.deleteEndpoint(); err != nil {
-		c.logger.Errorf("Can't delete Endpoint: %s", err)
-	} else {
-		c.logger.Infof("Endpoint '%s' has been deleted", epName)
-	}
-
-	svcName := util.NameFromMeta(c.Service.ObjectMeta)
-	if err := c.deleteService(); err != nil {
-		c.logger.Errorf("Can't delete Service: %s", err)
-	} else {
-		c.logger.Infof("Service '%s' has been deleted", svcName)
-	}
-
-	ssName := util.NameFromMeta(c.Statefulset.ObjectMeta)
-	if err := c.deleteStatefulSet(); err != nil {
-		c.logger.Errorf("Can't delete StatefulSet: %s", err)
-	} else {
-		c.logger.Infof("StatefulSet '%s' has been deleted", ssName)
-	}
-
-	for _, obj := range c.Secrets {
-		if err := c.deleteSecret(obj); err != nil {
-			c.logger.Errorf("Can't delete Secret: %s", err)
+	if c.Endpoint != nil {
+		c.logger.Debugln("Deleting Endpoints")
+		epName := util.NameFromMeta(c.Endpoint.ObjectMeta)
+		if err := c.deleteEndpoint(); err != nil {
+			c.logger.Errorf("Can't delete Endpoint: %s", err)
 		} else {
-			c.logger.Infof("Secret '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
+			c.logger.Infof("Endpoint '%s' has been deleted", epName)
 		}
 	}
 
+	if c.Service != nil {
+		c.logger.Debugln("Deleting Service")
+		svcName := util.NameFromMeta(c.Service.ObjectMeta)
+		if err := c.deleteService(); err != nil {
+			c.logger.Errorf("Can't delete Service: %s", err)
+		} else {
+			c.logger.Infof("Service '%s' has been deleted", svcName)
+		}
+	}
+
+	if c.Statefulset != nil {
+		c.logger.Debugln("Deleting StatefulSet")
+		ssName := util.NameFromMeta(c.Statefulset.ObjectMeta)
+		if err := c.deleteStatefulSet(); err != nil {
+			c.logger.Errorf("Can't delete StatefulSet: %s", err)
+		} else {
+			c.logger.Infof("StatefulSet '%s' has been deleted", ssName)
+		}
+	}
+
+	if c.Secrets != nil {
+		c.logger.Debugln("Deleting Secrets")
+		for _, obj := range c.Secrets {
+			c.logger.Debugf("Deleting Secret '%s'", util.NameFromMeta(obj.ObjectMeta))
+			if err := c.deleteSecret(obj); err != nil {
+				c.logger.Errorf("Can't delete Secret: %s", err)
+			} else {
+				c.logger.Infof("Secret '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
+			}
+		}
+	}
+
+	c.logger.Debugln("Deleting Pods")
 	if err := c.deletePods(); err != nil {
 		c.logger.Errorf("Can't delete Pods: %s", err)
 	} else {
 		c.logger.Infof("Pods have been deleted")
 	}
 
+	c.logger.Debugln("Deleting PVCs")
 	if err := c.deletePersistenVolumeClaims(); err != nil {
 		return fmt.Errorf("Can't delete PersistentVolumeClaims: %s", err)
 	}

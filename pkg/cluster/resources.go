@@ -117,7 +117,7 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 		return nil, err
 	}
 	c.Statefulset = statefulSet
-	c.logger.Debugf("Created new StatefulSet, uid: %s", statefulSet.UID)
+	c.logger.Debugf("Created new StatefulSet '%s', uid: %s", util.NameFromMeta(statefulSet.ObjectMeta), statefulSet.UID)
 
 	return statefulSet, nil
 }
@@ -244,13 +244,13 @@ func (c *Cluster) applySecrets() error {
 	for secretUsername, secretSpec := range secrets {
 		secret, err := c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
 		if k8sutil.ResourceAlreadyExists(err) {
-			curSecrets, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
+			curSecret, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
 			if err != nil {
 				return fmt.Errorf("Can't get current Secret: %s", err)
 			}
-			c.logger.Debugf("Secret '%s' already exists, fetching it's password", util.NameFromMeta(secret.ObjectMeta))
+			c.logger.Debugf("Secret '%s' already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
 			pwdUser := c.pgUsers[secretUsername]
-			pwdUser.Password = string(curSecrets.Data["password"])
+			pwdUser.Password = string(curSecret.Data["password"])
 			c.pgUsers[secretUsername] = pwdUser
 
 			continue
@@ -259,7 +259,7 @@ func (c *Cluster) applySecrets() error {
 				return fmt.Errorf("Can't create Secret for user '%s': %s", secretUsername, err)
 			}
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("Created new Secret, uid: %s", secret.UID)
+			c.logger.Debugf("Created new Secret '%s', uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
 		}
 	}
 
