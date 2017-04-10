@@ -154,7 +154,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
 			// We cannot assume any role of the newly created pod. Normally, for a multi-pod cluster
 			// we should observe the 'replica' value, but it could be that some pods are not allowed
 			// to promote, therefore, the new pod could be a master as well.
-			if role == "master" || role == "replica" {
+			if role == constants.PodRoleMaster || role == constants.PodRoleReplica {
 				return nil
 			}
 		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
@@ -203,10 +203,10 @@ func (c *Cluster) waitPodLabelsReady() error {
 		LabelSelector: ls.String(),
 	}
 	masterListOption := v1.ListOptions{
-		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": "master"}).String(),
+		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": constants.PodRoleMaster}).String(),
 	}
 	replicaListOption := v1.ListOptions{
-		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": "replica"}).String(),
+		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": constants.PodRoleReplica}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {

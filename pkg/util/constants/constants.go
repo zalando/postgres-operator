@@ -12,4 +12,6 @@ const (
 	ZalandoDnsNameAnnotation = "zalando.org/dnsname"
 	KubeIAmAnnotation        = "iam.amazonaws.com/role"
 	ResourceName             = TPRName + "s"
+	PodRoleMaster            = "master"
+	PodRoleReplica           = "replica"
 )

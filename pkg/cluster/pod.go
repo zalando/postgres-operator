@@ -7,6 +7,7 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
@@ -179,7 +180,7 @@ func (c *Cluster) recreatePods() error {
 			continue
 		}
 
-		if role == "master" {
+		if role == constants.PodRoleMaster {
 			masterPod = pod
 			continue
 		}

@@ -7,6 +7,7 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
 func (c *Cluster) SyncCluster() {
@@ -173,7 +174,7 @@ func (c *Cluster) syncPods() error {
 			c.logPodChanges(&pod, curSs, reason)
 		}
 
-		if util.PodSpiloRole(&pod) == "master" {
+		if util.PodSpiloRole(&pod) == constants.PodRoleMaster {
 			//TODO: do manual failover first
 		}
 		err = c.recreatePod(pod)
