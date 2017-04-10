@@ -152,7 +152,6 @@ func (c *Cluster) syncPods() error {
 
 	//First check if we have left overs from the previous rolling update
 	for _, pod := range pods.Items {
-		podRole := util.PodSpiloRole(&pod)
 		podName := spec.PodName{
 			Namespace: pod.Namespace,
 			Name:      pod.Name,
@@ -161,7 +160,7 @@ func (c *Cluster) syncPods() error {
 		if match && pod.Status.Phase == v1.PodPending {
 			c.logger.Infof("Waiting for left over Pod '%s'", podName)
 			ch := c.registerPodSubscriber(podName)
-			c.waitForPodLabel(ch, podRole)
+			c.waitForPodLabel(ch)
 			c.unregisterPodSubscriber(podName)
 		}
 	}
@@ -177,7 +176,7 @@ func (c *Cluster) syncPods() error {
 		if util.PodSpiloRole(&pod) == "master" {
 			//TODO: do manual failover first
 		}
-		err = c.recreatePod(pod, "replica") // newly created pods are always "replica"s
+		err = c.recreatePod(pod)
 
 		c.logger.Infof("Pod '%s' has been successfully recreated", util.NameFromMeta(pod.ObjectMeta))
 	}

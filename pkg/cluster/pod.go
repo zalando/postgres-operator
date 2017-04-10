@@ -112,7 +112,7 @@ func (c *Cluster) registerPodSubscriber(podName spec.PodName) chan spec.PodEvent
 	return ch
 }
 
-func (c *Cluster) recreatePod(pod v1.Pod, spiloRole string) error {
+func (c *Cluster) recreatePod(pod v1.Pod) error {
 	podName := spec.PodName{
 		Namespace: pod.Namespace,
 		Name:      pod.Name,
@@ -133,7 +133,7 @@ func (c *Cluster) recreatePod(pod v1.Pod, spiloRole string) error {
 	if err := c.waitForPodDeletion(ch); err != nil {
 		return err
 	}
-	if err := c.waitForPodLabel(ch, spiloRole); err != nil {
+	if err := c.waitForPodLabel(ch); err != nil {
 		return err
 	}
 	c.logger.Infof("Pod '%s' is ready", podName)
@@ -184,7 +184,7 @@ func (c *Cluster) recreatePods() error {
 			continue
 		}
 
-		err = c.recreatePod(pod, "replica")
+		err = c.recreatePod(pod)
 		if err != nil {
 			return fmt.Errorf("Can't recreate replica Pod '%s': %s", util.NameFromMeta(pod.ObjectMeta), err)
 		}
@@ -197,7 +197,7 @@ func (c *Cluster) recreatePods() error {
 	//TODO: specify master, leave new master empty
 	c.logger.Infof("Recreating master Pod '%s'", util.NameFromMeta(masterPod.ObjectMeta))
 
-	if err := c.recreatePod(masterPod, "replica"); err != nil {
+	if err := c.recreatePod(masterPod); err != nil {
 		return fmt.Errorf("Can't recreate master Pod '%s': %s", util.NameFromMeta(masterPod.ObjectMeta), err)
 	}
 

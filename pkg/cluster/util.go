@@ -146,12 +146,15 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, spiloRole string) error {
+func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
 			role := util.PodSpiloRole(podEvent.CurPod)
-			if role == spiloRole { // TODO: newly-created Pods are always replicas => check against empty string only
+			// We cannot assume any role of the newly created pod. Normally, for a multi-pod cluster
+			// we should observe the 'replica' value, but it could be that some pods are not allowed
+			// to promote, therefore, the new pod could be a master as well.
+			if role == "master" || role == "replica" {
 				return nil
 			}
 		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
