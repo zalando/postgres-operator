@@ -7,7 +7,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/kr/pretty"
+	"github.com/motomux/pretty"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"k8s.io/client-go/pkg/api/v1"

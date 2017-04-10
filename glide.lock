@@ -1,5 +1,5 @@
-hash: df231b69e7a8a90bd0d1982289f36ecdcc30e1d65babd78b6dc1c908e49cec54
-updated: 2017-04-06T12:51:40.340251897+02:00
+hash: 9cb22736d27cb74bb0f674c5e57954c8fd14e4b5cae0b2e22ead9f10728f91f8
+updated: 2017-04-10T15:33:31.332520218+02:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -77,8 +77,6 @@ imports:
   version: 77ed1c8a01217656d2080ad51981f6e99adaa177
 - name: github.com/kelseyhightower/envconfig
   version: 8bf4bbfc795e2c7c8a5ea47b707453ed019e2ad4
-- name: github.com/kr/pretty
-  version: cfb55aafdaf3ec08f0db22699ab822c50091b1c4
 - name: github.com/kr/text
   version: 7cafcd837844e784b526369c9bce262804aebc60
 - name: github.com/lib/pq
@@ -91,6 +89,8 @@ imports:
   - buffer
   - jlexer
   - jwriter
+- name: github.com/motomux/pretty
+  version: b2aad2c9a95d14eb978f29baa6e3a5c3c20eef30
 - name: github.com/pborman/uuid
   version: ca53cad383cad2479bbba7f7a1a05797ec1386e4
 - name: github.com/PuerkitoBio/purell

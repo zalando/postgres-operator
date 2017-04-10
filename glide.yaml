@@ -28,4 +28,4 @@ import:
   - tools/cache
   - tools/clientcmd
 - package: github.com/kelseyhightower/envconfig
-- package: github.com/kr/pretty
+- package: github.com/motomux/pretty
