@@ -1,10 +1,12 @@
 package teams
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
+	"encoding/json"
+	"net/http"
+
+	"github.com/Sirupsen/logrus"
 )
 
 type InfrastructureAccount struct {
@@ -38,13 +40,15 @@ type Team struct {
 type TeamsAPI struct {
 	url                string
 	httpClient         *http.Client
+	logger             *logrus.Entry
 	RefreshTokenAction func() (string, error)
 }
 
-func NewTeamsAPI(url string) *TeamsAPI {
+func NewTeamsAPI(url string, log *logrus.Logger) *TeamsAPI {
 	t := TeamsAPI{
 		url:        strings.TrimRight(url, "/"),
 		httpClient: &http.Client{},
+		logger:     log.WithField("pkg", "teamsapi"),
 	}
 
 	return &t
@@ -57,6 +61,7 @@ func (t *TeamsAPI) TeamInfo(teamId string) (*Team, error) {
 		return nil, err
 	}
 	url := fmt.Sprintf("%s/teams/%s", t.url, teamId)
+	t.logger.Debugf("Request url: %s", url)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -67,9 +72,21 @@ func (t *TeamsAPI) TeamInfo(teamId string) (*Team, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		var raw map[string]json.RawMessage
+		d := json.NewDecoder(resp.Body)
+		err = d.Decode(&raw)
+		if err != nil {
+			return nil, err
+		}
 
+		if errMessage, ok := raw["error"]; ok {
+			return nil, fmt.Errorf("Team API query failed with status code %d and message: '%s'", resp.StatusCode, string(errMessage))
+		} else {
+			return nil, fmt.Errorf("Team API query failed with status code %d", resp.StatusCode)
+		}
+	}
 	teamInfo := &Team{}
 	d := json.NewDecoder(resp.Body)
 	err = d.Decode(teamInfo)

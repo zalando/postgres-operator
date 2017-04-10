@@ -27,6 +27,7 @@ func (c *Controller) getOAuthToken() (string, error) {
 	credentialsSecret, err := c.KubeClient.Secrets(api.NamespaceDefault).Get(c.opConfig.OAuthTokenSecretName)
 
 	if err != nil {
+		c.logger.Debugf("Oauth token secret name: %s", c.opConfig.OAuthTokenSecretName)
 		return "", fmt.Errorf("Can't get credentials Secret: %s", err)
 	}
 	data := credentialsSecret.Data

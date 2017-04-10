@@ -137,11 +137,14 @@ func (c *Cluster) logPodChanges(pod *v1.Pod, statefulset *v1beta1.StatefulSet, r
 }
 
 func (c *Cluster) getTeamMembers() ([]string, error) {
+	if c.Spec.TeamId == "" {
+		return nil, fmt.Errorf("No teamId specified")
+	}
 	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamId)
 	if err != nil {
 		return nil, fmt.Errorf("Can't get team info: %s", err)
 	}
-	c.logger.Debugf("Got from the Team API: %v", teamInfo)
+	c.logger.Debugf("Got from the Team API: %+v", *teamInfo)
 
 	return teamInfo.Members, nil
 }
