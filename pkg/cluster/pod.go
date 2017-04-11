@@ -190,9 +190,6 @@ func (c *Cluster) recreatePods() error {
 	var masterPod v1.Pod
 	for _, pod := range pods.Items {
 		role := util.PodSpiloRole(&pod)
-		if role == "" {
-			continue
-		}
 
 		if role == constants.PodRoleMaster {
 			masterPod = pod

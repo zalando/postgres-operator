@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -45,40 +44,6 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 	return
 }
 
-func podMatchesTemplate(pod *v1.Pod, ss *v1beta1.StatefulSet) (match bool, reason string) {
-	//TODO: improve me
-	match = false
-	reason = ""
-	if len(pod.Spec.Containers) != 1 {
-		reason = "new pod defines more than one container"
-		return
-	}
-	container := pod.Spec.Containers[0]
-	ssContainer := ss.Spec.Template.Spec.Containers[0]
-
-	switch {
-	case container.Image != ssContainer.Image:
-		{
-			reason = "new pod's container image doesn't match the current one"
-		}
-	case !reflect.DeepEqual(container.Env, ssContainer.Env):
-		{
-			reason = "new pod's container environment doesn't match the current one"
-		}
-	case !reflect.DeepEqual(container.Ports, ssContainer.Ports):
-		{
-			reason = "new pod's container ports don't match the current ones"
-		}
-	case !reflect.DeepEqual(container.Resources, ssContainer.Resources):
-		{
-			reason = "new pod's container resources don't match the current ones"
-		}
-	default:
-		match = true
-	}
-	return
-}
-
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("StatefulSet '%s' has been changed",
@@ -116,21 +81,6 @@ func (c *Cluster) logServiceChanges(old, new *v1.Service, isUpdate bool, reason 
 func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
 	c.logger.Infof("Volume specification has been changed")
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
-	if reason != "" {
-		c.logger.Infof("Reason: %s", reason)
-	}
-}
-
-func (c *Cluster) logPodChanges(pod *v1.Pod, statefulset *v1beta1.StatefulSet, reason string) {
-	c.logger.Infof("Pod'%s does not match the StatefulSet's Pod template and needs to be recreated",
-		util.NameFromMeta(pod.ObjectMeta),
-	)
-
-	if len(pod.Spec.Containers) == 1 {
-		podContainer := pod.Spec.Containers[0]
-		templateContainer := statefulset.Spec.Template.Spec.Containers[0]
-		c.logger.Debugf("diff pod <-> statefulset\n%s", util.PrettyDiff(podContainer, templateContainer))
-	}
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
 	}

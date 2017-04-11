@@ -68,19 +68,19 @@ func (c *Cluster) LoadResources() error {
 
 func (c *Cluster) ListResources() error {
 	if c.Statefulset != nil {
-		c.logger.Infof("StatefulSet: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
+		c.logger.Infof("Found StatefulSet: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}
 
 	for _, obj := range c.Secrets {
-		c.logger.Infof("Secret: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("Found Secret: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	if c.Endpoint != nil {
-		c.logger.Infof("Endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
+		c.logger.Infof("Found Endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
 	}
 
 	if c.Service != nil {
-		c.logger.Infof("Service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
+		c.logger.Infof("Found Service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
 	}
 
 	pods, err := c.listPods()
@@ -89,7 +89,7 @@ func (c *Cluster) ListResources() error {
 	}
 
 	for _, obj := range pods {
-		c.logger.Infof("Pod: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("Found Pod: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	pvcs, err := c.listPersistentVolumeClaims()
@@ -98,7 +98,7 @@ func (c *Cluster) ListResources() error {
 	}
 
 	for _, obj := range pvcs {
-		c.logger.Infof("PVC: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("Found PVC: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	return nil

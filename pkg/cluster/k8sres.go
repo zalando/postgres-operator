@@ -115,7 +115,6 @@ bootstrap:
 		ImagePullPolicy: v1.PullAlways,
 		Resources: v1.ResourceRequirements{
 			Requests: *resourceList,
-			Limits: v1.ResourceList{},
 		},
 		Ports: []v1.ContainerPort{
 			{

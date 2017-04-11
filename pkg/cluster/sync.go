@@ -3,11 +3,7 @@ package cluster
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api/v1"
-
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
 func (c *Cluster) SyncCluster() {
@@ -29,11 +25,6 @@ func (c *Cluster) SyncCluster() {
 	c.logger.Debugf("Syncing StatefulSets")
 	if err := c.syncStatefulSet(); err != nil {
 		c.logger.Errorf("Can't sync StatefulSets: %s", err)
-	}
-
-	c.logger.Debugf("Syncing Pods")
-	if err := c.syncPods(); err != nil {
-		c.logger.Errorf("Can't sync Pods: %s", err)
 	}
 }
 
@@ -129,58 +120,6 @@ func (c *Cluster) syncStatefulSet() error {
 		return fmt.Errorf("Can't recreate Pods: %s", err)
 	}
 	c.logger.Infof("Pods have been recreated")
-
-	return nil
-}
-
-func (c *Cluster) syncPods() error {
-	curSs := c.Statefulset
-
-	ls := c.labelsSet()
-	namespace := c.Metadata.Namespace
-
-	listOptions := v1.ListOptions{
-		LabelSelector: ls.String(),
-	}
-	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
-	if err != nil {
-		return fmt.Errorf("Can't get list of Pods: %s", err)
-	}
-	if int32(len(pods.Items)) != *curSs.Spec.Replicas {
-		//TODO: wait for Pods being created by StatefulSet
-		return fmt.Errorf("Number of existing Pods does not match number of replicas of the StatefulSet")
-	}
-
-	//First check if we have left overs from the previous rolling update
-	for _, pod := range pods.Items {
-		podName := spec.PodName{
-			Namespace: pod.Namespace,
-			Name:      pod.Name,
-		}
-		match, _ := podMatchesTemplate(&pod, curSs)
-		if match && pod.Status.Phase == v1.PodPending {
-			c.logger.Infof("Waiting for left over Pod '%s'", podName)
-			ch := c.registerPodSubscriber(podName)
-			c.waitForPodLabel(ch)
-			c.unregisterPodSubscriber(podName)
-		}
-	}
-
-	for _, pod := range pods.Items {
-		if match, reason := podMatchesTemplate(&pod, curSs); match {
-			c.logger.Infof("Pod '%s' matches StatefulSet pod template", util.NameFromMeta(pod.ObjectMeta))
-			continue
-		} else {
-			c.logPodChanges(&pod, curSs, reason)
-		}
-
-		if util.PodSpiloRole(&pod) == constants.PodRoleMaster {
-			//TODO: do manual failover first
-		}
-		err = c.recreatePod(pod)
-
-		c.logger.Infof("Pod '%s' has been successfully recreated", util.NameFromMeta(pod.ObjectMeta))
-	}
 
 	return nil
 }
