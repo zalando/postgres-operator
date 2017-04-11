@@ -41,7 +41,7 @@ type Config struct {
 	OpConfig       *config.Config
 }
 
-type KubeResources struct {
+type kubeResources struct {
 	Service     *v1.Service
 	Endpoint    *v1.Endpoints
 	Secrets     map[types.UID]*v1.Secret
@@ -51,7 +51,7 @@ type KubeResources struct {
 }
 
 type Cluster struct {
-	KubeResources
+	kubeResources
 	spec.Postgresql
 	Config
 	logger         *logrus.Entry
@@ -64,7 +64,7 @@ type Cluster struct {
 
 func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
-	kubeResources := KubeResources{Secrets: make(map[types.UID]*v1.Secret)}
+	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret)}
 
 	cluster := &Cluster{
 		Config:         cfg,
@@ -73,7 +73,7 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
 		pgUsers:        make(map[string]spec.PgUser),
 		podEvents:      make(chan spec.PodEvent),
 		podSubscribers: make(map[spec.PodName]chan spec.PodEvent),
-		KubeResources:  kubeResources,
+		kubeResources:  kubeResources,
 	}
 
 	return cluster
