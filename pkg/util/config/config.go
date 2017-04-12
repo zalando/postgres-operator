@@ -44,6 +44,7 @@ type Config struct {
 	WALES3Bucket       string `envconfig:"wal_s3_bucket"`
 	KubeIAMRole        string `envconfig:"kube_iam_role"`
 	DebugLogging       bool   `split_words:"true" default:"false"`
+	DNSNameFormat      string `envconfig:"dns_name_format" default:"%s.%s.%s"`
 }
 
 func LoadFromEnv() *Config {

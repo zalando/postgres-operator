@@ -79,6 +79,7 @@ type PostgresSpec struct {
 	NumberOfInstances   int32                `json:"numberOfInstances"`
 	Users               map[string]UserFlags `json:"users"`
 	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+ 	ClusterName         string				 `json:"-"`
 }
 
 type PostgresqlList struct {
@@ -190,6 +191,18 @@ func (pl *PostgresqlList) GetListMeta() unversioned.List {
 type PostgresqlListCopy PostgresqlList
 type PostgresqlCopy Postgresql
 
+func clusterName(clusterName string, teamName string) (string, error) {
+	teamNameLen := len(teamName)
+	if len(clusterName) < teamNameLen + 2 {
+		return "", fmt.Errorf("Name is too short")
+	}
+	if strings.ToLower(clusterName[:teamNameLen]) != strings.ToLower(teamName) {
+		return "", fmt.Errorf("Name must start with the team name")
+	}
+
+	return clusterName[teamNameLen+1:], nil
+}
+
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	tmp := PostgresqlCopy{}
 	err := json.Unmarshal(data, &tmp)
@@ -197,6 +210,12 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	tmp2 := Postgresql(tmp)
+
+	clusterName, err := clusterName(tmp2.Metadata.Name, tmp2.Spec.TeamId)
+	if err != nil {
+		return err
+	}
+	tmp2.Spec.ClusterName = clusterName
 	*p = tmp2
 
 	return nil

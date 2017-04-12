@@ -9,7 +9,6 @@ import (
 	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
@@ -243,7 +242,7 @@ func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.labelsSet(),
 			Annotations: map[string]string{
-				constants.ZalandoDnsNameAnnotation: util.ClusterDNSName(c.Metadata.Name, c.TeamName(), c.OpConfig.DbHostedZone),
+				constants.ZalandoDnsNameAnnotation: c.dnsName(),
 			},
 		},
 		Spec: v1.ServiceSpec{

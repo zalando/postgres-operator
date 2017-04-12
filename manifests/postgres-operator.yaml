@@ -56,3 +56,5 @@ spec:
           value: "registry.opensource.zalan.do/acid/spilo-9.6:1.2-p12"
         - name: PGOP_DB_HOSTED_ZONE
           value: "db.example.com"
+        - name: PGOP_DNS_NAME_FORMAT
+          value: "%s.%s.staging.%s"

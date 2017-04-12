@@ -54,10 +54,6 @@ func PodSpiloRole(pod *v1.Pod) string {
 	return pod.Labels["spilo-role"]
 }
 
-func ClusterDNSName(clusterName, teamName, hostedZone string) string {
-	return fmt.Sprintf("%s.%s.%s", clusterName, teamName, hostedZone)
-}
-
 func PGUserPassword(user spec.PgUser) string {
 	s := md5.Sum([]byte(user.Password + user.Name))
 
