@@ -211,7 +211,7 @@ func (c *Cluster) labelsSet() labels.Set {
 
 func (c *Cluster) dnsName() string {
 	return strings.ToLower(fmt.Sprintf(
-		c.OpConfig.DNSFormat,
+		c.OpConfig.DNSNameFormat,
 		c.Spec.ClusterName,
 		c.TeamName(),
 		c.OpConfig.DbHostedZone))
