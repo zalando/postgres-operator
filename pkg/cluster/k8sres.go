@@ -247,7 +247,7 @@ func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 		},
 		Spec: v1.ServiceSpec{
 			Type:  v1.ServiceTypeLoadBalancer,
-			Ports: []v1.ServicePort{{Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			Ports: []v1.ServicePort{{Name: "Postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			LoadBalancerSourceRanges: allowedSourceRanges,
 		},
 	}
