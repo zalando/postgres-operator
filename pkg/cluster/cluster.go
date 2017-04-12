@@ -30,15 +30,17 @@ import (
 
 var (
 	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
+	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 )
 
 //TODO: remove struct duplication
 type Config struct {
-	KubeClient     *kubernetes.Clientset //TODO: move clients to the better place?
-	RestClient     *rest.RESTClient
-	EtcdClient     etcdclient.KeysAPI
-	TeamsAPIClient *teams.TeamsAPI
-	OpConfig       *config.Config
+	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
+	RestClient          *rest.RESTClient
+	EtcdClient          etcdclient.KeysAPI
+	TeamsAPIClient      *teams.TeamsAPI
+	OpConfig            *config.Config
+	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
 }
 
 type kubeResources struct {
@@ -122,6 +124,11 @@ func (c *Cluster) SetStatus(status spec.PostgresStatus) {
 
 func (c *Cluster) initUsers() error {
 	c.initSystemUsers()
+
+	if err := c.initInfrastructureRoles(); err != nil {
+		return fmt.Errorf("Can't init infrastructure roles: %s", err)
+	}
+
 	if err := c.initRobotUsers(); err != nil {
 		return fmt.Errorf("Can't init robot users: %s", err)
 	}
@@ -129,6 +136,8 @@ func (c *Cluster) initUsers() error {
 	if err := c.initHumanUsers(); err != nil {
 		return fmt.Errorf("Can't init human users: %s", err)
 	}
+
+	c.logger.Debugf("Initialized users: %# v", util.Pretty(c.pgUsers))
 
 	return nil
 }
@@ -398,5 +407,16 @@ func (c *Cluster) initHumanUsers() error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Cluster) initInfrastructureRoles() error {
+	// add infrastucture roles from the operator's definition
+	for username, data := range c.InfrastructureRoles {
+		if !isValidUsername(username) {
+			return fmt.Errorf("Invalid username: '%s'", username)
+		}
+		c.pgUsers[username] = data
+	}
 	return nil
 }

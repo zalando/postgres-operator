@@ -66,7 +66,9 @@ func (c *Cluster) createPgUser(user spec.PgUser) (isHuman bool, err error) {
 	if addLoginFlag {
 		flags = append(flags, "LOGIN")
 	}
-
+	if !isHuman && user.MemberOf != "" {
+		flags = append(flags, fmt.Sprintf("IN ROLE \"%s\"", user.MemberOf))
+	}
 	userFlags := strings.Join(flags, " ")
 	userPassword := fmt.Sprintf("ENCRYPTED PASSWORD '%s'", util.PGUserPassword(user))
 	if user.Password == "" {

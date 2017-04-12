@@ -37,4 +37,5 @@ type PgUser struct {
 	Name     string
 	Password string
 	Flags    []string
+	MemberOf string
 }

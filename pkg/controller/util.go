@@ -8,17 +8,19 @@ import (
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/cluster"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
-		KubeClient:     c.KubeClient,
-		RestClient:     c.RestClient,
-		EtcdClient:     c.EtcdClient,
-		TeamsAPIClient: c.TeamsAPIClient,
-		OpConfig:       c.opConfig,
+		KubeClient:          c.KubeClient,
+		RestClient:          c.RestClient,
+		EtcdClient:          c.EtcdClient,
+		TeamsAPIClient:      c.TeamsAPIClient,
+		OpConfig:            c.opConfig,
+		InfrastructureRoles: c.InfrastructureRoles,
 	}
 }
 
@@ -70,4 +72,49 @@ func (c *Controller) createTPR() error {
 	restClient := c.RestClient
 
 	return k8sutil.WaitTPRReady(restClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.PodNamespace)
+}
+
+func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, err error) {
+	if c.opConfig.InfrastructureRolesSecretName == "" {
+		// we don't have infrastructure roles defined, bail out
+		return nil, nil
+	}
+	infraRolesSecret, err := c.KubeClient.Secrets(api.NamespaceDefault).Get(c.opConfig.InfrastructureRolesSecretName)
+	if err != nil {
+		c.logger.Debugf("Infrastructure roles secret name: %s", c.opConfig.InfrastructureRolesSecretName)
+		return nil, fmt.Errorf("Can't get infrastructure roles Secret: %s", err)
+	}
+	data := infraRolesSecret.Data
+	result = make(map[string]spec.PgUser)
+Users:
+	// in worst case we would have one line per user
+	for i := 1; i <= len(data); i++ {
+		properties := []string{"user", "password", "inrole"}
+		t := spec.PgUser{}
+		for _, p := range properties {
+			key := fmt.Sprintf("%s%d", p, i)
+			if val, present := data[key]; !present {
+				if p == "user" {
+					// exit when the user name with the next sequence id is absent
+					break Users
+				}
+			} else {
+				s := string(val)
+				switch p {
+				case "user":
+					t.Name = s
+				case "password":
+					t.Password = s
+				case "inrole":
+					t.MemberOf = s
+				default:
+					c.logger.Warnf("Unknown key %s", p)
+				}
+			}
+		}
+		if t.Name != "" {
+			result[t.Name] = t
+		}
+	}
+	return result, nil
 }

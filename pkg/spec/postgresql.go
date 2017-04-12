@@ -79,7 +79,7 @@ type PostgresSpec struct {
 	NumberOfInstances   int32                `json:"numberOfInstances"`
 	Users               map[string]UserFlags `json:"users"`
 	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
- 	ClusterName         string				 `json:"-"`
+	ClusterName         string               `json:"-"`
 }
 
 type PostgresqlList struct {
@@ -193,7 +193,7 @@ type PostgresqlCopy Postgresql
 
 func clusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
-	if len(clusterName) < teamNameLen + 2 {
+	if len(clusterName) < teamNameLen+2 {
 		return "", fmt.Errorf("Name is too short")
 	}
 	if strings.ToLower(clusterName[:teamNameLen]) != strings.ToLower(teamName) {

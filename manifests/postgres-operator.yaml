@@ -58,3 +58,5 @@ spec:
           value: "db.example.com"
         - name: PGOP_DNS_NAME_FORMAT
           value: "%s.%s.staging.%s"
+        - name: PGOP_INFRASTRUCTURE_ROLES_SECRET_NAME
+          value: "postgresql-infrastructure-roles"

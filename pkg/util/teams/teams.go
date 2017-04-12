@@ -1,10 +1,10 @@
 package teams
 
 import (
-	"fmt"
-	"strings"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 )

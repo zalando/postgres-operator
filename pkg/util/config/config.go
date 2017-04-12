@@ -24,12 +24,13 @@ type Resources struct {
 }
 
 type Auth struct {
-	PamRoleName          string `split_words:"true" default:"zalandos"`
-	PamConfiguration     string `split_words:"true" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
-	TeamsAPIUrl          string `envconfig:"teams_api_url" default:"https://teams.example.com/api/"`
-	OAuthTokenSecretName string `envconfig:"oauth_token_secret_name" default:"postgresql-operator"`
-	SuperUsername        string `split_words:"true" default:"postgres"`
-	ReplicationUsername  string `split_words:"true" default:"replication"`
+	PamRoleName                   string `split_words:"true" default:"zalandos"`
+	PamConfiguration              string `split_words:"true" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
+	TeamsAPIUrl                   string `envconfig:"teams_api_url" default:"https://teams.example.com/api/"`
+	OAuthTokenSecretName          string `envconfig:"oauth_token_secret_name" default:"postgresql-operator"`
+	InfrastructureRolesSecretName string `split_words:"true"`
+	SuperUsername                 string `split_words:"true" default:"postgres"`
+	ReplicationUsername           string `split_words:"true" default:"replication"`
 }
 
 type Config struct {

@@ -48,9 +48,9 @@ func ControllerConfig() *controller.Config {
 	restClient, err := k8sutil.KubernetesRestClient(restConfig)
 
 	return &controller.Config{
-		PodNamespace:   podNamespace, //TODO: move to config.Config
-		KubeClient:     client,
-		RestClient:     restClient,
+		PodNamespace: podNamespace, //TODO: move to config.Config
+		KubeClient:   client,
+		RestClient:   restClient,
 	}
 }
 

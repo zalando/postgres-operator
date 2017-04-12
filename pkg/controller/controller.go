@@ -17,11 +17,12 @@ import (
 )
 
 type Config struct {
-	PodNamespace   string
-	KubeClient     *kubernetes.Clientset
-	RestClient     *rest.RESTClient
-	EtcdClient     etcdclient.KeysAPI
-	TeamsAPIClient *teams.TeamsAPI
+	PodNamespace        string
+	KubeClient          *kubernetes.Clientset
+	RestClient          *rest.RESTClient
+	EtcdClient          etcdclient.KeysAPI
+	TeamsAPIClient      *teams.TeamsAPI
+	InfrastructureRoles map[string]spec.PgUser
 }
 
 type Controller struct {
@@ -74,6 +75,11 @@ func (c *Controller) initController() {
 	}
 
 	c.TeamsAPIClient.RefreshTokenAction = c.getOAuthToken
+	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
+		c.logger.Warningf("Can't get infrastructure roles: %s", err)
+	} else {
+		c.InfrastructureRoles = infraRoles
+	}
 
 	// Postgresqls
 	clusterLw := &cache.ListWatch{

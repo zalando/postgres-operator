@@ -1,0 +1,15 @@
+apiVersion: v1
+data:
+  # robot_zmon_acid_monitoring
+  user1: cm9ib3Rfem1vbl9hY2lkX21vbml0b3Jpbmc=
+  # robot_zmon
+  inrole1: cm9ib3Rfem1vbg==
+  # testuser
+  user2: dGVzdHVzZXI=
+  # foobar
+  password2: Zm9vYmFy
+kind: Secret
+metadata:
+  name: postgresql-infrastructure-roles
+  namespace: default
+type: Opaque

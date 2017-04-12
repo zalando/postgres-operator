@@ -18,7 +18,7 @@ import (
 )
 
 func isValidUsername(username string) bool {
-	return alphaNumericRegexp.MatchString(username)
+	return userRegexp.MatchString(username)
 }
 
 func normalizeUserFlags(userFlags []string) (flags []string, err error) {
@@ -218,8 +218,10 @@ func (c *Cluster) dnsName() string {
 }
 
 func (c *Cluster) credentialSecretName(username string) string {
+	// secret  must consist of lower case alphanumeric characters, '-' or '.',
+	// and must start and end with an alphanumeric character
 	return fmt.Sprintf(constants.UserSecretTemplate,
-		username,
+		strings.Replace(username, "_", "-", -1),
 		c.Metadata.Name,
 		constants.TPRName,
 		constants.TPRVendor)
