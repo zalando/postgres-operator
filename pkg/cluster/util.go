@@ -156,10 +156,10 @@ func (c *Cluster) waitPodLabelsReady() error {
 		LabelSelector: ls.String(),
 	}
 	masterListOption := v1.ListOptions{
-		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": constants.PodRoleMaster}).String(),
+		LabelSelector: labels.Merge(ls, labels.Set{constants.SpiloRoleLabel: constants.PodRoleMaster}).String(),
 	}
 	replicaListOption := v1.ListOptions{
-		LabelSelector: labels.Merge(ls, labels.Set{"spilo-role": constants.PodRoleReplica}).String(),
+		LabelSelector: labels.Merge(ls, labels.Set{constants.SpiloRoleLabel: constants.PodRoleReplica}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
@@ -204,8 +204,8 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 
 func (c *Cluster) labelsSet() labels.Set {
 	return labels.Set{
-		"application":   "spilo",
-		"spilo-cluster": c.Metadata.Name,
+		constants.ApplicationNameLabel: constants.ApplicationNameLabelValue,
+		constants.ClusterNameLabel:     c.Metadata.Name,
 	}
 }
 

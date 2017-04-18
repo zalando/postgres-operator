@@ -196,7 +196,7 @@ func clusterName(clusterName string, teamName string) (string, error) {
 	if len(clusterName) < teamNameLen+2 {
 		return "", fmt.Errorf("Name is too short")
 	}
-	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName) + "-" {
+	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
 		return "", fmt.Errorf("Name must start with the team name and dash")
 	}
 
