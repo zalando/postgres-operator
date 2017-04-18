@@ -41,11 +41,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		if !ok {
 			return nil, fmt.Errorf("Can't cast object to postgresql")
 		}
-		clusterName := spec.ClusterName{
-			Namespace: pg.Metadata.Namespace,
-			Name:      pg.Metadata.Name,
-		}
-
+		clusterName := util.NameFromMeta(pg.Metadata)
 		cl := cluster.New(clusterConfig, *pg, c.logger.Logger)
 
 		stopCh := make(chan struct{})
@@ -83,10 +79,7 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 		return
 	}
 
-	clusterName := spec.ClusterName{
-		Namespace: pg.Metadata.Namespace,
-		Name:      pg.Metadata.Name,
-	}
+	clusterName := util.NameFromMeta(pg.Metadata)
 
 	_, ok = c.clusters[clusterName]
 	if ok {
@@ -123,10 +116,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 		c.logger.Errorf("Can't cast to postgresql spec")
 	}
 
-	clusterName := spec.ClusterName{
-		Namespace: pgNew.Metadata.Namespace,
-		Name:      pgNew.Metadata.Name,
-	}
+	clusterName := util.NameFromMeta(pgNew.Metadata)
 
 	//TODO: Do not update cluster which is currently creating
 	if pgPrev.Metadata.ResourceVersion == pgNew.Metadata.ResourceVersion {
@@ -155,10 +145,7 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 		c.logger.Errorf("Can't cast to postgresql spec")
 		return
 	}
-	clusterName := spec.ClusterName{
-		Namespace: pgCur.Metadata.Namespace,
-		Name:      pgCur.Metadata.Name,
-	}
+	clusterName := util.NameFromMeta(pgCur.Metadata)
 	pgCluster, ok := c.clusters[clusterName]
 	if !ok {
 		c.logger.Errorf("Unknown cluster: %s", clusterName)

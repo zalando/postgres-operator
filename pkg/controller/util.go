@@ -3,7 +3,6 @@ package controller
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
@@ -26,7 +25,9 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 
 func (c *Controller) getOAuthToken() (string, error) {
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
-	credentialsSecret, err := c.KubeClient.Secrets(api.NamespaceDefault).Get(c.opConfig.OAuthTokenSecretName)
+	credentialsSecret, err := c.KubeClient.
+		Secrets(c.opConfig.OAuthTokenSecretName.Namespace).
+		Get(c.opConfig.OAuthTokenSecretName.Name)
 
 	if err != nil {
 		c.logger.Debugf("Oauth token secret name: %s", c.opConfig.OAuthTokenSecretName)
@@ -75,15 +76,19 @@ func (c *Controller) createTPR() error {
 }
 
 func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, err error) {
-	if c.opConfig.InfrastructureRolesSecretName == "" {
+	if c.opConfig.InfrastructureRolesSecretName == (spec.NamespacedName{}) {
 		// we don't have infrastructure roles defined, bail out
 		return nil, nil
 	}
-	infraRolesSecret, err := c.KubeClient.Secrets(api.NamespaceDefault).Get(c.opConfig.InfrastructureRolesSecretName)
+
+	infraRolesSecret, err := c.KubeClient.
+		Secrets(c.opConfig.InfrastructureRolesSecretName.Namespace).
+		Get(c.opConfig.InfrastructureRolesSecretName.Name)
 	if err != nil {
 		c.logger.Debugf("Infrastructure roles secret name: %s", c.opConfig.InfrastructureRolesSecretName)
 		return nil, fmt.Errorf("Can't get infrastructure roles Secret: %s", err)
 	}
+
 	data := infraRolesSecret.Data
 	result = make(map[string]spec.PgUser)
 Users:
@@ -112,9 +117,11 @@ Users:
 				}
 			}
 		}
+
 		if t.Name != "" {
 			result[t.Name] = t
 		}
 	}
+
 	return result, nil
 }

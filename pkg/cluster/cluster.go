@@ -59,7 +59,7 @@ type Cluster struct {
 	logger         *logrus.Entry
 	pgUsers        map[string]spec.PgUser
 	podEvents      chan spec.PodEvent
-	podSubscribers map[spec.PodName]chan spec.PodEvent
+	podSubscribers map[spec.NamespacedName]chan spec.PodEvent
 	pgDb           *sql.DB
 	mu             sync.Mutex
 }
@@ -74,18 +74,15 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
 		logger:         lg,
 		pgUsers:        make(map[string]spec.PgUser),
 		podEvents:      make(chan spec.PodEvent),
-		podSubscribers: make(map[spec.PodName]chan spec.PodEvent),
+		podSubscribers: make(map[spec.NamespacedName]chan spec.PodEvent),
 		kubeResources:  kubeResources,
 	}
 
 	return cluster
 }
 
-func (c *Cluster) ClusterName() spec.ClusterName {
-	return spec.ClusterName{
-		Name:      c.Metadata.Name,
-		Namespace: c.Metadata.Namespace,
-	}
+func (c *Cluster) ClusterName() spec.NamespacedName {
+	return util.NameFromMeta(c.Metadata)
 }
 
 func (c *Cluster) TeamName() string {

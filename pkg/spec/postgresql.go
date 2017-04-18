@@ -52,11 +52,11 @@ type PostgresStatus string
 
 const (
 	ClusterStatusUnknown      PostgresStatus = ""
-	ClusterStatusCreating                    = "Creating"
-	ClusterStatusUpdating                    = "Updating"
-	ClusterStatusUpdateFailed                = "UpdateFailed"
-	ClusterStatusAddFailed                   = "CreateFailed"
-	ClusterStatusRunning                     = "Running"
+	ClusterStatusCreating     PostgresStatus = "Creating"
+	ClusterStatusUpdating     PostgresStatus = "Updating"
+	ClusterStatusUpdateFailed PostgresStatus = "UpdateFailed"
+	ClusterStatusAddFailed    PostgresStatus = "CreateFailed"
+	ClusterStatusRunning      PostgresStatus = "Running"
 )
 
 // PostgreSQL Third Party (resource) Object

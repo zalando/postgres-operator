@@ -7,7 +7,7 @@ import (
 
 type PodEventType string
 
-type PodName types.NamespacedName
+type NamespacedName types.NamespacedName
 
 const (
 	PodEventAdd    PodEventType = "ADD"
@@ -16,21 +16,11 @@ const (
 )
 
 type PodEvent struct {
-	ClusterName ClusterName
-	PodName     PodName
+	ClusterName NamespacedName
+	PodName     NamespacedName
 	PrevPod     *v1.Pod
 	CurPod      *v1.Pod
 	EventType   PodEventType
-}
-
-func (p PodName) String() string {
-	return types.NamespacedName(p).String()
-}
-
-type ClusterName types.NamespacedName
-
-func (c ClusterName) String() string {
-	return types.NamespacedName(c).String()
 }
 
 type PgUser struct {
@@ -38,4 +28,20 @@ type PgUser struct {
 	Password string
 	Flags    []string
 	MemberOf string
+}
+
+func (p NamespacedName) String() string {
+	return types.NamespacedName(p).String()
+}
+
+func (n *NamespacedName) Decode(value string) error {
+	name := types.NewNamespacedNameFromString(value)
+	if value != "" && name == (types.NamespacedName{}) {
+		name.Name = value
+		name.Namespace = v1.NamespaceDefault
+	}
+
+	*n = NamespacedName(name)
+
+	return nil
 }

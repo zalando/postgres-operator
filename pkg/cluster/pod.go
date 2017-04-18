@@ -84,10 +84,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 }
 
 func (c *Cluster) deletePod(pod *v1.Pod) error {
-	podName := spec.PodName{
-		Namespace: pod.Namespace,
-		Name:      pod.Name,
-	}
+	podName := util.NameFromMeta(pod.ObjectMeta)
 
 	ch := make(chan spec.PodEvent)
 	if _, ok := c.podSubscribers[podName]; ok {
@@ -110,7 +107,7 @@ func (c *Cluster) deletePod(pod *v1.Pod) error {
 	return nil
 }
 
-func (c *Cluster) unregisterPodSubscriber(podName spec.PodName) {
+func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	if _, ok := c.podSubscribers[podName]; !ok {
 		panic("Subscriber for Pod '" + podName.String() + "' is not found")
 	}
@@ -119,7 +116,7 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.PodName) {
 	delete(c.podSubscribers, podName)
 }
 
-func (c *Cluster) registerPodSubscriber(podName spec.PodName) chan spec.PodEvent {
+func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.PodEvent {
 	ch := make(chan spec.PodEvent)
 	if _, ok := c.podSubscribers[podName]; ok {
 		panic("Pod '" + podName.String() + "' is already subscribed")
@@ -129,10 +126,7 @@ func (c *Cluster) registerPodSubscriber(podName spec.PodName) chan spec.PodEvent
 }
 
 func (c *Cluster) recreatePod(pod v1.Pod) error {
-	podName := spec.PodName{
-		Namespace: pod.Namespace,
-		Name:      pod.Name,
-	}
+	podName := util.NameFromMeta(pod.ObjectMeta)
 
 	orphanDependents := false
 	deleteOptions := &v1.DeleteOptions{

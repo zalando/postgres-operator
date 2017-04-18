@@ -55,13 +55,6 @@ func (c *Controller) podWatchFunc(options api.ListOptions) (watch.Interface, err
 	return c.KubeClient.CoreV1Client.Pods(c.PodNamespace).Watch(opts)
 }
 
-func PodNameFromMeta(meta v1.ObjectMeta) spec.PodName {
-	return spec.PodName{
-		Namespace: meta.Namespace,
-		Name:      meta.Name,
-	}
-}
-
 func (c *Controller) podAdd(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
@@ -70,7 +63,7 @@ func (c *Controller) podAdd(obj interface{}) {
 
 	podEvent := spec.PodEvent{
 		ClusterName: util.PodClusterName(pod),
-		PodName:     PodNameFromMeta(pod.ObjectMeta),
+		PodName:     util.NameFromMeta(pod.ObjectMeta),
 		CurPod:      pod,
 		EventType:   spec.PodEventAdd,
 	}
@@ -91,7 +84,7 @@ func (c *Controller) podUpdate(prev, cur interface{}) {
 
 	podEvent := spec.PodEvent{
 		ClusterName: util.PodClusterName(curPod),
-		PodName:     PodNameFromMeta(curPod.ObjectMeta),
+		PodName:     util.NameFromMeta(curPod.ObjectMeta),
 		PrevPod:     prevPod,
 		CurPod:      curPod,
 		EventType:   spec.PodEventUpdate,
@@ -108,7 +101,7 @@ func (c *Controller) podDelete(obj interface{}) {
 
 	podEvent := spec.PodEvent{
 		ClusterName: util.PodClusterName(pod),
-		PodName:     PodNameFromMeta(pod.ObjectMeta),
+		PodName:     util.NameFromMeta(pod.ObjectMeta),
 		CurPod:      pod,
 		EventType:   spec.PodEventDelete,
 	}

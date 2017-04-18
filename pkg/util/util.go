@@ -11,7 +11,6 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/types"
 	"strings"
 )
 
@@ -30,24 +29,22 @@ func RandomPassword(n int) string {
 	return string(b)
 }
 
-func NameFromMeta(meta v1.ObjectMeta) types.NamespacedName {
-	obj := types.NamespacedName{
+func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
+	return spec.NamespacedName{
 		Namespace: meta.Namespace,
 		Name:      meta.Name,
 	}
-
-	return obj
 }
 
-func PodClusterName(pod *v1.Pod) spec.ClusterName {
+func PodClusterName(pod *v1.Pod) spec.NamespacedName {
 	if name, ok := pod.Labels["spilo-cluster"]; ok {
-		return spec.ClusterName{
+		return spec.NamespacedName{
 			Namespace: pod.Namespace,
 			Name:      name,
 		}
 	}
 
-	return spec.ClusterName{}
+	return spec.NamespacedName{}
 }
 
 func PodSpiloRole(pod *v1.Pod) string {

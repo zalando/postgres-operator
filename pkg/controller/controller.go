@@ -29,8 +29,8 @@ type Controller struct {
 	Config
 	opConfig    *config.Config
 	logger      *logrus.Entry
-	clusters    map[spec.ClusterName]*cluster.Cluster
-	stopChMap   map[spec.ClusterName]chan struct{}
+	clusters    map[spec.NamespacedName]*cluster.Cluster
+	stopChMap   map[spec.NamespacedName]chan struct{}
 	waitCluster sync.WaitGroup
 
 	postgresqlInformer cache.SharedIndexInformer
@@ -51,8 +51,8 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 		Config:    *controllerConfig,
 		opConfig:  operatorConfig,
 		logger:    logger.WithField("pkg", "controller"),
-		clusters:  make(map[spec.ClusterName]*cluster.Cluster),
-		stopChMap: make(map[spec.ClusterName]chan struct{}),
+		clusters:  make(map[spec.NamespacedName]*cluster.Cluster),
+		stopChMap: make(map[spec.NamespacedName]chan struct{}),
 		podCh:     make(chan spec.PodEvent),
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.com/kelseyhightower/envconfig"
 )
 
@@ -24,13 +25,13 @@ type Resources struct {
 }
 
 type Auth struct {
-	PamRoleName                   string `split_words:"true" default:"zalandos"`
-	PamConfiguration              string `split_words:"true" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
-	TeamsAPIUrl                   string `envconfig:"teams_api_url" default:"https://teams.example.com/api/"`
-	OAuthTokenSecretName          string `envconfig:"oauth_token_secret_name" default:"postgresql-operator"`
-	InfrastructureRolesSecretName string `split_words:"true"`
-	SuperUsername                 string `split_words:"true" default:"postgres"`
-	ReplicationUsername           string `split_words:"true" default:"replication"`
+	PamRoleName                   string              `split_words:"true" default:"zalandos"`
+	PamConfiguration              string              `split_words:"true" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
+	TeamsAPIUrl                   string              `envconfig:"teams_api_url" default:"https://teams.example.com/api/"`
+	OAuthTokenSecretName          spec.NamespacedName `envconfig:"oauth_token_secret_name" default:"postgresql-operator"`
+	InfrastructureRolesSecretName spec.NamespacedName `split_words:"true"`
+	SuperUsername                 string              `split_words:"true" default:"postgres"`
+	ReplicationUsername           string              `split_words:"true" default:"replication"`
 }
 
 type Config struct {
@@ -49,6 +50,8 @@ type Config struct {
 }
 
 func LoadFromEnv() *Config {
+	//TODO: maybe we should use ConfigMaps( https://kubernetes.io/docs/tasks/configure-pod-container/configmap/ ) instead?
+
 	var cfg Config
 	err := envconfig.Process("PGOP", &cfg)
 	if err != nil {
