@@ -2,7 +2,7 @@ apiVersion: "acid.zalan.do/v1"
 kind: "Postgresql"
 
 metadata:
-  name: testcluster
+  name: acid-testcluster
 spec:
   teamId: "ACID"
   volume:

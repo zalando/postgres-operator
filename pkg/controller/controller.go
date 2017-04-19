@@ -17,7 +17,6 @@ import (
 )
 
 type Config struct {
-	PodNamespace        string
 	KubeClient          *kubernetes.Clientset
 	RestClient          *rest.RESTClient
 	EtcdClient          etcdclient.KeysAPI
@@ -63,7 +62,6 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 	c.initController()
 
-	c.logger.Infof("'%s' namespace will be watched", c.PodNamespace)
 	go c.runInformers(stopCh)
 
 	c.logger.Info("Started working in background")

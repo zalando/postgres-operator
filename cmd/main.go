@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/controller"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/config"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 )
@@ -16,9 +17,9 @@ import (
 var (
 	KubeConfigFile string
 	podNamespace   string
+	configMapName  spec.NamespacedName
 	OutOfCluster   bool
 	version        string
-	cfg            *config.Config
 )
 
 func init() {
@@ -27,11 +28,14 @@ func init() {
 	flag.Parse()
 
 	podNamespace = os.Getenv("MY_POD_NAMESPACE")
-	if len(podNamespace) == 0 {
+	if podNamespace == "" {
 		podNamespace = "default"
 	}
 
-	cfg = config.LoadFromEnv()
+	configMap := os.Getenv("CONFIG_MAP_NAME")
+	if configMap != "" {
+		configMapName.Decode(configMap)
+	}
 }
 
 func ControllerConfig() *controller.Config {
@@ -48,16 +52,15 @@ func ControllerConfig() *controller.Config {
 	restClient, err := k8sutil.KubernetesRestClient(restConfig)
 
 	return &controller.Config{
-		PodNamespace: podNamespace, //TODO: move to config.Config
-		KubeClient:   client,
-		RestClient:   restClient,
+		KubeClient: client,
+		RestClient: restClient,
 	}
 }
 
 func main() {
+	configMapData := make(map[string]string)
 	log.SetOutput(os.Stdout)
 	log.Printf("Spilo operator %s\n", version)
-	log.Printf("Config: %s", cfg.MustMarshal())
 
 	sigs := make(chan os.Signal, 1)
 	stop := make(chan struct{})
@@ -66,6 +69,23 @@ func main() {
 	wg := &sync.WaitGroup{} // Goroutines can add themselves to this to be waited on
 
 	controllerConfig := ControllerConfig()
+
+	if configMapName != (spec.NamespacedName{}) {
+		configMap, err := controllerConfig.KubeClient.ConfigMaps(configMapName.Namespace).Get(configMapName.Name)
+		if err != nil {
+			panic(err)
+		}
+
+		configMapData = configMap.Data
+	} else {
+		log.Printf("No ConfigMap specified. Loading default values")
+	}
+	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
+		configMapData["namespace"] = podNamespace
+	}
+	cfg := config.NewFromMap(configMapData)
+
+	log.Printf("Config: %s", cfg.MustMarshal())
 
 	c := controller.New(controllerConfig, cfg)
 	c.Run(stop, wg)

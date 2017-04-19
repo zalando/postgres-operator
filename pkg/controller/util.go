@@ -72,7 +72,7 @@ func (c *Controller) createTPR() error {
 
 	restClient := c.RestClient
 
-	return k8sutil.WaitTPRReady(restClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.PodNamespace)
+	return k8sutil.WaitTPRReady(restClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.opConfig.Namespace)
 }
 
 func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, err error) {
@@ -124,4 +124,15 @@ Users:
 	}
 
 	return result, nil
+}
+
+func (c *Controller) PodClusterName(pod *v1.Pod) spec.NamespacedName {
+	if name, ok := pod.Labels[c.opConfig.ClusterNameLabel]; ok {
+		return spec.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      name,
+		}
+	}
+
+	return spec.NamespacedName{}
 }

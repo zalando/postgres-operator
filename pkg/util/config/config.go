@@ -2,64 +2,53 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.com/kelseyhightower/envconfig"
 )
 
 type TPR struct {
-	ReadyWaitInterval time.Duration `split_words:"true" default:"3s"`
-	ReadyWaitTimeout  time.Duration `split_words:"true" default:"30s"`
-	ResyncPeriod      time.Duration `split_words:"true" default:"5m"`
+	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod      time.Duration `name:"resync_period" default:"5m"`
 }
 
 type Resources struct {
-	ResyncPeriodPod        time.Duration `split_words:"true" default:"5m"`
-	ResourceCheckInterval  time.Duration `split_words:"true" default:"3s"`
-	ResourceCheckTimeout   time.Duration `split_words:"true" default:"10m"`
-	PodLabelWaitTimeout    time.Duration `split_words:"true" default:"10m"`
-	PodDeletionWaitTimeout time.Duration `split_words:"true" default:"10m"`
+	ResyncPeriodPod        time.Duration     `name:"resync_period_pod" default:"5m"`
+	ResourceCheckInterval  time.Duration     `name:"resource_check_interval" default:"3s"`
+	ResourceCheckTimeout   time.Duration     `name:"resource_check_timeout" default:"10m"`
+	PodLabelWaitTimeout    time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
+	PodDeletionWaitTimeout time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
+	ClusterLabels          map[string]string `name:"cluster_labels" default:"application:spilo"`
+	ClusterNameLabel       string            `name:"cluster_name_label" default:"cluster-name"`
+	PodRoleLabel           string            `name:"pod_role_label" default:"spilo-role"`
 }
 
 type Auth struct {
-	PamRoleName                   string              `split_words:"true" default:"zalandos"`
-	PamConfiguration              string              `split_words:"true" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
-	TeamsAPIUrl                   string              `envconfig:"teams_api_url" default:"https://teams.example.com/api/"`
-	OAuthTokenSecretName          spec.NamespacedName `envconfig:"oauth_token_secret_name" default:"postgresql-operator"`
-	InfrastructureRolesSecretName spec.NamespacedName `split_words:"true"`
-	SuperUsername                 string              `split_words:"true" default:"postgres"`
-	ReplicationUsername           string              `split_words:"true" default:"replication"`
+	PamRoleName                   string              `name:"pam_rol_name" default:"zalandos"`
+	PamConfiguration              string              `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
+	TeamsAPIUrl                   string              `name:"teams_api_url" default:"https://teams.example.com/api/"`
+	OAuthTokenSecretName          spec.NamespacedName `name:"oauth_token_secret_name" default:"postgresql-operator"`
+	InfrastructureRolesSecretName spec.NamespacedName `name:"infrastructure_roles_secret_name"`
+	SuperUsername                 string              `name:"super_username" default:"postgres"`
+	ReplicationUsername           string              `name:"replication_username" default:"replication"`
 }
 
 type Config struct {
 	TPR
 	Resources
 	Auth
-	EtcdHost           string `split_words:"true" default:"etcd-client.default.svc.cluster.local:2379"`
-	DockerImage        string `split_words:"true" default:"registry.opensource.zalan.do/acid/spilo-9.6:1.2-p12"`
-	ServiceAccountName string `split_words:"true" default:"operator"`
-	DbHostedZone       string `split_words:"true" default:"db.example.com"`
-	EtcdScope          string `split_words:"true" default:"service"`
-	WALES3Bucket       string `envconfig:"wal_s3_bucket"`
-	KubeIAMRole        string `envconfig:"kube_iam_role"`
-	DebugLogging       bool   `split_words:"true" default:"false"`
-	DNSNameFormat      string `envconfig:"dns_name_format" default:"%s.%s.%s"`
-}
-
-func LoadFromEnv() *Config {
-	//TODO: maybe we should use ConfigMaps( https://kubernetes.io/docs/tasks/configure-pod-container/configmap/ ) instead?
-
-	var cfg Config
-	err := envconfig.Process("PGOP", &cfg)
-	if err != nil {
-		panic(fmt.Errorf("Can't read config: %v", err))
-	}
-	cfg.EtcdScope = strings.Trim(cfg.EtcdScope, "/")
-
-	return &cfg
+	Namespace          string `name:"namespace"`
+	EtcdHost           string `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
+	DockerImage        string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-9.6:1.2-p12"`
+	ServiceAccountName string `name:"service_account_name" default:"operator"`
+	DbHostedZone       string `name:"db_hosted_zone" default:"db.example.com"`
+	EtcdScope          string `name:"etcd_scope" default:"service"`
+	WALES3Bucket       string `name:"wal_s3_bucket"`
+	KubeIAMRole        string `name:"kube_iam_role"`
+	DebugLogging       bool   `name:"debug_logging" default:"false"`
+	DNSNameFormat      string `name:"dns_name_format" default:"%s.%s.%s"`
 }
 
 func (c Config) MustMarshal() string {
@@ -69,4 +58,24 @@ func (c Config) MustMarshal() string {
 	}
 
 	return string(b)
+}
+
+func NewFromMap(m map[string]string) *Config {
+	cfg := Config{}
+	fields, _ := structFields(&cfg)
+
+	for _, structField := range fields {
+		key := strings.ToLower(structField.Name)
+		value, ok := m[key]
+		if !ok && structField.Default != "" {
+			value = structField.Default
+		}
+
+		err := processField(value, structField.Field)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return &cfg
 }

@@ -29,7 +29,7 @@ func (c *Controller) podListFunc(options api.ListOptions) (runtime.Object, error
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.CoreV1().Pods(c.PodNamespace).List(opts)
+	return c.KubeClient.CoreV1().Pods(c.opConfig.Namespace).List(opts)
 }
 
 func (c *Controller) podWatchFunc(options api.ListOptions) (watch.Interface, error) {
@@ -52,7 +52,7 @@ func (c *Controller) podWatchFunc(options api.ListOptions) (watch.Interface, err
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.CoreV1Client.Pods(c.PodNamespace).Watch(opts)
+	return c.KubeClient.CoreV1Client.Pods(c.opConfig.Namespace).Watch(opts)
 }
 
 func (c *Controller) podAdd(obj interface{}) {
@@ -62,7 +62,7 @@ func (c *Controller) podAdd(obj interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName: util.PodClusterName(pod),
+		ClusterName: c.PodClusterName(pod),
 		PodName:     util.NameFromMeta(pod.ObjectMeta),
 		CurPod:      pod,
 		EventType:   spec.PodEventAdd,
@@ -83,7 +83,7 @@ func (c *Controller) podUpdate(prev, cur interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName: util.PodClusterName(curPod),
+		ClusterName: c.PodClusterName(curPod),
 		PodName:     util.NameFromMeta(curPod.ObjectMeta),
 		PrevPod:     prevPod,
 		CurPod:      curPod,
@@ -100,7 +100,7 @@ func (c *Controller) podDelete(obj interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName: util.PodClusterName(pod),
+		ClusterName: c.PodClusterName(pod),
 		PodName:     util.NameFromMeta(pod.ObjectMeta),
 		CurPod:      pod,
 		EventType:   spec.PodEventDelete,

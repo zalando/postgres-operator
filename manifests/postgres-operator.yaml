@@ -14,49 +14,9 @@ spec:
       - name: postgres-operator
         image: pierone.example.com/acid/postgres-operator:0.1
         env:
-        - name: MY_POD_NAMESPACE #TODO: use PGOP_ prefix
+        - name: MY_POD_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        - name: PGOP_SERVICE_ACCOUNT_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.serviceAccountName
-        - name: PGOP_READY_WAIT_INTERVAL
-          value: "3s"
-        - name: PGOP_READY_WAIT_TIMEOUT
-          value: "30s"
-        - name: PGOP_RESYNC_PERIOD
-          value: "5m"
-        - name: PGOP_RESYNC_PERIOD_POD
-          value: "5m"
-        - name: PGOP_RESOURCE_CHECK_INTERVAL
-          value: "3s"
-        - name: PGOP_RESOURCE_CHECK_TIMEOUT
-          value: "10m"
-        - name: PGOP_POD_LABEL_WAIT_TIMEOUT
-          value: "10m"
-        - name: PGOP_POD_DELETION_WAIT_TIMEOUT
-          value: "10m"
-        - name: PGOP_PAM_ROLE_NAME
-          value: "zalandos"
-        - name: PGOP_PAM_CONFIGURATION
-          value: "https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"
-        - name: PGOP_TEAMS_API_URL
-          value: "https://teams.example.com/api/"
-        - name: PGOP_OAUTH_TOKEN_SECRET_NAME
-          value: "postgresql-operator"
-        - name: PGOP_SUPER_USERNAME
-          value: "postgres"
-        - name: PGOP_REPLICATION_USERNAME
-          value: "replication"
-        - name: PGOP_ETCD_HOST
-          value: "etcd-client.default.svc.cluster.local:2379"
-        - name: PGOP_DOCKER_IMAGE
-          value: "registry.opensource.zalan.do/acid/spilo-9.6:1.2-p12"
-        - name: PGOP_DB_HOSTED_ZONE
-          value: "db.example.com"
-        - name: PGOP_DNS_NAME_FORMAT
-          value: "%s.%s.staging.%s"
-        - name: PGOP_INFRASTRUCTURE_ROLES_SECRET_NAME
-          value: "postgresql-infrastructure-roles"
+        - name: CONFIG_MAP_NAME
+          value: "postgres-operator"

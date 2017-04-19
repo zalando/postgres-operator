@@ -12,7 +12,6 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
@@ -35,21 +34,6 @@ func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
 		Namespace: meta.Namespace,
 		Name:      meta.Name,
 	}
-}
-
-func PodClusterName(pod *v1.Pod) spec.NamespacedName {
-	if name, ok := pod.Labels[constants.ClusterNameLabel]; ok {
-		return spec.NamespacedName{
-			Namespace: pod.Namespace,
-			Name:      name,
-		}
-	}
-
-	return spec.NamespacedName{}
-}
-
-func PodSpiloRole(pod *v1.Pod) string {
-	return pod.Labels[constants.SpiloRoleLabel]
 }
 
 func PGUserPassword(user spec.PgUser) string {

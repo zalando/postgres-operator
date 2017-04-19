@@ -19,7 +19,7 @@ import (
 func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
 	c.logger.Info("Getting list of currently running clusters")
 	object, err := c.RestClient.Get().
-		Namespace(c.PodNamespace).
+		Namespace(c.opConfig.Namespace).
 		Resource(constants.ResourceName).
 		VersionedParams(&options, api.ParameterCodec).
 		FieldsSelectorParam(fields.Everything()).
@@ -65,7 +65,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 func (c *Controller) clusterWatchFunc(options api.ListOptions) (watch.Interface, error) {
 	return c.RestClient.Get().
 		Prefix("watch").
-		Namespace(c.PodNamespace).
+		Namespace(c.opConfig.Namespace).
 		Resource(constants.ResourceName).
 		VersionedParams(&options, api.ParameterCodec).
 		FieldsSelectorParam(fields.Everything()).

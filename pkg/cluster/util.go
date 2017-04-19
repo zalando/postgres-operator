@@ -103,7 +103,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
-			role := util.PodSpiloRole(podEvent.CurPod)
+			role := c.PodSpiloRole(podEvent.CurPod)
 			// We cannot assume any role of the newly created pod. Normally, for a multi-pod cluster
 			// we should observe the 'replica' value, but it could be that some pods are not allowed
 			// to promote, therefore, the new pod could be a master as well.
@@ -156,10 +156,14 @@ func (c *Cluster) waitPodLabelsReady() error {
 		LabelSelector: ls.String(),
 	}
 	masterListOption := v1.ListOptions{
-		LabelSelector: labels.Merge(ls, labels.Set{constants.SpiloRoleLabel: constants.PodRoleMaster}).String(),
+		LabelSelector: labels.Merge(ls, labels.Set{
+			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
+		}).String(),
 	}
 	replicaListOption := v1.ListOptions{
-		LabelSelector: labels.Merge(ls, labels.Set{constants.SpiloRoleLabel: constants.PodRoleReplica}).String(),
+		LabelSelector: labels.Merge(ls, labels.Set{
+			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
+		}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
@@ -203,10 +207,10 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 }
 
 func (c *Cluster) labelsSet() labels.Set {
-	return labels.Set{
-		constants.ApplicationNameLabel: constants.ApplicationNameLabelValue,
-		constants.ClusterNameLabel:     c.Metadata.Name,
-	}
+	lbls := c.OpConfig.ClusterLabels
+	lbls[c.OpConfig.ClusterNameLabel] = c.Metadata.Name
+
+	return labels.Set(lbls)
 }
 
 func (c *Cluster) dnsName() string {
@@ -228,7 +232,7 @@ func (c *Cluster) credentialSecretName(username string) string {
 }
 
 func (c *Cluster) deleteEtcdKey() error {
-	etcdKey := fmt.Sprintf("/service/%s", c.Metadata.Name)
+	etcdKey := fmt.Sprintf("/%s/%s", c.OpConfig.EtcdScope, c.Metadata.Name)
 
 	//TODO: retry multiple times
 	resp, err := c.EtcdClient.Delete(context.Background(),
@@ -244,4 +248,8 @@ func (c *Cluster) deleteEtcdKey() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) PodSpiloRole(pod *v1.Pod) string {
+	return pod.Labels[c.OpConfig.PodRoleLabel]
 }
