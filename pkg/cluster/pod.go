@@ -45,11 +45,13 @@ func (c *Cluster) deletePods() error {
 	}
 
 	for _, obj := range pods {
-		c.logger.Debugf("Deleting Pod '%s'", util.NameFromMeta(obj.ObjectMeta))
-		if err := c.deletePod(&obj); err != nil {
-			c.logger.Errorf("Can't delete Pod: %s", err)
+		podName := util.NameFromMeta(obj.ObjectMeta)
+
+		c.logger.Debugf("Deleting Pod '%s'", podName)
+		if err := c.deletePod(podName); err != nil {
+			c.logger.Errorf("Can't delete Pod '%s': %s", podName, err)
 		} else {
-			c.logger.Infof("Pod '%s' has been deleted", util.NameFromMeta(obj.ObjectMeta))
+			c.logger.Infof("Pod '%s' has been deleted", podName)
 		}
 	}
 	if len(pods) > 0 {
@@ -83,9 +85,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 	return nil
 }
 
-func (c *Cluster) deletePod(pod *v1.Pod) error {
-	podName := util.NameFromMeta(pod.ObjectMeta)
-
+func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 	ch := make(chan spec.PodEvent)
 	if _, ok := c.podSubscribers[podName]; ok {
 		panic("Pod '" + podName.String() + "' is already subscribed")
@@ -96,7 +96,7 @@ func (c *Cluster) deletePod(pod *v1.Pod) error {
 		delete(c.podSubscribers, podName)
 	}()
 
-	if err := c.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, deleteOptions); err != nil {
 		return err
 	}
 

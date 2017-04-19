@@ -171,7 +171,7 @@ func (c *Cluster) waitPodLabelsReady() error {
 	}
 	podsNumber := len(pods.Items)
 
-	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
 			masterPods, err := c.KubeClient.Pods(namespace).List(masterListOption)
 			if err != nil {
@@ -185,11 +185,20 @@ func (c *Cluster) waitPodLabelsReady() error {
 				return false, fmt.Errorf("Too many masters")
 			}
 			if len(replicaPods.Items) == podsNumber {
-				return false, fmt.Errorf("Cluster has no master")
+				c.masterLess = true
+				return true, nil
 			}
 
 			return len(masterPods.Items)+len(replicaPods.Items) == podsNumber, nil
 		})
+
+	//TODO: wait for master for a while and then set masterLess flag
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *Cluster) waitStatefulsetPodsReady() error {

@@ -48,10 +48,8 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		c.stopChMap[clusterName] = stopCh
 		c.clusters[clusterName] = cl
 		cl.LoadResources()
-		go cl.Run(stopCh)
-
 		cl.ListResources()
-		cl.SyncCluster()
+		cl.SyncCluster(stopCh)
 	}
 	if len(c.clusters) > 0 {
 		c.logger.Infof("There are %d clusters currently running", len(c.clusters))
@@ -95,13 +93,12 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 	c.stopChMap[clusterName] = stopCh
 
 	cl.SetStatus(spec.ClusterStatusCreating)
-	if err := cl.Create(); err != nil {
+	if err := cl.Create(stopCh); err != nil {
 		c.logger.Errorf("Can't create cluster: %s", err)
 		cl.SetStatus(spec.ClusterStatusAddFailed)
 		return
 	}
 	cl.SetStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
-	go cl.Run(stopCh)
 
 	c.logger.Infof("Postgresql cluster '%s' has been created", clusterName)
 }

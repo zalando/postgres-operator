@@ -56,12 +56,14 @@ type Cluster struct {
 	kubeResources
 	spec.Postgresql
 	Config
-	logger         *logrus.Entry
-	pgUsers        map[string]spec.PgUser
-	podEvents      chan spec.PodEvent
-	podSubscribers map[spec.NamespacedName]chan spec.PodEvent
-	pgDb           *sql.DB
-	mu             sync.Mutex
+	logger               *logrus.Entry
+	pgUsers              map[string]spec.PgUser
+	podEvents            chan spec.PodEvent
+	podSubscribers       map[spec.NamespacedName]chan spec.PodEvent
+	pgDb                 *sql.DB
+	mu                   sync.Mutex
+	masterLess           bool
+	podDispatcherRunning bool
 }
 
 func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
@@ -69,13 +71,15 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret)}
 
 	cluster := &Cluster{
-		Config:         cfg,
-		Postgresql:     pgSpec,
-		logger:         lg,
-		pgUsers:        make(map[string]spec.PgUser),
-		podEvents:      make(chan spec.PodEvent),
-		podSubscribers: make(map[spec.NamespacedName]chan spec.PodEvent),
-		kubeResources:  kubeResources,
+		Config:               cfg,
+		Postgresql:           pgSpec,
+		logger:               lg,
+		pgUsers:              make(map[string]spec.PgUser),
+		podEvents:            make(chan spec.PodEvent),
+		podSubscribers:       make(map[spec.NamespacedName]chan spec.PodEvent),
+		kubeResources:        kubeResources,
+		masterLess:           false,
+		podDispatcherRunning: false,
 	}
 
 	return cluster
@@ -88,12 +92,6 @@ func (c *Cluster) ClusterName() spec.NamespacedName {
 func (c *Cluster) TeamName() string {
 	// TODO: check Teams API for the actual name (in case the user passes an integer Id).
 	return c.Spec.TeamId
-}
-
-func (c *Cluster) Run(stopCh <-chan struct{}) {
-	go c.podEventsDispatcher(stopCh)
-
-	<-stopCh
 }
 
 func (c *Cluster) SetStatus(status spec.PostgresStatus) {
@@ -155,7 +153,12 @@ func (c *Cluster) etcdKeyExists(keyName string) (bool, error) {
 	return resp != nil, err
 }
 
-func (c *Cluster) Create() error {
+func (c *Cluster) Create(stopCh <-chan struct{}) error {
+	if !c.podDispatcherRunning {
+		go c.podEventsDispatcher(stopCh)
+		c.podDispatcherRunning = true
+	}
+
 	keyExist, err := c.etcdKeyExists(fmt.Sprintf("/%s/%s", c.OpConfig.EtcdScope, c.Metadata.Name))
 	if err != nil {
 		c.logger.Warnf("Can't check etcd key: %s", err)
@@ -203,14 +206,18 @@ func (c *Cluster) Create() error {
 		return err
 	}
 
-	if err := c.initDbConn(); err != nil {
-		return fmt.Errorf("Can't init db connection: %s", err)
-	}
+	if !c.masterLess {
+		if err := c.initDbConn(); err != nil {
+			return fmt.Errorf("Can't init db connection: %s", err)
+		}
 
-	if err := c.createUsers(); err != nil {
-		return fmt.Errorf("Can't create users: %s", err)
+		if err := c.createUsers(); err != nil {
+			return fmt.Errorf("Can't create users: %s", err)
+		} else {
+			c.logger.Infof("Users have been successfully created")
+		}
 	} else {
-		c.logger.Infof("Users have been successfully created")
+		c.logger.Warnln("Cluster is masterless")
 	}
 
 	c.ListResources()

@@ -6,7 +6,11 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 )
 
-func (c *Cluster) SyncCluster() {
+func (c *Cluster) SyncCluster(stopCh <-chan struct{}) {
+	if !c.podDispatcherRunning {
+		go c.podEventsDispatcher(stopCh)
+	}
+
 	c.logger.Debugf("Syncing Secrets")
 	if err := c.syncSecrets(); err != nil {
 		c.logger.Infof("Can't sync Secrets: %s", err)
