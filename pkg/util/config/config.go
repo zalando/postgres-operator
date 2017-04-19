@@ -41,7 +41,7 @@ type Config struct {
 	Auth
 	Namespace          string `name:"namespace"`
 	EtcdHost           string `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
-	DockerImage        string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-9.6:1.2-p12"`
+	DockerImage        string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
 	ServiceAccountName string `name:"service_account_name" default:"operator"`
 	DbHostedZone       string `name:"db_hosted_zone" default:"db.example.com"`
 	EtcdScope          string `name:"etcd_scope" default:"service"`
