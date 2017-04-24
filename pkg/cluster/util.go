@@ -7,6 +7,7 @@ import (
 	"time"
 
 	etcdclient "github.com/coreos/etcd/client"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/labels"
@@ -42,6 +43,12 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 	}
 
 	return
+}
+
+func specPatch(spec interface{}) ([]byte, error) {
+	return json.Marshal(struct {
+		Spec interface{} `json:"spec"`
+	}{spec})
 }
 
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reason string) {

@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
@@ -126,11 +127,20 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	if c.Statefulset == nil {
 		return fmt.Errorf("There is no StatefulSet in the cluster")
 	}
-	statefulSet, err := c.KubeClient.StatefulSets(newStatefulSet.Namespace).Update(newStatefulSet)
+	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
+
+	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
-		return err
+		return fmt.Errorf("Can't form patch for the StatefulSet '%s': %s", statefulSetName, err)
 	}
 
+	statefulSet, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
+		c.Statefulset.Name,
+		api.MergePatchType,
+		patchData, "")
+	if err != nil {
+		return fmt.Errorf("Can't patch StatefulSet '%s': %s", statefulSetName, err)
+	}
 	c.Statefulset = statefulSet
 
 	return nil
@@ -182,12 +192,19 @@ func (c *Cluster) updateService(newService *v1.Service) error {
 	if c.Service == nil {
 		return fmt.Errorf("There is no Service in the cluster")
 	}
-	newService.ObjectMeta = c.Service.ObjectMeta
-	newService.Spec.ClusterIP = c.Service.Spec.ClusterIP
+	serviceName := util.NameFromMeta(c.Service.ObjectMeta)
 
-	svc, err := c.KubeClient.Services(newService.Namespace).Update(newService)
+	patchData, err := specPatch(newService.Spec)
 	if err != nil {
-		return err
+		return fmt.Errorf("Can't form patch for the Service '%s': %s", serviceName, err)
+	}
+
+	svc, err := c.KubeClient.Services(c.Service.Namespace).Patch(
+		c.Service.Name,
+		api.MergePatchType,
+		patchData, "")
+	if err != nil {
+		return fmt.Errorf("Can't patch Service '%s': %s", serviceName, err)
 	}
 	c.Service = svc
 
