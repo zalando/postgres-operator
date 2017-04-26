@@ -23,8 +23,12 @@ spec:
       max_connections: "10"
       log_statement: "all"
   resources:
-    cpu: 10m
-    memory: 100Mi
+    requests:
+      cpu: 10m
+      memory: 100Mi
+    limits:
+      cpu: 300m
+      memory: 3000Mi
   patroni:
     initdb:
       encoding: "UTF8"

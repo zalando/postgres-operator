@@ -12,20 +12,41 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
-func resourceList(resources spec.Resources) *v1.ResourceList {
-	resourceList := v1.ResourceList{}
-	if resources.Cpu != "" {
-		resourceList[v1.ResourceCPU] = resource.MustParse(resources.Cpu)
-	}
+func (c *Cluster) resourceRequirements(resources spec.Resources) *v1.ResourceRequirements {
+	specRequests := resources.ResourceRequest
+	specLimits := resources.ResourceLimits
 
-	if resources.Memory != "" {
-		resourceList[v1.ResourceMemory] = resource.MustParse(resources.Memory)
-	}
+	config := c.OpConfig
 
-	return &resourceList
+	defaultRequests := spec.ResourceDescription{Cpu: config.DefaultCpuRequest, Memory: config.DefaultMemoryRequest}
+	defaultLimits := spec.ResourceDescription{Cpu: config.DefaultCpuLimit, Memory: config.DefaultMemoryLimit}
+
+	result := v1.ResourceRequirements{}
+
+	result.Requests = fillResourceList(specRequests, defaultRequests)
+	result.Limits = fillResourceList(specLimits, defaultLimits)
+
+	return &result
 }
 
-func (c *Cluster) genPodTemplate(resourceList *v1.ResourceList, pgVersion string) *v1.PodTemplateSpec {
+func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescription) v1.ResourceList {
+	requests := v1.ResourceList{}
+
+	if spec.Cpu != "" {
+		requests[v1.ResourceCPU] = resource.MustParse(spec.Cpu)
+	} else {
+		requests[v1.ResourceCPU] = resource.MustParse(defaults.Cpu)
+	}
+
+	if spec.Memory != "" {
+		requests[v1.ResourceMemory] = resource.MustParse(spec.Memory)
+	} else {
+		requests[v1.ResourceMemory] = resource.MustParse(defaults.Memory)
+	}
+	return requests
+}
+
+func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, pgVersion string) *v1.PodTemplateSpec {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -112,9 +133,7 @@ bootstrap:
 		Name:            c.Metadata.Name,
 		Image:           c.OpConfig.DockerImage,
 		ImagePullPolicy: v1.PullAlways,
-		Resources: v1.ResourceRequirements{
-			Requests: *resourceList,
-		},
+		Resources:       *resourceRequirements,
 		Ports: []v1.ContainerPort{
 			{
 				ContainerPort: 8008,
@@ -163,8 +182,8 @@ bootstrap:
 }
 
 func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) *v1beta1.StatefulSet {
-	resourceList := resourceList(spec.Resources)
-	podTemplate := c.genPodTemplate(resourceList, spec.PgVersion)
+	resourceRequirements := c.resourceRequirements(spec.Resources)
+	podTemplate := c.genPodTemplate(resourceRequirements, spec.PgVersion)
 	volumeClaimTemplate := persistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 
 	statefulSet := &v1beta1.StatefulSet{

@@ -278,7 +278,7 @@ func (c Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match
 		return
 	}
 
-	if !reflect.DeepEqual(container1.Resources, container2.Resources) {
+	if !compareResources(&container1.Resources, &container2.Resources) {
 		match = false
 		needsRollUpdate = true
 		reason = "new statefulset's container resources don't match the current ones"
@@ -291,6 +291,35 @@ func (c Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match
 	}
 
 	return
+}
+
+func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (equal bool) {
+	equal = true
+	if a != nil {
+		equal = compareResoucesAssumeFirstNotNil(a, b)
+	}
+	if equal && (b != nil) {
+		equal = compareResoucesAssumeFirstNotNil(b, a)
+	}
+	return
+}
+
+func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
+	if b == nil || (len(b.Requests) == 0) {
+		return (len(a.Requests) == 0)
+	}
+	for k, v := range a.Requests {
+		if (&v).Cmp(b.Requests[k]) != 0 {
+			return false
+		}
+	}
+	for k, v := range a.Limits {
+		if (&v).Cmp(b.Limits[k]) != 0 {
+			return false
+		}
+	}
+	return true
+
 }
 
 func (c *Cluster) Update(newSpec *spec.Postgresql) error {

@@ -32,9 +32,14 @@ type PostgresqlParam struct {
 	Parameters map[string]string `json:"parameters"`
 }
 
-type Resources struct {
+type ResourceDescription struct {
 	Cpu    string `json:"cpu"`
 	Memory string `json:"memory"`
+}
+
+type Resources struct {
+	ResourceRequest ResourceDescription `json:"requests,omitempty""`
+	ResourceLimits  ResourceDescription `json:"limits,omitempty""`
 }
 
 type Patroni struct {
