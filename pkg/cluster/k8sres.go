@@ -262,6 +262,7 @@ func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 			Labels:    c.labelsSet(),
 			Annotations: map[string]string{
 				constants.ZalandoDnsNameAnnotation: c.dnsName(),
+				constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 			},
 		},
 		Spec: v1.ServiceSpec{
