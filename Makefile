@@ -52,7 +52,7 @@ push:
 	docker push "$(IMAGE):$(TAG)"
 
 scm-source.json: .git
-	echo '{\n "url": "$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
+	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
 tools:
 	@go get -u honnef.co/go/staticcheck/cmd/staticcheck
