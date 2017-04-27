@@ -2,24 +2,31 @@ package controller
 
 import (
 	"fmt"
+	"hash/crc32"
 
 	"k8s.io/client-go/pkg/api/v1"
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/cluster"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/config"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {
+	infrastructureRoles := make(map[string]spec.PgUser)
+	for k, v := range c.InfrastructureRoles {
+		infrastructureRoles[k] = v
+	}
+
 	return cluster.Config{
 		KubeClient:          c.KubeClient,
 		RestClient:          c.RestClient,
 		EtcdClient:          c.EtcdClient,
 		TeamsAPIClient:      c.TeamsAPIClient,
-		OpConfig:            c.opConfig,
-		InfrastructureRoles: c.InfrastructureRoles,
+		OpConfig:            config.Copy(c.opConfig),
+		InfrastructureRoles: infrastructureRoles,
 	}
 }
 
@@ -53,6 +60,10 @@ func thirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
 		},
 		Description: constants.TPRDescription,
 	}
+}
+
+func (c *Controller) clusterWorkerId(clusterName spec.NamespacedName) uint32 {
+	return crc32.ChecksumIEEE([]byte(clusterName.String())) % c.opConfig.Workers
 }
 
 func (c *Controller) createTPR() error {

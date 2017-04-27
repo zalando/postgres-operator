@@ -65,7 +65,7 @@ func (c *Controller) podAdd(obj interface{}) {
 		ClusterName: c.PodClusterName(pod),
 		PodName:     util.NameFromMeta(pod.ObjectMeta),
 		CurPod:      pod,
-		EventType:   spec.PodEventAdd,
+		EventType:   spec.EventAdd,
 	}
 
 	c.podCh <- podEvent
@@ -87,7 +87,7 @@ func (c *Controller) podUpdate(prev, cur interface{}) {
 		PodName:     util.NameFromMeta(curPod.ObjectMeta),
 		PrevPod:     prevPod,
 		CurPod:      curPod,
-		EventType:   spec.PodEventUpdate,
+		EventType:   spec.EventUpdate,
 	}
 
 	c.podCh <- podEvent
@@ -103,7 +103,7 @@ func (c *Controller) podDelete(obj interface{}) {
 		ClusterName: c.PodClusterName(pod),
 		PodName:     util.NameFromMeta(pod.ObjectMeta),
 		CurPod:      pod,
-		EventType:   spec.PodEventDelete,
+		EventType:   spec.EventDelete,
 	}
 
 	c.podCh <- podEvent
@@ -114,7 +114,11 @@ func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}) {
 	for {
 		select {
 		case event := <-c.podCh:
-			if subscriber, ok := c.clusters[event.ClusterName]; ok {
+			c.clustersMu.RLock()
+			subscriber, ok := c.clusters[event.ClusterName]
+			c.clustersMu.RUnlock()
+
+			if ok {
 				c.logger.Debugf("Sending %s event of Pod '%s' to the '%s' cluster channel", event.EventType, event.PodName, event.ClusterName)
 				go subscriber.ReceivePodEvent(event)
 			}

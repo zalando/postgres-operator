@@ -11,12 +11,7 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 )
 
-var (
-	deleteOptions    = &v1.DeleteOptions{OrphanDependents: &orphanDependents}
-	orphanDependents = false
-)
-
-func (c *Cluster) LoadResources() error {
+func (c *Cluster) loadResources() error {
 	ns := c.Metadata.Namespace
 	listOptions := v1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
@@ -152,7 +147,7 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("There is no StatefulSet in the cluster")
 	}
 
-	err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(c.Statefulset.Name, deleteOptions)
+	err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(c.Statefulset.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
@@ -217,7 +212,7 @@ func (c *Cluster) deleteService() error {
 	if c.Service == nil {
 		return fmt.Errorf("There is no Service in the cluster")
 	}
-	err := c.KubeClient.Services(c.Service.Namespace).Delete(c.Service.Name, deleteOptions)
+	err := c.KubeClient.Services(c.Service.Namespace).Delete(c.Service.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
@@ -256,7 +251,7 @@ func (c *Cluster) deleteEndpoint() error {
 	if c.Endpoint == nil {
 		return fmt.Errorf("There is no Endpoint in the cluster")
 	}
-	err := c.KubeClient.Endpoints(c.Endpoint.Namespace).Delete(c.Endpoint.Name, deleteOptions)
+	err := c.KubeClient.Endpoints(c.Endpoint.Namespace).Delete(c.Endpoint.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
@@ -300,7 +295,7 @@ func (c *Cluster) applySecrets() error {
 
 func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 	c.logger.Debugf("Deleting Secret '%s'", util.NameFromMeta(secret.ObjectMeta))
-	err := c.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, deleteOptions)
+	err := c.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}

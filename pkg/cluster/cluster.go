@@ -39,7 +39,7 @@ type Config struct {
 	RestClient          *rest.RESTClient
 	EtcdClient          etcdclient.KeysAPI
 	TeamsAPIClient      *teams.TeamsAPI
-	OpConfig            *config.Config
+	OpConfig            config.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
 }
 
@@ -60,15 +60,18 @@ type Cluster struct {
 	pgUsers              map[string]spec.PgUser
 	podEvents            chan spec.PodEvent
 	podSubscribers       map[spec.NamespacedName]chan spec.PodEvent
+	podSubscribersMu     sync.RWMutex
 	pgDb                 *sql.DB
 	mu                   sync.Mutex
 	masterLess           bool
 	podDispatcherRunning bool
+	deleteOptions        *v1.DeleteOptions
 }
 
-func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
+func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret)}
+	orphanDependents := true
 
 	cluster := &Cluster{
 		Config:               cfg,
@@ -80,6 +83,7 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
 		kubeResources:        kubeResources,
 		masterLess:           false,
 		podDispatcherRunning: false,
+		deleteOptions:        &v1.DeleteOptions{OrphanDependents: &orphanDependents},
 	}
 
 	return cluster
@@ -89,12 +93,12 @@ func (c *Cluster) ClusterName() spec.NamespacedName {
 	return util.NameFromMeta(c.Metadata)
 }
 
-func (c *Cluster) TeamName() string {
+func (c *Cluster) teamName() string {
 	// TODO: check Teams API for the actual name (in case the user passes an integer Id).
 	return c.Spec.TeamId
 }
 
-func (c *Cluster) SetStatus(status spec.PostgresStatus) {
+func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	c.Status = status
 	b, err := json.Marshal(status)
 	if err != nil {
@@ -154,10 +158,24 @@ func (c *Cluster) etcdKeyExists(keyName string) (bool, error) {
 }
 
 func (c *Cluster) Create(stopCh <-chan struct{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var err error
+
 	if !c.podDispatcherRunning {
 		go c.podEventsDispatcher(stopCh)
 		c.podDispatcherRunning = true
 	}
+
+	defer func() {
+		if err == nil {
+			c.setStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
+		} else {
+			c.setStatus(spec.ClusterStatusAddFailed)
+		}
+	}()
+
+	c.setStatus(spec.ClusterStatusCreating)
 
 	keyExist, err := c.etcdKeyExists(fmt.Sprintf("/%s/%s", c.OpConfig.EtcdScope, c.Metadata.Name))
 	if err != nil {
@@ -180,38 +198,36 @@ func (c *Cluster) Create(stopCh <-chan struct{}) error {
 		c.logger.Infof("Service '%s' has been successfully created", util.NameFromMeta(service.ObjectMeta))
 	}
 
-	if err := c.initUsers(); err != nil {
+	if err = c.initUsers(); err != nil {
 		return err
-	} else {
-		c.logger.Infof("User secrets have been initialized")
 	}
+	c.logger.Infof("User secrets have been initialized")
 
-	if err := c.applySecrets(); err != nil {
+	if err = c.applySecrets(); err != nil {
 		return fmt.Errorf("Can't create Secrets: %s", err)
-	} else {
-		c.logger.Infof("Secrets have been successfully created")
 	}
+	c.logger.Infof("Secrets have been successfully created")
 
 	ss, err := c.createStatefulSet()
 	if err != nil {
 		return fmt.Errorf("Can't create StatefulSet: %s", err)
-	} else {
-		c.logger.Infof("StatefulSet '%s' has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 	}
+	c.logger.Infof("StatefulSet '%s' has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
 	c.logger.Info("Waiting for cluster being ready")
 
-	if err := c.waitStatefulsetPodsReady(); err != nil {
+	if err = c.waitStatefulsetPodsReady(); err != nil {
 		c.logger.Errorf("Failed to create cluster: %s", err)
 		return err
 	}
+	c.logger.Infof("Pods are ready")
 
 	if !c.masterLess {
-		if err := c.initDbConn(); err != nil {
+		if err = c.initDbConn(); err != nil {
 			return fmt.Errorf("Can't init db connection: %s", err)
 		}
 
-		if err := c.createUsers(); err != nil {
+		if err = c.createUsers(); err != nil {
 			return fmt.Errorf("Can't create users: %s", err)
 		} else {
 			c.logger.Infof("Users have been successfully created")
@@ -323,13 +339,18 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 }
 
 func (c *Cluster) Update(newSpec *spec.Postgresql) error {
-	c.logger.Infof("Cluster update from version %s to %s",
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.setStatus(spec.ClusterStatusUpdating)
+	c.logger.Debugf("Cluster update from version %s to %s",
 		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
 
 	newService := c.genService(newSpec.Spec.AllowedSourceRanges)
 	if match, reason := c.sameServiceWith(newService); !match {
 		c.logServiceChanges(c.Service, newService, true, reason)
 		if err := c.updateService(newService); err != nil {
+			c.setStatus(spec.ClusterStatusUpdateFailed)
 			return fmt.Errorf("Can't update Service: %s", err)
 		} else {
 			c.logger.Infof("Service '%s' has been updated", util.NameFromMeta(c.Service.ObjectMeta))
@@ -348,8 +369,10 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logStatefulSetChanges(c.Statefulset, newStatefulSet, true, reason)
 		//TODO: mind the case of updating allowedSourceRanges
 		if err := c.updateStatefulSet(newStatefulSet); err != nil {
+			c.setStatus(spec.ClusterStatusUpdateFailed)
 			return fmt.Errorf("Can't upate StatefulSet: %s", err)
 		}
+		//TODO: if there is a change in numberOfInstances, make sure Pods have been created/deleted
 		c.logger.Infof("StatefulSet '%s' has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	}
 
@@ -363,15 +386,20 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logger.Infof("Rolling update is needed")
 		// TODO: wait for actual streaming to the replica
 		if err := c.recreatePods(); err != nil {
+			c.setStatus(spec.ClusterStatusUpdateFailed)
 			return fmt.Errorf("Can't recreate Pods: %s", err)
 		}
 		c.logger.Infof("Rolling update has been finished")
 	}
+	c.setStatus(spec.ClusterStatusRunning)
 
 	return nil
 }
 
 func (c *Cluster) Delete() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if err := c.deleteEndpoint(); err != nil {
 		c.logger.Errorf("Can't delete Endpoint: %s", err)
 	}

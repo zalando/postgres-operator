@@ -72,7 +72,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 	}
 	for _, pvc := range pvcs {
 		c.logger.Debugf("Deleting PVC '%s'", util.NameFromMeta(pvc.ObjectMeta))
-		if err := c.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, deleteOptions); err != nil {
+		if err := c.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, c.deleteOptions); err != nil {
 			c.logger.Warningf("Can't delete PersistentVolumeClaim: %s", err)
 		}
 	}
@@ -86,17 +86,10 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 }
 
 func (c *Cluster) deletePod(podName spec.NamespacedName) error {
-	ch := make(chan spec.PodEvent)
-	if _, ok := c.podSubscribers[podName]; ok {
-		panic("Pod '" + podName.String() + "' is already subscribed")
-	}
-	c.podSubscribers[podName] = ch
-	defer func() {
-		close(ch)
-		delete(c.podSubscribers, podName)
-	}()
+	ch := c.registerPodSubscriber(podName)
+	defer c.unregisterPodSubscriber(podName)
 
-	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, c.deleteOptions); err != nil {
 		return err
 	}
 
@@ -108,6 +101,9 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 }
 
 func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
+	c.podSubscribersMu.Lock()
+	defer c.podSubscribersMu.Unlock()
+
 	if _, ok := c.podSubscribers[podName]; !ok {
 		panic("Subscriber for Pod '" + podName.String() + "' is not found")
 	}
@@ -117,26 +113,25 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 }
 
 func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.PodEvent {
+	c.podSubscribersMu.Lock()
+	defer c.podSubscribersMu.Unlock()
+
 	ch := make(chan spec.PodEvent)
 	if _, ok := c.podSubscribers[podName]; ok {
 		panic("Pod '" + podName.String() + "' is already subscribed")
 	}
 	c.podSubscribers[podName] = ch
+
 	return ch
 }
 
 func (c *Cluster) recreatePod(pod v1.Pod) error {
 	podName := util.NameFromMeta(pod.ObjectMeta)
 
-	orphanDependents := false
-	deleteOptions := &v1.DeleteOptions{
-		OrphanDependents: &orphanDependents,
-	}
-
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
-	if err := c.KubeClient.Pods(pod.Namespace).Delete(pod.Name, deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(pod.Namespace).Delete(pod.Name, c.deleteOptions); err != nil {
 		return fmt.Errorf("Can't delete Pod: %s", err)
 	}
 
@@ -156,10 +151,11 @@ func (c *Cluster) podEventsDispatcher(stopCh <-chan struct{}) {
 	for {
 		select {
 		case event := <-c.podEvents:
-			if subscriber, ok := c.podSubscribers[event.PodName]; ok {
+			c.podSubscribersMu.RLock()
+			subscriber, ok := c.podSubscribers[event.PodName]
+			c.podSubscribersMu.RUnlock()
+			if ok {
 				go func() { subscriber <- event }() //TODO: is it a right way to do nonblocking send to the channel?
-			} else {
-				c.logger.Debugf("Skipping event for an unwatched Pod '%s'", event.PodName)
 			}
 		case <-stopCh:
 			return
@@ -183,7 +179,7 @@ func (c *Cluster) recreatePods() error {
 
 	var masterPod v1.Pod
 	for _, pod := range pods.Items {
-		role := c.PodSpiloRole(&pod)
+		role := c.podSpiloRole(&pod)
 
 		if role == constants.PodRoleMaster {
 			masterPod = pod

@@ -110,7 +110,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
-			role := c.PodSpiloRole(podEvent.CurPod)
+			role := c.podSpiloRole(podEvent.CurPod)
 			// We cannot assume any role of the newly created pod. Normally, for a multi-pod cluster
 			// we should observe the 'replica' value, but it could be that some pods are not allowed
 			// to promote, therefore, the new pod could be a master as well.
@@ -127,7 +127,7 @@ func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
-			if podEvent.EventType == spec.PodEventDelete {
+			if podEvent.EventType == spec.EventDelete {
 				return nil
 			}
 		case <-time.After(c.OpConfig.PodDeletionWaitTimeout):
@@ -233,7 +233,7 @@ func (c *Cluster) dnsName() string {
 	return strings.ToLower(fmt.Sprintf(
 		c.OpConfig.DNSNameFormat,
 		c.Spec.ClusterName,
-		c.TeamName(),
+		c.teamName(),
 		c.OpConfig.DbHostedZone))
 }
 
@@ -266,6 +266,6 @@ func (c *Cluster) deleteEtcdKey() error {
 	return nil
 }
 
-func (c *Cluster) PodSpiloRole(pod *v1.Pod) string {
+func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
 	return pod.Labels[c.OpConfig.PodRoleLabel]
 }

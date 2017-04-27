@@ -53,6 +53,7 @@ type Config struct {
 	KubeIAMRole        string `name:"kube_iam_role"`
 	DebugLogging       bool   `name:"debug_logging" default:"false"`
 	DNSNameFormat      string `name:"dns_name_format" default:"%s.%s.%s"`
+	Workers            uint32 `name:"workers" default:"4"`
 }
 
 func (c Config) MustMarshal() string {
@@ -82,4 +83,15 @@ func NewFromMap(m map[string]string) *Config {
 	}
 
 	return &cfg
+}
+
+func Copy(c *Config) Config {
+	cfg := *c
+
+	cfg.ClusterLabels = make(map[string]string, len(c.ClusterLabels))
+	for k, v := range c.ClusterLabels {
+		cfg.ClusterLabels[k] = v
+	}
+
+	return cfg
 }

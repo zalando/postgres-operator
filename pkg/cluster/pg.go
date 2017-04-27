@@ -26,8 +26,6 @@ func (c *Cluster) pgConnectionString() string {
 func (c *Cluster) initDbConn() error {
 	//TODO: concurrent safe?
 	if c.pgDb == nil {
-		c.mu.Lock()
-		defer c.mu.Unlock()
 		if c.pgDb == nil {
 			conn, err := sql.Open("postgres", c.pgConnectionString())
 			if err != nil {

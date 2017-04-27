@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -28,14 +29,17 @@ type Controller struct {
 	Config
 	opConfig    *config.Config
 	logger      *logrus.Entry
-	clusters    map[spec.NamespacedName]*cluster.Cluster
-	stopChMap   map[spec.NamespacedName]chan struct{}
 	waitCluster sync.WaitGroup
+
+	clustersMu sync.RWMutex
+	clusters   map[spec.NamespacedName]*cluster.Cluster
+	stopChs    map[spec.NamespacedName]chan struct{}
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
+	podCh              chan spec.PodEvent
 
-	podCh chan spec.PodEvent
+	clusterEventQueues []*cache.FIFO
 }
 
 func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
@@ -47,12 +51,12 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 
 	controllerConfig.TeamsAPIClient = teams.NewTeamsAPI(operatorConfig.TeamsAPIUrl, logger)
 	return &Controller{
-		Config:    *controllerConfig,
-		opConfig:  operatorConfig,
-		logger:    logger.WithField("pkg", "controller"),
-		clusters:  make(map[spec.NamespacedName]*cluster.Cluster),
-		stopChMap: make(map[spec.NamespacedName]chan struct{}),
-		podCh:     make(chan spec.PodEvent),
+		Config:   *controllerConfig,
+		opConfig: operatorConfig,
+		logger:   logger.WithField("pkg", "controller"),
+		clusters: make(map[spec.NamespacedName]*cluster.Cluster),
+		stopChs:  make(map[spec.NamespacedName]chan struct{}),
+		podCh:    make(chan spec.PodEvent),
 	}
 }
 
@@ -63,6 +67,10 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 
 	go c.runInformers(stopCh)
+
+	for i := range c.clusterEventQueues {
+		go c.processClusterEventsQueue(i)
+	}
 
 	c.logger.Info("Started working in background")
 }
@@ -116,6 +124,18 @@ func (c *Controller) initController() {
 
 	if err := c.initEtcdClient(c.opConfig.EtcdHost); err != nil {
 		c.logger.Fatalf("Can't get etcd client: %s", err)
+	}
+
+	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
+	for i := range c.clusterEventQueues {
+		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
+			e, ok := obj.(spec.ClusterEvent)
+			if !ok {
+				return "", fmt.Errorf("Can't cast to ClusterEvent")
+			}
+
+			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil
+		})
 	}
 }
 

@@ -5,22 +5,31 @@ import (
 	"k8s.io/client-go/pkg/types"
 )
 
-type PodEventType string
+type EventType string
 
 type NamespacedName types.NamespacedName
 
 const (
-	PodEventAdd    PodEventType = "ADD"
-	PodEventUpdate PodEventType = "UPDATE"
-	PodEventDelete PodEventType = "DELETE"
+	EventAdd    EventType = "ADD"
+	EventUpdate EventType = "UPDATE"
+	EventDelete EventType = "DELETE"
+	EventSync   EventType = "SYNC"
 )
+
+type ClusterEvent struct {
+	UID       types.UID
+	EventType EventType
+	OldSpec   *Postgresql
+	NewSpec   *Postgresql
+	WorkerID  uint32
+}
 
 type PodEvent struct {
 	ClusterName NamespacedName
 	PodName     NamespacedName
 	PrevPod     *v1.Pod
 	CurPod      *v1.Pod
-	EventType   PodEventType
+	EventType   EventType
 }
 
 type PgUser struct {
@@ -31,7 +40,15 @@ type PgUser struct {
 }
 
 func (p NamespacedName) String() string {
+	if p.Namespace == "" && p.Name == "" {
+		return ""
+	}
+
 	return types.NamespacedName(p).String()
+}
+
+func (p NamespacedName) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + p.String() + "\""), nil
 }
 
 func (n *NamespacedName) Decode(value string) error {

@@ -28,3 +28,4 @@ data:
   resync_period_pod: 5m
   super_username: postgres
   teams_api_url: https://teams.example.com/api/
+  workers: "4"

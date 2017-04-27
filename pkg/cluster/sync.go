@@ -7,8 +7,14 @@ import (
 )
 
 func (c *Cluster) SyncCluster(stopCh <-chan struct{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.loadResources()
+
 	if !c.podDispatcherRunning {
 		go c.podEventsDispatcher(stopCh)
+		c.podDispatcherRunning = true
 	}
 
 	c.logger.Debugf("Syncing Secrets")
