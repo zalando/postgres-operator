@@ -96,8 +96,18 @@ func (c *Cluster) syncEndpoint() error {
 
 func (c *Cluster) syncStatefulSet() error {
 	cSpec := c.Spec
+	var rollUpdate bool
 	if c.Statefulset == nil {
 		c.logger.Infof("Can't find the cluster's StatefulSet")
+		pods, err := c.listPods()
+		if err != nil {
+			return fmt.Errorf("Can't list pods of the StatefulSet: %s", err)
+		}
+
+		if len(pods) > 0 {
+			c.logger.Infof("Found pods without the statefulset: trigger rolling update")
+			rollUpdate = true
+		}
 		ss, err := c.createStatefulSet()
 		if err != nil {
 			return fmt.Errorf("Can't create missing StatefulSet: %s", err)
@@ -107,23 +117,30 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("Cluster is not ready: %s", err)
 		}
 		c.logger.Infof("Created missing StatefulSet '%s'", util.NameFromMeta(ss.ObjectMeta))
-		return nil
+		if !rollUpdate {
+			return nil
+		}
 	}
-
-	desiredSS := c.genStatefulSet(cSpec)
-	match, rollUpdate, reason := c.compareStatefulSetWith(desiredSS)
-	if match {
-		return nil
-	}
-	c.logStatefulSetChanges(c.Statefulset, desiredSS, false, reason)
-
-	if err := c.updateStatefulSet(desiredSS); err != nil {
-		return fmt.Errorf("Can't update StatefulSet: %s", err)
-	}
-
 	if !rollUpdate {
-		c.logger.Debugln("No rolling update is needed")
-		return nil
+		var (
+			match  bool
+			reason string
+		)
+		desiredSS := c.genStatefulSet(cSpec)
+		match, rollUpdate, reason = c.compareStatefulSetWith(desiredSS)
+		if match {
+			return nil
+		}
+		c.logStatefulSetChanges(c.Statefulset, desiredSS, false, reason)
+
+		if err := c.updateStatefulSet(desiredSS); err != nil {
+			return fmt.Errorf("Can't update StatefulSet: %s", err)
+		}
+
+		if !rollUpdate {
+			c.logger.Debugln("No rolling update is needed")
+			return nil
+		}
 	}
 	c.logger.Debugln("Performing rolling update")
 	if err := c.recreatePods(); err != nil {
