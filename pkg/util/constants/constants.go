@@ -9,7 +9,7 @@ const (
 	DataVolumeName            = "pgdata"
 	PasswordLength            = 64
 	UserSecretTemplate        = "%s.%s.credentials.%s.%s" // Username, ClusterName, TPRName, TPRVendor
-	ZalandoDnsNameAnnotation  = "zalando.org/dnsname"
+	ZalandoDnsNameAnnotation  = "external-dns.alpha.kubernetes.io/hostname"
 	ElbTimeoutAnnotationName  = "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout"
 	ElbTimeoutAnnotationValue = "3600"
 	KubeIAmAnnotation         = "iam.amazonaws.com/role"
