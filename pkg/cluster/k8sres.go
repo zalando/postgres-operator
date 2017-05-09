@@ -228,30 +228,46 @@ func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) *v1.Pe
 	return volumeClaim
 }
 
-func (c *Cluster) genUserSecrets() (secrets map[string]*v1.Secret, err error) {
+func (c *Cluster) genUserSecrets() (secrets map[string]*v1.Secret) {
 	secrets = make(map[string]*v1.Secret, len(c.pgUsers))
 	namespace := c.Metadata.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		if pgUser.Password == "" {
-			continue
+		secret := c.genSingleUserSecret(namespace, pgUser)
+		if secret != nil {
+			secrets[username] = secret
 		}
-		secret := v1.Secret{
-			ObjectMeta: v1.ObjectMeta{
-				Name:      c.credentialSecretName(username),
-				Namespace: namespace,
-				Labels:    c.labelsSet(),
-			},
-			Type: v1.SecretTypeOpaque,
-			Data: map[string][]byte{
-				"username": []byte(pgUser.Name),
-				"password": []byte(pgUser.Password),
-			},
+	}
+	/* special case for the system user */
+	for _, systemUser := range c.systemUsers {
+		secret := c.genSingleUserSecret(namespace, systemUser)
+		if secret != nil {
+			secrets[systemUser.Name] = secret
 		}
-		secrets[username] = &secret
 	}
 
 	return
+}
+
+func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
+	//Skip users with no password i.e. human users (they'll be authenticated using pam)
+	if pgUser.Password == "" {
+		return nil
+	}
+	username := pgUser.Name
+	secret := v1.Secret{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      c.credentialSecretName(username),
+			Namespace: namespace,
+			Labels:    c.labelsSet(),
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"username": []byte(pgUser.Name),
+			"password": []byte(pgUser.Password),
+		},
+	}
+	return &secret
 }
 
 func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {

@@ -26,6 +26,7 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/users"
 )
 
 var (
@@ -58,6 +59,7 @@ type Cluster struct {
 	Config
 	logger               *logrus.Entry
 	pgUsers              map[string]spec.PgUser
+	systemUsers          map[string]spec.PgUser
 	podEvents            chan spec.PodEvent
 	podSubscribers       map[spec.NamespacedName]chan spec.PodEvent
 	podSubscribersMu     sync.RWMutex
@@ -65,6 +67,7 @@ type Cluster struct {
 	mu                   sync.Mutex
 	masterLess           bool
 	podDispatcherRunning bool
+	userSyncStrategy     spec.UserSyncer
 	deleteOptions        *v1.DeleteOptions
 }
 
@@ -78,11 +81,13 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 		Postgresql:           pgSpec,
 		logger:               lg,
 		pgUsers:              make(map[string]spec.PgUser),
+		systemUsers:          make(map[string]spec.PgUser),
 		podEvents:            make(chan spec.PodEvent),
 		podSubscribers:       make(map[spec.NamespacedName]chan spec.PodEvent),
 		kubeResources:        kubeResources,
 		masterLess:           false,
 		podDispatcherRunning: false,
+		userSyncStrategy:     users.DefaultUserSyncStrategy{},
 		deleteOptions:        &v1.DeleteOptions{OrphanDependents: &orphanDependents},
 	}
 
@@ -426,12 +431,15 @@ func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
 }
 
 func (c *Cluster) initSystemUsers() {
-	c.pgUsers[c.OpConfig.SuperUsername] = spec.PgUser{
+	// We don't actually use that to create users, delegating this
+	// task to Patroni. Those definitions are only used to create
+	// secrets, therefore, setting flags like SUPERUSER or REPLICATION
+	// is not necessary here
+	c.systemUsers[constants.SuperuserKeyName] = spec.PgUser{
 		Name:     c.OpConfig.SuperUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
-
-	c.pgUsers[c.OpConfig.ReplicationUsername] = spec.PgUser{
+	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
 		Name:     c.OpConfig.ReplicationUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
@@ -464,7 +472,9 @@ func (c *Cluster) initHumanUsers() error {
 		return fmt.Errorf("Can't get list of team members: %s", err)
 	} else {
 		for _, username := range teamMembers {
-			c.pgUsers[username] = spec.PgUser{Name: username}
+			flags := []string{constants.RoleFlagLogin, constants.RoleFlagSuperuser}
+			memberOf := []string{c.OpConfig.PamRoleName}
+			c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
 		}
 	}
 
@@ -476,6 +486,11 @@ func (c *Cluster) initInfrastructureRoles() error {
 	for username, data := range c.InfrastructureRoles {
 		if !isValidUsername(username) {
 			return fmt.Errorf("Invalid username: '%s'", username)
+		}
+		if flags, err := normalizeUserFlags(data.Flags); err != nil {
+			return fmt.Errorf("Invalid flags for user '%s': %s", username, err)
+		} else {
+			data.Flags = flags
 		}
 		c.pgUsers[username] = data
 	}

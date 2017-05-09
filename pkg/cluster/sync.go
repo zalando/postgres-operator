@@ -36,6 +36,14 @@ func (c *Cluster) SyncCluster(stopCh <-chan struct{}) {
 	if err := c.syncStatefulSet(); err != nil {
 		c.logger.Errorf("Can't sync StatefulSets: %s", err)
 	}
+	if err := c.initDbConn(); err != nil {
+		c.logger.Errorf("Can't init db connection: %s", err)
+	} else {
+		c.logger.Debugf("Syncing Roles")
+		if err := c.SyncRoles(); err != nil {
+			c.logger.Errorf("Can't sync Roles: %s", err)
+		}
+	}
 }
 
 func (c *Cluster) syncSecrets() error {
@@ -148,5 +156,25 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 	c.logger.Infof("Pods have been recreated")
 
+	return nil
+}
+
+func (c *Cluster) SyncRoles() error {
+	var userNames []string
+
+	if err := c.initUsers(); err != nil {
+		return err
+	}
+	for _, u := range c.pgUsers {
+		userNames = append(userNames, u.Name)
+	}
+	dbUsers, err := c.readPgUsersFromDatabase(userNames)
+	if err != nil {
+		return fmt.Errorf("Error getting users from the database: %s", err)
+	}
+	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)
+	if err := c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
+		return fmt.Errorf("Error executing sync statements: %s", err)
+	}
 	return nil
 }

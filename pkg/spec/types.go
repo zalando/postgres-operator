@@ -1,6 +1,8 @@
 package spec
 
 import (
+	"database/sql"
+
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
 )
@@ -24,6 +26,13 @@ type ClusterEvent struct {
 	WorkerID  uint32
 }
 
+type SyncUserOperation int
+
+const (
+	PGSyncUserAdd = iota
+	PGsyncUserAlter
+)
+
 type PodEvent struct {
 	ClusterName NamespacedName
 	PodName     NamespacedName
@@ -36,7 +45,19 @@ type PgUser struct {
 	Name     string
 	Password string
 	Flags    []string
-	MemberOf string
+	MemberOf []string
+}
+
+type PgUserMap map[string]PgUser
+
+type PgSyncUserRequest struct {
+	Kind SyncUserOperation
+	User PgUser
+}
+
+type UserSyncer interface {
+	ProduceSyncRequests(dbUsers PgUserMap, newUsers PgUserMap) (req []PgSyncUserRequest)
+	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
 }
 
 func (p NamespacedName) String() string {

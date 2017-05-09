@@ -24,6 +24,7 @@ func isValidUsername(username string) bool {
 
 func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 	uniqueFlags := make(map[string]bool)
+	addLogin := true
 
 	for _, flag := range userFlags {
 		if !alphaNumericRegexp.MatchString(flag) {
@@ -36,10 +37,24 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 			}
 		}
 	}
+	if uniqueFlags[constants.RoleFlagLogin] && uniqueFlags[constants.RoleFlagNoLogin] {
+		return nil, fmt.Errorf("Conflicting or redundant flags: LOGIN and NOLOGIN")
+	}
 
 	flags = []string{}
 	for k := range uniqueFlags {
+		if k == constants.RoleFlagNoLogin || k == constants.RoleFlagLogin {
+			addLogin = false
+			if k == constants.RoleFlagNoLogin {
+				// we don't add NOLOGIN to the list of flags to be consistent with what we get
+				// from the readPgUsersFromDatabase in SyncUsers
+				continue
+			}
+		}
 		flags = append(flags, k)
+	}
+	if addLogin {
+		flags = append(flags, constants.RoleFlagLogin)
 	}
 
 	return

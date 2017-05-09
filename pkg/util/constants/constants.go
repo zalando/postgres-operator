@@ -16,4 +16,12 @@ const (
 	ResourceName              = TPRName + "s"
 	PodRoleMaster             = "master"
 	PodRoleReplica            = "replica"
+	SuperuserKeyName          = "superuser"
+	ReplicationUserKeyName    = "replication"
+	RoleFlagSuperuser         = "SUPERUSER"
+	RoleFlagInherit           = "INHERIT"
+	RoleFlagLogin             = "LOGIN"
+	RoleFlagNoLogin           = "NOLOGIN"
+	RoleFlagCreateRole        = "CREATEROLE"
+	RoleFlagCreateDB          = "CREATEDB"
 )

@@ -8,18 +8,28 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
+	"github.com/lib/pq"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
-var createUserSQL = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s %s;`
+var getUserSQL = `SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.rolinherit,
+	        a.rolcreaterole, a.rolcreatedb, a.rolcanlogin,
+	        ARRAY(SELECT b.rolname
+	              FROM pg_catalog.pg_auth_members m
+	              JOIN pg_catalog.pg_authid b ON (m.roleid = b.oid)
+	             WHERE m.member = a.oid) as memberof
+	 FROM pg_catalog.pg_authid a
+	 WHERE a.rolname = ANY($1)
+	 ORDER BY 1;`
 
 func (c *Cluster) pgConnectionString() string {
 	hostname := fmt.Sprintf("%s.%s.svc.cluster.local", c.Metadata.Name, c.Metadata.Namespace)
-	password := c.pgUsers[c.OpConfig.SuperUsername].Password
+	username := c.systemUsers[constants.SuperuserKeyName].Name
+	password := c.systemUsers[constants.SuperuserKeyName].Password
 
 	return fmt.Sprintf("host='%s' dbname=postgres sslmode=require user='%s' password='%s'",
 		hostname,
-		c.OpConfig.SuperUsername,
+		username,
 		strings.Replace(password, "$", "\\$", -1))
 }
 
@@ -33,6 +43,7 @@ func (c *Cluster) initDbConn() error {
 			}
 			err = conn.Ping()
 			if err != nil {
+				conn.Close()
 				return err
 			}
 
@@ -43,42 +54,48 @@ func (c *Cluster) initDbConn() error {
 	return nil
 }
 
-func (c *Cluster) createPgUser(user spec.PgUser) (isHuman bool, err error) {
-	var flags []string = user.Flags
-
-	if user.Password == "" {
-		isHuman = true
-		flags = append(flags, "SUPERUSER")
-		flags = append(flags, fmt.Sprintf("IN ROLE \"%s\"", c.OpConfig.PamRoleName))
-	} else {
-		isHuman = false
+func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUserMap, err error) {
+	var rows *sql.Rows
+	users = make(spec.PgUserMap)
+	if rows, err = c.pgDb.Query(getUserSQL, pq.Array(userNames)); err != nil {
+		return nil, fmt.Errorf("Error when querying users: %s", err)
 	}
-
-	addLoginFlag := true
-	for _, v := range flags {
-		if v == "NOLOGIN" {
-			addLoginFlag = false
-			break
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			rolname, rolpassword                                          string
+			rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool
+			memberof                                                      []string
+		)
+		err := rows.Scan(&rolname, &rolpassword, &rolsuper, &rolinherit,
+			&rolcreaterole, &rolcreatedb, &rolcanlogin, pq.Array(&memberof))
+		if err != nil {
+			return nil, fmt.Errorf("Error when processing user rows: %s", err)
 		}
-	}
-	if addLoginFlag {
-		flags = append(flags, "LOGIN")
-	}
-	if !isHuman && user.MemberOf != "" {
-		flags = append(flags, fmt.Sprintf("IN ROLE \"%s\"", user.MemberOf))
-	}
-	userFlags := strings.Join(flags, " ")
-	userPassword := fmt.Sprintf("ENCRYPTED PASSWORD '%s'", util.PGUserPassword(user))
-	if user.Password == "" {
-		userPassword = "PASSWORD NULL"
-	}
-	query := fmt.Sprintf(createUserSQL, user.Name, userFlags, userPassword)
-
-	_, err = c.pgDb.Query(query) // TODO: Try several times
-	if err != nil {
-		err = fmt.Errorf("DB error: %s", err)
-		return
+		flags := makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin)
+		// XXX: the code assumes the password we get from pg_authid is always MD5
+		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof}
 	}
 
-	return
+	return users, nil
+}
+
+func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool) (result []string) {
+	if rolsuper {
+		result = append(result, constants.RoleFlagSuperuser)
+	}
+	if rolinherit {
+		result = append(result, constants.RoleFlagInherit)
+	}
+	if rolcreaterole {
+		result = append(result, constants.RoleFlagCreateRole)
+	}
+	if rolcreatedb {
+		result = append(result, constants.RoleFlagCreateDB)
+	}
+	if rolcanlogin {
+		result = append(result, constants.RoleFlagLogin)
+	}
+
+	return result
 }

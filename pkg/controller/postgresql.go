@@ -159,7 +159,7 @@ func (c *Controller) processClusterEventsQueue(idx int) {
 
 func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
 	var (
-		uid types.UID
+		uid         types.UID
 		clusterName spec.NamespacedName
 	)
 

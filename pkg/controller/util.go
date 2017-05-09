@@ -122,7 +122,7 @@ Users:
 				case "password":
 					t.Password = s
 				case "inrole":
-					t.MemberOf = s
+					t.MemberOf = append(t.MemberOf, s)
 				default:
 					c.logger.Warnf("Unknown key %s", p)
 				}

@@ -6,9 +6,11 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-
+	
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 
 func (c *Cluster) loadResources() error {
@@ -183,7 +185,7 @@ func (c *Cluster) createService() (*v1.Service, error) {
 	return service, nil
 }
 
-func (c *Cluster) updateService(newService *v1.Service) error {
+func (c *Cluster) 	updateService(newService *v1.Service) error {
 	if c.Service == nil {
 		return fmt.Errorf("There is no Service in the cluster")
 	}
@@ -262,23 +264,29 @@ func (c *Cluster) deleteEndpoint() error {
 }
 
 func (c *Cluster) applySecrets() error {
-	secrets, err := c.genUserSecrets()
-
-	if err != nil {
-		return fmt.Errorf("Can't get user Secrets")
-	}
+	secrets := c.genUserSecrets()
 
 	for secretUsername, secretSpec := range secrets {
 		secret, err := c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
 		if k8sutil.ResourceAlreadyExists(err) {
+			var userMap map[string]spec.PgUser
 			curSecret, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
 			if err != nil {
 				return fmt.Errorf("Can't get current Secret: %s", err)
 			}
 			c.logger.Debugf("Secret '%s' already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
-			pwdUser := c.pgUsers[secretUsername]
+			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
+				secretUsername = constants.SuperuserKeyName
+				userMap = c.systemUsers
+			} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name  {
+				secretUsername = constants.ReplicationUserKeyName
+				userMap = c.systemUsers
+			} else {
+				userMap = c.pgUsers
+			}
+			pwdUser := userMap[secretUsername]
 			pwdUser.Password = string(curSecret.Data["password"])
-			c.pgUsers[secretUsername] = pwdUser
+			userMap[secretUsername] = pwdUser
 
 			continue
 		} else {
@@ -305,23 +313,12 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 	return err
 }
 
-func (c *Cluster) createUsers() error {
+func (c *Cluster) createUsers() (err error) {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
-	for username, user := range c.pgUsers {
-		if username == c.OpConfig.SuperUsername || username == c.OpConfig.ReplicationUsername {
-			continue
-		}
-
-		isHuman, err := c.createPgUser(user)
-		var userType string
-		if isHuman {
-			userType = "human"
-		} else {
-			userType = "robot"
-		}
-		if err != nil {
-			c.logger.Warnf("Can't create %s user '%s': %s", userType, username, err)
-		}
+	reqs := c.userSyncStrategy.ProduceSyncRequests(nil, c.pgUsers)
+	err = c.userSyncStrategy.ExecuteSyncRequests(reqs, c.pgDb)
+	if err != nil {
+		return err
 	}
 
 	return nil
