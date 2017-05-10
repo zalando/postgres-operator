@@ -1,6 +1,9 @@
 package k8sutil
 
 import (
+	"fmt"
+	"time"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	apierrors "k8s.io/client-go/pkg/api/errors"
@@ -12,6 +15,7 @@ import (
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/retryutil"
 )
 
 func RestConfig(kubeConfig string, outOfCluster bool) (*rest.Config, error) {
@@ -34,17 +38,17 @@ func ResourceNotFound(err error) bool {
 }
 
 func KubernetesRestClient(c *rest.Config) (*rest.RESTClient, error) {
-	c.APIPath = "/apis"
-	c.GroupVersion = &unversioned.GroupVersion{
-		Group:   constants.TPRVendor,
-		Version: constants.TPRApiVersion,
-	}
+	c.GroupVersion = &unversioned.GroupVersion{Version: constants.K8sVersion}
+	c.APIPath = constants.K8sApiPath
 	c.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	schemeBuilder := runtime.NewSchemeBuilder(
 		func(scheme *runtime.Scheme) error {
 			scheme.AddKnownTypes(
-				*c.GroupVersion,
+				unversioned.GroupVersion{
+					Group:   constants.TPRVendor,
+					Version: constants.TPRApiVersion,
+				},
 				&spec.Postgresql{},
 				&spec.PostgresqlList{},
 				&api.ListOptions{},
@@ -55,4 +59,17 @@ func KubernetesRestClient(c *rest.Config) (*rest.RESTClient, error) {
 	schemeBuilder.AddToScheme(api.Scheme)
 
 	return rest.RESTClientFor(c)
+}
+
+func WaitTPRReady(restclient rest.Interface, interval, timeout time.Duration, ns string) error {
+	return retryutil.Retry(interval, timeout, func() (bool, error) {
+		_, err := restclient.Get().RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, ns)).DoRaw()
+		if err != nil {
+			if ResourceNotFound(err) { // not set up yet. wait more.
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
 }

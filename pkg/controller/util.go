@@ -81,9 +81,7 @@ func (c *Controller) createTPR() error {
 		c.logger.Infof("ThirdPartyResource '%s' has been registered", TPRName)
 	}
 
-	restClient := c.RestClient
-
-	return k8sutil.WaitTPRReady(restClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.opConfig.Namespace)
+	return k8sutil.WaitTPRReady(c.RestClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.opConfig.Namespace)
 }
 
 func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, err error) {

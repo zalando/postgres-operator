@@ -50,6 +50,9 @@ func ControllerConfig() *controller.Config {
 	}
 
 	restClient, err := k8sutil.KubernetesRestClient(restConfig)
+	if err != nil {
+		log.Fatalf("Can't create rest client: %s", err)
+	}
 
 	return &controller.Config{
 		KubeClient: client,

@@ -6,6 +6,10 @@ const (
 	TPRVendor                 = "acid.zalan.do"
 	TPRDescription            = "Managed PostgreSQL clusters"
 	TPRApiVersion             = "v1"
+	ListClustersURITemplate   = "/apis/" + TPRVendor + "/" + TPRApiVersion + "/namespaces/%s/" + ResourceName       // Namespace
+	WatchClustersURITemplate  = "/apis/" + TPRVendor + "/" + TPRApiVersion + "/watch/namespaces/%s/" + ResourceName // Namespace
+	K8sVersion                = "v1"
+	K8sApiPath                = "/api"
 	DataVolumeName            = "pgdata"
 	PasswordLength            = 64
 	UserSecretTemplate        = "%s.%s.credentials.%s.%s" // Username, ClusterName, TPRName, TPRVendor

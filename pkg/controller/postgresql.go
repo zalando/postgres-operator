@@ -20,13 +20,13 @@ import (
 
 func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
 	c.logger.Info("Getting list of currently running clusters")
-	object, err := c.RestClient.Get().
-		Namespace(c.opConfig.Namespace).
-		Resource(constants.ResourceName).
+
+	req := c.RestClient.Get().
+		RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, c.opConfig.Namespace)).
 		VersionedParams(&options, api.ParameterCodec).
-		FieldsSelectorParam(fields.Everything()).
-		Do().
-		Get()
+		FieldsSelectorParam(fields.Everything())
+
+	object, err := req.Do().Get()
 
 	if err != nil {
 		return nil, fmt.Errorf("Can't get list of postgresql objects: %s", err)
@@ -53,6 +53,15 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 	}
 
 	return object, err
+}
+
+func (c *Controller) clusterWatchFunc(options api.ListOptions) (watch.Interface, error) {
+	req := c.RestClient.Get().
+		RequestURI(fmt.Sprintf(constants.WatchClustersURITemplate, c.opConfig.Namespace)).
+		VersionedParams(&options, api.ParameterCodec).
+		FieldsSelectorParam(fields.Everything())
+
+	return req.Watch()
 }
 
 func (c *Controller) processEvent(obj interface{}) error {
@@ -182,16 +191,6 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 
 	c.clusterEventQueues[workerId].Add(clusterEvent)
 	c.logger.WithField("worker", workerId).Infof("%s of the '%s' cluster has been queued for", eventType, clusterName)
-}
-
-func (c *Controller) clusterWatchFunc(options api.ListOptions) (watch.Interface, error) {
-	return c.RestClient.Get().
-		Prefix("watch").
-		Namespace(c.opConfig.Namespace).
-		Resource(constants.ResourceName).
-		VersionedParams(&options, api.ParameterCodec).
-		FieldsSelectorParam(fields.Everything()).
-		Watch()
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
