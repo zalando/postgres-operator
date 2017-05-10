@@ -6,11 +6,11 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
 )
 
 func (c *Cluster) loadResources() error {
@@ -185,7 +185,7 @@ func (c *Cluster) createService() (*v1.Service, error) {
 	return service, nil
 }
 
-func (c *Cluster) 	updateService(newService *v1.Service) error {
+func (c *Cluster) updateService(newService *v1.Service) error {
 	if c.Service == nil {
 		return fmt.Errorf("There is no Service in the cluster")
 	}
@@ -278,7 +278,7 @@ func (c *Cluster) applySecrets() error {
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
 				userMap = c.systemUsers
-			} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name  {
+			} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
 				secretUsername = constants.ReplicationUserKeyName
 				userMap = c.systemUsers
 			} else {

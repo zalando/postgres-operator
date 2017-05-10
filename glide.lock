@@ -85,7 +85,7 @@ imports:
 - name: github.com/kr/text
   version: 7cafcd837844e784b526369c9bce262804aebc60
 - name: github.com/lib/pq
-  version: 2704adc878c21e1329f46f6e56a1c387d788ff94
+  version: 0477eb88c5ca4009cb281f13c90633375b6a9987
   subpackages:
   - oid
 - name: github.com/mailru/easyjson

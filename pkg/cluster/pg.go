@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.com/lib/pq"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
 

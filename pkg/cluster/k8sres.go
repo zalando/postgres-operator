@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"encoding/json"
 
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
@@ -11,6 +12,36 @@ import (
 	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
 	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
 )
+
+const (
+	PGBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
+	PatroniPGBinariesParameterName   = "pg_bin"
+	PatroniPGParametersParameterName = "parameters"
+)
+
+type pgUser struct {
+	Password string   `json:"password"`
+	Options  []string `json:"options"`
+}
+
+type PatroniDCS struct {
+	TTL                  uint32  `json:"ttl,omitempty"`
+	LoopWait             uint32  `json:"loop_wait,omitempty"`
+	RetryTimeout         uint32  `json:"retry_timeout,omitempty"`
+	MaximumLagOnFailover float32 `json:"maximum_lag_on_failover,omitempty"`
+}
+
+type pgBootstrap struct {
+	Initdb []interface{}     `json:"initdb"`
+	Users  map[string]pgUser `json:"users"`
+	PgHBA  []string          `json:"pg_hba"`
+	DCS    PatroniDCS        `json:"dcs,omitempty"`
+}
+
+type spiloConfiguration struct {
+	PgLocalConfiguration map[string]interface{} `json:"postgresql"`
+	Bootstrap            pgBootstrap            `json:"bootstrap"`
+}
 
 func (c *Cluster) resourceRequirements(resources spec.Resources) *v1.ResourceRequirements {
 	specRequests := resources.ResourceRequest
@@ -37,7 +68,6 @@ func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescr
 	} else {
 		requests[v1.ResourceCPU] = resource.MustParse(defaults.Cpu)
 	}
-
 	if spec.Memory != "" {
 		requests[v1.ResourceMemory] = resource.MustParse(spec.Memory)
 	} else {
@@ -46,7 +76,103 @@ func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescr
 	return requests
 }
 
-func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, pgVersion string) *v1.PodTemplateSpec {
+func (c *Cluster) generateSpiloJSONConfiguration(pg *spec.PostgresqlParam, patroni *spec.Patroni) string {
+	config := spiloConfiguration{}
+
+	config.Bootstrap = pgBootstrap{}
+
+	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "md5"},
+		map[string]string{"auth-local": "trust"}}
+
+	// Initdb parameters in the manifest take priority over the default ones
+	// The whole type switch dance is caused by the ability to specify both
+	// maps and normal string items in the array of initdb options. We need
+	// both to convert the initial key-value to strings when necessary, and
+	// to de-duplicate the options supplied.
+PATRONI_INITDB_PARAMS:
+	for k, v := range patroni.InitDB {
+		for i, defaultParam := range config.Bootstrap.Initdb {
+			switch defaultParam.(type) {
+			case map[string]string:
+				{
+					for k1 := range defaultParam.(map[string]string) {
+						if k1 == k {
+							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
+							continue PATRONI_INITDB_PARAMS
+						}
+					}
+				}
+			case string:
+				{
+					if k == v {
+						continue PATRONI_INITDB_PARAMS
+					}
+				}
+			default:
+				c.logger.Warnf("Unsupported type for initdb configuration item %s: %T", defaultParam)
+				continue PATRONI_INITDB_PARAMS
+			}
+		}
+		// The following options are known to have no parameters
+		if v == "true" {
+			switch k {
+			case "data-checksums", "debug", "no-locale", "noclean", "nosync", "sync-only":
+				config.Bootstrap.Initdb = append(config.Bootstrap.Initdb, k)
+				continue
+			}
+		}
+		config.Bootstrap.Initdb = append(config.Bootstrap.Initdb, map[string]string{k: v})
+	}
+
+	// pg_hba parameters in the manifest replace the default ones. We cannot
+	// reasonably merge them automatically, because pg_hba parsing stops on
+	// a first successfully matched rule.
+	if len(patroni.PgHba) > 0 {
+		config.Bootstrap.PgHBA = patroni.PgHba
+	} else {
+		config.Bootstrap.PgHBA = []string{
+			"hostnossl all all all reject",
+			fmt.Sprintf("hostssl   all +%s all pam", c.OpConfig.PamRoleName),
+			"hostssl   all all all md5",
+		}
+	}
+
+	if patroni.MaximumLagOnFailover >= 0 {
+		config.Bootstrap.DCS.MaximumLagOnFailover = patroni.MaximumLagOnFailover
+	}
+	if patroni.LoopWait != 0 {
+		config.Bootstrap.DCS.LoopWait = patroni.LoopWait
+	}
+	if patroni.RetryTimeout != 0 {
+		config.Bootstrap.DCS.RetryTimeout = patroni.RetryTimeout
+	}
+	if patroni.TTL != 0 {
+		config.Bootstrap.DCS.TTL = patroni.TTL
+	}
+
+	config.PgLocalConfiguration = make(map[string]interface{})
+	config.PgLocalConfiguration[PatroniPGBinariesParameterName] = fmt.Sprintf(PGBinariesLocationTemplate, pg.PgVersion)
+	if len(pg.Parameters) > 0 {
+		config.PgLocalConfiguration[PatroniPGParametersParameterName] = pg.Parameters
+	}
+	config.Bootstrap.Users = map[string]pgUser{
+		c.OpConfig.PamRoleName: {
+			Password: "",
+			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
+		},
+	}
+	result, err := json.Marshal(config)
+	if err != nil {
+		c.logger.Errorf("Cannot convert spilo configuration into JSON: %s", err)
+		return ""
+	}
+	return string(result)
+}
+
+func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, pgParameters *spec.PostgresqlParam, patroniParameters *spec.Patroni) *v1.PodTemplateSpec {
+
+	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
+
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -104,26 +230,9 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 			Name:  "PAM_OAUTH2",
 			Value: c.OpConfig.PamConfiguration,
 		},
-		{
-			Name: "SPILO_CONFIGURATION",
-			Value: fmt.Sprintf(`
-postgresql:
-  bin_dir: /usr/lib/postgresql/%s/bin
-bootstrap:
-  initdb:
-  - auth-host: md5
-  - auth-local: trust
-  users:
-    %s:
-      password: NULL
-      options:
-        - createdb
-        - nologin
-  pg_hba:
-  - hostnossl all all all reject
-  - hostssl   all +%s all pam
-  - hostssl   all all all md5`, pgVersion, c.OpConfig.PamRoleName, c.OpConfig.PamRoleName),
-		},
+	}
+	if spiloConfiguration != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "SPILO_CONFIGURATION", Value: spiloConfiguration})
 	}
 	if c.OpConfig.WALES3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
@@ -183,7 +292,7 @@ bootstrap:
 
 func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) *v1beta1.StatefulSet {
 	resourceRequirements := c.resourceRequirements(spec.Resources)
-	podTemplate := c.genPodTemplate(resourceRequirements, spec.PgVersion)
+	podTemplate := c.genPodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni)
 	volumeClaimTemplate := persistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 
 	statefulSet := &v1beta1.StatefulSet{
