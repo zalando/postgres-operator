@@ -12,7 +12,7 @@ const (
 	K8sApiPath                = "/api"
 	DataVolumeName            = "pgdata"
 	PasswordLength            = 64
-	UserSecretTemplate        = "%s.%s.credentials.%s.%s" // Username, ClusterName, TPRName, TPRVendor
+	UserSecretTemplate        = "%s.%s.credentials." + TPRName + "." + TPRVendor // Username, ClusterName
 	ZalandoDnsNameAnnotation  = "external-dns.alpha.kubernetes.io/hostname"
 	ElbTimeoutAnnotationName  = "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout"
 	ElbTimeoutAnnotationValue = "3600"

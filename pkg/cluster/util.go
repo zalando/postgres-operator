@@ -257,9 +257,7 @@ func (c *Cluster) credentialSecretName(username string) string {
 	// and must start and end with an alphanumeric character
 	return fmt.Sprintf(constants.UserSecretTemplate,
 		strings.Replace(username, "_", "-", -1),
-		c.Metadata.Name,
-		constants.TPRName,
-		constants.TPRVendor)
+		c.Metadata.Name)
 }
 
 func (c *Cluster) deleteEtcdKey() error {
