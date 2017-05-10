@@ -66,4 +66,4 @@ vet:
 	@staticcheck $(PKG)
 
 deps:
-	@glide update
+	@glide install --strip-vendor
