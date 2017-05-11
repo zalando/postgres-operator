@@ -25,7 +25,7 @@ type Team struct {
 	Id           string   `json:"id"`
 	TeamName     string   `json:"id_name"`
 	TeamId       string   `json:"team_id"`
-	Type         string   `json:"official"`
+	Type         string   `json:"type"`
 	FullName     string   `json:"name"`
 	Aliases      []string `json:"alias"`
 	Mails        []string `json:"mail"`
