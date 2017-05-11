@@ -55,6 +55,7 @@ func ControllerConfig() *controller.Config {
 	}
 
 	return &controller.Config{
+		RestConfig: restConfig,
 		KubeClient: client,
 		RestClient: restClient,
 	}

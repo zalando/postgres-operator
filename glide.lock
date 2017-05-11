@@ -1,5 +1,5 @@
-hash: 5f99f20e4693c230cd709102e4bba350f87205bda86b2c6148ac79da05d7ae47
-updated: 2017-05-10T11:51:19.667157509+02:00
+hash: b2ea8a2133857a3860d2a63eec76a9eed71565f69723848ee17b77aacc49905b
+updated: 2017-05-10T14:44:44.907924292+02:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -85,7 +85,7 @@ imports:
 - name: github.com/kr/text
   version: 7cafcd837844e784b526369c9bce262804aebc60
 - name: github.com/lib/pq
-  version: 0477eb88c5ca4009cb281f13c90633375b6a9987
+  version: 2704adc878c21e1329f46f6e56a1c387d788ff94
   subpackages:
   - oid
 - name: github.com/mailru/easyjson

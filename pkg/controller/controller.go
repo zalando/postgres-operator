@@ -18,6 +18,7 @@ import (
 )
 
 type Config struct {
+	RestConfig          *rest.Config
 	KubeClient          *kubernetes.Clientset
 	RestClient          *rest.RESTClient
 	EtcdClient          etcdclient.KeysAPI

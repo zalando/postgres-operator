@@ -16,6 +16,7 @@ import:
 - package: k8s.io/apimachinery
   subpackages:
   - pkg/util/json
+  - pkg/util/remotecommand
 - package: k8s.io/client-go
   version: ^2.0.0
 - package: k8s.io/kubernetes
