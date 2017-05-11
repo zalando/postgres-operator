@@ -1,12 +1,13 @@
 .PHONY: clean local linux macos docker push scm-source.json
 
+BINARY ?= postgres-operator
+BUILD_FLAGS ?= -v -i
 ifeq ($(RACE),1)
-	GOFLAGS=-race
+	BUILD_FLAGS += -race -a
+    CGO_ENABLED=1
 endif
 
-BINARY ?= postgres-operator
-BUILD_FLAGS ?= -v
-LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS) -i
+LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
 LDFLAGS ?= -X=main.version=$(VERSION)
 DOCKERFILE = docker/Dockerfile
 IMAGE ?= pierone.example.com/acid/$(BINARY)
@@ -33,13 +34,13 @@ linux: build/linux/${BINARY}
 macos: build/macos/${BINARY}
 
 build/${BINARY}: ${SOURCES}
-	go build -o $@ $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
+	CGO_ENABLED=${CGO_ENABLED} go build -o $@ $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
 
 build/linux/${BINARY}: ${SOURCES}
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
 
 build/macos/${BINARY}: ${SOURCES}
-	GOOS=darwin GOARCH=amd64 go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
 
 docker-context: scm-source.json linux
 	mkdir -p docker/build/
@@ -47,6 +48,9 @@ docker-context: scm-source.json linux
 
 docker: ${DOCKERFILE} docker-context
 	cd docker && docker build --rm -t "$(IMAGE):$(TAG)" .
+
+indocker-race:
+	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.8.1 bash -c "make linux"
 
 push:
 	docker push "$(IMAGE):$(TAG)"
