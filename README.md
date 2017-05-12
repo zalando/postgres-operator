@@ -111,6 +111,12 @@ Etcd is required to deploy the operator.
 
     $ kubectl --context minikube  create -f https://raw.githubusercontent.com/coreos/etcd/master/hack/kubernetes-deploy/etcd.yml
 
+### Create ConfigMap
+
+ConfigMap is used to store configuration of the operator
+
+    $ kubectl --context minikube  create -f manifests/configmap.yaml
+
 ### Deploy fake Teams API
 
 Teams API is used as a source of human users.
