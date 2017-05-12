@@ -42,7 +42,7 @@ type TeamsAPI struct {
 	httpClient         *http.Client
 	logger             *logrus.Entry
 	RefreshTokenAction func() (string, error)
-	enabled bool
+	enabled            bool
 }
 
 func NewTeamsAPI(url string, log *logrus.Logger, enabled bool) *TeamsAPI {
@@ -50,7 +50,7 @@ func NewTeamsAPI(url string, log *logrus.Logger, enabled bool) *TeamsAPI {
 		url:        strings.TrimRight(url, "/"),
 		httpClient: &http.Client{},
 		logger:     log.WithField("pkg", "teamsapi"),
-		enabled: enabled,
+		enabled:    enabled,
 	}
 
 	return &t

@@ -40,17 +40,17 @@ func (c *Cluster) DatabaseAccessDisabled() bool {
 }
 func (c *Cluster) initDbConn() (err error) {
 	if c.pgDb == nil {
-			conn, err := sql.Open("postgres", c.pgConnectionString())
-			if err != nil {
-				return err
-			}
-			err = conn.Ping()
-			if err != nil {
-				conn.Close()
-				return err
-			}
+		conn, err := sql.Open("postgres", c.pgConnectionString())
+		if err != nil {
+			return err
+		}
+		err = conn.Ping()
+		if err != nil {
+			conn.Close()
+			return err
+		}
 
-			c.pgDb = conn
+		c.pgDb = conn
 	}
 
 	return nil

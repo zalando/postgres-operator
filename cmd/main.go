@@ -15,13 +15,13 @@ import (
 )
 
 var (
-	KubeConfigFile string
-	podNamespace   string
-	configMapName  spec.NamespacedName
-	OutOfCluster   bool
-	noTeamsAPI bool
+	KubeConfigFile   string
+	podNamespace     string
+	configMapName    spec.NamespacedName
+	OutOfCluster     bool
+	noTeamsAPI       bool
 	noDatabaseAccess bool
-	version        string
+	version          string
 )
 
 func init() {
