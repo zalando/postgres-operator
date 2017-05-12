@@ -85,26 +85,6 @@ to test your that your setup is working.
 
 Note: if you use multiple kubernetes clusters, you can switch to minikube with `kubectl config use-context minikube`
 
-### Deploying the operator
-
-You need to install the service account definition in your minikube cluster. You can run without it, but then you
-have to change the service account references in the postgres-operator manifest as well.
-
-    $ kubectl --context minikube create -f manifests/serviceaccount.yaml
-
-The fastest way to run your docker image locally is to reuse the docker from minikube. That way, there is no need to
-pull docker images from pierone or push them, as the image is essentially there once you build it. The following steps
-will get you the docker image built and deployed.
-
-    $ eval $(minikube docker-env)
-    $ export TAG=$(git describe --tags --always --dirty)
-    $ make docker
-    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
-    
-The last line changes the docker image tag in the manifest to the one the operator image has been built with and removes
-the serviceAccountName definition, as the ServiceAccount is not defined in minikube (neither it should, as one has admin
-permissions there).
-
 ### Deploy etcd
 
 Etcd is required to deploy the operator.
@@ -123,6 +103,25 @@ Teams API is used as a source of human users.
 
     $ kubectl --context minikube  create -f manifests/fake-teams-api.yaml
 
+### Deploying the operator
+
+You need to install the service account definition in your minikube cluster. You can run without it, but then you
+have to change the service account references in the postgres-operator manifest as well.
+
+    $ kubectl --context minikube create -f manifests/serviceaccount.yaml
+
+The fastest way to run your docker image locally is to reuse the docker from minikube. That way, there is no need to
+pull docker images from pierone or push them, as the image is essentially there once you build it. The following steps
+will get you the docker image built and deployed.
+
+    $ eval $(minikube docker-env)
+    $ export TAG=$(git describe --tags --always --dirty)
+    $ make docker
+    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
+
+The last line changes the docker image tag in the manifest to the one the operator image has been built with and removes
+the serviceAccountName definition, as the ServiceAccount is not defined in minikube (neither it should, as one has admin
+permissions there).
 
 ### Check if ThirdPartyResource has been registered
 
