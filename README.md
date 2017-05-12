@@ -111,6 +111,13 @@ Etcd is required to deploy the operator.
 
     $ kubectl --context minikube  create -f https://raw.githubusercontent.com/coreos/etcd/master/hack/kubernetes-deploy/etcd.yml
 
+### Deploy fake Teams API
+
+Teams API is used as a source of human users.
+
+    $ kubectl --context minikube  create -f manifests/fake-teams-api.yaml
+
+
 ### Check if ThirdPartyResource has been registered
 
     $ kubectl --context minikube   get thirdpartyresources
