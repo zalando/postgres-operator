@@ -52,7 +52,7 @@ type Config struct {
 	WALES3Bucket       string `name:"wal_s3_bucket"`
 	KubeIAMRole        string `name:"kube_iam_role"`
 	DebugLogging       bool   `name:"debug_logging" default:"false"`
-	EnableDBAccess	   bool   `name:"enable_db_access" default:"true"`
+	EnableDBAccess	   bool   `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI     bool   `name:"enable_teams_api" default:"true"`
 	DNSNameFormat      string `name:"dns_name_format" default:"%s.%s.%s"`
 	Workers            uint32 `name:"workers" default:"4"`
