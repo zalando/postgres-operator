@@ -35,8 +35,8 @@ Given the schema above, the postgres operator source code located at `github.com
 -`~/go/src/github.com/zalando-incubator/postgres-operator`.
 
     $ export GOPATH=~/go
-    $ mkdir -p ${GOPATH}/src/github.com/zalando-incubator/postgres-operator
-    $ cd ${GOPATH}/src/github.com/zalando-incubator/postgres-operator && git clone https://github.com/zalando-incubator/postgres-operator.git
+    $ mkdir -p ${GOPATH}/src/github.com/zalando-incubator/
+    $ cd ${GOPATH}/src/github.com/zalando-incubator/ && git clone https://github.com/zalando-incubator/postgres-operator.git
 
 
 ## Building the operator
