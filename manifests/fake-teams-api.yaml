@@ -38,9 +38,7 @@ metadata:
   namespace: default
 type: Opaque
 data:
-  cluster-registry-rw-token-secret: c29tZSBkYXRhCg==
-  cluster-registry-rw-token-type: QmVhcmVy
-  cluster-rw-token-secret: c29tZSBkYXRhCg==
-  cluster-rw-token-type: QmVhcmVy
-  read-only-token-secret: c29tZSBkYXRhCg==
+apiVersion: v1
+data:
+  read-only-token-secret: dGVzdHRva2Vu
   read-only-token-type: QmVhcmVy
