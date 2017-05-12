@@ -1,12 +1,12 @@
 # postgres operator
 
-Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html)
+The Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
 During the initial run it registers the [Third Party Resource (TPR)](https://kubernetes.io/docs/user-guide/thirdpartyresources/) for Postgres.
-The Postgres TPR is essentially the schema that describes the contents of the manifests for deploying individual Postgres clusters.
+The Postgresql TPR is essentially the schema that describes the contents of the manifests for deploying individual Postgres clusters using Statefulsets and Patroni.
 
 Once the operator is running, it performs the following actions:
 
-* watches for new postgres cluster manifests and deploys corresponding clusters.
+* watches for new Postgres cluster manifests and deploys corresponding clusters.
 * watches for updates to existing manifests and changes corresponding properties of the running clusters.
 * watches for deletes of the existing manifests and deletes corresponding database clusters.
 * acts on an update to the operator definition itself and changes the running clusters when necessary (i.e. when the docker image inside the operator definition has been updated.)
