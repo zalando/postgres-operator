@@ -15,16 +15,20 @@ import (
 )
 
 var (
-	KubeConfigFile string
-	podNamespace   string
-	configMapName  spec.NamespacedName
-	OutOfCluster   bool
-	version        string
+	KubeConfigFile   string
+	podNamespace     string
+	configMapName    spec.NamespacedName
+	OutOfCluster     bool
+	noTeamsAPI       bool
+	noDatabaseAccess bool
+	version          string
 )
 
 func init() {
 	flag.StringVar(&KubeConfigFile, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
 	flag.BoolVar(&OutOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
+	flag.BoolVar(&noDatabaseAccess, "nodatabaseaccess", false, "Disable all access to the database from the operator side.")
+	flag.BoolVar(&noTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
 
 	podNamespace = os.Getenv("MY_POD_NAMESPACE")
@@ -86,6 +90,12 @@ func main() {
 	}
 	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
 		configMapData["namespace"] = podNamespace
+	}
+	if noDatabaseAccess {
+		configMapData["enable_database_access"] = "false"
+	}
+	if noTeamsAPI {
+		configMapData["enable_teams_api"] = "false"
 	}
 	cfg := config.NewFromMap(configMapData)
 

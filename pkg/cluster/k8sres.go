@@ -1,8 +1,8 @@
 package cluster
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"

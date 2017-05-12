@@ -227,18 +227,20 @@ func (c *Cluster) Create(stopCh <-chan struct{}) error {
 	}
 	c.logger.Infof("Pods are ready")
 
-	if !c.masterLess {
-		if err = c.initDbConn(); err != nil {
+	if !(c.masterLess || c.DatabaseAccessDisabled()) {
+		if err := c.initDbConn(); err != nil {
 			return fmt.Errorf("Can't init db connection: %s", err)
-		}
-
-		if err = c.createUsers(); err != nil {
-			return fmt.Errorf("Can't create users: %s", err)
 		} else {
-			c.logger.Infof("Users have been successfully created")
+			if err = c.createUsers(); err != nil {
+				return fmt.Errorf("Can't create users: %s", err)
+			} else {
+				c.logger.Infof("Users have been successfully created")
+			}
 		}
 	} else {
-		c.logger.Warnln("Cluster is masterless")
+		if c.masterLess {
+			c.logger.Warnln("Cluster is masterless")
+		}
 	}
 
 	c.ListResources()

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
+	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )

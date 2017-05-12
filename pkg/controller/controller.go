@@ -50,7 +50,7 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 		logger.Level = logrus.DebugLevel
 	}
 
-	controllerConfig.TeamsAPIClient = teams.NewTeamsAPI(operatorConfig.TeamsAPIUrl, logger)
+	controllerConfig.TeamsAPIClient = teams.NewTeamsAPI(operatorConfig.TeamsAPIUrl, logger, operatorConfig.EnableTeamsAPI)
 	return &Controller{
 		Config:   *controllerConfig,
 		opConfig: operatorConfig,

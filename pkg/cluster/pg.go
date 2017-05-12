@@ -32,22 +32,25 @@ func (c *Cluster) pgConnectionString() string {
 		strings.Replace(password, "$", "\\$", -1))
 }
 
-func (c *Cluster) initDbConn() error {
-	//TODO: concurrent safe?
+func (c *Cluster) DatabaseAccessDisabled() bool {
+	if c.OpConfig.EnableDBAccess == false {
+		c.logger.Debugf("Database access is disabled")
+	}
+	return c.OpConfig.EnableDBAccess == false
+}
+func (c *Cluster) initDbConn() (err error) {
 	if c.pgDb == nil {
-		if c.pgDb == nil {
-			conn, err := sql.Open("postgres", c.pgConnectionString())
-			if err != nil {
-				return err
-			}
-			err = conn.Ping()
-			if err != nil {
-				conn.Close()
-				return err
-			}
-
-			c.pgDb = conn
+		conn, err := sql.Open("postgres", c.pgConnectionString())
+		if err != nil {
+			return err
 		}
+		err = conn.Ping()
+		if err != nil {
+			conn.Close()
+			return err
+		}
+
+		c.pgDb = conn
 	}
 
 	return nil
