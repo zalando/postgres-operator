@@ -13,6 +13,7 @@ spec:
       containers:
       - name: postgres-operator
         image: pierone.example.com/acid/postgres-operator:0.1
+        imagePullPolicy: IfNotPresent
         env:
         - name: MY_POD_NAMESPACE
           valueFrom:
