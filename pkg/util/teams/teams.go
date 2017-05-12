@@ -42,13 +42,15 @@ type TeamsAPI struct {
 	httpClient         *http.Client
 	logger             *logrus.Entry
 	RefreshTokenAction func() (string, error)
+	enabled bool
 }
 
-func NewTeamsAPI(url string, log *logrus.Logger) *TeamsAPI {
+func NewTeamsAPI(url string, log *logrus.Logger, enabled bool) *TeamsAPI {
 	t := TeamsAPI{
 		url:        strings.TrimRight(url, "/"),
 		httpClient: &http.Client{},
 		logger:     log.WithField("pkg", "teamsapi"),
+		enabled: enabled,
 	}
 
 	return &t
@@ -56,6 +58,10 @@ func NewTeamsAPI(url string, log *logrus.Logger) *TeamsAPI {
 
 func (t *TeamsAPI) TeamInfo(teamId string) (*Team, error) {
 	// TODO: avoid getting a new token on every call to the Teams API.
+	if !t.enabled {
+		t.logger.Debug("Team API is disabled, returning empty list of members")
+		return &Team{}, nil
+	}
 	token, err := t.RefreshTokenAction()
 	if err != nil {
 		return nil, err
