@@ -27,11 +27,11 @@ Go projects expect their source code and all the dependencies to be located unde
 Normally, one would create a directory for the GOPATH (i.e. ~/go) and place the source code under the ~/go/src subdirectories.
 
 Given the schema above, the postgres operator source code located at `github.com/zalando-incubator/postgres-operator` should be put at
-`~/go/src/github.com/zalando-incubator/postgres-operator`.
+-`~/go/src/github.com/zalando-incubator/postgres-operator`.
 
     $ export GOPATH=~/go
-    $ mkdir -p ${GOPATH}/src/github.bus.zalan.do/acid/
-    $ cd ${GOPATH}/src/github.bus.zalan.do/acid/ && git clone git@github.bus.zalan.do:acid/postgres-operator.git
+    $ mkdir -p ${GOPATH}/src/github.com/zalando-incubator/postgres-operator
+    $ cd ${GOPATH}/src/github.com/zalando-incubator/postgres-operator && git clone https://github.com/zalando-incubator/postgres-operator.git
 
 
 ## Building the operator
@@ -51,7 +51,7 @@ Build the operator docker image and pushing it to pierone:
     $ make docker push
 
 You may define the TAG variable to assign an explicit tag to your docker image and the IMAGE to set the image name.
-By default, the tag is computed with `git describe --tags --always --dirty` and the image is `pierone.example.com/acid/postgres-operator`
+By default, the tag is computed with `git describe --tags --always --dirty` and the image is `pierone.stups.zalan.do/acid/postgres-operator`
 
 Building the operator binary (for testing the out-of-cluster option):
 
@@ -67,7 +67,7 @@ The best way to test the operator is to run it in minikube. Minikube is a tool t
 
 See [minikube installation guide](https://github.com/kubernetes/minikube/releases)
 
-Make sure you use Minikube 1.7.
+Make sure you use the latest version of Minikube.
 After the installation, issue the
 
     $ minikube start
@@ -79,3 +79,45 @@ One you have it started successfully, use [the quickstart guide](https://github.
 to test your that your setup is working.
 
 Note: if you use multiple kubernetes clusters, you can switch to minikube with `kubectl config use-context minikube`
+
+### Deploying the operator
+
+You need to install the service account definition in your minikube cluster. You can run without it, but then you
+have to change the service account references in the postgres-operator manifest as well.
+
+    $ kubectl --context minikube create -f manifests/serviceaccount.yaml
+
+The fastest way to run your docker image locally is to reuse the docker from minikube. That way, there is no need to
+pull docker images from pierone or push them, as the image is essentially there once you build it. The following steps
+will get you the docker image built and deployed.
+
+    $ eval $(minikube docker-env)
+    $ export TAG=$(git describe --tags --always --dirty)
+    $ make docker
+    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
+    
+The last line changes the docker image tag in the manifest to the one the operator image has been built with and removes
+the serviceAccountName definition, as the ServiceAccount is not defined in minikube (neither it should, as one has admin
+permissions there).
+
+### Deploy etcd
+
+Etcd is required to deploy the operator.
+
+    $ kubectl --context minikube  create -f https://raw.githubusercontent.com/coreos/etcd/master/hack/kubernetes-deploy/etcd.yml
+
+### Check if ThirdPartyResource has been registered
+
+    $ kubectl --context minikube   get thirdpartyresources
+
+    NAME                       DESCRIPTION                   VERSION(S)
+    postgresql.acid.zalan.do   Managed PostgreSQL clusters   v1
+
+
+### Create a new spilo cluster
+
+    $ kubectl --context minikube  create -f manifests/testpostgresql.yaml
+    
+### Watch Pods being created
+
+    $ kubectl --context minikube  get pods -w --show-labels
