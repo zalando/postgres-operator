@@ -18,7 +18,12 @@ Another example is changing the docker image inside the operator. In this case, 
 it manages and updates them with the new docker images; afterwards, all pods from each Statefulset are killed one by one
 (rolling upgrade) and the replacements are spawned automatically by each Statefulset with the new docker image.
 
-## Setting up Go.
+## Status
+
+This project is currently in development. It is used internally by Zalando in order to run staging databases on Kuberenetes.
+Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
+
+## Setting up Go
 
 Postgres operator is written in Go. Use the [installation instructions](https://golang.org/doc/install#install) if you don't have Go on your system.
 You won't be able to compile the operator with Go older than 1.7. We recommend installing [the latest one](https://golang.org/dl/).
