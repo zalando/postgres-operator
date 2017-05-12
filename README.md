@@ -1,4 +1,4 @@
-# postgres operator prototype (WIP)
+# postgres operator (WIP)
 
 Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html)
 During the initial run it registers the [Third Party Resource (TPR)](https://kubernetes.io/docs/user-guide/thirdpartyresources/) for Postgres.
