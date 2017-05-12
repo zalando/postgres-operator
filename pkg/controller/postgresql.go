@@ -12,10 +12,10 @@ import (
 	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/cluster"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
 func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {

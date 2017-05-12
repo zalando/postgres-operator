@@ -11,7 +11,7 @@ import (
 	"github.com/motomux/pretty"
 	"k8s.io/client-go/pkg/api/v1"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
 const (

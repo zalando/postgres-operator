@@ -8,7 +8,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
 func (c *Controller) ExecCommand(podName spec.NamespacedName, command []string) (string, error) {

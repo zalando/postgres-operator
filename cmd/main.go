@@ -8,10 +8,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/controller"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/config"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/controller"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
 var (

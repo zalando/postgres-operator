@@ -26,8 +26,8 @@ You won't be able to compile the operator with Go older than 1.7. We recommend i
 Go projects expect their source code and all the dependencies to be located under the [GOPATH](https://github.com/golang/go/wiki/GOPATH).
 Normally, one would create a directory for the GOPATH (i.e. ~/go) and place the source code under the ~/go/src subdirectories.
 
-Given the schema above, the postgres operator source code located at `github.bus.zalan.do/acid/postgres-operator` should be put at
-`~/go/src/github.bus.zalan.do/acid/postgres-operator`.
+Given the schema above, the postgres operator source code located at `github.com/zalando-incubator/postgres-operator` should be put at
+`~/go/src/github.com/zalando-incubator/postgres-operator`.
 
     $ export GOPATH=~/go
     $ mkdir -p ${GOPATH}/src/github.bus.zalan.do/acid/

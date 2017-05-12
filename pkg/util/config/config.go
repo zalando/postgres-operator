@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
 type TPR struct {

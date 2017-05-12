@@ -7,11 +7,11 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/cluster"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/config"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {

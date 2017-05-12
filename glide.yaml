@@ -1,4 +1,4 @@
-package: github.bus.zalan.do/acid/postgres-operator
+package: github.com/zalando-incubator/postgres-operator
 import:
 - package: github.com/gogo/protobuf
   version: ^0.3.0

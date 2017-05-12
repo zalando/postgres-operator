@@ -3,7 +3,7 @@ package cluster
 import (
 	"fmt"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
 func (c *Cluster) SyncCluster(stopCh <-chan struct{}) {

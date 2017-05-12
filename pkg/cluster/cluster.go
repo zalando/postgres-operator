@@ -20,13 +20,13 @@ import (
 	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/rest"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/spec"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/config"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/constants"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/k8sutil"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/teams"
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/users"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 )
 
 var (
