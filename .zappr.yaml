@@ -1,2 +1,12 @@
+# for github.com
+approvals:
+  groups:
+    zalando:
+      minimum: 2
+      from:
+        orgs:
+          - "zalando"
 X-Zalando-Team: "acid"
-X-Zalando-Type: "code"
+# type should be one of [code, doc, config, tools, secrets]
+# code will be the default value, if X-Zalando-Type is not found in .zappr.yml
+X-Zalando-Type: code
