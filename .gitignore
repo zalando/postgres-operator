@@ -26,3 +26,5 @@ _testmain.go
 /.glide/
 /build/
 /docker/build/
+
+scm-source.json

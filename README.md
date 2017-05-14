@@ -20,7 +20,7 @@ it manages and updates them with the new docker images; afterwards, all pods fro
 
 ## Status
 
-This project is currently in development. It is used internally by Zalando in order to run staging databases on Kuberenetes.
+This project is currently in development. It is used internally by Zalando in order to run staging databases on Kubernetes.
 Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
 
 ## Setting up Go
@@ -51,7 +51,7 @@ Next, install dependencies with glide by issuing:
 
 This would take a while to complete. You have to redo `make deps` every time you dependencies list changes, i.e. after adding a new library dependency.
 
-Build the operator docker image and pushing it to pierone:
+Build the operator docker image and pushing it to Pier One:
 
     $ make docker push
 
