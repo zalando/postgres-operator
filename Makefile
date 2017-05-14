@@ -1,7 +1,8 @@
 .PHONY: clean local linux macos docker push scm-source.json
 
 BINARY ?= postgres-operator
-BUILD_FLAGS ?= -v -i
+BUILD_FLAGS ?= -v
+CGO_ENABLED ?= 0
 ifeq ($(RACE),1)
 	BUILD_FLAGS += -race -a
     CGO_ENABLED=1
