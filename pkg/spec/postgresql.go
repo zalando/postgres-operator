@@ -38,8 +38,8 @@ type ResourceDescription struct {
 }
 
 type Resources struct {
-	ResourceRequest ResourceDescription `json:"requests,omitempty""`
-	ResourceLimits  ResourceDescription `json:"limits,omitempty""`
+	ResourceRequest ResourceDescription `json:"requests,omitempty"`
+	ResourceLimits  ResourceDescription `json:"limits,omitempty"`
 }
 
 type Patroni struct {
