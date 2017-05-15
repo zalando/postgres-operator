@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
@@ -126,6 +127,8 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	}
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
 
+	c.logger.Debugf("Updating StatefulSet")
+
 	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
 		return fmt.Errorf("Can't form patch for the StatefulSet '%s': %s", statefulSetName, err)
@@ -141,6 +144,56 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	c.Statefulset = statefulSet
 
 	return nil
+}
+
+// replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL TPR.
+func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+	if c.Statefulset == nil {
+		return fmt.Errorf("There is no StatefulSet in the cluster")
+	}
+
+	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
+	c.logger.Debugf("Replacing StatefulSet")
+
+	// Delete the current statefulset without deleting the pods
+	OrphanDepencies := true
+	oldStatefulset := c.Statefulset
+
+	options := v1.DeleteOptions{OrphanDependents: &OrphanDepencies}
+	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
+		return fmt.Errorf("Can't delete statefulset '%s': %s", statefulSetName, err)
+	}
+	// make sure we clear the stored statefulset status if the subsequent create fails.
+	c.Statefulset = nil
+	// wait until the statefulset is truly deleted
+	c.logger.Debugf("Waiting for the statefulset to be deleted")
+
+	before := time.Now()
+	for {
+		_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name)
+		if err != nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+		if time.Since(before) >= constants.StatefulsetDeletionTimeout {
+			return fmt.Errorf("Timeout waiting for the statefulset to be deleted")
+		}
+	}
+
+	// create the new statefulset with the desired spec. It would take over the remaining pods.
+	createdStatefulset, err := c.KubeClient.StatefulSets(newStatefulSet.Namespace).Create(newStatefulSet)
+	if err != nil {
+		return fmt.Errorf("Can't create statefulset '%s': %s", statefulSetName, err)
+	} else {
+		// check that all the previous replicas were picked up.
+		if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
+			createdStatefulset.Status.Replicas != oldStatefulset.Status.Replicas {
+			return fmt.Errorf("Number of pods for the old and updated Statefulsets is not identical")
+		}
+	}
+	c.Statefulset = createdStatefulset
+	return nil
+
 }
 
 func (c *Cluster) deleteStatefulSet() error {
