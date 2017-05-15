@@ -106,7 +106,10 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	if c.Statefulset != nil {
 		return nil, fmt.Errorf("StatefulSet already exists in the cluster")
 	}
-	statefulSetSpec := c.genStatefulSet(c.Spec)
+	statefulSetSpec, err := c.genStatefulSet(c.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("Can't generate StatefulSet: %s", err)
+	}
 	statefulSet, err := c.KubeClient.StatefulSets(statefulSetSpec.Namespace).Create(statefulSetSpec)
 	if k8sutil.ResourceAlreadyExists(err) {
 		return nil, fmt.Errorf("StatefulSet '%s' already exists", util.NameFromMeta(statefulSetSpec.ObjectMeta))

@@ -369,7 +369,10 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		//TODO: update PVC
 	}
 
-	newStatefulSet := c.genStatefulSet(newSpec.Spec)
+	newStatefulSet, err := c.genStatefulSet(newSpec.Spec)
+	if err != nil {
+		return fmt.Errorf("Can't generate StatefulSet: %s", err)
+	}
 	sameSS, rollingUpdate, reason := c.compareStatefulSetWith(newStatefulSet)
 
 	if !sameSS {
