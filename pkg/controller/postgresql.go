@@ -37,7 +37,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		return nil, fmt.Errorf("Can't extract list of postgresql objects: %s", err)
 	}
 
-	var activeClustersCnt int
+	var activeClustersCnt, failedClustersCnt int
 	for _, obj := range objList {
 		pg, ok := obj.(*spec.Postgresql)
 		if !ok {
@@ -45,6 +45,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		}
 
 		if pg.Error != nil {
+			failedClustersCnt++
 			continue
 		}
 		c.queueClusterEvent(nil, pg, spec.EventSync)
@@ -52,8 +53,12 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		c.logger.Debugf("Sync of the '%s' cluster has been queued", util.NameFromMeta(pg.Metadata))
 		activeClustersCnt++
 	}
-	if activeClustersCnt > 0 {
-		c.logger.Infof("There are %d clusters currently running", len(objList))
+	if len(objList) > 0 {
+		var failedClusters string
+		if failedClustersCnt > 0 {
+			failedClusters = fmt.Sprintf("and %d are in failed state", failedClustersCnt)
+		}
+		c.logger.Infof("There are %d clusters running%s", activeClustersCnt, failedClusters)
 	} else {
 		c.logger.Infof("No clusters running")
 	}
