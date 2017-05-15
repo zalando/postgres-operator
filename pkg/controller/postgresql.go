@@ -37,16 +37,22 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		return nil, fmt.Errorf("Can't extract list of postgresql objects: %s", err)
 	}
 
+	var activeClustersCnt int
 	for _, obj := range objList {
 		pg, ok := obj.(*spec.Postgresql)
 		if !ok {
 			return nil, fmt.Errorf("Can't cast object to postgresql")
 		}
+
+		if pg.Error != nil {
+			continue
+		}
 		c.queueClusterEvent(nil, pg, spec.EventSync)
 
 		c.logger.Debugf("Sync of the '%s' cluster has been queued", util.NameFromMeta(pg.Metadata))
+		activeClustersCnt++
 	}
-	if len(objList) > 0 {
+	if activeClustersCnt > 0 {
 		c.logger.Infof("There are %d clusters currently running", len(objList))
 	} else {
 		c.logger.Infof("No clusters running")
@@ -168,17 +174,30 @@ func (c *Controller) processClusterEventsQueue(idx int) {
 
 func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
 	var (
-		uid         types.UID
-		clusterName spec.NamespacedName
+		uid          types.UID
+		clusterName  spec.NamespacedName
+		clusterError error
 	)
 
 	if old != nil {
 		uid = old.Metadata.GetUID()
 		clusterName = util.NameFromMeta(old.Metadata)
+		if eventType == spec.EventUpdate && new.Error == nil && old != nil {
+			eventType = spec.EventAdd
+			clusterError = new.Error
+		}
+		clusterError = old.Error
 	} else {
 		uid = new.Metadata.GetUID()
 		clusterName = util.NameFromMeta(new.Metadata)
+		clusterError = new.Error
 	}
+
+	if clusterError != nil {
+		c.logger.Debugf("Skipping %s event for invalid cluster %s (reason: %s)", eventType, clusterName, clusterError)
+		return
+	}
+
 	workerId := c.clusterWorkerId(clusterName)
 	clusterEvent := spec.ClusterEvent{
 		EventType: eventType,
