@@ -37,17 +37,30 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		return nil, fmt.Errorf("Can't extract list of postgresql objects: %s", err)
 	}
 
+	var activeClustersCnt, failedClustersCnt int
 	for _, obj := range objList {
 		pg, ok := obj.(*spec.Postgresql)
 		if !ok {
 			return nil, fmt.Errorf("Can't cast object to postgresql")
 		}
+
+		if pg.Error != nil {
+			failedClustersCnt++
+			continue
+		}
 		c.queueClusterEvent(nil, pg, spec.EventSync)
 
 		c.logger.Debugf("Sync of the '%s' cluster has been queued", util.NameFromMeta(pg.Metadata))
+		activeClustersCnt++
 	}
 	if len(objList) > 0 {
-		c.logger.Infof("There are %d clusters currently running", len(objList))
+		if failedClustersCnt > 0 && activeClustersCnt == 0 {
+			c.logger.Infof("There are no clusters running. %d are in the failed state", failedClustersCnt)
+		} else if failedClustersCnt == 0 && activeClustersCnt > 0 {
+			c.logger.Infof("There are %d clusters running", activeClustersCnt)
+		} else {
+			c.logger.Infof("There are %d clusters running and %d are in the failed state", activeClustersCnt, failedClustersCnt)
+		}
 	} else {
 		c.logger.Infof("No clusters running")
 	}
@@ -168,17 +181,31 @@ func (c *Controller) processClusterEventsQueue(idx int) {
 
 func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
 	var (
-		uid         types.UID
-		clusterName spec.NamespacedName
+		uid          types.UID
+		clusterName  spec.NamespacedName
+		clusterError error
 	)
 
-	if old != nil {
+	if old != nil { //update, delete
 		uid = old.Metadata.GetUID()
 		clusterName = util.NameFromMeta(old.Metadata)
-	} else {
+		if eventType == spec.EventUpdate && new.Error == nil && old != nil {
+			eventType = spec.EventAdd
+			clusterError = new.Error
+		} else {
+			clusterError = old.Error
+		}
+	} else { //add, sync
 		uid = new.Metadata.GetUID()
 		clusterName = util.NameFromMeta(new.Metadata)
+		clusterError = new.Error
 	}
+
+	if clusterError != nil && eventType != spec.EventDelete {
+		c.logger.Debugf("Skipping %s event for invalid cluster %s (reason: %s)", eventType, clusterName, clusterError)
+		return
+	}
+
 	workerId := c.clusterWorkerId(clusterName)
 	clusterEvent := spec.ClusterEvent{
 		EventType: eventType,

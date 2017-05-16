@@ -43,7 +43,9 @@ type spiloConfiguration struct {
 	Bootstrap            pgBootstrap            `json:"bootstrap"`
 }
 
-func (c *Cluster) resourceRequirements(resources spec.Resources) *v1.ResourceRequirements {
+func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRequirements, error) {
+	var err error
+
 	specRequests := resources.ResourceRequest
 	specLimits := resources.ResourceLimits
 
@@ -54,26 +56,47 @@ func (c *Cluster) resourceRequirements(resources spec.Resources) *v1.ResourceReq
 
 	result := v1.ResourceRequirements{}
 
-	result.Requests = fillResourceList(specRequests, defaultRequests)
-	result.Limits = fillResourceList(specLimits, defaultLimits)
+	result.Requests, err = fillResourceList(specRequests, defaultRequests)
+	if err != nil {
+		return nil, fmt.Errorf("Can't fill resource requests: %s", err)
+	}
 
-	return &result
+	result.Limits, err = fillResourceList(specLimits, defaultLimits)
+	if err != nil {
+		return nil, fmt.Errorf("Can't fill resource limits: %s", err)
+	}
+
+	return &result, nil
 }
 
-func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescription) v1.ResourceList {
+func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescription) (v1.ResourceList, error) {
+	var err error
 	requests := v1.ResourceList{}
 
 	if spec.Cpu != "" {
-		requests[v1.ResourceCPU] = resource.MustParse(spec.Cpu)
+		requests[v1.ResourceCPU], err = resource.ParseQuantity(spec.Cpu)
+		if err != nil {
+			return nil, fmt.Errorf("Can't parse CPU quantity: %s", err)
+		}
 	} else {
-		requests[v1.ResourceCPU] = resource.MustParse(defaults.Cpu)
+		requests[v1.ResourceCPU], err = resource.ParseQuantity(defaults.Cpu)
+		if err != nil {
+			return nil, fmt.Errorf("Can't parse default CPU quantity: %s", err)
+		}
 	}
 	if spec.Memory != "" {
-		requests[v1.ResourceMemory] = resource.MustParse(spec.Memory)
+		requests[v1.ResourceMemory], err = resource.ParseQuantity(spec.Memory)
+		if err != nil {
+			return nil, fmt.Errorf("Can't parse memory quantity: %s", err)
+		}
 	} else {
-		requests[v1.ResourceMemory] = resource.MustParse(defaults.Memory)
+		requests[v1.ResourceMemory], err = resource.ParseQuantity(defaults.Memory)
+		if err != nil {
+			return nil, fmt.Errorf("Can't parse default memory quantity: %s", err)
+		}
 	}
-	return requests
+
+	return requests, nil
 }
 
 func (c *Cluster) generateSpiloJSONConfiguration(pg *spec.PostgresqlParam, patroni *spec.Patroni) string {
@@ -170,7 +193,6 @@ PATRONI_INITDB_PARAMS:
 }
 
 func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, pgParameters *spec.PostgresqlParam, patroniParameters *spec.Patroni) *v1.PodTemplateSpec {
-
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -290,10 +312,17 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 	return &template
 }
 
-func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) *v1beta1.StatefulSet {
-	resourceRequirements := c.resourceRequirements(spec.Resources)
+func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
+	resourceRequirements, err := c.resourceRequirements(spec.Resources)
+	if err != nil {
+		return nil, err
+	}
+
 	podTemplate := c.genPodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni)
-	volumeClaimTemplate := persistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
+	volumeClaimTemplate, err := persistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
+	if err != nil {
+		return nil, err
+	}
 
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: v1.ObjectMeta{
@@ -309,10 +338,10 @@ func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) *v1beta1.StatefulSet {
 		},
 	}
 
-	return statefulSet
+	return statefulSet, nil
 }
 
-func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) *v1.PersistentVolumeClaim {
+func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
 	metadata := v1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
@@ -323,18 +352,24 @@ func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) *v1.Pe
 		metadata.Annotations = map[string]string{"volume.alpha.kubernetes.io/storage-class": "default"}
 	}
 
+	quantity, err := resource.ParseQuantity(volumeSize)
+	if err != nil {
+		return nil, fmt.Errorf("Can't parse volume size: %s", err)
+	}
+
 	volumeClaim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metadata,
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceStorage: resource.MustParse(volumeSize),
+					v1.ResourceStorage: quantity,
 				},
 			},
 		},
 	}
-	return volumeClaim
+
+	return volumeClaim, nil
 }
 
 func (c *Cluster) genUserSecrets() (secrets map[string]*v1.Secret) {
