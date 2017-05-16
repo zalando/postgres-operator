@@ -2,12 +2,12 @@ package cluster
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
+	"github.bus.zalan.do/acid/postgres-operator/pkg/util/retryutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -168,16 +168,13 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	// wait until the statefulset is truly deleted
 	c.logger.Debugf("Waiting for the statefulset to be deleted")
 
-	before := time.Now()
-	for {
-		_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name)
-		if err != nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-		if time.Since(before) >= constants.StatefulsetDeletionTimeout {
-			return fmt.Errorf("Timeout waiting for the statefulset to be deleted")
-		}
+	err := retryutil.Retry(constants.StatefulsetDeletionInterval, constants.StatefulsetDeletionTimeout,
+		func() (bool, error) {
+			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name)
+			return err != nil, nil
+		})
+	if err != nil {
+		fmt.Errorf("could not delete statefulset: %s", err)
 	}
 
 	// create the new statefulset with the desired spec. It would take over the remaining pods.
