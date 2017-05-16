@@ -137,7 +137,12 @@ func (c *Cluster) syncStatefulSet() error {
 			match  bool
 			reason string
 		)
-		desiredSS := c.genStatefulSet(cSpec)
+
+		desiredSS, err := c.genStatefulSet(cSpec)
+		if err != nil {
+			return fmt.Errorf("Can't generate StatefulSet: %s", err)
+		}
+
 		match, needsReplace, rollUpdate, reason = c.compareStatefulSetWith(desiredSS)
 		if match {
 			return nil

@@ -134,7 +134,17 @@ permissions there).
 ### Create a new spilo cluster
 
     $ kubectl --context minikube  create -f manifests/testpostgresql.yaml
-    
+
 ### Watch Pods being created
 
     $ kubectl --context minikube  get pods -w --show-labels
+
+### Connect to PostgreSQL
+
+We can use the generated secret of the `postgres` robot user to connect to our `acid-testcluster` master running in Minikube:
+
+    $ export HOST_PORT=$(minikube service acid-testcluster --url | sed 's,.*/,,')
+    $ export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
+    $ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
+    $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-testcluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
+    $ psql -U postgres
