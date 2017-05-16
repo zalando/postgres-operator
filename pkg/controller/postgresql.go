@@ -54,11 +54,13 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		activeClustersCnt++
 	}
 	if len(objList) > 0 {
-		var failedClusters string
-		if failedClustersCnt > 0 {
-			failedClusters = fmt.Sprintf("and %d are in failed state", failedClustersCnt)
+		if failedClustersCnt > 0 && activeClustersCnt == 0 {
+			c.logger.Infof("There are no clusters running. %d are in the failed state", failedClustersCnt)
+		} else if failedClustersCnt == 0 && activeClustersCnt > 0 {
+			c.logger.Infof("There are %d clusters running", activeClustersCnt)
+		} else {
+			c.logger.Infof("There are %d clusters running and %d are in the failed state", activeClustersCnt, failedClustersCnt)
 		}
-		c.logger.Infof("There are %d clusters running%s", activeClustersCnt, failedClusters)
 	} else {
 		c.logger.Infof("No clusters running")
 	}
