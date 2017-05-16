@@ -184,21 +184,22 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 		clusterError error
 	)
 
-	if old != nil {
+	if old != nil { //update, delete
 		uid = old.Metadata.GetUID()
 		clusterName = util.NameFromMeta(old.Metadata)
 		if eventType == spec.EventUpdate && new.Error == nil && old != nil {
 			eventType = spec.EventAdd
 			clusterError = new.Error
+		} else {
+			clusterError = old.Error
 		}
-		clusterError = old.Error
-	} else {
+	} else { //add, sync
 		uid = new.Metadata.GetUID()
 		clusterName = util.NameFromMeta(new.Metadata)
 		clusterError = new.Error
 	}
 
-	if clusterError != nil {
+	if clusterError != nil && eventType != spec.EventDelete {
 		c.logger.Debugf("Skipping %s event for invalid cluster %s (reason: %s)", eventType, clusterName, clusterError)
 		return
 	}
