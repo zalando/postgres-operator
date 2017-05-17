@@ -267,7 +267,8 @@ func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string)
 	return
 }
 
-func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match, needsRollUpdate bool, reason string) {
+
+func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match, needsReplace, needsRollUpdate bool, reason string) {
 	match = true
 	//TODO: improve me
 	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
@@ -275,42 +276,89 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (matc
 		reason = "new statefulset's number of replicas doesn't match the current one"
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
-		match = false
 		needsRollUpdate = true
 		reason = "new statefulset's container specification doesn't match the current one"
-		return
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warnf("StatefulSet '%s' has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return
 	}
+	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
+	// and the combined effect of all the changes should be applied.
+	// TODO: log all reasons for changing the statefulset, not just the last one.
+	// TODO: make sure this is in sync with genPodTemplate, ideally by using the same list of fields to generate
+	// the template and the diff
+	if c.Statefulset.Spec.Template.Spec.ServiceAccountName != statefulSet.Spec.Template.Spec.ServiceAccountName {
+		needsReplace = true
+		needsRollUpdate = true
+		reason = "new statefulset's serviceAccountName service asccount name doesn't match the current one"
+	}
+	if *c.Statefulset.Spec.Template.Spec.TerminationGracePeriodSeconds != *statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds {
+		needsReplace = true
+		needsRollUpdate = true
+		reason = "new statefulset's terminationGracePeriodSeconds  doesn't match the current one"
+	}
+	// Some generated fields like creationTimestamp make it not possible to use DeepCompare on Spec.Template.ObjectMeta
+	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Labels, statefulSet.Spec.Template.Labels) {
+		needsReplace = true
+		needsRollUpdate = true
+		reason = "new statefulset's metadata labels doesn't match the current one"
+	}
+	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
+		needsRollUpdate = true
+		needsReplace = true
+		reason = "new statefulset's metadata annotations doesn't match the current one"
+	}
+	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
+		needsReplace = true
+		needsRollUpdate = true
+		reason = "new statefulset's volumeClaimTemplates contains different number of volumes to the old one"
+	}
+	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
+		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
+		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
+		if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
+			needsReplace = true
+			needsRollUpdate = true
+			reason = fmt.Sprintf("new statefulset's name for volume %d doesn't match the current one", i)
+			continue
+		}
+		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
+			needsReplace = true
+			needsRollUpdate = true
+			reason = fmt.Sprintf("new statefulset's annotations for volume %s doesn't match the current one", name)
+		}
+		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
+			name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
+			needsReplace = true
+			needsRollUpdate = true
+			reason = fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %s doesn't match the current one", name)
+		}
+	}
 
 	container1 := c.Statefulset.Spec.Template.Spec.Containers[0]
 	container2 := statefulSet.Spec.Template.Spec.Containers[0]
 	if container1.Image != container2.Image {
-		match = false
 		needsRollUpdate = true
 		reason = "new statefulset's container image doesn't match the current one"
-		return
 	}
 
 	if !reflect.DeepEqual(container1.Ports, container2.Ports) {
-		match = false
 		needsRollUpdate = true
 		reason = "new statefulset's container ports don't match the current one"
-		return
 	}
 
 	if !compareResources(&container1.Resources, &container2.Resources) {
-		match = false
 		needsRollUpdate = true
 		reason = "new statefulset's container resources don't match the current ones"
-		return
 	}
 	if !reflect.DeepEqual(container1.Env, container2.Env) {
-		match = false
 		needsRollUpdate = true
 		reason = "new statefulset's container environment doesn't match the current one"
+	}
+
+	if needsRollUpdate || needsReplace {
+		match = false
 	}
 
 	return
@@ -373,14 +421,22 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	if err != nil {
 		return fmt.Errorf("Can't generate StatefulSet: %s", err)
 	}
-	sameSS, rollingUpdate, reason := c.compareStatefulSetWith(newStatefulSet)
+
+	sameSS, needsReplace, rollingUpdate, reason := c.compareStatefulSetWith(newStatefulSet)
 
 	if !sameSS {
 		c.logStatefulSetChanges(c.Statefulset, newStatefulSet, true, reason)
 		//TODO: mind the case of updating allowedSourceRanges
-		if err := c.updateStatefulSet(newStatefulSet); err != nil {
-			c.setStatus(spec.ClusterStatusUpdateFailed)
-			return fmt.Errorf("Can't upate StatefulSet: %s", err)
+		if !needsReplace {
+			if err := c.updateStatefulSet(newStatefulSet); err != nil {
+				c.setStatus(spec.ClusterStatusUpdateFailed)
+				return fmt.Errorf("Can't upate StatefulSet: %s", err)
+			}
+		} else {
+			if err := c.replaceStatefulSet(newStatefulSet); err != nil {
+				c.setStatus(spec.ClusterStatusUpdateFailed)
+				return fmt.Errorf("Can't replace StatefulSet: %s", err)
+			}
 		}
 		//TODO: if there is a change in numberOfInstances, make sure Pods have been created/deleted
 		c.logger.Infof("StatefulSet '%s' has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))

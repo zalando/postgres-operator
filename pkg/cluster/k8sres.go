@@ -1,9 +1,10 @@
 package cluster
 
 import (
-	"encoding/json"
 	"fmt"
+	"sort"
 
+	"encoding/json"
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -107,13 +108,22 @@ func (c *Cluster) generateSpiloJSONConfiguration(pg *spec.PostgresqlParam, patro
 	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "md5"},
 		map[string]string{"auth-local": "trust"}}
 
+	initdbOptionNames := []string{}
+
+	for k := range patroni.InitDB {
+		initdbOptionNames = append(initdbOptionNames, k)
+	}
+	/* We need to sort the user-defined options to more easily compare the resulting specs */
+	sort.Strings(initdbOptionNames)
+
 	// Initdb parameters in the manifest take priority over the default ones
 	// The whole type switch dance is caused by the ability to specify both
 	// maps and normal string items in the array of initdb options. We need
 	// both to convert the initial key-value to strings when necessary, and
 	// to de-duplicate the options supplied.
 PATRONI_INITDB_PARAMS:
-	for k, v := range patroni.InitDB {
+	for _, k := range initdbOptionNames {
+		v := patroni.InitDB[k]
 		for i, defaultParam := range config.Bootstrap.Initdb {
 			switch defaultParam.(type) {
 			case map[string]string:
@@ -127,7 +137,8 @@ PATRONI_INITDB_PARAMS:
 				}
 			case string:
 				{
-					if k == v {
+					/* if the option already occurs in the list */
+					if defaultParam.(string) == v {
 						continue PATRONI_INITDB_PARAMS
 					}
 				}
