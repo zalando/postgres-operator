@@ -38,8 +38,8 @@ type ResourceDescription struct {
 }
 
 type Resources struct {
-	ResourceRequest ResourceDescription `json:"requests,omitempty""`
-	ResourceLimits  ResourceDescription `json:"limits,omitempty""`
+	ResourceRequest ResourceDescription `json:"requests,omitempty"`
+	ResourceLimits  ResourceDescription `json:"limits,omitempty"`
 }
 
 type Patroni struct {
@@ -62,6 +62,7 @@ const (
 	ClusterStatusUpdateFailed PostgresStatus = "UpdateFailed"
 	ClusterStatusAddFailed    PostgresStatus = "CreateFailed"
 	ClusterStatusRunning      PostgresStatus = "Running"
+	ClusterStatusInvalid      PostgresStatus = "Invalid"
 )
 
 // PostgreSQL Third Party (resource) Object
@@ -71,6 +72,7 @@ type Postgresql struct {
 
 	Spec   PostgresSpec   `json:"spec"`
 	Status PostgresStatus `json:"status"`
+	Error  error          `json:"-"`
 }
 
 type PostgresSpec struct {
@@ -189,6 +191,18 @@ func (pl *PostgresqlList) GetListMeta() unversioned.List {
 	return &pl.Metadata
 }
 
+func clusterName(clusterName string, teamName string) (string, error) {
+	teamNameLen := len(teamName)
+	if len(clusterName) < teamNameLen+2 {
+		return "", fmt.Errorf("Name is too short")
+	}
+	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
+		return "", fmt.Errorf("Name must match {TEAM}-{NAME} format")
+	}
+
+	return clusterName[teamNameLen+1:], nil
+}
+
 // The code below is used only to work around a known problem with third-party
 // resources and ugorji. If/when these issues are resolved, the code below
 // should no longer be required.
@@ -196,31 +210,31 @@ func (pl *PostgresqlList) GetListMeta() unversioned.List {
 type PostgresqlListCopy PostgresqlList
 type PostgresqlCopy Postgresql
 
-func clusterName(clusterName string, teamName string) (string, error) {
-	teamNameLen := len(teamName)
-	if len(clusterName) < teamNameLen+2 {
-		return "", fmt.Errorf("Name is too short")
-	}
-	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
-		return "", fmt.Errorf("Name must start with the team name and dash")
-	}
-
-	return clusterName[teamNameLen+1:], nil
-}
-
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	tmp := PostgresqlCopy{}
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
-		return err
+		metaErr := json.Unmarshal(data, &tmp.Metadata)
+		if metaErr != nil {
+			return err
+		}
+
+		tmp.Error = err
+		tmp.Status = ClusterStatusInvalid
+
+		*p = Postgresql(tmp)
+
+		return nil
 	}
 	tmp2 := Postgresql(tmp)
 
 	clusterName, err := clusterName(tmp2.Metadata.Name, tmp2.Spec.TeamId)
-	if err != nil {
-		return err
+	if err == nil {
+		tmp2.Spec.ClusterName = clusterName
+	} else {
+		tmp2.Error = err
+		tmp2.Status = ClusterStatusInvalid
 	}
-	tmp2.Spec.ClusterName = clusterName
 	*p = tmp2
 
 	return nil
