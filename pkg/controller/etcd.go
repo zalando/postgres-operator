@@ -8,10 +8,10 @@ import (
 )
 
 func (c *Controller) initEtcdClient(etcdHost string) error {
-	etcdUrl := fmt.Sprintf("http://%s", etcdHost)
+	etcdURL := fmt.Sprintf("http://%s", etcdHost)
 
 	cfg, err := etcdclient.New(etcdclient.Config{
-		Endpoints:               []string{etcdUrl},
+		Endpoints:               []string{etcdURL},
 		Transport:               etcdclient.DefaultTransport,
 		HeaderTimeoutPerRequest: time.Second,
 	})

@@ -10,7 +10,7 @@ import (
 )
 
 type InfrastructureAccount struct {
-	Id          string `json:"id"`
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Provider    string `json:"provider"`
 	Type        string `json:"type"`
@@ -22,9 +22,9 @@ type InfrastructureAccount struct {
 
 type Team struct {
 	Dn           string   `json:"dn"`
-	Id           string   `json:"id"`
+	ID           string   `json:"id"`
 	TeamName     string   `json:"id_name"`
-	TeamId       string   `json:"team_id"`
+	TeamID       string   `json:"team_id"`
 	Type         string   `json:"type"`
 	FullName     string   `json:"name"`
 	Aliases      []string `json:"alias"`
@@ -32,12 +32,12 @@ type Team struct {
 	Members      []string `json:"member"`
 	CostCenter   string   `json:"cost_center"`
 	DeliveryLead string   `json:"delivery_lead"`
-	ParentTeamId string   `json:"parent_team_id"`
+	ParentTeamID string   `json:"parent_team_id"`
 
 	InfrastructureAccounts []InfrastructureAccount `json:"infrastructure-accounts"`
 }
 
-type TeamsAPI struct {
+type API struct {
 	url                string
 	httpClient         *http.Client
 	logger             *logrus.Entry
@@ -45,8 +45,8 @@ type TeamsAPI struct {
 	enabled            bool
 }
 
-func NewTeamsAPI(url string, log *logrus.Logger, enabled bool) *TeamsAPI {
-	t := TeamsAPI{
+func NewTeamsAPI(url string, log *logrus.Logger, enabled bool) *API {
+	t := API{
 		url:        strings.TrimRight(url, "/"),
 		httpClient: &http.Client{},
 		logger:     log.WithField("pkg", "teamsapi"),
@@ -56,7 +56,7 @@ func NewTeamsAPI(url string, log *logrus.Logger, enabled bool) *TeamsAPI {
 	return &t
 }
 
-func (t *TeamsAPI) TeamInfo(teamId string) (*Team, error) {
+func (t *API) TeamInfo(teamID string) (*Team, error) {
 	// TODO: avoid getting a new token on every call to the Teams API.
 	if !t.enabled {
 		t.logger.Debug("Team API is disabled, returning empty list of members")
@@ -66,7 +66,7 @@ func (t *TeamsAPI) TeamInfo(teamId string) (*Team, error) {
 	if err != nil {
 		return nil, err
 	}
-	url := fmt.Sprintf("%s/teams/%s", t.url, teamId)
+	url := fmt.Sprintf("%s/teams/%s", t.url, teamID)
 	t.logger.Debugf("Request url: %s", url)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -89,9 +89,9 @@ func (t *TeamsAPI) TeamInfo(teamId string) (*Team, error) {
 
 		if errMessage, ok := raw["error"]; ok {
 			return nil, fmt.Errorf("Team API query failed with status code %d and message: '%s'", resp.StatusCode, string(errMessage))
-		} else {
-			return nil, fmt.Errorf("Team API query failed with status code %d", resp.StatusCode)
 		}
+
+		return nil, fmt.Errorf("Team API query failed with status code %d", resp.StatusCode)
 	}
 	teamInfo := &Team{}
 	d := json.NewDecoder(resp.Body)

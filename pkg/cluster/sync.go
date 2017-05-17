@@ -77,11 +77,11 @@ func (c *Cluster) syncService() error {
 	}
 
 	desiredSvc := c.genService(cSpec.AllowedSourceRanges)
-	if match, reason := c.sameServiceWith(desiredSvc); match {
+	match, reason := c.sameServiceWith(desiredSvc)
+	if match {
 		return nil
-	} else {
-		c.logServiceChanges(c.Service, desiredSvc, false, reason)
 	}
+	c.logServiceChanges(c.Service, desiredSvc, false, reason)
 
 	if err := c.updateService(desiredSvc); err != nil {
 		return fmt.Errorf("Can't update Service to match desired state: %s", err)

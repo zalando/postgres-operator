@@ -23,9 +23,9 @@ type Resources struct {
 	ClusterLabels          map[string]string `name:"cluster_labels" default:"application:spilo"`
 	ClusterNameLabel       string            `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel           string            `name:"pod_role_label" default:"spilo-role"`
-	DefaultCpuRequest      string            `name:"default_cpu_request" default:"100m"`
+	DefaultCPURequest      string            `name:"default_cpu_request" default:"100m"`
 	DefaultMemoryRequest   string            `name:"default_memory_request" default:"100Mi"`
-	DefaultCpuLimit        string            `name:"default_cpu_limit" default:"3"`
+	DefaultCPULimit        string            `name:"default_cpu_limit" default:"3"`
 	DefaultMemoryLimit     string            `name:"default_memory_limit" default:"1Gi"`
 }
 

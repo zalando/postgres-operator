@@ -33,7 +33,7 @@ type PostgresqlParam struct {
 }
 
 type ResourceDescription struct {
-	Cpu    string `json:"cpu"`
+	CPU    string `json:"cpu"`
 	Memory string `json:"memory"`
 }
 
@@ -81,7 +81,7 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	TeamId              string               `json:"teamId"`
+	TeamID              string               `json:"teamId"`
 	AllowedSourceRanges []string             `json:"allowedSourceRanges"`
 	NumberOfInstances   int32                `json:"numberOfInstances"`
 	Users               map[string]UserFlags `json:"users"`
@@ -162,7 +162,7 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	}
 
 	if got.EndTime.Before(got.StartTime) {
-		return fmt.Errorf("'From' time must be prior to the 'To' time.")
+		return fmt.Errorf("'From' time must be prior to the 'To' time")
 	}
 
 	if !weekdayProvidedFrom || !weekdayProvidedTo {
@@ -228,7 +228,7 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	}
 	tmp2 := Postgresql(tmp)
 
-	clusterName, err := clusterName(tmp2.Metadata.Name, tmp2.Spec.TeamId)
+	clusterName, err := clusterName(tmp2.Metadata.Name, tmp2.Spec.TeamID)
 	if err == nil {
 		tmp2.Spec.ClusterName = clusterName
 	} else {

@@ -170,12 +170,12 @@ func (c *Cluster) recreatePods() error {
 	listOptions := v1.ListOptions{
 		LabelSelector: ls.String(),
 	}
+
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("Can't get the list of Pods: %s", err)
-	} else {
-		c.logger.Infof("There are %d Pods in the cluster to recreate", len(pods.Items))
 	}
+	c.logger.Infof("There are %d Pods in the cluster to recreate", len(pods.Items))
 
 	var masterPod v1.Pod
 	for _, pod := range pods.Items {
@@ -186,8 +186,7 @@ func (c *Cluster) recreatePods() error {
 			continue
 		}
 
-		err = c.recreatePod(pod)
-		if err != nil {
+		if err := c.recreatePod(pod); err != nil {
 			return fmt.Errorf("Can't recreate replica Pod '%s': %s", util.NameFromMeta(pod.ObjectMeta), err)
 		}
 	}

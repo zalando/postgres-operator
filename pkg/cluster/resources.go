@@ -185,12 +185,11 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	createdStatefulset, err := c.KubeClient.StatefulSets(newStatefulSet.Namespace).Create(newStatefulSet)
 	if err != nil {
 		return fmt.Errorf("Can't create statefulset '%s': %s", statefulSetName, err)
-	} else {
-		// check that all the previous replicas were picked up.
-		if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
-			createdStatefulset.Status.Replicas != oldStatefulset.Status.Replicas {
-			c.logger.Warnf("Number of pods for the old and updated Statefulsets is not identical")
-		}
+	}
+	// check that all the previous replicas were picked up.
+	if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
+		createdStatefulset.Status.Replicas != oldStatefulset.Status.Replicas {
+		c.logger.Warnf("Number of pods for the old and updated Statefulsets is not identical")
 	}
 
 	c.Statefulset = createdStatefulset

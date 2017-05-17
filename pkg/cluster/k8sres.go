@@ -52,8 +52,8 @@ func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRe
 
 	config := c.OpConfig
 
-	defaultRequests := spec.ResourceDescription{Cpu: config.DefaultCpuRequest, Memory: config.DefaultMemoryRequest}
-	defaultLimits := spec.ResourceDescription{Cpu: config.DefaultCpuLimit, Memory: config.DefaultMemoryLimit}
+	defaultRequests := spec.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
+	defaultLimits := spec.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
 
 	result := v1.ResourceRequirements{}
 
@@ -74,13 +74,13 @@ func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescr
 	var err error
 	requests := v1.ResourceList{}
 
-	if spec.Cpu != "" {
-		requests[v1.ResourceCPU], err = resource.ParseQuantity(spec.Cpu)
+	if spec.CPU != "" {
+		requests[v1.ResourceCPU], err = resource.ParseQuantity(spec.CPU)
 		if err != nil {
 			return nil, fmt.Errorf("Can't parse CPU quantity: %s", err)
 		}
 	} else {
-		requests[v1.ResourceCPU], err = resource.ParseQuantity(defaults.Cpu)
+		requests[v1.ResourceCPU], err = resource.ParseQuantity(defaults.CPU)
 		if err != nil {
 			return nil, fmt.Errorf("Can't parse default CPU quantity: %s", err)
 		}
@@ -432,7 +432,7 @@ func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.labelsSet(),
 			Annotations: map[string]string{
-				constants.ZalandoDnsNameAnnotation: c.dnsName(),
+				constants.ZalandoDNSNameAnnotation: c.dnsName(),
 				constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 			},
 		},

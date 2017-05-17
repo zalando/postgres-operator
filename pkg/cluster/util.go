@@ -30,11 +30,10 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 		if !alphaNumericRegexp.MatchString(flag) {
 			err = fmt.Errorf("User flag '%s' is not alphanumeric", flag)
 			return
-		} else {
-			flag = strings.ToUpper(flag)
-			if _, ok := uniqueFlags[flag]; !ok {
-				uniqueFlags[flag] = true
-			}
+		}
+		flag = strings.ToUpper(flag)
+		if _, ok := uniqueFlags[flag]; !ok {
+			uniqueFlags[flag] = true
 		}
 	}
 	if uniqueFlags[constants.RoleFlagLogin] && uniqueFlags[constants.RoleFlagNoLogin] {
@@ -109,10 +108,10 @@ func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
 }
 
 func (c *Cluster) getTeamMembers() ([]string, error) {
-	if c.Spec.TeamId == "" {
+	if c.Spec.TeamID == "" {
 		return nil, fmt.Errorf("No teamId specified")
 	}
-	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamId)
+	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamID)
 	if err != nil {
 		return nil, fmt.Errorf("Can't get team info: %s", err)
 	}

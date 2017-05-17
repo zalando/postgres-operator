@@ -22,7 +22,7 @@ type Config struct {
 	KubeClient          *kubernetes.Clientset
 	RestClient          *rest.RESTClient
 	EtcdClient          etcdclient.KeysAPI
-	TeamsAPIClient      *teams.TeamsAPI
+	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
 }
 
