@@ -227,7 +227,7 @@ func (c *Cluster) Create(stopCh <-chan struct{}) error {
 	}
 	c.logger.Infof("Pods are ready")
 
-	if !(c.masterLess || c.DatabaseAccessDisabled()) {
+	if !(c.masterLess || c.databaseAccessDisabled()) {
 		if err := c.initDbConn(); err != nil {
 			return fmt.Errorf("Can't init db connection: %s", err)
 		} else {

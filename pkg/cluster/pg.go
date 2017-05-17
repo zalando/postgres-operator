@@ -32,12 +32,14 @@ func (c *Cluster) pgConnectionString() string {
 		strings.Replace(password, "$", "\\$", -1))
 }
 
-func (c *Cluster) DatabaseAccessDisabled() bool {
+func (c *Cluster) databaseAccessDisabled() bool {
 	if c.OpConfig.EnableDBAccess == false {
 		c.logger.Debugf("Database access is disabled")
 	}
+
 	return c.OpConfig.EnableDBAccess == false
 }
+
 func (c *Cluster) initDbConn() (err error) {
 	if c.pgDb == nil {
 		conn, err := sql.Open("postgres", c.pgConnectionString())

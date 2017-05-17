@@ -36,7 +36,8 @@ func (c *Cluster) SyncCluster(stopCh <-chan struct{}) {
 	if err := c.syncStatefulSet(); err != nil {
 		c.logger.Errorf("Can't sync StatefulSets: %s", err)
 	}
-	if c.DatabaseAccessDisabled() {
+
+	if c.databaseAccessDisabled() {
 		return
 	}
 	if err := c.initDbConn(); err != nil {
