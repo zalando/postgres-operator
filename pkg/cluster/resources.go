@@ -7,11 +7,11 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
 
 func (c *Cluster) loadResources() error {
@@ -174,10 +174,11 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	err := retryutil.Retry(constants.StatefulsetDeletionInterval, constants.StatefulsetDeletionTimeout,
 		func() (bool, error) {
 			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name)
+
 			return err != nil, nil
 		})
 	if err != nil {
-		fmt.Errorf("could not delete statefulset: %s", err)
+		return fmt.Errorf("could not delete statefulset: %s", err)
 	}
 
 	// create the new statefulset with the desired spec. It would take over the remaining pods.
@@ -191,9 +192,9 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 			c.logger.Warnf("Number of pods for the old and updated Statefulsets is not identical")
 		}
 	}
+
 	c.Statefulset = createdStatefulset
 	return nil
-
 }
 
 func (c *Cluster) deleteStatefulSet() error {

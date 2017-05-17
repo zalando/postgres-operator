@@ -267,7 +267,6 @@ func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string)
 	return
 }
 
-
 func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match, needsReplace, needsRollUpdate bool, reason string) {
 	match = true
 	//TODO: improve me
