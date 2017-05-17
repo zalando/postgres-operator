@@ -7,7 +7,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
-	"github.bus.zalan.do/acid/postgres-operator/pkg/util/retryutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
