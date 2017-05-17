@@ -26,7 +26,7 @@ func decoderFrom(field reflect.Value) (d Decoder) {
 
 	d, ok := field.Interface().(Decoder)
 	if !ok && field.CanAddr() {
-		d, ok = field.Addr().Interface().(Decoder)
+		d, _ = field.Addr().Interface().(Decoder)
 	}
 
 	return d
