@@ -107,7 +107,7 @@ func (c *Cluster) syncEndpoint() error {
 
 func (c *Cluster) syncStatefulSet() error {
 	cSpec := c.Spec
-	var rollUpdate, needsReplace bool
+	var rollUpdate bool
 	if c.Statefulset == nil {
 		c.logger.Infof("Can't find the cluster's StatefulSet")
 		pods, err := c.listPods()
@@ -132,24 +132,20 @@ func (c *Cluster) syncStatefulSet() error {
 			return nil
 		}
 	}
+	/* TODO: should check that we need to replace the statefulset */
 	if !rollUpdate {
-		var (
-			match  bool
-			reason string
-		)
-
 		desiredSS, err := c.genStatefulSet(cSpec)
 		if err != nil {
 			return fmt.Errorf("Can't generate StatefulSet: %s", err)
 		}
 
-		match, needsReplace, rollUpdate, reason = c.compareStatefulSetWith(desiredSS)
-		if match {
+		cmp := c.compareStatefulSetWith(desiredSS)
+		if cmp.match {
 			return nil
 		}
-		c.logStatefulSetChanges(c.Statefulset, desiredSS, false, reason)
+		c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
 
-		if !needsReplace {
+		if !cmp.replace{
 			if err := c.updateStatefulSet(desiredSS); err != nil {
 				return fmt.Errorf("Can't update StatefulSet: %s", err)
 			}
@@ -159,7 +155,7 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 		}
 
-		if !rollUpdate {
+		if !cmp.rollingUpdate{
 			c.logger.Debugln("No rolling update is needed")
 			return nil
 		}

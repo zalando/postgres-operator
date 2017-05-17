@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/rest"
@@ -27,6 +28,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
 
 var (
@@ -69,6 +71,13 @@ type Cluster struct {
 	podDispatcherRunning bool
 	userSyncStrategy     spec.UserSyncer
 	deleteOptions        *v1.DeleteOptions
+}
+
+type compareStatefulsetResult struct {
+	match         bool
+	replace       bool
+	rollingUpdate bool
+	reasons       []string
 }
 
 func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
@@ -268,20 +277,23 @@ func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string)
 }
 
 
-func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match, needsReplace, needsRollUpdate bool, reason string) {
+func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
+	reasons := make([]string, 0)
+	var match, needsRollUpdate, needsReplace bool
+
 	match = true
 	//TODO: improve me
 	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
 		match = false
-		reason = "new statefulset's number of replicas doesn't match the current one"
+		reasons = append(reasons, "new statefulset's number of replicas doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
 		needsRollUpdate = true
-		reason = "new statefulset's container specification doesn't match the current one"
+		reasons = append(reasons,"new statefulset's container specification doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warnf("StatefulSet '%s' has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
-		return
+		return &compareStatefulsetResult{}
 	}
 	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
 	// and the combined effect of all the changes should be applied.
@@ -291,48 +303,44 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (matc
 	if c.Statefulset.Spec.Template.Spec.ServiceAccountName != statefulSet.Spec.Template.Spec.ServiceAccountName {
 		needsReplace = true
 		needsRollUpdate = true
-		reason = "new statefulset's serviceAccountName service asccount name doesn't match the current one"
+		reasons = append(reasons, "new statefulset's serviceAccountName service asccount name doesn't match the current one")
 	}
 	if *c.Statefulset.Spec.Template.Spec.TerminationGracePeriodSeconds != *statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds {
 		needsReplace = true
 		needsRollUpdate = true
-		reason = "new statefulset's terminationGracePeriodSeconds  doesn't match the current one"
+		reasons = append(reasons, "new statefulset's terminationGracePeriodSeconds  doesn't match the current one")
 	}
 	// Some generated fields like creationTimestamp make it not possible to use DeepCompare on Spec.Template.ObjectMeta
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Labels, statefulSet.Spec.Template.Labels) {
 		needsReplace = true
 		needsRollUpdate = true
-		reason = "new statefulset's metadata labels doesn't match the current one"
+		reasons = append(reasons, "new statefulset's metadata labels doesn't match the current one")
 	}
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
 		needsRollUpdate = true
 		needsReplace = true
-		reason = "new statefulset's metadata annotations doesn't match the current one"
+		reasons = append(reasons, "new statefulset's metadata annotations doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
 		needsReplace = true
-		needsRollUpdate = true
-		reason = "new statefulset's volumeClaimTemplates contains different number of volumes to the old one"
+		reasons = append(reasons, "new statefulset's volumeClaimTemplates contains different number of volumes to the old one")
 	}
 	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
 		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
 		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
 		if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
 			needsReplace = true
-			needsRollUpdate = true
-			reason = fmt.Sprintf("new statefulset's name for volume %d doesn't match the current one", i)
+			reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d doesn't match the current one", i))
 			continue
 		}
 		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
 			needsReplace = true
-			needsRollUpdate = true
-			reason = fmt.Sprintf("new statefulset's annotations for volume %s doesn't match the current one", name)
+			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %s doesn't match the current one", name))
 		}
 		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
 			name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
 			needsReplace = true
-			needsRollUpdate = true
-			reason = fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %s doesn't match the current one", name)
+			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %s doesn't match the current one", name))
 		}
 	}
 
@@ -340,28 +348,27 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (matc
 	container2 := statefulSet.Spec.Template.Spec.Containers[0]
 	if container1.Image != container2.Image {
 		needsRollUpdate = true
-		reason = "new statefulset's container image doesn't match the current one"
+		reasons = append(reasons, "new statefulset's container image doesn't match the current one")
 	}
 
 	if !reflect.DeepEqual(container1.Ports, container2.Ports) {
 		needsRollUpdate = true
-		reason = "new statefulset's container ports don't match the current one"
+		reasons = append(reasons, "new statefulset's container ports don't match the current one")
 	}
 
 	if !compareResources(&container1.Resources, &container2.Resources) {
 		needsRollUpdate = true
-		reason = "new statefulset's container resources don't match the current ones"
+		reasons = append(reasons, "new statefulset's container resources don't match the current ones")
 	}
 	if !reflect.DeepEqual(container1.Env, container2.Env) {
 		needsRollUpdate = true
-		reason = "new statefulset's container environment doesn't match the current one"
+		reasons = append(reasons, "new statefulset's container environment doesn't match the current one")
 	}
 
 	if needsRollUpdate || needsReplace {
 		match = false
 	}
-
-	return
+	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
 }
 
 func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (equal bool) {
@@ -414,20 +421,21 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 
 	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
 		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
-		//TODO: update PVC
+		if err := c.updateVolumes(newSpec.Spec.Volume); err != nil {
+			return fmt.Errorf("Could not update volumes: %s", err)
+		}
 	}
 
 	newStatefulSet, err := c.genStatefulSet(newSpec.Spec)
 	if err != nil {
 		return fmt.Errorf("Can't generate StatefulSet: %s", err)
 	}
+	cmp := c.compareStatefulSetWith(newStatefulSet)
 
-	sameSS, needsReplace, rollingUpdate, reason := c.compareStatefulSetWith(newStatefulSet)
-
-	if !sameSS {
-		c.logStatefulSetChanges(c.Statefulset, newStatefulSet, true, reason)
+	if !cmp.match {
+		c.logStatefulSetChanges(c.Statefulset, newStatefulSet, true, cmp.reasons)
 		//TODO: mind the case of updating allowedSourceRanges
-		if !needsReplace {
+		if !cmp.replace {
 			if err := c.updateStatefulSet(newStatefulSet); err != nil {
 				c.setStatus(spec.ClusterStatusUpdateFailed)
 				return fmt.Errorf("Can't upate StatefulSet: %s", err)
@@ -442,13 +450,15 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logger.Infof("StatefulSet '%s' has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	}
 
+
+
 	if c.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
 		c.logger.Warnf("Postgresql version change(%s -> %s) is not allowed",
 			c.Spec.PgVersion, newSpec.Spec.PgVersion)
 		//TODO: rewrite pg version in tpr spec
 	}
 
-	if rollingUpdate {
+	if cmp.rollingUpdate {
 		c.logger.Infof("Rolling update is needed")
 		// TODO: wait for actual streaming to the replica
 		if err := c.recreatePods(); err != nil {
@@ -459,6 +469,39 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	}
 	c.setStatus(spec.ClusterStatusRunning)
 
+	return nil
+}
+
+
+// updateVolumes changes size of the persistent volumes
+// backed by EBS. It checks the new size against the PVs to
+// decide whcih volumes to update. When updating, it first
+// changes the EBS and only then update the PV.
+func (c *Cluster) updateVolumes(newVolume spec.Volume) (error) {
+	newQuantity, err := resource.ParseQuantity(newVolume.Size)
+	newSize := newQuantity.ScaledValue(resource.Giga)
+
+	pvs, err := c.listPersistentVolumes()
+	if err != nil {
+		return fmt.Errorf("Could not list persistent volumes: %s", err)
+	}
+	ec2, err := volumes.ConnectToEC2()
+	if err != nil {
+		return fmt.Errorf("Could not connect to EC2")
+	}
+	for _, pv := range pvs {
+		cap := pv.Spec.Capacity[v1.ResourceStorage]
+		if cap.ScaledValue(resource.Giga) != newSize {
+			c.logger.Debugf("Updating persistent volume %s to %d", pv.Name, newSize)
+			if err := volumes.ResizeVolume(ec2, pv.Spec.AWSElasticBlockStore.VolumeID, newSize); err != nil {
+				return fmt.Errorf("Could not resize EBS volume: %s", err)
+			}
+			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
+			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
+				return fmt.Errorf("Could not update persistent volume: %s", err)
+			}
+		}
+	}
 	return nil
 }
 

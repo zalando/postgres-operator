@@ -19,6 +19,16 @@ const (
 	ElbTimeoutAnnotationName    = "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout"
 	ElbTimeoutAnnotationValue   = "3600"
 	KubeIAmAnnotation           = "iam.amazonaws.com/role"
+	VolumeClaimStorageProvisionerAnnotation = "volume.beta.kubernetes.io/storage-provisioner"
+	VolumeStorateProvisionerAnnotation = "pv.kubernetes.io/provisioned-by"
+	EBSProvisioner= "kubernetes.io/aws-ebs"
+	//https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VolumeModification.html
+	EBSVolumeStateModifying = "modifying"
+	EBSVolumeStateOptimizing = "optimizing"
+	EBSVolumeStateFailed = "failed"
+	EBSVolumeStateCompleted = "completed"
+	EBSVolumeResizeWaitInterval = 2
+	EBSVolumeResizeWaitTimeout = 30
 	ResourceName                = TPRName + "s"
 	PodRoleMaster               = "master"
 	PodRoleReplica              = "replica"
