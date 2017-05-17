@@ -159,10 +159,10 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	c.logger.Debugf("Replacing StatefulSet")
 
 	// Delete the current statefulset without deleting the pods
-	OrphanDepencies := true
+	orphanDepencies := true
 	oldStatefulset := c.Statefulset
 
-	options := v1.DeleteOptions{OrphanDependents: &OrphanDepencies}
+	options := v1.DeleteOptions{OrphanDependents: &orphanDepencies}
 	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
 		return fmt.Errorf("Can't delete statefulset '%s': %s", statefulSetName, err)
 	}
