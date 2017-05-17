@@ -6,7 +6,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
-func (c *Cluster) SyncCluster(stopCh <-chan struct{}) error {
+func (c *Cluster) Sync(stopCh <-chan struct{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

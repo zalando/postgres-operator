@@ -165,7 +165,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 			c.clustersMu.Unlock()
 		}
 
-		if err := cl.SyncCluster(stopCh); err != nil {
+		if err := cl.Sync(stopCh); err != nil {
 			logger.Errorf("Can't sync cluster '%s': %s", clusterName, err)
 			return nil
 		}
