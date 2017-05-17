@@ -28,7 +28,7 @@ func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
 	for name, newUser := range newUsers {
 		dbUser, exists := dbUsers[name]
 		if !exists {
-			reqs = append(reqs, spec.PgSyncUserRequest{Kind:spec.PGSyncUserAdd, User:newUser})
+			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserAdd, User: newUser})
 		} else {
 			r := spec.PgSyncUserRequest{}
 			newMD5Password := util.PGUserPassword(newUser)
