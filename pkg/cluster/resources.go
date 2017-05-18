@@ -370,9 +370,6 @@ func (c *Cluster) createUsers() (err error) {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
 	reqs := c.userSyncStrategy.ProduceSyncRequests(nil, c.pgUsers)
 	err = c.userSyncStrategy.ExecuteSyncRequests(reqs, c.pgDb)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }

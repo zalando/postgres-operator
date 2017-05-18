@@ -59,11 +59,8 @@ func (c *Cluster) syncSecrets() error {
 	}
 
 	err := c.applySecrets()
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (c *Cluster) syncService() error {

@@ -215,11 +215,7 @@ func (c *Cluster) waitPodLabelsReady() error {
 
 	//TODO: wait for master for a while and then set masterLess flag
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (c *Cluster) waitStatefulsetPodsReady() error {
