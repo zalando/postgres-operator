@@ -43,19 +43,19 @@ type Config struct {
 	TPR
 	Resources
 	Auth
-	Namespace          string `name:"namespace"`
-	EtcdHost           string `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
-	DockerImage        string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
-	ServiceAccountName string `name:"service_account_name" default:"operator"`
-	DbHostedZone       string `name:"db_hosted_zone" default:"db.example.com"`
-	EtcdScope          string `name:"etcd_scope" default:"service"`
-	WALES3Bucket       string `name:"wal_s3_bucket"`
-	KubeIAMRole        string `name:"kube_iam_role"`
-	DebugLogging       bool   `name:"debug_logging" default:"false"`
-	EnableDBAccess     bool   `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI     bool   `name:"enable_teams_api" default:"true"`
-	DNSNameFormat      string `name:"dns_name_format" default:"%s.%s.%s"`
-	Workers            uint32 `name:"workers" default:"4"`
+	Namespace          string         `name:"namespace"`
+	EtcdHost           string         `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
+	DockerImage        string         `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
+	ServiceAccountName string         `name:"service_account_name" default:"operator"`
+	DbHostedZone       string         `name:"db_hosted_zone" default:"db.example.com"`
+	EtcdScope          string         `name:"etcd_scope" default:"service"`
+	WALES3Bucket       string         `name:"wal_s3_bucket"`
+	KubeIAMRole        string         `name:"kube_iam_role"`
+	DebugLogging       bool           `name:"debug_logging" default:"true"`
+	EnableDBAccess     bool           `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI     bool           `name:"enable_teams_api" default:"true"`
+	DNSNameFormat      stringTemplate `name:"dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
+	Workers            uint32         `name:"workers" default:"4"`
 }
 
 func (c Config) MustMarshal() string {

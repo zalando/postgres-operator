@@ -9,7 +9,7 @@ data:
   pod_role_label: spilo-role
   db_hosted_zone: db.example.com
   debug_logging: "true"
-  dns_name_format: '%s.%s.staging.%s'
+  dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
   docker_image: registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4
   etcd_host: etcd-client.default.svc.cluster.local:2379
   infrastructure_roles_secret_name: postgresql-infrastructure-roles
