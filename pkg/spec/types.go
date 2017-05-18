@@ -60,16 +60,16 @@ type UserSyncer interface {
 	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
 }
 
-func (p NamespacedName) String() string {
-	if p.Namespace == "" && p.Name == "" {
+func (n NamespacedName) String() string {
+	if n.Namespace == "" && n.Name == "" {
 		return ""
 	}
 
-	return types.NamespacedName(p).String()
+	return types.NamespacedName(n).String()
 }
 
-func (p NamespacedName) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + p.String() + "\""), nil
+func (n NamespacedName) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + n.String() + "\""), nil
 }
 
 func (n *NamespacedName) Decode(value string) error {

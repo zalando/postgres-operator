@@ -28,7 +28,7 @@ func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
 	for name, newUser := range newUsers {
 		dbUser, exists := dbUsers[name]
 		if !exists {
-			reqs = append(reqs, spec.PgSyncUserRequest{spec.PGSyncUserAdd, newUser})
+			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserAdd, User: newUser})
 		} else {
 			r := spec.PgSyncUserRequest{}
 			newMD5Password := util.PGUserPassword(newUser)
@@ -67,7 +67,7 @@ func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserReque
 				return fmt.Errorf("Can't alter user '%s': %s", r.User.Name, err)
 			}
 		default:
-			return fmt.Errorf("Unrecognized operation: %s", r.Kind)
+			return fmt.Errorf("Unrecognized operation: %v", r.Kind)
 		}
 
 	}

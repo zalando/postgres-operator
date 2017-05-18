@@ -209,18 +209,18 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 		return
 	}
 
-	workerId := c.clusterWorkerId(clusterName)
+	workerID := c.clusterWorkerID(clusterName)
 	clusterEvent := spec.ClusterEvent{
 		EventType: eventType,
 		UID:       uid,
 		OldSpec:   old,
 		NewSpec:   new,
-		WorkerID:  workerId,
+		WorkerID:  workerID,
 	}
 	//TODO: if we delete cluster, discard all the previous events for the cluster
 
-	c.clusterEventQueues[workerId].Add(clusterEvent)
-	c.logger.WithField("worker", workerId).Infof("%s of the '%s' cluster has been queued for", eventType, clusterName)
+	c.clusterEventQueues[workerID].Add(clusterEvent)
+	c.logger.WithField("worker", workerID).Infof("%s of the '%s' cluster has been queued for", eventType, clusterName)
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {

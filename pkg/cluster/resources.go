@@ -185,12 +185,11 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	createdStatefulset, err := c.KubeClient.StatefulSets(newStatefulSet.Namespace).Create(newStatefulSet)
 	if err != nil {
 		return fmt.Errorf("Can't create statefulset '%s': %s", statefulSetName, err)
-	} else {
-		// check that all the previous replicas were picked up.
-		if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
-			createdStatefulset.Status.Replicas != oldStatefulset.Status.Replicas {
-			c.logger.Warnf("Number of pods for the old and updated Statefulsets is not identical")
-		}
+	}
+	// check that all the previous replicas were picked up.
+	if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
+		createdStatefulset.Status.Replicas != oldStatefulset.Status.Replicas {
+		c.logger.Warnf("Number of pods for the old and updated Statefulsets is not identical")
 	}
 
 	c.Statefulset = createdStatefulset
@@ -296,12 +295,6 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 	return endpoints, nil
 }
 
-func (c *Cluster) updateEndpoint(newEndpoint *v1.Endpoints) error {
-	//TODO: to be implemented
-
-	return nil
-}
-
 func (c *Cluster) deleteEndpoint() error {
 	c.logger.Debugln("Deleting Endpoint")
 	if c.Endpoint == nil {
@@ -371,9 +364,6 @@ func (c *Cluster) createUsers() (err error) {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
 	reqs := c.userSyncStrategy.ProduceSyncRequests(nil, c.pgUsers)
 	err = c.userSyncStrategy.ExecuteSyncRequests(reqs, c.pgDb)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }

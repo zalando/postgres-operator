@@ -22,7 +22,7 @@ type Config struct {
 	KubeClient          *kubernetes.Clientset
 	RestClient          *rest.RESTClient
 	EtcdClient          etcdclient.KeysAPI
-	TeamsAPIClient      *teams.TeamsAPI
+	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
 }
 
@@ -30,7 +30,6 @@ type Controller struct {
 	Config
 	opConfig    *config.Config
 	logger      *logrus.Entry
-	waitCluster sync.WaitGroup
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster

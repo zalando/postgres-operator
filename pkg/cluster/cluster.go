@@ -39,7 +39,7 @@ type Config struct {
 	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
 	RestClient          *rest.RESTClient
 	EtcdClient          etcdclient.KeysAPI
-	TeamsAPIClient      *teams.TeamsAPI
+	TeamsAPIClient      *teams.API
 	OpConfig            config.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
 }
@@ -100,7 +100,7 @@ func (c *Cluster) ClusterName() spec.NamespacedName {
 
 func (c *Cluster) teamName() string {
 	// TODO: check Teams API for the actual name (in case the user passes an integer Id).
-	return c.Spec.TeamId
+	return c.Spec.TeamID
 }
 
 func (c *Cluster) setStatus(status spec.PostgresStatus) {
@@ -199,9 +199,8 @@ func (c *Cluster) Create(stopCh <-chan struct{}) error {
 	service, err := c.createService()
 	if err != nil {
 		return fmt.Errorf("Can't create Service: %s", err)
-	} else {
-		c.logger.Infof("Service '%s' has been successfully created", util.NameFromMeta(service.ObjectMeta))
 	}
+	c.logger.Infof("Service '%s' has been successfully created", util.NameFromMeta(service.ObjectMeta))
 
 	if err = c.initUsers(); err != nil {
 		return err
@@ -230,20 +229,21 @@ func (c *Cluster) Create(stopCh <-chan struct{}) error {
 	if !(c.masterLess || c.databaseAccessDisabled()) {
 		if err := c.initDbConn(); err != nil {
 			return fmt.Errorf("Can't init db connection: %s", err)
-		} else {
-			if err = c.createUsers(); err != nil {
-				return fmt.Errorf("Can't create users: %s", err)
-			} else {
-				c.logger.Infof("Users have been successfully created")
-			}
 		}
+		if err = c.createUsers(); err != nil {
+			return fmt.Errorf("Can't create users: %s", err)
+		}
+		c.logger.Infof("Users have been successfully created")
 	} else {
 		if c.masterLess {
 			c.logger.Warnln("Cluster is masterless")
 		}
 	}
 
-	c.ListResources()
+	err = c.ListResources()
+	if err != nil {
+		c.logger.Errorf("Can't list resources: %s", err)
+	}
 
 	return nil
 }
@@ -406,9 +406,8 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		if err := c.updateService(newService); err != nil {
 			c.setStatus(spec.ClusterStatusUpdateFailed)
 			return fmt.Errorf("Can't update Service: %s", err)
-		} else {
-			c.logger.Infof("Service '%s' has been updated", util.NameFromMeta(c.Service.ObjectMeta))
 		}
+		c.logger.Infof("Service '%s' has been updated", util.NameFromMeta(c.Service.ObjectMeta))
 	}
 
 	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
@@ -530,12 +529,11 @@ func (c *Cluster) initHumanUsers() error {
 	teamMembers, err := c.getTeamMembers()
 	if err != nil {
 		return fmt.Errorf("Can't get list of team members: %s", err)
-	} else {
-		for _, username := range teamMembers {
-			flags := []string{constants.RoleFlagLogin, constants.RoleFlagSuperuser}
-			memberOf := []string{c.OpConfig.PamRoleName}
-			c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
-		}
+	}
+	for _, username := range teamMembers {
+		flags := []string{constants.RoleFlagLogin, constants.RoleFlagSuperuser}
+		memberOf := []string{c.OpConfig.PamRoleName}
+		c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
 	}
 
 	return nil
@@ -547,11 +545,11 @@ func (c *Cluster) initInfrastructureRoles() error {
 		if !isValidUsername(username) {
 			return fmt.Errorf("Invalid username: '%s'", username)
 		}
-		if flags, err := normalizeUserFlags(data.Flags); err != nil {
+		flags, err := normalizeUserFlags(data.Flags)
+		if err != nil {
 			return fmt.Errorf("Invalid flags for user '%s': %s", username, err)
-		} else {
-			data.Flags = flags
 		}
+		data.Flags = flags
 		c.pgUsers[username] = data
 	}
 	return nil

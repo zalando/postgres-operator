@@ -1,12 +1,10 @@
 package cluster
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -30,11 +28,10 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 		if !alphaNumericRegexp.MatchString(flag) {
 			err = fmt.Errorf("User flag '%s' is not alphanumeric", flag)
 			return
-		} else {
-			flag = strings.ToUpper(flag)
-			if _, ok := uniqueFlags[flag]; !ok {
-				uniqueFlags[flag] = true
-			}
+		}
+		flag = strings.ToUpper(flag)
+		if _, ok := uniqueFlags[flag]; !ok {
+			uniqueFlags[flag] = true
 		}
 	}
 	if uniqueFlags[constants.RoleFlagLogin] && uniqueFlags[constants.RoleFlagNoLogin] {
@@ -109,10 +106,10 @@ func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
 }
 
 func (c *Cluster) getTeamMembers() ([]string, error) {
-	if c.Spec.TeamId == "" {
+	if c.Spec.TeamID == "" {
 		return nil, fmt.Errorf("No teamId specified")
 	}
-	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamId)
+	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamID)
 	if err != nil {
 		return nil, fmt.Errorf("Can't get team info: %s", err)
 	}
@@ -216,11 +213,7 @@ func (c *Cluster) waitPodLabelsReady() error {
 
 	//TODO: wait for master for a while and then set masterLess flag
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (c *Cluster) waitStatefulsetPodsReady() error {
@@ -257,25 +250,6 @@ func (c *Cluster) credentialSecretName(username string) string {
 	return fmt.Sprintf(constants.UserSecretTemplate,
 		strings.Replace(username, "_", "-", -1),
 		c.Metadata.Name)
-}
-
-func (c *Cluster) deleteEtcdKey() error {
-	etcdKey := fmt.Sprintf("/%s/%s", c.OpConfig.EtcdScope, c.Metadata.Name)
-
-	//TODO: retry multiple times
-	resp, err := c.EtcdClient.Delete(context.Background(),
-		etcdKey,
-		&etcdclient.DeleteOptions{Recursive: true})
-
-	if err != nil {
-		return fmt.Errorf("Can't delete etcd key: %s", err)
-	}
-
-	if resp == nil {
-		return fmt.Errorf("No response from etcd cluster")
-	}
-
-	return nil
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {

@@ -62,7 +62,7 @@ func thirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
 	}
 }
 
-func (c *Controller) clusterWorkerId(clusterName spec.NamespacedName) uint32 {
+func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 	return crc32.ChecksumIEEE([]byte(clusterName.String())) % c.opConfig.Workers
 }
 
@@ -74,9 +74,8 @@ func (c *Controller) createTPR() error {
 	if err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return err
-		} else {
-			c.logger.Infof("ThirdPartyResource '%s' is already registered", TPRName)
 		}
+		c.logger.Infof("ThirdPartyResource '%s' is already registered", TPRName)
 	} else {
 		c.logger.Infof("ThirdPartyResource '%s' has been registered", TPRName)
 	}
