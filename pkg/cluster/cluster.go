@@ -227,7 +227,7 @@ func (c *Cluster) Create(stopCh <-chan struct{}) error {
 	}
 	c.logger.Infof("Pods are ready")
 
-	if !(c.masterLess || c.DatabaseAccessDisabled()) {
+	if !(c.masterLess || c.databaseAccessDisabled()) {
 		if err := c.initDbConn(); err != nil {
 			return fmt.Errorf("Can't init db connection: %s", err)
 		} else {
@@ -466,20 +466,20 @@ func (c *Cluster) Delete() error {
 	defer c.mu.Unlock()
 
 	if err := c.deleteEndpoint(); err != nil {
-		c.logger.Errorf("Can't delete Endpoint: %s", err)
+		return fmt.Errorf("Can't delete Endpoint: %s", err)
 	}
 
 	if err := c.deleteService(); err != nil {
-		c.logger.Errorf("Can't delete Service: %s", err)
+		return fmt.Errorf("Can't delete Service: %s", err)
 	}
 
 	if err := c.deleteStatefulSet(); err != nil {
-		c.logger.Errorf("Can't delete StatefulSet: %s", err)
+		return fmt.Errorf("Can't delete StatefulSet: %s", err)
 	}
 
 	for _, obj := range c.Secrets {
 		if err := c.deleteSecret(obj); err != nil {
-			c.logger.Errorf("Can't delete Secret: %s", err)
+			return fmt.Errorf("Can't delete Secret: %s", err)
 		}
 	}
 

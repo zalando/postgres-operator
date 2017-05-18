@@ -6,7 +6,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
-func (c *Cluster) SyncCluster(stopCh <-chan struct{}) {
+func (c *Cluster) Sync(stopCh <-chan struct{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -19,34 +19,37 @@ func (c *Cluster) SyncCluster(stopCh <-chan struct{}) {
 
 	c.logger.Debugf("Syncing Secrets")
 	if err := c.syncSecrets(); err != nil {
-		c.logger.Infof("Can't sync Secrets: %s", err)
+		return fmt.Errorf("Can't sync Secrets: %s", err)
 	}
 
 	c.logger.Debugf("Syncing Endpoints")
 	if err := c.syncEndpoint(); err != nil {
-		c.logger.Errorf("Can't sync Endpoints: %s", err)
+		return fmt.Errorf("Can't sync Endpoints: %s", err)
 	}
 
 	c.logger.Debugf("Syncing Services")
 	if err := c.syncService(); err != nil {
-		c.logger.Errorf("Can't sync Services: %s", err)
+		return fmt.Errorf("Can't sync Services: %s", err)
 	}
 
 	c.logger.Debugf("Syncing StatefulSets")
 	if err := c.syncStatefulSet(); err != nil {
-		c.logger.Errorf("Can't sync StatefulSets: %s", err)
+		return fmt.Errorf("Can't sync StatefulSets: %s", err)
 	}
-	if c.DatabaseAccessDisabled() {
-		return
+
+	if c.databaseAccessDisabled() {
+		return nil
 	}
 	if err := c.initDbConn(); err != nil {
-		c.logger.Errorf("Can't init db connection: %s", err)
+		return fmt.Errorf("Can't init db connection: %s", err)
 	} else {
 		c.logger.Debugf("Syncing Roles")
 		if err := c.SyncRoles(); err != nil {
-			c.logger.Errorf("Can't sync Roles: %s", err)
+			return fmt.Errorf("Can't sync Roles: %s", err)
 		}
 	}
+
+	return nil
 }
 
 func (c *Cluster) syncSecrets() error {
