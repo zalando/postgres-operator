@@ -54,7 +54,7 @@ type Config struct {
 	DebugLogging       bool           `name:"debug_logging" default:"true"`
 	EnableDBAccess     bool           `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI     bool           `name:"enable_teams_api" default:"true"`
-	DNSNameFormat      stringTemplate `name:"dns_name_format" default:"{{cluster}}.{{team}}.{{hostedzone}}"`
+	DNSNameFormat      stringTemplate `name:"dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	Workers            uint32         `name:"workers" default:"4"`
 }
 
@@ -94,7 +94,6 @@ func Copy(c *Config) Config {
 	for k, v := range c.ClusterLabels {
 		cfg.ClusterLabels[k] = v
 	}
-	cfg.DNSNameFormat.Decode(c.DNSNameFormat.String())
 
 	return cfg
 }

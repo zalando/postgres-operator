@@ -8,6 +8,7 @@ import (
 	"sync"
 	"syscall"
 
+	"fmt"
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -98,8 +99,11 @@ func main() {
 		configMapData["enable_teams_api"] = "false"
 	}
 	cfg := config.NewFromMap(configMapData)
+	cfg2 := config.Copy(cfg)
 
-	log.Printf("Config: %s", cfg.MustMarshal())
+	fmt.Printf("%p %p\n", &cfg.DNSNameFormat, &cfg2.DNSNameFormat)
+
+	os.Exit(0)
 
 	c := controller.New(controllerConfig, cfg)
 	c.Run(stop, wg)
