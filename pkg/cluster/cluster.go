@@ -240,7 +240,10 @@ func (c *Cluster) Create(stopCh <-chan struct{}) error {
 		}
 	}
 
-	c.ListResources()
+	err = c.ListResources()
+	if err != nil {
+		c.logger.Errorf("Can't list resources: %s", err)
+	}
 
 	return nil
 }

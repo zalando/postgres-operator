@@ -10,7 +10,10 @@ func (c *Cluster) SyncCluster(stopCh <-chan struct{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.loadResources()
+	err := c.loadResources()
+	if err != nil {
+		c.logger.Errorf("Can't load resources: %s", err)
+	}
 
 	if !c.podDispatcherRunning {
 		go c.podEventsDispatcher(stopCh)
