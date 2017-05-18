@@ -245,7 +245,7 @@ func (c *Cluster) labelsSet() labels.Set {
 }
 
 func (c *Cluster) dnsName() string {
-	return strings.ToLower(c.OpConfig.DNSNameFormat.Parse(
+	return strings.ToLower(c.OpConfig.DNSNameFormat.Format(
 		"cluster", c.Spec.ClusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))

@@ -172,7 +172,7 @@ func (f *stringTemplate) Decode(value string) error {
 	return nil
 }
 
-func (f *stringTemplate) Parse(a ...string) string {
+func (f *stringTemplate) Format(a ...string) string {
 	res := string(*f)
 
 	for i := 0; i < len(a); i += 2 {
