@@ -295,12 +295,6 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 	return endpoints, nil
 }
 
-func (c *Cluster) updateEndpoint(newEndpoint *v1.Endpoints) error {
-	//TODO: to be implemented
-
-	return nil
-}
-
 func (c *Cluster) deleteEndpoint() error {
 	c.logger.Debugln("Deleting Endpoint")
 	if c.Endpoint == nil {

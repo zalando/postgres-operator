@@ -1,12 +1,10 @@
 package cluster
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -253,25 +251,6 @@ func (c *Cluster) credentialSecretName(username string) string {
 	return fmt.Sprintf(constants.UserSecretTemplate,
 		strings.Replace(username, "_", "-", -1),
 		c.Metadata.Name)
-}
-
-func (c *Cluster) deleteEtcdKey() error {
-	etcdKey := fmt.Sprintf("/%s/%s", c.OpConfig.EtcdScope, c.Metadata.Name)
-
-	//TODO: retry multiple times
-	resp, err := c.EtcdClient.Delete(context.Background(),
-		etcdKey,
-		&etcdclient.DeleteOptions{Recursive: true})
-
-	if err != nil {
-		return fmt.Errorf("Can't delete etcd key: %s", err)
-	}
-
-	if resp == nil {
-		return fmt.Errorf("No response from etcd cluster")
-	}
-
-	return nil
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {

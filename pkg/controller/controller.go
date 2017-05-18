@@ -30,7 +30,6 @@ type Controller struct {
 	Config
 	opConfig    *config.Config
 	logger      *logrus.Entry
-	waitCluster sync.WaitGroup
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster
