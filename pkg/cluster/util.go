@@ -245,11 +245,10 @@ func (c *Cluster) labelsSet() labels.Set {
 }
 
 func (c *Cluster) dnsName() string {
-	return strings.ToLower(fmt.Sprintf(
-		c.OpConfig.DNSNameFormat,
-		c.Spec.ClusterName,
-		c.teamName(),
-		c.OpConfig.DbHostedZone))
+	return strings.ToLower(c.OpConfig.DNSNameFormat.Format(
+		"cluster", c.Spec.ClusterName,
+		"team", c.teamName(),
+		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
 func (c *Cluster) credentialSecretName(username string) string {

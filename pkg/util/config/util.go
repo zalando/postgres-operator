@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -17,6 +18,8 @@ type fieldInfo struct {
 	Default string
 	Field   reflect.Value
 }
+
+type stringTemplate string
 
 func decoderFrom(field reflect.Value) (d Decoder) {
 	// it may be impossible for a struct field to fail this check
@@ -161,4 +164,24 @@ func processField(value string, field reflect.Value) error {
 	}
 
 	return nil
+}
+
+func (f *stringTemplate) Decode(value string) error {
+	*f = stringTemplate(value)
+
+	return nil
+}
+
+func (f *stringTemplate) Format(a ...string) string {
+	res := string(*f)
+
+	for i := 0; i < len(a); i += 2 {
+		res = strings.Replace(res, "{"+a[i]+"}", a[i+1], -1)
+	}
+
+	return res
+}
+
+func (f stringTemplate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(f))
 }
