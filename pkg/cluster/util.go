@@ -1,11 +1,11 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/labels"
