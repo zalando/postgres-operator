@@ -23,7 +23,6 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
 		KubeClient:          c.KubeClient,
 		RestClient:          c.RestClient,
-		EtcdClient:          c.EtcdClient,
 		TeamsAPIClient:      c.TeamsAPIClient,
 		OpConfig:            config.Copy(c.opConfig),
 		InfrastructureRoles: infrastructureRoles,

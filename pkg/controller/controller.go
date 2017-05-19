@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
@@ -21,7 +20,6 @@ type Config struct {
 	RestConfig          *rest.Config
 	KubeClient          *kubernetes.Clientset
 	RestClient          *rest.RESTClient
-	EtcdClient          etcdclient.KeysAPI
 	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
 }
@@ -121,10 +119,6 @@ func (c *Controller) initController() {
 		UpdateFunc: c.podUpdate,
 		DeleteFunc: c.podDelete,
 	})
-
-	if err := c.initEtcdClient(c.opConfig.EtcdHost); err != nil {
-		c.logger.Fatalf("Can't get etcd client: %s", err)
-	}
 
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
