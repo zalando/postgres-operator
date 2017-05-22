@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
 func (c *Cluster) Sync(stopCh <-chan struct{}) error {
@@ -12,7 +13,7 @@ func (c *Cluster) Sync(stopCh <-chan struct{}) error {
 
 	err := c.loadResources()
 	if err != nil {
-		c.logger.Errorf("Can't load resources: %s", err)
+		c.logger.Errorf("could not load resources: %v", err)
 	}
 
 	if !c.podDispatcherRunning {
@@ -20,35 +21,43 @@ func (c *Cluster) Sync(stopCh <-chan struct{}) error {
 		c.podDispatcherRunning = true
 	}
 
-	c.logger.Debugf("Syncing Secrets")
+	c.logger.Debugf("Syncing secrets")
 	if err := c.syncSecrets(); err != nil {
-		return fmt.Errorf("Can't sync Secrets: %s", err)
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("could not sync secrets: %v", err)
+		}
 	}
 
-	c.logger.Debugf("Syncing Endpoints")
+	c.logger.Debugf("Syncing endpoints")
 	if err := c.syncEndpoint(); err != nil {
-		return fmt.Errorf("Can't sync Endpoints: %s", err)
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("could not sync endpoints: %v", err)
+		}
 	}
 
-	c.logger.Debugf("Syncing Services")
+	c.logger.Debugf("Syncing services")
 	if err := c.syncService(); err != nil {
-		return fmt.Errorf("Can't sync Services: %s", err)
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("coud not sync services: %v", err)
+		}
 	}
 
-	c.logger.Debugf("Syncing StatefulSets")
+	c.logger.Debugf("Syncing statefulsets")
 	if err := c.syncStatefulSet(); err != nil {
-		return fmt.Errorf("Can't sync StatefulSets: %s", err)
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("could not sync statefulsets: %v", err)
+		}
 	}
 
 	if c.databaseAccessDisabled() {
 		return nil
 	}
 	if err := c.initDbConn(); err != nil {
-		return fmt.Errorf("Can't init db connection: %s", err)
+		return fmt.Errorf("could not init db connection: %v", err)
 	} else {
-		c.logger.Debugf("Syncing Roles")
+		c.logger.Debugf("Syncing roles")
 		if err := c.SyncRoles(); err != nil {
-			return fmt.Errorf("Can't sync Roles: %s", err)
+			return fmt.Errorf("could not sync roles: %v", err)
 		}
 	}
 
