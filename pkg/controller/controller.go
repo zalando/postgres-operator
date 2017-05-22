@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	etcdclient "github.com/coreos/etcd/client"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
@@ -21,16 +20,14 @@ type Config struct {
 	RestConfig          *rest.Config
 	KubeClient          *kubernetes.Clientset
 	RestClient          *rest.RESTClient
-	EtcdClient          etcdclient.KeysAPI
-	TeamsAPIClient      *teams.TeamsAPI
+	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
 }
 
 type Controller struct {
 	Config
-	opConfig    *config.Config
-	logger      *logrus.Entry
-	waitCluster sync.WaitGroup
+	opConfig *config.Config
+	logger   *logrus.Entry
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster
@@ -78,12 +75,12 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 func (c *Controller) initController() {
 	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("Can't register ThirdPartyResource: %s", err)
+		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
 	}
 
 	c.TeamsAPIClient.RefreshTokenAction = c.getOAuthToken
 	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
-		c.logger.Warningf("Can't get infrastructure roles: %s", err)
+		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.InfrastructureRoles = infraRoles
 	}
@@ -123,16 +120,12 @@ func (c *Controller) initController() {
 		DeleteFunc: c.podDelete,
 	})
 
-	if err := c.initEtcdClient(c.opConfig.EtcdHost); err != nil {
-		c.logger.Fatalf("Can't get etcd client: %s", err)
-	}
-
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
 		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
 			e, ok := obj.(spec.ClusterEvent)
 			if !ok {
-				return "", fmt.Errorf("Can't cast to ClusterEvent")
+				return "", fmt.Errorf("could not cast to ClusterEvent")
 			}
 
 			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil

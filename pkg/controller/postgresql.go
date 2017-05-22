@@ -29,19 +29,19 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 	object, err := req.Do().Get()
 
 	if err != nil {
-		return nil, fmt.Errorf("Can't get list of postgresql objects: %s", err)
+		return nil, fmt.Errorf("could not get list of postgresql objects: %v", err)
 	}
 
 	objList, err := meta.ExtractList(object)
 	if err != nil {
-		return nil, fmt.Errorf("Can't extract list of postgresql objects: %s", err)
+		return nil, fmt.Errorf("could not extract list of postgresql objects: %v", err)
 	}
 
 	var activeClustersCnt, failedClustersCnt int
 	for _, obj := range objList {
 		pg, ok := obj.(*spec.Postgresql)
 		if !ok {
-			return nil, fmt.Errorf("Can't cast object to postgresql")
+			return nil, fmt.Errorf("could not cast object to postgresql")
 		}
 
 		if pg.Error != nil {
@@ -49,8 +49,6 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 			continue
 		}
 		c.queueClusterEvent(nil, pg, spec.EventSync)
-
-		c.logger.Debugf("Sync of the '%s' cluster has been queued", util.NameFromMeta(pg.Metadata))
 		activeClustersCnt++
 	}
 	if len(objList) > 0 {
@@ -73,7 +71,6 @@ func (c *Controller) clusterWatchFunc(options api.ListOptions) (watch.Interface,
 		RequestURI(fmt.Sprintf(constants.WatchClustersURITemplate, c.opConfig.Namespace)).
 		VersionedParams(&options, api.ParameterCodec).
 		FieldsSelectorParam(fields.Everything())
-
 	return req.Watch()
 }
 
@@ -82,7 +79,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 	event, ok := obj.(spec.ClusterEvent)
 	if !ok {
-		return fmt.Errorf("Can't cast to ClusterEvent")
+		return fmt.Errorf("could not cast to ClusterEvent")
 	}
 	logger := c.logger.WithField("worker", event.WorkerID)
 
@@ -115,7 +112,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 		c.clustersMu.Unlock()
 
 		if err := cl.Create(stopCh); err != nil {
-			logger.Errorf("Can't create cluster: %s", err)
+			cl.Error = fmt.Errorf("could not create cluster: %v", err)
+			logger.Errorf("%v", cl.Error)
+
 			return nil
 		}
 
@@ -128,7 +127,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 			return nil
 		}
 		if err := cl.Update(event.NewSpec); err != nil {
-			logger.Errorf("Can't update cluster: %s", err)
+			cl.Error = fmt.Errorf("could not update cluster: %s", err)
+			logger.Errorf("%v", cl.Error)
+
 			return nil
 		}
 		logger.Infof("Cluster '%s' has been updated", clusterName)
@@ -140,7 +141,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		}
 
 		if err := cl.Delete(); err != nil {
-			logger.Errorf("Can't delete cluster '%s': %s", clusterName, err)
+			logger.Errorf("could not delete cluster '%s': %s", clusterName, err)
 			return nil
 		}
 		close(c.stopChs[clusterName])
@@ -165,7 +166,11 @@ func (c *Controller) processEvent(obj interface{}) error {
 			c.clustersMu.Unlock()
 		}
 
-		cl.SyncCluster(stopCh)
+		if err := cl.Sync(stopCh); err != nil {
+			cl.Error = fmt.Errorf("could not sync cluster '%s': %s", clusterName, err)
+			logger.Errorf("%v", cl)
+			return nil
+		}
 
 		logger.Infof("Cluster '%s' has been synced", clusterName)
 	}
@@ -189,8 +194,8 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	if old != nil { //update, delete
 		uid = old.Metadata.GetUID()
 		clusterName = util.NameFromMeta(old.Metadata)
-		if eventType == spec.EventUpdate && new.Error == nil && old != nil {
-			eventType = spec.EventAdd
+		if eventType == spec.EventUpdate && new.Error == nil && old.Error != nil {
+			eventType = spec.EventSync
 			clusterError = new.Error
 		} else {
 			clusterError = old.Error
@@ -202,28 +207,28 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	}
 
 	if clusterError != nil && eventType != spec.EventDelete {
-		c.logger.Debugf("Skipping %s event for invalid cluster %s (reason: %s)", eventType, clusterName, clusterError)
+		c.logger.Debugf("Skipping %s event for invalid cluster %s (reason: %v)", eventType, clusterName, clusterError)
 		return
 	}
 
-	workerId := c.clusterWorkerId(clusterName)
+	workerID := c.clusterWorkerID(clusterName)
 	clusterEvent := spec.ClusterEvent{
 		EventType: eventType,
 		UID:       uid,
 		OldSpec:   old,
 		NewSpec:   new,
-		WorkerID:  workerId,
+		WorkerID:  workerID,
 	}
 	//TODO: if we delete cluster, discard all the previous events for the cluster
 
-	c.clusterEventQueues[workerId].Add(clusterEvent)
-	c.logger.WithField("worker", workerId).Infof("%s of the '%s' cluster has been queued for", eventType, clusterName)
+	c.clusterEventQueues[workerID].Add(clusterEvent)
+	c.logger.WithField("worker", workerID).Infof("%s of the '%s' cluster has been queued", eventType, clusterName)
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
 	pg, ok := obj.(*spec.Postgresql)
 	if !ok {
-		c.logger.Errorf("Can't cast to postgresql spec")
+		c.logger.Errorf("could not cast to postgresql spec")
 		return
 	}
 
@@ -234,11 +239,11 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	pgOld, ok := prev.(*spec.Postgresql)
 	if !ok {
-		c.logger.Errorf("Can't cast to postgresql spec")
+		c.logger.Errorf("could not cast to postgresql spec")
 	}
 	pgNew, ok := cur.(*spec.Postgresql)
 	if !ok {
-		c.logger.Errorf("Can't cast to postgresql spec")
+		c.logger.Errorf("could not cast to postgresql spec")
 	}
 	if pgOld.Metadata.ResourceVersion == pgNew.Metadata.ResourceVersion {
 		return
@@ -253,7 +258,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 func (c *Controller) postgresqlDelete(obj interface{}) {
 	pg, ok := obj.(*spec.Postgresql)
 	if !ok {
-		c.logger.Errorf("Can't cast to postgresql spec")
+		c.logger.Errorf("could not cast to postgresql spec")
 		return
 	}
 

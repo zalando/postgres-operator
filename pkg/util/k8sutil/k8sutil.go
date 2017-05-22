@@ -39,7 +39,7 @@ func ResourceNotFound(err error) bool {
 
 func KubernetesRestClient(c *rest.Config) (*rest.RESTClient, error) {
 	c.GroupVersion = &unversioned.GroupVersion{Version: constants.K8sVersion}
-	c.APIPath = constants.K8sApiPath
+	c.APIPath = constants.K8sAPIPath
 	c.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	schemeBuilder := runtime.NewSchemeBuilder(

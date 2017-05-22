@@ -32,12 +32,14 @@ func (c *Cluster) pgConnectionString() string {
 		strings.Replace(password, "$", "\\$", -1))
 }
 
-func (c *Cluster) DatabaseAccessDisabled() bool {
-	if c.OpConfig.EnableDBAccess == false {
+func (c *Cluster) databaseAccessDisabled() bool {
+	if !c.OpConfig.EnableDBAccess {
 		c.logger.Debugf("Database access is disabled")
 	}
-	return c.OpConfig.EnableDBAccess == false
+
+	return !c.OpConfig.EnableDBAccess
 }
+
 func (c *Cluster) initDbConn() (err error) {
 	if c.pgDb == nil {
 		conn, err := sql.Open("postgres", c.pgConnectionString())
@@ -60,7 +62,7 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 	var rows *sql.Rows
 	users = make(spec.PgUserMap)
 	if rows, err = c.pgDb.Query(getUserSQL, pq.Array(userNames)); err != nil {
-		return nil, fmt.Errorf("Error when querying users: %s", err)
+		return nil, fmt.Errorf("error when querying users: %v", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -72,7 +74,7 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 		err := rows.Scan(&rolname, &rolpassword, &rolsuper, &rolinherit,
 			&rolcreaterole, &rolcreatedb, &rolcanlogin, pq.Array(&memberof))
 		if err != nil {
-			return nil, fmt.Errorf("Error when processing user rows: %s", err)
+			return nil, fmt.Errorf("error when processing user rows: %v", err)
 		}
 		flags := makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin)
 		// XXX: the code assumes the password we get from pg_authid is always MD5

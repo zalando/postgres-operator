@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	MD5Prefix = "md5"
+	md5prefix = "md5"
 )
 
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
@@ -41,12 +41,12 @@ func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
 }
 
 func PGUserPassword(user spec.PgUser) string {
-	if (len(user.Password) == md5.Size && user.Password[:3] == MD5Prefix) || user.Password == "" {
+	if (len(user.Password) == md5.Size && user.Password[:3] == md5prefix) || user.Password == "" {
 		// Avoid processing already encrypted or empty passwords
 		return user.Password
 	}
 	s := md5.Sum([]byte(user.Password + user.Name))
-	return MD5Prefix + hex.EncodeToString(s[:])
+	return md5prefix + hex.EncodeToString(s[:])
 }
 
 func Pretty(x interface{}) (f fmt.Formatter) {
