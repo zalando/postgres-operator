@@ -3,8 +3,8 @@ package spec
 import (
 	"database/sql"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/types"
 )
 
 type EventType string

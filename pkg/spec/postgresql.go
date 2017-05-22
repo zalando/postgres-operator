@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var alphaRegexp = regexp.MustCompile("^[a-zA-Z]*$")
@@ -67,8 +67,8 @@ const (
 
 // PostgreSQL Third Party (resource) Object
 type Postgresql struct {
-	unversioned.TypeMeta `json:",inline"`
-	Metadata             v1.ObjectMeta `json:"metadata"`
+	v1.TypeMeta `json:",inline"`
+	Metadata    meta_v1.ObjectMeta `json:"metadata"`
 
 	Spec   PostgresSpec   `json:"spec"`
 	Status PostgresStatus `json:"status"`
@@ -90,8 +90,8 @@ type PostgresSpec struct {
 }
 
 type PostgresqlList struct {
-	unversioned.TypeMeta `json:",inline"`
-	Metadata             unversioned.ListMeta `json:"metadata"`
+	v1.TypeMeta `json:",inline"`
+	Metadata    v1.ListMeta `json:"metadata"`
 
 	Items []Postgresql `json:"items"`
 }
@@ -175,19 +175,19 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (p *Postgresql) GetObjectKind() unversioned.ObjectKind {
+func (p *Postgresql) GetObjectKind() schema.ObjectKind {
 	return &p.TypeMeta
 }
 
-func (p *Postgresql) GetObjectMeta() meta.Object {
+func (p *Postgresql) GetObjectMeta() v1.Object {
 	return &p.Metadata
 }
 
-func (pl *PostgresqlList) GetObjectKind() unversioned.ObjectKind {
+func (pl *PostgresqlList) GetObjectKind() schema.ObjectKind {
 	return &pl.TypeMeta
 }
 
-func (pl *PostgresqlList) GetListMeta() unversioned.List {
+func (pl *PostgresqlList) GetListMeta() v1.List {
 	return &pl.Metadata
 }
 

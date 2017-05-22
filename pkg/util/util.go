@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/motomux/pretty"
-	"k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
@@ -33,7 +33,7 @@ func RandomPassword(n int) string {
 	return string(b)
 }
 
-func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
+func NameFromMeta(meta meta_v1.ObjectMeta) spec.NamespacedName {
 	return spec.NamespacedName{
 		Namespace: meta.Namespace,
 		Name:      meta.Name,

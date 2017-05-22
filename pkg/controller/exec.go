@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"fmt"
 
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
@@ -16,8 +17,7 @@ func (c *Controller) ExecCommand(podName spec.NamespacedName, command []string) 
 		execOut bytes.Buffer
 		execErr bytes.Buffer
 	)
-
-	pod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name)
+	pod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, meta_v1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("Can't get Pod info: %s", err)
 	}

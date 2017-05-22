@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/crc32"
 
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
@@ -33,7 +34,7 @@ func (c *Controller) getOAuthToken() (string, error) {
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
 	credentialsSecret, err := c.KubeClient.
 		Secrets(c.opConfig.OAuthTokenSecretName.Namespace).
-		Get(c.opConfig.OAuthTokenSecretName.Name)
+		Get(c.opConfig.OAuthTokenSecretName.Name, meta_v1.GetOptions{})
 
 	if err != nil {
 		c.logger.Debugf("Oauth token secret name: %s", c.opConfig.OAuthTokenSecretName)
@@ -50,7 +51,7 @@ func (c *Controller) getOAuthToken() (string, error) {
 
 func thirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
 	return &extv1beta.ThirdPartyResource{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			//ThirdPartyResources are cluster-wide
 			Name: TPRName,
 		},
@@ -90,7 +91,7 @@ func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, er
 
 	infraRolesSecret, err := c.KubeClient.
 		Secrets(c.opConfig.InfrastructureRolesSecretName.Namespace).
-		Get(c.opConfig.InfrastructureRolesSecretName.Name)
+		Get(c.opConfig.InfrastructureRolesSecretName.Name, meta_v1.GetOptions{})
 	if err != nil {
 		c.logger.Debugf("Infrastructure roles secret name: %s", c.opConfig.InfrastructureRolesSecretName)
 		return nil, fmt.Errorf("Can't get infrastructure roles Secret: %s", err)

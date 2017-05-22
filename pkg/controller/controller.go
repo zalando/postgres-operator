@@ -26,8 +26,8 @@ type Config struct {
 
 type Controller struct {
 	Config
-	opConfig    *config.Config
-	logger      *logrus.Entry
+	opConfig *config.Config
+	logger   *logrus.Entry
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster

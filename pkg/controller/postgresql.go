@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/fields"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
@@ -18,7 +19,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
-func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
+func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
 	c.logger.Info("Getting list of currently running clusters")
 
 	req := c.RestClient.Get().
@@ -68,7 +69,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 	return object, err
 }
 
-func (c *Controller) clusterWatchFunc(options api.ListOptions) (watch.Interface, error) {
+func (c *Controller) clusterWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
 	req := c.RestClient.Get().
 		RequestURI(fmt.Sprintf(constants.WatchClustersURITemplate, c.opConfig.Namespace)).
 		VersionedParams(&options, api.ParameterCodec).

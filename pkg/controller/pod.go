@@ -1,58 +1,21 @@
 package controller
 
 import (
-	"k8s.io/client-go/pkg/api"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/watch"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
-func (c *Controller) podListFunc(options api.ListOptions) (runtime.Object, error) {
-	var labelSelector string
-	var fieldSelector string
-
-	if options.LabelSelector != nil {
-		labelSelector = options.LabelSelector.String()
-	}
-
-	if options.FieldSelector != nil {
-		fieldSelector = options.FieldSelector.String()
-	}
-	opts := v1.ListOptions{
-		LabelSelector:   labelSelector,
-		FieldSelector:   fieldSelector,
-		Watch:           options.Watch,
-		ResourceVersion: options.ResourceVersion,
-		TimeoutSeconds:  options.TimeoutSeconds,
-	}
-
-	return c.KubeClient.CoreV1().Pods(c.opConfig.Namespace).List(opts)
+func (c *Controller) podListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
+	return c.KubeClient.CoreV1().Pods(c.opConfig.Namespace).List(options)
 }
 
-func (c *Controller) podWatchFunc(options api.ListOptions) (watch.Interface, error) {
-	var labelSelector string
-	var fieldSelector string
-
-	if options.LabelSelector != nil {
-		labelSelector = options.LabelSelector.String()
-	}
-
-	if options.FieldSelector != nil {
-		fieldSelector = options.FieldSelector.String()
-	}
-
-	opts := v1.ListOptions{
-		LabelSelector:   labelSelector,
-		FieldSelector:   fieldSelector,
-		Watch:           options.Watch,
-		ResourceVersion: options.ResourceVersion,
-		TimeoutSeconds:  options.TimeoutSeconds,
-	}
-
-	return c.KubeClient.CoreV1Client.Pods(c.opConfig.Namespace).Watch(opts)
+func (c *Controller) podWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
+	return c.KubeClient.CoreV1().Pods(c.opConfig.Namespace).Watch(options)
 }
 
 func (c *Controller) podAdd(obj interface{}) {

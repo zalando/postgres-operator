@@ -5,10 +5,11 @@ import (
 	"sort"
 
 	"encoding/json"
-	"k8s.io/client-go/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -310,7 +311,7 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 	}
 
 	template := v1.PodTemplateSpec{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Labels:    c.labelsSet(),
 			Namespace: c.Metadata.Name,
 		},
@@ -336,7 +337,7 @@ func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, 
 	}
 
 	statefulSet := &v1beta1.StatefulSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.labelsSet(),
@@ -353,7 +354,7 @@ func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, 
 }
 
 func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
-	metadata := v1.ObjectMeta{
+	metadata := meta_v1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
 	if volumeStorageClass != "" {
@@ -411,7 +412,7 @@ func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.
 	}
 	username := pgUser.Name
 	secret := v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      c.credentialSecretName(username),
 			Namespace: namespace,
 			Labels:    c.labelsSet(),
@@ -427,7 +428,7 @@ func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.
 
 func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 	service := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.labelsSet(),
@@ -448,7 +449,7 @@ func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 
 func (c *Cluster) genEndpoints() *v1.Endpoints {
 	endpoints := &v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.labelsSet(),

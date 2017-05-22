@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/labels"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -151,7 +152,7 @@ func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
 func (c *Cluster) waitStatefulsetReady() error {
 	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
-			listOptions := v1.ListOptions{
+			listOptions := meta_v1.ListOptions{
 				LabelSelector: c.labelsSet().String(),
 			}
 			ss, err := c.KubeClient.StatefulSets(c.Metadata.Namespace).List(listOptions)
@@ -171,15 +172,15 @@ func (c *Cluster) waitPodLabelsReady() error {
 	ls := c.labelsSet()
 	namespace := c.Metadata.Namespace
 
-	listOptions := v1.ListOptions{
+	listOptions := meta_v1.ListOptions{
 		LabelSelector: ls.String(),
 	}
-	masterListOption := v1.ListOptions{
+	masterListOption := meta_v1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
 			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
 		}).String(),
 	}
-	replicaListOption := v1.ListOptions{
+	replicaListOption := meta_v1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
 			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
 		}).String(),

@@ -8,6 +8,8 @@ import (
 	"sync"
 	"syscall"
 
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -79,7 +81,7 @@ func main() {
 	controllerConfig := ControllerConfig()
 
 	if configMapName != (spec.NamespacedName{}) {
-		configMap, err := controllerConfig.KubeClient.ConfigMaps(configMapName.Namespace).Get(configMapName.Name)
+		configMap, err := controllerConfig.KubeClient.ConfigMaps(configMapName.Namespace).Get(configMapName.Name, meta_v1.GetOptions{})
 		if err != nil {
 			panic(err)
 		}
