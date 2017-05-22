@@ -78,12 +78,12 @@ func (c *Cluster) syncSecrets() error {
 func (c *Cluster) syncService() error {
 	cSpec := c.Spec
 	if c.Service == nil {
-		c.logger.Infof("Can't find the cluster's Service")
+		c.logger.Infof("could not find the cluster's service")
 		svc, err := c.createService()
 		if err != nil {
-			return fmt.Errorf("Can't create missing Service: %s", err)
+			return fmt.Errorf("could not create missing service: %v", err)
 		}
-		c.logger.Infof("Created missing Service '%s'", util.NameFromMeta(svc.ObjectMeta))
+		c.logger.Infof("Created missing service '%s'", util.NameFromMeta(svc.ObjectMeta))
 
 		return nil
 	}
@@ -96,21 +96,21 @@ func (c *Cluster) syncService() error {
 	c.logServiceChanges(c.Service, desiredSvc, false, reason)
 
 	if err := c.updateService(desiredSvc); err != nil {
-		return fmt.Errorf("Can't update Service to match desired state: %s", err)
+		return fmt.Errorf("could not update service to match desired state: %v", err)
 	}
-	c.logger.Infof("Service '%s' is in the desired state now", util.NameFromMeta(desiredSvc.ObjectMeta))
+	c.logger.Infof("service '%s' is in the desired state now", util.NameFromMeta(desiredSvc.ObjectMeta))
 
 	return nil
 }
 
 func (c *Cluster) syncEndpoint() error {
 	if c.Endpoint == nil {
-		c.logger.Infof("Can't find the cluster's Endpoint")
+		c.logger.Infof("could not find the cluster's endpoint")
 		ep, err := c.createEndpoint()
 		if err != nil {
-			return fmt.Errorf("Can't create missing Endpoint: %s", err)
+			return fmt.Errorf("could not create missing endpoint: %v", err)
 		}
-		c.logger.Infof("Created missing Endpoint '%s'", util.NameFromMeta(ep.ObjectMeta))
+		c.logger.Infof("Created missing endpoint '%s'", util.NameFromMeta(ep.ObjectMeta))
 		return nil
 	}
 
@@ -121,10 +121,10 @@ func (c *Cluster) syncStatefulSet() error {
 	cSpec := c.Spec
 	var rollUpdate, needsReplace bool
 	if c.Statefulset == nil {
-		c.logger.Infof("Can't find the cluster's StatefulSet")
+		c.logger.Infof("could not find the cluster's statefulset")
 		pods, err := c.listPods()
 		if err != nil {
-			return fmt.Errorf("Can't list pods of the StatefulSet: %s", err)
+			return fmt.Errorf("could not list pods of the statefulset: %v", err)
 		}
 
 		if len(pods) > 0 {
@@ -133,13 +133,13 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 		ss, err := c.createStatefulSet()
 		if err != nil {
-			return fmt.Errorf("Can't create missing StatefulSet: %s", err)
+			return fmt.Errorf("could not create missing statefulset: %v", err)
 		}
 		err = c.waitStatefulsetPodsReady()
 		if err != nil {
-			return fmt.Errorf("Cluster is not ready: %s", err)
+			return fmt.Errorf("cluster is not ready: %v", err)
 		}
-		c.logger.Infof("Created missing StatefulSet '%s'", util.NameFromMeta(ss.ObjectMeta))
+		c.logger.Infof("Created missing statefulset '%s'", util.NameFromMeta(ss.ObjectMeta))
 		if !rollUpdate {
 			return nil
 		}
@@ -152,7 +152,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 		desiredSS, err := c.genStatefulSet(cSpec)
 		if err != nil {
-			return fmt.Errorf("Can't generate StatefulSet: %s", err)
+			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
 
 		match, needsReplace, rollUpdate, reason = c.compareStatefulSetWith(desiredSS)
@@ -163,11 +163,11 @@ func (c *Cluster) syncStatefulSet() error {
 
 		if !needsReplace {
 			if err := c.updateStatefulSet(desiredSS); err != nil {
-				return fmt.Errorf("Can't update StatefulSet: %s", err)
+				return fmt.Errorf("could not update statefulset: %v", err)
 			}
 		} else {
 			if err := c.replaceStatefulSet(desiredSS); err != nil {
-				return fmt.Errorf("Can't replace StatefulSet: %s", err)
+				return fmt.Errorf("could not replace statefulset: %v", err)
 			}
 		}
 
@@ -178,9 +178,9 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 	c.logger.Debugln("Performing rolling update")
 	if err := c.recreatePods(); err != nil {
-		return fmt.Errorf("Can't recreate Pods: %s", err)
+		return fmt.Errorf("could not recreate pods: %v", err)
 	}
-	c.logger.Infof("Pods have been recreated")
+	c.logger.Infof("pods have been recreated")
 
 	return nil
 }
@@ -196,11 +196,11 @@ func (c *Cluster) SyncRoles() error {
 	}
 	dbUsers, err := c.readPgUsersFromDatabase(userNames)
 	if err != nil {
-		return fmt.Errorf("Error getting users from the database: %s", err)
+		return fmt.Errorf("error getting users from the database: %v", err)
 	}
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)
 	if err := c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
-		return fmt.Errorf("Error executing sync statements: %s", err)
+		return fmt.Errorf("error executing sync statements: %v", err)
 	}
 	return nil
 }

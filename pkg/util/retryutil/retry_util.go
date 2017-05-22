@@ -10,7 +10,7 @@ type ConditionFunc func() (bool, error)
 func Retry(interval time.Duration, timeout time.Duration, f ConditionFunc) error {
 	//TODO: make the retry exponential
 	if timeout < interval {
-		return fmt.Errorf("timout(%s) should be greater than interval(%s)", timeout, interval)
+		return fmt.Errorf("timout(%s) should be greater than interval(%v)", timeout, interval)
 	}
 	maxRetries := int(timeout / interval)
 	tick := time.NewTicker(interval)
@@ -29,5 +29,5 @@ func Retry(interval time.Duration, timeout time.Duration, f ConditionFunc) error
 		}
 		<-tick.C
 	}
-	return fmt.Errorf("Still failing after %d retries", maxRetries)
+	return fmt.Errorf("still failing after %d retries", maxRetries)
 }

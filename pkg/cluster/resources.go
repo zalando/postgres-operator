@@ -22,42 +22,42 @@ func (c *Cluster) loadResources() error {
 
 	services, err := c.KubeClient.Services(ns).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of Services: %s", err)
+		return fmt.Errorf("could not get list of services: %v", err)
 	}
 	if len(services.Items) > 1 {
-		return fmt.Errorf("Too many(%d) Services for a cluster", len(services.Items))
+		return fmt.Errorf("too many(%d) services for a cluster", len(services.Items))
 	} else if len(services.Items) == 1 {
 		c.Service = &services.Items[0]
 	}
 
 	endpoints, err := c.KubeClient.Endpoints(ns).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of Endpoints: %s", err)
+		return fmt.Errorf("could not get list of endpoints: %v", err)
 	}
 	if len(endpoints.Items) > 1 {
-		return fmt.Errorf("Too many(%d) Endpoints for a cluster", len(endpoints.Items))
+		return fmt.Errorf("too many(%d) endpoints for a cluster", len(endpoints.Items))
 	} else if len(endpoints.Items) == 1 {
 		c.Endpoint = &endpoints.Items[0]
 	}
 
 	secrets, err := c.KubeClient.Secrets(ns).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of Secrets: %s", err)
+		return fmt.Errorf("could not get list of secrets: %v", err)
 	}
 	for i, secret := range secrets.Items {
 		if _, ok := c.Secrets[secret.UID]; ok {
 			continue
 		}
 		c.Secrets[secret.UID] = &secrets.Items[i]
-		c.logger.Debugf("Secret loaded, uid: %s", secret.UID)
+		c.logger.Debugf("secret loaded, uid: %s", secret.UID)
 	}
 
 	statefulSets, err := c.KubeClient.StatefulSets(ns).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("Can't get list of StatefulSets: %s", err)
+		return fmt.Errorf("could not get list of statefulsets: %v", err)
 	}
 	if len(statefulSets.Items) > 1 {
-		return fmt.Errorf("Too many(%d) StatefulSets for a cluster", len(statefulSets.Items))
+		return fmt.Errorf("too many(%d) statefulsets for a cluster", len(statefulSets.Items))
 	} else if len(statefulSets.Items) == 1 {
 		c.Statefulset = &statefulSets.Items[0]
 	}
@@ -67,33 +67,33 @@ func (c *Cluster) loadResources() error {
 
 func (c *Cluster) ListResources() error {
 	if c.Statefulset != nil {
-		c.logger.Infof("Found StatefulSet: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
+		c.logger.Infof("Found statefulset: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}
 
 	for _, obj := range c.Secrets {
-		c.logger.Infof("Found Secret: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("Found secret: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	if c.Endpoint != nil {
-		c.logger.Infof("Found Endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
+		c.logger.Infof("Found endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
 	}
 
 	if c.Service != nil {
-		c.logger.Infof("Found Service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
+		c.logger.Infof("Found service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
 	}
 
 	pods, err := c.listPods()
 	if err != nil {
-		return fmt.Errorf("Can't get the list of Pods: %s", err)
+		return fmt.Errorf("could not get the list of pods: %v", err)
 	}
 
 	for _, obj := range pods {
-		c.logger.Infof("Found Pod: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("Found pod: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {
-		return fmt.Errorf("Can't get the list of PVCs: %s", err)
+		return fmt.Errorf("could not get the list of PVCs: %v", err)
 	}
 
 	for _, obj := range pvcs {
@@ -105,36 +105,33 @@ func (c *Cluster) ListResources() error {
 
 func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	if c.Statefulset != nil {
-		return nil, fmt.Errorf("StatefulSet already exists in the cluster")
+		return nil, fmt.Errorf("statefulset already exists in the cluster")
 	}
 	statefulSetSpec, err := c.genStatefulSet(c.Spec)
 	if err != nil {
-		return nil, fmt.Errorf("Can't generate StatefulSet: %s", err)
+		return nil, fmt.Errorf("could not generate statefulset: %v", err)
 	}
 	statefulSet, err := c.KubeClient.StatefulSets(statefulSetSpec.Namespace).Create(statefulSetSpec)
-	if k8sutil.ResourceAlreadyExists(err) {
-		return nil, fmt.Errorf("StatefulSet '%s' already exists", util.NameFromMeta(statefulSetSpec.ObjectMeta))
-	}
 	if err != nil {
 		return nil, err
 	}
 	c.Statefulset = statefulSet
-	c.logger.Debugf("Created new StatefulSet '%s', uid: %s", util.NameFromMeta(statefulSet.ObjectMeta), statefulSet.UID)
+	c.logger.Debugf("Created new statefulset '%s', uid: %s", util.NameFromMeta(statefulSet.ObjectMeta), statefulSet.UID)
 
 	return statefulSet, nil
 }
 
 func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	if c.Statefulset == nil {
-		return fmt.Errorf("There is no StatefulSet in the cluster")
+		return fmt.Errorf("there is no statefulset in the cluster")
 	}
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
 
-	c.logger.Debugf("Updating StatefulSet")
+	c.logger.Debugf("Updating statefulset")
 
 	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
-		return fmt.Errorf("Can't form patch for the StatefulSet '%s': %s", statefulSetName, err)
+		return fmt.Errorf("could not form patch for the statefulset '%s': %v", statefulSetName, err)
 	}
 
 	statefulSet, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
@@ -142,7 +139,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 		api.MergePatchType,
 		patchData, "")
 	if err != nil {
-		return fmt.Errorf("Can't patch StatefulSet '%s': %s", statefulSetName, err)
+		return fmt.Errorf("could not patch statefulset '%s': %v", statefulSetName, err)
 	}
 	c.Statefulset = statefulSet
 
@@ -152,11 +149,11 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 // replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL TPR.
 func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	if c.Statefulset == nil {
-		return fmt.Errorf("There is no StatefulSet in the cluster")
+		return fmt.Errorf("there is no statefulset in the cluster")
 	}
 
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
-	c.logger.Debugf("Replacing StatefulSet")
+	c.logger.Debugf("Replacing statefulset")
 
 	// Delete the current statefulset without deleting the pods
 	orphanDepencies := true
@@ -164,7 +161,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 
 	options := v1.DeleteOptions{OrphanDependents: &orphanDepencies}
 	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
-		return fmt.Errorf("Can't delete statefulset '%s': %s", statefulSetName, err)
+		return fmt.Errorf("could not delete statefulset '%s': %v", statefulSetName, err)
 	}
 	// make sure we clear the stored statefulset status if the subsequent create fails.
 	c.Statefulset = nil
@@ -178,13 +175,13 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 			return err != nil, nil
 		})
 	if err != nil {
-		return fmt.Errorf("could not delete statefulset: %s", err)
+		return fmt.Errorf("could not delete statefulset: %v", err)
 	}
 
 	// create the new statefulset with the desired spec. It would take over the remaining pods.
 	createdStatefulset, err := c.KubeClient.StatefulSets(newStatefulSet.Namespace).Create(newStatefulSet)
 	if err != nil {
-		return fmt.Errorf("Can't create statefulset '%s': %s", statefulSetName, err)
+		return fmt.Errorf("could not create statefulset '%s': %v", statefulSetName, err)
 	}
 	// check that all the previous replicas were picked up.
 	if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
@@ -197,24 +194,24 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 }
 
 func (c *Cluster) deleteStatefulSet() error {
-	c.logger.Debugln("Deleting StatefulSet")
+	c.logger.Debugln("Deleting statefulset")
 	if c.Statefulset == nil {
-		return fmt.Errorf("There is no StatefulSet in the cluster")
+		return fmt.Errorf("there is no statefulset in the cluster")
 	}
 
 	err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Delete(c.Statefulset.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("StatefulSet '%s' has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
+	c.logger.Infof("statefulset '%s' has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	c.Statefulset = nil
 
 	if err := c.deletePods(); err != nil {
-		return fmt.Errorf("Can't delete Pods: %s", err)
+		return fmt.Errorf("could not delete pods: %v", err)
 	}
 
 	if err := c.deletePersistenVolumeClaims(); err != nil {
-		return fmt.Errorf("Can't delete PersistentVolumeClaims: %s", err)
+		return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
 	}
 
 	return nil
@@ -222,14 +219,11 @@ func (c *Cluster) deleteStatefulSet() error {
 
 func (c *Cluster) createService() (*v1.Service, error) {
 	if c.Service != nil {
-		return nil, fmt.Errorf("Service already exists in the cluster")
+		return nil, fmt.Errorf("service already exists in the cluster")
 	}
 	serviceSpec := c.genService(c.Spec.AllowedSourceRanges)
 
 	service, err := c.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
-	if k8sutil.ResourceAlreadyExists(err) {
-		return nil, fmt.Errorf("Service '%s' already exists", util.NameFromMeta(serviceSpec.ObjectMeta))
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -240,13 +234,13 @@ func (c *Cluster) createService() (*v1.Service, error) {
 
 func (c *Cluster) updateService(newService *v1.Service) error {
 	if c.Service == nil {
-		return fmt.Errorf("There is no Service in the cluster")
+		return fmt.Errorf("there is no service in the cluster")
 	}
 	serviceName := util.NameFromMeta(c.Service.ObjectMeta)
 
 	patchData, err := specPatch(newService.Spec)
 	if err != nil {
-		return fmt.Errorf("Can't form patch for the Service '%s': %s", serviceName, err)
+		return fmt.Errorf("could not form patch for the service '%s': %v", serviceName, err)
 	}
 
 	svc, err := c.KubeClient.Services(c.Service.Namespace).Patch(
@@ -254,7 +248,7 @@ func (c *Cluster) updateService(newService *v1.Service) error {
 		api.MergePatchType,
 		patchData, "")
 	if err != nil {
-		return fmt.Errorf("Can't patch Service '%s': %s", serviceName, err)
+		return fmt.Errorf("could not patch service '%s': %v", serviceName, err)
 	}
 	c.Service = svc
 
@@ -262,16 +256,16 @@ func (c *Cluster) updateService(newService *v1.Service) error {
 }
 
 func (c *Cluster) deleteService() error {
-	c.logger.Debugln("Deleting Service")
+	c.logger.Debugln("Deleting service")
 
 	if c.Service == nil {
-		return fmt.Errorf("There is no Service in the cluster")
+		return fmt.Errorf("there is no service in the cluster")
 	}
 	err := c.KubeClient.Services(c.Service.Namespace).Delete(c.Service.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("Service '%s' has been deleted", util.NameFromMeta(c.Service.ObjectMeta))
+	c.logger.Infof("service '%s' has been deleted", util.NameFromMeta(c.Service.ObjectMeta))
 	c.Service = nil
 
 	return nil
@@ -279,14 +273,11 @@ func (c *Cluster) deleteService() error {
 
 func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 	if c.Endpoint != nil {
-		return nil, fmt.Errorf("Endpoint already exists in the cluster")
+		return nil, fmt.Errorf("endpoint already exists in the cluster")
 	}
 	endpointsSpec := c.genEndpoints()
 
 	endpoints, err := c.KubeClient.Endpoints(endpointsSpec.Namespace).Create(endpointsSpec)
-	if k8sutil.ResourceAlreadyExists(err) {
-		return nil, fmt.Errorf("Endpoint '%s' already exists", util.NameFromMeta(endpointsSpec.ObjectMeta))
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -296,15 +287,15 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 }
 
 func (c *Cluster) deleteEndpoint() error {
-	c.logger.Debugln("Deleting Endpoint")
+	c.logger.Debugln("Deleting endpoint")
 	if c.Endpoint == nil {
-		return fmt.Errorf("There is no Endpoint in the cluster")
+		return fmt.Errorf("there is no endpoint in the cluster")
 	}
 	err := c.KubeClient.Endpoints(c.Endpoint.Namespace).Delete(c.Endpoint.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("Endpoint '%s' has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
+	c.logger.Infof("endpoint '%s' has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
 	c.Endpoint = nil
 
 	return nil
@@ -319,9 +310,9 @@ func (c *Cluster) applySecrets() error {
 			var userMap map[string]spec.PgUser
 			curSecret, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
 			if err != nil {
-				return fmt.Errorf("Can't get current Secret: %s", err)
+				return fmt.Errorf("could not get current secret: %v", err)
 			}
-			c.logger.Debugf("Secret '%s' already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
+			c.logger.Debugf("secret '%s' already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
 				userMap = c.systemUsers
@@ -338,10 +329,10 @@ func (c *Cluster) applySecrets() error {
 			continue
 		} else {
 			if err != nil {
-				return fmt.Errorf("Can't create Secret for user '%s': %s", secretUsername, err)
+				return fmt.Errorf("could not create secret for user '%s': %v", secretUsername, err)
 			}
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("Created new Secret '%s', uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			c.logger.Debugf("Created new secret '%s', uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
 		}
 	}
 
@@ -349,12 +340,12 @@ func (c *Cluster) applySecrets() error {
 }
 
 func (c *Cluster) deleteSecret(secret *v1.Secret) error {
-	c.logger.Debugf("Deleting Secret '%s'", util.NameFromMeta(secret.ObjectMeta))
+	c.logger.Debugf("Deleting secret '%s'", util.NameFromMeta(secret.ObjectMeta))
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("Secret '%s' has been deleted", util.NameFromMeta(secret.ObjectMeta))
+	c.logger.Infof("secret '%s' has been deleted", util.NameFromMeta(secret.ObjectMeta))
 	delete(c.Secrets, secret.UID)
 
 	return err

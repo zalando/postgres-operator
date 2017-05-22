@@ -102,7 +102,7 @@ func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err err
 	parts := strings.Split(s, ":")
 	if len(parts) == 3 {
 		if len(parts[0]) != 3 || !alphaRegexp.MatchString(parts[0]) {
-			err = fmt.Errorf("Weekday must be 3 characters length")
+			err = fmt.Errorf("weekday must be 3 characters length")
 			return
 		}
 		timeLayout = "Mon:15:04"
@@ -148,7 +148,7 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 
 	parts := strings.Split(string(data[1:len(data)-1]), "-")
 	if len(parts) != 2 {
-		return fmt.Errorf("Incorrect maintenance window format")
+		return fmt.Errorf("incorrect maintenance window format")
 	}
 
 	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = parseTime(parts[0])
@@ -194,10 +194,10 @@ func (pl *PostgresqlList) GetListMeta() unversioned.List {
 func clusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
 	if len(clusterName) < teamNameLen+2 {
-		return "", fmt.Errorf("Name is too short")
+		return "", fmt.Errorf("name is too short")
 	}
 	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
-		return "", fmt.Errorf("Name must match {TEAM}-{NAME} format")
+		return "", fmt.Errorf("name must match {TEAM}-{NAME} format")
 	}
 
 	return clusterName[teamNameLen+1:], nil

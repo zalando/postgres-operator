@@ -37,12 +37,12 @@ func (c *Controller) getOAuthToken() (string, error) {
 
 	if err != nil {
 		c.logger.Debugf("Oauth token secret name: %s", c.opConfig.OAuthTokenSecretName)
-		return "", fmt.Errorf("Can't get credentials Secret: %s", err)
+		return "", fmt.Errorf("could not get credentials secret: %v", err)
 	}
 	data := credentialsSecret.Data
 
 	if string(data["read-only-token-type"]) != "Bearer" {
-		return "", fmt.Errorf("Wrong token type: %s", data["read-only-token-type"])
+		return "", fmt.Errorf("wrong token type: %v", data["read-only-token-type"])
 	}
 
 	return string(data["read-only-token-secret"]), nil
@@ -93,7 +93,7 @@ func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, er
 		Get(c.opConfig.InfrastructureRolesSecretName.Name)
 	if err != nil {
 		c.logger.Debugf("Infrastructure roles secret name: %s", c.opConfig.InfrastructureRolesSecretName)
-		return nil, fmt.Errorf("Can't get infrastructure roles Secret: %s", err)
+		return nil, fmt.Errorf("could not get infrastructure roles secret: %v", err)
 	}
 
 	data := infraRolesSecret.Data

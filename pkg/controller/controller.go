@@ -26,8 +26,8 @@ type Config struct {
 
 type Controller struct {
 	Config
-	opConfig    *config.Config
-	logger      *logrus.Entry
+	opConfig *config.Config
+	logger   *logrus.Entry
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster
@@ -75,12 +75,12 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 func (c *Controller) initController() {
 	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("Can't register ThirdPartyResource: %s", err)
+		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
 	}
 
 	c.TeamsAPIClient.RefreshTokenAction = c.getOAuthToken
 	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
-		c.logger.Warningf("Can't get infrastructure roles: %s", err)
+		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.InfrastructureRoles = infraRoles
 	}
@@ -125,7 +125,7 @@ func (c *Controller) initController() {
 		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
 			e, ok := obj.(spec.ClusterEvent)
 			if !ok {
-				return "", fmt.Errorf("Can't cast to ClusterEvent")
+				return "", fmt.Errorf("could not cast to ClusterEvent")
 			}
 
 			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil

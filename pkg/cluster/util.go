@@ -26,7 +26,7 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 
 	for _, flag := range userFlags {
 		if !alphaNumericRegexp.MatchString(flag) {
-			err = fmt.Errorf("User flag '%s' is not alphanumeric", flag)
+			err = fmt.Errorf("user flag '%v' is not alphanumeric", flag)
 			return
 		}
 		flag = strings.ToUpper(flag)
@@ -35,7 +35,7 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 		}
 	}
 	if uniqueFlags[constants.RoleFlagLogin] && uniqueFlags[constants.RoleFlagNoLogin] {
-		return nil, fmt.Errorf("Conflicting or redundant flags: LOGIN and NOLOGIN")
+		return nil, fmt.Errorf("conflicting or redundant flags: LOGIN and NOLOGIN")
 	}
 
 	flags = []string{}
@@ -65,11 +65,11 @@ func specPatch(spec interface{}) ([]byte, error) {
 
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("StatefulSet '%s' has been changed",
+		c.logger.Infof("statefulset '%s' has been changed",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("StatefulSet '%s' is not in the desired state and needs to be updated",
+		c.logger.Infof("statefulset '%s' is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
@@ -82,11 +82,11 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 
 func (c *Cluster) logServiceChanges(old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("Service '%s' has been changed",
+		c.logger.Infof("service '%s' has been changed",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("Service '%s  is not in the desired state and needs to be updated",
+		c.logger.Infof("service '%s  is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
@@ -107,11 +107,11 @@ func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
 
 func (c *Cluster) getTeamMembers() ([]string, error) {
 	if c.Spec.TeamID == "" {
-		return nil, fmt.Errorf("No teamId specified")
+		return nil, fmt.Errorf("no teamId specified")
 	}
 	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamID)
 	if err != nil {
-		return nil, fmt.Errorf("Can't get team info: %s", err)
+		return nil, fmt.Errorf("could not get team info: %v", err)
 	}
 	c.logger.Debugf("Got from the Team API: %+v", *teamInfo)
 
@@ -130,7 +130,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
 				return nil
 			}
 		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
-			return fmt.Errorf("Pod label wait timeout")
+			return fmt.Errorf("pod label wait timeout")
 		}
 	}
 }
@@ -143,7 +143,7 @@ func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
 				return nil
 			}
 		case <-time.After(c.OpConfig.PodDeletionWaitTimeout):
-			return fmt.Errorf("Pod deletion wait timeout")
+			return fmt.Errorf("pod deletion wait timeout")
 		}
 	}
 }
@@ -160,7 +160,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 			}
 
 			if len(ss.Items) != 1 {
-				return false, fmt.Errorf("StatefulSet is not found")
+				return false, fmt.Errorf("statefulset is not found")
 			}
 
 			return *ss.Items[0].Spec.Replicas == ss.Items[0].Status.Replicas, nil
@@ -201,7 +201,7 @@ func (c *Cluster) waitPodLabelsReady() error {
 				return false, err
 			}
 			if len(masterPods.Items) > 1 {
-				return false, fmt.Errorf("Too many masters")
+				return false, fmt.Errorf("too many masters")
 			}
 			if len(replicaPods.Items) == podsNumber {
 				c.masterLess = true
@@ -219,12 +219,12 @@ func (c *Cluster) waitPodLabelsReady() error {
 func (c *Cluster) waitStatefulsetPodsReady() error {
 	// TODO: wait for the first Pod only
 	if err := c.waitStatefulsetReady(); err != nil {
-		return fmt.Errorf("Statuful set error: %s", err)
+		return fmt.Errorf("statuful set error: %v", err)
 	}
 
 	// TODO: wait only for master
 	if err := c.waitPodLabelsReady(); err != nil {
-		return fmt.Errorf("Pod labels error: %s", err)
+		return fmt.Errorf("pod labels error: %v", err)
 	}
 
 	return nil
