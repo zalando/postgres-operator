@@ -104,7 +104,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	c.Status = status
 	b, err := json.Marshal(status)
 	if err != nil {
-		c.logger.Fatalf("could not marshal status: %s", err)
+		c.logger.Fatalf("could not marshal status: %v", err)
 	}
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 

@@ -75,12 +75,12 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 func (c *Controller) initController() {
 	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("could not register ThirdPartyResource: %s", err)
+		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
 	}
 
 	c.TeamsAPIClient.RefreshTokenAction = c.getOAuthToken
 	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %s", err)
+		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.InfrastructureRoles = infraRoles
 	}
