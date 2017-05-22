@@ -88,10 +88,10 @@ func (t *API) TeamInfo(teamID string) (*Team, error) {
 		}
 
 		if errMessage, ok := raw["error"]; ok {
-			return nil, fmt.Errorf("Team API query failed with status code %d and message: '%s'", resp.StatusCode, string(errMessage))
+			return nil, fmt.Errorf("team API query failed with status code %d and message: '%v'", resp.StatusCode, string(errMessage))
 		}
 
-		return nil, fmt.Errorf("Team API query failed with status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("team API query failed with status code %d", resp.StatusCode)
 	}
 	teamInfo := &Team{}
 	d := json.NewDecoder(resp.Body)

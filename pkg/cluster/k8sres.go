@@ -59,12 +59,12 @@ func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRe
 
 	result.Requests, err = fillResourceList(specRequests, defaultRequests)
 	if err != nil {
-		return nil, fmt.Errorf("Can't fill resource requests: %s", err)
+		return nil, fmt.Errorf("could not fill resource requests: %v", err)
 	}
 
 	result.Limits, err = fillResourceList(specLimits, defaultLimits)
 	if err != nil {
-		return nil, fmt.Errorf("Can't fill resource limits: %s", err)
+		return nil, fmt.Errorf("could not fill resource limits: %v", err)
 	}
 
 	return &result, nil
@@ -77,23 +77,23 @@ func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescr
 	if spec.CPU != "" {
 		requests[v1.ResourceCPU], err = resource.ParseQuantity(spec.CPU)
 		if err != nil {
-			return nil, fmt.Errorf("Can't parse CPU quantity: %s", err)
+			return nil, fmt.Errorf("could not parse CPU quantity: %v", err)
 		}
 	} else {
 		requests[v1.ResourceCPU], err = resource.ParseQuantity(defaults.CPU)
 		if err != nil {
-			return nil, fmt.Errorf("Can't parse default CPU quantity: %s", err)
+			return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
 		}
 	}
 	if spec.Memory != "" {
 		requests[v1.ResourceMemory], err = resource.ParseQuantity(spec.Memory)
 		if err != nil {
-			return nil, fmt.Errorf("Can't parse memory quantity: %s", err)
+			return nil, fmt.Errorf("could not parse memory quantity: %v", err)
 		}
 	} else {
 		requests[v1.ResourceMemory], err = resource.ParseQuantity(defaults.Memory)
 		if err != nil {
-			return nil, fmt.Errorf("Can't parse default memory quantity: %s", err)
+			return nil, fmt.Errorf("could not parse default memory quantity: %v", err)
 		}
 	}
 
@@ -365,7 +365,7 @@ func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.P
 
 	quantity, err := resource.ParseQuantity(volumeSize)
 	if err != nil {
-		return nil, fmt.Errorf("Can't parse volume size: %s", err)
+		return nil, fmt.Errorf("could not parse volume size: %v", err)
 	}
 
 	volumeClaim := &v1.PersistentVolumeClaim{
