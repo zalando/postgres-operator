@@ -4,8 +4,6 @@ import:
   version: ^0.3.0
 - package: github.com/Sirupsen/logrus
   version: ^0.11.5
-- package: github.com/coreos/etcd
-  version: ^3.1.7
   subpackages:
   - client
 - package: github.com/lib/pq
@@ -14,12 +12,13 @@ import:
   subpackages:
   - context
 - package: k8s.io/apimachinery
+  version: 84c15da65eb86243c295d566203d7689cc6ac04b
   subpackages:
   - pkg/util/json
   - pkg/util/remotecommand
 - package: k8s.io/client-go
   version: ^2.0.0
 - package: k8s.io/kubernetes
-  version: ^1.6.2
+  version: ee39d359dd0896c4c0eccf23f033f158ad3d3bd7
   subpackages:
   - pkg/client/unversioned/remotecommand
