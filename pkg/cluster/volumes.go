@@ -17,7 +17,7 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 
 	pvcs, err := c.KubeClient.PersistentVolumeClaims(ns).List(listOptions)
 	if err != nil {
-		return nil, fmt.Errorf("Can't get list of PersistentVolumeClaims: %s", err)
+		return nil, fmt.Errorf("could not list of PersistentVolumeClaims: %v", err)
 	}
 	return pvcs.Items, nil
 }
@@ -32,7 +32,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 	for _, pvc := range pvcs {
 		c.logger.Debugf("Deleting PVC '%s'", util.NameFromMeta(pvc.ObjectMeta))
 		if err := c.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, c.deleteOptions); err != nil {
-			c.logger.Warningf("Can't delete PersistentVolumeClaim: %s", err)
+			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
 		}
 	}
 	if len(pvcs) > 0 {
@@ -50,7 +50,7 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {
-		return nil, fmt.Errorf("Could not list cluster's PersistentVolumeClaims: %s", err)
+		return nil, fmt.Errorf("could not list cluster's PersistentVolumeClaims: %v", err)
 	}
 	for _, pvc := range pvcs {
 		if pvc.Annotations[constants.VolumeClaimStorageProvisionerAnnotation] != constants.EBSProvisioner {
@@ -58,10 +58,10 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 		}
 		pv, err := c.KubeClient.PersistentVolumes().Get(pvc.Spec.VolumeName)
 		if err != nil {
-			return nil, fmt.Errorf("Could not get PersistentVolume: %s", err)
+			return nil, fmt.Errorf("could not get PersistentVolume: %v", err)
 		}
 		if pv.Annotations[constants.VolumeStorateProvisionerAnnotation] != constants.EBSProvisioner {
-			return nil, fmt.Errorf("Mismatched PersistentVolimeClaim and PersistentVolume provisioner annotations for the volume %s", pv.Name)
+			return nil, fmt.Errorf("mismatched PersistentVolimeClaim and PersistentVolume provisioner annotations for the volume %s", pv.Name)
 		}
 		result = append(result, pv)
 	}

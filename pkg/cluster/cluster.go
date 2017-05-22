@@ -12,7 +12,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/ap
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -453,7 +453,8 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 // changes the EBS and only then update the PV.
 func (c *Cluster) updateVolumes(newVolume spec.Volume) (error) {
 	newQuantity, err := resource.ParseQuantity(newVolume.Size)
-	newSize := newQuantity.ScaledValue(resource.Giga)
+	// value in Gigabytes
+	newSize := newQuantity.ScaledValue(0) / (1073741824)
 
 	pvs, err := c.listPersistentVolumes()
 	if err != nil {

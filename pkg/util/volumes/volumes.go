@@ -18,7 +18,7 @@ const (
 func ConnectToEC2() (*ec2.EC2, error) {
 	sess ,err := session.NewSession(&aws.Config{Region: aws.String(AWS_REGION)})
 	if err != nil {
-		return nil, fmt.Errorf("Could not establish AWS session: %s", err)
+		return nil, fmt.Errorf("could not establish AWS session: %v", err)
 	}
 	return ec2.New(sess), nil
 }
@@ -30,15 +30,15 @@ func ResizeVolume(svc *ec2.EC2, volumeId string, newSize int64) (error) {
 	output, err := svc.ModifyVolume(&input)
 
 	if err != nil {
-		return fmt.Errorf("Could not modify persistent volume: %s", err)
+		return fmt.Errorf("could not modify persistent volume: %v", err)
 	}
 
 	state := *output.VolumeModification.ModificationState
 	if state == constants.EBSVolumeStateFailed {
-		return fmt.Errorf("Could not modify persistent volume %s: modification state failed", volumeId)
+		return fmt.Errorf("could not modify persistent volume %s: modification state failed", volumeId)
 	}
 	if state == "" {
-		return fmt.Errorf("Received empty modification status")
+		return fmt.Errorf("received empty modification status")
 	}
 	if state == constants.EBSVolumeStateOptimizing || state == constants.EBSVolumeStateCompleted {
 		return nil
@@ -49,13 +49,13 @@ func ResizeVolume(svc *ec2.EC2, volumeId string, newSize int64) (error) {
 		func() (bool, error) {
 			out, err := svc.DescribeVolumesModifications(&in)
 			if err != nil {
-				return false, fmt.Errorf("Could not describe volume modification: %s", err)
+				return false, fmt.Errorf("could not describe volume modification: %v", err)
 			}
 			if len(out.VolumesModifications) != 1 {
-				return false, fmt.Errorf("Describe volume modification didn't return one record for volume \"%s\"", volumeId)
+				return false, fmt.Errorf("describe volume modification didn't return one record for volume \"%s\"", volumeId)
 			}
 			if *out.VolumesModifications[0].VolumeId != volumeId {
-				return false, fmt.Errorf("Non-matching volume id when describing modifications: \"%s\" is different from \"%s\"")
+				return false, fmt.Errorf("non-matching volume id when describing modifications: \"%s\" is different from \"%s\"")
 			}
 			return *out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
 		})
