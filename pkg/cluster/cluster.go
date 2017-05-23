@@ -55,17 +55,17 @@ type Cluster struct {
 	kubeResources
 	spec.Postgresql
 	Config
-	logger               *logrus.Entry
-	pgUsers              map[string]spec.PgUser
-	systemUsers          map[string]spec.PgUser
-	podEvents            chan spec.PodEvent
-	podSubscribers       map[spec.NamespacedName]chan spec.PodEvent
-	podSubscribersMu     sync.RWMutex
-	pgDb                 *sql.DB
-	mu                   sync.Mutex
-	masterLess           bool
-	userSyncStrategy     spec.UserSyncer
-	deleteOptions        *meta_v1.DeleteOptions
+	logger           *logrus.Entry
+	pgUsers          map[string]spec.PgUser
+	systemUsers      map[string]spec.PgUser
+	podEvents        chan spec.PodEvent
+	podSubscribers   map[spec.NamespacedName]chan spec.PodEvent
+	podSubscribersMu sync.RWMutex
+	pgDb             *sql.DB
+	mu               sync.Mutex
+	masterLess       bool
+	userSyncStrategy spec.UserSyncer
+	deleteOptions    *meta_v1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 }
 
@@ -84,17 +84,17 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	})
 
 	cluster := &Cluster{
-		Config:               cfg,
-		Postgresql:           pgSpec,
-		logger:               lg,
-		pgUsers:              make(map[string]spec.PgUser),
-		systemUsers:          make(map[string]spec.PgUser),
-		podEvents:            make(chan spec.PodEvent),
-		podSubscribers:       make(map[spec.NamespacedName]chan spec.PodEvent),
-		kubeResources:        kubeResources,
-		masterLess:           false,
-		userSyncStrategy:     users.DefaultUserSyncStrategy{},
-		deleteOptions:        &meta_v1.DeleteOptions{OrphanDependents: &orphanDependents},
+		Config:           cfg,
+		Postgresql:       pgSpec,
+		logger:           lg,
+		pgUsers:          make(map[string]spec.PgUser),
+		systemUsers:      make(map[string]spec.PgUser),
+		podEvents:        make(chan spec.PodEvent),
+		podSubscribers:   make(map[spec.NamespacedName]chan spec.PodEvent),
+		kubeResources:    kubeResources,
+		masterLess:       false,
+		userSyncStrategy: users.DefaultUserSyncStrategy{},
+		deleteOptions:    &meta_v1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
 	}
 
