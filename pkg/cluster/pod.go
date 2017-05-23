@@ -146,23 +146,6 @@ func (c *Cluster) recreatePod(pod v1.Pod) error {
 	return nil
 }
 
-func (c *Cluster) podEventsDispatcher(stopCh <-chan struct{}) {
-	c.logger.Infof("Watching '%s' cluster", c.ClusterName())
-	for {
-		select {
-		case event := <-c.podEvents:
-			c.podSubscribersMu.RLock()
-			subscriber, ok := c.podSubscribers[event.PodName]
-			c.podSubscribersMu.RUnlock()
-			if ok {
-				go func() { subscriber <- event }() //TODO: is it a right way to do nonblocking send to the channel?
-			}
-		case <-stopCh:
-			return
-		}
-	}
-}
-
 func (c *Cluster) recreatePods() error {
 	ls := c.labelsSet()
 	namespace := c.Metadata.Namespace
