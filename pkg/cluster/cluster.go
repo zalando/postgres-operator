@@ -466,7 +466,7 @@ func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
 	c.podEventsQueue.Add(event)
 }
 
-func (c *Cluster) podEventProcess(obj interface{}) error {
+func (c *Cluster) processPodEvent(obj interface{}) error {
 	event, ok := obj.(spec.PodEvent)
 	if !ok {
 		return fmt.Errorf("could not cast to PodEvent")
@@ -492,7 +492,7 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 		case <-stopCh:
 			return
 		default:
-			c.podEventsQueue.Pop(cache.PopProcessFunc(c.podEventProcess))
+			c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent))
 		}
 	}
 }
