@@ -92,7 +92,6 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 	c.clustersMu.RLock()
 	cl, clusterFound := c.clusters[clusterName]
-	stopCh := c.stopChs[clusterName]
 	c.clustersMu.RUnlock()
 
 	switch event.EventType {
@@ -106,13 +105,14 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 		stopCh := make(chan struct{})
 		cl = cluster.New(c.makeClusterConfig(), *event.NewSpec, logger)
+		cl.Run(stopCh)
 
 		c.clustersMu.Lock()
 		c.clusters[clusterName] = cl
 		c.stopChs[clusterName] = stopCh
 		c.clustersMu.Unlock()
 
-		if err := cl.Create(stopCh); err != nil {
+		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Errorf("could not create cluster: %v", err)
 			logger.Errorf("%v", cl.Error)
 
@@ -133,6 +133,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 			return nil
 		}
+		cl.Error = nil
 		logger.Infof("Cluster '%s' has been updated", clusterName)
 	case spec.EventDelete:
 		logger.Infof("Deletion of the '%s' cluster started", clusterName)
@@ -158,8 +159,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
+			stopCh := make(chan struct{})
 			cl = cluster.New(c.makeClusterConfig(), *event.NewSpec, logger)
-			stopCh = make(chan struct{})
+			cl.Run(stopCh)
 
 			c.clustersMu.Lock()
 			c.clusters[clusterName] = cl
@@ -167,11 +169,12 @@ func (c *Controller) processEvent(obj interface{}) error {
 			c.clustersMu.Unlock()
 		}
 
-		if err := cl.Sync(stopCh); err != nil {
+		if err := cl.Sync(); err != nil {
 			cl.Error = fmt.Errorf("could not sync cluster '%s': %s", clusterName, err)
 			logger.Errorf("%v", cl)
 			return nil
 		}
+		cl.Error = nil
 
 		logger.Infof("Cluster '%s' has been synced", clusterName)
 	}

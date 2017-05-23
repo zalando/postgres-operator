@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -63,15 +64,24 @@ type Cluster struct {
 	pgDb                 *sql.DB
 	mu                   sync.Mutex
 	masterLess           bool
-	podDispatcherRunning bool
 	userSyncStrategy     spec.UserSyncer
 	deleteOptions        *meta_v1.DeleteOptions
+	podEventsQueue   *cache.FIFO
 }
 
 func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret)}
 	orphanDependents := true
+
+	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
+		e, ok := obj.(spec.PodEvent)
+		if !ok {
+			return "", fmt.Errorf("could not cast to PodEvent")
+		}
+
+		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
+	})
 
 	cluster := &Cluster{
 		Config:               cfg,
@@ -83,9 +93,9 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 		podSubscribers:       make(map[spec.NamespacedName]chan spec.PodEvent),
 		kubeResources:        kubeResources,
 		masterLess:           false,
-		podDispatcherRunning: false,
 		userSyncStrategy:     users.DefaultUserSyncStrategy{},
 		deleteOptions:        &meta_v1.DeleteOptions{OrphanDependents: &orphanDependents},
+		podEventsQueue:   podEventsQueue,
 	}
 
 	return cluster
@@ -143,15 +153,10 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
-func (c *Cluster) Create(stopCh <-chan struct{}) error {
+func (c *Cluster) Create() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var err error
-
-	if !c.podDispatcherRunning {
-		go c.podEventsDispatcher(stopCh)
-		c.podDispatcherRunning = true
-	}
 
 	defer func() {
 		if err == nil {
@@ -460,7 +465,38 @@ func (c *Cluster) Delete() error {
 }
 
 func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
-	c.podEvents <- event
+	c.podEventsQueue.Add(event)
+}
+
+func (c *Cluster) podEventProcess(obj interface{}) error {
+	event, ok := obj.(spec.PodEvent)
+	if !ok {
+		return fmt.Errorf("could not cast to PodEvent")
+	}
+
+	c.podSubscribersMu.RLock()
+	subscriber, ok := c.podSubscribers[event.PodName]
+	c.podSubscribersMu.RUnlock()
+	if ok {
+		subscriber <- event
+	}
+
+	return nil
+}
+
+func (c *Cluster) Run(stopCh <-chan struct{}) {
+	go c.processPodEventQueue(stopCh)
+}
+
+func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
+	for {
+		select {
+		case <-stopCh:
+			return
+		default:
+			c.podEventsQueue.Pop(cache.PopProcessFunc(c.podEventProcess))
+		}
+	}
 }
 
 func (c *Cluster) initSystemUsers() {

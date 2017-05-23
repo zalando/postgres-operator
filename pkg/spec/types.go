@@ -34,11 +34,12 @@ const (
 )
 
 type PodEvent struct {
-	ClusterName NamespacedName
-	PodName     NamespacedName
-	PrevPod     *v1.Pod
-	CurPod      *v1.Pod
-	EventType   EventType
+	ResourceVersion string
+	ClusterName     NamespacedName
+	PodName         NamespacedName
+	PrevPod         *v1.Pod
+	CurPod          *v1.Pod
+	EventType       EventType
 }
 
 type PgUser struct {
