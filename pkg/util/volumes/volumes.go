@@ -3,8 +3,8 @@ package volumes
 import (
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -12,23 +12,20 @@ import (
 )
 
 const (
-	AWS_REGION="eu-central-1"
+	AWS_REGION = "eu-central-1"
 )
 
 func ConnectToEC2() (*ec2.EC2, error) {
-	sess ,err := session.NewSession(&aws.Config{Region: aws.String(AWS_REGION)})
+	sess, err := session.NewSession(&aws.Config{Region: aws.String(AWS_REGION)})
 	if err != nil {
 		return nil, fmt.Errorf("could not establish AWS session: %v", err)
 	}
 	return ec2.New(sess), nil
 }
 
-
-func ResizeVolume(svc *ec2.EC2, volumeId string, newSize int64) (error) {
+func ResizeVolume(svc *ec2.EC2, volumeId string, newSize int64) error {
 	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeId}
-	// check dry run first
 	output, err := svc.ModifyVolume(&input)
-
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
 	}

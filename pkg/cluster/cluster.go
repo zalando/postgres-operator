@@ -13,8 +13,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/api/resource"
+	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/rest"
@@ -27,6 +27,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
+	"strings"
 )
 
 var (
@@ -250,7 +251,6 @@ func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string)
 	return
 }
 
-
 func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
 	reasons := make([]string, 0)
 	var match, needsRollUpdate, needsReplace bool
@@ -263,7 +263,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
 		needsRollUpdate = true
-		reasons = append(reasons,"new statefulset's container specification doesn't match the current one")
+		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 
@@ -398,6 +398,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		if err := c.updateVolumes(newSpec.Spec.Volume); err != nil {
 			return fmt.Errorf("Could not update volumes: %s", err)
 		}
+		c.logger.Infof("volumes have been updated successfully")
 	}
 
 	newStatefulSet, err := c.genStatefulSet(newSpec.Spec)
@@ -424,8 +425,6 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logger.Infof("statefulset '%s' has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	}
 
-
-
 	if c.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
 		c.logger.Warnf("Postgresql version change(%s -> %s) is not allowed",
 			c.Spec.PgVersion, newSpec.Spec.PgVersion)
@@ -446,38 +445,55 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	return nil
 }
 
-
 // updateVolumes changes size of the persistent volumes
 // backed by EBS. It checks the new size against the PVs to
 // decide whcih volumes to update. When updating, it first
 // changes the EBS and only then update the PV.
-func (c *Cluster) updateVolumes(newVolume spec.Volume) (error) {
+func (c *Cluster) updateVolumes(newVolume spec.Volume) error {
 	newQuantity, err := resource.ParseQuantity(newVolume.Size)
 	// value in Gigabytes
 	newSize := newQuantity.ScaledValue(0) / (1073741824)
 
 	pvs, err := c.listPersistentVolumes()
 	if err != nil {
-		return fmt.Errorf("Could not list persistent volumes: %s", err)
+		return fmt.Errorf("could not list persistent volumes: %s", err)
 	}
 	ec2, err := volumes.ConnectToEC2()
 	if err != nil {
-		return fmt.Errorf("Could not connect to EC2")
+		return fmt.Errorf("could not connect to EC2")
 	}
 	for _, pv := range pvs {
 		cap := pv.Spec.Capacity[v1.ResourceStorage]
-		if cap.ScaledValue(resource.Giga) != newSize {
-			c.logger.Debugf("Updating persistent volume %s to %d", pv.Name, newSize)
-			if err := volumes.ResizeVolume(ec2, pv.Spec.AWSElasticBlockStore.VolumeID, newSize); err != nil {
-				return fmt.Errorf("Could not resize EBS volume: %s", err)
+		if cap.ScaledValue(0)/(1073741824) != newSize {
+			awsVolumeId, err := getAWSVolumeId(pv)
+			if err != nil {
+				return err
+			}
+			c.logger.Debugf("updating persistent volume %s to %d", pv.Name, newSize)
+			if err := volumes.ResizeVolume(ec2, awsVolumeId, newSize); err != nil {
+				return fmt.Errorf("could not resize EBS volume %s: %v", awsVolumeId, err)
 			}
 			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
 			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
-				return fmt.Errorf("Could not update persistent volume: %s", err)
+				return fmt.Errorf("could not update persistent volume: %s", err)
 			}
+			c.logger.Debugf("successfully updated persistent volume %s", pv.Name)
 		}
 	}
 	return nil
+}
+
+// getAWSVolumeId converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes
+func getAWSVolumeId(pv *v1.PersistentVolume) (string, error) {
+	id := pv.Spec.AWSElasticBlockStore.VolumeID
+	if id == "" {
+		return "", fmt.Errorf("volume id is empty for volume %s", pv.Name)
+	}
+	idx := strings.LastIndex(id, "/vol-") + 1
+	if idx == 0 {
+		return "", fmt.Errorf("malfored EBS volume id %s", id)
+	}
+	return id[idx:], nil
 }
 
 func (c *Cluster) Delete() error {

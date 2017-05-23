@@ -50,7 +50,6 @@ func (c *Cluster) deletePods() error {
 	return nil
 }
 
-
 func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)

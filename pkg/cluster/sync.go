@@ -157,7 +157,7 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 		c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
 
-		if !cmp.replace{
+		if !cmp.replace {
 			if err := c.updateStatefulSet(desiredSS); err != nil {
 				return fmt.Errorf("could not update statefulset: %v", err)
 			}
@@ -167,7 +167,7 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 		}
 
-		if !cmp.rollingUpdate{
+		if !cmp.rollingUpdate {
 			c.logger.Debugln("No rolling update is needed")
 			return nil
 		}
