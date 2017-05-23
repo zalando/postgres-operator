@@ -62,10 +62,11 @@ func (c *Controller) podAdd(obj interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName: c.PodClusterName(pod),
-		PodName:     util.NameFromMeta(pod.ObjectMeta),
-		CurPod:      pod,
-		EventType:   spec.EventAdd,
+		ClusterName:     c.PodClusterName(pod),
+		PodName:         util.NameFromMeta(pod.ObjectMeta),
+		CurPod:          pod,
+		EventType:       spec.EventAdd,
+		ResourceVersion: pod.ResourceVersion,
 	}
 
 	c.podCh <- podEvent
@@ -83,11 +84,12 @@ func (c *Controller) podUpdate(prev, cur interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName: c.PodClusterName(curPod),
-		PodName:     util.NameFromMeta(curPod.ObjectMeta),
-		PrevPod:     prevPod,
-		CurPod:      curPod,
-		EventType:   spec.EventUpdate,
+		ClusterName:     c.PodClusterName(curPod),
+		PodName:         util.NameFromMeta(curPod.ObjectMeta),
+		PrevPod:         prevPod,
+		CurPod:          curPod,
+		EventType:       spec.EventUpdate,
+		ResourceVersion: curPod.ResourceVersion,
 	}
 
 	c.podCh <- podEvent
@@ -100,27 +102,28 @@ func (c *Controller) podDelete(obj interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName: c.PodClusterName(pod),
-		PodName:     util.NameFromMeta(pod.ObjectMeta),
-		CurPod:      pod,
-		EventType:   spec.EventDelete,
+		ClusterName:     c.PodClusterName(pod),
+		PodName:         util.NameFromMeta(pod.ObjectMeta),
+		CurPod:          pod,
+		EventType:       spec.EventDelete,
+		ResourceVersion: pod.ResourceVersion,
 	}
 
 	c.podCh <- podEvent
 }
 
 func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}) {
-	c.logger.Infof("Watching all pod events")
+	c.logger.Debugln("Watching all pod events")
 	for {
 		select {
 		case event := <-c.podCh:
 			c.clustersMu.RLock()
-			subscriber, ok := c.clusters[event.ClusterName]
+			cluster, ok := c.clusters[event.ClusterName]
 			c.clustersMu.RUnlock()
 
 			if ok {
 				c.logger.Debugf("Sending %s event of pod '%s' to the '%s' cluster channel", event.EventType, event.PodName, event.ClusterName)
-				go subscriber.ReceivePodEvent(event)
+				cluster.ReceivePodEvent(event)
 			}
 		case <-stopCh:
 			return

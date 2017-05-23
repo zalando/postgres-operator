@@ -7,18 +7,13 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
-func (c *Cluster) Sync(stopCh <-chan struct{}) error {
+func (c *Cluster) Sync() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	err := c.loadResources()
 	if err != nil {
 		c.logger.Errorf("could not load resources: %v", err)
-	}
-
-	if !c.podDispatcherRunning {
-		go c.podEventsDispatcher(stopCh)
-		c.podDispatcherRunning = true
 	}
 
 	c.logger.Debugf("Syncing secrets")
