@@ -40,6 +40,7 @@ var (
 type Config struct {
 	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
 	RestClient          *rest.RESTClient
+	RestConfig          *rest.Config
 	TeamsAPIClient      *teams.API
 	OpConfig            config.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
@@ -476,14 +477,40 @@ func (c *Cluster) updateVolumes(newVolume spec.Volume) error {
 			if err := volumes.ResizeVolume(ec2, awsVolumeId, newSize); err != nil {
 				return fmt.Errorf("could not resize EBS volume %s: %v", awsVolumeId, err)
 			}
+			c.logger.Debugf("resizing the filesystem on the volume %s", pv.Name)
+			podName := getPodNameFromPersistentVolume(pv)
+			if err := c.resizeVolumeFS(podName); err != nil {
+				return fmt.Errorf("could not resize the filesystem on pod '%s': %v", podName, err)
+			}
+			c.logger.Debugf("filesystem resize successfull on volume %s", pv.Name)
 			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
+			c.logger.Debugf("updating persistent volume definition for volume %s", pv.Name)
 			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
 				return fmt.Errorf("could not update persistent volume: %s", err)
 			}
 			c.logger.Debugf("successfully updated persistent volume %s", pv.Name)
 		}
 	}
+
 	return nil
+}
+
+func (c *Cluster) resizeVolumeFS(podName *spec.NamespacedName) error {
+	out, err := c.ExecCommand(podName, "bash", "-c", "df -h /home/postgres/pgdata --output=source|tail -1|xargs resize2fs 2>&1")
+	if err != nil {
+		return err
+	}
+	if out != "" {
+		c.logger.Debugf("command stdout: %s", out)
+	}
+	return nil
+
+}
+
+func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedName {
+	namespace := pv.Spec.ClaimRef.Namespace
+	name := pv.Spec.ClaimRef.Name[len(constants.DataVolumeName)+1:]
+	return &spec.NamespacedName{namespace, name}
 }
 
 // getAWSVolumeId converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes
