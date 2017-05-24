@@ -1,11 +1,11 @@
 package spec
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
-	"encoding/json"
-	"bytes"
 
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
@@ -178,9 +178,9 @@ var clExp = Postgresql{
 		PostgresqlParam: PostgresqlParam{
 			PgVersion: "9.6",
 			Parameters: map[string]string{
-				"shared_buffers": "32MB",
+				"shared_buffers":  "32MB",
 				"max_connections": "10",
-				"log_statement": "all",
+				"log_statement":   "all",
 			},
 		},
 		Volume: Volume{
@@ -206,14 +206,14 @@ var clExp = Postgresql{
 		TeamID:              "ACID",
 		AllowedSourceRanges: []string{"127.0.0.1/32"},
 		NumberOfInstances:   2,
-		Users:               map[string]UserFlags{"zalando": UserFlags{"superuser", "createdb"}},
-		MaintenanceWindows: []MaintenanceWindow{MaintenanceWindow{
+		Users:               map[string]UserFlags{"zalando": {"superuser", "createdb"}},
+		MaintenanceWindows: []MaintenanceWindow{{
 			StartWeekday: time.Monday,
 			StartTime:    mustParseTime("01:00"),
 			EndTime:      mustParseTime("06:00"),
 			EndWeekday:   time.Sunday,
 		},
-			MaintenanceWindow{
+			{
 				StartWeekday: time.Saturday,
 				StartTime:    mustParseTime("00:00"),
 				EndTime:      mustParseTime("04:00"),

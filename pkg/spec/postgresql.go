@@ -95,7 +95,7 @@ type PostgresqlList struct {
 }
 
 var alphaRegexp = regexp.MustCompile("^[a-zA-Z]*$")
-var weekdays = map[string]int{"Sun":0, "Mon":1, "Tue":2, "Wed":3, "Thu":4, "Fri":5, "Sat":6}
+var weekdays = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
 
 func ParseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
 	var timeLayout string
@@ -170,7 +170,7 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("'From' time must be prior to the 'To' time")
 	}
 
-	if (int(got.StartWeekday) + 6) % 7 > (int(got.EndWeekday) + 6) % 7 {
+	if (int(got.StartWeekday)+6)%7 > (int(got.EndWeekday)+6)%7 {
 		return fmt.Errorf("'From' weekday must be prior to the 'To' weekday")
 	}
 
