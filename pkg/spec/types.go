@@ -1,6 +1,8 @@
 package spec
 
 import (
+	"fmt"
+	"strings"
 	"database/sql"
 	"fmt"
 	"strings"
