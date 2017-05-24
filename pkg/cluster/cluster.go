@@ -34,6 +34,7 @@ import (
 var (
 	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
 	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
+	ext2fsSuccessRegexp = regexp.MustCompile(`The filesystem on [/a-z0-9]+ is now \d+ \(\d+\w+\) blocks long.`)
 )
 
 //TODO: remove struct duplication
@@ -496,15 +497,21 @@ func (c *Cluster) updateVolumes(newVolume spec.Volume) error {
 }
 
 func (c *Cluster) resizeVolumeFS(podName *spec.NamespacedName) error {
+	// resize2fs always writes to stderr, and ExecCommand considers a non-empty stderr an error
 	out, err := c.ExecCommand(podName, "bash", "-c", "df -h /home/postgres/pgdata --output=source|tail -1|xargs resize2fs 2>&1")
 	if err != nil {
 		return err
 	}
-	if out != "" {
-		c.logger.Debugf("command stdout: %s", out)
-	}
-	return nil
 
+	if out != "" {
+		c.logger.Debugf("command output is: %s", out)
+	}
+
+	if strings.Contains(out, "Nothing to do") ||
+		(strings.Contains(out,  "on-line resizing required") && ext2fsSuccessRegexp.MatchString(out)) {
+		return nil
+	}
+	return fmt.Errorf("unrecognized output: %s, assuming error", out)
 }
 
 func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedName {
