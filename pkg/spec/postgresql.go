@@ -12,8 +12,6 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
-var alphaRegexp = regexp.MustCompile("^[a-zA-Z]*$")
-
 type MaintenanceWindow struct {
 	StartTime    time.Time    // Start time
 	StartWeekday time.Weekday // Start weekday
@@ -96,7 +94,10 @@ type PostgresqlList struct {
 	Items []Postgresql `json:"items"`
 }
 
-func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
+var alphaRegexp = regexp.MustCompile("^[a-zA-Z]*$")
+var weekdays = map[string]int{"Sun":0, "Mon":1, "Tue":2, "Wed":3, "Thu":4, "Fri":5, "Sat":6}
+
+func ParseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
 	var timeLayout string
 
 	parts := strings.Split(s, ":")
@@ -107,6 +108,12 @@ func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err err
 		}
 		timeLayout = "Mon:15:04"
 		wdProvided = true
+		weekday, ok := weekdays[parts[0]]
+		if !ok {
+			err = fmt.Errorf("incorrect weekday")
+			return
+		}
+		wd = time.Weekday(weekday)
 	} else {
 		wdProvided = false
 		timeLayout = "15:04"
@@ -116,8 +123,6 @@ func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err err
 	if err != nil {
 		return
 	}
-
-	wd = tp.Weekday()
 	t = tp.UTC()
 
 	return
@@ -125,7 +130,7 @@ func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err err
 
 func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
 	var startWd, endWd string
-	if m.StartWeekday == time.Sunday && m.EndWeekday == time.Saturday {
+	if m.StartWeekday == time.Monday && m.EndWeekday == time.Sunday {
 		startWd = ""
 		endWd = ""
 	} else {
@@ -151,12 +156,12 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("incorrect maintenance window format")
 	}
 
-	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = parseTime(parts[0])
+	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = ParseTime(parts[0])
 	if err != nil {
 		return err
 	}
 
-	got.EndTime, got.EndWeekday, weekdayProvidedTo, err = parseTime(parts[1])
+	got.EndTime, got.EndWeekday, weekdayProvidedTo, err = ParseTime(parts[1])
 	if err != nil {
 		return err
 	}
@@ -165,9 +170,13 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("'From' time must be prior to the 'To' time")
 	}
 
+	if (int(got.StartWeekday) + 6) % 7 > (int(got.EndWeekday) + 6) % 7 {
+		return fmt.Errorf("'From' weekday must be prior to the 'To' weekday")
+	}
+
 	if !weekdayProvidedFrom || !weekdayProvidedTo {
-		got.StartWeekday = time.Sunday
-		got.EndWeekday = time.Saturday
+		got.StartWeekday = time.Monday
+		got.EndWeekday = time.Sunday
 	}
 
 	*m = got
@@ -191,11 +200,17 @@ func (pl *PostgresqlList) GetListMeta() unversioned.List {
 	return &pl.Metadata
 }
 
-func clusterName(clusterName string, teamName string) (string, error) {
+func extractClusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
+
 	if len(clusterName) < teamNameLen+2 {
 		return "", fmt.Errorf("name is too short")
 	}
+
+	if teamNameLen == 0 {
+		return "", fmt.Errorf("Team name is empty")
+	}
+
 	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
 		return "", fmt.Errorf("name must match {TEAM}-{NAME} format")
 	}
@@ -228,7 +243,7 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	}
 	tmp2 := Postgresql(tmp)
 
-	clusterName, err := clusterName(tmp2.Metadata.Name, tmp2.Spec.TeamID)
+	clusterName, err := extractClusterName(tmp2.Metadata.Name, tmp2.Spec.TeamID)
 	if err == nil {
 		tmp2.Spec.ClusterName = clusterName
 	} else {
