@@ -2,6 +2,7 @@ package volumes
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -9,23 +10,55 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 const (
 	AWS_REGION = "eu-central-1"
 )
 
-func ConnectToEC2() (*ec2.EC2, error) {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(AWS_REGION)})
-	if err != nil {
-		return nil, fmt.Errorf("could not establish AWS session: %v", err)
-	}
-	return ec2.New(sess), nil
+type VolumeResizer interface {
+	ConnectToProvider() error
+	VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
+	GetProviderVolumeID(pv *v1.PersistentVolume) (string, error)
+	ResizeVolume(providerVolumeId string, newSize int64) error
+	DisconnectFromProvider() error
 }
 
-func ResizeVolume(svc *ec2.EC2, volumeId string, newSize int64) error {
+
+type EBSVolumeResizer struct {
+	connection *ec2.EC2
+}
+
+func (c *EBSVolumeResizer) ConnectToProvider() (error) {
+	sess, err := session.NewSession(&aws.Config{Region: aws.String(AWS_REGION)})
+	if err != nil {
+		return fmt.Errorf("could not establish AWS session: %v", err)
+	}
+	c.connection = ec2.New(sess)
+	return nil
+}
+
+func (c *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) (bool) {
+	return pv.Spec.AWSElasticBlockStore != nil
+}
+
+// GetProviderVolumeID converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes
+func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string, error) {
+	volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
+	if volumeID == "" {
+		return "", fmt.Errorf("volume id is empty for volume %s", pv.Name)
+	}
+	idx := strings.LastIndex(volumeID, "/vol-") + 1
+	if idx == 0 {
+		return "", fmt.Errorf("malfored EBS volume id %s", volumeID)
+	}
+	return volumeID[idx:], nil
+}
+
+func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeId}
-	output, err := svc.ModifyVolume(&input)
+	output, err := c.connection.ModifyVolume(&input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
 	}
@@ -44,7 +77,7 @@ func ResizeVolume(svc *ec2.EC2, volumeId string, newSize int64) error {
 	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []*string{&volumeId}}
 	return retryutil.Retry(constants.EBSVolumeResizeWaitInterval, constants.EBSVolumeResizeWaitTimeout,
 		func() (bool, error) {
-			out, err := svc.DescribeVolumesModifications(&in)
+			out, err := c.connection.DescribeVolumesModifications(&in)
 			if err != nil {
 				return false, fmt.Errorf("could not describe volume modification: %v", err)
 			}
@@ -56,4 +89,8 @@ func ResizeVolume(svc *ec2.EC2, volumeId string, newSize int64) error {
 			}
 			return *out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
 		})
+}
+
+func (c *EBSVolumeResizer) DisconnectFromProvider() error {
+	return nil
 }

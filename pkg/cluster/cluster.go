@@ -400,7 +400,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 
 	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
 		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
-		if err := c.updateVolumes(newSpec.Spec.Volume); err != nil {
+		if err := c.resizeVolumes(newSpec.Spec.Volume, &volumes.EBSVolumeResizer{}); err != nil {
 			return fmt.Errorf("Could not update volumes: %s", err)
 		}
 		c.logger.Infof("volumes have been updated successfully")
@@ -450,32 +450,33 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	return nil
 }
 
-// updateVolumes changes size of the persistent volumes
-// backed by EBS. It checks the new size against the PVs to
-// decide whcih volumes to update. When updating, it first
-// changes the EBS and only then update the PV.
-func (c *Cluster) updateVolumes(newVolume spec.Volume) error {
+// resizeVolumes resize persistent volumes compatible with the given resizer interface
+func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizer volumes.VolumeResizer) error {
 	newQuantity, err := resource.ParseQuantity(newVolume.Size)
 	// value in Gigabytes
 	newSize := newQuantity.ScaledValue(0) / (1073741824)
 
 	pvs, err := c.listPersistentVolumes()
 	if err != nil {
-		return fmt.Errorf("could not list persistent volumes: %s", err)
+		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
-	ec2, err := volumes.ConnectToEC2()
+	err = resizer.ConnectToProvider()
 	if err != nil {
-		return fmt.Errorf("could not connect to EC2")
+		return fmt.Errorf("could not connect to the volume provider: %v", err)
 	}
+
 	for _, pv := range pvs {
+		if !resizer.VolumeBelongsToProvider(pv) {
+			continue
+		}
 		cap := pv.Spec.Capacity[v1.ResourceStorage]
 		if cap.ScaledValue(0)/(1073741824) != newSize {
-			awsVolumeId, err := getAWSVolumeId(pv)
+			awsVolumeId, err := resizer.GetProviderVolumeID(pv)
 			if err != nil {
 				return err
 			}
 			c.logger.Debugf("updating persistent volume %s to %d", pv.Name, newSize)
-			if err := volumes.ResizeVolume(ec2, awsVolumeId, newSize); err != nil {
+			if err := resizer.ResizeVolume(awsVolumeId, newSize); err != nil {
 				return fmt.Errorf("could not resize EBS volume %s: %v", awsVolumeId, err)
 			}
 			c.logger.Debugf("resizing the filesystem on the volume %s", pv.Name)
@@ -492,6 +493,7 @@ func (c *Cluster) updateVolumes(newVolume spec.Volume) error {
 			c.logger.Debugf("successfully updated persistent volume %s", pv.Name)
 		}
 	}
+	resizer.DisconnectFromProvider()
 
 	return nil
 }
@@ -520,18 +522,6 @@ func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedNam
 	return &spec.NamespacedName{namespace, name}
 }
 
-// getAWSVolumeId converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes
-func getAWSVolumeId(pv *v1.PersistentVolume) (string, error) {
-	id := pv.Spec.AWSElasticBlockStore.VolumeID
-	if id == "" {
-		return "", fmt.Errorf("volume id is empty for volume %s", pv.Name)
-	}
-	idx := strings.LastIndex(id, "/vol-") + 1
-	if idx == 0 {
-		return "", fmt.Errorf("malfored EBS volume id %s", id)
-	}
-	return id[idx:], nil
-}
 
 func (c *Cluster) Delete() error {
 	c.mu.Lock()
