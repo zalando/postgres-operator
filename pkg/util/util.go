@@ -41,7 +41,7 @@ func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
 }
 
 func PGUserPassword(user spec.PgUser) string {
-	if (len(user.Password) == md5.Size && user.Password[:3] == md5prefix) || user.Password == "" {
+	if (len(user.Password) == md5.Size*2+len(md5prefix) && user.Password[:3] == md5prefix) || user.Password == "" {
 		// Avoid processing already encrypted or empty passwords
 		return user.Password
 	}
