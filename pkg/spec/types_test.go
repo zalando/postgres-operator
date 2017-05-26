@@ -33,12 +33,12 @@ func TestNamespacedNameDecode(t *testing.T) {
 func TestNamespacedNameMarshal(t *testing.T) {
 	for _, tt := range nnTests {
 		var actual NamespacedName
-		err := actual.Decode(tt.s)
+
 		m, err := actual.MarshalJSON()
 		if err != nil {
 			t.Errorf("Marshal error: %v", err)
 		}
-		if bytes.Compare(m, tt.expectedMarshal) != 0 {
+		if bytes.Equal(m, tt.expectedMarshal) {
 			t.Errorf("Expected marshal: %v, got %#v", tt.expected, actual)
 		}
 	}

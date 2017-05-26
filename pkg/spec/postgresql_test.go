@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
-var parseTime = []struct {
+var parseTimeTests = []struct {
 	in                 string
 	out                time.Time
 	outWeekday         time.Weekday
@@ -323,8 +323,8 @@ func mustParseTime(s string) time.Time {
 }
 
 func TestParseTime(t *testing.T) {
-	for _, tt := range parseTime {
-		aTime, weekday, weekdayProvided, err := ParseTime(tt.in)
+	for _, tt := range parseTimeTests {
+		aTime, weekday, weekdayProvided, err := parseTime(tt.in)
 		if err != nil {
 			if err.Error() != tt.err.Error() {
 				t.Errorf("ParseTime expected error: %v, got: %v", err, tt.err)
@@ -387,7 +387,7 @@ func TestMarshalMaintenanceWindow(t *testing.T) {
 			continue
 		}
 
-		if bytes.Compare(s, tt.in) != 0 {
+		if !bytes.Equal(s, tt.in) {
 			t.Errorf("Expected Marshal: %s, got: %s", string(tt.in), string(s))
 		}
 	}
@@ -422,7 +422,7 @@ func TestMarshal(t *testing.T) {
 			t.Errorf("Marshal error: %v", err)
 			continue
 		}
-		if bytes.Compare(m, tt.marshal) != 0 {
+		if !bytes.Equal(m, tt.marshal) {
 			t.Errorf("Marshal Postgresql expected: %s, got: %s", string(tt.marshal), string(m))
 		}
 	}
@@ -437,8 +437,6 @@ func TestPostgresMeta(t *testing.T) {
 		if a := tt.out.GetObjectMeta(); reflect.DeepEqual(a, tt.out.Metadata) {
 			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.Metadata, a)
 		}
-
-		return
 	}
 }
 
