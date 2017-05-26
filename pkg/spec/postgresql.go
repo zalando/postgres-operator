@@ -69,7 +69,7 @@ type Postgresql struct {
 	Metadata             v1.ObjectMeta `json:"metadata"`
 
 	Spec   PostgresSpec   `json:"spec"`
-	Status PostgresStatus `json:"status"`
+	Status PostgresStatus `json:"status,omitempty"`
 	Error  error          `json:"-"`
 }
 
