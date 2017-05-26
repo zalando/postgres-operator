@@ -97,7 +97,7 @@ type PostgresqlList struct {
 var alphaRegexp = regexp.MustCompile("^[a-zA-Z]*$")
 var weekdays = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
 
-func ParseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
+func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
 	var timeLayout string
 
 	parts := strings.Split(s, ":")
@@ -156,12 +156,12 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("incorrect maintenance window format")
 	}
 
-	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = ParseTime(parts[0])
+	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = parseTime(parts[0])
 	if err != nil {
 		return err
 	}
 
-	got.EndTime, got.EndWeekday, weekdayProvidedTo, err = ParseTime(parts[1])
+	got.EndTime, got.EndWeekday, weekdayProvidedTo, err = parseTime(parts[1])
 	if err != nil {
 		return err
 	}
