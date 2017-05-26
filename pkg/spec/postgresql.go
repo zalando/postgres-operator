@@ -226,7 +226,8 @@ type PostgresqlListCopy PostgresqlList
 type PostgresqlCopy Postgresql
 
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
-	tmp := PostgresqlCopy{}
+	var tmp PostgresqlCopy
+
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		metaErr := json.Unmarshal(data, &tmp.Metadata)
@@ -256,7 +257,8 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 }
 
 func (pl *PostgresqlList) UnmarshalJSON(data []byte) error {
-	tmp := PostgresqlListCopy{}
+	var tmp PostgresqlListCopy
+
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
