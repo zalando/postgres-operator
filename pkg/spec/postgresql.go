@@ -69,7 +69,7 @@ type Postgresql struct {
 	Metadata             v1.ObjectMeta `json:"metadata"`
 
 	Spec   PostgresSpec   `json:"spec"`
-	Status PostgresStatus `json:"status"`
+	Status PostgresStatus `json:"status,omitempty"`
 	Error  error          `json:"-"`
 }
 
@@ -97,7 +97,7 @@ type PostgresqlList struct {
 var alphaRegexp = regexp.MustCompile("^[a-zA-Z]*$")
 var weekdays = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
 
-func ParseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
+func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
 	var timeLayout string
 
 	parts := strings.Split(s, ":")
@@ -156,12 +156,12 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("incorrect maintenance window format")
 	}
 
-	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = ParseTime(parts[0])
+	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = parseTime(parts[0])
 	if err != nil {
 		return err
 	}
 
-	got.EndTime, got.EndWeekday, weekdayProvidedTo, err = ParseTime(parts[1])
+	got.EndTime, got.EndWeekday, weekdayProvidedTo, err = parseTime(parts[1])
 	if err != nil {
 		return err
 	}
@@ -200,11 +200,16 @@ func (pl *PostgresqlList) GetListMeta() unversioned.List {
 	return &pl.Metadata
 }
 
-func clusterName(clusterName string, teamName string) (string, error) {
+func extractClusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
 	if len(clusterName) < teamNameLen+2 {
 		return "", fmt.Errorf("name is too short")
 	}
+
+	if teamNameLen == 0 {
+		return "", fmt.Errorf("Team name is empty")
+	}
+
 	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
 		return "", fmt.Errorf("name must match {TEAM}-{NAME} format")
 	}
@@ -220,7 +225,8 @@ type PostgresqlListCopy PostgresqlList
 type PostgresqlCopy Postgresql
 
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
-	tmp := PostgresqlCopy{}
+	var tmp PostgresqlCopy
+
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		metaErr := json.Unmarshal(data, &tmp.Metadata)
@@ -237,7 +243,7 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	}
 	tmp2 := Postgresql(tmp)
 
-	clusterName, err := clusterName(tmp2.Metadata.Name, tmp2.Spec.TeamID)
+	clusterName, err := extractClusterName(tmp2.Metadata.Name, tmp2.Spec.TeamID)
 	if err == nil {
 		tmp2.Spec.ClusterName = clusterName
 	} else {
@@ -250,7 +256,8 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 }
 
 func (pl *PostgresqlList) UnmarshalJSON(data []byte) error {
-	tmp := PostgresqlListCopy{}
+	var tmp PostgresqlListCopy
+
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
 		return err
