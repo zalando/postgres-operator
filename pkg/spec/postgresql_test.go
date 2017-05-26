@@ -1,8 +1,8 @@
 package spec
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -104,7 +104,31 @@ var wrongMaintenanceWindows = [][]byte{
 	[]byte(`"Mon:00:00"`),
 }
 
-var cl = []byte(`{
+var unmarshalCluster = []struct {
+	in  []byte
+	out Postgresql
+}{{
+	[]byte(`{
+  "kind": "Postgresql","apiVersion": "acid.zalan.do/v1",
+  "metadata": {"name": "acid-testcluster1"}, "spec": {"teamId": 100}}`),
+	Postgresql{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Postgresql",
+			APIVersion: "acid.zalan.do/v1",
+		},
+		Metadata: v1.ObjectMeta{
+			Name: "acid-testcluster1",
+		},
+		Status: ClusterStatusInvalid,
+		Error: &json.UnmarshalTypeError{
+			Value:  "number",
+			Type:   reflect.TypeOf(""),
+			Offset: 126,
+			Struct: "PostgresSpec",
+			Field:  "teamId",
+		},
+	}},
+	{[]byte(`{
   "kind": "Postgresql",
   "apiVersion": "acid.zalan.do/v1",
   "metadata": {
@@ -164,67 +188,87 @@ var cl = []byte(`{
       "Sat:00:00-Sat:04:00"
     ]
   }
-}`)
-
-var clExp = Postgresql{
-	TypeMeta: unversioned.TypeMeta{
-		Kind:       "Postgresql",
-		APIVersion: "acid.zalan.do/v1",
-	},
-	Metadata: v1.ObjectMeta{
-		Name: "acid-testcluster1",
-	},
-	Spec: PostgresSpec{
-		PostgresqlParam: PostgresqlParam{
-			PgVersion: "9.6",
-			Parameters: map[string]string{
-				"shared_buffers":  "32MB",
-				"max_connections": "10",
-				"log_statement":   "all",
+}`),
+		Postgresql{
+			TypeMeta: unversioned.TypeMeta{
+				Kind:       "Postgresql",
+				APIVersion: "acid.zalan.do/v1",
 			},
-		},
-		Volume: Volume{
-			Size:         "5Gi",
-			StorageClass: "SSD",
-		},
-		Patroni: Patroni{
-			InitDB: map[string]string{
-				"encoding":       "UTF8",
-				"locale":         "en_US.UTF-8",
-				"data-checksums": "true",
+			Metadata: v1.ObjectMeta{
+				Name: "acid-testcluster1",
 			},
-			PgHba:                []string{"hostssl all all 0.0.0.0/0 md5", "host    all all 0.0.0.0/0 md5"},
-			TTL:                  30,
-			LoopWait:             10,
-			RetryTimeout:         10,
-			MaximumLagOnFailover: 33554432,
-		},
-		Resources: Resources{
-			ResourceRequest: ResourceDescription{CPU: "10m", Memory: "50Mi"},
-			ResourceLimits:  ResourceDescription{CPU: "300m", Memory: "3000Mi"},
-		},
-		TeamID:              "ACID",
-		AllowedSourceRanges: []string{"127.0.0.1/32"},
-		NumberOfInstances:   2,
-		Users:               map[string]UserFlags{"zalando": {"superuser", "createdb"}},
-		MaintenanceWindows: []MaintenanceWindow{{
-			StartWeekday: time.Monday,
-			StartTime:    mustParseTime("01:00"),
-			EndTime:      mustParseTime("06:00"),
-			EndWeekday:   time.Sunday,
-		},
-			{
-				StartWeekday: time.Saturday,
-				StartTime:    mustParseTime("00:00"),
-				EndTime:      mustParseTime("04:00"),
-				EndWeekday:   time.Saturday,
+			Spec: PostgresSpec{
+				PostgresqlParam: PostgresqlParam{
+					PgVersion: "9.6",
+					Parameters: map[string]string{
+						"shared_buffers":  "32MB",
+						"max_connections": "10",
+						"log_statement":   "all",
+					},
+				},
+				Volume: Volume{
+					Size:         "5Gi",
+					StorageClass: "SSD",
+				},
+				Patroni: Patroni{
+					InitDB: map[string]string{
+						"encoding":       "UTF8",
+						"locale":         "en_US.UTF-8",
+						"data-checksums": "true",
+					},
+					PgHba:                []string{"hostssl all all 0.0.0.0/0 md5", "host    all all 0.0.0.0/0 md5"},
+					TTL:                  30,
+					LoopWait:             10,
+					RetryTimeout:         10,
+					MaximumLagOnFailover: 33554432,
+				},
+				Resources: Resources{
+					ResourceRequest: ResourceDescription{CPU: "10m", Memory: "50Mi"},
+					ResourceLimits:  ResourceDescription{CPU: "300m", Memory: "3000Mi"},
+				},
+				TeamID:              "ACID",
+				AllowedSourceRanges: []string{"127.0.0.1/32"},
+				NumberOfInstances:   2,
+				Users:               map[string]UserFlags{"zalando": {"superuser", "createdb"}},
+				MaintenanceWindows: []MaintenanceWindow{{
+					StartWeekday: time.Monday,
+					StartTime:    mustParseTime("01:00"),
+					EndTime:      mustParseTime("06:00"),
+					EndWeekday:   time.Sunday,
+				},
+					{
+						StartWeekday: time.Saturday,
+						StartTime:    mustParseTime("00:00"),
+						EndTime:      mustParseTime("04:00"),
+						EndWeekday:   time.Saturday,
+					},
+				},
+				ClusterName: "testcluster1",
 			},
-		},
-		ClusterName: "testcluster1",
-	},
-	Status: "",
-	Error:  nil,
+			Error: nil,
+		}},
+	{
+		[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "teapot-testcluster1"}, "spec": {"teamId": "acid"}}`),
+		Postgresql{
+			TypeMeta: unversioned.TypeMeta{
+				Kind:       "Postgresql",
+				APIVersion: "acid.zalan.do/v1",
+			},
+			Metadata: v1.ObjectMeta{
+				Name: "teapot-testcluster1",
+			},
+			Spec:   PostgresSpec{TeamID: "acid"},
+			Status: ClusterStatusInvalid,
+			Error:  errors.New("name must match {TEAM}-{NAME} format"),
+		}},
 }
+
+var invalidClusterSpec = []struct {
+	in  []byte
+	err error
+}{{[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1"`),
+	errors.New("unexpected end of JSON input"),
+}}
 
 func mustParseTime(s string) time.Time {
 	v, err := time.Parse("15:04", s)
@@ -323,25 +367,30 @@ func TestUnmarshalMaintWindowsErrs(t *testing.T) {
 	}
 }
 
-func TestPostgresqlUnmarshal(t *testing.T) {
-	var cluster Postgresql
-	err := cluster.UnmarshalJSON(cl)
-	if err != nil {
-		t.Errorf("Unmarshal Error: %v", err)
-	}
+func TestPostgresUnmarshal(t *testing.T) {
+	for _, tt := range unmarshalCluster {
+		var cluster Postgresql
+		err := cluster.UnmarshalJSON(tt.in)
+		if err != nil {
+			t.Errorf("Unmarshal Error: %v", err)
+		}
 
-	if !reflect.DeepEqual(cluster, clExp) {
-		t.Errorf("Expected Postgresql: %#v, got %#v", clExp, cluster)
+		if !reflect.DeepEqual(cluster, tt.out) {
+			t.Errorf("Expected Postgresql: %#v, got %#v", tt.out, cluster)
+		}
 	}
 }
 
-func TestPostgresqlMarshal(t *testing.T) {
-	m, err := json.Marshal(clExp)
-	if err != nil {
-		t.Errorf("Marshal Error: %v", err)
-	}
+func TestInvalidPostgresUnmarshal(t *testing.T) {
+	for _, tt := range invalidClusterSpec {
+		var cluster Postgresql
+		err := cluster.UnmarshalJSON(tt.in)
+		if err == nil {
+			t.Errorf("Error expected for %s", string(tt.in))
+		}
 
-	if bytes.Compare(m, cl) != 0 {
-		t.Errorf("Expected postgresql marshal: %s, got %s", string(cl), string(m))
+		if err.Error() != tt.err.Error() {
+			t.Errorf("Unmarshal error expected: %v, got: %v", tt.err, err)
+		}
 	}
 }
