@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -9,13 +10,12 @@ import (
 
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
-	"bytes"
 )
 
 var parseTimeTests = []struct {
-	in                 string
-	out                time.Time
-	err                error
+	in  string
+	out time.Time
+	err error
 }{
 	{"16:08", mustParseTime("16:08"), nil},
 	{"11:00", mustParseTime("11:00"), nil},
@@ -26,9 +26,9 @@ var parseTimeTests = []struct {
 }
 
 var parseWeekdayTests = []struct {
-	in                 string
-	out                time.Weekday
-	err                error
+	in  string
+	out time.Weekday
+	err error
 }{
 	{"Wed", time.Wednesday, nil},
 	{"Sunday", time.Weekday(0), errors.New("incorrect weekday")},
@@ -58,21 +58,31 @@ var maintenanceWindows = []struct {
 	err error
 }{{[]byte(`"Tue:10:00-20:00"`),
 	MaintenanceWindow{
-		Weekday: time.Tuesday,
-		StartTime:    mustParseTime("10:00"),
-		EndTime:      mustParseTime("20:00"),
+		Everyday:  false,
+		Weekday:   time.Tuesday,
+		StartTime: mustParseTime("10:00"),
+		EndTime:   mustParseTime("20:00"),
 	}, nil},
 	{[]byte(`"Mon:10:00-10:00"`),
 		MaintenanceWindow{
-			Weekday: time.Monday,
-			StartTime:    mustParseTime("10:00"),
-			EndTime:      mustParseTime("10:00"),
+			Everyday:  false,
+			Weekday:   time.Monday,
+			StartTime: mustParseTime("10:00"),
+			EndTime:   mustParseTime("10:00"),
 		}, nil},
 	{[]byte(`"Sun:00:00-00:00"`),
 		MaintenanceWindow{
-			Weekday: time.Sunday,
-			StartTime:    mustParseTime("00:00"),
-			EndTime:      mustParseTime("00:00"),
+			Everyday:  false,
+			Weekday:   time.Sunday,
+			StartTime: mustParseTime("00:00"),
+			EndTime:   mustParseTime("00:00"),
+		}, nil},
+	{[]byte(`"01:00-10:00"`),
+		MaintenanceWindow{
+			Everyday:  true,
+			Weekday:   time.Sunday,
+			StartTime: mustParseTime("01:00"),
+			EndTime:   mustParseTime("10:00"),
 		}, nil},
 	{[]byte(`"Mon:12:00-11:00"`), MaintenanceWindow{}, errors.New(`'From' time must be prior to the 'To' time`)},
 	{[]byte(`"Wed:33:00-00:00"`), MaintenanceWindow{}, errors.New(`could not parse start time: parsing time "33:00": hour out of range`)},
@@ -168,7 +178,8 @@ var unmarshalCluster = []struct {
     },
     "maintenanceWindows": [
       "Mon:01:00-06:00",
-      "Sat:00:00-04:00"
+      "Sat:00:00-04:00",
+      "05:00-05:15"
     ]
   }
 }`),
@@ -214,21 +225,28 @@ var unmarshalCluster = []struct {
 				NumberOfInstances:   2,
 				Users:               map[string]UserFlags{"zalando": {"superuser", "createdb"}},
 				MaintenanceWindows: []MaintenanceWindow{{
-					Weekday: time.Monday,
-					StartTime:    mustParseTime("01:00"),
-					EndTime:      mustParseTime("06:00"),
+					Everyday:  false,
+					Weekday:   time.Monday,
+					StartTime: mustParseTime("01:00"),
+					EndTime:   mustParseTime("06:00"),
+				}, {
+					Everyday:  false,
+					Weekday:   time.Saturday,
+					StartTime: mustParseTime("00:00"),
+					EndTime:   mustParseTime("04:00"),
 				},
 					{
-						Weekday: time.Saturday,
-						StartTime:    mustParseTime("00:00"),
-						EndTime:      mustParseTime("04:00"),
+						Everyday:  true,
+						Weekday: time.Sunday,
+						StartTime: mustParseTime("05:00"),
+						EndTime:   mustParseTime("05:15"),
 					},
 				},
 				ClusterName: "testcluster1",
 			},
 			Error: nil,
 		},
-		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"volume":{"size":"5Gi","storageClass":"SSD"},"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"ACID","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00"]}}`), nil},
+		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"volume":{"size":"5Gi","storageClass":"SSD"},"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"ACID","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00","05:00-05:15"]}}`), nil},
 	{
 		[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "teapot-testcluster1"}, "spec": {"teamId": "acid"}}`),
 		Postgresql{
@@ -336,7 +354,6 @@ func TestWeekdayTime(t *testing.T) {
 		}
 	}
 }
-
 
 func TestClusterName(t *testing.T) {
 	for _, tt := range clusterNames {
