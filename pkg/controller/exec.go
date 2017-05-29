@@ -19,11 +19,11 @@ func (c *Controller) ExecCommand(podName spec.NamespacedName, command []string) 
 
 	pod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name)
 	if err != nil {
-		return "", fmt.Errorf("Can't get Pod info: %s", err)
+		return "", fmt.Errorf("could not get pod info: %v", err)
 	}
 
 	if len(pod.Spec.Containers) != 1 {
-		return "", fmt.Errorf("Can't determine which container to use")
+		return "", fmt.Errorf("could not determine which container to use")
 	}
 
 	req := c.RestClient.Post().
@@ -40,7 +40,7 @@ func (c *Controller) ExecCommand(podName spec.NamespacedName, command []string) 
 
 	exec, err := remotecommand.NewExecutor(c.RestConfig, "POST", req.URL())
 	if err != nil {
-		return "", fmt.Errorf("Failed to init executor: %s", err)
+		return "", fmt.Errorf("failed to init executor: %v", err)
 	}
 
 	err = exec.Stream(remotecommand.StreamOptions{
@@ -50,11 +50,11 @@ func (c *Controller) ExecCommand(podName spec.NamespacedName, command []string) 
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("Can't execute: %s", err)
+		return "", fmt.Errorf("could not execute: %v", err)
 	}
 
 	if execErr.Len() > 0 {
-		return "", fmt.Errorf("Stderr: %s", execErr.String())
+		return "", fmt.Errorf("stderr: %v", execErr.String())
 	}
 
 	return execOut.String(), nil

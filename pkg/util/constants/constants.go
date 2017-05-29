@@ -3,7 +3,6 @@ package constants
 import "time"
 
 const (
-	//Constants
 	TPRName                     = "postgresql"
 	TPRVendor                   = "acid.zalan.do"
 	TPRDescription              = "Managed PostgreSQL clusters"
@@ -11,11 +10,11 @@ const (
 	ListClustersURITemplate     = "/apis/" + TPRVendor + "/" + TPRApiVersion + "/namespaces/%s/" + ResourceName       // Namespace
 	WatchClustersURITemplate    = "/apis/" + TPRVendor + "/" + TPRApiVersion + "/watch/namespaces/%s/" + ResourceName // Namespace
 	K8sVersion                  = "v1"
-	K8sApiPath                  = "/api"
+	K8sAPIPath                  = "/api"
 	DataVolumeName              = "pgdata"
 	PasswordLength              = 64
 	UserSecretTemplate          = "%s.%s.credentials." + TPRName + "." + TPRVendor // Username, ClusterName
-	ZalandoDnsNameAnnotation    = "external-dns.alpha.kubernetes.io/hostname"
+	ZalandoDNSNameAnnotation    = "external-dns.alpha.kubernetes.io/hostname"
 	ElbTimeoutAnnotationName    = "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout"
 	ElbTimeoutAnnotationValue   = "3600"
 	KubeIAmAnnotation           = "iam.amazonaws.com/role"

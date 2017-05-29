@@ -2,6 +2,9 @@
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
+ifeq ("$(shell uname)", "Darwin")
+BUILD_FLAGS += -i
+endif
 CGO_ENABLED ?= 0
 ifeq ($(RACE),1)
 	BUILD_FLAGS += -race -a
@@ -30,18 +33,14 @@ default: local
 clean:
 	rm -rf build scm-source.json
 
-local: build/${BINARY}
-linux: build/linux/${BINARY}
-macos: build/macos/${BINARY}
+local: ${SOURCES}
+	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
 
-build/${BINARY}: ${SOURCES}
-	CGO_ENABLED=${CGO_ENABLED} go build -o $@ $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
+linux: ${SOURCES}
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/linux/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
 
-build/linux/${BINARY}: ${SOURCES}
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
-
-build/macos/${BINARY}: ${SOURCES}
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o $@ ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
+macos: ${SOURCES}
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=${CGO_ENABLED} go build -o build/macos/${BINARY} ${BUILD_FLAGS} -ldflags "$(LDFLAGS)" $^
 
 docker-context: scm-source.json linux
 	mkdir -p docker/build/
