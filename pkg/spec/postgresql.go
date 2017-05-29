@@ -3,7 +3,6 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -13,11 +12,9 @@ import (
 )
 
 type MaintenanceWindow struct {
-	StartTime    time.Time    // Start time
-	StartWeekday time.Weekday // Start weekday
-
-	EndTime    time.Time    // End time
-	EndWeekday time.Weekday // End weekday
+	Weekday   time.Weekday
+	StartTime time.Time // Start time
+	EndTime   time.Time // End time
 }
 
 type Volume struct {
@@ -94,61 +91,43 @@ type PostgresqlList struct {
 	Items []Postgresql `json:"items"`
 }
 
-var alphaRegexp = regexp.MustCompile("^[a-zA-Z]*$")
 var weekdays = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
 
-func parseTime(s string) (t time.Time, wd time.Weekday, wdProvided bool, err error) {
-	var timeLayout string
-
+func parseTime(s string) (time.Time, error) {
 	parts := strings.Split(s, ":")
-	if len(parts) == 3 {
-		if len(parts[0]) != 3 || !alphaRegexp.MatchString(parts[0]) {
-			err = fmt.Errorf("weekday must be 3 characters length")
-			return
-		}
-		timeLayout = "Mon:15:04"
-		wdProvided = true
-		weekday, ok := weekdays[parts[0]]
-		if !ok {
-			err = fmt.Errorf("incorrect weekday")
-			return
-		}
-		wd = time.Weekday(weekday)
-	} else {
-		wdProvided = false
-		timeLayout = "15:04"
+	if len(parts) != 2 {
+		return time.Time{}, fmt.Errorf("incorrect time format")
 	}
+	timeLayout := "15:04"
 
 	tp, err := time.Parse(timeLayout, s)
 	if err != nil {
-		return
+		return time.Time{}, err
 	}
-	t = tp.UTC()
 
-	return
+	return tp.UTC(), nil
+}
+
+func parseWeekday(s string) (time.Weekday, error) {
+	weekday, ok := weekdays[s]
+	if !ok {
+		return time.Weekday(0), fmt.Errorf("incorrect weekday")
+	}
+
+	return time.Weekday(weekday), nil
 }
 
 func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
-	var startWd, endWd string
-	if m.StartWeekday == time.Monday && m.EndWeekday == time.Sunday {
-		startWd = ""
-		endWd = ""
-	} else {
-		startWd = m.StartWeekday.String()[:3] + ":"
-		endWd = m.EndWeekday.String()[:3] + ":"
-	}
-
-	return []byte(fmt.Sprintf("\"%s%s-%s%s\"",
-		startWd, m.StartTime.Format("15:04"),
-		endWd, m.EndTime.Format("15:04"))), nil
+	return []byte(fmt.Sprintf("\"%s:%s-%s\"",
+		m.Weekday.String()[:3],
+		m.StartTime.Format("15:04"),
+		m.EndTime.Format("15:04"))), nil
 }
 
 func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	var (
-		got                 MaintenanceWindow
-		weekdayProvidedFrom bool
-		weekdayProvidedTo   bool
-		err                 error
+		got MaintenanceWindow
+		err error
 	)
 
 	parts := strings.Split(string(data[1:len(data)-1]), "-")
@@ -156,27 +135,28 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("incorrect maintenance window format")
 	}
 
-	got.StartTime, got.StartWeekday, weekdayProvidedFrom, err = parseTime(parts[0])
-	if err != nil {
-		return err
+	fromParts := strings.Split(parts[0], ":")
+	if len(fromParts) != 3 {
+		return fmt.Errorf("incorrect maintenance window format")
 	}
 
-	got.EndTime, got.EndWeekday, weekdayProvidedTo, err = parseTime(parts[1])
+	got.Weekday, err = parseWeekday(fromParts[0])
 	if err != nil {
-		return err
+		return fmt.Errorf("could not parse weekday: %v", err)
+	}
+
+	got.StartTime, err = parseTime(fromParts[1] + ":" + fromParts[2])
+	if err != nil {
+		return fmt.Errorf("could not parse start time: %v", err)
+	}
+
+	got.EndTime, err = parseTime(parts[1])
+	if err != nil {
+		return fmt.Errorf("could not parse end time: %v", err)
 	}
 
 	if got.EndTime.Before(got.StartTime) {
 		return fmt.Errorf("'From' time must be prior to the 'To' time")
-	}
-
-	if (int(got.StartWeekday)+6)%7 > (int(got.EndWeekday)+6)%7 {
-		return fmt.Errorf("'From' weekday must be prior to the 'To' weekday")
-	}
-
-	if !weekdayProvidedFrom || !weekdayProvidedTo {
-		got.StartWeekday = time.Monday
-		got.EndWeekday = time.Sunday
 	}
 
 	*m = got
@@ -207,7 +187,7 @@ func extractClusterName(clusterName string, teamName string) (string, error) {
 	}
 
 	if teamNameLen == 0 {
-		return "", fmt.Errorf("Team name is empty")
+		return "", fmt.Errorf("team name is empty")
 	}
 
 	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
