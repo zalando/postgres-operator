@@ -225,23 +225,21 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
-func (c *Cluster) sameServiceWith(service *v1.Service) (match bool, reason string) {
+func (c *Cluster) sameServiceWith(service *v1.Service) string {
 	//TODO: improve comparison
 	if !reflect.DeepEqual(c.Service.Spec.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges) {
-		reason = "new service's LoadBalancerSourceRange doesn't match the current one"
+		return "new service's LoadBalancerSourceRange doesn't match the current one"
 	} else {
-		match = true
+		return ""
 	}
-	return
 }
 
-func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string) {
+func (c *Cluster) sameVolumeWith(volume spec.Volume) string {
 	if !reflect.DeepEqual(c.Spec.Volume, volume) {
-		reason = "new volume's specification doesn't match the current one"
+		return "new volume's specification doesn't match the current one"
 	} else {
-		match = true
+		return ""
 	}
-	return
 }
 
 func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (match, needsReplace, needsRollUpdate bool, reason string) {
@@ -290,6 +288,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (matc
 		needsRollUpdate = true
 		reason = "new statefulset's volumeClaimTemplates contains different number of volumes to the old one"
 	}
+
 	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
 		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
 		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
@@ -312,25 +311,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (matc
 		}
 	}
 
-	container1 := c.Statefulset.Spec.Template.Spec.Containers[0]
-	container2 := statefulSet.Spec.Template.Spec.Containers[0]
-	if container1.Image != container2.Image {
+	containerReason := sameContainers(&c.Statefulset.Spec.Template.Spec.Containers[0], &statefulSet.Spec.Template.Spec.Containers[0])
+	if containerReason != "" {
+		reason = containerReason
 		needsRollUpdate = true
-		reason = "new statefulset's container image doesn't match the current one"
-	}
-
-	if !reflect.DeepEqual(container1.Ports, container2.Ports) {
-		needsRollUpdate = true
-		reason = "new statefulset's container ports don't match the current one"
-	}
-
-	if !compareResources(&container1.Resources, &container2.Resources) {
-		needsRollUpdate = true
-		reason = "new statefulset's container resources don't match the current ones"
-	}
-	if !reflect.DeepEqual(container1.Env, container2.Env) {
-		needsRollUpdate = true
-		reason = "new statefulset's container environment doesn't match the current one"
 	}
 
 	if needsRollUpdate || needsReplace {
@@ -340,7 +324,31 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) (matc
 	return
 }
 
-func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (equal bool) {
+func compareVolumeClaimTemplates(a, b *v1.PersistentVolumeClaim) (needsReplace bool, needsRollUpdate bool, reason string) {
+	//TODO: implement me
+	return
+}
+
+func sameContainers(a, b *v1.Container) string {
+	if a.Image != b.Image {
+		return "new statefulset's container image doesn't match the current one"
+	}
+
+	if !reflect.DeepEqual(a.Ports, b.Ports) {
+		return "new statefulset's container ports don't match the current one"
+	}
+
+	if !compareResources(&a.Resources, &b.Resources) {
+		return "new statefulset's container resources don't match the current ones"
+	}
+	if !reflect.DeepEqual(a.Env, b.Env) {
+		return "new statefulset's container environment doesn't match the current one"
+	}
+
+	return ""
+}
+
+func compareResources(a, b *v1.ResourceRequirements) (equal bool) {
 	equal = true
 	if a != nil {
 		equal = compareResoucesAssumeFirstNotNil(a, b)
@@ -348,6 +356,7 @@ func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (e
 	if equal && (b != nil) {
 		equal = compareResoucesAssumeFirstNotNil(b, a)
 	}
+
 	return
 }
 
@@ -378,7 +387,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
 
 	newService := c.genService(newSpec.Spec.AllowedSourceRanges)
-	if match, reason := c.sameServiceWith(newService); !match {
+	if reason := c.sameServiceWith(newService); reason != "" {
 		c.logServiceChanges(c.Service, newService, true, reason)
 		if err := c.updateService(newService); err != nil {
 			c.setStatus(spec.ClusterStatusUpdateFailed)
@@ -387,7 +396,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logger.Infof("service '%s' has been updated", util.NameFromMeta(c.Service.ObjectMeta))
 	}
 
-	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
+	if reason := c.sameVolumeWith(newSpec.Spec.Volume); reason != "" {
 		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
 		//TODO: update PVC
 	}
