@@ -1,0 +1,45 @@
+package cluster
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/filesystems"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+)
+
+func (c *Cluster) getPostgresFilesystemInfo(podName *spec.NamespacedName) (err error, device string, fstype string) {
+	out, err := c.ExecCommand(podName, "bash", "-c", fmt.Sprint("df -T %s|tail -1", constants.PostgresDataMount))
+	if err != nil {
+		return err, "", ""
+	}
+	fields := strings.Fields(out)
+	if len(fields) < 2 {
+		return fmt.Errorf("too few fields in the df output"), "", ""
+	}
+	return nil, fields[0], fields[1]
+}
+
+func (c *Cluster) resizePostgresFilesystem(podName *spec.NamespacedName, resizers []filesystems.FilesystemResizer) error {
+	// resize2fs always writes to stderr, and ExecCommand considers a non-empty stderr an error
+	// first, determine the device and the filesystem
+	err, deviceName, fsType := c.getPostgresFilesystemInfo(podName)
+	if err != nil {
+		return fmt.Errorf("could not get device and type for the postgres filesystem: %v", err)
+	}
+	for _, resizer := range(resizers) {
+		if !resizer.CanResizeFilesystem(fsType) {
+			continue
+		}
+		err := resizer.ResizeFilesystem(deviceName, func(cmd string) (out string, err error) {
+			return c.ExecCommand(podName, "bash", "-c", cmd)
+		})
+
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("could not resize filesystem: no compatible resizers for the filesystem of type %s", fsType)
+}

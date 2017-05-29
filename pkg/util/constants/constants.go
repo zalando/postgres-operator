@@ -35,6 +35,9 @@ const (
 	ReplicationUserKeyName      = "replication"
 	StatefulsetDeletionInterval = 1 * time.Second
 	StatefulsetDeletionTimeout  = 30 * time.Second
+	Gigabyte = 1073741824
+	PostgresDataMount = "/home/postgres/pgdata"
+	PostgresDataPath = PostgresDataMount + "/pgroot"
 
 	RoleFlagSuperuser  = "SUPERUSER"
 	RoleFlagInherit    = "INHERIT"

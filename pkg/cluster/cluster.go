@@ -13,7 +13,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/resource"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/types"
@@ -28,13 +27,11 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
-	"strings"
 )
 
 var (
 	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
 	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
-	ext2fsSuccessRegexp = regexp.MustCompile(`The filesystem on [/a-z0-9]+ is now \d+ \(\d+\w+\) blocks long.`)
 )
 
 //TODO: remove struct duplication
@@ -400,7 +397,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 
 	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
 		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
-		if err := c.resizeVolumes(newSpec.Spec.Volume, &volumes.EBSVolumeResizer{}); err != nil {
+		if err := c.resizeVolumes(newSpec.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
 			return fmt.Errorf("Could not update volumes: %s", err)
 		}
 		c.logger.Infof("volumes have been updated successfully")
@@ -448,78 +445,6 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	c.setStatus(spec.ClusterStatusRunning)
 
 	return nil
-}
-
-// resizeVolumes resize persistent volumes compatible with the given resizer interface
-func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizer volumes.VolumeResizer) error {
-	newQuantity, err := resource.ParseQuantity(newVolume.Size)
-	// value in Gigabytes
-	newSize := newQuantity.ScaledValue(0) / (1073741824)
-
-	pvs, err := c.listPersistentVolumes()
-	if err != nil {
-		return fmt.Errorf("could not list persistent volumes: %v", err)
-	}
-	err = resizer.ConnectToProvider()
-	if err != nil {
-		return fmt.Errorf("could not connect to the volume provider: %v", err)
-	}
-
-	for _, pv := range pvs {
-		if !resizer.VolumeBelongsToProvider(pv) {
-			continue
-		}
-		cap := pv.Spec.Capacity[v1.ResourceStorage]
-		if cap.ScaledValue(0)/(1073741824) != newSize {
-			awsVolumeId, err := resizer.GetProviderVolumeID(pv)
-			if err != nil {
-				return err
-			}
-			c.logger.Debugf("updating persistent volume %s to %d", pv.Name, newSize)
-			if err := resizer.ResizeVolume(awsVolumeId, newSize); err != nil {
-				return fmt.Errorf("could not resize EBS volume %s: %v", awsVolumeId, err)
-			}
-			c.logger.Debugf("resizing the filesystem on the volume %s", pv.Name)
-			podName := getPodNameFromPersistentVolume(pv)
-			if err := c.resizeVolumeFS(podName); err != nil {
-				return fmt.Errorf("could not resize the filesystem on pod '%s': %v", podName, err)
-			}
-			c.logger.Debugf("filesystem resize successfull on volume %s", pv.Name)
-			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
-			c.logger.Debugf("updating persistent volume definition for volume %s", pv.Name)
-			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
-				return fmt.Errorf("could not update persistent volume: %s", err)
-			}
-			c.logger.Debugf("successfully updated persistent volume %s", pv.Name)
-		}
-	}
-	resizer.DisconnectFromProvider()
-
-	return nil
-}
-
-func (c *Cluster) resizeVolumeFS(podName *spec.NamespacedName) error {
-	// resize2fs always writes to stderr, and ExecCommand considers a non-empty stderr an error
-	out, err := c.ExecCommand(podName, "bash", "-c", "df -h /home/postgres/pgdata --output=source|tail -1|xargs resize2fs 2>&1")
-	if err != nil {
-		return err
-	}
-
-	if out != "" {
-		c.logger.Debugf("command output is: %s", out)
-	}
-
-	if strings.Contains(out, "Nothing to do") ||
-		(strings.Contains(out,  "on-line resizing required") && ext2fsSuccessRegexp.MatchString(out)) {
-		return nil
-	}
-	return fmt.Errorf("unrecognized output: %s, assuming error", out)
-}
-
-func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedName {
-	namespace := pv.Spec.ClaimRef.Namespace
-	name := pv.Spec.ClaimRef.Name[len(constants.DataVolumeName)+1:]
-	return &spec.NamespacedName{namespace, name}
 }
 
 

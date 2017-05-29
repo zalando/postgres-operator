@@ -5,6 +5,7 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
 
 func (c *Cluster) Sync() error {
@@ -35,6 +36,11 @@ func (c *Cluster) Sync() error {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("coud not sync services: %v", err)
 		}
+	}
+
+	c.logger.Debugf("Syncing persistent volumes")
+	if err := c.SyncVolumes(); err != nil {
+		return fmt.Errorf("could not sync persistent volumes: %v", err)
 	}
 
 	c.logger.Debugf("Syncing statefulsets")
@@ -193,5 +199,21 @@ func (c *Cluster) SyncRoles() error {
 	if err := c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
 		return fmt.Errorf("error executing sync statements: %v", err)
 	}
+	return nil
+}
+
+/* SyncVolume reads all persistent volumes and checks that their size matches the one declared in the statefulset */
+func (c* Cluster) SyncVolumes() error {
+	act, err := c.VolumesNeedResizing(c.Spec.Volume)
+	if err != nil {
+		return fmt.Errorf("could not check compare size of the volumes: %v", err)
+	}
+	if !act {
+		return nil
+	}
+	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
+		return fmt.Errorf("Could not sync volumes: %s", err)
+	}
+	c.logger.Infof("volumes have been synced successfully")
 	return nil
 }
