@@ -105,11 +105,41 @@ func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
 	}
 }
 
+func (c *Cluster) getOAuthToken() (string, error) {
+	//TODO: we can move this function to the Controller in case it will be needed there. As for now we use it only in the Cluster
+	// Temporary getting postgresql-operator secret from the NamespaceDefault
+	credentialsSecret, err := c.KubeClient.
+		Secrets(c.OpConfig.OAuthTokenSecretName.Namespace).
+		Get(c.OpConfig.OAuthTokenSecretName.Name)
+
+	if err != nil {
+		c.logger.Debugf("Oauth token secret name: %s", c.OpConfig.OAuthTokenSecretName)
+		return "", fmt.Errorf("could not get credentials secret: %v", err)
+	}
+	data := credentialsSecret.Data
+
+	if string(data["read-only-token-type"]) != "Bearer" {
+		return "", fmt.Errorf("wrong token type: %v", data["read-only-token-type"])
+	}
+
+	return string(data["read-only-token-secret"]), nil
+}
+
 func (c *Cluster) getTeamMembers() ([]string, error) {
 	if c.Spec.TeamID == "" {
 		return nil, fmt.Errorf("no teamId specified")
 	}
-	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamID)
+	if !c.OpConfig.EnableTeamsAPI {
+		c.logger.Debug("Team API is disabled, returning empty list of members")
+		return []string{}, nil
+	}
+
+	token, err := c.getOAuthToken()
+	if err != nil {
+		return []string{}, fmt.Errorf("could not get oauth token: %v", err)
+	}
+
+	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamID, token)
 	if err != nil {
 		return nil, fmt.Errorf("could not get team info: %v", err)
 	}

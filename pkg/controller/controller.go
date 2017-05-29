@@ -47,7 +47,8 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 		logger.Level = logrus.DebugLevel
 	}
 
-	controllerConfig.TeamsAPIClient = teams.NewTeamsAPI(operatorConfig.TeamsAPIUrl, logger, operatorConfig.EnableTeamsAPI)
+	controllerConfig.TeamsAPIClient = teams.NewTeamsAPI(operatorConfig.TeamsAPIUrl, logger)
+
 	return &Controller{
 		Config:   *controllerConfig,
 		opConfig: operatorConfig,
@@ -78,7 +79,6 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
 	}
 
-	c.TeamsAPIClient.RefreshTokenAction = c.getOAuthToken
 	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {

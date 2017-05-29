@@ -38,34 +38,22 @@ type Team struct {
 }
 
 type API struct {
-	url                string
-	httpClient         *http.Client
-	logger             *logrus.Entry
-	RefreshTokenAction func() (string, error)
-	enabled            bool
+	url        string
+	httpClient *http.Client
+	logger     *logrus.Entry
 }
 
-func NewTeamsAPI(url string, log *logrus.Logger, enabled bool) *API {
+func NewTeamsAPI(url string, log *logrus.Logger) *API {
 	t := API{
 		url:        strings.TrimRight(url, "/"),
 		httpClient: &http.Client{},
 		logger:     log.WithField("pkg", "teamsapi"),
-		enabled:    enabled,
 	}
 
 	return &t
 }
 
-func (t *API) TeamInfo(teamID string) (*Team, error) {
-	// TODO: avoid getting a new token on every call to the Teams API.
-	if !t.enabled {
-		t.logger.Debug("Team API is disabled, returning empty list of members")
-		return &Team{}, nil
-	}
-	token, err := t.RefreshTokenAction()
-	if err != nil {
-		return nil, err
-	}
+func (t *API) TeamInfo(teamID, token string) (*Team, error) {
 	url := fmt.Sprintf("%s/teams/%s", t.url, teamID)
 	t.logger.Debugf("Request url: %s", url)
 	req, err := http.NewRequest("GET", url, nil)
@@ -84,7 +72,7 @@ func (t *API) TeamInfo(teamID string) (*Team, error) {
 		d := json.NewDecoder(resp.Body)
 		err = d.Decode(&raw)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("team API query failed with status code %d and malformed response: %v", resp.StatusCode, err)
 		}
 
 		if errMessage, ok := raw["error"]; ok {
@@ -97,7 +85,7 @@ func (t *API) TeamInfo(teamID string) (*Team, error) {
 	d := json.NewDecoder(resp.Body)
 	err = d.Decode(teamInfo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse team API response: %v", err)
 	}
 
 	return teamInfo, nil
