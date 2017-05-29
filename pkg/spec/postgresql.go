@@ -12,6 +12,7 @@ import (
 )
 
 type MaintenanceWindow struct {
+	Everyday  bool
 	Weekday   time.Weekday
 	StartTime time.Time // Start time
 	EndTime   time.Time // End time
@@ -118,10 +119,16 @@ func parseWeekday(s string) (time.Weekday, error) {
 }
 
 func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("\"%s:%s-%s\"",
-		m.Weekday.String()[:3],
-		m.StartTime.Format("15:04"),
-		m.EndTime.Format("15:04"))), nil
+	if m.Everyday {
+		return []byte(fmt.Sprintf("\"%s-%s\"",
+			m.StartTime.Format("15:04"),
+			m.EndTime.Format("15:04"))), nil
+	} else {
+		return []byte(fmt.Sprintf("\"%s:%s-%s\"",
+			m.Weekday.String()[:3],
+			m.StartTime.Format("15:04"),
+			m.EndTime.Format("15:04"))), nil
+	}
 }
 
 func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
@@ -136,16 +143,21 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	}
 
 	fromParts := strings.Split(parts[0], ":")
-	if len(fromParts) != 3 {
+	switch len(fromParts) {
+	case 3:
+		got.Everyday = false
+		got.Weekday, err = parseWeekday(fromParts[0])
+		if err != nil {
+			return fmt.Errorf("could not parse weekday: %v", err)
+		}
+
+		got.StartTime, err = parseTime(fromParts[1] + ":" + fromParts[2])
+	case 2:
+		got.Everyday = true
+		got.StartTime, err = parseTime(fromParts[0] + ":" + fromParts[1])
+	default:
 		return fmt.Errorf("incorrect maintenance window format")
 	}
-
-	got.Weekday, err = parseWeekday(fromParts[0])
-	if err != nil {
-		return fmt.Errorf("could not parse weekday: %v", err)
-	}
-
-	got.StartTime, err = parseTime(fromParts[1] + ":" + fromParts[2])
 	if err != nil {
 		return fmt.Errorf("could not parse start time: %v", err)
 	}
