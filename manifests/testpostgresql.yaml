@@ -42,5 +42,5 @@ spec:
     retry_timeout: 10
     maximum_lag_on_failover: 33554432
   maintenanceWindows:
-  - 01:00-06:00 #UTC
+  - Mon:01:00-06:00 #UTC
   - Sat:00:00-04:00
