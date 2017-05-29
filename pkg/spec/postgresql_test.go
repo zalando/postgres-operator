@@ -1,7 +1,6 @@
 package spec
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -10,23 +9,30 @@ import (
 
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
+	"bytes"
 )
 
 var parseTimeTests = []struct {
 	in                 string
 	out                time.Time
-	outWeekday         time.Weekday
-	outWeekdayProvided bool
 	err                error
 }{
-	{"Mon:16:08", mustParseTime("16:08"), time.Monday, true, nil},
-	{"Sun:11:00", mustParseTime("11:00"), time.Sunday, true, nil},
-	{"23:59", mustParseTime("23:59"), time.Weekday(0), false, nil},
+	{"16:08", mustParseTime("16:08"), nil},
+	{"11:00", mustParseTime("11:00"), nil},
+	{"23:59", mustParseTime("23:59"), nil},
 
-	{"Thr:00:12", time.Now(), time.Sunday, false, errors.New(`incorrect weekday`)},
-	{"26:09", time.Now(), time.Sunday, false, errors.New(`parsing time "26:09": hour out of range`)},
-	{"Std:26:09", time.Now(), time.Sunday, false, errors.New(`incorrect weekday`)},
-	{"Saturday:00:00", time.Now(), time.Sunday, false, errors.New(`weekday must be 3 characters length`)},
+	{"26:09", time.Now(), errors.New(`parsing time "26:09": hour out of range`)},
+	{"23:69", time.Now(), errors.New(`parsing time "23:69": minute out of range`)},
+}
+
+var parseWeekdayTests = []struct {
+	in                 string
+	out                time.Weekday
+	err                error
+}{
+	{"Wed", time.Wednesday, nil},
+	{"Sunday", time.Weekday(0), errors.New("incorrect weekday")},
+	{"", time.Weekday(0), errors.New("incorrect weekday")},
 }
 
 var clusterNames = []struct {
@@ -40,7 +46,7 @@ var clusterNames = []struct {
 	{"my-team-another-test", "my-team", "another-test", nil},
 	{"------strange-team-cluster", "-----", "strange-team-cluster", nil},
 	{"acid-test", "test", "", errors.New("name must match {TEAM}-{NAME} format")},
-	{"-test", "", "", errors.New("Team name is empty")},
+	{"-test", "", "", errors.New("team name is empty")},
 	{"-test", "-", "", errors.New("name must match {TEAM}-{NAME} format")},
 	{"", "-", "", errors.New("name is too short")},
 	{"-", "-", "", errors.New("name is too short")},
@@ -50,56 +56,33 @@ var maintenanceWindows = []struct {
 	in  []byte
 	out MaintenanceWindow
 	err error
-}{{[]byte(`"10:00-20:00"`),
+}{{[]byte(`"Tue:10:00-20:00"`),
 	MaintenanceWindow{
+		Weekday: time.Tuesday,
 		StartTime:    mustParseTime("10:00"),
-		StartWeekday: time.Monday,
 		EndTime:      mustParseTime("20:00"),
-		EndWeekday:   time.Sunday,
 	}, nil},
-	{[]byte(`"Tue:10:00-Sun:23:00"`),
+	{[]byte(`"Mon:10:00-10:00"`),
 		MaintenanceWindow{
+			Weekday: time.Monday,
 			StartTime:    mustParseTime("10:00"),
-			StartWeekday: time.Tuesday,
-			EndTime:      mustParseTime("23:00"),
-			EndWeekday:   time.Sunday,
-		}, nil},
-	{[]byte(`"Mon:10:00-Mon:10:00"`),
-		MaintenanceWindow{
-			StartTime:    mustParseTime("10:00"),
-			StartWeekday: time.Monday,
 			EndTime:      mustParseTime("10:00"),
-			EndWeekday:   time.Monday,
 		}, nil},
-	{[]byte(`"Sun:00:00-Sun:00:00"`),
+	{[]byte(`"Sun:00:00-00:00"`),
 		MaintenanceWindow{
+			Weekday: time.Sunday,
 			StartTime:    mustParseTime("00:00"),
-			StartWeekday: time.Sunday,
 			EndTime:      mustParseTime("00:00"),
-			EndWeekday:   time.Sunday,
 		}, nil},
-	{[]byte(`"00:00-10:00"`),
-		MaintenanceWindow{
-			StartTime:    mustParseTime("00:00"),
-			StartWeekday: time.Monday,
-			EndTime:      mustParseTime("10:00"),
-			EndWeekday:   time.Sunday,
-		}, nil},
-	{[]byte(`"00:00-00:00"`),
-		MaintenanceWindow{
-			StartTime:    mustParseTime("00:00"),
-			StartWeekday: time.Monday,
-			EndTime:      mustParseTime("00:00"),
-			EndWeekday:   time.Sunday,
-		}, nil},
-	{[]byte(`"Mon:12:00-Sun:11:00"`), MaintenanceWindow{}, errors.New(`'From' time must be prior to the 'To' time`)},
-	{[]byte(`"Mon:12:00-Mon:11:00"`), MaintenanceWindow{}, errors.New(`'From' time must be prior to the 'To' time`)},
-	{[]byte(`"Wed:00:00-Tue:26:00"`), MaintenanceWindow{}, errors.New(`parsing time "Tue:26:00": hour out of range`)},
-	{[]byte(`"Sun:00:00-Mon:00:00"`), MaintenanceWindow{}, errors.New(`'From' weekday must be prior to the 'To' weekday`)},
-	{[]byte(`"Wed:00:00-Mon:10:00"`), MaintenanceWindow{}, errors.New(`'From' weekday must be prior to the 'To' weekday`)},
-	{[]byte(`"10:00-00:00"`), MaintenanceWindow{}, errors.New(`'From' time must be prior to the 'To' time`)},
-	{[]byte(`"Mon:00:00:00-Tue:10:00:00"`), MaintenanceWindow{}, errors.New(`parsing time "Mon:00:00:00" as "15:04": cannot parse "Mon:00:00:00" as "15"`)},
-	{[]byte(`"Mon:00:00"`), MaintenanceWindow{}, errors.New("incorrect maintenance window format")}}
+	{[]byte(`"Mon:12:00-11:00"`), MaintenanceWindow{}, errors.New(`'From' time must be prior to the 'To' time`)},
+	{[]byte(`"Wed:33:00-00:00"`), MaintenanceWindow{}, errors.New(`could not parse start time: parsing time "33:00": hour out of range`)},
+	{[]byte(`"Wed:00:00-26:00"`), MaintenanceWindow{}, errors.New(`could not parse end time: parsing time "26:00": hour out of range`)},
+	{[]byte(`"Sunday:00:00-00:00"`), MaintenanceWindow{}, errors.New(`could not parse weekday: incorrect weekday`)},
+	{[]byte(`":00:00-10:00"`), MaintenanceWindow{}, errors.New(`could not parse weekday: incorrect weekday`)},
+	{[]byte(`"Mon:10:00-00:00"`), MaintenanceWindow{}, errors.New(`'From' time must be prior to the 'To' time`)},
+	{[]byte(`"Mon:00:00:00-10:00:00"`), MaintenanceWindow{}, errors.New(`incorrect maintenance window format`)},
+	{[]byte(`"Mon:00:00"`), MaintenanceWindow{}, errors.New("incorrect maintenance window format")},
+	{[]byte(`"Mon:00:00-00:00:00"`), MaintenanceWindow{}, errors.New("could not parse end time: incorrect time format")}}
 
 var unmarshalCluster = []struct {
 	in      []byte
@@ -184,8 +167,8 @@ var unmarshalCluster = []struct {
       "maximum_lag_on_failover": 33554432
     },
     "maintenanceWindows": [
-      "01:00-06:00",
-      "Sat:00:00-Sat:04:00"
+      "Mon:01:00-06:00",
+      "Sat:00:00-04:00"
     ]
   }
 }`),
@@ -231,23 +214,21 @@ var unmarshalCluster = []struct {
 				NumberOfInstances:   2,
 				Users:               map[string]UserFlags{"zalando": {"superuser", "createdb"}},
 				MaintenanceWindows: []MaintenanceWindow{{
-					StartWeekday: time.Monday,
+					Weekday: time.Monday,
 					StartTime:    mustParseTime("01:00"),
 					EndTime:      mustParseTime("06:00"),
-					EndWeekday:   time.Sunday,
 				},
 					{
-						StartWeekday: time.Saturday,
+						Weekday: time.Saturday,
 						StartTime:    mustParseTime("00:00"),
 						EndTime:      mustParseTime("04:00"),
-						EndWeekday:   time.Saturday,
 					},
 				},
 				ClusterName: "testcluster1",
 			},
 			Error: nil,
 		},
-		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"volume":{"size":"5Gi","storageClass":"SSD"},"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"ACID","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["01:00-06:00","Sat:00:00-Sat:04:00"]}}`), nil},
+		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"volume":{"size":"5Gi","storageClass":"SSD"},"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"ACID","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00"]}}`), nil},
 	{
 		[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "teapot-testcluster1"}, "spec": {"teamId": "acid"}}`),
 		Postgresql{
@@ -264,13 +245,13 @@ var unmarshalCluster = []struct {
 		},
 		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"teapot-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null},"status":"Invalid"}`), nil},
 	{[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1"`),
-		Postgresql{},
-		[]byte{},
-		errors.New("unexpected end of JSON input")},
+	 Postgresql{},
+	 []byte{},
+	 errors.New("unexpected end of JSON input")},
 	{[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster","creationTimestamp":qaz},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null},"status":"Invalid"}`),
-		Postgresql{},
-		[]byte{},
-		errors.New("invalid character 'q' looking for beginning of value")}}
+	 Postgresql{},
+	 []byte{},
+	 errors.New("invalid character 'q' looking for beginning of value")}}
 
 var postgresqlList = []struct {
 	in  []byte
@@ -310,8 +291,8 @@ var postgresqlList = []struct {
 		},
 		nil},
 	{[]byte(`{"apiVersion":"v1","items":[{"apiVersion":"acid.zalan.do/v1","kind":"Postgresql","metadata":{"labels":{"team":"acid"},"name":"acid-testcluster42","namespace"`),
-		PostgresqlList{},
-		errors.New("unexpected end of JSON input")}}
+	 PostgresqlList{},
+	 errors.New("unexpected end of JSON input")}}
 
 func mustParseTime(s string) time.Time {
 	v, err := time.Parse("15:04", s)
@@ -319,15 +300,15 @@ func mustParseTime(s string) time.Time {
 		panic(err)
 	}
 
-	return v
+	return v.UTC()
 }
 
 func TestParseTime(t *testing.T) {
 	for _, tt := range parseTimeTests {
-		aTime, weekday, weekdayProvided, err := parseTime(tt.in)
+		aTime, err := parseTime(tt.in)
 		if err != nil {
 			if err.Error() != tt.err.Error() {
-				t.Errorf("ParseTime expected error: %v, got: %v", err, tt.err)
+				t.Errorf("ParseTime expected error: %v, got: %v", tt.err, err)
 			}
 
 			continue
@@ -336,16 +317,26 @@ func TestParseTime(t *testing.T) {
 		if aTime != tt.out {
 			t.Errorf("Expected time: %v, got: %v", tt.out, aTime)
 		}
+	}
+}
 
-		if weekday != tt.outWeekday {
-			t.Errorf("Expected weekday: %v, got: %v", tt.outWeekday, weekday)
+func TestWeekdayTime(t *testing.T) {
+	for _, tt := range parseWeekdayTests {
+		aTime, err := parseWeekday(tt.in)
+		if err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("ParseWeekday expected error: %v, got: %v", tt.err, err)
+			}
+
+			continue
 		}
 
-		if weekdayProvided != tt.outWeekdayProvided {
-			t.Errorf("Expected weekdayProvided: %t, got: %t", tt.outWeekdayProvided, weekdayProvided)
+		if aTime != tt.out {
+			t.Errorf("Expected weekday: %v, got: %v", tt.out, aTime)
 		}
 	}
 }
+
 
 func TestClusterName(t *testing.T) {
 	for _, tt := range clusterNames {
@@ -363,9 +354,13 @@ func TestClusterName(t *testing.T) {
 func TestUnmarshalMaintenanceWindow(t *testing.T) {
 	for _, tt := range maintenanceWindows {
 		var m MaintenanceWindow
-		err := m.UnmarshalJSON([]byte(tt.in))
+		err := m.UnmarshalJSON(tt.in)
 		if err != nil && err.Error() != tt.err.Error() {
 			t.Errorf("MaintenanceWindow unmarshal expected error: %v, got %v", tt.err, err)
+			continue
+		}
+		if tt.err != nil && err == nil {
+			t.Errorf("Expected error")
 			continue
 		}
 
