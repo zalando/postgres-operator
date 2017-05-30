@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/filesystems"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/filesystems"
 )
 
 func (c *Cluster) getPostgresFilesystemInfo(podName *spec.NamespacedName) (err error, device string, fstype string) {
@@ -28,7 +28,7 @@ func (c *Cluster) resizePostgresFilesystem(podName *spec.NamespacedName, resizer
 	if err != nil {
 		return fmt.Errorf("could not get device and type for the postgres filesystem: %v", err)
 	}
-	for _, resizer := range(resizers) {
+	for _, resizer := range resizers {
 		if !resizer.CanResizeFilesystem(fsType) {
 			continue
 		}

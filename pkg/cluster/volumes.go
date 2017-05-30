@@ -5,14 +5,14 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/api/resource"
+	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/filesystems"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
 
 func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, error) {
@@ -61,11 +61,11 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 	lastPodIndex := *c.Statefulset.Spec.Replicas - 1
 	for _, pvc := range pvcs {
 		lastDash := strings.LastIndex(pvc.Name, "-")
-		if lastDash > 0 && lastDash < len(pvc.Name) - 1 {
-			if pvcNumber, err := strconv.Atoi(pvc.Name[lastDash + 1:]); err != nil {
+		if lastDash > 0 && lastDash < len(pvc.Name)-1 {
+			if pvcNumber, err := strconv.Atoi(pvc.Name[lastDash+1:]); err != nil {
 				return nil, fmt.Errorf("could not convert last part of the persistent volume claim name %s to a number", pvc.Name)
 			} else {
-				if int32(pvcNumber) >  lastPodIndex {
+				if int32(pvcNumber) > lastPodIndex {
 					c.logger.Debugf("Skipping persistent volume %s corresponding to a non-running pods", pvc.Name)
 					continue
 				}
@@ -140,12 +140,12 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 	return nil
 }
 
-func (c *Cluster) VolumesNeedResizing(newVolume spec.Volume) (bool, error){
+func (c *Cluster) VolumesNeedResizing(newVolume spec.Volume) (bool, error) {
 	volumes, manifestSize, err := c.listVolumesWitManifestSize(newVolume)
 	if err != nil {
 		return false, err
 	}
-	for _, pv := range(volumes) {
+	for _, pv := range volumes {
 		currentSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
 		if currentSize != manifestSize {
 			return true, nil

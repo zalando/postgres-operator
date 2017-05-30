@@ -202,7 +202,7 @@ func (c *Cluster) SyncRoles() error {
 }
 
 /* SyncVolume reads all persistent volumes and checks that their size matches the one declared in the statefulset */
-func (c* Cluster) SyncVolumes() error {
+func (c *Cluster) SyncVolumes() error {
 	act, err := c.VolumesNeedResizing(c.Spec.Volume)
 	if err != nil {
 		return fmt.Errorf("could not check compare size of the volumes: %v", err)

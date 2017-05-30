@@ -448,7 +448,6 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	return nil
 }
 
-
 func (c *Cluster) Delete() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

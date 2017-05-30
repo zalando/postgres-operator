@@ -13,18 +13,12 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
-const (
-	AWS_REGION = "eu-central-1"
-	EBSVolumeIDStart = "/vol-"
-	EBSVolumeIdAtrribute = "volume-id"
-)
-
 type EBSVolumeResizer struct {
 	connection *ec2.EC2
 }
 
-func (c *EBSVolumeResizer) ConnectToProvider() (error) {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(AWS_REGION)})
+func (c *EBSVolumeResizer) ConnectToProvider() error {
+	sess, err := session.NewSession(&aws.Config{Region: aws.String(constants.AWS_REGION)})
 	if err != nil {
 		return fmt.Errorf("could not establish AWS session: %v", err)
 	}
@@ -32,11 +26,11 @@ func (c *EBSVolumeResizer) ConnectToProvider() (error) {
 	return nil
 }
 
-func (c *EBSVolumeResizer) IsConnectedToProvider() (bool) {
+func (c *EBSVolumeResizer) IsConnectedToProvider() bool {
 	return c.connection != nil
 }
 
-func (c *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) (bool) {
+func (c *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool {
 	return pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner
 }
 
@@ -46,7 +40,7 @@ func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string,
 	if volumeID == "" {
 		return "", fmt.Errorf("volume id is empty for volume %s", pv.Name)
 	}
-	idx := strings.LastIndex(volumeID, EBSVolumeIDStart) + 1
+	idx := strings.LastIndex(volumeID, constants.EBSVolumeIDStart) + 1
 	if idx == 0 {
 		return "", fmt.Errorf("malfored EBS volume id %s", volumeID)
 	}
@@ -55,7 +49,7 @@ func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string,
 
 func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 	/* first check if the volume is already of a requested size */
-	volumeOutput, err := c.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds:[]*string{&volumeId}})
+	volumeOutput, err := c.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeId}})
 	if err != nil {
 		return fmt.Errorf("could not get information about the volume: %v", err)
 	}

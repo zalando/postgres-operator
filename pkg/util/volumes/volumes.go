@@ -12,4 +12,3 @@ type VolumeResizer interface {
 	ResizeVolume(providerVolumeId string, newSize int64) error
 	DisconnectFromProvider() error
 }
-
