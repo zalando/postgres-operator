@@ -37,7 +37,7 @@ func (c *EBSVolumeResizer) IsConnectedToProvider() (bool) {
 }
 
 func (c *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) (bool) {
-	return pv.Spec.AWSElasticBlockStore != nil
+	return pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner
 }
 
 // GetProviderVolumeID converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes

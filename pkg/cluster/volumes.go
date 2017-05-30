@@ -2,6 +2,8 @@ package cluster
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/api/resource"
@@ -48,7 +50,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 	return nil
 }
 
-// ListEC2VolumeIDs returns all EBS volume IDs belong to this cluster
+// ListEC2VolumeIDs returns all volume IDs belong to this cluster
 func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 	result := make([]*v1.PersistentVolume, 0)
 
@@ -56,16 +58,23 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not list cluster's PersistentVolumeClaims: %v", err)
 	}
+	lastPodIndex := *c.Statefulset.Spec.Replicas - 1
 	for _, pvc := range pvcs {
-		if pvc.Annotations[constants.VolumeClaimStorageProvisionerAnnotation] != constants.EBSProvisioner {
-			continue
+		lastDash := strings.LastIndex(pvc.Name, "-")
+		if lastDash > 0 && lastDash < len(pvc.Name) - 1 {
+			if pvcNumber, err := strconv.Atoi(pvc.Name[lastDash + 1:]); err != nil {
+				return nil, fmt.Errorf("could not convert last part of the persistent volume claim name %s to a number", pvc.Name)
+			} else {
+				if int32(pvcNumber) >  lastPodIndex {
+					c.logger.Debugf("Skipping persistent volume %s corresponding to a non-running pods", pvc.Name)
+					continue
+				}
+			}
+
 		}
 		pv, err := c.KubeClient.PersistentVolumes().Get(pvc.Spec.VolumeName)
 		if err != nil {
 			return nil, fmt.Errorf("could not get PersistentVolume: %v", err)
-		}
-		if pv.Annotations[constants.VolumeStorateProvisionerAnnotation] != constants.EBSProvisioner {
-			return nil, fmt.Errorf("mismatched PersistentVolimeClaim and PersistentVolume provisioner annotations for the volume %s", pv.Name)
 		}
 		result = append(result, pv)
 	}

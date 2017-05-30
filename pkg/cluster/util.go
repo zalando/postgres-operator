@@ -76,7 +76,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if len(reasons) > 0 {
-		for reason := range reasons {
+		for _, reason := range reasons {
 			c.logger.Infof("Reason: %s", reason)
 		}
 	}
