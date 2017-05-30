@@ -38,11 +38,6 @@ func (c *Cluster) Sync() error {
 		}
 	}
 
-	c.logger.Debugf("Syncing persistent volumes")
-	if err := c.SyncVolumes(); err != nil {
-		return fmt.Errorf("could not sync persistent volumes: %v", err)
-	}
-
 	c.logger.Debugf("Syncing statefulsets")
 	if err := c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
@@ -50,16 +45,20 @@ func (c *Cluster) Sync() error {
 		}
 	}
 
-	if c.databaseAccessDisabled() {
-		return nil
-	}
-	if err := c.initDbConn(); err != nil {
-		return fmt.Errorf("could not init db connection: %v", err)
-	} else {
-		c.logger.Debugf("Syncing roles")
-		if err := c.SyncRoles(); err != nil {
-			return fmt.Errorf("could not sync roles: %v", err)
+	if !c.databaseAccessDisabled() {
+		if err := c.initDbConn(); err != nil {
+			return fmt.Errorf("could not init db connection: %v", err)
+		} else {
+			c.logger.Debugf("Syncing roles")
+			if err := c.SyncRoles(); err != nil {
+				return fmt.Errorf("could not sync roles: %v", err)
+			}
 		}
+	}
+
+	c.logger.Debugf("Syncing persistent volumes")
+	if err := c.SyncVolumes(); err != nil {
+		return fmt.Errorf("could not sync persistent volumes: %v", err)
 	}
 
 	return nil

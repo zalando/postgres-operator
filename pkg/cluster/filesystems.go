@@ -10,7 +10,7 @@ import (
 )
 
 func (c *Cluster) getPostgresFilesystemInfo(podName *spec.NamespacedName) (err error, device string, fstype string) {
-	out, err := c.ExecCommand(podName, "bash", "-c", fmt.Sprint("df -T %s|tail -1", constants.PostgresDataMount))
+	out, err := c.ExecCommand(podName, "bash", "-c", fmt.Sprintf("df -T %s|tail -1", constants.PostgresDataMount))
 	if err != nil {
 		return err, "", ""
 	}

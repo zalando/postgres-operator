@@ -395,14 +395,6 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logger.Infof("service '%s' has been updated", util.NameFromMeta(c.Service.ObjectMeta))
 	}
 
-	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
-		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
-		if err := c.resizeVolumes(newSpec.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
-			return fmt.Errorf("Could not update volumes: %v", err)
-		}
-		c.logger.Infof("volumes have been updated successfully")
-	}
-
 	newStatefulSet, err := c.genStatefulSet(newSpec.Spec)
 	if err != nil {
 		return fmt.Errorf("could not generate statefulset: %v", err)
@@ -442,6 +434,15 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		}
 		c.logger.Infof("Rolling update has been finished")
 	}
+
+	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
+		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
+		if err := c.resizeVolumes(newSpec.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
+			return fmt.Errorf("Could not update volumes: %v", err)
+		}
+		c.logger.Infof("volumes have been updated successfully")
+	}
+
 	c.setStatus(spec.ClusterStatusRunning)
 
 	return nil

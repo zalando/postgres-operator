@@ -16,6 +16,7 @@ import (
 const (
 	AWS_REGION = "eu-central-1"
 	EBSVolumeIDStart = "/vol-"
+	EBSVolumeIdAtrribute = "volume-id"
 )
 
 type EBSVolumeResizer struct {
@@ -53,6 +54,19 @@ func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string,
 }
 
 func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
+	/* first check if the volume is already of a requested size */
+	volumeOutput, err := c.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds:[]*string{&volumeId}})
+	if err != nil {
+		return fmt.Errorf("could not get information about the volume: %v", err)
+	}
+	vol := volumeOutput.Volumes[0]
+	if *vol.VolumeId != volumeId {
+		return fmt.Errorf("describe volume %s returned information about a non-matching volume %s", volumeId, *vol.VolumeId)
+	}
+	if *vol.Size == newSize {
+		// nothing to do
+		return nil
+	}
 	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeId}
 	output, err := c.connection.ModifyVolume(&input)
 	if err != nil {
