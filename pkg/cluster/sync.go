@@ -212,7 +212,7 @@ func (c* Cluster) SyncVolumes() error {
 		return nil
 	}
 	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
-		return fmt.Errorf("Could not sync volumes: %s", err)
+		return fmt.Errorf("Could not sync volumes: %v", err)
 	}
 	c.logger.Infof("volumes have been synced successfully")
 	return nil
