@@ -425,14 +425,22 @@ func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.
 	return &secret
 }
 
-func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
+func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v1.Service {
+
+	dnsNameFunction := c.masterDnsName
+	name := c.Metadata.Name
+	if role == Replica {
+		dnsNameFunction = c.replicaDnsName
+		name = name + "-repl"
+	}
+
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      c.Metadata.Name,
+			Name:      name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.labelsSet(),
 			Annotations: map[string]string{
-				constants.ZalandoDNSNameAnnotation: c.dnsName(),
+				constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
 				constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 			},
 		},
@@ -441,6 +449,9 @@ func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 			Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 			LoadBalancerSourceRanges: allowedSourceRanges,
 		},
+	}
+	if role == Replica {
+		service.Spec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
 	}
 
 	return service
