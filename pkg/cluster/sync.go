@@ -205,7 +205,7 @@ func (c *Cluster) SyncRoles() error {
 func (c *Cluster) SyncVolumes() error {
 	act, err := c.VolumesNeedResizing(c.Spec.Volume)
 	if err != nil {
-		return fmt.Errorf("could not check compare size of the volumes: %v", err)
+		return fmt.Errorf("could not compare size of the volumes: %v", err)
 	}
 	if !act {
 		return nil
