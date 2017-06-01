@@ -28,11 +28,11 @@ func (c *Cluster) loadResources() error {
 		return fmt.Errorf("too many(%d) services for a cluster", len(services.Items))
 	}
 	for i, svc := range services.Items {
-		if len(svc.Spec.Selector) == 0 {
-			// TODO: check that the actual value of the selector matches the one on the replica
-			c.Service[Master] = &services.Items[i]
-		} else {
+		switch PostgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
+		case Replica:
 			c.Service[Replica] = &services.Items[i]
+		default:
+			c.Service[Master] = &services.Items[i]
 		}
 	}
 
@@ -40,10 +40,15 @@ func (c *Cluster) loadResources() error {
 	if err != nil {
 		return fmt.Errorf("could not get list of endpoints: %v", err)
 	}
-	if len(endpoints.Items) > 1 {
+	if len(endpoints.Items) > 2 {
 		return fmt.Errorf("too many(%d) endpoints for a cluster", len(endpoints.Items))
-	} else if len(endpoints.Items) == 1 {
-		c.Endpoint = &endpoints.Items[0]
+	}
+
+	for i, ep := range endpoints.Items {
+		if ep.Labels[c.OpConfig.PodRoleLabel] != string(Replica) {
+			c.Endpoint = &endpoints.Items[i]
+			break
+		}
 	}
 
 	secrets, err := c.KubeClient.Secrets(ns).List(listOptions)
@@ -64,7 +69,8 @@ func (c *Cluster) loadResources() error {
 	}
 	if len(statefulSets.Items) > 1 {
 		return fmt.Errorf("too many(%d) statefulsets for a cluster", len(statefulSets.Items))
-	} else if len(statefulSets.Items) == 1 {
+	}
+	if len(statefulSets.Items) == 1 {
 		c.Statefulset = &statefulSets.Items[0]
 	}
 
@@ -280,7 +286,7 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 	if c.Endpoint != nil {
 		return nil, fmt.Errorf("endpoint already exists in the cluster")
 	}
-	endpointsSpec := c.genEndpoints()
+	endpointsSpec := c.genMasterEndpoints()
 
 	endpoints, err := c.KubeClient.Endpoints(endpointsSpec.Namespace).Create(endpointsSpec)
 	if err != nil {

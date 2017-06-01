@@ -438,7 +438,7 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Namespace: c.Metadata.Namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.roleLabelsSet(role),
 			Annotations: map[string]string{
 				constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
 				constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
@@ -457,12 +457,12 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 	return service
 }
 
-func (c *Cluster) genEndpoints() *v1.Endpoints {
+func (c *Cluster) genMasterEndpoints() *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.roleLabelsSet(Master),
 		},
 	}
 

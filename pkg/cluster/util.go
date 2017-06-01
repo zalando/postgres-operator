@@ -263,10 +263,19 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 }
 
 func (c *Cluster) labelsSet() labels.Set {
-	lbls := c.OpConfig.ClusterLabels
+	lbls := make(map[string]string)
+	for k, v := range(c.OpConfig.ClusterLabels) {
+		lbls[k] = v
+	}
 	lbls[c.OpConfig.ClusterNameLabel] = c.Metadata.Name
 
 	return labels.Set(lbls)
+}
+
+func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
+	lbls := c.labelsSet()
+	lbls[c.OpConfig.PodRoleLabel] = string(role)
+	return lbls
 }
 
 func (c *Cluster) masterDnsName() string {
