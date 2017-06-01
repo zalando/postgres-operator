@@ -264,7 +264,7 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 
 func (c *Cluster) labelsSet() labels.Set {
 	lbls := make(map[string]string)
-	for k, v := range(c.OpConfig.ClusterLabels) {
+	for k, v := range c.OpConfig.ClusterLabels {
 		lbls[k] = v
 	}
 	lbls[c.OpConfig.ClusterNameLabel] = c.Metadata.Name

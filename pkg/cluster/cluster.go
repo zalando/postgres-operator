@@ -390,6 +390,11 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	c.logger.Debugf("Cluster update from version %s to %s",
 		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
 
+	/* Make sure we update when this function exists */
+	defer func() {
+		c.Postgresql = *newSpec
+	}()
+
 	for _, role := range []PostgresRole{Master, Replica} {
 		if role == Replica {
 			if !newSpec.Spec.ReplicaLoadBalancer {
