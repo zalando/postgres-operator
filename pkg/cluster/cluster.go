@@ -155,8 +155,6 @@ func (c *Cluster) initUsers() error {
 		return fmt.Errorf("could not init human users: %v", err)
 	}
 
-	c.logger.Debugf("Initialized users: %# v", util.Pretty(c.pgUsers))
-
 	return nil
 }
 

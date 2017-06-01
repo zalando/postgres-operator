@@ -145,7 +145,6 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get team info: %v", err)
 	}
-	c.logger.Debugf("Got from the Team API: %+v", *teamInfo)
 
 	return teamInfo.Members, nil
 }
