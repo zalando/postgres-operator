@@ -16,7 +16,7 @@ import (
 
 const (
 	PGBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
-	PatroniPGBinariesParameterName   = "pg_bin"
+	PatroniPGBinariesParameterName   = "bin_dir"
 	PatroniPGParametersParameterName = "parameters"
 )
 
