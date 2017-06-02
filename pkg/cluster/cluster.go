@@ -239,12 +239,17 @@ func (c *Cluster) Create() error {
 
 func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
-	if !reflect.DeepEqual(c.Service[role].Spec.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges) {
-		reason = fmt.Sprintf("new %s service's LoadBalancerSourceRange doesn't match the current one", role)
-	} else {
-		match = true
+	match = true
+	old := c.Service[role].Spec.LoadBalancerSourceRanges
+	new := service.Spec.LoadBalancerSourceRanges
+	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
+	if (len(old) == 0) && (len(new) == 0) {
+		return true, ""
 	}
-	return
+	if !reflect.DeepEqual(old, new) {
+		return false, fmt.Sprintf("new %s service's LoadBalancerSourceRange doesn't match the current one", role)
+	}
+	return true, ""
 }
 
 func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string) {
