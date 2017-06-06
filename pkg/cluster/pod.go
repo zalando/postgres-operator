@@ -24,19 +24,6 @@ func (c *Cluster) listPods() ([]v1.Pod, error) {
 	return pods.Items, nil
 }
 
-func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, error) {
-	ns := c.Metadata.Namespace
-	listOptions := v1.ListOptions{
-		LabelSelector: c.labelsSet().String(),
-	}
-
-	pvcs, err := c.KubeClient.PersistentVolumeClaims(ns).List(listOptions)
-	if err != nil {
-		return nil, fmt.Errorf("could not get list of PersistentVolumeClaims: %v", err)
-	}
-	return pvcs.Items, nil
-}
-
 func (c *Cluster) deletePods() error {
 	c.logger.Debugln("Deleting pods")
 	pods, err := c.listPods()
@@ -58,28 +45,6 @@ func (c *Cluster) deletePods() error {
 		c.logger.Debugln("pods have been deleted")
 	} else {
 		c.logger.Debugln("No pods to delete")
-	}
-
-	return nil
-}
-
-func (c *Cluster) deletePersistenVolumeClaims() error {
-	c.logger.Debugln("Deleting PVCs")
-	ns := c.Metadata.Namespace
-	pvcs, err := c.listPersistentVolumeClaims()
-	if err != nil {
-		return err
-	}
-	for _, pvc := range pvcs {
-		c.logger.Debugf("Deleting PVC '%s'", util.NameFromMeta(pvc.ObjectMeta))
-		if err := c.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, c.deleteOptions); err != nil {
-			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
-		}
-	}
-	if len(pvcs) > 0 {
-		c.logger.Debugln("PVCs have been deleted")
-	} else {
-		c.logger.Debugln("No PVCs to delete")
 	}
 
 	return nil

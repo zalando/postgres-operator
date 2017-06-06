@@ -213,7 +213,7 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 		},
 		{
 			Name:  "PGROOT",
-			Value: "/home/postgres/pgdata/pgroot",
+			Value: constants.PostgresDataPath,
 		},
 		{
 			Name:  "ETCD_HOST",
@@ -293,7 +293,7 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 		VolumeMounts: []v1.VolumeMount{
 			{
 				Name:      constants.DataVolumeName,
-				MountPath: "/home/postgres/pgdata", //TODO: fetch from manifesto
+				MountPath: constants.PostgresDataMount, //TODO: fetch from manifesto
 			},
 		},
 		Env: envVars,

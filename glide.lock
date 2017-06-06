@@ -7,7 +7,7 @@ imports:
   - compute/metadata
   - internal
 - name: github.com/aws/aws-sdk-go
-  version: 63ce630574a5ec05ecd8e8de5cea16332a5a684d
+  version: e766cfe96ef7320817087fa4cd92c09abdb87310
   subpackages:
   - aws
   - aws/awserr

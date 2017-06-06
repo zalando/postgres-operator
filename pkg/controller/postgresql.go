@@ -169,8 +169,8 @@ func (c *Controller) processEvent(obj interface{}) error {
 		}
 
 		if err := cl.Sync(); err != nil {
-			cl.Error = fmt.Errorf("could not sync cluster '%s': %s", clusterName, err)
-			logger.Errorf("%v", cl)
+			cl.Error = fmt.Errorf("could not sync cluster '%s': %v", clusterName, err)
+			logger.Errorf("%v", cl.Error)
 			return nil
 		}
 		cl.Error = nil

@@ -1,4 +1,4 @@
-package controller
+package cluster
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
-func (c *Controller) ExecCommand(podName spec.NamespacedName, command []string) (string, error) {
+func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (string, error) {
 	var (
 		execOut bytes.Buffer
 		execErr bytes.Buffer

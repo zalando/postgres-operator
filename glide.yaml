@@ -22,3 +22,5 @@ import:
   version: ee39d359dd0896c4c0eccf23f033f158ad3d3bd7
   subpackages:
   - pkg/client/unversioned/remotecommand
+- package: github.com/aws/aws-sdk-go
+  version: ^1.8.24
