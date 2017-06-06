@@ -43,4 +43,4 @@ spec:
     maximum_lag_on_failover: 33554432
   maintenanceWindows:
   - 01:00-06:00 #UTC
-  - Sat:00:00-Sat:04:00
+  - Sat:00:00-04:00

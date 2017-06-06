@@ -29,25 +29,6 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 	}
 }
 
-func (c *Controller) getOAuthToken() (string, error) {
-	// Temporary getting postgresql-operator secret from the NamespaceDefault
-	credentialsSecret, err := c.KubeClient.
-		Secrets(c.opConfig.OAuthTokenSecretName.Namespace).
-		Get(c.opConfig.OAuthTokenSecretName.Name)
-
-	if err != nil {
-		c.logger.Debugf("Oauth token secret name: %s", c.opConfig.OAuthTokenSecretName)
-		return "", fmt.Errorf("could not get credentials secret: %v", err)
-	}
-	data := credentialsSecret.Data
-
-	if string(data["read-only-token-type"]) != "Bearer" {
-		return "", fmt.Errorf("wrong token type: %v", data["read-only-token-type"])
-	}
-
-	return string(data["read-only-token-secret"]), nil
-}
-
 func thirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
 	return &extv1beta.ThirdPartyResource{
 		ObjectMeta: v1.ObjectMeta{
