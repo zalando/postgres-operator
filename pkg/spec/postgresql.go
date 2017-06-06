@@ -79,6 +79,7 @@ type PostgresSpec struct {
 
 	TeamID              string               `json:"teamId"`
 	AllowedSourceRanges []string             `json:"allowedSourceRanges"`
+	ReplicaLoadBalancer bool                 `json:"replicaLoadBalancer,omitempty"`
 	NumberOfInstances   int32                `json:"numberOfInstances"`
 	Users               map[string]UserFlags `json:"users"`
 	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`

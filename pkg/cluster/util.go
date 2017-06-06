@@ -82,14 +82,14 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 	}
 }
 
-func (c *Cluster) logServiceChanges(old, new *v1.Service, isUpdate bool, reason string) {
+func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("service '%s' has been changed",
-			util.NameFromMeta(old.ObjectMeta),
+		c.logger.Infof("%s service '%s' has been changed",
+			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("service '%s  is not in the desired state and needs to be updated",
-			util.NameFromMeta(old.ObjectMeta),
+		c.logger.Infof("%s service '%s  is not in the desired state and needs to be updated",
+			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	}
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
@@ -145,7 +145,6 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get team info: %v", err)
 	}
-	c.logger.Debugf("Got from the Team API: %+v", *teamInfo)
 
 	return teamInfo.Members, nil
 }
@@ -263,14 +262,30 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 }
 
 func (c *Cluster) labelsSet() labels.Set {
-	lbls := c.OpConfig.ClusterLabels
+	lbls := make(map[string]string)
+	for k, v := range c.OpConfig.ClusterLabels {
+		lbls[k] = v
+	}
 	lbls[c.OpConfig.ClusterNameLabel] = c.Metadata.Name
 
 	return labels.Set(lbls)
 }
 
-func (c *Cluster) dnsName() string {
-	return strings.ToLower(c.OpConfig.DNSNameFormat.Format(
+func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
+	lbls := c.labelsSet()
+	lbls[c.OpConfig.PodRoleLabel] = string(role)
+	return lbls
+}
+
+func (c *Cluster) masterDnsName() string {
+	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
+		"cluster", c.Spec.ClusterName,
+		"team", c.teamName(),
+		"hostedzone", c.OpConfig.DbHostedZone))
+}
+
+func (c *Cluster) replicaDnsName() string {
+	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
 		"cluster", c.Spec.ClusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
