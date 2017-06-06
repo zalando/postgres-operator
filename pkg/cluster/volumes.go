@@ -30,14 +30,13 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 
 func (c *Cluster) deletePersistenVolumeClaims() error {
 	c.logger.Debugln("Deleting PVCs")
-	ns := c.Metadata.Namespace
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {
 		return err
 	}
 	for _, pvc := range pvcs {
 		c.logger.Debugf("Deleting PVC '%s'", util.NameFromMeta(pvc.ObjectMeta))
-		if err := c.KubeClient.PersistentVolumeClaims(ns).Delete(pvc.Name, c.deleteOptions); err != nil {
+		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, c.deleteOptions); err != nil {
 			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
 		}
 	}
@@ -50,7 +49,6 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 	return nil
 }
 
-// ListEC2VolumeIDs returns all volume IDs belong to this cluster
 func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 	result := make([]*v1.PersistentVolume, 0)
 
@@ -94,6 +92,13 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
 	for _, pv := range pvs {
+		volumeSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
+		if volumeSize > newSize {
+			return fmt.Errorf("cannot shrink persistent volume")
+		}
+		if volumeSize == newSize {
+			continue
+		}
 		for _, resizer := range resizers {
 			if !resizer.VolumeBelongsToProvider(pv) {
 				continue
@@ -106,32 +111,26 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 				}
 				defer resizer.DisconnectFromProvider()
 			}
-			volumeSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
-			if volumeSize > newSize {
-				return fmt.Errorf("cannot shrink persistent volume")
+			awsVolumeId, err := resizer.GetProviderVolumeID(pv)
+			if err != nil {
+				return err
 			}
-			if volumeSize != newSize {
-				awsVolumeId, err := resizer.GetProviderVolumeID(pv)
-				if err != nil {
-					return err
-				}
-				c.logger.Debugf("updating persistent volume %s to %d", pv.Name, newSize)
-				if err := resizer.ResizeVolume(awsVolumeId, newSize); err != nil {
-					return fmt.Errorf("could not resize EBS volume %s: %v", awsVolumeId, err)
-				}
-				c.logger.Debugf("resizing the filesystem on the volume %s", pv.Name)
-				podName := getPodNameFromPersistentVolume(pv)
-				if err := c.resizePostgresFilesystem(podName, []filesystems.FilesystemResizer{&filesystems.Ext234Resize{}}); err != nil {
-					return fmt.Errorf("could not resize the filesystem on pod '%s': %v", podName, err)
-				}
-				c.logger.Debugf("filesystem resize successfull on volume %s", pv.Name)
-				pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
-				c.logger.Debugf("updating persistent volume definition for volume %s", pv.Name)
-				if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
-					return fmt.Errorf("could not update persistent volume: %s", err)
-				}
-				c.logger.Debugf("successfully updated persistent volume %s", pv.Name)
+			c.logger.Debugf("updating persistent volume %s to %d", pv.Name, newSize)
+			if err := resizer.ResizeVolume(awsVolumeId, newSize); err != nil {
+				return fmt.Errorf("could not resize EBS volume %s: %v", awsVolumeId, err)
 			}
+			c.logger.Debugf("resizing the filesystem on the volume %s", pv.Name)
+			podName := getPodNameFromPersistentVolume(pv)
+			if err := c.resizePostgresFilesystem(podName, []filesystems.FilesystemResizer{&filesystems.Ext234Resize{}}); err != nil {
+				return fmt.Errorf("could not resize the filesystem on pod '%s': %v", podName, err)
+			}
+			c.logger.Debugf("filesystem resize successfull on volume %s", pv.Name)
+			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
+			c.logger.Debugf("updating persistent volume definition for volume %s", pv.Name)
+			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
+				return fmt.Errorf("could not update persistent volume: %s", err)
+			}
+			c.logger.Debugf("successfully updated persistent volume %s", pv.Name)
 		}
 	}
 	if len(pvs) > 0 && totalCompatible == 0 {
@@ -167,6 +166,7 @@ func (c *Cluster) listVolumesWitManifestSize(newVolume spec.Volume) ([]*v1.Persi
 	return volumes, manifestSize, nil
 }
 
+// getPodNameFromPersistentVolume returns a pod name that it extracts from the volume claim ref.
 func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedName {
 	namespace := pv.Spec.ClaimRef.Namespace
 	name := pv.Spec.ClaimRef.Name[len(constants.DataVolumeName)+1:]

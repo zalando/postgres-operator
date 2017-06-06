@@ -9,22 +9,23 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/filesystems"
 )
 
-func (c *Cluster) getPostgresFilesystemInfo(podName *spec.NamespacedName) (err error, device string, fstype string) {
+func (c *Cluster) getPostgresFilesystemInfo(podName *spec.NamespacedName) (device, fstype string, err error) {
 	out, err := c.ExecCommand(podName, "bash", "-c", fmt.Sprintf("df -T %s|tail -1", constants.PostgresDataMount))
 	if err != nil {
-		return err, "", ""
+		return "", "", err
 	}
 	fields := strings.Fields(out)
 	if len(fields) < 2 {
-		return fmt.Errorf("too few fields in the df output"), "", ""
+		return "", "", fmt.Errorf("too few fields in the df output")
 	}
-	return nil, fields[0], fields[1]
+
+	return fields[0], fields[1], nil
 }
 
 func (c *Cluster) resizePostgresFilesystem(podName *spec.NamespacedName, resizers []filesystems.FilesystemResizer) error {
 	// resize2fs always writes to stderr, and ExecCommand considers a non-empty stderr an error
 	// first, determine the device and the filesystem
-	err, deviceName, fsType := c.getPostgresFilesystemInfo(podName)
+	deviceName, fsType, err := c.getPostgresFilesystemInfo(podName)
 	if err != nil {
 		return fmt.Errorf("could not get device and type for the postgres filesystem: %v", err)
 	}
