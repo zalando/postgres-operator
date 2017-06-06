@@ -87,7 +87,7 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 	if err != nil {
 		return fmt.Errorf("could not parse volume size: %v", err)
 	}
-	pvs, newSize, err := c.listVolumesWitManifestSize(newVolume)
+	pvs, newSize, err := c.listVolumesWithManifestSize(newVolume)
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
@@ -140,7 +140,7 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 }
 
 func (c *Cluster) VolumesNeedResizing(newVolume spec.Volume) (bool, error) {
-	volumes, manifestSize, err := c.listVolumesWitManifestSize(newVolume)
+	volumes, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
 	if err != nil {
 		return false, err
 	}
@@ -153,7 +153,7 @@ func (c *Cluster) VolumesNeedResizing(newVolume spec.Volume) (bool, error) {
 	return false, nil
 }
 
-func (c *Cluster) listVolumesWitManifestSize(newVolume spec.Volume) ([]*v1.PersistentVolume, int64, error) {
+func (c *Cluster) listVolumesWithManifestSize(newVolume spec.Volume) ([]*v1.PersistentVolume, int64, error) {
 	newSize, err := resource.ParseQuantity(newVolume.Size)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not parse volume size from the manifest: %v", err)
