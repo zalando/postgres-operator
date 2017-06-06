@@ -63,7 +63,7 @@ func specPatch(spec interface{}) ([]byte, error) {
 	}{spec})
 }
 
-func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reason string) {
+func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
 		c.logger.Infof("statefulset '%s' has been changed",
 			util.NameFromMeta(old.ObjectMeta),
@@ -75,8 +75,10 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 	}
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
-	if reason != "" {
-		c.logger.Infof("Reason: %s", reason)
+	if len(reasons) > 0 {
+		for _, reason := range reasons {
+			c.logger.Infof("Reason: %s", reason)
+		}
 	}
 }
 

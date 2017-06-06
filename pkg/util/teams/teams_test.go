@@ -144,7 +144,7 @@ func TestInfo(t *testing.T) {
 	for _, tc := range teamsAPItc {
 		func() {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Header.Get("Authorization") != "Bearer " + token {
+				if r.Header.Get("Authorization") != "Bearer "+token {
 					t.Errorf("Authorization token is wrong or not provided")
 				}
 				w.WriteHeader(tc.inCode)
