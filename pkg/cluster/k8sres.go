@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	PGBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
-	PatroniPGBinariesParameterName   = "bin_dir"
-	PatroniPGParametersParameterName = "parameters"
+	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
+	patroniPGBinariesParameterName   = "bin_dir"
+	patroniPGParametersParameterName = "parameters"
 )
 
 type pgUser struct {
@@ -25,7 +25,7 @@ type pgUser struct {
 	Options  []string `json:"options"`
 }
 
-type PatroniDCS struct {
+type patroniDCS struct {
 	TTL                  uint32  `json:"ttl,omitempty"`
 	LoopWait             uint32  `json:"loop_wait,omitempty"`
 	RetryTimeout         uint32  `json:"retry_timeout,omitempty"`
@@ -36,7 +36,7 @@ type pgBootstrap struct {
 	Initdb []interface{}     `json:"initdb"`
 	Users  map[string]pgUser `json:"users"`
 	PgHBA  []string          `json:"pg_hba"`
-	DCS    PatroniDCS        `json:"dcs,omitempty"`
+	DCS    patroniDCS        `json:"dcs,omitempty"`
 }
 
 type spiloConfiguration struct {
@@ -185,9 +185,9 @@ PATRONI_INITDB_PARAMS:
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
-	config.PgLocalConfiguration[PatroniPGBinariesParameterName] = fmt.Sprintf(PGBinariesLocationTemplate, pg.PgVersion)
+	config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
 	if len(pg.Parameters) > 0 {
-		config.PgLocalConfiguration[PatroniPGParametersParameterName] = pg.Parameters
+		config.PgLocalConfiguration[patroniPGParametersParameterName] = pg.Parameters
 	}
 	config.Bootstrap.Users = map[string]pgUser{
 		c.OpConfig.PamRoleName: {

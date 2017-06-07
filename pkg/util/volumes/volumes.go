@@ -4,6 +4,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+// VolumeResizer defines the set of methods used to implememnt provider-specific resizing of persistent volumes.
 type VolumeResizer interface {
 	ConnectToProvider() error
 	IsConnectedToProvider() bool

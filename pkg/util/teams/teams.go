@@ -9,7 +9,8 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-type InfrastructureAccount struct {
+// InfrastructureAccount defines an account of the team on some infrastructure (i.e AWS, Google) platform.
+type infrastructureAccount struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Provider    string `json:"provider"`
@@ -20,7 +21,8 @@ type InfrastructureAccount struct {
 	Disabled    bool   `json:"disabled"`
 }
 
-type Team struct {
+// Team defines informaiton for a single team, including the list of members and infrastructure accounts.
+type team struct {
 	Dn           string   `json:"dn"`
 	ID           string   `json:"id"`
 	TeamName     string   `json:"id_name"`
@@ -34,15 +36,17 @@ type Team struct {
 	DeliveryLead string   `json:"delivery_lead"`
 	ParentTeamID string   `json:"parent_team_id"`
 
-	InfrastructureAccounts []InfrastructureAccount `json:"infrastructure-accounts"`
+	InfrastructureAccounts []infrastructureAccount `json:"infrastructure-accounts"`
 }
 
+//
 type API struct {
 	url        string
 	httpClient *http.Client
 	logger     *logrus.Entry
 }
 
+// NewTeamsAPI creates an object to query the team API.
 func NewTeamsAPI(url string, log *logrus.Logger) *API {
 	t := API{
 		url:        strings.TrimRight(url, "/"),
@@ -53,7 +57,8 @@ func NewTeamsAPI(url string, log *logrus.Logger) *API {
 	return &t
 }
 
-func (t *API) TeamInfo(teamID, token string) (*Team, error) {
+// TeamInfo returns information about a given team using its ID and a token to authenticate to the API service.
+func (t *API) TeamInfo(teamID, token string) (*team, error) {
 	url := fmt.Sprintf("%s/teams/%s", t.url, teamID)
 	t.logger.Debugf("Request url: %s", url)
 	req, err := http.NewRequest("GET", url, nil)
@@ -81,7 +86,7 @@ func (t *API) TeamInfo(teamID, token string) (*Team, error) {
 
 		return nil, fmt.Errorf("team API query failed with status code %d", resp.StatusCode)
 	}
-	teamInfo := &Team{}
+	teamInfo := &team{}
 	d := json.NewDecoder(resp.Body)
 	err = d.Decode(teamInfo)
 	if err != nil {

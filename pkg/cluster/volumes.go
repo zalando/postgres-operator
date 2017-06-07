@@ -60,15 +60,14 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 	for _, pvc := range pvcs {
 		lastDash := strings.LastIndex(pvc.Name, "-")
 		if lastDash > 0 && lastDash < len(pvc.Name)-1 {
-			if pvcNumber, err := strconv.Atoi(pvc.Name[lastDash+1:]); err != nil {
+			pvcNumber, err := strconv.Atoi(pvc.Name[lastDash+1:])
+			if err != nil {
 				return nil, fmt.Errorf("could not convert last part of the persistent volume claim name %s to a number", pvc.Name)
-			} else {
-				if int32(pvcNumber) > lastPodIndex {
-					c.logger.Debugf("Skipping persistent volume %s corresponding to a non-running pods", pvc.Name)
-					continue
-				}
 			}
-
+			if int32(pvcNumber) > lastPodIndex {
+				c.logger.Debugf("Skipping persistent volume %s corresponding to a non-running pods", pvc.Name)
+				continue
+			}
 		}
 		pv, err := c.KubeClient.PersistentVolumes().Get(pvc.Spec.VolumeName)
 		if err != nil {
@@ -139,7 +138,7 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 	return nil
 }
 
-func (c *Cluster) VolumesNeedResizing(newVolume spec.Volume) (bool, error) {
+func (c *Cluster) volumesNeedResizing(newVolume spec.Volume) (bool, error) {
 	volumes, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
 	if err != nil {
 		return false, err

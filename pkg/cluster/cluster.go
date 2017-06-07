@@ -34,7 +34,7 @@ var (
 	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 )
 
-//TODO: remove struct duplication
+// Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
 	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
 	RestClient          *rest.RESTClient
@@ -77,6 +77,7 @@ type compareStatefulsetResult struct {
 	reasons       []string
 }
 
+// New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
@@ -108,7 +109,7 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	return cluster
 }
 
-func (c *Cluster) ClusterName() spec.NamespacedName {
+func (c *Cluster) clusterName() spec.NamespacedName {
 	return util.NameFromMeta(c.Metadata)
 }
 
@@ -136,7 +137,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 
 	if err != nil {
-		c.logger.Warningf("could not set status for cluster '%s': %s", c.ClusterName(), err)
+		c.logger.Warningf("could not set status for cluster '%s': %s", c.clusterName(), err)
 	}
 }
 
@@ -158,6 +159,7 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
+// Create creates the new kubernetes objects associated with the cluster.
 func (c *Cluster) Create() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -229,7 +231,7 @@ func (c *Cluster) Create() error {
 		}
 	}
 
-	err = c.ListResources()
+	err = c.listResources()
 	if err != nil {
 		c.logger.Errorf("could not list resources: %s", err)
 	}
@@ -385,6 +387,8 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 }
 
+// Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
+// (i.e. service) is treated as an error.
 func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -488,6 +492,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	return nil
 }
 
+// Delete deletes the cluster and cleans up all objects associated with it (including statefulsets).
 func (c *Cluster) Delete() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -518,6 +523,7 @@ func (c *Cluster) Delete() error {
 	return nil
 }
 
+// ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
 func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
 	c.podEventsQueue.Add(event)
 }
@@ -538,6 +544,7 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 	return nil
 }
 
+// Run starts the pod event dispatching for the given cluster.
 func (c *Cluster) Run(stopCh <-chan struct{}) {
 	go c.processPodEventQueue(stopCh)
 }

@@ -3,7 +3,6 @@ package util
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -24,6 +23,7 @@ func init() {
 	rand.Seed(int64(time.Now().Unix()))
 }
 
+// RandomPassword generates random alphanumeric password of a given length.
 func RandomPassword(n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -33,6 +33,7 @@ func RandomPassword(n int) string {
 	return string(b)
 }
 
+// NameFromMeta converts a metadata object to the NamespacedName name representation.
 func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
 	return spec.NamespacedName{
 		Namespace: meta.Namespace,
@@ -40,6 +41,7 @@ func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
 	}
 }
 
+// PGUserPassword is used to generate md5 password hash for a given user. It does nothing for already hashed passwords.
 func PGUserPassword(user spec.PgUser) string {
 	if (len(user.Password) == md5.Size*2+len(md5prefix) && user.Password[:3] == md5prefix) || user.Password == "" {
 		// Avoid processing already encrypted or empty passwords
@@ -49,17 +51,14 @@ func PGUserPassword(user spec.PgUser) string {
 	return md5prefix + hex.EncodeToString(s[:])
 }
 
-func Pretty(x interface{}) (f fmt.Formatter) {
-	return pretty.Formatter(x)
-}
-
+// PrettyDiff shows the diff between 2 objects in an easy to understand format. It is mainly used for debugging output.
 func PrettyDiff(a, b interface{}) (result string) {
 	diff := pretty.Diff(a, b)
 	return strings.Join(diff, "\n")
 }
 
+// SubstractStringSlices finds elements in a that are not in b and return them as a result slice.
 func SubstractStringSlices(a []string, b []string) (result []string, equal bool) {
-	// Find elements in a that are not in b and return them as a result slice
 	// Slices are assumed to contain unique elements only
 OUTER:
 	for _, vala := range a {

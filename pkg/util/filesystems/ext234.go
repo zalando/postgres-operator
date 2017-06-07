@@ -11,19 +11,22 @@ var (
 )
 
 const (
-	EXT2      = "ext2"
-	EXT3      = "ext3"
-	EXT4      = "ext4"
+	ext2      = "ext2"
+	ext3      = "ext3"
+	ext4      = "ext4"
 	resize2fs = "resize2fs"
 )
 
+//  Ext234Resize implements the FilesystemResizer interface for the ext4/3/2fs.
 type Ext234Resize struct {
 }
 
+// CanResizeFilesystem checks whether Ext234Resize can resize this filesystem.
 func (c *Ext234Resize) CanResizeFilesystem(fstype string) bool {
-	return fstype == EXT2 || fstype == EXT3 || fstype == EXT4
+	return fstype == ext2 || fstype == ext3 || fstype == ext4
 }
 
+// ResizeFilesystem calls resize2fs to resize the filesystem if necessary.
 func (c *Ext234Resize) ResizeFilesystem(deviceName string, commandExecutor func(cmd string) (out string, err error)) error {
 	command := fmt.Sprintf("%s %s 2>&1", resize2fs, deviceName)
 	out, err := commandExecutor(command)

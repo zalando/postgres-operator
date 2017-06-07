@@ -18,9 +18,14 @@ const (
 	inRoleTemplate   = `IN ROLE %s`
 )
 
+// DefaultUserSyncStrategy implements a user sync strategy that merges already existing database users
+// with those defined in the manifest, altering existing users when necessary. It will never strips
+// an existing roles of another role membership, nor it removes the already assigned flag
+// (except for the NOLOGIN). TODO: process other NOflags, i.e. NOSUPERUSER correctly.
 type DefaultUserSyncStrategy struct {
 }
 
+// ProduceSyncRequests figures out the types of changes that need to happen with the given users.
 func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
 	newUsers spec.PgUserMap) (reqs []spec.PgSyncUserRequest) {
 
@@ -55,6 +60,7 @@ func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
 	return
 }
 
+// ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
 func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserRequest, db *sql.DB) error {
 	for _, r := range reqs {
 		switch r.Kind {

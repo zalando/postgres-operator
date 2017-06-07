@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type Decoder interface {
+type decoder interface {
 	Decode(value string) error
 }
 
@@ -21,15 +21,15 @@ type fieldInfo struct {
 
 type stringTemplate string
 
-func decoderFrom(field reflect.Value) (d Decoder) {
+func decoderFrom(field reflect.Value) (d decoder) {
 	// it may be impossible for a struct field to fail this check
 	if !field.CanInterface() {
 		return
 	}
 
-	d, ok := field.Interface().(Decoder)
+	d, ok := field.Interface().(decoder)
 	if !ok && field.CanAddr() {
-		d, _ = field.Addr().Interface().(Decoder)
+		d, _ = field.Addr().Interface().(decoder)
 	}
 
 	return d

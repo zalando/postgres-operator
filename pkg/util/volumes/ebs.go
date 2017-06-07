@@ -13,10 +13,12 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+// EBSVolumeResizer implements volume resizing interface for AWS EBS volumes.
 type EBSVolumeResizer struct {
 	connection *ec2.EC2
 }
 
+// ConnectToProvider connects to AWS.
 func (c *EBSVolumeResizer) ConnectToProvider() error {
 	sess, err := session.NewSession(&aws.Config{Region: aws.String(constants.AWS_REGION)})
 	if err != nil {
@@ -26,10 +28,12 @@ func (c *EBSVolumeResizer) ConnectToProvider() error {
 	return nil
 }
 
+// IsConnectedToProvider checks if AWS connection is established.
 func (c *EBSVolumeResizer) IsConnectedToProvider() bool {
 	return c.connection != nil
 }
 
+// VolumeBelongsToProvider checks if the given persistent volume is backed by EBS.
 func (c *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool {
 	return pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner
 }
@@ -47,6 +51,7 @@ func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string,
 	return volumeID[idx:], nil
 }
 
+// ResizeVolume actually calls AWS API to resize the EBS volume if necessary.
 func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 	/* first check if the volume is already of a requested size */
 	volumeOutput, err := c.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeId}})
@@ -89,7 +94,8 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 				return false, fmt.Errorf("describe volume modification didn't return one record for volume \"%s\"", volumeId)
 			}
 			if *out.VolumesModifications[0].VolumeId != volumeId {
-				return false, fmt.Errorf("non-matching volume id when describing modifications: \"%s\" is different from \"%s\"")
+				return false, fmt.Errorf("non-matching volume id when describing modifications: \"%s\" is different from \"%s\"",
+					*out.VolumesModifications[0].VolumeId, volumeId)
 			}
 			return *out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
 		})

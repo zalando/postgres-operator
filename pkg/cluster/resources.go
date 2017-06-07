@@ -77,7 +77,7 @@ func (c *Cluster) loadResources() error {
 	return nil
 }
 
-func (c *Cluster) ListResources() error {
+func (c *Cluster) listResources() error {
 	if c.Statefulset != nil {
 		c.logger.Infof("Found statefulset: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}

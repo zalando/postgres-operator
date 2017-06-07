@@ -62,7 +62,7 @@ func (c *Controller) podAdd(obj interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName:     c.PodClusterName(pod),
+		ClusterName:     c.podClusterName(pod),
 		PodName:         util.NameFromMeta(pod.ObjectMeta),
 		CurPod:          pod,
 		EventType:       spec.EventAdd,
@@ -84,7 +84,7 @@ func (c *Controller) podUpdate(prev, cur interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName:     c.PodClusterName(curPod),
+		ClusterName:     c.podClusterName(curPod),
 		PodName:         util.NameFromMeta(curPod.ObjectMeta),
 		PrevPod:         prevPod,
 		CurPod:          curPod,
@@ -102,7 +102,7 @@ func (c *Controller) podDelete(obj interface{}) {
 	}
 
 	podEvent := spec.PodEvent{
-		ClusterName:     c.PodClusterName(pod),
+		ClusterName:     c.podClusterName(pod),
 		PodName:         util.NameFromMeta(pod.ObjectMeta),
 		CurPod:          pod,
 		EventType:       spec.EventDelete,
