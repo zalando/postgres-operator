@@ -242,15 +242,22 @@ func (c *Cluster) Create() error {
 func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
 	match = true
-	old := c.Service[role].Spec.LoadBalancerSourceRanges
-	new := service.Spec.LoadBalancerSourceRanges
+	oldSourceRanges := c.Service[role].Spec.LoadBalancerSourceRanges
+	newSourceRanges := service.Spec.LoadBalancerSourceRanges
 	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
-	if (len(old) == 0) && (len(new) == 0) {
+	if (len(oldSourceRanges) == 0) && (len(newSourceRanges) == 0) {
 		return true, ""
 	}
-	if !reflect.DeepEqual(old, new) {
+	if !reflect.DeepEqual(oldSourceRanges, newSourceRanges) {
 		return false, fmt.Sprintf("new %s service's LoadBalancerSourceRange doesn't match the current one", role)
 	}
+
+	oldDNSAnnotation := c.Service[role].Annotations[constants.ZalandoDNSNameAnnotation]
+	newDNSAnnotation := service.Annotations[constants.ZalandoDNSNameAnnotation]
+	if oldDNSAnnotation != newDNSAnnotation {
+		return false, fmt.Sprintf("new %s service's '%s' annotation doesn't match the current one", role, constants.ZalandoDNSNameAnnotation)
+	}
+
 	return true, ""
 }
 
