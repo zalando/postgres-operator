@@ -255,7 +255,7 @@ func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match
 	oldDNSAnnotation := c.Service[role].Annotations[constants.ZalandoDNSNameAnnotation]
 	newDNSAnnotation := service.Annotations[constants.ZalandoDNSNameAnnotation]
 	if oldDNSAnnotation != newDNSAnnotation {
-		return false, fmt.Sprintf("new service's '%s' annotation doesn't match the current one", constants.ZalandoDNSNameAnnotation)
+		return false, fmt.Sprintf("new %s service's '%s' annotation doesn't match the current one", role, constants.ZalandoDNSNameAnnotation)
 	}
 
 	return true, ""
