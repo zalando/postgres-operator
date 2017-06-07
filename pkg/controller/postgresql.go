@@ -183,7 +183,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 func (c *Controller) processClusterEventsQueue(idx int) {
 	for {
-		c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(c.processEvent))
+		if _, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(c.processEvent)); err != nil {
+			c.logger.Errorf("error when processing cluster events queue: %v", err)
+		}
 	}
 }
 
@@ -224,7 +226,9 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	}
 	//TODO: if we delete cluster, discard all the previous events for the cluster
 
-	c.clusterEventQueues[workerID].Add(clusterEvent)
+	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
+		c.logger.WithField("worker", workerID).Errorf("error when queueing cluster event: %v", clusterEvent)
+	}
 	c.logger.WithField("worker", workerID).Infof("%s of the '%s' cluster has been queued", eventType, clusterName)
 }
 

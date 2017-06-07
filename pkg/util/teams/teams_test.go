@@ -148,7 +148,9 @@ func TestInfo(t *testing.T) {
 					t.Errorf("Authorization token is wrong or not provided")
 				}
 				w.WriteHeader(tc.inCode)
-				fmt.Fprint(w, tc.in)
+				if _, err := fmt.Fprint(w, tc.in); err != nil {
+					t.Errorf("Error writing teams api response %v", err)
+				}
 			}))
 			defer ts.Close()
 			api := NewTeamsAPI(ts.URL, logger)

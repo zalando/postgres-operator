@@ -48,7 +48,9 @@ func (c *Cluster) initDbConn() (err error) {
 		}
 		err = conn.Ping()
 		if err != nil {
-			conn.Close()
+			if err2 := conn.Close(); err2 != nil {
+				c.logger.Error("error when closing PostgreSQL connection after another error: %v", err2)
+			}
 			return err
 		}
 
@@ -64,7 +66,12 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 	if rows, err = c.pgDb.Query(getUserSQL, pq.Array(userNames)); err != nil {
 		return nil, fmt.Errorf("error when querying users: %v", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err2 := rows.Close(); err2 != nil {
+			err = fmt.Errorf("error when closing query cursor: %v", err2)
+		}
+
+	}()
 	for rows.Next() {
 		var (
 			rolname, rolpassword                                          string

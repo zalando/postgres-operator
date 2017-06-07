@@ -56,7 +56,9 @@ func KubernetesRestClient(c *rest.Config) (*rest.RESTClient, error) {
 			)
 			return nil
 		})
-	schemeBuilder.AddToScheme(api.Scheme)
+	if err := schemeBuilder.AddToScheme(api.Scheme); err != nil {
+		return nil, fmt.Errorf("could not apply functions to register PostgreSQL TPR type: %v", err)
+	}
 
 	return rest.RESTClientFor(c)
 }

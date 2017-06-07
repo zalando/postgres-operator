@@ -37,10 +37,7 @@ func (c *Cluster) resizePostgresFilesystem(podName *spec.NamespacedName, resizer
 			return c.ExecCommand(podName, "bash", "-c", cmd)
 		})
 
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}
 	return fmt.Errorf("could not resize filesystem: no compatible resizers for the filesystem of type %s", fsType)
 }
