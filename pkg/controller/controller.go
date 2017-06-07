@@ -141,6 +141,7 @@ func (c *Controller) runInformers(stopCh <-chan struct{}) {
 	go c.postgresqlInformer.Run(stopCh)
 	go c.podInformer.Run(stopCh)
 	go c.podEventsDispatcher(stopCh)
+	go c.clusterResync(stopCh)
 
 	<-stopCh
 }

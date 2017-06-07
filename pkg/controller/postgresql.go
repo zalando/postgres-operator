@@ -19,6 +19,19 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
+func (c *Controller) clusterResync(stopCh <-chan struct{}) {
+	ticker := time.NewTicker(c.opConfig.ResyncPeriod)
+
+	for {
+		select {
+		case <-ticker.C:
+			c.clusterListFunc(api.ListOptions{ResourceVersion:"0"})
+		case <-stopCh:
+			return
+		}
+	}
+}
+
 func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
 	c.logger.Info("Getting list of currently running clusters")
 
