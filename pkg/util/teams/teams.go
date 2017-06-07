@@ -58,7 +58,7 @@ func NewTeamsAPI(url string, log *logrus.Logger) *API {
 }
 
 // TeamInfo returns information about a given team using its ID and a token to authenticate to the API service.
-func (t *API) TeamInfo(teamID, token string) (*team, error) {
+func (t *API) TeamInfo(teamID, token string) (tm *team, er error) {
 	url := fmt.Sprintf("%s/teams/%s", t.url, teamID)
 	t.logger.Debugf("Request url: %s", url)
 	req, err := http.NewRequest("GET", url, nil)
@@ -71,7 +71,12 @@ func (t *API) TeamInfo(teamID, token string) (*team, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err:= resp.Body.Close(); err != nil {
+			er = fmt.Errorf("error when closing response; %v", err)
+			tm = nil
+		}
+	}()
 	if resp.StatusCode != 200 {
 		var raw map[string]json.RawMessage
 		d := json.NewDecoder(resp.Body)
