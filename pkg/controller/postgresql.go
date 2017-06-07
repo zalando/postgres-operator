@@ -2,8 +2,8 @@ package controller
 
 import (
 	"fmt"
-	"time"
 	"reflect"
+	"time"
 
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/meta"
@@ -19,17 +19,35 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
-func (c *Controller) resyncClusters(objList []runtime.Object) error {
+func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
+	c.logger.Info("Getting list of currently running clusters")
+
+	req := c.RestClient.Get().
+		RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, c.opConfig.Namespace)).
+		VersionedParams(&options, api.ParameterCodec).
+		FieldsSelectorParam(fields.Everything())
+
+	object, err := req.Do().Get()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not get list of postgresql objects: %v", err)
+	}
+
+	objList, err := meta.ExtractList(object)
+	if err != nil {
+		return nil, fmt.Errorf("could not extract list of postgresql objects: %v", err)
+	}
+
 	if time.Since(c.lastClusterSyncTime) <= c.opConfig.ResyncPeriod {
 		c.logger.Debugln("skipping resync of clusters")
-		return nil
+		return object, err
 	}
 
 	var activeClustersCnt, failedClustersCnt int
 	for _, obj := range objList {
 		pg, ok := obj.(*spec.Postgresql)
 		if !ok {
-			return fmt.Errorf("could not cast object to postgresql")
+			return nil, fmt.Errorf("could not cast object to postgresql")
 		}
 
 		if pg.Error != nil {
@@ -52,32 +70,6 @@ func (c *Controller) resyncClusters(objList []runtime.Object) error {
 	}
 
 	c.lastClusterSyncTime = time.Now()
-
-	return nil
-}
-
-func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
-	c.logger.Info("Getting list of currently running clusters")
-
-	req := c.RestClient.Get().
-		RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, c.opConfig.Namespace)).
-		VersionedParams(&options, api.ParameterCodec).
-		FieldsSelectorParam(fields.Everything())
-
-	object, err := req.Do().Get()
-
-	if err != nil {
-		return nil, fmt.Errorf("could not get list of postgresql objects: %v", err)
-	}
-
-	objList, err := meta.ExtractList(object)
-	if err != nil {
-		return nil, fmt.Errorf("could not extract list of postgresql objects: %v", err)
-	}
-
-	if err := c.resyncClusters(objList); err != nil {
-		return nil, fmt.Errorf("could not resync clusters: %v", err)
-	}
 
 	return object, err
 }
