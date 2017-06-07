@@ -8,6 +8,8 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
 
+// Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
+// Unlike the update, sync does not error out if some objects do not exist and takes care of creating them.
 func (c *Cluster) Sync() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -32,9 +34,20 @@ func (c *Cluster) Sync() error {
 	}
 
 	c.logger.Debugf("Syncing services")
-	if err := c.syncService(); err != nil {
-		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("coud not sync services: %v", err)
+	for _, role := range []PostgresRole{Master, Replica} {
+		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+			if c.Service[role] != nil {
+				// delete the left over replica service
+				if err := c.deleteService(role); err != nil {
+					return fmt.Errorf("could not delete obsolete %s service: %v", role)
+				}
+			}
+			continue
+		}
+		if err := c.syncService(role); err != nil {
+			if !k8sutil.ResourceAlreadyExists(err) {
+				return fmt.Errorf("coud not sync %s service: %v", role, err)
+			}
 		}
 	}
 
@@ -48,16 +61,15 @@ func (c *Cluster) Sync() error {
 	if !c.databaseAccessDisabled() {
 		if err := c.initDbConn(); err != nil {
 			return fmt.Errorf("could not init db connection: %v", err)
-		} else {
-			c.logger.Debugf("Syncing roles")
-			if err := c.SyncRoles(); err != nil {
-				return fmt.Errorf("could not sync roles: %v", err)
-			}
+		}
+		c.logger.Debugf("Syncing roles")
+		if err := c.syncRoles(); err != nil {
+			return fmt.Errorf("could not sync roles: %v", err)
 		}
 	}
 
 	c.logger.Debugf("Syncing persistent volumes")
-	if err := c.SyncVolumes(); err != nil {
+	if err := c.syncVolumes(); err != nil {
 		return fmt.Errorf("could not sync persistent volumes: %v", err)
 	}
 
@@ -75,30 +87,30 @@ func (c *Cluster) syncSecrets() error {
 	return err
 }
 
-func (c *Cluster) syncService() error {
+func (c *Cluster) syncService(role PostgresRole) error {
 	cSpec := c.Spec
-	if c.Service == nil {
-		c.logger.Infof("could not find the cluster's service")
-		svc, err := c.createService()
+	if c.Service[role] == nil {
+		c.logger.Infof("could not find the cluster's %s service", role)
+		svc, err := c.createService(role)
 		if err != nil {
-			return fmt.Errorf("could not create missing service: %v", err)
+			return fmt.Errorf("could not create missing %s service: %v", role, err)
 		}
-		c.logger.Infof("Created missing service '%s'", util.NameFromMeta(svc.ObjectMeta))
+		c.logger.Infof("Created missing %s service '%s'", role, util.NameFromMeta(svc.ObjectMeta))
 
 		return nil
 	}
 
-	desiredSvc := c.genService(cSpec.AllowedSourceRanges)
-	match, reason := c.sameServiceWith(desiredSvc)
+	desiredSvc := c.genService(role, cSpec.AllowedSourceRanges)
+	match, reason := c.sameServiceWith(role, desiredSvc)
 	if match {
 		return nil
 	}
-	c.logServiceChanges(c.Service, desiredSvc, false, reason)
+	c.logServiceChanges(role, c.Service[role], desiredSvc, false, reason)
 
-	if err := c.updateService(desiredSvc); err != nil {
-		return fmt.Errorf("could not update service to match desired state: %v", err)
+	if err := c.updateService(role, desiredSvc); err != nil {
+		return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 	}
-	c.logger.Infof("service '%s' is in the desired state now", util.NameFromMeta(desiredSvc.ObjectMeta))
+	c.logger.Infof("%s service '%s' is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 
 	return nil
 }
@@ -181,7 +193,7 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) SyncRoles() error {
+func (c *Cluster) syncRoles() error {
 	var userNames []string
 
 	if err := c.initUsers(); err != nil {
@@ -201,9 +213,9 @@ func (c *Cluster) SyncRoles() error {
 	return nil
 }
 
-/* SyncVolume reads all persistent volumes and checks that their size matches the one declared in the statefulset */
-func (c *Cluster) SyncVolumes() error {
-	act, err := c.VolumesNeedResizing(c.Spec.Volume)
+// syncVolumes reads all persistent volumes and checks that their size matches the one declared in the statefulset.
+func (c *Cluster) syncVolumes() error {
+	act, err := c.volumesNeedResizing(c.Spec.Volume)
 	if err != nil {
 		return fmt.Errorf("could not compare size of the volumes: %v", err)
 	}

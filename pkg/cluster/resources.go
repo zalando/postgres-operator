@@ -24,20 +24,31 @@ func (c *Cluster) loadResources() error {
 	if err != nil {
 		return fmt.Errorf("could not get list of services: %v", err)
 	}
-	if len(services.Items) > 1 {
+	if len(services.Items) > 2 {
 		return fmt.Errorf("too many(%d) services for a cluster", len(services.Items))
-	} else if len(services.Items) == 1 {
-		c.Service = &services.Items[0]
+	}
+	for i, svc := range services.Items {
+		switch PostgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
+		case Replica:
+			c.Service[Replica] = &services.Items[i]
+		default:
+			c.Service[Master] = &services.Items[i]
+		}
 	}
 
 	endpoints, err := c.KubeClient.Endpoints(ns).List(listOptions)
 	if err != nil {
 		return fmt.Errorf("could not get list of endpoints: %v", err)
 	}
-	if len(endpoints.Items) > 1 {
+	if len(endpoints.Items) > 2 {
 		return fmt.Errorf("too many(%d) endpoints for a cluster", len(endpoints.Items))
-	} else if len(endpoints.Items) == 1 {
-		c.Endpoint = &endpoints.Items[0]
+	}
+
+	for i, ep := range endpoints.Items {
+		if ep.Labels[c.OpConfig.PodRoleLabel] != string(Replica) {
+			c.Endpoint = &endpoints.Items[i]
+			break
+		}
 	}
 
 	secrets, err := c.KubeClient.Secrets(ns).List(listOptions)
@@ -58,14 +69,15 @@ func (c *Cluster) loadResources() error {
 	}
 	if len(statefulSets.Items) > 1 {
 		return fmt.Errorf("too many(%d) statefulsets for a cluster", len(statefulSets.Items))
-	} else if len(statefulSets.Items) == 1 {
+	}
+	if len(statefulSets.Items) == 1 {
 		c.Statefulset = &statefulSets.Items[0]
 	}
 
 	return nil
 }
 
-func (c *Cluster) ListResources() error {
+func (c *Cluster) listResources() error {
 	if c.Statefulset != nil {
 		c.logger.Infof("Found statefulset: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}
@@ -78,8 +90,8 @@ func (c *Cluster) ListResources() error {
 		c.logger.Infof("Found endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
 	}
 
-	if c.Service != nil {
-		c.logger.Infof("Found service: %s (uid: %s)", util.NameFromMeta(c.Service.ObjectMeta), c.Service.UID)
+	for role, service := range c.Service {
+		c.logger.Infof("Found %s service: %s (uid: %s)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
 	}
 
 	pods, err := c.listPods()
@@ -217,57 +229,56 @@ func (c *Cluster) deleteStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) createService() (*v1.Service, error) {
-	if c.Service != nil {
+func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
+	if c.Service[role] != nil {
 		return nil, fmt.Errorf("service already exists in the cluster")
 	}
-	serviceSpec := c.genService(c.Spec.AllowedSourceRanges)
+	serviceSpec := c.genService(role, c.Spec.AllowedSourceRanges)
 
 	service, err := c.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
 	if err != nil {
 		return nil, err
 	}
-	c.Service = service
 
+	c.Service[role] = service
 	return service, nil
 }
 
-func (c *Cluster) updateService(newService *v1.Service) error {
-	if c.Service == nil {
+func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error {
+	if c.Service[role] == nil {
 		return fmt.Errorf("there is no service in the cluster")
 	}
-	serviceName := util.NameFromMeta(c.Service.ObjectMeta)
+	serviceName := util.NameFromMeta(c.Service[role].ObjectMeta)
 
 	patchData, err := specPatch(newService.Spec)
 	if err != nil {
 		return fmt.Errorf("could not form patch for the service '%s': %v", serviceName, err)
 	}
 
-	svc, err := c.KubeClient.Services(c.Service.Namespace).Patch(
-		c.Service.Name,
+	svc, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(
+		c.Service[role].Name,
 		api.MergePatchType,
 		patchData, "")
 	if err != nil {
 		return fmt.Errorf("could not patch service '%s': %v", serviceName, err)
 	}
-	c.Service = svc
+	c.Service[role] = svc
 
 	return nil
 }
 
-func (c *Cluster) deleteService() error {
-	c.logger.Debugln("Deleting service")
-
-	if c.Service == nil {
-		return fmt.Errorf("there is no service in the cluster")
+func (c *Cluster) deleteService(role PostgresRole) error {
+	c.logger.Debugf("Deleting service %s", role)
+	if c.Service[role] == nil {
+		return fmt.Errorf("There is no %s service in the cluster", role)
 	}
-	err := c.KubeClient.Services(c.Service.Namespace).Delete(c.Service.Name, c.deleteOptions)
+	service := c.Service[role]
+	err := c.KubeClient.Services(service.Namespace).Delete(service.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("service '%s' has been deleted", util.NameFromMeta(c.Service.ObjectMeta))
-	c.Service = nil
-
+	c.logger.Infof("%s service '%s' has been deleted", role, util.NameFromMeta(service.ObjectMeta))
+	c.Service[role] = nil
 	return nil
 }
 
@@ -275,7 +286,7 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 	if c.Endpoint != nil {
 		return nil, fmt.Errorf("endpoint already exists in the cluster")
 	}
-	endpointsSpec := c.genEndpoints()
+	endpointsSpec := c.genMasterEndpoints()
 
 	endpoints, err := c.KubeClient.Endpoints(endpointsSpec.Namespace).Create(endpointsSpec)
 	if err != nil {

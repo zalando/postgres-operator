@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	PGBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
-	PatroniPGBinariesParameterName   = "pg_bin"
-	PatroniPGParametersParameterName = "parameters"
+	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
+	patroniPGBinariesParameterName   = "bin_dir"
+	patroniPGParametersParameterName = "parameters"
 )
 
 type pgUser struct {
@@ -25,7 +25,7 @@ type pgUser struct {
 	Options  []string `json:"options"`
 }
 
-type PatroniDCS struct {
+type patroniDCS struct {
 	TTL                  uint32  `json:"ttl,omitempty"`
 	LoopWait             uint32  `json:"loop_wait,omitempty"`
 	RetryTimeout         uint32  `json:"retry_timeout,omitempty"`
@@ -36,7 +36,7 @@ type pgBootstrap struct {
 	Initdb []interface{}     `json:"initdb"`
 	Users  map[string]pgUser `json:"users"`
 	PgHBA  []string          `json:"pg_hba"`
-	DCS    PatroniDCS        `json:"dcs,omitempty"`
+	DCS    patroniDCS        `json:"dcs,omitempty"`
 }
 
 type spiloConfiguration struct {
@@ -185,9 +185,9 @@ PATRONI_INITDB_PARAMS:
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
-	config.PgLocalConfiguration[PatroniPGBinariesParameterName] = fmt.Sprintf(PGBinariesLocationTemplate, pg.PgVersion)
+	config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
 	if len(pg.Parameters) > 0 {
-		config.PgLocalConfiguration[PatroniPGParametersParameterName] = pg.Parameters
+		config.PgLocalConfiguration[patroniPGParametersParameterName] = pg.Parameters
 	}
 	config.Bootstrap.Users = map[string]pgUser{
 		c.OpConfig.PamRoleName: {
@@ -425,14 +425,22 @@ func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.
 	return &secret
 }
 
-func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
+func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v1.Service {
+
+	dnsNameFunction := c.masterDnsName
+	name := c.Metadata.Name
+	if role == Replica {
+		dnsNameFunction = c.replicaDnsName
+		name = name + "-repl"
+	}
+
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      c.Metadata.Name,
+			Name:      name,
 			Namespace: c.Metadata.Namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.roleLabelsSet(role),
 			Annotations: map[string]string{
-				constants.ZalandoDNSNameAnnotation: c.dnsName(),
+				constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
 				constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 			},
 		},
@@ -442,16 +450,19 @@ func (c *Cluster) genService(allowedSourceRanges []string) *v1.Service {
 			LoadBalancerSourceRanges: allowedSourceRanges,
 		},
 	}
+	if role == Replica {
+		service.Spec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
+	}
 
 	return service
 }
 
-func (c *Cluster) genEndpoints() *v1.Endpoints {
+func (c *Cluster) genMasterEndpoints() *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.roleLabelsSet(Master),
 		},
 	}
 

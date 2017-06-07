@@ -7,6 +7,7 @@ import (
 
 type ConditionFunc func() (bool, error)
 
+// Retry calls ConditionFunc until it returns boolean true, a timeout expires or an error occurs.
 func Retry(interval time.Duration, timeout time.Duration, f ConditionFunc) error {
 	//TODO: make the retry exponential
 	if timeout < interval {

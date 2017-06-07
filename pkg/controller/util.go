@@ -115,7 +115,7 @@ Users:
 	return result, nil
 }
 
-func (c *Controller) PodClusterName(pod *v1.Pod) spec.NamespacedName {
+func (c *Controller) podClusterName(pod *v1.Pod) spec.NamespacedName {
 	if name, ok := pod.Labels[c.opConfig.ClusterNameLabel]; ok {
 		return spec.NamespacedName{
 			Namespace: pod.Namespace,

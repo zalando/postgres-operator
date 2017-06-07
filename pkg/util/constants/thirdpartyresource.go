@@ -1,5 +1,6 @@
 package constants
 
+// Different properties of the PostgreSQL Third Party Resources
 const (
 	TPRName        = "postgresql"
 	TPRVendor      = "acid.zalan.do"

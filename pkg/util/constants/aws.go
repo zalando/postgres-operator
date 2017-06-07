@@ -2,8 +2,11 @@ package constants
 
 import "time"
 
+// AWS specific constants used by other modules
 const (
-	AWS_REGION       = "eu-central-1"
+	// default region for AWS. TODO: move it to the operator configuration
+	AWS_REGION = "eu-central-1"
+	// EBS related constants
 	EBSVolumeIDStart = "/vol-"
 	EBSProvisioner   = "kubernetes.io/aws-ebs"
 	//https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VolumeModification.html

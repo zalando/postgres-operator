@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
+// MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.
 type MaintenanceWindow struct {
 	Everyday  bool
 	Weekday   time.Weekday
@@ -18,26 +19,31 @@ type MaintenanceWindow struct {
 	EndTime   time.Time // End time
 }
 
+// Volume describes a single volume in the manifest.
 type Volume struct {
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass"`
 }
 
+// PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
 type PostgresqlParam struct {
 	PgVersion  string            `json:"version"`
 	Parameters map[string]string `json:"parameters"`
 }
 
+// ResourceDescription describes CPU and memory resources defined for a cluster.
 type ResourceDescription struct {
 	CPU    string `json:"cpu"`
 	Memory string `json:"memory"`
 }
 
+// Resources describes requests and limits for the cluster resouces.
 type Resources struct {
 	ResourceRequest ResourceDescription `json:"requests,omitempty"`
 	ResourceLimits  ResourceDescription `json:"limits,omitempty"`
 }
 
+// Patroni contains Patroni-specific configuration
 type Patroni struct {
 	InitDB               map[string]string `json:"initdb"`
 	PgHba                []string          `json:"pg_hba"`
@@ -47,10 +53,12 @@ type Patroni struct {
 	MaximumLagOnFailover float32           `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
 }
 
-type UserFlags []string
+type userFlags []string
 
+// PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus string
 
+// possible values for PostgreSQL cluster statuses
 const (
 	ClusterStatusUnknown      PostgresStatus = ""
 	ClusterStatusCreating     PostgresStatus = "Creating"
@@ -61,7 +69,7 @@ const (
 	ClusterStatusInvalid      PostgresStatus = "Invalid"
 )
 
-// PostgreSQL Third Party (resource) Object
+// Postgresql defines PostgreSQL Third Party (resource) Object.
 type Postgresql struct {
 	unversioned.TypeMeta `json:",inline"`
 	Metadata             v1.ObjectMeta `json:"metadata"`
@@ -71,6 +79,7 @@ type Postgresql struct {
 	Error  error          `json:"-"`
 }
 
+// PostgresSpec defines the specification for the PostgreSQL TPR.
 type PostgresSpec struct {
 	PostgresqlParam `json:"postgresql"`
 	Volume          `json:"volume,omitempty"`
@@ -79,12 +88,14 @@ type PostgresSpec struct {
 
 	TeamID              string               `json:"teamId"`
 	AllowedSourceRanges []string             `json:"allowedSourceRanges"`
+	ReplicaLoadBalancer bool                 `json:"replicaLoadBalancer,omitempty"`
 	NumberOfInstances   int32                `json:"numberOfInstances"`
-	Users               map[string]UserFlags `json:"users"`
+	Users               map[string]userFlags `json:"users"`
 	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
 	ClusterName         string               `json:"-"`
 }
 
+// PostgresqlList defines a list of PostgreSQL clusters.
 type PostgresqlList struct {
 	unversioned.TypeMeta `json:",inline"`
 	Metadata             unversioned.ListMeta `json:"metadata"`
@@ -118,6 +129,7 @@ func parseWeekday(s string) (time.Weekday, error) {
 	return time.Weekday(weekday), nil
 }
 
+// MarshalJSON converts a maintenance window definition to JSON.
 func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
 	if m.Everyday {
 		return []byte(fmt.Sprintf("\"%s-%s\"",
@@ -131,6 +143,7 @@ func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
 	}
 }
 
+// UnmarshalJSON convets a JSON to the maintenance window definition.
 func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	var (
 		got MaintenanceWindow
@@ -176,18 +189,17 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// GetObject implements Object interface for PostgreSQL TPR spec object.
 func (p *Postgresql) GetObjectKind() unversioned.ObjectKind {
 	return &p.TypeMeta
 }
 
+// GetObjectMeta implements ObjectMetaAccessor interface for PostgreSQL TPR spec object.
 func (p *Postgresql) GetObjectMeta() meta.Object {
 	return &p.Metadata
 }
 
-func (pl *PostgresqlList) GetObjectKind() unversioned.ObjectKind {
-	return &pl.TypeMeta
-}
-
+// GetListMeta implements ListMetaAccessor interface for PostgreSQL TPR List spec object.
 func (pl *PostgresqlList) GetListMeta() unversioned.List {
 	return &pl.Metadata
 }
@@ -213,11 +225,12 @@ func extractClusterName(clusterName string, teamName string) (string, error) {
 // resources and ugorji. If/when these issues are resolved, the code below
 // should no longer be required.
 //
-type PostgresqlListCopy PostgresqlList
-type PostgresqlCopy Postgresql
+type postgresqlListCopy PostgresqlList
+type postgresqlCopy Postgresql
 
+// UnmarshalJSON converts a JSON into the PostgreSQL object.
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
-	var tmp PostgresqlCopy
+	var tmp postgresqlCopy
 
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
@@ -247,8 +260,9 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// UnmarshalJSON converts a JSON into the PostgreSQL List object.
 func (pl *PostgresqlList) UnmarshalJSON(data []byte) error {
-	var tmp PostgresqlListCopy
+	var tmp postgresqlListCopy
 
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {

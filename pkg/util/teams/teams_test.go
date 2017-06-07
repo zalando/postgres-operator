@@ -17,7 +17,7 @@ var (
 var teamsAPItc = []struct {
 	in     string
 	inCode int
-	out    *Team
+	out    *team
 	err    error
 }{
 	{`{
@@ -66,7 +66,7 @@ var teamsAPItc = []struct {
 "parent_team_id": "111221"
 }`,
 		200,
-		&Team{
+		&team{
 			Dn:           "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
 			ID:           "acid",
 			TeamName:     "ACID",
@@ -79,7 +79,7 @@ var teamsAPItc = []struct {
 			CostCenter:   "00099999",
 			DeliveryLead: "member4",
 			ParentTeamID: "111221",
-			InfrastructureAccounts: []InfrastructureAccount{
+			InfrastructureAccounts: []infrastructureAccount{
 				{
 					ID:          "1234512345",
 					Name:        "acid",

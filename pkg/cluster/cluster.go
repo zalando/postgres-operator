@@ -34,7 +34,7 @@ var (
 	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 )
 
-//TODO: remove struct duplication
+// Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
 	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
 	RestClient          *rest.RESTClient
@@ -45,7 +45,7 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Service     *v1.Service
+	Service     map[PostgresRole]*v1.Service
 	Endpoint    *v1.Endpoints
 	Secrets     map[types.UID]*v1.Secret
 	Statefulset *v1beta1.StatefulSet
@@ -77,9 +77,10 @@ type compareStatefulsetResult struct {
 	reasons       []string
 }
 
+// New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
-	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret)}
+	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -108,7 +109,7 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	return cluster
 }
 
-func (c *Cluster) ClusterName() spec.NamespacedName {
+func (c *Cluster) clusterName() spec.NamespacedName {
 	return util.NameFromMeta(c.Metadata)
 }
 
@@ -136,7 +137,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 
 	if err != nil {
-		c.logger.Warningf("could not set status for cluster '%s': %s", c.ClusterName(), err)
+		c.logger.Warningf("could not set status for cluster '%s': %s", c.clusterName(), err)
 	}
 }
 
@@ -155,11 +156,10 @@ func (c *Cluster) initUsers() error {
 		return fmt.Errorf("could not init human users: %v", err)
 	}
 
-	c.logger.Debugf("Initialized users: %# v", util.Pretty(c.pgUsers))
-
 	return nil
 }
 
+// Create creates the new kubernetes objects associated with the cluster.
 func (c *Cluster) Create() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -182,11 +182,16 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("endpoint '%s' has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
-	service, err := c.createService()
-	if err != nil {
-		return fmt.Errorf("could not create service: %v", err)
+	for _, role := range []PostgresRole{Master, Replica} {
+		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+			continue
+		}
+		service, err := c.createService(role)
+		if err != nil {
+			return fmt.Errorf("could not create %s service: %v", role, err)
+		}
+		c.logger.Infof("%s service '%s' has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
 	}
-	c.logger.Infof("service '%s' has been successfully created", util.NameFromMeta(service.ObjectMeta))
 
 	if err = c.initUsers(); err != nil {
 		return err
@@ -226,7 +231,7 @@ func (c *Cluster) Create() error {
 		}
 	}
 
-	err = c.ListResources()
+	err = c.listResources()
 	if err != nil {
 		c.logger.Errorf("could not list resources: %s", err)
 	}
@@ -234,14 +239,19 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
-func (c *Cluster) sameServiceWith(service *v1.Service) (match bool, reason string) {
+func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
-	if !reflect.DeepEqual(c.Service.Spec.LoadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges) {
-		reason = "new service's LoadBalancerSourceRange doesn't match the current one"
-	} else {
-		match = true
+	match = true
+	old := c.Service[role].Spec.LoadBalancerSourceRanges
+	new := service.Spec.LoadBalancerSourceRanges
+	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
+	if (len(old) == 0) && (len(new) == 0) {
+		return true, ""
 	}
-	return
+	if !reflect.DeepEqual(old, new) {
+		return false, fmt.Sprintf("new %s service's LoadBalancerSourceRange doesn't match the current one", role)
+	}
+	return true, ""
 }
 
 func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string) {
@@ -377,6 +387,8 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 }
 
+// Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
+// (i.e. service) is treated as an error.
 func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -385,14 +397,46 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	c.logger.Debugf("Cluster update from version %s to %s",
 		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
 
-	newService := c.genService(newSpec.Spec.AllowedSourceRanges)
-	if match, reason := c.sameServiceWith(newService); !match {
-		c.logServiceChanges(c.Service, newService, true, reason)
-		if err := c.updateService(newService); err != nil {
-			c.setStatus(spec.ClusterStatusUpdateFailed)
-			return fmt.Errorf("could not update service: %v", err)
+	/* Make sure we update when this function exists */
+	defer func() {
+		c.Postgresql = *newSpec
+	}()
+
+	for _, role := range []PostgresRole{Master, Replica} {
+		if role == Replica {
+			if !newSpec.Spec.ReplicaLoadBalancer {
+				// old spec had a load balancer, but the new one doesn't
+				if c.Spec.ReplicaLoadBalancer {
+					err := c.deleteService(role)
+					if err != nil {
+						return fmt.Errorf("could not delete obsolete %s service: %v", role, err)
+					}
+					c.logger.Infof("deleted obsolete %s service", role)
+				}
+			} else {
+				if !c.Spec.ReplicaLoadBalancer {
+					// old spec didn't have a load balancer, but the one does
+					service, err := c.createService(role)
+					if err != nil {
+						return fmt.Errorf("could not create new %s service: %v", role, err)
+					}
+					c.logger.Infof("%s service '%s' has been created", role, util.NameFromMeta(service.ObjectMeta))
+				}
+			}
+			// only proceeed further if both old and new load balancer were present
+			if !(newSpec.Spec.ReplicaLoadBalancer && c.Spec.ReplicaLoadBalancer) {
+				continue
+			}
 		}
-		c.logger.Infof("service '%s' has been updated", util.NameFromMeta(c.Service.ObjectMeta))
+		newService := c.genService(role, newSpec.Spec.AllowedSourceRanges)
+		if match, reason := c.sameServiceWith(role, newService); !match {
+			c.logServiceChanges(role, c.Service[role], newService, true, reason)
+			if err := c.updateService(role, newService); err != nil {
+				c.setStatus(spec.ClusterStatusUpdateFailed)
+				return fmt.Errorf("could not update %s service: %v", role, err)
+			}
+			c.logger.Infof("%s service '%s' has been updated", role, util.NameFromMeta(c.Service[role].ObjectMeta))
+		}
 	}
 
 	newStatefulSet, err := c.genStatefulSet(newSpec.Spec)
@@ -448,6 +492,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	return nil
 }
 
+// Delete deletes the cluster and cleans up all objects associated with it (including statefulsets).
 func (c *Cluster) Delete() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -456,8 +501,13 @@ func (c *Cluster) Delete() error {
 		return fmt.Errorf("could not delete endpoint: %v", err)
 	}
 
-	if err := c.deleteService(); err != nil {
-		return fmt.Errorf("could not delete service: %v", err)
+	for _, role := range []PostgresRole{Master, Replica} {
+		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+			continue
+		}
+		if err := c.deleteService(role); err != nil {
+			return fmt.Errorf("could not delete %s service: %v", role, err)
+		}
 	}
 
 	if err := c.deleteStatefulSet(); err != nil {
@@ -473,6 +523,7 @@ func (c *Cluster) Delete() error {
 	return nil
 }
 
+// ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
 func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
 	c.podEventsQueue.Add(event)
 }
@@ -493,6 +544,7 @@ func (c *Cluster) processPodEvent(obj interface{}) error {
 	return nil
 }
 
+// Run starts the pod event dispatching for the given cluster.
 func (c *Cluster) Run(stopCh <-chan struct{}) {
 	go c.processPodEventQueue(stopCh)
 }
