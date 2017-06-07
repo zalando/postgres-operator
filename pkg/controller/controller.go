@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -14,6 +15,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
 type Config struct {
@@ -38,6 +40,8 @@ type Controller struct {
 	podCh              chan spec.PodEvent
 
 	clusterEventQueues []*cache.FIFO
+
+	lastClusterSyncTime time.Time
 }
 
 func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
@@ -93,7 +97,7 @@ func (c *Controller) initController() {
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
 		clusterLw,
 		&spec.Postgresql{},
-		c.opConfig.ResyncPeriod,
+		constants.QueueResyncPeriodTPR,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -111,7 +115,7 @@ func (c *Controller) initController() {
 	c.podInformer = cache.NewSharedIndexInformer(
 		podLw,
 		&v1.Pod{},
-		c.opConfig.ResyncPeriodPod,
+		constants.QueueResyncPeriodPod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{

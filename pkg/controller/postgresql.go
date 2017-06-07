@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 	"reflect"
 
 	"k8s.io/client-go/pkg/api"
@@ -17,6 +18,43 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
+
+func (c *Controller) resyncClusters(objList []runtime.Object) error {
+	if time.Since(c.lastClusterSyncTime) <= c.opConfig.ResyncPeriod {
+		c.logger.Debugln("skipping resync of clusters")
+		return nil
+	}
+
+	var activeClustersCnt, failedClustersCnt int
+	for _, obj := range objList {
+		pg, ok := obj.(*spec.Postgresql)
+		if !ok {
+			return fmt.Errorf("could not cast object to postgresql")
+		}
+
+		if pg.Error != nil {
+			failedClustersCnt++
+			continue
+		}
+		c.queueClusterEvent(nil, pg, spec.EventSync)
+		activeClustersCnt++
+	}
+	if len(objList) > 0 {
+		if failedClustersCnt > 0 && activeClustersCnt == 0 {
+			c.logger.Infof("There are no clusters running. %d are in the failed state", failedClustersCnt)
+		} else if failedClustersCnt == 0 && activeClustersCnt > 0 {
+			c.logger.Infof("There are %d clusters running", activeClustersCnt)
+		} else {
+			c.logger.Infof("There are %d clusters running and %d are in the failed state", activeClustersCnt, failedClustersCnt)
+		}
+	} else {
+		c.logger.Infof("No clusters running")
+	}
+
+	c.lastClusterSyncTime = time.Now()
+
+	return nil
+}
 
 func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
 	c.logger.Info("Getting list of currently running clusters")
@@ -37,30 +75,8 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		return nil, fmt.Errorf("could not extract list of postgresql objects: %v", err)
 	}
 
-	var activeClustersCnt, failedClustersCnt int
-	for _, obj := range objList {
-		pg, ok := obj.(*spec.Postgresql)
-		if !ok {
-			return nil, fmt.Errorf("could not cast object to postgresql")
-		}
-
-		if pg.Error != nil {
-			failedClustersCnt++
-			continue
-		}
-		c.queueClusterEvent(nil, pg, spec.EventSync)
-		activeClustersCnt++
-	}
-	if len(objList) > 0 {
-		if failedClustersCnt > 0 && activeClustersCnt == 0 {
-			c.logger.Infof("There are no clusters running. %d are in the failed state", failedClustersCnt)
-		} else if failedClustersCnt == 0 && activeClustersCnt > 0 {
-			c.logger.Infof("There are %d clusters running", activeClustersCnt)
-		} else {
-			c.logger.Infof("There are %d clusters running and %d are in the failed state", activeClustersCnt, failedClustersCnt)
-		}
-	} else {
-		c.logger.Infof("No clusters running")
+	if err := c.resyncClusters(objList); err != nil {
+		return nil, fmt.Errorf("could not resync clusters: %v", err)
 	}
 
 	return object, err
