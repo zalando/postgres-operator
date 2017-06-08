@@ -3,6 +3,8 @@ package controller
 import (
 	"fmt"
 	"reflect"
+	"sync/atomic"
+	"time"
 
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/meta"
@@ -17,6 +19,19 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
+
+func (c *Controller) clusterResync(stopCh <-chan struct{}) {
+	ticker := time.NewTicker(c.opConfig.ResyncPeriod)
+
+	for {
+		select {
+		case <-ticker.C:
+			c.clusterListFunc(api.ListOptions{ResourceVersion: "0"})
+		case <-stopCh:
+			return
+		}
+	}
+}
 
 func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, error) {
 	c.logger.Info("Getting list of currently running clusters")
@@ -35,6 +50,11 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 	objList, err := meta.ExtractList(object)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract list of postgresql objects: %v", err)
+	}
+
+	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
+		c.logger.Debugln("skipping resync of clusters")
+		return object, err
 	}
 
 	var activeClustersCnt, failedClustersCnt int
@@ -62,6 +82,8 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 	} else {
 		c.logger.Infof("No clusters running")
 	}
+
+	atomic.StoreInt64(&c.lastClusterSyncTime, time.Now().Unix())
 
 	return object, err
 }

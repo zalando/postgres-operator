@@ -15,7 +15,6 @@ type TPR struct {
 }
 
 type Resources struct {
-	ResyncPeriodPod        time.Duration     `name:"resync_period_pod" default:"5m"`
 	ResourceCheckInterval  time.Duration     `name:"resource_check_interval" default:"3s"`
 	ResourceCheckTimeout   time.Duration     `name:"resource_check_timeout" default:"10m"`
 	PodLabelWaitTimeout    time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
