@@ -3,7 +3,6 @@ package controller
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
