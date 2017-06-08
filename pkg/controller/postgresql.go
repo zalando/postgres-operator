@@ -25,7 +25,7 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
-			c.clusterListFunc(api.ListOptions{ResourceVersion:"0"})
+			c.clusterListFunc(api.ListOptions{ResourceVersion: "0"})
 		case <-stopCh:
 			return
 		}

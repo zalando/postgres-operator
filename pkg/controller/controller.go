@@ -2,8 +2,8 @@ package controller
 
 import (
 	"fmt"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
@@ -14,8 +14,8 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 )
 
 type Config struct {
