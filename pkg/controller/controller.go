@@ -41,7 +41,7 @@ type Controller struct {
 
 	clusterEventQueues []*cache.FIFO
 
-	lastClusterSyncTime time.Time
+	lastClusterSyncTime int64
 }
 
 func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {

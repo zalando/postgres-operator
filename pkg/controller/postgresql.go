@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/client-go/pkg/api"
@@ -51,7 +52,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		return nil, fmt.Errorf("could not extract list of postgresql objects: %v", err)
 	}
 
-	if time.Since(c.lastClusterSyncTime) <= c.opConfig.ResyncPeriod {
+	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
 		c.logger.Debugln("skipping resync of clusters")
 		return object, err
 	}
@@ -82,7 +83,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 		c.logger.Infof("No clusters running")
 	}
 
-	c.lastClusterSyncTime = time.Now()
+	atomic.StoreInt64(&c.lastClusterSyncTime, time.Now().Unix())
 
 	return object, err
 }
