@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -25,13 +24,6 @@ var pgUsers = []struct {
 		Flags:    []string{},
 		MemberOf: []string{}},
 		"md592f413f3974bdf3799bb6fecb5f9f2c6"}}
-
-var prettyTest = []struct {
-	in  interface{}
-	out string
-}{
-	{pgUsers, `[{{test password [] []} md587f77988ccb5aa917c93201ba314fcd4} {{test md592f413f3974bdf3799bb6fecb5f9f2c6 [] []} md592f413f3974bdf3799bb6fecb5f9f2c6}]`},
-}
 
 var prettyDiffTest = []struct {
 	inA interface{}
@@ -82,14 +74,6 @@ func TestPGUserPassword(t *testing.T) {
 		pwd := PGUserPassword(tt.in)
 		if pwd != tt.out {
 			t.Errorf("PgUserPassword expected: %s, got: %s", tt.out, pwd)
-		}
-	}
-}
-
-func TestPretty(t *testing.T) {
-	for _, tt := range prettyTest {
-		if actual := Pretty(tt.in); fmt.Sprintf("%v", actual) != tt.out {
-			t.Errorf("Pretty expected: %s, got: %s", tt.out, actual)
 		}
 	}
 }

@@ -72,7 +72,7 @@ func (t *API) TeamInfo(teamID, token string) (tm *team, er error) {
 		return nil, err
 	}
 	defer func() {
-		if err:= resp.Body.Close(); err != nil {
+		if err := resp.Body.Close(); err != nil {
 			er = fmt.Errorf("error when closing response; %v", err)
 			tm = nil
 		}
