@@ -39,7 +39,7 @@ func (c *Cluster) Sync() error {
 			if c.Service[role] != nil {
 				// delete the left over replica service
 				if err := c.deleteService(role); err != nil {
-					return fmt.Errorf("could not delete obsolete %s service: %v", role)
+					return fmt.Errorf("could not delete obsolete %s service: %v", role, err)
 				}
 			}
 			continue
