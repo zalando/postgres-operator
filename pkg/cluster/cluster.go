@@ -532,7 +532,9 @@ func (c *Cluster) Delete() error {
 
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
 func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
-	c.podEventsQueue.Add(event)
+	if err := c.podEventsQueue.Add(event); err != nil {
+		c.logger.Errorf("error when receiving pod events: %v", err)
+	}
 }
 
 func (c *Cluster) processPodEvent(obj interface{}) error {
@@ -562,7 +564,9 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 		case <-stopCh:
 			return
 		default:
-			c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent))
+			if _, err := c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent)); err != nil {
+				c.logger.Errorf("error when processing pod event queeue %v", err)
+			}
 		}
 	}
 }

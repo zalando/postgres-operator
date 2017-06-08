@@ -2,6 +2,8 @@ package spec
 
 import (
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
@@ -72,10 +74,6 @@ type UserSyncer interface {
 }
 
 func (n NamespacedName) String() string {
-	if n.Namespace == "" && n.Name == "" {
-		return ""
-	}
-
 	return types.NamespacedName(n).String()
 }
 
@@ -87,9 +85,16 @@ func (n NamespacedName) MarshalJSON() ([]byte, error) {
 // Decode converts a (possibly unqualified) string into the namespaced name object.
 func (n *NamespacedName) Decode(value string) error {
 	name := types.NewNamespacedNameFromString(value)
-	if value != "" && name == (types.NamespacedName{}) {
+
+	if strings.Trim(value, string(types.Separator)) != "" && name == (types.NamespacedName{}) {
 		name.Name = value
 		name.Namespace = v1.NamespaceDefault
+	} else if name.Namespace == "" {
+		name.Namespace = v1.NamespaceDefault
+	}
+
+	if name.Name == "" {
+		return fmt.Errorf("Incorrect namespaced name")
 	}
 
 	*n = NamespacedName(name)

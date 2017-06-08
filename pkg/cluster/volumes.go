@@ -108,7 +108,11 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 				if err != nil {
 					return fmt.Errorf("could not connect to the volume provider: %v", err)
 				}
-				defer resizer.DisconnectFromProvider()
+				defer func() {
+					err2 := resizer.DisconnectFromProvider(); if err2 != nil {
+						c.logger.Errorf("%v", err2)
+					}
+				}()
 			}
 			awsVolumeId, err := resizer.GetProviderVolumeID(pv)
 			if err != nil {
