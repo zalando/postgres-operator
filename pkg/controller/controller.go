@@ -31,7 +31,7 @@ type Controller struct {
 	logger   *logrus.Entry
 
 	clustersMu sync.RWMutex
-	clusters   map[types.NamespacedName]types.Cluster
+	clusters   map[types.NamespacedName]types.OperatorCluster
 	stopChs    map[types.NamespacedName]chan struct{}
 
 	postgresqlInformer cache.SharedIndexInformer
@@ -56,7 +56,7 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 		Config:   *controllerConfig,
 		opConfig: operatorConfig,
 		logger:   logger.WithField("pkg", "controller"),
-		clusters: make(map[types.NamespacedName]types.Cluster),
+		clusters: make(map[types.NamespacedName]types.OperatorCluster),
 		stopChs:  make(map[types.NamespacedName]chan struct{}),
 		podCh:    make(chan types.PodEvent),
 	}

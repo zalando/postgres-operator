@@ -70,7 +70,7 @@ type UserSyncer interface {
 	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
 }
 
-type Cluster interface {
+type OperatorCluster interface {
 	Create() error
 	Delete() error
 	ExecCommand(podName *NamespacedName, command ...string) (string, error)
