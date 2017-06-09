@@ -281,7 +281,6 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 	return nil
 }
 
-
 func (c *Cluster) deleteService(role PostgresRole) error {
 	c.logger.Debugf("Deleting service %s", role)
 	if c.Service[role] == nil {
