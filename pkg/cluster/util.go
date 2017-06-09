@@ -63,10 +63,10 @@ func specPatch(spec interface{}) ([]byte, error) {
 	}{spec})
 }
 
-func metadataAnnotationsPatch(annotations map[string]string) (string) {
+func metadataAnnotationsPatch(annotations map[string]string) string {
 	annotationsList := make([]string, 0, len(annotations))
 
-	for name, value := range(annotations) {
+	for name, value := range annotations {
 		annotationsList = append(annotationsList, fmt.Sprintf(`"%s":"%s"`, name, value))
 	}
 	annotationsString := strings.Join(annotationsList, ",")
