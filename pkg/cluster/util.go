@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"regexp"
+	"strings"
 	"time"
 
+	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/labels"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"

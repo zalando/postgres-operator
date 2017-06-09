@@ -139,15 +139,16 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 	if len(pvs) > 0 && totalCompatible == 0 {
 		return fmt.Errorf("could not resize EBS volumes: persistent volumes are not compatible with existing resizing providers")
 	}
+
 	return nil
 }
 
 func (c *Cluster) volumesNeedResizing(newVolume spec.Volume) (bool, error) {
-	volumes, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
+	vlms, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
 	if err != nil {
 		return false, err
 	}
-	for _, pv := range volumes {
+	for _, pv := range vlms {
 		currentSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
 		if currentSize != manifestSize {
 			return true, nil
@@ -162,17 +163,19 @@ func (c *Cluster) listVolumesWithManifestSize(newVolume spec.Volume) ([]*v1.Pers
 		return nil, 0, fmt.Errorf("could not parse volume size from the manifest: %v", err)
 	}
 	manifestSize := quantityToGigabyte(newSize)
-	volumes, err := c.listPersistentVolumes()
+	vlms, err := c.listPersistentVolumes()
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not list persistent volumes: %v", err)
 	}
-	return volumes, manifestSize, nil
+
+	return vlms, manifestSize, nil
 }
 
 // getPodNameFromPersistentVolume returns a pod name that it extracts from the volume claim ref.
 func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedName {
 	namespace := pv.Spec.ClaimRef.Namespace
 	name := pv.Spec.ClaimRef.Name[len(constants.DataVolumeName)+1:]
+
 	return &spec.NamespacedName{namespace, name}
 }
 
