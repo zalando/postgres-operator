@@ -184,8 +184,6 @@ func (b *mockBody) Close() error {
 }
 
 func (c *mockHttpClient) Do(req *http.Request) (*http.Response, error) {
-	fmt.Printf("do request: %v", *req)
-
 	resp := http.Response{
 		Status:        "200 OK",
 		StatusCode:    200,
