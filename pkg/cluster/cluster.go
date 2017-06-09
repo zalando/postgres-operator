@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -27,11 +26,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
-)
-
-var (
-	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
-	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 )
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
