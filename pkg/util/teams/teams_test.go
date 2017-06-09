@@ -2,11 +2,12 @@ package teams
 
 import (
 	"fmt"
-	"github.com/Sirupsen/logrus"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/Sirupsen/logrus"
 )
 
 var (
@@ -165,6 +166,56 @@ func TestInfo(t *testing.T) {
 				t.Errorf("Expected %#v, got: %#v", tc.out, actual)
 			}
 		}()
+	}
+}
+
+type mockHttpClient struct {
+}
+
+type mockBody struct {
+}
+
+func (b *mockBody) Read(p []byte) (n int, err error) {
+	return 2, nil
+}
+
+func (b *mockBody) Close() error {
+	return fmt.Errorf("close error")
+}
+
+func (c *mockHttpClient) Do(req *http.Request) (*http.Response, error) {
+	fmt.Printf("do request: %v", *req)
+
+	resp := http.Response{
+		Status:        "200 OK",
+		StatusCode:    200,
+		ContentLength: 2,
+		Close:         false,
+		Request:       req,
+	}
+	resp.Body = &mockBody{}
+
+	return &resp, nil
+}
+
+func TestHttpClientClose(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+token {
+			t.Errorf("Authorization token is wrong or not provided")
+		}
+		w.WriteHeader(200)
+		if _, err := fmt.Fprint(w, "{}"); err != nil {
+			t.Errorf("Error writing teams api response %v", err)
+		}
+	}))
+
+	api := NewTeamsAPI(ts.URL, logger)
+	api.httpClient = &mockHttpClient{}
+
+	_, err := api.TeamInfo("acid", token)
+	expError := fmt.Errorf("error when closing response: close error")
+	if err.Error() != expError.Error() {
+		t.Errorf("Expected error: %v, got: %v", expError, err)
 	}
 }
 

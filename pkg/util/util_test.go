@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -82,14 +81,6 @@ func TestPGUserPassword(t *testing.T) {
 		pwd := PGUserPassword(tt.in)
 		if pwd != tt.out {
 			t.Errorf("PgUserPassword expected: %s, got: %s", tt.out, pwd)
-		}
-	}
-}
-
-func TestPretty(t *testing.T) {
-	for _, tt := range prettyTest {
-		if actual := Pretty(tt.in); fmt.Sprintf("%v", actual) != tt.out {
-			t.Errorf("Pretty expected: %s, got: %s", tt.out, actual)
 		}
 	}
 }

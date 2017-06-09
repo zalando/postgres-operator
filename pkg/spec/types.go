@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"database/sql"
-	"fmt"
-	"strings"
 
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"

@@ -223,7 +223,7 @@ var unmarshalCluster = []struct {
 				TeamID:              "ACID",
 				AllowedSourceRanges: []string{"127.0.0.1/32"},
 				NumberOfInstances:   2,
-				Users:               map[string]UserFlags{"zalando": {"superuser", "createdb"}},
+				Users:               map[string]userFlags{"zalando": {"superuser", "createdb"}},
 				MaintenanceWindows: []MaintenanceWindow{{
 					Everyday:  false,
 					Weekday:   time.Monday,
@@ -237,7 +237,7 @@ var unmarshalCluster = []struct {
 				},
 					{
 						Everyday:  true,
-						Weekday: time.Sunday,
+						Weekday:   time.Sunday,
 						StartTime: mustParseTime("05:00"),
 						EndTime:   mustParseTime("05:15"),
 					},
@@ -263,13 +263,13 @@ var unmarshalCluster = []struct {
 		},
 		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"teapot-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null},"status":"Invalid"}`), nil},
 	{[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1"`),
-	 Postgresql{},
-	 []byte{},
-	 errors.New("unexpected end of JSON input")},
+		Postgresql{},
+		[]byte{},
+		errors.New("unexpected end of JSON input")},
 	{[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster","creationTimestamp":qaz},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null},"status":"Invalid"}`),
-	 Postgresql{},
-	 []byte{},
-	 errors.New("invalid character 'q' looking for beginning of value")}}
+		Postgresql{},
+		[]byte{},
+		errors.New("invalid character 'q' looking for beginning of value")}}
 
 var postgresqlList = []struct {
 	in  []byte
@@ -309,8 +309,8 @@ var postgresqlList = []struct {
 		},
 		nil},
 	{[]byte(`{"apiVersion":"v1","items":[{"apiVersion":"acid.zalan.do/v1","kind":"Postgresql","metadata":{"labels":{"team":"acid"},"name":"acid-testcluster42","namespace"`),
-	 PostgresqlList{},
-	 errors.New("unexpected end of JSON input")}}
+		PostgresqlList{},
+		errors.New("unexpected end of JSON input")}}
 
 func mustParseTime(s string) time.Time {
 	v, err := time.Parse("15:04", s)
