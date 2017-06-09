@@ -250,6 +250,20 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 	}
 	serviceName := util.NameFromMeta(c.Service[role].ObjectMeta)
 
+	if len(newService.ObjectMeta.Annotations) > 0 {
+
+		annotationsPatchData := metadataAnnotationsPatch(newService.ObjectMeta.Annotations)
+
+		_, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(
+			c.Service[role].Name,
+			api.StrategicMergePatchType,
+			[]byte(annotationsPatchData), "")
+
+		if err != nil {
+			return fmt.Errorf("could not replace annotations for the service '%s': %v", serviceName, err)
+		}
+	}
+
 	patchData, err := specPatch(newService.Spec)
 	if err != nil {
 		return fmt.Errorf("could not form patch for the service '%s': %v", serviceName, err)
@@ -266,6 +280,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 	return nil
 }
+
 
 func (c *Cluster) deleteService(role PostgresRole) error {
 	c.logger.Debugf("Deleting service %s", role)
