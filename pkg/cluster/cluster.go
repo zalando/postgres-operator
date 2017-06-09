@@ -28,6 +28,24 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
 
+type Interface interface {
+	Create() error
+	Delete() error
+	ExecCommand(podName *spec.NamespacedName, command ...string) (string, error)
+	ReceivePodEvent(event spec.PodEvent)
+	Run(stopCh <-chan struct{})
+	Sync() error
+	Update(newSpec *spec.Postgresql) error
+	SetFailed(err error)
+}
+
+type PostgresRole string
+
+const (
+	Master  PostgresRole = "master"
+	Replica PostgresRole = "replica"
+)
+
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
 	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
@@ -629,4 +647,8 @@ func (c *Cluster) initInfrastructureRoles() error {
 		c.pgUsers[username] = data
 	}
 	return nil
+}
+
+func (c *Cluster) SetFailed(err error) {
+	c.Error = err
 }

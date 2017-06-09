@@ -134,8 +134,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 		c.clustersMu.Unlock()
 
 		if err := cl.Create(); err != nil {
-			cl.Error = fmt.Errorf("could not create cluster: %v", err)
-			logger.Errorf("%v", cl.Error)
+			err = fmt.Errorf("could not create cluster: %v", err)
+			logger.Errorf("%v", err)
+			cl.SetFailed(err)
 
 			return nil
 		}
@@ -149,12 +150,13 @@ func (c *Controller) processEvent(obj interface{}) error {
 			return nil
 		}
 		if err := cl.Update(event.NewSpec); err != nil {
-			cl.Error = fmt.Errorf("could not update cluster: %s", err)
-			logger.Errorf("%v", cl.Error)
+			err = fmt.Errorf("could not update cluster: %s", err)
+			logger.Errorf("%v", err)
+			cl.SetFailed(err)
 
 			return nil
 		}
-		cl.Error = nil
+		cl.SetFailed(nil)
 		logger.Infof("Cluster '%s' has been updated", clusterName)
 	case spec.EventDelete:
 		logger.Infof("Deletion of the '%s' cluster started", clusterName)
@@ -191,11 +193,12 @@ func (c *Controller) processEvent(obj interface{}) error {
 		}
 
 		if err := cl.Sync(); err != nil {
-			cl.Error = fmt.Errorf("could not sync cluster '%s': %v", clusterName, err)
-			logger.Errorf("%v", cl.Error)
+			err = fmt.Errorf("could not sync cluster '%s': %v", clusterName, err)
+			logger.Errorf("%v", err)
+			cl.SetFailed(err)
 			return nil
 		}
-		cl.Error = nil
+		cl.SetFailed(nil)
 
 		logger.Infof("Cluster '%s' has been synced", clusterName)
 	}
