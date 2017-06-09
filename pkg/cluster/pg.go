@@ -7,7 +7,7 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
@@ -60,9 +60,9 @@ func (c *Cluster) initDbConn() (err error) {
 	return nil
 }
 
-func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUserMap, err error) {
+func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users types.PgUserMap, err error) {
 	var rows *sql.Rows
-	users = make(spec.PgUserMap)
+	users = make(types.PgUserMap)
 	if rows, err = c.pgDb.Query(getUserSQL, pq.Array(userNames)); err != nil {
 		return nil, fmt.Errorf("error when querying users: %v", err)
 	}
@@ -85,7 +85,7 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 		}
 		flags := makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin)
 		// XXX: the code assumes the password we get from pg_authid is always MD5
-		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof}
+		users[rolname] = types.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof}
 	}
 
 	return users, nil

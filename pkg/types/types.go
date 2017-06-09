@@ -1,19 +1,16 @@
-package spec
+package types
 
 import (
 	"database/sql"
-	"fmt"
-	"strings"
 
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
+
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
 // EvenType contains type of the events for the TPRs and Pods received from Kubernetes
 type EventType string
-
-// NamespacedName describes the namespace/name pairs used in Kubernetes names.
-type NamespacedName types.NamespacedName
 
 // Possible values for the EventType
 const (
@@ -27,8 +24,8 @@ const (
 type ClusterEvent struct {
 	UID       types.UID
 	EventType EventType
-	OldSpec   *Postgresql
-	NewSpec   *Postgresql
+	OldSpec   *spec.Postgresql
+	NewSpec   *spec.Postgresql
 	WorkerID  uint32
 }
 
@@ -73,31 +70,13 @@ type UserSyncer interface {
 	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
 }
 
-func (n NamespacedName) String() string {
-	return types.NamespacedName(n).String()
-}
-
-// MarshalJSON defines marshaling rule for the namespaced name type.
-func (n NamespacedName) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + n.String() + "\""), nil
-}
-
-// Decode converts a (possibly unqualified) string into the namespaced name object.
-func (n *NamespacedName) Decode(value string) error {
-	name := types.NewNamespacedNameFromString(value)
-
-	if strings.Trim(value, string(types.Separator)) != "" && name == (types.NamespacedName{}) {
-		name.Name = value
-		name.Namespace = v1.NamespaceDefault
-	} else if name.Namespace == "" {
-		name.Namespace = v1.NamespaceDefault
-	}
-
-	if name.Name == "" {
-		return fmt.Errorf("Incorrect namespaced name")
-	}
-
-	*n = NamespacedName(name)
-
-	return nil
+type Cluster interface {
+	Create() error
+	Delete() error
+	ExecCommand(podName *NamespacedName, command ...string) (string, error)
+	ReceivePodEvent(event PodEvent)
+	Run(stopCh <-chan struct{})
+	Sync() error
+	Update(newSpec *spec.Postgresql) error
+	SetFailed(err error)
 }

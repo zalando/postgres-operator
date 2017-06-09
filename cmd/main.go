@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
@@ -17,7 +17,7 @@ import (
 var (
 	KubeConfigFile   string
 	podNamespace     string
-	configMapName    spec.NamespacedName
+	configMapName    types.NamespacedName
 	OutOfCluster     bool
 	noTeamsAPI       bool
 	noDatabaseAccess bool
@@ -78,7 +78,7 @@ func main() {
 
 	controllerConfig := ControllerConfig()
 
-	if configMapName != (spec.NamespacedName{}) {
+	if configMapName != (types.NamespacedName{}) {
 		configMap, err := controllerConfig.KubeClient.ConfigMaps(configMapName.Namespace).Get(configMapName.Name)
 		if err != nil {
 			panic(err)

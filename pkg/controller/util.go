@@ -8,14 +8,14 @@ import (
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {
-	infrastructureRoles := make(map[string]spec.PgUser)
+	infrastructureRoles := make(map[string]types.PgUser)
 	for k, v := range c.InfrastructureRoles {
 		infrastructureRoles[k] = v
 	}
@@ -43,7 +43,7 @@ func thirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
 	}
 }
 
-func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
+func (c *Controller) clusterWorkerID(clusterName types.NamespacedName) uint32 {
 	return crc32.ChecksumIEEE([]byte(clusterName.String())) % c.opConfig.Workers
 }
 
@@ -64,8 +64,8 @@ func (c *Controller) createTPR() error {
 	return k8sutil.WaitTPRReady(c.RestClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.opConfig.Namespace)
 }
 
-func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, err error) {
-	if c.opConfig.InfrastructureRolesSecretName == (spec.NamespacedName{}) {
+func (c *Controller) getInfrastructureRoles() (result map[string]types.PgUser, err error) {
+	if c.opConfig.InfrastructureRolesSecretName == (types.NamespacedName{}) {
 		// we don't have infrastructure roles defined, bail out
 		return nil, nil
 	}
@@ -79,12 +79,12 @@ func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, er
 	}
 
 	data := infraRolesSecret.Data
-	result = make(map[string]spec.PgUser)
+	result = make(map[string]types.PgUser)
 Users:
 	// in worst case we would have one line per user
 	for i := 1; i <= len(data); i++ {
 		properties := []string{"user", "password", "inrole"}
-		t := spec.PgUser{}
+		t := types.PgUser{}
 		for _, p := range properties {
 			key := fmt.Sprintf("%s%d", p, i)
 			if val, present := data[key]; !present {
@@ -115,13 +115,13 @@ Users:
 	return result, nil
 }
 
-func (c *Controller) podClusterName(pod *v1.Pod) spec.NamespacedName {
+func (c *Controller) podClusterName(pod *v1.Pod) types.NamespacedName {
 	if name, ok := pod.Labels[c.opConfig.ClusterNameLabel]; ok {
-		return spec.NamespacedName{
+		return types.NamespacedName{
 			Namespace: pod.Namespace,
 			Name:      name,
 		}
 	}
 
-	return spec.NamespacedName{}
+	return types.NamespacedName{}
 }

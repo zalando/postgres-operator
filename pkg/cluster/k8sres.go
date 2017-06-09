@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
@@ -404,7 +405,7 @@ func (c *Cluster) genUserSecrets() (secrets map[string]*v1.Secret) {
 	return
 }
 
-func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
+func (c *Cluster) genSingleUserSecret(namespace string, pgUser types.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
 		return nil

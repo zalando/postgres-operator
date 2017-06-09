@@ -6,7 +6,7 @@ import (
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/watch"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
@@ -61,11 +61,11 @@ func (c *Controller) podAdd(obj interface{}) {
 		return
 	}
 
-	podEvent := spec.PodEvent{
+	podEvent := types.PodEvent{
 		ClusterName:     c.podClusterName(pod),
 		PodName:         util.NameFromMeta(pod.ObjectMeta),
 		CurPod:          pod,
-		EventType:       spec.EventAdd,
+		EventType:       types.EventAdd,
 		ResourceVersion: pod.ResourceVersion,
 	}
 
@@ -83,12 +83,12 @@ func (c *Controller) podUpdate(prev, cur interface{}) {
 		return
 	}
 
-	podEvent := spec.PodEvent{
+	podEvent := types.PodEvent{
 		ClusterName:     c.podClusterName(curPod),
 		PodName:         util.NameFromMeta(curPod.ObjectMeta),
 		PrevPod:         prevPod,
 		CurPod:          curPod,
-		EventType:       spec.EventUpdate,
+		EventType:       types.EventUpdate,
 		ResourceVersion: curPod.ResourceVersion,
 	}
 
@@ -101,11 +101,11 @@ func (c *Controller) podDelete(obj interface{}) {
 		return
 	}
 
-	podEvent := spec.PodEvent{
+	podEvent := types.PodEvent{
 		ClusterName:     c.podClusterName(pod),
 		PodName:         util.NameFromMeta(pod.ObjectMeta),
 		CurPod:          pod,
-		EventType:       spec.EventDelete,
+		EventType:       types.EventDelete,
 		ResourceVersion: pod.ResourceVersion,
 	}
 

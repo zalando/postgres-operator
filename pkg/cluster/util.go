@@ -16,6 +16,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
@@ -159,7 +160,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
+func (c *Cluster) waitForPodLabel(podEvents chan types.PodEvent) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
@@ -176,11 +177,11 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
 	}
 }
 
-func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
+func (c *Cluster) waitForPodDeletion(podEvents chan types.PodEvent) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
-			if podEvent.EventType == spec.EventDelete {
+			if podEvent.EventType == types.EventDelete {
 				return nil
 			}
 		case <-time.After(c.OpConfig.PodDeletionWaitTimeout):
@@ -313,7 +314,7 @@ func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
 	return pod.Labels[c.OpConfig.PodRoleLabel]
 }
 
-func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (string, error) {
+func (c *Cluster) ExecCommand(podName *types.NamespacedName, command ...string) (string, error) {
 	var (
 		execOut bytes.Buffer
 		execErr bytes.Buffer

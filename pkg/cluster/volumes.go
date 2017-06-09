@@ -9,6 +9,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/filesystems"
@@ -172,11 +173,11 @@ func (c *Cluster) listVolumesWithManifestSize(newVolume spec.Volume) ([]*v1.Pers
 }
 
 // getPodNameFromPersistentVolume returns a pod name that it extracts from the volume claim ref.
-func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedName {
+func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *types.NamespacedName {
 	namespace := pv.Spec.ClaimRef.Namespace
 	name := pv.Spec.ClaimRef.Name[len(constants.DataVolumeName)+1:]
 
-	return &spec.NamespacedName{namespace, name}
+	return &types.NamespacedName{namespace, name}
 }
 
 func quantityToGigabyte(q resource.Quantity) int64 {

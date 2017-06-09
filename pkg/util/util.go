@@ -10,7 +10,7 @@ import (
 	"github.com/motomux/pretty"
 	"k8s.io/client-go/pkg/api/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 )
 
 const (
@@ -34,15 +34,15 @@ func RandomPassword(n int) string {
 }
 
 // NameFromMeta converts a metadata object to the NamespacedName name representation.
-func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
-	return spec.NamespacedName{
+func NameFromMeta(meta v1.ObjectMeta) types.NamespacedName {
+	return types.NamespacedName{
 		Namespace: meta.Namespace,
 		Name:      meta.Name,
 	}
 }
 
 // PGUserPassword is used to generate md5 password hash for a given user. It does nothing for already hashed passwords.
-func PGUserPassword(user spec.PgUser) string {
+func PGUserPassword(user types.PgUser) string {
 	if (len(user.Password) == md5.Size*2+len(md5prefix) && user.Password[:3] == md5prefix) || user.Password == "" {
 		// Avoid processing already encrypted or empty passwords
 		return user.Password

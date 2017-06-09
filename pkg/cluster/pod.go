@@ -5,7 +5,7 @@ import (
 
 	"k8s.io/client-go/pkg/api/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
@@ -50,7 +50,7 @@ func (c *Cluster) deletePods() error {
 	return nil
 }
 
-func (c *Cluster) deletePod(podName spec.NamespacedName) error {
+func (c *Cluster) deletePod(podName types.NamespacedName) error {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
@@ -65,7 +65,7 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 	return nil
 }
 
-func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
+func (c *Cluster) unregisterPodSubscriber(podName types.NamespacedName) {
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
@@ -77,11 +77,11 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	delete(c.podSubscribers, podName)
 }
 
-func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.PodEvent {
+func (c *Cluster) registerPodSubscriber(podName types.NamespacedName) chan types.PodEvent {
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
-	ch := make(chan spec.PodEvent)
+	ch := make(chan types.PodEvent)
 	if _, ok := c.podSubscribers[podName]; ok {
 		panic("pod '" + podName.String() + "' is already subscribed")
 	}

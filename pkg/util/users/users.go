@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
@@ -26,31 +26,31 @@ type DefaultUserSyncStrategy struct {
 }
 
 // ProduceSyncRequests figures out the types of changes that need to happen with the given users.
-func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
-	newUsers spec.PgUserMap) (reqs []spec.PgSyncUserRequest) {
+func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers types.PgUserMap,
+	newUsers types.PgUserMap) (reqs []types.PgSyncUserRequest) {
 
 	// No existing roles are deleted or stripped of role memebership/flags
 	for name, newUser := range newUsers {
 		dbUser, exists := dbUsers[name]
 		if !exists {
-			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserAdd, User: newUser})
+			reqs = append(reqs, types.PgSyncUserRequest{Kind: types.PGSyncUserAdd, User: newUser})
 		} else {
-			r := spec.PgSyncUserRequest{}
+			r := types.PgSyncUserRequest{}
 			newMD5Password := util.PGUserPassword(newUser)
 
 			if dbUser.Password != newMD5Password {
 				r.User.Password = newMD5Password
-				r.Kind = spec.PGsyncUserAlter
+				r.Kind = types.PGsyncUserAlter
 			}
 			if addNewRoles, equal := util.SubstractStringSlices(newUser.MemberOf, dbUser.MemberOf); !equal {
 				r.User.MemberOf = addNewRoles
-				r.Kind = spec.PGsyncUserAlter
+				r.Kind = types.PGsyncUserAlter
 			}
 			if addNewFlags, equal := util.SubstractStringSlices(newUser.Flags, dbUser.Flags); !equal {
 				r.User.Flags = addNewFlags
-				r.Kind = spec.PGsyncUserAlter
+				r.Kind = types.PGsyncUserAlter
 			}
-			if r.Kind == spec.PGsyncUserAlter {
+			if r.Kind == types.PGsyncUserAlter {
 				r.User.Name = newUser.Name
 				reqs = append(reqs, r)
 			}
@@ -61,14 +61,14 @@ func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
 }
 
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
-func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserRequest, db *sql.DB) error {
+func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []types.PgSyncUserRequest, db *sql.DB) error {
 	for _, r := range reqs {
 		switch r.Kind {
-		case spec.PGSyncUserAdd:
+		case types.PGSyncUserAdd:
 			if err := s.createPgUser(r.User, db); err != nil {
 				return fmt.Errorf("could not create user '%s': %v", r.User.Name, err)
 			}
-		case spec.PGsyncUserAlter:
+		case types.PGsyncUserAlter:
 			if err := s.alterPgUser(r.User, db); err != nil {
 				return fmt.Errorf("could not alter user '%s': %v", r.User.Name, err)
 			}
@@ -80,7 +80,7 @@ func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserReque
 	return nil
 }
 
-func (s DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err error) {
+func (s DefaultUserSyncStrategy) createPgUser(user types.PgUser, db *sql.DB) (err error) {
 	var userFlags []string
 	var userPassword string
 
@@ -107,7 +107,7 @@ func (s DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err
 	return
 }
 
-func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err error) {
+func (s DefaultUserSyncStrategy) alterPgUser(user types.PgUser, db *sql.DB) (err error) {
 	var resultStmt []string
 
 	if user.Password != "" || len(user.Flags) > 0 {
@@ -129,7 +129,7 @@ func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err 
 	return
 }
 
-func produceAlterStmt(user spec.PgUser) string {
+func produceAlterStmt(user types.PgUser) string {
 	// ALTER ROLE ... LOGIN ENCRYPTED PASSWORD ..
 	result := make([]string, 1)
 	password := user.Password
@@ -144,12 +144,12 @@ func produceAlterStmt(user spec.PgUser) string {
 	return fmt.Sprintf(alterUserSQL, user.Name, strings.Join(result, " "))
 }
 
-func produceGrantStmt(user spec.PgUser) string {
+func produceGrantStmt(user types.PgUser) string {
 	// GRANT ROLE "foo", "bar" TO baz
 	return fmt.Sprintf(grantToUserSQL, quoteMemberList(user), user.Name)
 }
 
-func quoteMemberList(user spec.PgUser) string {
+func quoteMemberList(user types.PgUser) string {
 	var memberof []string
 	for _, member := range user.MemberOf {
 		memberof = append(memberof, fmt.Sprintf(`"%s"`, member))

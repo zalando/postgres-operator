@@ -14,11 +14,12 @@ import (
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/types"
+	ktypes "k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -27,17 +28,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
-
-type Interface interface {
-	Create() error
-	Delete() error
-	ExecCommand(podName *spec.NamespacedName, command ...string) (string, error)
-	ReceivePodEvent(event spec.PodEvent)
-	Run(stopCh <-chan struct{})
-	Sync() error
-	Update(newSpec *spec.Postgresql) error
-	SetFailed(err error)
-}
 
 type PostgresRole string
 
@@ -53,13 +43,13 @@ type Config struct {
 	RestConfig          *rest.Config
 	TeamsAPIClient      *teams.API
 	OpConfig            config.Config
-	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
+	InfrastructureRoles map[string]types.PgUser // inherited from the controller
 }
 
 type kubeResources struct {
 	Service     map[PostgresRole]*v1.Service
 	Endpoint    *v1.Endpoints
-	Secrets     map[types.UID]*v1.Secret
+	Secrets     map[ktypes.UID]*v1.Secret
 	Statefulset *v1beta1.StatefulSet
 	//Pods are treated separately
 	//PVCs are treated separately
@@ -70,14 +60,14 @@ type Cluster struct {
 	spec.Postgresql
 	Config
 	logger           *logrus.Entry
-	pgUsers          map[string]spec.PgUser
-	systemUsers      map[string]spec.PgUser
-	podSubscribers   map[spec.NamespacedName]chan spec.PodEvent
+	pgUsers          map[string]types.PgUser
+	systemUsers      map[string]types.PgUser
+	podSubscribers   map[types.NamespacedName]chan types.PodEvent
 	podSubscribersMu sync.RWMutex
 	pgDb             *sql.DB
 	mu               sync.Mutex
 	masterLess       bool
-	userSyncStrategy spec.UserSyncer
+	userSyncStrategy types.UserSyncer
 	deleteOptions    *v1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 }
@@ -92,11 +82,11 @@ type compareStatefulsetResult struct {
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
-	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
+	kubeResources := kubeResources{Secrets: make(map[ktypes.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
-		e, ok := obj.(spec.PodEvent)
+		e, ok := obj.(types.PodEvent)
 		if !ok {
 			return "", fmt.Errorf("could not cast to PodEvent")
 		}
@@ -108,9 +98,9 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 		Config:           cfg,
 		Postgresql:       pgSpec,
 		logger:           lg,
-		pgUsers:          make(map[string]spec.PgUser),
-		systemUsers:      make(map[string]spec.PgUser),
-		podSubscribers:   make(map[spec.NamespacedName]chan spec.PodEvent),
+		pgUsers:          make(map[string]types.PgUser),
+		systemUsers:      make(map[string]types.PgUser),
+		podSubscribers:   make(map[types.NamespacedName]chan types.PodEvent),
 		kubeResources:    kubeResources,
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
@@ -121,7 +111,7 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	return cluster
 }
 
-func (c *Cluster) clusterName() spec.NamespacedName {
+func (c *Cluster) clusterName() types.NamespacedName {
 	return util.NameFromMeta(c.Metadata)
 }
 
@@ -543,14 +533,14 @@ func (c *Cluster) Delete() error {
 }
 
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
-func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
+func (c *Cluster) ReceivePodEvent(event types.PodEvent) {
 	if err := c.podEventsQueue.Add(event); err != nil {
 		c.logger.Errorf("error when receiving pod events: %v", err)
 	}
 }
 
 func (c *Cluster) processPodEvent(obj interface{}) error {
-	event, ok := obj.(spec.PodEvent)
+	event, ok := obj.(types.PodEvent)
 	if !ok {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
@@ -588,11 +578,11 @@ func (c *Cluster) initSystemUsers() {
 	// task to Patroni. Those definitions are only used to create
 	// secrets, therefore, setting flags like SUPERUSER or REPLICATION
 	// is not necessary here
-	c.systemUsers[constants.SuperuserKeyName] = spec.PgUser{
+	c.systemUsers[constants.SuperuserKeyName] = types.PgUser{
 		Name:     c.OpConfig.SuperUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
-	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
+	c.systemUsers[constants.ReplicationUserKeyName] = types.PgUser{
 		Name:     c.OpConfig.ReplicationUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
@@ -609,7 +599,7 @@ func (c *Cluster) initRobotUsers() error {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
 
-		c.pgUsers[username] = spec.PgUser{
+		c.pgUsers[username] = types.PgUser{
 			Name:     username,
 			Password: util.RandomPassword(constants.PasswordLength),
 			Flags:    flags,
@@ -627,7 +617,7 @@ func (c *Cluster) initHumanUsers() error {
 	for _, username := range teamMembers {
 		flags := []string{constants.RoleFlagLogin, constants.RoleFlagSuperuser}
 		memberOf := []string{c.OpConfig.PamRoleName}
-		c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
+		c.pgUsers[username] = types.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
 	}
 
 	return nil

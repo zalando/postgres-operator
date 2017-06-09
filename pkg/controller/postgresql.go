@@ -10,12 +10,13 @@ import (
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/fields"
 	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/types"
+	ktypes "k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
@@ -68,7 +69,7 @@ func (c *Controller) clusterListFunc(options api.ListOptions) (runtime.Object, e
 			failedClustersCnt++
 			continue
 		}
-		c.queueClusterEvent(nil, pg, spec.EventSync)
+		c.queueClusterEvent(nil, pg, types.EventSync)
 		activeClustersCnt++
 	}
 	if len(objList) > 0 {
@@ -97,15 +98,15 @@ func (c *Controller) clusterWatchFunc(options api.ListOptions) (watch.Interface,
 }
 
 func (c *Controller) processEvent(obj interface{}) error {
-	var clusterName spec.NamespacedName
+	var clusterName types.NamespacedName
 
-	event, ok := obj.(spec.ClusterEvent)
+	event, ok := obj.(types.ClusterEvent)
 	if !ok {
 		return fmt.Errorf("could not cast to ClusterEvent")
 	}
 	logger := c.logger.WithField("worker", event.WorkerID)
 
-	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync {
+	if event.EventType == types.EventAdd || event.EventType == types.EventSync {
 		clusterName = util.NameFromMeta(event.NewSpec.Metadata)
 	} else {
 		clusterName = util.NameFromMeta(event.OldSpec.Metadata)
@@ -116,7 +117,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 	c.clustersMu.RUnlock()
 
 	switch event.EventType {
-	case spec.EventAdd:
+	case types.EventAdd:
 		if clusterFound {
 			logger.Debugf("Cluster '%s' already exists", clusterName)
 			return nil
@@ -142,7 +143,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		}
 
 		logger.Infof("Cluster '%s' has been created", clusterName)
-	case spec.EventUpdate:
+	case types.EventUpdate:
 		logger.Infof("Update of the '%s' cluster started", clusterName)
 
 		if !clusterFound {
@@ -158,7 +159,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		}
 		cl.SetFailed(nil)
 		logger.Infof("Cluster '%s' has been updated", clusterName)
-	case spec.EventDelete:
+	case types.EventDelete:
 		logger.Infof("Deletion of the '%s' cluster started", clusterName)
 		if !clusterFound {
 			logger.Errorf("Unknown cluster: %s", clusterName)
@@ -177,7 +178,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		c.clustersMu.Unlock()
 
 		logger.Infof("Cluster '%s' has been deleted", clusterName)
-	case spec.EventSync:
+	case types.EventSync:
 		logger.Infof("Syncing of the '%s' cluster started", clusterName)
 
 		// no race condition because a cluster is always processed by single worker
@@ -214,18 +215,18 @@ func (c *Controller) processClusterEventsQueue(idx int) {
 	}
 }
 
-func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
+func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType types.EventType) {
 	var (
-		uid          types.UID
-		clusterName  spec.NamespacedName
+		uid          ktypes.UID
+		clusterName  types.NamespacedName
 		clusterError error
 	)
 
 	if old != nil { //update, delete
 		uid = old.Metadata.GetUID()
 		clusterName = util.NameFromMeta(old.Metadata)
-		if eventType == spec.EventUpdate && new.Error == nil && old.Error != nil {
-			eventType = spec.EventSync
+		if eventType == types.EventUpdate && new.Error == nil && old.Error != nil {
+			eventType = types.EventSync
 			clusterError = new.Error
 		} else {
 			clusterError = old.Error
@@ -236,13 +237,13 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 		clusterError = new.Error
 	}
 
-	if clusterError != nil && eventType != spec.EventDelete {
+	if clusterError != nil && eventType != types.EventDelete {
 		c.logger.Debugf("Skipping %s event for invalid cluster %s (reason: %v)", eventType, clusterName, clusterError)
 		return
 	}
 
 	workerID := c.clusterWorkerID(clusterName)
-	clusterEvent := spec.ClusterEvent{
+	clusterEvent := types.ClusterEvent{
 		EventType: eventType,
 		UID:       uid,
 		OldSpec:   old,
@@ -265,7 +266,7 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 	}
 
 	// We will not get multiple Add events for the same cluster
-	c.queueClusterEvent(nil, pg, spec.EventAdd)
+	c.queueClusterEvent(nil, pg, types.EventAdd)
 }
 
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
@@ -284,7 +285,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 		return
 	}
 
-	c.queueClusterEvent(pgOld, pgNew, spec.EventUpdate)
+	c.queueClusterEvent(pgOld, pgNew, types.EventUpdate)
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {
@@ -294,5 +295,5 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 		return
 	}
 
-	c.queueClusterEvent(pg, nil, spec.EventDelete)
+	c.queueClusterEvent(pg, nil, types.EventDelete)
 }

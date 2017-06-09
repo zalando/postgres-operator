@@ -10,15 +10,15 @@ import (
 )
 
 var pgUsers = []struct {
-	in  spec.PgUser
+	in  types.PgUser
 	out string
-}{{spec.PgUser{
+}{{types.PgUser{
 	Name:     "test",
 	Password: "password",
 	Flags:    []string{},
 	MemberOf: []string{}},
 	"md587f77988ccb5aa917c93201ba314fcd4"},
-	{spec.PgUser{
+	{types.PgUser{
 		Name:     "test",
 		Password: "md592f413f3974bdf3799bb6fecb5f9f2c6",
 		Flags:    []string{},
@@ -58,7 +58,7 @@ func TestNameFromMeta(t *testing.T) {
 		Namespace: "default",
 	}
 
-	expected := spec.NamespacedName{
+	expected := types.NamespacedName{
 		Name:      "testcluster",
 		Namespace: "default",
 	}

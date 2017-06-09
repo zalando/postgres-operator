@@ -10,8 +10,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
@@ -22,7 +22,7 @@ type Config struct {
 	KubeClient          *kubernetes.Clientset
 	RestClient          *rest.RESTClient
 	TeamsAPIClient      *teams.API
-	InfrastructureRoles map[string]spec.PgUser
+	InfrastructureRoles map[string]types.PgUser
 }
 
 type Controller struct {
@@ -31,12 +31,12 @@ type Controller struct {
 	logger   *logrus.Entry
 
 	clustersMu sync.RWMutex
-	clusters   map[spec.NamespacedName]cluster.Interface
-	stopChs    map[spec.NamespacedName]chan struct{}
+	clusters   map[types.NamespacedName]types.Cluster
+	stopChs    map[types.NamespacedName]chan struct{}
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
-	podCh              chan spec.PodEvent
+	podCh              chan types.PodEvent
 
 	clusterEventQueues []*cache.FIFO
 
@@ -56,9 +56,9 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 		Config:   *controllerConfig,
 		opConfig: operatorConfig,
 		logger:   logger.WithField("pkg", "controller"),
-		clusters: make(map[spec.NamespacedName]cluster.Interface),
-		stopChs:  make(map[spec.NamespacedName]chan struct{}),
-		podCh:    make(chan spec.PodEvent),
+		clusters: make(map[types.NamespacedName]types.Cluster),
+		stopChs:  make(map[types.NamespacedName]chan struct{}),
+		podCh:    make(chan types.PodEvent),
 	}
 }
 
@@ -130,7 +130,7 @@ func (c *Controller) initController() {
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
 		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
-			e, ok := obj.(spec.ClusterEvent)
+			e, ok := obj.(types.ClusterEvent)
 			if !ok {
 				return "", fmt.Errorf("could not cast to ClusterEvent")
 			}

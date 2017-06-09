@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 )
 
 type TPR struct {
@@ -29,13 +29,13 @@ type Resources struct {
 }
 
 type Auth struct {
-	PamRoleName                   string              `name:"pam_rol_name" default:"zalandos"`
-	PamConfiguration              string              `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
-	TeamsAPIUrl                   string              `name:"teams_api_url" default:"https://teams.example.com/api/"`
-	OAuthTokenSecretName          spec.NamespacedName `name:"oauth_token_secret_name" default:"postgresql-operator"`
-	InfrastructureRolesSecretName spec.NamespacedName `name:"infrastructure_roles_secret_name"`
-	SuperUsername                 string              `name:"super_username" default:"postgres"`
-	ReplicationUsername           string              `name:"replication_username" default:"replication"`
+	PamRoleName                   string               `name:"pam_rol_name" default:"zalandos"`
+	PamConfiguration              string               `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
+	TeamsAPIUrl                   string               `name:"teams_api_url" default:"https://teams.example.com/api/"`
+	OAuthTokenSecretName          types.NamespacedName `name:"oauth_token_secret_name" default:"postgresql-operator"`
+	InfrastructureRolesSecretName types.NamespacedName `name:"infrastructure_roles_secret_name"`
+	SuperUsername                 string               `name:"super_username" default:"postgres"`
+	ReplicationUsername           string               `name:"replication_username" default:"replication"`
 }
 
 type Config struct {

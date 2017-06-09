@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/types"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/filesystems"
 )
 
-func (c *Cluster) getPostgresFilesystemInfo(podName *spec.NamespacedName) (device, fstype string, err error) {
+func (c *Cluster) getPostgresFilesystemInfo(podName *types.NamespacedName) (device, fstype string, err error) {
 	out, err := c.ExecCommand(podName, "bash", "-c", fmt.Sprintf("df -T %s|tail -1", constants.PostgresDataMount))
 	if err != nil {
 		return "", "", err
@@ -22,7 +22,7 @@ func (c *Cluster) getPostgresFilesystemInfo(podName *spec.NamespacedName) (devic
 	return fields[0], fields[1], nil
 }
 
-func (c *Cluster) resizePostgresFilesystem(podName *spec.NamespacedName, resizers []filesystems.FilesystemResizer) error {
+func (c *Cluster) resizePostgresFilesystem(podName *types.NamespacedName, resizers []filesystems.FilesystemResizer) error {
 	// resize2fs always writes to stderr, and ExecCommand considers a non-empty stderr an error
 	// first, determine the device and the filesystem
 	deviceName, fsType, err := c.getPostgresFilesystemInfo(podName)
