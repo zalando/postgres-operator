@@ -63,6 +63,16 @@ func specPatch(spec interface{}) ([]byte, error) {
 	}{spec})
 }
 
+func metadataAnnotationsPatch(annotations map[string]string) (string) {
+	annotationsList := make([]string, 0, len(annotations))
+
+	for name, value := range(annotations) {
+		annotationsList = append(annotationsList, fmt.Sprintf(`"%s":"%s"`, name, value))
+	}
+	annotationsString := strings.Join(annotationsList, ",")
+	return fmt.Sprintf(`{"metadata":{"annotations": {"$patch":"replace", %s}}}`, annotationsString)
+}
+
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
 		c.logger.Infof("statefulset '%s' has been changed",
