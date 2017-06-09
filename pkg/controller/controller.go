@@ -13,6 +13,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 )
 
@@ -38,6 +39,8 @@ type Controller struct {
 	podCh              chan spec.PodEvent
 
 	clusterEventQueues []*cache.FIFO
+
+	lastClusterSyncTime int64
 }
 
 func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
@@ -93,7 +96,7 @@ func (c *Controller) initController() {
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
 		clusterLw,
 		&spec.Postgresql{},
-		c.opConfig.ResyncPeriod,
+		constants.QueueResyncPeriodTPR,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	if err := c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -113,7 +116,7 @@ func (c *Controller) initController() {
 	c.podInformer = cache.NewSharedIndexInformer(
 		podLw,
 		&v1.Pod{},
-		c.opConfig.ResyncPeriodPod,
+		constants.QueueResyncPeriodPod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	if err := c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -141,6 +144,7 @@ func (c *Controller) runInformers(stopCh <-chan struct{}) {
 	go c.postgresqlInformer.Run(stopCh)
 	go c.podInformer.Run(stopCh)
 	go c.podEventsDispatcher(stopCh)
+	go c.clusterResync(stopCh)
 
 	<-stopCh
 }

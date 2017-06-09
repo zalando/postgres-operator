@@ -135,12 +135,12 @@ func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
 		return []byte(fmt.Sprintf("\"%s-%s\"",
 			m.StartTime.Format("15:04"),
 			m.EndTime.Format("15:04"))), nil
-	} else {
-		return []byte(fmt.Sprintf("\"%s:%s-%s\"",
-			m.Weekday.String()[:3],
-			m.StartTime.Format("15:04"),
-			m.EndTime.Format("15:04"))), nil
 	}
+
+	return []byte(fmt.Sprintf("\"%s:%s-%s\"",
+		m.Weekday.String()[:3],
+		m.StartTime.Format("15:04"),
+		m.EndTime.Format("15:04"))), nil
 }
 
 // UnmarshalJSON convets a JSON to the maintenance window definition.

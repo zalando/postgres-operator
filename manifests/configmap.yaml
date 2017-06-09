@@ -25,7 +25,6 @@ data:
   resource_check_interval: 3s
   resource_check_timeout: 10m
   resync_period: 5m
-  resync_period_pod: 5m
   super_username: postgres
   teams_api_url: http://fake-teams-api.default.svc.cluster.local
   workers: "4"

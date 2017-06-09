@@ -10,4 +10,7 @@ const (
 	K8sAPIPath                  = "/api"
 	StatefulsetDeletionInterval = 1 * time.Second
 	StatefulsetDeletionTimeout  = 30 * time.Second
+
+	QueueResyncPeriodPod = 5 * time.Minute
+	QueueResyncPeriodTPR = 5 * time.Minute
 )

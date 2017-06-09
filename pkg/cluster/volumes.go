@@ -109,8 +109,8 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 					return fmt.Errorf("could not connect to the volume provider: %v", err)
 				}
 				defer func() {
-					err2 := resizer.DisconnectFromProvider(); if err2 != nil {
-						c.logger.Errorf("%v", err2)
+					if err := resizer.DisconnectFromProvider(); err != nil {
+						c.logger.Errorf("%v", err)
 					}
 				}()
 			}
@@ -127,7 +127,7 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 			if err := c.resizePostgresFilesystem(podName, []filesystems.FilesystemResizer{&filesystems.Ext234Resize{}}); err != nil {
 				return fmt.Errorf("could not resize the filesystem on pod '%s': %v", podName, err)
 			}
-			c.logger.Debugf("filesystem resize successfull on volume %s", pv.Name)
+			c.logger.Debugf("filesystem resize successful on volume %s", pv.Name)
 			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
 			c.logger.Debugf("updating persistent volume definition for volume %s", pv.Name)
 			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {

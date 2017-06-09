@@ -282,7 +282,7 @@ var postgresqlList = []struct {
 				Kind:       "List",
 				APIVersion: "v1",
 			},
-			Items: []Postgresql{Postgresql{
+			Items: []Postgresql{{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Postgresql",
 					APIVersion: "acid.zalan.do/v1",
@@ -382,7 +382,7 @@ func TestUnmarshalMaintenanceWindow(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(m, tt.out) {
-			t.Errorf("Expected maintenace window: %#v, got: %#v", tt.out, m)
+			t.Errorf("Expected maintenance window: %#v, got: %#v", tt.out, m)
 		}
 	}
 }

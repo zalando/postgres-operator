@@ -430,7 +430,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 					c.logger.Infof("%s service '%s' has been created", role, util.NameFromMeta(service.ObjectMeta))
 				}
 			}
-			// only proceeed further if both old and new load balancer were present
+			// only proceed further if both old and new load balancer were present
 			if !(newSpec.Spec.ReplicaLoadBalancer && c.Spec.ReplicaLoadBalancer) {
 				continue
 			}
