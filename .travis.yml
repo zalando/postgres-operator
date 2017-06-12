@@ -1,0 +1,16 @@
+dist: trusty
+
+language: go
+
+go:
+  - 1.8
+
+before_install:
+  - go get github.com/Masterminds/glide
+  - go get github.com/mattn/goveralls
+
+install:
+  - make deps
+
+script:
+  - goverals -service=travis-ci
