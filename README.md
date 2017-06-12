@@ -1,5 +1,7 @@
 # postgres operator
 
+[![Build Status](https://travis-ci.org/zalando-incubator/postgres-operator.svg?branch=master)](https://travis-ci.org/zalando-incubator/postgres-operator)
+
 The Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
 During the initial run it registers the [Third Party Resource (TPR)](https://kubernetes.io/docs/user-guide/thirdpartyresources/) for Postgres.
 The Postgresql TPR is essentially the schema that describes the contents of the manifests for deploying individual Postgres clusters using Statefulsets and Patroni.
