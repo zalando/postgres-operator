@@ -70,7 +70,8 @@ func metadataAnnotationsPatch(annotations map[string]string) string {
 		annotationsList = append(annotationsList, fmt.Sprintf(`"%s":"%s"`, name, value))
 	}
 	annotationsString := strings.Join(annotationsList, ",")
-	return fmt.Sprintf(`{"metadata":{"annotations": {"$patch":"replace", %s}}}`, annotationsString)
+	// TODO: perhaps use patchStrategy:"replace" json annotation instead of constructing the patch literally.
+	return fmt.Sprintf(constants.ServiceMetadataAnnotationFormat, annotationsString)
 }
 
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
