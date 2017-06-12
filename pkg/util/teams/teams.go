@@ -39,11 +39,14 @@ type team struct {
 	InfrastructureAccounts []infrastructureAccount `json:"infrastructure-accounts"`
 }
 
-//
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type API struct {
-	url        string
-	httpClient *http.Client
-	logger     *logrus.Entry
+	httpClient
+	url    string
+	logger *logrus.Entry
 }
 
 // NewTeamsAPI creates an object to query the team API.
@@ -58,23 +61,28 @@ func NewTeamsAPI(url string, log *logrus.Logger) *API {
 }
 
 // TeamInfo returns information about a given team using its ID and a token to authenticate to the API service.
-func (t *API) TeamInfo(teamID, token string) (tm *team, er error) {
+func (t *API) TeamInfo(teamID, token string) (tm *team, err error) {
+	var (
+		req  *http.Request
+		resp *http.Response
+	)
+
 	url := fmt.Sprintf("%s/teams/%s", t.url, teamID)
 	t.logger.Debugf("Request url: %s", url)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err = http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)
-	resp, err := t.httpClient.Do(req)
+	resp, err = t.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			er = fmt.Errorf("error when closing response; %v", err)
-			tm = nil
+		closeErr := resp.Body.Close()
+		if closeErr != nil {
+			err = fmt.Errorf("error when closing response: %v", closeErr)
 		}
 	}()
 	if resp.StatusCode != 200 {
@@ -82,21 +90,27 @@ func (t *API) TeamInfo(teamID, token string) (tm *team, er error) {
 		d := json.NewDecoder(resp.Body)
 		err = d.Decode(&raw)
 		if err != nil {
-			return nil, fmt.Errorf("team API query failed with status code %d and malformed response: %v", resp.StatusCode, err)
+			err = fmt.Errorf("team API query failed with status code %d and malformed response: %v", resp.StatusCode, err)
+			return
 		}
 
 		if errMessage, ok := raw["error"]; ok {
-			return nil, fmt.Errorf("team API query failed with status code %d and message: '%v'", resp.StatusCode, string(errMessage))
+			err = fmt.Errorf("team API query failed with status code %d and message: '%v'", resp.StatusCode, string(errMessage))
+			return
 		}
+		err = fmt.Errorf("team API query failed with status code %d", resp.StatusCode)
 
-		return nil, fmt.Errorf("team API query failed with status code %d", resp.StatusCode)
+		return
 	}
-	teamInfo := &team{}
+
+	tm = &team{}
 	d := json.NewDecoder(resp.Body)
-	err = d.Decode(teamInfo)
+	err = d.Decode(tm)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse team API response: %v", err)
+		err = fmt.Errorf("could not parse team API response: %v", err)
+		tm = nil
+		return
 	}
 
-	return teamInfo, nil
+	return
 }
