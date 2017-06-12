@@ -13,4 +13,4 @@ install:
   - make deps
 
 script:
-  - goverals -service=travis-ci
+  - goveralls -service=travis-ci
