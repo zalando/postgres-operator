@@ -1,0 +1,23 @@
+build_steps:
+    - desc: 'Install required build software'
+      cmd: |
+        apt-get install -y make git apt-transport-https ca-certificates curl
+    - desc: 'Install go'
+      cmd: |
+        add-apt-repository ppa:longsleep/golang-backports
+        apt-get update
+        apt-get install -y golang-go
+    - desc: 'Install Docker'
+      cmd: |
+        curl -sSL https://get.docker.com/ | sh
+    - desc: 'Symlink sources into the GOPATH'
+      cmd: |
+        export GOPATH=$HOME/go
+        export OPERATOR_TOP_DIR=$GOPATH/src/github.com/zalando-incubator
+        mkdir -p $OPERATOR_TOP_DIR
+        ln -s $(pwd) $OPERATOR_TOP_DIR/postgres-operator
+    - desc: 'Build & push'
+      cmd: |
+        export PATH=$PATH:$HOME/go/bin
+        export IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+        make tools deps docker push
