@@ -101,7 +101,7 @@ func main() {
 
 	log.Printf("Config: %s", cfg.MustMarshal())
 
-	c := controller.New(controllerConfig, cfg)
+	c := controller.NewController(controllerConfig, cfg)
 	c.Run(stop, wg)
 
 	sig := <-sigs

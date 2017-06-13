@@ -43,7 +43,7 @@ type Controller struct {
 	lastClusterSyncTime int64
 }
 
-func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
+func NewController(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 	logger := logrus.New()
 
 	if operatorConfig.DebugLogging {
