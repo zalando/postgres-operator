@@ -6,4 +6,4 @@ build_steps:
     - desc: 'Install Docker'
       cmd: 'curl -sSL https://get.docker.com/ | sh'
     - desc: 'Build & push'
-      cmd: 'make tools deps docker push'
+      cmd: 'PATH=$HOME/go/bin IMAGE=registry.opensource.zalan.do make tools deps docker push'
