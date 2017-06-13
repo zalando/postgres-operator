@@ -2,7 +2,7 @@ build_steps:
     - desc: 'Install required build software'
       cmd: 'apt-get install -y make git apt-transport-https ca-certificates curl'
     - desc: 'Install go'
-      cmd: 'add-apt-repository ppa:longsleep/golang-backports && apt-get update && apt-get install golang-go'
+      cmd: 'add-apt-repository ppa:longsleep/golang-backports && apt-get update && apt-get install -y golang-go'
     - desc: 'Install Docker'
       cmd: 'curl -sSL https://get.docker.com/ | sh'
     - desc: 'Build & push'
