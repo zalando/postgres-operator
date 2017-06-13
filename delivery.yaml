@@ -1,0 +1,3 @@
+build_steps:
+    - desc: 'Test'
+      cmd: 'echo "Hello World"'
