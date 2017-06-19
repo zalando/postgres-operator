@@ -8,6 +8,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -60,7 +61,7 @@ func ControllerConfig() *controller.Config {
 
 	return &controller.Config{
 		RestConfig: restConfig,
-		KubeClient: client,
+		KubeClient: cluster.NewFromKubernetesInterface(client),
 		RestClient: restClient,
 	}
 }

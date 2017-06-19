@@ -29,7 +29,7 @@ func (c *Controller) podListFunc(options api.ListOptions) (runtime.Object, error
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.CoreV1().Pods(c.opConfig.Namespace).List(opts)
+	return c.KubeClient.Pods(c.opConfig.Namespace).List(opts)
 }
 
 func (c *Controller) podWatchFunc(options api.ListOptions) (watch.Interface, error) {
@@ -52,7 +52,7 @@ func (c *Controller) podWatchFunc(options api.ListOptions) (watch.Interface, err
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.CoreV1Client.Pods(c.opConfig.Namespace).Watch(opts)
+	return c.KubeClient.Pods(c.opConfig.Namespace).Watch(opts)
 }
 
 func (c *Controller) podAdd(obj interface{}) {

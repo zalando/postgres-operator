@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -19,7 +18,7 @@ import (
 
 type Config struct {
 	RestConfig          *rest.Config
-	KubeClient          *kubernetes.Clientset
+	KubeClient          cluster.KubernetesClient
 	RestClient          *rest.RESTClient
 	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
@@ -27,6 +26,7 @@ type Config struct {
 
 type Controller struct {
 	Config
+
 	opConfig *config.Config
 	logger   *logrus.Entry
 
@@ -82,7 +82,7 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
 	}
 
-	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
+	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.InfrastructureRoles = infraRoles
