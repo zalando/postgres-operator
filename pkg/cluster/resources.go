@@ -233,7 +233,7 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	if c.Service[role] != nil {
 		return nil, fmt.Errorf("service already exists in the cluster")
 	}
-	serviceSpec := c.genService(role, c.Spec.AllowedSourceRanges)
+	serviceSpec := c.genService(role, &c.Spec)
 
 	service, err := c.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
 	if err != nil {
@@ -249,9 +249,23 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		return fmt.Errorf("there is no service in the cluster")
 	}
 	serviceName := util.NameFromMeta(c.Service[role].ObjectMeta)
+	// TODO: check if it possible to change the service type with a patch in future versions of Kubernetes
+	if newService.Spec.Type != c.Service[role].Spec.Type {
+		// service type has changed, need to replace the service completely.
+		// we cannot patch, since old attributes could be incompatible with the new service type
+		err := c.KubeClient.Services(c.Service[role].Namespace).Delete(c.Service[role].Name, c.deleteOptions)
+		if err != nil {
+			return fmt.Errorf("could not delete service '%s': '%v'", serviceName, err)
+		}
+		svc, err := c.KubeClient.Services(newService.Namespace).Create(newService)
+		if err != nil {
+			return fmt.Errorf("could not create service '%s': '%v'", serviceName, err)
+		}
+		c.Service[role] = svc
+		return nil
+	}
 
 	if len(newService.ObjectMeta.Annotations) > 0 {
-
 		annotationsPatchData := metadataAnnotationsPatch(newService.ObjectMeta.Annotations)
 
 		_, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(

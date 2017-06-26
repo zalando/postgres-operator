@@ -18,6 +18,7 @@ const (
 	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
 	patroniPGBinariesParameterName   = "bin_dir"
 	patroniPGParametersParameterName = "parameters"
+	localHost                        = "127.0.0.1/32"
 )
 
 type pgUser struct {
@@ -425,7 +426,7 @@ func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.
 	return &secret
 }
 
-func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v1.Service {
+func (c *Cluster) genService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
 
 	dnsNameFunction := c.masterDnsName
 	name := c.Metadata.Name
@@ -434,24 +435,46 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 		name = name + "-repl"
 	}
 
+	serviceSpec := v1.ServiceSpec{
+		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+		Type:  v1.ServiceTypeClusterIP,
+	}
+
+	if role == Replica {
+		serviceSpec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
+	}
+
+	var annotations map[string]string
+
+	// Examine the per-cluster load balancer setting, if it is not defined - check the operator configuration.
+	if (newSpec.UseLoadBalancer != nil && *newSpec.UseLoadBalancer) ||
+		(newSpec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
+
+		// safe default value: lock load balancer to only local address unless overriden explicitely.
+		sourceRanges := []string{localHost}
+		allowedSourceRanges := newSpec.AllowedSourceRanges
+		if len(allowedSourceRanges) >= 0 {
+			sourceRanges = allowedSourceRanges
+		}
+
+		serviceSpec.Type = v1.ServiceTypeLoadBalancer
+		serviceSpec.LoadBalancerSourceRanges = sourceRanges
+
+		annotations = map[string]string{
+			constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
+			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+		}
+
+	}
+
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      name,
-			Namespace: c.Metadata.Namespace,
-			Labels:    c.roleLabelsSet(role),
-			Annotations: map[string]string{
-				constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
-				constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-			},
+			Name:        name,
+			Namespace:   c.Metadata.Namespace,
+			Labels:      c.roleLabelsSet(role),
+			Annotations: annotations,
 		},
-		Spec: v1.ServiceSpec{
-			Type:  v1.ServiceTypeLoadBalancer,
-			Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			LoadBalancerSourceRanges: allowedSourceRanges,
-		},
-	}
-	if role == Replica {
-		service.Spec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
+		Spec: serviceSpec,
 	}
 
 	return service
