@@ -100,7 +100,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 		return nil
 	}
 
-	desiredSvc := c.genService(role, cSpec.AllowedSourceRanges)
+	desiredSvc := c.genService(role, &cSpec)
 	match, reason := c.sameServiceWith(role, desiredSvc)
 	if match {
 		return nil

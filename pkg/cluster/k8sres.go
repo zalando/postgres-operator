@@ -426,7 +426,7 @@ func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.
 	return &secret
 }
 
-func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v1.Service {
+func (c *Cluster) genService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
 
 	dnsNameFunction := c.masterDnsName
 	name := c.Metadata.Name
@@ -436,13 +436,23 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 	}
 
 	serviceSpec := v1.ServiceSpec{
-		Ports:	[]v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+		Type:  v1.ServiceTypeClusterIP,
 	}
+
+	if role == Replica {
+		serviceSpec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
+	}
+
 	var annotations map[string]string
 
-	if c.OpConfig.EnableLoadBalancer {
+	// Examine the per-cluster load balancer setting, if it is not defined - check the operator configuration.
+	if (newSpec.UseLoadBalancer != nil && *newSpec.UseLoadBalancer) ||
+		(newSpec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
+
 		// safe default value: lock load balancer to only local address unless overriden explicitely.
 		sourceRanges := []string{localHost}
+		allowedSourceRanges := newSpec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {
 			sourceRanges = allowedSourceRanges
 		}
@@ -455,16 +465,13 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 		}
 
-		if role == Replica {
-			serviceSpec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
-		}
 	}
 
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      name,
-			Namespace: c.Metadata.Namespace,
-			Labels:    c.roleLabelsSet(role),
+			Name:        name,
+			Namespace:   c.Metadata.Namespace,
+			Labels:      c.roleLabelsSet(role),
 			Annotations: annotations,
 		},
 		Spec: serviceSpec,

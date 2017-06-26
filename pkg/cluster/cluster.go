@@ -435,7 +435,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 				continue
 			}
 		}
-		newService := c.genService(role, newSpec.Spec.AllowedSourceRanges)
+		newService := c.genService(role, &newSpec.Spec)
 		if match, reason := c.sameServiceWith(role, newService); !match {
 			c.logServiceChanges(role, c.Service[role], newService, true, reason)
 			if err := c.updateService(role, newService); err != nil {
