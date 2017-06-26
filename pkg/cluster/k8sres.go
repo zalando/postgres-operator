@@ -18,6 +18,7 @@ const (
 	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
 	patroniPGBinariesParameterName   = "bin_dir"
 	patroniPGParametersParameterName = "parameters"
+	localHost                        = "127.0.0.1/32"
 )
 
 type pgUser struct {
@@ -434,10 +435,24 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 		name = name + "-repl"
 	}
 
-	// safe default value: lock load balancer to only local address unless overriden explicitely.
-	sourceRanges := []string{"127.0.0.1/32"}
-	if len(allowedSourceRanges) >= 0 {
-		sourceRanges = allowedSourceRanges
+	serviceSpec := v1.ServiceSpec{}
+
+	if c.OpConfig.EnableLoadBalancer {
+		// safe default value: lock load balancer to only local address unless overriden explicitely.
+		sourceRanges := []string{localHost}
+		if len(allowedSourceRanges) >= 0 {
+			sourceRanges = allowedSourceRanges
+		}
+
+		serviceSpec = v1.ServiceSpec{
+			Type:  v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+			LoadBalancerSourceRanges: sourceRanges,
+		}
+
+		if role == Replica {
+			serviceSpec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
+		}
 	}
 
 	service := &v1.Service{
@@ -450,14 +465,7 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 				constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 			},
 		},
-		Spec: v1.ServiceSpec{
-			Type:  v1.ServiceTypeLoadBalancer,
-			Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			LoadBalancerSourceRanges: sourceRanges,
-		},
-	}
-	if role == Replica {
-		service.Spec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
+		Spec: serviceSpec,
 	}
 
 	return service

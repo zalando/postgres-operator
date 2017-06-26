@@ -53,6 +53,7 @@ type Config struct {
 	DebugLogging         bool           `name:"debug_logging" default:"true"`
 	EnableDBAccess       bool           `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI       bool           `name:"enable_teams_api" default:"true"`
+	EnableLoadBalancer   bool           `name:"enable_load_balancer" default:"true"`
 	MasterDNSNameFormat  stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	Workers              uint32         `name:"workers" default:"4"`
