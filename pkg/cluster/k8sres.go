@@ -436,6 +436,7 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 	}
 
 	serviceSpec := v1.ServiceSpec{}
+	var annotations map[string]string
 
 	if c.OpConfig.EnableLoadBalancer {
 		// safe default value: lock load balancer to only local address unless overriden explicitely.
@@ -450,6 +451,11 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 			LoadBalancerSourceRanges: sourceRanges,
 		}
 
+		annotations = map[string]string{
+			constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
+			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
+		}
+
 		if role == Replica {
 			serviceSpec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
 		}
@@ -460,10 +466,7 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 			Name:      name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.roleLabelsSet(role),
-			Annotations: map[string]string{
-				constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
-				constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-			},
+			Annotations: annotations,
 		},
 		Spec: serviceSpec,
 	}
