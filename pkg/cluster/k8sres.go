@@ -434,6 +434,12 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 		name = name + "-repl"
 	}
 
+	// safe default value: lock load balancer to only local address unless overriden explicitely.
+	sourceRanges := []string{"127.0.0.1/32"}
+	if len(allowedSourceRanges) >= 0 {
+		sourceRanges = allowedSourceRanges
+	}
+
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
@@ -447,7 +453,7 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 		Spec: v1.ServiceSpec{
 			Type:  v1.ServiceTypeLoadBalancer,
 			Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			LoadBalancerSourceRanges: allowedSourceRanges,
+			LoadBalancerSourceRanges: sourceRanges,
 		},
 	}
 	if role == Replica {
