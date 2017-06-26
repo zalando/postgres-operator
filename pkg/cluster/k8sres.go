@@ -435,7 +435,9 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 		name = name + "-repl"
 	}
 
-	serviceSpec := v1.ServiceSpec{}
+	serviceSpec := v1.ServiceSpec{
+		Ports:	[]v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
+	}
 	var annotations map[string]string
 
 	if c.OpConfig.EnableLoadBalancer {
@@ -445,11 +447,8 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 			sourceRanges = allowedSourceRanges
 		}
 
-		serviceSpec = v1.ServiceSpec{
-			Type:  v1.ServiceTypeLoadBalancer,
-			Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
-			LoadBalancerSourceRanges: sourceRanges,
-		}
+		serviceSpec.Type = v1.ServiceTypeLoadBalancer
+		serviceSpec.LoadBalancerSourceRanges = sourceRanges
 
 		annotations = map[string]string{
 			constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
