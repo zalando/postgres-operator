@@ -13,12 +13,13 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 )
 
 type Config struct {
 	RestConfig          *rest.Config
-	KubeClient          cluster.KubernetesClient
+	KubeClient          k8sutil.KubernetesClient
 	RestClient          *rest.RESTClient
 	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser

@@ -8,9 +8,9 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
 const (
@@ -43,8 +43,8 @@ func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
 	return &mockSecret{}
 }
 
-func newMockKubernetesClient() cluster.KubernetesClient {
-	return cluster.KubernetesClient{SecretsGetter: &MockSecretGetter{}}
+func newMockKubernetesClient() k8sutil.KubernetesClient {
+	return k8sutil.KubernetesClient{SecretsGetter: &MockSecretGetter{}}
 }
 
 func newMockController() *Controller {

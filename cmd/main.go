@@ -8,7 +8,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -49,7 +48,7 @@ func ControllerConfig() *controller.Config {
 		log.Fatalf("Can't get REST config: %s", err)
 	}
 
-	client, err := k8sutil.KubernetesClient(restConfig)
+	client, err := k8sutil.ClientSet(restConfig)
 	if err != nil {
 		log.Fatalf("Can't create client: %s", err)
 	}
@@ -61,7 +60,7 @@ func ControllerConfig() *controller.Config {
 
 	return &controller.Config{
 		RestConfig: restConfig,
-		KubeClient: cluster.NewFromKubernetesInterface(client),
+		KubeClient: k8sutil.NewFromKubernetesInterface(client),
 		RestClient: restClient,
 	}
 }
