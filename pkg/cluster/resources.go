@@ -253,15 +253,40 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 	if newService.Spec.Type != c.Service[role].Spec.Type {
 		// service type has changed, need to replace the service completely.
 		// we cannot patch, since old attributes could be incompatible with the new service type
-		err := c.KubeClient.Services(c.Service[role].Namespace).Delete(c.Service[role].Name, c.deleteOptions)
+		// we do re-creating the service in 4 steps (for the master service):
+		//  fetch the actual endpoint, delete the old service, create the new service, restore the endpoint
+		// we cannot rely on the stored value of the endpoint in the cluster, because it doesn't reflect the current
+		// address the endpoint points to.
+		var (
+			currentEndpoint *v1.Endpoints
+			err             error
+		)
+
+		if role == Master {
+			currentEndpoint, err = c.KubeClient.Endpoints(c.Service[role].Namespace).Get(c.Service[role].Name)
+			if err != nil {
+				return fmt.Errorf("could not get current cluster endpoints: %v", err)
+			}
+		}
+		err = c.KubeClient.Services(c.Service[role].Namespace).Delete(c.Service[role].Name, c.deleteOptions)
 		if err != nil {
 			return fmt.Errorf("could not delete service '%s': '%v'", serviceName, err)
 		}
+		c.Endpoint = nil
 		svc, err := c.KubeClient.Services(newService.Namespace).Create(newService)
 		if err != nil {
 			return fmt.Errorf("could not create service '%s': '%v'", serviceName, err)
 		}
 		c.Service[role] = svc
+		// recreate the endpoint
+		if role == Master {
+			endpointSpec := c.genMasterEndpoints(currentEndpoint.Subsets)
+			ep, err := c.KubeClient.Endpoints(c.Service[role].Namespace).Create(endpointSpec)
+			if err != nil {
+				return fmt.Errorf("could not create endpoint '%s': '%v'", ep.Name, err)
+			}
+			c.Endpoint = ep
+		}
 		return nil
 	}
 
@@ -314,7 +339,7 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 	if c.Endpoint != nil {
 		return nil, fmt.Errorf("endpoint already exists in the cluster")
 	}
-	endpointsSpec := c.genMasterEndpoints()
+	endpointsSpec := c.genMasterEndpoints(nil)
 
 	endpoints, err := c.KubeClient.Endpoints(endpointsSpec.Namespace).Create(endpointsSpec)
 	if err != nil {

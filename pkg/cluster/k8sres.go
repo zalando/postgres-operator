@@ -480,13 +480,16 @@ func (c *Cluster) genService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.
 	return service
 }
 
-func (c *Cluster) genMasterEndpoints() *v1.Endpoints {
+func (c *Cluster) genMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.roleLabelsSet(Master),
 		},
+	}
+	if len(subsets) > 0 {
+		endpoints.Subsets = subsets
 	}
 
 	return endpoints

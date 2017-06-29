@@ -242,6 +242,10 @@ func (c *Cluster) Create() error {
 func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
 	match = true
+	if c.Service[role].Spec.Type != service.Spec.Type {
+		return false, fmt.Sprintf("new %s service's type %s doesn't match the current one %s",
+			role, service.Spec.Type, c.Service[role].Spec.Type)
+	}
 	oldSourceRanges := c.Service[role].Spec.LoadBalancerSourceRanges
 	newSourceRanges := service.Spec.LoadBalancerSourceRanges
 	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
