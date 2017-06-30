@@ -296,7 +296,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
 	// and the combined effect of all the changes should be applied.
 	// TODO: log all reasons for changing the statefulset, not just the last one.
-	// TODO: make sure this is in sync with genPodTemplate, ideally by using the same list of fields to generate
+	// TODO: make sure this is in sync with generatePodTemplate, ideally by using the same list of fields to generate
 	// the template and the diff
 	if c.Statefulset.Spec.Template.Spec.ServiceAccountName != statefulSet.Spec.Template.Spec.ServiceAccountName {
 		needsReplace = true
@@ -439,7 +439,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 				continue
 			}
 		}
-		newService := c.genService(role, &newSpec.Spec)
+		newService := c.generateService(role, &newSpec.Spec)
 		if match, reason := c.sameServiceWith(role, newService); !match {
 			c.logServiceChanges(role, c.Service[role], newService, true, reason)
 			if err := c.updateService(role, newService); err != nil {
@@ -450,7 +450,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		}
 	}
 
-	newStatefulSet, err := c.genStatefulSet(newSpec.Spec)
+	newStatefulSet, err := c.generateStatefulSet(newSpec.Spec)
 	if err != nil {
 		return fmt.Errorf("could not generate statefulset: %v", err)
 	}

@@ -204,7 +204,7 @@ PATRONI_INITDB_PARAMS:
 	return string(result)
 }
 
-func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, pgParameters *spec.PostgresqlParam, patroniParameters *spec.Patroni) *v1.PodTemplateSpec {
+func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements, pgParameters *spec.PostgresqlParam, patroniParameters *spec.Patroni) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -324,14 +324,14 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 	return &template
 }
 
-func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
+func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
 	resourceRequirements, err := c.resourceRequirements(spec.Resources)
 	if err != nil {
 		return nil, err
 	}
 
-	podTemplate := c.genPodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni)
-	volumeClaimTemplate, err := persistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
+	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni)
+	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func (c *Cluster) genStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, 
 	return statefulSet, nil
 }
 
-func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
+func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
 	metadata := v1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
@@ -384,19 +384,19 @@ func persistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.P
 	return volumeClaim, nil
 }
 
-func (c *Cluster) genUserSecrets() (secrets map[string]*v1.Secret) {
+func (c *Cluster) generateUserSecrets() (secrets map[string]*v1.Secret) {
 	secrets = make(map[string]*v1.Secret, len(c.pgUsers))
 	namespace := c.Metadata.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		secret := c.genSingleUserSecret(namespace, pgUser)
+		secret := c.generateSingleUserSecret(namespace, pgUser)
 		if secret != nil {
 			secrets[username] = secret
 		}
 	}
 	/* special case for the system user */
 	for _, systemUser := range c.systemUsers {
-		secret := c.genSingleUserSecret(namespace, systemUser)
+		secret := c.generateSingleUserSecret(namespace, systemUser)
 		if secret != nil {
 			secrets[systemUser.Name] = secret
 		}
@@ -405,7 +405,7 @@ func (c *Cluster) genUserSecrets() (secrets map[string]*v1.Secret) {
 	return
 }
 
-func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
+func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
 		return nil
@@ -426,7 +426,7 @@ func (c *Cluster) genSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.
 	return &secret
 }
 
-func (c *Cluster) genService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
 
 	dnsNameFunction := c.masterDnsName
 	name := c.Metadata.Name
@@ -480,7 +480,7 @@ func (c *Cluster) genService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.
 	return service
 }
 
-func (c *Cluster) genMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
+func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      c.Metadata.Name,
