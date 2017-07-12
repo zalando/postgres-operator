@@ -99,13 +99,11 @@ func (c *Controller) initController() {
 		constants.QueueResyncPeriodTPR,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
-	if err := c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.postgresqlAdd,
 		UpdateFunc: c.postgresqlUpdate,
 		DeleteFunc: c.postgresqlDelete,
-	}); err != nil {
-		c.logger.Fatalf("could not add event handlers: %v", err)
-	}
+	})
 
 	// Pods
 	podLw := &cache.ListWatch{
@@ -119,13 +117,11 @@ func (c *Controller) initController() {
 		constants.QueueResyncPeriodPod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
-	if err := c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.podAdd,
 		UpdateFunc: c.podUpdate,
 		DeleteFunc: c.podDelete,
-	}); err != nil {
-		c.logger.Fatalf("could not add event handlers: %v", err)
-	}
+	})
 
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {

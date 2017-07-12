@@ -6,9 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/pkg/api/meta"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/api/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.
@@ -71,8 +70,8 @@ const (
 
 // Postgresql defines PostgreSQL Third Party (resource) Object.
 type Postgresql struct {
-	unversioned.TypeMeta `json:",inline"`
-	Metadata             v1.ObjectMeta `json:"metadata"`
+	meta_v1.TypeMeta `json:",inline"`
+	Metadata         meta_v1.ObjectMeta `json:"metadata"`
 
 	Spec   PostgresSpec   `json:"spec"`
 	Status PostgresStatus `json:"status,omitempty"`
@@ -99,8 +98,8 @@ type PostgresSpec struct {
 
 // PostgresqlList defines a list of PostgreSQL clusters.
 type PostgresqlList struct {
-	unversioned.TypeMeta `json:",inline"`
-	Metadata             unversioned.ListMeta `json:"metadata"`
+	meta_v1.TypeMeta `json:",inline"`
+	Metadata         meta_v1.ListMeta `json:"metadata"`
 
 	Items []Postgresql `json:"items"`
 }
@@ -192,17 +191,21 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 }
 
 // GetObject implements Object interface for PostgreSQL TPR spec object.
-func (p *Postgresql) GetObjectKind() unversioned.ObjectKind {
+func (p *Postgresql) GetObjectKind() schema.ObjectKind {
 	return &p.TypeMeta
 }
 
 // GetObjectMeta implements ObjectMetaAccessor interface for PostgreSQL TPR spec object.
-func (p *Postgresql) GetObjectMeta() meta.Object {
+func (p *Postgresql) GetObjectMeta() meta_v1.Object {
 	return &p.Metadata
 }
 
+func (pl *PostgresqlList) GetObjectKind() schema.ObjectKind {
+	return &pl.TypeMeta
+}
+
 // GetListMeta implements ListMetaAccessor interface for PostgreSQL TPR List spec object.
-func (pl *PostgresqlList) GetListMeta() unversioned.List {
+func (pl *PostgresqlList) GetListMeta() meta_v1.List {
 	return &pl.Metadata
 }
 

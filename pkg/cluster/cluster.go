@@ -11,11 +11,11 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
@@ -66,7 +66,7 @@ type Cluster struct {
 	mu               sync.Mutex
 	masterLess       bool
 	userSyncStrategy spec.UserSyncer
-	deleteOptions    *v1.DeleteOptions
+	deleteOptions    *meta_v1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 }
 
@@ -102,7 +102,7 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 		kubeResources:    kubeResources,
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &v1.DeleteOptions{OrphanDependents: &orphanDependents},
+		deleteOptions:    &meta_v1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
 	}
 
@@ -126,7 +126,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 
-	_, err = c.RestClient.Patch(api.MergePatchType).
+	_, err = c.RestClient.Patch(types.MergePatchType).
 		RequestURI(c.Metadata.GetSelfLink()).
 		Body(request).
 		DoRaw()

@@ -5,7 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/client-go/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -17,7 +18,7 @@ import (
 
 func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, error) {
 	ns := c.Metadata.Namespace
-	listOptions := v1.ListOptions{
+	listOptions := meta_v1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}
 
@@ -69,7 +70,7 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 				continue
 			}
 		}
-		pv, err := c.KubeClient.PersistentVolumes().Get(pvc.Spec.VolumeName)
+		pv, err := c.KubeClient.PersistentVolumes().Get(pvc.Spec.VolumeName, meta_v1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("could not get PersistentVolume: %v", err)
 		}
