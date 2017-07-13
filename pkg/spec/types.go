@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
+	"k8s.io/client-go/rest"
+
+	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 )
 
 // EvenType contains type of the events for the TPRs and Pods received from Kubernetes
@@ -65,6 +69,15 @@ type PgUserMap map[string]PgUser
 type PgSyncUserRequest struct {
 	Kind syncUserOperation
 	User PgUser
+}
+
+// Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
+type ClusterConfig struct {
+	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
+	RestClient          *rest.RESTClient
+	TeamsAPIClient      *teams.API
+	RestConfig          *rest.Config
+	InfrastructureRoles map[string]PgUser // inherited from the controller
 }
 
 // UserSyncer defines an interface for the implementations to sync users from the manifest to the DB.

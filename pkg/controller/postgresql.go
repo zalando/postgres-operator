@@ -17,6 +17,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
@@ -125,7 +126,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		logger.Infof("Creation of the '%s' cluster started", clusterName)
 
 		stopCh := make(chan struct{})
-		cl = cluster.New(c.makeClusterConfig(), *event.NewSpec, logger)
+		cl = cluster.New(c.makeClusterConfig(), config.Copy(c.opConfig), *event.NewSpec, logger)
 		cl.Run(stopCh)
 
 		c.clustersMu.Lock()
@@ -176,7 +177,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
 			stopCh := make(chan struct{})
-			cl = cluster.New(c.makeClusterConfig(), *event.NewSpec, logger)
+			cl = cluster.New(c.makeClusterConfig(), config.Copy(c.opConfig), *event.NewSpec, logger)
 			cl.Run(stopCh)
 
 			c.clustersMu.Lock()

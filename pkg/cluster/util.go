@@ -111,11 +111,11 @@ func (c *Cluster) getOAuthToken() (string, error) {
 	//TODO: we can move this function to the Controller in case it will be needed there. As for now we use it only in the Cluster
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
 	credentialsSecret, err := c.KubeClient.
-		Secrets(c.OpConfig.OAuthTokenSecretName.Namespace).
-		Get(c.OpConfig.OAuthTokenSecretName.Name)
+		Secrets(c.OAuthTokenSecretName.Namespace).
+		Get(c.OAuthTokenSecretName.Name)
 
 	if err != nil {
-		c.logger.Debugf("Oauth token secret name: %s", c.OpConfig.OAuthTokenSecretName)
+		c.logger.Debugf("Oauth token secret name: %s", c.OAuthTokenSecretName)
 		return "", fmt.Errorf("could not get credentials secret: %v", err)
 	}
 	data := credentialsSecret.Data
@@ -131,7 +131,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	if c.Spec.TeamID == "" {
 		return nil, fmt.Errorf("no teamId specified")
 	}
-	if !c.OpConfig.EnableTeamsAPI {
+	if !c.EnableTeamsAPI {
 		c.logger.Debug("Team API is disabled, returning empty list of members")
 		return []string{}, nil
 	}
@@ -160,7 +160,7 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
 			if role == constants.PodRoleMaster || role == constants.PodRoleReplica {
 				return nil
 			}
-		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
+		case <-time.After(c.PodLabelWaitTimeout):
 			return fmt.Errorf("pod label wait timeout")
 		}
 	}
@@ -173,14 +173,14 @@ func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
 			if podEvent.EventType == spec.EventDelete {
 				return nil
 			}
-		case <-time.After(c.OpConfig.PodDeletionWaitTimeout):
+		case <-time.After(c.PodDeletionWaitTimeout):
 			return fmt.Errorf("pod deletion wait timeout")
 		}
 	}
 }
 
 func (c *Cluster) waitStatefulsetReady() error {
-	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	return retryutil.Retry(c.ResourceCheckInterval, c.ResourceCheckTimeout,
 		func() (bool, error) {
 			listOptions := v1.ListOptions{
 				LabelSelector: c.labelsSet().String(),
@@ -207,12 +207,12 @@ func (c *Cluster) waitPodLabelsReady() error {
 	}
 	masterListOption := v1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
+			c.PodRoleLabel: constants.PodRoleMaster,
 		}).String(),
 	}
 	replicaListOption := v1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
+			c.PodRoleLabel: constants.PodRoleReplica,
 		}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
@@ -221,7 +221,7 @@ func (c *Cluster) waitPodLabelsReady() error {
 	}
 	podsNumber := len(pods.Items)
 
-	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err = retryutil.Retry(c.ResourceCheckInterval, c.ResourceCheckTimeout,
 		func() (bool, error) {
 			masterPods, err := c.KubeClient.Pods(namespace).List(masterListOption)
 			if err != nil {
@@ -263,32 +263,32 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 
 func (c *Cluster) labelsSet() labels.Set {
 	lbls := make(map[string]string)
-	for k, v := range c.OpConfig.ClusterLabels {
+	for k, v := range c.ClusterLabels {
 		lbls[k] = v
 	}
-	lbls[c.OpConfig.ClusterNameLabel] = c.Metadata.Name
+	lbls[c.ClusterNameLabel] = c.Metadata.Name
 
 	return labels.Set(lbls)
 }
 
 func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
 	lbls := c.labelsSet()
-	lbls[c.OpConfig.PodRoleLabel] = string(role)
+	lbls[c.PodRoleLabel] = string(role)
 	return lbls
 }
 
 func (c *Cluster) masterDnsName() string {
-	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
+	return strings.ToLower(c.MasterDNSNameFormat.Format(
 		"cluster", c.Spec.ClusterName,
 		"team", c.teamName(),
-		"hostedzone", c.OpConfig.DbHostedZone))
+		"hostedzone", c.DbHostedZone))
 }
 
 func (c *Cluster) replicaDnsName() string {
-	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
+	return strings.ToLower(c.ReplicaDNSNameFormat.Format(
 		"cluster", c.Spec.ClusterName,
 		"team", c.teamName(),
-		"hostedzone", c.OpConfig.DbHostedZone))
+		"hostedzone", c.DbHostedZone))
 }
 
 func (c *Cluster) credentialSecretName(username string) string {
@@ -300,5 +300,5 @@ func (c *Cluster) credentialSecretName(username string) string {
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
-	return pod.Labels[c.OpConfig.PodRoleLabel]
+	return pod.Labels[c.PodRoleLabel]
 }

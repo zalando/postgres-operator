@@ -11,12 +11,10 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/pkg/types"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -24,7 +22,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
@@ -33,16 +30,6 @@ var (
 	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
 	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 )
-
-// Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
-type Config struct {
-	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
-	RestClient          *rest.RESTClient
-	RestConfig          *rest.Config
-	TeamsAPIClient      *teams.API
-	OpConfig            config.Config
-	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
-}
 
 type kubeResources struct {
 	Service     map[PostgresRole]*v1.Service
@@ -56,7 +43,8 @@ type kubeResources struct {
 type Cluster struct {
 	kubeResources
 	spec.Postgresql
-	Config
+	spec.ClusterConfig
+	config.Config
 	logger           *logrus.Entry
 	pgUsers          map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
@@ -78,7 +66,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
+func New(cfg spec.ClusterConfig, opCfg config.Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true
@@ -93,7 +81,8 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	})
 
 	cluster := &Cluster{
-		Config:           cfg,
+		ClusterConfig:    cfg,
+		Config:           opCfg,
 		Postgresql:       pgSpec,
 		logger:           lg,
 		pgUsers:          make(map[string]spec.PgUser),
@@ -586,11 +575,11 @@ func (c *Cluster) initSystemUsers() {
 	// secrets, therefore, setting flags like SUPERUSER or REPLICATION
 	// is not necessary here
 	c.systemUsers[constants.SuperuserKeyName] = spec.PgUser{
-		Name:     c.OpConfig.SuperUsername,
+		Name:     c.SuperUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
 	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
-		Name:     c.OpConfig.ReplicationUsername,
+		Name:     c.ReplicationUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
 }
@@ -623,7 +612,7 @@ func (c *Cluster) initHumanUsers() error {
 	}
 	for _, username := range teamMembers {
 		flags := []string{constants.RoleFlagLogin, constants.RoleFlagSuperuser}
-		memberOf := []string{c.OpConfig.PamRoleName}
+		memberOf := []string{c.PamRoleName}
 		c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
 	}
 

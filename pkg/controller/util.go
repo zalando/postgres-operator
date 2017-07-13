@@ -7,25 +7,22 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
-func (c *Controller) makeClusterConfig() cluster.Config {
+func (c *Controller) makeClusterConfig() spec.ClusterConfig {
 	infrastructureRoles := make(map[string]spec.PgUser)
 	for k, v := range c.InfrastructureRoles {
 		infrastructureRoles[k] = v
 	}
 
-	return cluster.Config{
+	return spec.ClusterConfig{
 		KubeClient:          c.KubeClient,
 		RestClient:          c.RestClient,
 		RestConfig:          c.RestConfig,
 		TeamsAPIClient:      c.TeamsAPIClient,
-		OpConfig:            config.Copy(c.opConfig),
 		InfrastructureRoles: infrastructureRoles,
 	}
 }

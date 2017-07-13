@@ -28,7 +28,7 @@ func (c *Cluster) loadResources() error {
 		return fmt.Errorf("too many(%d) services for a cluster", len(services.Items))
 	}
 	for i, svc := range services.Items {
-		switch PostgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
+		switch PostgresRole(svc.Labels[c.PodRoleLabel]) {
 		case Replica:
 			c.Service[Replica] = &services.Items[i]
 		default:
@@ -45,7 +45,7 @@ func (c *Cluster) loadResources() error {
 	}
 
 	for i, ep := range endpoints.Items {
-		if ep.Labels[c.OpConfig.PodRoleLabel] != string(Replica) {
+		if ep.Labels[c.PodRoleLabel] != string(Replica) {
 			c.Endpoint = &endpoints.Items[i]
 			break
 		}

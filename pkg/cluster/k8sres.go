@@ -50,10 +50,8 @@ func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRe
 	specRequests := resources.ResourceRequest
 	specLimits := resources.ResourceLimits
 
-	config := c.OpConfig
-
-	defaultRequests := spec.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
-	defaultLimits := spec.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
+	defaultRequests := spec.ResourceDescription{CPU: c.DefaultCPURequest, Memory: c.DefaultMemoryRequest}
+	defaultLimits := spec.ResourceDescription{CPU: c.DefaultCPULimit, Memory: c.DefaultMemoryLimit}
 
 	result := v1.ResourceRequirements{}
 
@@ -166,7 +164,7 @@ PATRONI_INITDB_PARAMS:
 	} else {
 		config.Bootstrap.PgHBA = []string{
 			"hostnossl all all all reject",
-			fmt.Sprintf("hostssl   all +%s all pam", c.OpConfig.PamRoleName),
+			fmt.Sprintf("hostssl   all +%s all pam", c.PamRoleName),
 			"hostssl   all all all md5",
 		}
 	}
@@ -190,7 +188,7 @@ PATRONI_INITDB_PARAMS:
 		config.PgLocalConfiguration[patroniPGParametersParameterName] = pg.Parameters
 	}
 	config.Bootstrap.Users = map[string]pgUser{
-		c.OpConfig.PamRoleName: {
+		c.PamRoleName: {
 			Password: "",
 			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
 		},
@@ -217,7 +215,7 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 		},
 		{
 			Name:  "ETCD_HOST",
-			Value: c.OpConfig.EtcdHost,
+			Value: c.EtcdHost,
 		},
 		{
 			Name: "POD_IP",
@@ -242,7 +240,7 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: c.credentialSecretName(c.OpConfig.SuperUsername),
+						Name: c.credentialSecretName(c.SuperUsername),
 					},
 					Key: "password",
 				},
@@ -253,7 +251,7 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
-						Name: c.credentialSecretName(c.OpConfig.ReplicationUsername),
+						Name: c.credentialSecretName(c.ReplicationUsername),
 					},
 					Key: "password",
 				},
@@ -261,19 +259,19 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 		},
 		{
 			Name:  "PAM_OAUTH2",
-			Value: c.OpConfig.PamConfiguration,
+			Value: c.PamConfiguration,
 		},
 	}
 	if spiloConfiguration != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "SPILO_CONFIGURATION", Value: spiloConfiguration})
 	}
-	if c.OpConfig.WALES3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+	if c.WALES3Bucket != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.WALES3Bucket})
 	}
 	privilegedMode := bool(true)
 	container := v1.Container{
 		Name:            c.Metadata.Name,
-		Image:           c.OpConfig.DockerImage,
+		Image:           c.DockerImage,
 		ImagePullPolicy: v1.PullAlways,
 		Resources:       *resourceRequirements,
 		Ports: []v1.ContainerPort{
@@ -304,7 +302,7 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 	terminateGracePeriodSeconds := int64(30)
 
 	podSpec := v1.PodSpec{
-		ServiceAccountName:            c.OpConfig.ServiceAccountName,
+		ServiceAccountName:            c.ServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
 	}
@@ -316,8 +314,8 @@ func (c *Cluster) genPodTemplate(resourceRequirements *v1.ResourceRequirements, 
 		},
 		Spec: podSpec,
 	}
-	if c.OpConfig.KubeIAMRole != "" {
-		template.Annotations = map[string]string{constants.KubeIAmAnnotation: c.OpConfig.KubeIAMRole}
+	if c.KubeIAMRole != "" {
+		template.Annotations = map[string]string{constants.KubeIAmAnnotation: c.KubeIAMRole}
 	}
 
 	return &template
@@ -451,7 +449,7 @@ func (c *Cluster) genService(role PostgresRole, allowedSourceRanges []string) *v
 		},
 	}
 	if role == Replica {
-		service.Spec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(Replica)}
+		service.Spec.Selector = map[string]string{c.PodRoleLabel: string(Replica)}
 	}
 
 	return service
