@@ -140,14 +140,14 @@ func (c *Cluster) recreatePods() error {
 	}
 	if masterPod.Name == "" {
 		c.logger.Warningln("No master pod in the cluster")
-	}
+	} else {
+		//TODO: do manual failover
+		//TODO: specify master, leave new master empty
+		c.logger.Infof("Recreating master pod '%s'", util.NameFromMeta(masterPod.ObjectMeta))
 
-	//TODO: do manual failover
-	//TODO: specify master, leave new master empty
-	c.logger.Infof("Recreating master pod '%s'", util.NameFromMeta(masterPod.ObjectMeta))
-
-	if err := c.recreatePod(masterPod); err != nil {
-		return fmt.Errorf("could not recreate master pod '%s': %v", util.NameFromMeta(masterPod.ObjectMeta), err)
+		if err := c.recreatePod(masterPod); err != nil {
+			return fmt.Errorf("could not recreate master pod '%s': %v", util.NameFromMeta(masterPod.ObjectMeta), err)
+		}
 	}
 
 	return nil
