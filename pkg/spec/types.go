@@ -1,9 +1,9 @@
 package spec
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
-	"database/sql"
 
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/types"
@@ -71,6 +71,28 @@ type PgSyncUserRequest struct {
 type UserSyncer interface {
 	ProduceSyncRequests(dbUsers PgUserMap, newUsers PgUserMap) (req []PgSyncUserRequest)
 	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
+}
+
+type ClusterEventHandler interface {
+	Create() error
+	Update(*Postgresql) error
+	Delete() error
+	Sync() error
+}
+
+type ClusterCommandExecutor interface {
+	ExecCommand(*NamespacedName, ...string) (string, error)
+}
+
+type ClusterController interface {
+	Run(<-chan struct{})
+	ReceivePodEvent(PodEvent)
+}
+
+type Cluster interface {
+	ClusterEventHandler
+	ClusterCommandExecutor
+	ClusterController
 }
 
 func (n NamespacedName) String() string {

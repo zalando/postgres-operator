@@ -10,7 +10,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -31,7 +30,7 @@ type Controller struct {
 	logger   *logrus.Entry
 
 	clustersMu sync.RWMutex
-	clusters   map[spec.NamespacedName]*cluster.Cluster
+	clusters   map[spec.NamespacedName]spec.Cluster
 	stopChs    map[spec.NamespacedName]chan struct{}
 
 	postgresqlInformer cache.SharedIndexInformer
@@ -56,7 +55,7 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 		Config:   *controllerConfig,
 		opConfig: operatorConfig,
 		logger:   logger.WithField("pkg", "controller"),
-		clusters: make(map[spec.NamespacedName]*cluster.Cluster),
+		clusters: make(map[spec.NamespacedName]spec.Cluster),
 		stopChs:  make(map[spec.NamespacedName]chan struct{}),
 		podCh:    make(chan spec.PodEvent),
 	}

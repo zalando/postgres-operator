@@ -178,7 +178,8 @@ func (c *Cluster) Create() error {
 	//TODO: service will create endpoint implicitly
 	ep, err := c.createEndpoint()
 	if err != nil {
-		return fmt.Errorf("could not create endpoint: %v", err)
+		c.Error = fmt.Errorf("could not create endpoint: %v", err)
+		return c.Error
 	}
 	c.logger.Infof("endpoint '%s' has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
@@ -188,41 +189,48 @@ func (c *Cluster) Create() error {
 		}
 		service, err := c.createService(role)
 		if err != nil {
-			return fmt.Errorf("could not create %s service: %v", role, err)
+			c.Error = fmt.Errorf("could not create %s service: %v", role, err)
+			return c.Error
 		}
 		c.logger.Infof("%s service '%s' has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
 	}
 
 	if err = c.initUsers(); err != nil {
-		return err
+		c.Error = err
+		return c.Error
 	}
 	c.logger.Infof("User secrets have been initialized")
 
 	if err = c.applySecrets(); err != nil {
-		return fmt.Errorf("could not create secrets: %v", err)
+		c.Error = fmt.Errorf("could not create secrets: %v", err)
+		return c.Error
 	}
 	c.logger.Infof("secrets have been successfully created")
 
 	ss, err := c.createStatefulSet()
 	if err != nil {
-		return fmt.Errorf("could not create statefulset: %v", err)
+		c.Error = fmt.Errorf("could not create statefulset: %v", err)
+		return c.Error
 	}
 	c.logger.Infof("statefulset '%s' has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
 	c.logger.Info("Waiting for cluster being ready")
 
 	if err = c.waitStatefulsetPodsReady(); err != nil {
+		c.Error = err
 		c.logger.Errorf("Failed to create cluster: %s", err)
-		return err
+		return c.Error
 	}
 	c.logger.Infof("pods are ready")
 
 	if !(c.masterLess || c.databaseAccessDisabled()) {
 		if err := c.initDbConn(); err != nil {
-			return fmt.Errorf("could not init db connection: %v", err)
+			c.Error = fmt.Errorf("could not init db connection: %v", err)
+			return c.Error
 		}
 		if err = c.createUsers(); err != nil {
-			return fmt.Errorf("could not create users: %v", err)
+			c.Error = fmt.Errorf("could not create users: %v", err)
+			return c.Error
 		}
 		c.logger.Infof("Users have been successfully created")
 	} else {
@@ -495,6 +503,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	}
 
 	c.setStatus(spec.ClusterStatusRunning)
+	c.Error = nil
 
 	return nil
 }

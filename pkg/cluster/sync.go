@@ -73,6 +73,8 @@ func (c *Cluster) Sync() error {
 		return fmt.Errorf("could not sync persistent volumes: %v", err)
 	}
 
+	c.Error = nil
+
 	return nil
 }
 
