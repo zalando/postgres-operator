@@ -57,6 +57,7 @@ type Config struct {
 	MasterDNSNameFormat  stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	Workers              uint32         `name:"workers" default:"4"`
+	Port                 uint32         `name:"port" default:"80"`
 }
 
 func (c Config) MustMarshal() string {

@@ -68,10 +68,14 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 	c.initController()
 
-	go c.runInformers(stopCh)
+	go c.runPodInformer(stopCh, wg)
+	go c.runPostgresqlInformer(stopCh, wg)
+	go c.podEventsDispatcher(stopCh, wg)
+	go c.clusterResync(stopCh, wg)
+	go c.restAPIServer(stopCh, wg)
 
 	for i := range c.clusterEventQueues {
-		go c.processClusterEventsQueue(i)
+		go c.processClusterEventsQueue(stopCh, i, wg)
 	}
 
 	c.logger.Info("Started working in background")
@@ -140,11 +144,20 @@ func (c *Controller) initController() {
 	}
 }
 
-func (c *Controller) runInformers(stopCh <-chan struct{}) {
-	go c.postgresqlInformer.Run(stopCh)
+func (c *Controller) runPodInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+	wg.Add(1)
+
 	go c.podInformer.Run(stopCh)
-	go c.podEventsDispatcher(stopCh)
-	go c.clusterResync(stopCh)
+
+	<-stopCh
+}
+
+func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+	wg.Add(1)
+
+	go c.postgresqlInformer.Run(stopCh)
 
 	<-stopCh
 }
