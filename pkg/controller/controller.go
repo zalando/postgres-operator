@@ -63,17 +63,17 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 }
 
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
-	defer wg.Done()
-	wg.Add(1)
 
 	c.initController()
 
+	wg.Add(4)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.podEventsDispatcher(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
 
 	for i := range c.clusterEventQueues {
+		wg.Add(1)
 		go c.processClusterEventsQueue(stopCh, i, wg)
 	}
 
@@ -145,7 +145,6 @@ func (c *Controller) initController() {
 
 func (c *Controller) runPodInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wg.Add(1)
 
 	go c.podInformer.Run(stopCh)
 
@@ -154,7 +153,6 @@ func (c *Controller) runPodInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) 
 
 func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wg.Add(1)
 
 	go c.postgresqlInformer.Run(stopCh)
 

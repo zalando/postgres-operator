@@ -23,7 +23,6 @@ import (
 
 func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wg.Add(1)
 	ticker := time.NewTicker(c.opConfig.ResyncPeriod)
 
 	for {
@@ -208,7 +207,6 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 func (c *Controller) processClusterEventsQueue(stopCh <-chan struct{}, idx int, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wg.Add(1)
 
 	go func() {
 		if _, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(c.processEvent)); err != nil {
