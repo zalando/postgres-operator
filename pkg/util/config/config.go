@@ -80,6 +80,9 @@ func NewFromMap(m map[string]string) *Config {
 			value = structField.Default
 		}
 
+		if value == "" {
+			continue
+		}
 		err := processField(value, structField.Field)
 		if err != nil {
 			panic(err)
