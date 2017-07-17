@@ -3,27 +3,20 @@ package controller
 import (
 	"sync"
 
-	"k8s.io/client-go/pkg/api"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/watch"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
-func (c *Controller) podListFunc(options api.ListOptions) (runtime.Object, error) {
+func (c *Controller) podListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
 	var labelSelector string
 	var fieldSelector string
 
-	if options.LabelSelector != nil {
-		labelSelector = options.LabelSelector.String()
-	}
-
-	if options.FieldSelector != nil {
-		fieldSelector = options.FieldSelector.String()
-	}
-	opts := v1.ListOptions{
+	opts := meta_v1.ListOptions{
 		LabelSelector:   labelSelector,
 		FieldSelector:   fieldSelector,
 		Watch:           options.Watch,
@@ -34,19 +27,11 @@ func (c *Controller) podListFunc(options api.ListOptions) (runtime.Object, error
 	return c.KubeClient.CoreV1().Pods(c.opConfig.Namespace).List(opts)
 }
 
-func (c *Controller) podWatchFunc(options api.ListOptions) (watch.Interface, error) {
+func (c *Controller) podWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
 	var labelSelector string
 	var fieldSelector string
 
-	if options.LabelSelector != nil {
-		labelSelector = options.LabelSelector.String()
-	}
-
-	if options.FieldSelector != nil {
-		fieldSelector = options.FieldSelector.String()
-	}
-
-	opts := v1.ListOptions{
+	opts := meta_v1.ListOptions{
 		LabelSelector:   labelSelector,
 		FieldSelector:   fieldSelector,
 		Watch:           options.Watch,
