@@ -90,8 +90,9 @@ func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Objec
 }
 
 func (c *Controller) clusterWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
+	options.Watch = true
 	req := c.RestClient.Get().
-		RequestURI(fmt.Sprintf(constants.WatchClustersURITemplate, c.opConfig.Namespace)).
+		RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, c.opConfig.Namespace)).
 		VersionedParams(&options, scheme.ParameterCodec).
 		FieldsSelectorParam(fields.Everything())
 	return req.Watch()
