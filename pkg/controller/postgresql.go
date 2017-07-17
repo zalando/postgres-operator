@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
@@ -39,7 +39,7 @@ func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Objec
 
 	req := c.RestClient.Get().
 		RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, c.opConfig.Namespace)).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		FieldsSelectorParam(fields.Everything())
 
 	object, err := req.Do().Get()
@@ -92,7 +92,7 @@ func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Objec
 func (c *Controller) clusterWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
 	req := c.RestClient.Get().
 		RequestURI(fmt.Sprintf(constants.WatchClustersURITemplate, c.opConfig.Namespace)).
-		VersionedParams(&options, api.ParameterCodec).
+		VersionedParams(&options, scheme.ParameterCodec).
 		FieldsSelectorParam(fields.Everything())
 	return req.Watch()
 }
