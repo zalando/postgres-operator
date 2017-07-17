@@ -146,15 +146,11 @@ func (c *Controller) initController() {
 func (c *Controller) runPodInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	go c.podInformer.Run(stopCh)
-
-	<-stopCh
+	c.podInformer.Run(stopCh)
 }
 
 func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	go c.postgresqlInformer.Run(stopCh)
-
-	<-stopCh
+	c.postgresqlInformer.Run(stopCh)
 }
