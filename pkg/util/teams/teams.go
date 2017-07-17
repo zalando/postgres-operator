@@ -39,6 +39,10 @@ type team struct {
 	InfrastructureAccounts []infrastructureAccount `json:"infrastructure-accounts"`
 }
 
+type Client interface {
+	TeamInfo(string, string) (*team, error)
+}
+
 type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }

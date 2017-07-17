@@ -39,7 +39,7 @@ type Config struct {
 	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
 	RestClient          *rest.RESTClient
 	RestConfig          *rest.Config
-	TeamsAPIClient      *teams.API
+	TeamsAPIClient      teams.Client
 	OpConfig            config.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
 }
