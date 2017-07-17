@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"sync"
+
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/runtime"
@@ -112,7 +114,9 @@ func (c *Controller) podDelete(obj interface{}) {
 	c.podCh <- podEvent
 }
 
-func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}) {
+func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	c.logger.Debugln("Watching all pod events")
 	for {
 		select {
