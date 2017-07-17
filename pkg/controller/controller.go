@@ -20,7 +20,7 @@ import (
 type Config struct {
 	RestConfig          *rest.Config
 	KubeClient          *kubernetes.Clientset
-	RestClient          *rest.RESTClient
+	RestClient          rest.Interface
 	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
 }

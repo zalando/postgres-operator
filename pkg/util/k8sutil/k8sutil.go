@@ -38,7 +38,7 @@ func ResourceNotFound(err error) bool {
 	return apierrors.IsNotFound(err)
 }
 
-func KubernetesRestClient(c *rest.Config) (*rest.RESTClient, error) {
+func KubernetesRestClient(c *rest.Config) (rest.Interface, error) {
 	c.GroupVersion = &schema.GroupVersion{Version: constants.K8sVersion}
 	c.APIPath = constants.K8sAPIPath
 	c.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}

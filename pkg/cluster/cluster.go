@@ -37,7 +37,7 @@ var (
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
 	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
-	RestClient          *rest.RESTClient
+	RestClient          rest.Interface
 	RestConfig          *rest.Config
 	TeamsAPIClient      *teams.API
 	OpConfig            config.Config
