@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -41,7 +41,7 @@ func ResourceNotFound(err error) bool {
 func KubernetesRestClient(c *rest.Config) (rest.Interface, error) {
 	c.GroupVersion = &schema.GroupVersion{Version: constants.K8sVersion}
 	c.APIPath = constants.K8sAPIPath
-	c.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	c.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	schemeBuilder := runtime.NewSchemeBuilder(
 		func(scheme *runtime.Scheme) error {
@@ -57,7 +57,7 @@ func KubernetesRestClient(c *rest.Config) (rest.Interface, error) {
 			)
 			return nil
 		})
-	if err := schemeBuilder.AddToScheme(api.Scheme); err != nil {
+	if err := schemeBuilder.AddToScheme(scheme.Scheme); err != nil {
 		return nil, fmt.Errorf("could not apply functions to register PostgreSQL TPR type: %v", err)
 	}
 
