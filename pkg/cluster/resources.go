@@ -3,7 +3,8 @@ package cluster
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
@@ -16,7 +17,7 @@ import (
 
 func (c *Cluster) loadResources() error {
 	ns := c.Metadata.Namespace
-	listOptions := v1.ListOptions{
+	listOptions := meta_v1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}
 
@@ -148,7 +149,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 
 	statefulSet, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
 		c.Statefulset.Name,
-		api.MergePatchType,
+		types.MergePatchType,
 		patchData, "")
 	if err != nil {
 		return fmt.Errorf("could not patch statefulset '%s': %v", statefulSetName, err)
@@ -171,7 +172,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	orphanDepencies := true
 	oldStatefulset := c.Statefulset
 
-	options := v1.DeleteOptions{OrphanDependents: &orphanDepencies}
+	options := meta_v1.DeleteOptions{OrphanDependents: &orphanDepencies}
 	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
 		return fmt.Errorf("could not delete statefulset '%s': %v", statefulSetName, err)
 	}
@@ -182,7 +183,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 
 	err := retryutil.Retry(constants.StatefulsetDeletionInterval, constants.StatefulsetDeletionTimeout,
 		func() (bool, error) {
-			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name)
+			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name, meta_v1.GetOptions{})
 
 			return err != nil, nil
 		})
@@ -262,7 +263,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		if role == Master {
 			// for the master service we need to re-create the endpoint as well. Get the up-to-date version of
 			// the addresses stored in it before the service is deleted (deletion of the service removes the endpooint)
-			currentEndpoint, err = c.KubeClient.Endpoints(c.Service[role].Namespace).Get(c.Service[role].Name)
+			currentEndpoint, err = c.KubeClient.Endpoints(c.Service[role].Namespace).Get(c.Service[role].Name, meta_v1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("could not get current cluster endpoints: %v", err)
 			}
@@ -294,7 +295,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 		_, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(
 			c.Service[role].Name,
-			api.StrategicMergePatchType,
+			types.StrategicMergePatchType,
 			[]byte(annotationsPatchData), "")
 
 		if err != nil {
@@ -309,7 +310,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 	svc, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(
 		c.Service[role].Name,
-		api.MergePatchType,
+		types.MergePatchType,
 		patchData, "")
 	if err != nil {
 		return fmt.Errorf("could not patch service '%s': %v", serviceName, err)
@@ -371,7 +372,7 @@ func (c *Cluster) applySecrets() error {
 		secret, err := c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
 		if k8sutil.ResourceAlreadyExists(err) {
 			var userMap map[string]spec.PgUser
-			curSecret, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
+			curSecret, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name, meta_v1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}

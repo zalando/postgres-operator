@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api"
-	apierrors "k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/serializer"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -37,26 +38,26 @@ func ResourceNotFound(err error) bool {
 	return apierrors.IsNotFound(err)
 }
 
-func KubernetesRestClient(c *rest.Config) (*rest.RESTClient, error) {
-	c.GroupVersion = &unversioned.GroupVersion{Version: constants.K8sVersion}
+func KubernetesRestClient(c *rest.Config) (rest.Interface, error) {
+	c.GroupVersion = &schema.GroupVersion{Version: constants.K8sVersion}
 	c.APIPath = constants.K8sAPIPath
-	c.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	c.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	schemeBuilder := runtime.NewSchemeBuilder(
 		func(scheme *runtime.Scheme) error {
 			scheme.AddKnownTypes(
-				unversioned.GroupVersion{
+				schema.GroupVersion{
 					Group:   constants.TPRVendor,
 					Version: constants.TPRApiVersion,
 				},
 				&spec.Postgresql{},
 				&spec.PostgresqlList{},
-				&api.ListOptions{},
-				&api.DeleteOptions{},
+				&meta_v1.ListOptions{},
+				&meta_v1.DeleteOptions{},
 			)
 			return nil
 		})
-	if err := schemeBuilder.AddToScheme(api.Scheme); err != nil {
+	if err := schemeBuilder.AddToScheme(scheme.Scheme); err != nil {
 		return nil, fmt.Errorf("could not apply functions to register PostgreSQL TPR type: %v", err)
 	}
 

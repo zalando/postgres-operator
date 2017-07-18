@@ -1,14 +1,15 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
-	"encoding/json"
-	"k8s.io/client-go/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -311,7 +312,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	}
 
 	template := v1.PodTemplateSpec{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Labels:    c.labelsSet(),
 			Namespace: c.Metadata.Name,
 		},
@@ -337,7 +338,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 	}
 
 	statefulSet := &v1beta1.StatefulSet{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.labelsSet(),
@@ -354,7 +355,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
-	metadata := v1.ObjectMeta{
+	metadata := meta_v1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
 	if volumeStorageClass != "" {
@@ -412,7 +413,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	}
 	username := pgUser.Name
 	secret := v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      c.credentialSecretName(username),
 			Namespace: namespace,
 			Labels:    c.labelsSet(),
@@ -468,7 +469,7 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	}
 
 	service := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name:        name,
 			Namespace:   c.Metadata.Namespace,
 			Labels:      c.roleLabelsSet(role),
@@ -482,7 +483,7 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 
 func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta_v1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.roleLabelsSet(Master),
