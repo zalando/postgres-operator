@@ -1,20 +1,16 @@
 package k8sutil
 
 import (
-	"fmt"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
@@ -23,6 +19,7 @@ func RestConfig(kubeConfig string, outOfCluster bool) (*rest.Config, error) {
 	if outOfCluster {
 		return clientcmd.BuildConfigFromFlags("", kubeConfig)
 	}
+
 	return rest.InClusterConfig()
 }
 
@@ -38,35 +35,24 @@ func ResourceNotFound(err error) bool {
 	return apierrors.IsNotFound(err)
 }
 
-func KubernetesRestClient(c *rest.Config) (rest.Interface, error) {
-	c.GroupVersion = &schema.GroupVersion{Version: constants.K8sVersion}
-	c.APIPath = constants.K8sAPIPath
-	c.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
-
-	schemeBuilder := runtime.NewSchemeBuilder(
-		func(scheme *runtime.Scheme) error {
-			scheme.AddKnownTypes(
-				schema.GroupVersion{
-					Group:   constants.TPRGroup,
-					Version: constants.TPRApiVersion,
-				},
-				&spec.Postgresql{},
-				&spec.PostgresqlList{},
-				&meta_v1.ListOptions{},
-				&meta_v1.DeleteOptions{},
-			)
-			return nil
-		})
-	if err := schemeBuilder.AddToScheme(scheme.Scheme); err != nil {
-		return nil, fmt.Errorf("could not apply functions to register PostgreSQL TPR type: %v", err)
+func KubernetesRestClient(cfg rest.Config) (rest.Interface, error) {
+	cfg.GroupVersion = &schema.GroupVersion{
+		Group:   constants.TPRGroup,
+		Version: constants.TPRApiVersion,
 	}
+	cfg.APIPath = constants.K8sAPIPath
+	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
-	return rest.RESTClientFor(c)
+	return rest.RESTClientFor(&cfg)
 }
 
 func WaitTPRReady(restclient rest.Interface, interval, timeout time.Duration, ns string) error {
 	return retryutil.Retry(interval, timeout, func() (bool, error) {
-		_, err := restclient.Get().RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, ns)).DoRaw()
+		_, err := restclient.
+			Get().
+			Namespace(ns).
+			Resource(constants.ResourceName).
+			DoRaw()
 		if err != nil {
 			if ResourceNotFound(err) { // not set up yet. wait more.
 				return false, nil

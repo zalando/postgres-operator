@@ -8,11 +8,8 @@ import (
 	"sync"
 	"syscall"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
@@ -47,28 +44,19 @@ func init() {
 func ControllerConfig() *controller.Config {
 	restConfig, err := k8sutil.RestConfig(KubeConfigFile, OutOfCluster)
 	if err != nil {
-		log.Fatalf("Can't get REST config: %v", err)
-	}
-
-	client, err := k8sutil.KubernetesClient(restConfig)
-	if err != nil {
-		log.Fatalf("Can't create client: %v", err)
-	}
-
-	restClient, err := k8sutil.KubernetesRestClient(restConfig)
-	if err != nil {
-		log.Fatalf("Can't create rest client: %v", err)
+		log.Fatalf("couldn't get REST config: %v", err)
 	}
 
 	return &controller.Config{
-		RestConfig: restConfig,
-		KubeClient: client,
-		RestClient: restClient,
+		RestConfig:       restConfig,
+		NoDatabaseAccess: noDatabaseAccess,
+		NoTeamsAPI:       noTeamsAPI,
+		ConfigMapName:    configMapName,
+		Namespace:        podNamespace,
 	}
 }
 
 func main() {
-	configMapData := make(map[string]string)
 	log.SetOutput(os.Stdout)
 	log.Printf("Spilo operator %s\n", version)
 
@@ -78,33 +66,7 @@ func main() {
 
 	wg := &sync.WaitGroup{} // Goroutines can add themselves to this to be waited on
 
-	controllerConfig := ControllerConfig()
-
-	if configMapName != (spec.NamespacedName{}) {
-		configMap, err := controllerConfig.KubeClient.ConfigMaps(configMapName.Namespace).Get(configMapName.Name, meta_v1.GetOptions{})
-		if err != nil {
-			panic(err)
-		}
-
-		configMapData = configMap.Data
-	} else {
-		log.Printf("No ConfigMap specified. Loading default values")
-	}
-
-	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
-		configMapData["namespace"] = podNamespace
-	}
-	if noDatabaseAccess {
-		configMapData["enable_database_access"] = "false"
-	}
-	if noTeamsAPI {
-		configMapData["enable_teams_api"] = "false"
-	}
-	cfg := config.NewFromMap(configMapData)
-
-	log.Printf("Config: %s", cfg.MustMarshal())
-
-	c := controller.New(controllerConfig, cfg)
+	c := controller.New(ControllerConfig())
 	c.Run(stop, wg)
 
 	sig := <-sigs

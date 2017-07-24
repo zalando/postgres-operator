@@ -6,6 +6,6 @@ const (
 	TPRGroup       = "acid.zalan.do"
 	TPRDescription = "Managed PostgreSQL clusters"
 	TPRApiVersion  = "v1"
-	TPRName        = TPRKind + "." + TPRKind
+	TPRName        = TPRKind + "." + TPRGroup
 	ResourceName   = TPRKind + "s"
 )

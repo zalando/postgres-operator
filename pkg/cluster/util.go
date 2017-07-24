@@ -153,7 +153,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 		return []string{}, fmt.Errorf("could not get oauth token: %v", err)
 	}
 
-	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamID, token)
+	teamInfo, err := c.teamsAPIClient.TeamInfo(c.Spec.TeamID, token)
 	if err != nil {
 		return nil, fmt.Errorf("could not get team info: %v", err)
 	}

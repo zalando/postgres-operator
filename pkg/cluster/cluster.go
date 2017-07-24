@@ -36,11 +36,8 @@ var (
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
-	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
-	RestClient          rest.Interface
-	RestConfig          *rest.Config
-	TeamsAPIClient      *teams.API
 	OpConfig            config.Config
+	RestConfig          *rest.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
 }
 
@@ -68,6 +65,9 @@ type Cluster struct {
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    *meta_v1.DeleteOptions
 	podEventsQueue   *cache.FIFO
+
+	teamsAPIClient *teams.API
+	KubeClient     *kubernetes.Clientset //TODO: move clients to the better place?
 }
 
 type compareStatefulsetResult struct {
@@ -78,7 +78,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
+func New(cfg Config, kubeClient *kubernetes.Clientset, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true
@@ -104,6 +104,7 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &meta_v1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
+		KubeClient:       kubeClient,
 	}
 
 	return cluster
@@ -126,7 +127,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 
-	_, err = c.RestClient.Patch(types.MergePatchType).
+	_, err = c.KubeClient.CoreV1().RESTClient().Patch(types.MergePatchType).
 		RequestURI(c.Metadata.GetSelfLink()).
 		Body(request).
 		DoRaw()

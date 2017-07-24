@@ -3,18 +3,15 @@ package controller
 import (
 	"fmt"
 	"reflect"
-	"sync/atomic"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
+	"encoding/json"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -35,67 +32,60 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}) {
 }
 
 func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
-	c.logger.Info("Getting list of currently running clusters")
+	req := c.RestClient.
+		Get().
+		Namespace(c.opConfig.Namespace).
+		Resource(constants.ResourceName).
+		VersionedParams(&options, meta_v1.ParameterCodec)
 
-	req := c.RestClient.Get().
-		RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, c.opConfig.Namespace)).
-		VersionedParams(&options, scheme.ParameterCodec).
-		FieldsSelectorParam(fields.Everything())
-
-	object, err := req.Do().Get()
-
+	b, err := req.DoRaw()
 	if err != nil {
-		return nil, fmt.Errorf("could not get list of postgresql objects: %v", err)
+		return nil, err
+	}
+	var list spec.PostgresqlList
+
+	return &list, json.Unmarshal(b, &list)
+}
+
+type tprDecoder struct {
+	dec   *json.Decoder
+	close func() error
+}
+
+func (d *tprDecoder) Close() {
+	d.close()
+}
+
+func (d *tprDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {
+	var e struct {
+		Type   watch.EventType
+		Object spec.Postgresql
+	}
+	if err := d.dec.Decode(&e); err != nil {
+		return watch.Error, nil, err
 	}
 
-	objList, err := meta.ExtractList(object)
-	if err != nil {
-		return nil, fmt.Errorf("could not extract list of postgresql objects: %v", err)
-	}
-
-	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
-		c.logger.Debugln("skipping resync of clusters")
-		return object, err
-	}
-
-	var activeClustersCnt, failedClustersCnt int
-	for _, obj := range objList {
-		pg, ok := obj.(*spec.Postgresql)
-		if !ok {
-			return nil, fmt.Errorf("could not cast object to postgresql")
-		}
-
-		if pg.Error != nil {
-			failedClustersCnt++
-			continue
-		}
-		c.queueClusterEvent(nil, pg, spec.EventSync)
-		activeClustersCnt++
-	}
-	if len(objList) > 0 {
-		if failedClustersCnt > 0 && activeClustersCnt == 0 {
-			c.logger.Infof("There are no clusters running. %d are in the failed state", failedClustersCnt)
-		} else if failedClustersCnt == 0 && activeClustersCnt > 0 {
-			c.logger.Infof("There are %d clusters running", activeClustersCnt)
-		} else {
-			c.logger.Infof("There are %d clusters running and %d are in the failed state", activeClustersCnt, failedClustersCnt)
-		}
-	} else {
-		c.logger.Infof("No clusters running")
-	}
-
-	atomic.StoreInt64(&c.lastClusterSyncTime, time.Now().Unix())
-
-	return object, err
+	return e.Type, &e.Object, nil
 }
 
 func (c *Controller) clusterWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
 	options.Watch = true
-	req := c.RestClient.Get().
-		RequestURI(fmt.Sprintf(constants.ListClustersURITemplate, c.opConfig.Namespace)).
-		VersionedParams(&options, scheme.ParameterCodec).
-		FieldsSelectorParam(fields.Everything())
-	return req.Watch()
+	r, err := c.RestClient.
+		Get().
+		Namespace(c.opConfig.Namespace).
+		Resource(constants.ResourceName).
+		VersionedParams(&options, meta_v1.ParameterCodec).
+		FieldsSelectorParam(nil).
+		Stream()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return watch.NewStreamWatcher(&tprDecoder{
+		dec:   json.NewDecoder(r),
+		close: r.Close,
+	}), nil
 }
 
 func (c *Controller) processEvent(obj interface{}) error {
@@ -127,7 +117,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		logger.Infof("Creation of the %q cluster started", clusterName)
 
 		stopCh := make(chan struct{})
-		cl = cluster.New(c.makeClusterConfig(), *event.NewSpec, logger)
+		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
 		cl.Run(stopCh)
 
 		c.clustersMu.Lock()
@@ -183,7 +173,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
 			stopCh := make(chan struct{})
-			cl = cluster.New(c.makeClusterConfig(), *event.NewSpec, logger)
+			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
 			cl.Run(stopCh)
 
 			c.clustersMu.Lock()
