@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
-	"encoding/json"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -32,6 +33,9 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}) {
 }
 
 func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
+	var list spec.PostgresqlList
+	var activeClustersCnt, failedClustersCnt int
+
 	req := c.RestClient.
 		Get().
 		Namespace(c.opConfig.Namespace).
@@ -42,9 +46,36 @@ func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Objec
 	if err != nil {
 		return nil, err
 	}
-	var list spec.PostgresqlList
+	err = json.Unmarshal(b, &list)
 
-	return &list, json.Unmarshal(b, &list)
+	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
+		c.logger.Debugln("skipping resync of clusters")
+		return &list, err
+	}
+
+	for _, pg := range list.Items {
+		if pg.Error != nil {
+			failedClustersCnt++
+			continue
+		}
+		c.queueClusterEvent(nil, &pg, spec.EventSync)
+		activeClustersCnt++
+	}
+	if len(list.Items) > 0 {
+		if failedClustersCnt > 0 && activeClustersCnt == 0 {
+			c.logger.Infof("There are no clusters running. %d are in the failed state", failedClustersCnt)
+		} else if failedClustersCnt == 0 && activeClustersCnt > 0 {
+			c.logger.Infof("There are %d clusters running", activeClustersCnt)
+		} else {
+			c.logger.Infof("There are %d clusters running and %d are in the failed state", activeClustersCnt, failedClustersCnt)
+		}
+	} else {
+		c.logger.Infof("No clusters running")
+	}
+
+	atomic.StoreInt64(&c.lastClusterSyncTime, time.Now().Unix())
+
+	return &list, err
 }
 
 type tprDecoder struct {
