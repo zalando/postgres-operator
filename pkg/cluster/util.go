@@ -77,11 +77,11 @@ func metadataAnnotationsPatch(annotations map[string]string) string {
 
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
-		c.logger.Infof("statefulset '%s' has been changed",
+		c.logger.Infof("statefulset %q has been changed",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("statefulset '%s' is not in the desired state and needs to be updated",
+		c.logger.Infof("statefulset %q is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
@@ -89,18 +89,18 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
-			c.logger.Infof("Reason: %s", reason)
+			c.logger.Infof("Reason: %q", reason)
 		}
 	}
 }
 
 func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("%s service '%s' has been changed",
+		c.logger.Infof("%s service %q has been changed",
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("%s service '%s  is not in the desired state and needs to be updated",
+		c.logger.Infof("%s service %q is not in the desired state and needs to be updated",
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	}
@@ -127,7 +127,7 @@ func (c *Cluster) getOAuthToken() (string, error) {
 		Get(c.OpConfig.OAuthTokenSecretName.Name, meta_v1.GetOptions{})
 
 	if err != nil {
-		c.logger.Debugf("Oauth token secret name: %s", c.OpConfig.OAuthTokenSecretName)
+		c.logger.Debugf("Oauth token secret name: %q", c.OpConfig.OAuthTokenSecretName)
 		return "", fmt.Errorf("could not get credentials secret: %v", err)
 	}
 	data := credentialsSecret.Data

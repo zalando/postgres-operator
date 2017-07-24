@@ -49,17 +49,16 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 }
 
 func (c *Controller) createTPR() error {
-	TPRName := fmt.Sprintf("%s.%s", constants.TPRName, constants.TPRVendor)
-	tpr := thirdPartyResource(TPRName)
+	tpr := thirdPartyResource(constants.TPRName)
 
 	_, err := c.KubeClient.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
 	if err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return err
 		}
-		c.logger.Infof("ThirdPartyResource '%s' is already registered", TPRName)
+		c.logger.Infof("ThirdPartyResource %q is already registered", constants.TPRName)
 	} else {
-		c.logger.Infof("ThirdPartyResource '%s' has been registered", TPRName)
+		c.logger.Infof("ThirdPartyResource %q' has been registered", constants.TPRName)
 	}
 
 	return k8sutil.WaitTPRReady(c.RestClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.opConfig.Namespace)
@@ -75,7 +74,7 @@ func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, er
 		Secrets(c.opConfig.InfrastructureRolesSecretName.Namespace).
 		Get(c.opConfig.InfrastructureRolesSecretName.Name, meta_v1.GetOptions{})
 	if err != nil {
-		c.logger.Debugf("Infrastructure roles secret name: %s", c.opConfig.InfrastructureRolesSecretName)
+		c.logger.Debugf("Infrastructure roles secret name: %q", c.opConfig.InfrastructureRolesSecretName)
 		return nil, fmt.Errorf("could not get infrastructure roles secret: %v", err)
 	}
 
@@ -103,7 +102,7 @@ Users:
 				case "inrole":
 					t.MemberOf = append(t.MemberOf, s)
 				default:
-					c.logger.Warnf("Unknown key %s", p)
+					c.logger.Warnf("Unknown key %q", p)
 				}
 			}
 		}

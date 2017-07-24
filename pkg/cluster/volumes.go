@@ -36,7 +36,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 		return err
 	}
 	for _, pvc := range pvcs {
-		c.logger.Debugf("Deleting PVC '%s'", util.NameFromMeta(pvc.ObjectMeta))
+		c.logger.Debugf("Deleting PVC %q", util.NameFromMeta(pvc.ObjectMeta))
 		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, c.deleteOptions); err != nil {
 			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
 		}
@@ -63,10 +63,10 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 		if lastDash > 0 && lastDash < len(pvc.Name)-1 {
 			pvcNumber, err := strconv.Atoi(pvc.Name[lastDash+1:])
 			if err != nil {
-				return nil, fmt.Errorf("could not convert last part of the persistent volume claim name %s to a number", pvc.Name)
+				return nil, fmt.Errorf("could not convert last part of the persistent volume claim name %q to a number", pvc.Name)
 			}
 			if int32(pvcNumber) > lastPodIndex {
-				c.logger.Debugf("Skipping persistent volume %s corresponding to a non-running pods", pvc.Name)
+				c.logger.Debugf("Skipping persistent volume %q corresponding to a non-running pods", pvc.Name)
 				continue
 			}
 		}
@@ -119,22 +119,22 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 			if err != nil {
 				return err
 			}
-			c.logger.Debugf("updating persistent volume %s to %d", pv.Name, newSize)
+			c.logger.Debugf("updating persistent volume %q to %d", pv.Name, newSize)
 			if err := resizer.ResizeVolume(awsVolumeId, newSize); err != nil {
-				return fmt.Errorf("could not resize EBS volume %s: %v", awsVolumeId, err)
+				return fmt.Errorf("could not resize EBS volume %q: %v", awsVolumeId, err)
 			}
-			c.logger.Debugf("resizing the filesystem on the volume %s", pv.Name)
+			c.logger.Debugf("resizing the filesystem on the volume %q", pv.Name)
 			podName := getPodNameFromPersistentVolume(pv)
 			if err := c.resizePostgresFilesystem(podName, []filesystems.FilesystemResizer{&filesystems.Ext234Resize{}}); err != nil {
-				return fmt.Errorf("could not resize the filesystem on pod '%s': %v", podName, err)
+				return fmt.Errorf("could not resize the filesystem on pod %q: %v", podName, err)
 			}
-			c.logger.Debugf("filesystem resize successful on volume %s", pv.Name)
+			c.logger.Debugf("filesystem resize successful on volume %q", pv.Name)
 			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
-			c.logger.Debugf("updating persistent volume definition for volume %s", pv.Name)
+			c.logger.Debugf("updating persistent volume definition for volume %q", pv.Name)
 			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
-				return fmt.Errorf("could not update persistent volume: %s", err)
+				return fmt.Errorf("could not update persistent volume: %q", err)
 			}
-			c.logger.Debugf("successfully updated persistent volume %s", pv.Name)
+			c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
 		}
 	}
 	if len(pvs) > 0 && totalCompatible == 0 {

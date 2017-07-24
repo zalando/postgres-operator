@@ -120,11 +120,11 @@ func (c *Controller) processEvent(obj interface{}) error {
 	switch event.EventType {
 	case spec.EventAdd:
 		if clusterFound {
-			logger.Debugf("Cluster '%s' already exists", clusterName)
+			logger.Debugf("Cluster %q already exists", clusterName)
 			return nil
 		}
 
-		logger.Infof("Creation of the '%s' cluster started", clusterName)
+		logger.Infof("Creation of the %q cluster started", clusterName)
 
 		stopCh := make(chan struct{})
 		cl = cluster.New(c.makeClusterConfig(), *event.NewSpec, logger)
@@ -142,31 +142,31 @@ func (c *Controller) processEvent(obj interface{}) error {
 			return nil
 		}
 
-		logger.Infof("Cluster '%s' has been created", clusterName)
+		logger.Infof("Cluster %q has been created", clusterName)
 	case spec.EventUpdate:
-		logger.Infof("Update of the '%s' cluster started", clusterName)
+		logger.Infof("Update of the %q cluster started", clusterName)
 
 		if !clusterFound {
-			logger.Warnf("Cluster '%s' does not exist", clusterName)
+			logger.Warnf("Cluster %q does not exist", clusterName)
 			return nil
 		}
 		if err := cl.Update(event.NewSpec); err != nil {
-			cl.Error = fmt.Errorf("could not update cluster: %s", err)
+			cl.Error = fmt.Errorf("could not update cluster: %v", err)
 			logger.Errorf("%v", cl.Error)
 
 			return nil
 		}
 		cl.Error = nil
-		logger.Infof("Cluster '%s' has been updated", clusterName)
+		logger.Infof("Cluster %q has been updated", clusterName)
 	case spec.EventDelete:
-		logger.Infof("Deletion of the '%s' cluster started", clusterName)
+		logger.Infof("Deletion of the %q cluster started", clusterName)
 		if !clusterFound {
-			logger.Errorf("Unknown cluster: %s", clusterName)
+			logger.Errorf("Unknown cluster: %q", clusterName)
 			return nil
 		}
 
 		if err := cl.Delete(); err != nil {
-			logger.Errorf("could not delete cluster '%s': %s", clusterName, err)
+			logger.Errorf("could not delete cluster %q: %v", clusterName, err)
 			return nil
 		}
 		close(c.stopChs[clusterName])
@@ -176,9 +176,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 		delete(c.stopChs, clusterName)
 		c.clustersMu.Unlock()
 
-		logger.Infof("Cluster '%s' has been deleted", clusterName)
+		logger.Infof("Cluster %q has been deleted", clusterName)
 	case spec.EventSync:
-		logger.Infof("Syncing of the '%s' cluster started", clusterName)
+		logger.Infof("Syncing of the %q cluster started", clusterName)
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
@@ -193,13 +193,13 @@ func (c *Controller) processEvent(obj interface{}) error {
 		}
 
 		if err := cl.Sync(); err != nil {
-			cl.Error = fmt.Errorf("could not sync cluster '%s': %v", clusterName, err)
+			cl.Error = fmt.Errorf("could not sync cluster %q: %v", clusterName, err)
 			logger.Errorf("%v", cl.Error)
 			return nil
 		}
 		cl.Error = nil
 
-		logger.Infof("Cluster '%s' has been synced", clusterName)
+		logger.Infof("Cluster %q has been synced", clusterName)
 	}
 
 	return nil
@@ -236,7 +236,7 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	}
 
 	if clusterError != nil && eventType != spec.EventDelete {
-		c.logger.Debugf("Skipping %s event for invalid cluster %s (reason: %v)", eventType, clusterName, clusterError)
+		c.logger.Debugf("Skipping %q event for invalid cluster %q (reason: %v)", eventType, clusterName, clusterError)
 		return
 	}
 
@@ -253,7 +253,7 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		c.logger.WithField("worker", workerID).Errorf("error when queueing cluster event: %v", clusterEvent)
 	}
-	c.logger.WithField("worker", workerID).Infof("%s of the '%s' cluster has been queued", eventType, clusterName)
+	c.logger.WithField("worker", workerID).Infof("%q of the %q cluster has been queued", eventType, clusterName)
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {

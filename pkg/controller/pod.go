@@ -107,7 +107,7 @@ func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}) {
 			c.clustersMu.RUnlock()
 
 			if ok {
-				c.logger.Debugf("Sending %s event of pod '%s' to the '%s' cluster channel", event.EventType, event.PodName, event.ClusterName)
+				c.logger.Debugf("Sending %q event of pod %q to the %q cluster channel", event.EventType, event.PodName, event.ClusterName)
 				cluster.ReceivePodEvent(event)
 			}
 		case <-stopCh:

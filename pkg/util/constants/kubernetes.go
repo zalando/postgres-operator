@@ -4,8 +4,8 @@ import "time"
 
 // General kubernetes-related constants
 const (
-	ListClustersURITemplate     = "/apis/" + TPRVendor + "/" + TPRApiVersion + "/namespaces/%s/" + ResourceName       // Namespace
-	WatchClustersURITemplate    = "/apis/" + TPRVendor + "/" + TPRApiVersion + "/watch/namespaces/%s/" + ResourceName // Namespace
+	ListClustersURITemplate     = "/apis/" + TPRGroup + "/" + TPRApiVersion + "/namespaces/%s/" + ResourceName       // Namespace
+	WatchClustersURITemplate    = "/apis/" + TPRGroup + "/" + TPRApiVersion + "/watch/namespaces/%s/" + ResourceName // Namespace
 	K8sVersion                  = "v1"
 	K8sAPIPath                  = "/api"
 	StatefulsetDeletionInterval = 1 * time.Second

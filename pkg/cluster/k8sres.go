@@ -199,7 +199,7 @@ PATRONI_INITDB_PARAMS:
 	}
 	result, err := json.Marshal(config)
 	if err != nil {
-		c.logger.Errorf("Cannot convert spilo configuration into JSON: %s", err)
+		c.logger.Errorf("Cannot convert spilo configuration into JSON: %v", err)
 		return ""
 	}
 	return string(result)

@@ -362,7 +362,7 @@ func TestClusterName(t *testing.T) {
 			continue
 		}
 		if name != tt.clusterName {
-			t.Errorf("Expected cluserName: %s, got: %s", tt.clusterName, name)
+			t.Errorf("Expected cluserName: %q, got: %q", tt.clusterName, name)
 		}
 	}
 }
@@ -399,7 +399,7 @@ func TestMarshalMaintenanceWindow(t *testing.T) {
 		}
 
 		if !bytes.Equal(s, tt.in) {
-			t.Errorf("Expected Marshal: %s, got: %s", string(tt.in), string(s))
+			t.Errorf("Expected Marshal: %q, got: %q", string(tt.in), string(s))
 		}
 	}
 }
@@ -434,7 +434,7 @@ func TestMarshal(t *testing.T) {
 			continue
 		}
 		if !bytes.Equal(m, tt.marshal) {
-			t.Errorf("Marshal Postgresql expected: %s, got: %s", string(tt.marshal), string(m))
+			t.Errorf("Marshal Postgresql expected: %q, got: %q", string(tt.marshal), string(m))
 		}
 	}
 }

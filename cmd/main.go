@@ -47,17 +47,17 @@ func init() {
 func ControllerConfig() *controller.Config {
 	restConfig, err := k8sutil.RestConfig(KubeConfigFile, OutOfCluster)
 	if err != nil {
-		log.Fatalf("Can't get REST config: %s", err)
+		log.Fatalf("Can't get REST config: %v", err)
 	}
 
 	client, err := k8sutil.KubernetesClient(restConfig)
 	if err != nil {
-		log.Fatalf("Can't create client: %s", err)
+		log.Fatalf("Can't create client: %v", err)
 	}
 
 	restClient, err := k8sutil.KubernetesRestClient(restConfig)
 	if err != nil {
-		log.Fatalf("Can't create rest client: %s", err)
+		log.Fatalf("Can't create rest client: %v", err)
 	}
 
 	return &controller.Config{

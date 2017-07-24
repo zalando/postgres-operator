@@ -37,5 +37,5 @@ func (c *Ext234Resize) ResizeFilesystem(deviceName string, commandExecutor func(
 		(strings.Contains(out, "on-line resizing required") && ext2fsSuccessRegexp.MatchString(out)) {
 		return nil
 	}
-	return fmt.Errorf("unrecognized output: %s, assuming error", out)
+	return fmt.Errorf("unrecognized output: %q, assuming error", out)
 }

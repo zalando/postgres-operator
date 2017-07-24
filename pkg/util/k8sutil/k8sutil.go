@@ -47,7 +47,7 @@ func KubernetesRestClient(c *rest.Config) (rest.Interface, error) {
 		func(scheme *runtime.Scheme) error {
 			scheme.AddKnownTypes(
 				schema.GroupVersion{
-					Group:   constants.TPRVendor,
+					Group:   constants.TPRGroup,
 					Version: constants.TPRApiVersion,
 				},
 				&spec.Postgresql{},
