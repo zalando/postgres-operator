@@ -28,6 +28,7 @@ type KubernetesClient struct {
 	v1core.ConfigMapsGetter
 	v1beta1.StatefulSetsGetter
 	extensions.ThirdPartyResourcesGetter
+	RESTClient rest.Interface
 }
 
 func NewFromKubernetesInterface(src kubernetes.Interface) (c KubernetesClient) {
@@ -41,6 +42,7 @@ func NewFromKubernetesInterface(src kubernetes.Interface) (c KubernetesClient) {
 	c.PersistentVolumesGetter = src.CoreV1()
 	c.StatefulSetsGetter = src.AppsV1beta1()
 	c.ThirdPartyResourcesGetter = src.ExtensionsV1beta1()
+	c.RESTClient = src.CoreV1().RESTClient()
 	return
 }
 

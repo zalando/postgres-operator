@@ -48,7 +48,7 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 func (c *Controller) createTPR() error {
 	tpr := thirdPartyResource(constants.TPRName)
 
-	_, err := c.KubeClient.ExtensionsV1beta1().ThirdPartyResources().Create(tpr)
+	_, err := c.KubeClient.ThirdPartyResources().Create(tpr)
 	if err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return err
@@ -69,7 +69,7 @@ func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (r
 
 	infraRolesSecret, err := c.KubeClient.
 		Secrets(rolesSecret.Namespace).
-		Get(rolesSecret.Name)
+		Get(rolesSecret.Name, meta_v1.GetOptions{})
 	if err != nil {
 		c.logger.Debugf("Infrastructure roles secret name: %q", *rolesSecret)
 		return nil, fmt.Errorf("could not get infrastructure roles secret: %v", err)

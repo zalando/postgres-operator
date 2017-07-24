@@ -58,7 +58,7 @@ func main() {
 		log.Fatalf("couldn't get REST config: %v", err)
 	}
 
-	c := controller.New(&config)
+	c := controller.NewController(&config)
 
 	c.Run(stop, wg)
 

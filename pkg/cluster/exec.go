@@ -28,7 +28,7 @@ func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (
 		return "", fmt.Errorf("could not determine which container to use")
 	}
 
-	req := c.KubeClient.CoreV1().RESTClient().Post().
+	req := c.KubeClient.RESTClient.Post().
 		Resource("pods").
 		Name(podName.Name).
 		Namespace(podName.Namespace).

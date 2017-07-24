@@ -13,7 +13,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/rest"
@@ -127,7 +126,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 
-	_, err = c.KubeClient.CoreV1().RESTClient().Patch(types.MergePatchType).
+	_, err = c.KubeClient.RESTClient.Patch(types.MergePatchType).
 		RequestURI(c.Metadata.GetSelfLink()).
 		Body(request).
 		DoRaw()

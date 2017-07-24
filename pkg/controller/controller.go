@@ -6,7 +6,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -35,7 +34,7 @@ type Controller struct {
 	opConfig *config.Config
 	logger   *logrus.Entry
 
-	KubeClient     *kubernetes.Clientset
+	KubeClient     k8sutil.KubernetesClient
 	RestClient     rest.Interface
 	TeamsAPIClient *teams.API
 
@@ -56,7 +55,7 @@ func NewController(controllerConfig *Config) *Controller {
 	configMapData := make(map[string]string)
 	logger := logrus.New()
 
-	client, err := k8sutil.KubernetesClient(controllerConfig.RestConfig)
+	client, err := k8sutil.ClientSet(controllerConfig.RestConfig)
 	if err != nil {
 		logger.Fatalf("couldn't create client: %v", err)
 	}
@@ -102,7 +101,7 @@ func NewController(controllerConfig *Config) *Controller {
 		stopChs:        make(map[spec.NamespacedName]chan struct{}),
 		podCh:          make(chan spec.PodEvent),
 		TeamsAPIClient: teams.NewTeamsAPI(operatorConfig.TeamsAPIUrl, logger),
-		KubeClient:     client,
+		KubeClient:     k8sutil.NewFromKubernetesInterface(client),
 		RestClient:     restClient,
 	}
 }
