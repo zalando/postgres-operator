@@ -15,7 +15,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 )
 
 type Config struct {
@@ -32,10 +31,9 @@ type Controller struct {
 	config   Config
 	opConfig *config.Config
 
-	logger         *logrus.Entry
-	KubeClient     k8sutil.KubernetesClient
-	RestClient     rest.Interface
-	TeamsAPIClient *teams.API
+	logger     *logrus.Entry
+	KubeClient k8sutil.KubernetesClient
+	RestClient rest.Interface
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster
@@ -112,8 +110,6 @@ func (c *Controller) initController() {
 	if c.opConfig.DebugLogging {
 		c.logger.Level = logrus.DebugLevel
 	}
-
-	c.TeamsAPIClient = teams.NewTeamsAPI(c.opConfig.TeamsAPIUrl, c.logger.Logger)
 
 	if err := c.createTPR(); err != nil {
 		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
