@@ -17,12 +17,12 @@ import (
 
 func (c *Controller) makeClusterConfig() cluster.Config {
 	infrastructureRoles := make(map[string]spec.PgUser)
-	for k, v := range c.InfrastructureRoles {
+	for k, v := range c.config.InfrastructureRoles {
 		infrastructureRoles[k] = v
 	}
 
 	return cluster.Config{
-		RestConfig:          c.RestConfig,
+		RestConfig:          c.config.RestConfig,
 		OpConfig:            config.Copy(c.opConfig),
 		InfrastructureRoles: infrastructureRoles,
 	}
