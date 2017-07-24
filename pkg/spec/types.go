@@ -3,7 +3,6 @@ package spec
 import (
 	"fmt"
 	"strings"
-
 	"database/sql"
 
 	"k8s.io/apimachinery/pkg/types"

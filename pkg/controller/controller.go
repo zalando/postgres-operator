@@ -31,6 +31,7 @@ type Config struct {
 
 type Controller struct {
 	Config
+
 	opConfig *config.Config
 	logger   *logrus.Entry
 
@@ -51,7 +52,7 @@ type Controller struct {
 	lastClusterSyncTime int64
 }
 
-func New(controllerConfig *Config) *Controller {
+func NewController(controllerConfig *Config) *Controller {
 	configMapData := make(map[string]string)
 	logger := logrus.New()
 
@@ -126,7 +127,7 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
 	}
 
-	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
+	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.InfrastructureRoles = infraRoles

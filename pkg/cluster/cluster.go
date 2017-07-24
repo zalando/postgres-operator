@@ -13,7 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/rest"
@@ -67,7 +67,7 @@ type Cluster struct {
 	podEventsQueue   *cache.FIFO
 
 	teamsAPIClient *teams.API
-	KubeClient     *kubernetes.Clientset //TODO: move clients to the better place?
+	KubeClient     k8sutil.KubernetesClient //TODO: move clients to the better place?
 }
 
 type compareStatefulsetResult struct {
@@ -78,7 +78,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient *kubernetes.Clientset, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true

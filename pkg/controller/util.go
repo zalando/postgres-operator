@@ -61,17 +61,17 @@ func (c *Controller) createTPR() error {
 	return k8sutil.WaitTPRReady(c.RestClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.opConfig.Namespace)
 }
 
-func (c *Controller) getInfrastructureRoles() (result map[string]spec.PgUser, err error) {
-	if c.opConfig.InfrastructureRolesSecretName == (spec.NamespacedName{}) {
+func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (result map[string]spec.PgUser, err error) {
+	if *rolesSecret == (spec.NamespacedName{}) {
 		// we don't have infrastructure roles defined, bail out
 		return nil, nil
 	}
 
 	infraRolesSecret, err := c.KubeClient.
-		Secrets(c.opConfig.InfrastructureRolesSecretName.Namespace).
-		Get(c.opConfig.InfrastructureRolesSecretName.Name, meta_v1.GetOptions{})
+		Secrets(rolesSecret.Namespace).
+		Get(rolesSecret.Name)
 	if err != nil {
-		c.logger.Debugf("Infrastructure roles secret name: %q", c.opConfig.InfrastructureRolesSecretName)
+		c.logger.Debugf("Infrastructure roles secret name: %q", *rolesSecret)
 		return nil, fmt.Errorf("could not get infrastructure roles secret: %v", err)
 	}
 
