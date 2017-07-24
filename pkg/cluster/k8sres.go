@@ -451,7 +451,7 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	if (newSpec.UseLoadBalancer != nil && *newSpec.UseLoadBalancer) ||
 		(newSpec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
 
-		// safe default value: lock load balancer to only local address unless overriden explicitely.
+		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
 		allowedSourceRanges := newSpec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {

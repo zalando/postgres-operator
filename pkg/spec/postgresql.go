@@ -87,7 +87,7 @@ type PostgresSpec struct {
 
 	TeamID              string   `json:"teamId"`
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
-	// EnableLoadBalancer  is a pointer, since it is importat to know if that parameters is omited from the manifest
+	// EnableLoadBalancer  is a pointer, since it is importat to know if that parameters is omitted from the manifest
 	UseLoadBalancer     *bool                `json:"useLoadBalancer,omitempty"`
 	ReplicaLoadBalancer bool                 `json:"replicaLoadBalancer,omitempty"`
 	NumberOfInstances   int32                `json:"numberOfInstances"`
