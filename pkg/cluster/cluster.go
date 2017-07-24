@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -36,7 +35,7 @@ var (
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
-	KubeClient          *kubernetes.Clientset //TODO: move clients to the better place?
+	KubeClient          k8sutil.KubernetesClient
 	RestClient          *rest.RESTClient
 	RestConfig          *rest.Config
 	TeamsAPIClient      *teams.API

@@ -48,7 +48,7 @@ func ControllerConfig() *controller.Config {
 		log.Fatalf("Can't get REST config: %s", err)
 	}
 
-	client, err := k8sutil.KubernetesClient(restConfig)
+	client, err := k8sutil.ClientSet(restConfig)
 	if err != nil {
 		log.Fatalf("Can't create client: %s", err)
 	}
@@ -60,7 +60,7 @@ func ControllerConfig() *controller.Config {
 
 	return &controller.Config{
 		RestConfig: restConfig,
-		KubeClient: client,
+		KubeClient: k8sutil.NewFromKubernetesInterface(client),
 		RestClient: restClient,
 	}
 }
@@ -101,7 +101,7 @@ func main() {
 
 	log.Printf("Config: %s", cfg.MustMarshal())
 
-	c := controller.New(controllerConfig, cfg)
+	c := controller.NewController(controllerConfig, cfg)
 	c.Run(stop, wg)
 
 	sig := <-sigs

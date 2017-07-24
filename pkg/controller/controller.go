@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -14,12 +13,13 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 )
 
 type Config struct {
 	RestConfig          *rest.Config
-	KubeClient          *kubernetes.Clientset
+	KubeClient          k8sutil.KubernetesClient
 	RestClient          *rest.RESTClient
 	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
@@ -27,6 +27,7 @@ type Config struct {
 
 type Controller struct {
 	Config
+
 	opConfig *config.Config
 	logger   *logrus.Entry
 
@@ -43,7 +44,7 @@ type Controller struct {
 	lastClusterSyncTime int64
 }
 
-func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
+func NewController(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 	logger := logrus.New()
 
 	if operatorConfig.DebugLogging {
@@ -82,7 +83,7 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
 	}
 
-	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
+	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.InfrastructureRoles = infraRoles
