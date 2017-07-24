@@ -100,7 +100,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 		return nil
 	}
 
-	desiredSvc := c.genService(role, cSpec.AllowedSourceRanges)
+	desiredSvc := c.generateService(role, &cSpec)
 	match, reason := c.sameServiceWith(role, desiredSvc)
 	if match {
 		return nil
@@ -158,7 +158,7 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 	/* TODO: should check that we need to replace the statefulset */
 	if !rollUpdate {
-		desiredSS, err := c.genStatefulSet(cSpec)
+		desiredSS, err := c.generateStatefulSet(cSpec)
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}

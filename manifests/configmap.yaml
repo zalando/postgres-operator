@@ -28,3 +28,4 @@ data:
   super_username: postgres
   teams_api_url: http://fake-teams-api.default.svc.cluster.local
   workers: "4"
+  enable_load_balancer: "true"
