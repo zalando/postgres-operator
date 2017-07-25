@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -25,14 +25,14 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
-			c.clusterListFunc(meta_v1.ListOptions{ResourceVersion: "0"})
+			c.clusterListFunc(metav1.ListOptions{ResourceVersion: "0"})
 		case <-stopCh:
 			return
 		}
 	}
 }
 
-func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
+func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
 	var list spec.PostgresqlList
 	var activeClustersCnt, failedClustersCnt int
 
@@ -40,7 +40,7 @@ func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Objec
 		Get().
 		Namespace(c.opConfig.Namespace).
 		Resource(constants.ResourceName).
-		VersionedParams(&options, meta_v1.ParameterCodec)
+		VersionedParams(&options, metav1.ParameterCodec)
 
 	b, err := req.DoRaw()
 	if err != nil {
@@ -99,13 +99,13 @@ func (d *tprDecoder) Decode() (action watch.EventType, object runtime.Object, er
 	return e.Type, &e.Object, nil
 }
 
-func (c *Controller) clusterWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
+func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
 	options.Watch = true
 	r, err := c.RestClient.
 		Get().
 		Namespace(c.opConfig.Namespace).
 		Resource(constants.ResourceName).
-		VersionedParams(&options, meta_v1.ParameterCodec).
+		VersionedParams(&options, metav1.ParameterCodec).
 		FieldsSelectorParam(nil).
 		Stream()
 

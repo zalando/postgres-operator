@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -70,8 +70,8 @@ const (
 
 // Postgresql defines PostgreSQL Third Party (resource) Object.
 type Postgresql struct {
-	meta_v1.TypeMeta `json:",inline"`
-	Metadata         meta_v1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
+	Metadata        metav1.ObjectMeta `json:"metadata"`
 
 	Spec   PostgresSpec   `json:"spec"`
 	Status PostgresStatus `json:"status,omitempty"`
@@ -98,8 +98,8 @@ type PostgresSpec struct {
 
 // PostgresqlList defines a list of PostgreSQL clusters.
 type PostgresqlList struct {
-	meta_v1.TypeMeta `json:",inline"`
-	Metadata         meta_v1.ListMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
+	Metadata        metav1.ListMeta `json:"metadata"`
 
 	Items []Postgresql `json:"items"`
 }
@@ -196,7 +196,7 @@ func (p *Postgresql) GetObjectKind() schema.ObjectKind {
 }
 
 // GetObjectMeta implements ObjectMetaAccessor interface for PostgreSQL TPR spec object.
-func (p *Postgresql) GetObjectMeta() meta_v1.Object {
+func (p *Postgresql) GetObjectMeta() metav1.Object {
 	return &p.Metadata
 }
 
@@ -205,7 +205,7 @@ func (pl *PostgresqlList) GetObjectKind() schema.ObjectKind {
 }
 
 // GetListMeta implements ListMetaAccessor interface for PostgreSQL TPR List spec object.
-func (pl *PostgresqlList) GetListMeta() meta_v1.List {
+func (pl *PostgresqlList) GetListMeta() metav1.List {
 	return &pl.Metadata
 }
 

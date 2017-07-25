@@ -3,7 +3,7 @@ package cluster
 import (
 	"fmt"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -13,7 +13,7 @@ import (
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
 	ns := c.Metadata.Namespace
-	listOptions := meta_v1.ListOptions{
+	listOptions := metav1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}
 
@@ -116,7 +116,7 @@ func (c *Cluster) recreatePods() error {
 	ls := c.labelsSet()
 	namespace := c.Metadata.Namespace
 
-	listOptions := meta_v1.ListOptions{
+	listOptions := metav1.ListOptions{
 		LabelSelector: ls.String(),
 	}
 

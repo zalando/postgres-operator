@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -312,7 +312,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	}
 
 	template := v1.PodTemplateSpec{
-		ObjectMeta: meta_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels:    c.labelsSet(),
 			Namespace: c.Metadata.Name,
 		},
@@ -338,7 +338,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 	}
 
 	statefulSet := &v1beta1.StatefulSet{
-		ObjectMeta: meta_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.labelsSet(),
@@ -355,7 +355,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
-	metadata := meta_v1.ObjectMeta{
+	metadata := metav1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
 	if volumeStorageClass != "" {
@@ -413,7 +413,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	}
 	username := pgUser.Name
 	secret := v1.Secret{
-		ObjectMeta: meta_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.credentialSecretName(username),
 			Namespace: namespace,
 			Labels:    c.labelsSet(),
@@ -469,7 +469,7 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	}
 
 	service := &v1.Service{
-		ObjectMeta: meta_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   c.Metadata.Namespace,
 			Labels:      c.roleLabelsSet(role),
@@ -483,7 +483,7 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 
 func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
-		ObjectMeta: meta_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.Metadata.Name,
 			Namespace: c.Metadata.Namespace,
 			Labels:    c.roleLabelsSet(Master),

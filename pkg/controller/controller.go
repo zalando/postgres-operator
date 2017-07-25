@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -78,7 +78,7 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.config.ConfigMapName != (spec.NamespacedName{}) {
 		configMap, err := c.KubeClient.ConfigMaps(c.config.ConfigMapName.Namespace).
-			Get(c.config.ConfigMapName.Name, meta_v1.GetOptions{})
+			Get(c.config.ConfigMapName.Name, metav1.GetOptions{})
 		if err != nil {
 			panic(err)
 		}

@@ -1,7 +1,7 @@
 package controller
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
@@ -10,11 +10,11 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
-func (c *Controller) podListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
+func (c *Controller) podListFunc(options metav1.ListOptions) (runtime.Object, error) {
 	var labelSelector string
 	var fieldSelector string
 
-	opts := meta_v1.ListOptions{
+	opts := metav1.ListOptions{
 		LabelSelector:   labelSelector,
 		FieldSelector:   fieldSelector,
 		Watch:           options.Watch,
@@ -25,11 +25,11 @@ func (c *Controller) podListFunc(options meta_v1.ListOptions) (runtime.Object, e
 	return c.KubeClient.Pods(c.opConfig.Namespace).List(opts)
 }
 
-func (c *Controller) podWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
+func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
 	var labelSelector string
 	var fieldSelector string
 
-	opts := meta_v1.ListOptions{
+	opts := metav1.ListOptions{
 		LabelSelector:   labelSelector,
 		FieldSelector:   fieldSelector,
 		Watch:           options.Watch,

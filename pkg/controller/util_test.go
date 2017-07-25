@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
@@ -21,7 +21,7 @@ type mockSecret struct {
 	v1core.SecretInterface
 }
 
-func (c *mockSecret) Get(name string, options meta_v1.GetOptions) (*v1.Secret, error) {
+func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
 	if name != testInfrastructureRolesSecretName {
 		return nil, fmt.Errorf("NotFound")
 	}
@@ -70,7 +70,7 @@ func TestPodClusterName(t *testing.T) {
 		},
 		{
 			&v1.Pod{
-				ObjectMeta: meta_v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: v1.NamespaceDefault,
 					Labels: map[string]string{
 						mockController.opConfig.ClusterNameLabel: "testcluster",

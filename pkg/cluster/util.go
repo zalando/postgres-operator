@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -124,7 +124,7 @@ func (c *Cluster) getOAuthToken() (string, error) {
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
 	credentialsSecret, err := c.KubeClient.
 		Secrets(c.OpConfig.OAuthTokenSecretName.Namespace).
-		Get(c.OpConfig.OAuthTokenSecretName.Name, meta_v1.GetOptions{})
+		Get(c.OpConfig.OAuthTokenSecretName.Name, metav1.GetOptions{})
 
 	if err != nil {
 		c.logger.Debugf("Oauth token secret name: %q", c.OpConfig.OAuthTokenSecretName)
@@ -194,7 +194,7 @@ func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
 func (c *Cluster) waitStatefulsetReady() error {
 	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
-			listOptions := meta_v1.ListOptions{
+			listOptions := metav1.ListOptions{
 				LabelSelector: c.labelsSet().String(),
 			}
 			ss, err := c.KubeClient.StatefulSets(c.Metadata.Namespace).List(listOptions)
@@ -214,15 +214,15 @@ func (c *Cluster) waitPodLabelsReady() error {
 	ls := c.labelsSet()
 	namespace := c.Metadata.Namespace
 
-	listOptions := meta_v1.ListOptions{
+	listOptions := metav1.ListOptions{
 		LabelSelector: ls.String(),
 	}
-	masterListOption := meta_v1.ListOptions{
+	masterListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
 			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
 		}).String(),
 	}
-	replicaListOption := meta_v1.ListOptions{
+	replicaListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
 			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
 		}).String(),

@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -62,7 +62,7 @@ type Cluster struct {
 	mu               sync.Mutex
 	masterLess       bool
 	userSyncStrategy spec.UserSyncer
-	deleteOptions    *meta_v1.DeleteOptions
+	deleteOptions    *metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
 	teamsAPIClient *teams.API
@@ -101,7 +101,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		kubeResources:    kubeResources,
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &meta_v1.DeleteOptions{OrphanDependents: &orphanDependents},
+		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
 		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger.Logger),
