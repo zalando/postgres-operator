@@ -129,9 +129,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 	logger := c.logger.WithField("worker", event.WorkerID)
 
 	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync {
-		clusterName = util.NameFromMeta(event.NewSpec.Metadata)
+		clusterName = util.NameFromMeta(event.NewSpec.ObjectMeta)
 	} else {
-		clusterName = util.NameFromMeta(event.OldSpec.Metadata)
+		clusterName = util.NameFromMeta(event.OldSpec.ObjectMeta)
 	}
 
 	c.clustersMu.RLock()
@@ -242,8 +242,8 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	)
 
 	if old != nil { //update, delete
-		uid = old.Metadata.GetUID()
-		clusterName = util.NameFromMeta(old.Metadata)
+		uid = old.GetUID()
+		clusterName = util.NameFromMeta(old.ObjectMeta)
 		if eventType == spec.EventUpdate && new.Error == nil && old.Error != nil {
 			eventType = spec.EventSync
 			clusterError = new.Error
@@ -251,8 +251,8 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 			clusterError = old.Error
 		}
 	} else { //add, sync
-		uid = new.Metadata.GetUID()
-		clusterName = util.NameFromMeta(new.Metadata)
+		uid = new.GetUID()
+		clusterName = util.NameFromMeta(new.ObjectMeta)
 		clusterError = new.Error
 	}
 
@@ -297,7 +297,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
 	}
-	if pgOld.Metadata.ResourceVersion == pgNew.Metadata.ResourceVersion {
+	if pgOld.ResourceVersion == pgNew.ResourceVersion {
 		return
 	}
 	if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {

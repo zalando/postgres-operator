@@ -12,7 +12,7 @@ import (
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
-	ns := c.Metadata.Namespace
+	ns := c.Namespace
 	listOptions := metav1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}
@@ -114,7 +114,7 @@ func (c *Cluster) recreatePod(pod v1.Pod) error {
 
 func (c *Cluster) recreatePods() error {
 	ls := c.labelsSet()
-	namespace := c.Metadata.Namespace
+	namespace := c.Namespace
 
 	listOptions := metav1.ListOptions{
 		LabelSelector: ls.String(),

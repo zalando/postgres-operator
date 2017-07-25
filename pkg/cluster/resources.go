@@ -16,7 +16,7 @@ import (
 )
 
 func (c *Cluster) loadResources() error {
-	ns := c.Metadata.Namespace
+	ns := c.Namespace
 	listOptions := metav1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}

@@ -197,7 +197,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 			listOptions := metav1.ListOptions{
 				LabelSelector: c.labelsSet().String(),
 			}
-			ss, err := c.KubeClient.StatefulSets(c.Metadata.Namespace).List(listOptions)
+			ss, err := c.KubeClient.StatefulSets(c.Namespace).List(listOptions)
 			if err != nil {
 				return false, err
 			}
@@ -212,7 +212,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 
 func (c *Cluster) waitPodLabelsReady() error {
 	ls := c.labelsSet()
-	namespace := c.Metadata.Namespace
+	namespace := c.Namespace
 
 	listOptions := metav1.ListOptions{
 		LabelSelector: ls.String(),
@@ -278,7 +278,7 @@ func (c *Cluster) labelsSet() labels.Set {
 	for k, v := range c.OpConfig.ClusterLabels {
 		lbls[k] = v
 	}
-	lbls[c.OpConfig.ClusterNameLabel] = c.Metadata.Name
+	lbls[c.OpConfig.ClusterNameLabel] = c.Name
 
 	return labels.Set(lbls)
 }
@@ -308,7 +308,7 @@ func (c *Cluster) credentialSecretName(username string) string {
 	// and must start and end with an alphanumeric character
 	return fmt.Sprintf(constants.UserSecretTemplate,
 		strings.Replace(username, "_", "-", -1),
-		c.Metadata.Name)
+		c.Name)
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {

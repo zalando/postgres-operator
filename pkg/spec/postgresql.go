@@ -7,7 +7,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.
@@ -70,8 +69,8 @@ const (
 
 // Postgresql defines PostgreSQL Third Party (resource) Object.
 type Postgresql struct {
-	metav1.TypeMeta `json:",inline"`
-	Metadata        metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
 
 	Spec   PostgresSpec   `json:"spec"`
 	Status PostgresStatus `json:"status,omitempty"`
@@ -99,7 +98,7 @@ type PostgresSpec struct {
 // PostgresqlList defines a list of PostgreSQL clusters.
 type PostgresqlList struct {
 	metav1.TypeMeta `json:",inline"`
-	Metadata        metav1.ListMeta `json:"metadata"`
+	metav1.ListMeta `json:"metadata"`
 
 	Items []Postgresql `json:"items"`
 }
@@ -190,25 +189,6 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// GetObject implements Object interface for PostgreSQL TPR spec object.
-func (p *Postgresql) GetObjectKind() schema.ObjectKind {
-	return &p.TypeMeta
-}
-
-// GetObjectMeta implements ObjectMetaAccessor interface for PostgreSQL TPR spec object.
-func (p *Postgresql) GetObjectMeta() metav1.Object {
-	return &p.Metadata
-}
-
-func (pl *PostgresqlList) GetObjectKind() schema.ObjectKind {
-	return &pl.TypeMeta
-}
-
-// GetListMeta implements ListMetaAccessor interface for PostgreSQL TPR List spec object.
-func (pl *PostgresqlList) GetListMeta() metav1.List {
-	return &pl.Metadata
-}
-
 func extractClusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
 	if len(clusterName) < teamNameLen+2 {
@@ -226,10 +206,6 @@ func extractClusterName(clusterName string, teamName string) (string, error) {
 	return clusterName[teamNameLen+1:], nil
 }
 
-// The code below is used only to work around a known problem with third-party
-// resources and ugorji. If/when these issues are resolved, the code below
-// should no longer be required.
-//
 type postgresqlListCopy PostgresqlList
 type postgresqlCopy Postgresql
 
@@ -239,7 +215,7 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
-		metaErr := json.Unmarshal(data, &tmp.Metadata)
+		metaErr := json.Unmarshal(data, &tmp.ObjectMeta)
 		if metaErr != nil {
 			return err
 		}
@@ -253,7 +229,7 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	}
 	tmp2 := Postgresql(tmp)
 
-	clusterName, err := extractClusterName(tmp2.Metadata.Name, tmp2.Spec.TeamID)
+	clusterName, err := extractClusterName(tmp2.ObjectMeta.Name, tmp2.Spec.TeamID)
 	if err == nil {
 		tmp2.Spec.ClusterName = clusterName
 	} else {
