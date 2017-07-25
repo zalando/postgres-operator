@@ -66,11 +66,11 @@ func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserReque
 		switch r.Kind {
 		case spec.PGSyncUserAdd:
 			if err := s.createPgUser(r.User, db); err != nil {
-				return fmt.Errorf("could not create user '%s': %v", r.User.Name, err)
+				return fmt.Errorf("could not create user %q: %v", r.User.Name, err)
 			}
 		case spec.PGsyncUserAlter:
 			if err := s.alterPgUser(r.User, db); err != nil {
-				return fmt.Errorf("could not alter user '%s': %v", r.User.Name, err)
+				return fmt.Errorf("could not alter user %q: %v", r.User.Name, err)
 			}
 		default:
 			return fmt.Errorf("unrecognized operation: %v", r.Kind)
@@ -100,7 +100,7 @@ func (s DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err
 
 	_, err = db.Query(query) // TODO: Try several times
 	if err != nil {
-		err = fmt.Errorf("dB error: %s, query: %v", err, query)
+		err = fmt.Errorf("dB error: %v, query: %q", err, query)
 		return
 	}
 
@@ -122,7 +122,7 @@ func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err 
 
 	_, err = db.Query(query) // TODO: Try several times
 	if err != nil {
-		err = fmt.Errorf("dB error: %s query %v", err, query)
+		err = fmt.Errorf("dB error: %v query %q", err, query)
 		return
 	}
 

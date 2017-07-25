@@ -2,7 +2,7 @@ package constants
 
 const (
 	PasswordLength         = 64
-	UserSecretTemplate     = "%s.%s.credentials." + TPRName + "." + TPRVendor // Username, ClusterName
+	UserSecretTemplate     = "%s.%s.credentials." + TPRKind + "." + TPRGroup // Username, ClusterName
 	SuperuserKeyName       = "superuser"
 	ReplicationUserKeyName = "replication"
 	RoleFlagSuperuser      = "SUPERUSER"

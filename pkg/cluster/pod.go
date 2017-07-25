@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -11,8 +12,8 @@ import (
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
-	ns := c.Metadata.Namespace
-	listOptions := v1.ListOptions{
+	ns := c.Namespace
+	listOptions := metav1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}
 
@@ -34,11 +35,11 @@ func (c *Cluster) deletePods() error {
 	for _, obj := range pods {
 		podName := util.NameFromMeta(obj.ObjectMeta)
 
-		c.logger.Debugf("Deleting pod '%s'", podName)
+		c.logger.Debugf("Deleting pod %q", podName)
 		if err := c.deletePod(podName); err != nil {
-			c.logger.Errorf("could not delete pod '%s': %s", podName, err)
+			c.logger.Errorf("could not delete pod %q: %v", podName, err)
 		} else {
-			c.logger.Infof("pod '%s' has been deleted", podName)
+			c.logger.Infof("pod %q has been deleted", podName)
 		}
 	}
 	if len(pods) > 0 {
@@ -106,16 +107,16 @@ func (c *Cluster) recreatePod(pod v1.Pod) error {
 	if err := c.waitForPodLabel(ch); err != nil {
 		return err
 	}
-	c.logger.Infof("pod '%s' is ready", podName)
+	c.logger.Infof("pod %q is ready", podName)
 
 	return nil
 }
 
 func (c *Cluster) recreatePods() error {
 	ls := c.labelsSet()
-	namespace := c.Metadata.Namespace
+	namespace := c.Namespace
 
-	listOptions := v1.ListOptions{
+	listOptions := metav1.ListOptions{
 		LabelSelector: ls.String(),
 	}
 
@@ -135,7 +136,7 @@ func (c *Cluster) recreatePods() error {
 		}
 
 		if err := c.recreatePod(pod); err != nil {
-			return fmt.Errorf("could not recreate replica pod '%s': %v", util.NameFromMeta(pod.ObjectMeta), err)
+			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 		}
 	}
 	if masterPod.Name == "" {
@@ -143,10 +144,10 @@ func (c *Cluster) recreatePods() error {
 	} else {
 		//TODO: do manual failover
 		//TODO: specify master, leave new master empty
-		c.logger.Infof("Recreating master pod '%s'", util.NameFromMeta(masterPod.ObjectMeta))
+		c.logger.Infof("Recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
 		if err := c.recreatePod(masterPod); err != nil {
-			return fmt.Errorf("could not recreate master pod '%s': %v", util.NameFromMeta(masterPod.ObjectMeta), err)
+			return fmt.Errorf("could not recreate master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
 		}
 	}
 

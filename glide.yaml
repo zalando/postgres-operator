@@ -1,26 +1,39 @@
 package: github.com/zalando-incubator/postgres-operator
 import:
-- package: github.com/gogo/protobuf
-  version: ^0.3.0
 - package: github.com/Sirupsen/logrus
-  version: ^0.11.5
-  subpackages:
-  - client
-- package: github.com/lib/pq
-- package: github.com/motomux/pretty
-- package: golang.org/x/net
-  subpackages:
-  - context
-- package: k8s.io/apimachinery
-  version: 84c15da65eb86243c295d566203d7689cc6ac04b
-  subpackages:
-  - pkg/util/json
-  - pkg/util/remotecommand
-- package: k8s.io/client-go
-  version: ^2.0.0
-- package: k8s.io/kubernetes
-  version: ee39d359dd0896c4c0eccf23f033f158ad3d3bd7
-  subpackages:
-  - pkg/client/unversioned/remotecommand
+  version: ^1.0.1
 - package: github.com/aws/aws-sdk-go
   version: ^1.8.24
+  subpackages:
+  - aws
+  - aws/session
+  - service/ec2
+- package: github.com/lib/pq
+- package: github.com/motomux/pretty
+- package: k8s.io/apimachinery
+  subpackages:
+  - pkg/api/errors
+  - pkg/api/meta
+  - pkg/api/resource
+  - pkg/apis/meta/v1
+  - pkg/fields
+  - pkg/labels
+  - pkg/runtime
+  - pkg/runtime/schema
+  - pkg/runtime/serializer
+  - pkg/types
+  - pkg/util/intstr
+  - pkg/util/remotecommand
+  - pkg/watch
+- package: k8s.io/client-go
+  version: ^4.0.0-beta.0
+  subpackages:
+  - kubernetes
+  - pkg/api
+  - pkg/api/v1
+  - pkg/apis/apps/v1beta1
+  - pkg/apis/extensions/v1beta1
+  - rest
+  - tools/cache
+  - tools/clientcmd
+  - tools/remotecommand

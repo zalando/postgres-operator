@@ -49,7 +49,7 @@ func TestNamespacedNameError(t *testing.T) {
 		var actual NamespacedName
 		err := actual.Decode(tt)
 		if err == nil {
-			t.Errorf("Error expected for '%s', got: %#v", tt, actual)
+			t.Errorf("Error expected for %q, got: %#v", tt, actual)
 		}
 	}
 }

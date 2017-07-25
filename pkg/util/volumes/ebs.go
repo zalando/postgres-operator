@@ -42,11 +42,11 @@ func (c *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
 func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string, error) {
 	volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
 	if volumeID == "" {
-		return "", fmt.Errorf("volume id is empty for volume %s", pv.Name)
+		return "", fmt.Errorf("volume id is empty for volume %q", pv.Name)
 	}
 	idx := strings.LastIndex(volumeID, constants.EBSVolumeIDStart) + 1
 	if idx == 0 {
-		return "", fmt.Errorf("malfored EBS volume id %s", volumeID)
+		return "", fmt.Errorf("malfored EBS volume id %q", volumeID)
 	}
 	return volumeID[idx:], nil
 }
@@ -60,7 +60,7 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 	}
 	vol := volumeOutput.Volumes[0]
 	if *vol.VolumeId != volumeId {
-		return fmt.Errorf("describe volume %s returned information about a non-matching volume %s", volumeId, *vol.VolumeId)
+		return fmt.Errorf("describe volume %q returned information about a non-matching volume %q", volumeId, *vol.VolumeId)
 	}
 	if *vol.Size == newSize {
 		// nothing to do
@@ -74,7 +74,7 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 
 	state := *output.VolumeModification.ModificationState
 	if state == constants.EBSVolumeStateFailed {
-		return fmt.Errorf("could not modify persistent volume %s: modification state failed", volumeId)
+		return fmt.Errorf("could not modify persistent volume %q: modification state failed", volumeId)
 	}
 	if state == "" {
 		return fmt.Errorf("received empty modification status")
@@ -91,10 +91,10 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 				return false, fmt.Errorf("could not describe volume modification: %v", err)
 			}
 			if len(out.VolumesModifications) != 1 {
-				return false, fmt.Errorf("describe volume modification didn't return one record for volume \"%s\"", volumeId)
+				return false, fmt.Errorf("describe volume modification didn't return one record for volume %q", volumeId)
 			}
 			if *out.VolumesModifications[0].VolumeId != volumeId {
-				return false, fmt.Errorf("non-matching volume id when describing modifications: \"%s\" is different from \"%s\"",
+				return false, fmt.Errorf("non-matching volume id when describing modifications: %q is different from %q",
 					*out.VolumesModifications[0].VolumeId, volumeId)
 			}
 			return *out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil

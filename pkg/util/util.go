@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/motomux/pretty"
-	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
@@ -34,7 +34,7 @@ func RandomPassword(n int) string {
 }
 
 // NameFromMeta converts a metadata object to the NamespacedName name representation.
-func NameFromMeta(meta v1.ObjectMeta) spec.NamespacedName {
+func NameFromMeta(meta metav1.ObjectMeta) spec.NamespacedName {
 	return spec.NamespacedName{
 		Namespace: meta.Namespace,
 		Name:      meta.Name,

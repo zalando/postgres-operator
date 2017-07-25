@@ -95,7 +95,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 		if err != nil {
 			return fmt.Errorf("could not create missing %s service: %v", role, err)
 		}
-		c.logger.Infof("Created missing %s service '%s'", role, util.NameFromMeta(svc.ObjectMeta))
+		c.logger.Infof("Created missing %s service %q", role, util.NameFromMeta(svc.ObjectMeta))
 
 		return nil
 	}
@@ -110,7 +110,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if err := c.updateService(role, desiredSvc); err != nil {
 		return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 	}
-	c.logger.Infof("%s service '%s' is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
+	c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 
 	return nil
 }
@@ -122,7 +122,7 @@ func (c *Cluster) syncEndpoint() error {
 		if err != nil {
 			return fmt.Errorf("could not create missing endpoint: %v", err)
 		}
-		c.logger.Infof("Created missing endpoint '%s'", util.NameFromMeta(ep.ObjectMeta))
+		c.logger.Infof("Created missing endpoint %q", util.NameFromMeta(ep.ObjectMeta))
 		return nil
 	}
 
@@ -151,7 +151,7 @@ func (c *Cluster) syncStatefulSet() error {
 		if err != nil {
 			return fmt.Errorf("cluster is not ready: %v", err)
 		}
-		c.logger.Infof("Created missing statefulset '%s'", util.NameFromMeta(ss.ObjectMeta))
+		c.logger.Infof("Created missing statefulset %q", util.NameFromMeta(ss.ObjectMeta))
 		if !rollUpdate {
 			return nil
 		}

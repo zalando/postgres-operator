@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
@@ -53,7 +53,7 @@ func TestRandomPassword(t *testing.T) {
 }
 
 func TestNameFromMeta(t *testing.T) {
-	meta := v1.ObjectMeta{
+	meta := metav1.ObjectMeta{
 		Name:      "testcluster",
 		Namespace: "default",
 	}
@@ -73,7 +73,7 @@ func TestPGUserPassword(t *testing.T) {
 	for _, tt := range pgUsers {
 		pwd := PGUserPassword(tt.in)
 		if pwd != tt.out {
-			t.Errorf("PgUserPassword expected: %s, got: %s", tt.out, pwd)
+			t.Errorf("PgUserPassword expected: %q, got: %q", tt.out, pwd)
 		}
 	}
 }
@@ -81,7 +81,7 @@ func TestPGUserPassword(t *testing.T) {
 func TestPrettyDiff(t *testing.T) {
 	for _, tt := range prettyDiffTest {
 		if actual := PrettyDiff(tt.inA, tt.inB); actual != tt.out {
-			t.Errorf("PrettyDiff expected: %s, got: %s", tt.out, actual)
+			t.Errorf("PrettyDiff expected: %q, got: %q", tt.out, actual)
 		}
 	}
 }
