@@ -33,7 +33,7 @@ type Controller struct {
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
-	RestClient rest.Interface
+	RestClient rest.Interface // kubernetes API group REST client
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster
