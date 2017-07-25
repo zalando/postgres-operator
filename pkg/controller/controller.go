@@ -171,11 +171,12 @@ func (c *Controller) initController() {
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 
-	wg.Add(4)
+	wg.Add(5)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.podEventsDispatcher(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
+	go c.RunAPIServer(stopCh, wg)
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
