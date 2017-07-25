@@ -107,7 +107,7 @@ var unmarshalCluster = []struct {
 			Kind:       "Postgresql",
 			APIVersion: "acid.zalan.do/v1",
 		},
-		Metadata: metav1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "acid-testcluster1",
 		},
 		Status: ClusterStatusInvalid,
@@ -187,7 +187,7 @@ var unmarshalCluster = []struct {
 				Kind:       "Postgresql",
 				APIVersion: "acid.zalan.do/v1",
 			},
-			Metadata: metav1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "acid-testcluster1",
 			},
 			Spec: PostgresSpec{
@@ -253,7 +253,7 @@ var unmarshalCluster = []struct {
 				Kind:       "Postgresql",
 				APIVersion: "acid.zalan.do/v1",
 			},
-			Metadata: metav1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "teapot-testcluster1",
 			},
 			Spec:   PostgresSpec{TeamID: "acid"},
@@ -286,7 +286,7 @@ var postgresqlList = []struct {
 					Kind:       "Postgresql",
 					APIVersion: "acid.zalan.do/v1",
 				},
-				Metadata: metav1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "acid-testcluster42",
 					Namespace:       "default",
 					Labels:          map[string]string{"team": "acid"},
@@ -445,8 +445,8 @@ func TestPostgresMeta(t *testing.T) {
 			t.Errorf("GetObjectKindMeta expected: %v, got: %v", tt.out.TypeMeta, a)
 		}
 
-		if a := tt.out.GetObjectMeta(); reflect.DeepEqual(a, tt.out.Metadata) {
-			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.Metadata, a)
+		if a := tt.out.GetObjectMeta(); reflect.DeepEqual(a, tt.out.ObjectMeta) {
+			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.ObjectMeta, a)
 		}
 	}
 }
@@ -475,8 +475,8 @@ func TestPostgresListMeta(t *testing.T) {
 			t.Errorf("GetObjectKindMeta expected: %v, got: %v", tt.out.TypeMeta, a)
 		}
 
-		if a := tt.out.GetListMeta(); reflect.DeepEqual(a, tt.out.Metadata) {
-			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.Metadata, a)
+		if a := tt.out.GetListMeta(); reflect.DeepEqual(a, tt.out.ListMeta) {
+			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.ListMeta, a)
 		}
 
 		return
