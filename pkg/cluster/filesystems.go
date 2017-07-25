@@ -39,5 +39,5 @@ func (c *Cluster) resizePostgresFilesystem(podName *spec.NamespacedName, resizer
 
 		return err
 	}
-	return fmt.Errorf("could not resize filesystem: no compatible resizers for the filesystem of type %s", fsType)
+	return fmt.Errorf("could not resize filesystem: no compatible resizers for the filesystem of type %q", fsType)
 }

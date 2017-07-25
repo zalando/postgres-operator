@@ -1,10 +1,9 @@
 package spec
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
-
-	"database/sql"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"

@@ -199,7 +199,7 @@ PATRONI_INITDB_PARAMS:
 	}
 	result, err := json.Marshal(config)
 	if err != nil {
-		c.logger.Errorf("Cannot convert spilo configuration into JSON: %s", err)
+		c.logger.Errorf("Cannot convert spilo configuration into JSON: %v", err)
 		return ""
 	}
 	return string(result)
@@ -451,7 +451,7 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	if (newSpec.UseLoadBalancer != nil && *newSpec.UseLoadBalancer) ||
 		(newSpec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
 
-		// safe default value: lock load balancer to only local address unless overriden explicitely.
+		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
 		allowedSourceRanges := newSpec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {
