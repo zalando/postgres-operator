@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"hash/crc32"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
@@ -30,7 +30,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 
 func thirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
 	return &extv1beta.ThirdPartyResource{
-		ObjectMeta: meta_v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			//ThirdPartyResources are cluster-wide
 			Name: TPRName,
 		},
@@ -69,7 +69,7 @@ func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (r
 
 	infraRolesSecret, err := c.KubeClient.
 		Secrets(rolesSecret.Namespace).
-		Get(rolesSecret.Name, meta_v1.GetOptions{})
+		Get(rolesSecret.Name, metav1.GetOptions{})
 	if err != nil {
 		c.logger.Debugf("Infrastructure roles secret name: %q", *rolesSecret)
 		return nil, fmt.Errorf("could not get infrastructure roles secret: %v", err)

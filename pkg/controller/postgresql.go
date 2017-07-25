@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -27,14 +27,14 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-ticker.C:
-			c.clusterListFunc(meta_v1.ListOptions{ResourceVersion: "0"})
+			c.clusterListFunc(metav1.ListOptions{ResourceVersion: "0"})
 		case <-stopCh:
 			return
 		}
 	}
 }
 
-func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
+func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
 	var list spec.PostgresqlList
 	var activeClustersCnt, failedClustersCnt int
 
@@ -42,7 +42,7 @@ func (c *Controller) clusterListFunc(options meta_v1.ListOptions) (runtime.Objec
 		Get().
 		Namespace(c.opConfig.Namespace).
 		Resource(constants.ResourceName).
-		VersionedParams(&options, meta_v1.ParameterCodec)
+		VersionedParams(&options, metav1.ParameterCodec)
 
 	b, err := req.DoRaw()
 	if err != nil {
@@ -101,13 +101,13 @@ func (d *tprDecoder) Decode() (action watch.EventType, object runtime.Object, er
 	return e.Type, &e.Object, nil
 }
 
-func (c *Controller) clusterWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
+func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
 	options.Watch = true
 	r, err := c.RestClient.
 		Get().
 		Namespace(c.opConfig.Namespace).
 		Resource(constants.ResourceName).
-		VersionedParams(&options, meta_v1.ParameterCodec).
+		VersionedParams(&options, metav1.ParameterCodec).
 		FieldsSelectorParam(nil).
 		Stream()
 
@@ -131,9 +131,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 	logger := c.logger.WithField("worker", event.WorkerID)
 
 	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync {
-		clusterName = util.NameFromMeta(event.NewSpec.Metadata)
+		clusterName = util.NameFromMeta(event.NewSpec.ObjectMeta)
 	} else {
-		clusterName = util.NameFromMeta(event.OldSpec.Metadata)
+		clusterName = util.NameFromMeta(event.OldSpec.ObjectMeta)
 	}
 
 	c.clustersMu.RLock()
@@ -248,8 +248,8 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	)
 
 	if old != nil { //update, delete
-		uid = old.Metadata.GetUID()
-		clusterName = util.NameFromMeta(old.Metadata)
+		uid = old.GetUID()
+		clusterName = util.NameFromMeta(old.ObjectMeta)
 		if eventType == spec.EventUpdate && new.Error == nil && old.Error != nil {
 			eventType = spec.EventSync
 			clusterError = new.Error
@@ -257,8 +257,8 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 			clusterError = old.Error
 		}
 	} else { //add, sync
-		uid = new.Metadata.GetUID()
-		clusterName = util.NameFromMeta(new.Metadata)
+		uid = new.GetUID()
+		clusterName = util.NameFromMeta(new.ObjectMeta)
 		clusterError = new.Error
 	}
 
@@ -303,7 +303,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
 	}
-	if pgOld.Metadata.ResourceVersion == pgNew.Metadata.ResourceVersion {
+	if pgOld.ResourceVersion == pgNew.ResourceVersion {
 		return
 	}
 	if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {

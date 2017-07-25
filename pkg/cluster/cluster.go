@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -62,7 +62,7 @@ type Cluster struct {
 	mu               sync.Mutex
 	masterLess       bool
 	userSyncStrategy spec.UserSyncer
-	deleteOptions    *meta_v1.DeleteOptions
+	deleteOptions    *metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
 	teamsAPIClient *teams.API
@@ -78,7 +78,7 @@ type compareStatefulsetResult struct {
 
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
-	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
+	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Name)
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true
 
@@ -101,7 +101,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		kubeResources:    kubeResources,
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &meta_v1.DeleteOptions{OrphanDependents: &orphanDependents},
+		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
 		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger.Logger),
@@ -111,7 +111,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 }
 
 func (c *Cluster) clusterName() spec.NamespacedName {
-	return util.NameFromMeta(c.Metadata)
+	return util.NameFromMeta(c.ObjectMeta)
 }
 
 func (c *Cluster) teamName() string {
@@ -128,7 +128,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 
 	_, err = c.KubeClient.RESTClient.Patch(types.MergePatchType).
-		RequestURI(c.Metadata.GetSelfLink()).
+		RequestURI(c.GetSelfLink()).
 		Body(request).
 		DoRaw()
 
@@ -407,7 +407,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 
 	c.setStatus(spec.ClusterStatusUpdating)
 	c.logger.Debugf("Cluster update from version %q to %q",
-		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
+		c.ResourceVersion, newSpec.ResourceVersion)
 
 	/* Make sure we update when this function exists */
 	defer func() {

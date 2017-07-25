@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
@@ -53,7 +53,7 @@ func TestRandomPassword(t *testing.T) {
 }
 
 func TestNameFromMeta(t *testing.T) {
-	meta := meta_v1.ObjectMeta{
+	meta := metav1.ObjectMeta{
 		Name:      "testcluster",
 		Namespace: "default",
 	}

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
@@ -19,7 +19,7 @@ func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (
 		execErr bytes.Buffer
 	)
 
-	pod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, meta_v1.GetOptions{})
+	pod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("could not get pod info: %v", err)
 	}
