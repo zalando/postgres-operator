@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"fmt"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
@@ -17,7 +19,7 @@ func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (
 		execErr bytes.Buffer
 	)
 
-	pod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name)
+	pod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("could not get pod info: %v", err)
 	}
@@ -26,17 +28,17 @@ func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (
 		return "", fmt.Errorf("could not determine which container to use")
 	}
 
-	req := c.RestClient.Post().
+	req := c.KubeClient.RESTClient.Post().
 		Resource("pods").
 		Name(podName.Name).
 		Namespace(podName.Namespace).
 		SubResource("exec")
-	req.VersionedParams(&api.PodExecOptions{
+	req.VersionedParams(&v1.PodExecOptions{
 		Container: pod.Spec.Containers[0].Name,
 		Command:   command,
 		Stdout:    true,
 		Stderr:    true,
-	}, api.ParameterCodec)
+	}, scheme.ParameterCodec)
 
 	exec, err := remotecommand.NewExecutor(c.RestConfig, "POST", req.URL())
 	if err != nil {

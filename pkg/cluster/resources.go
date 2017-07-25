@@ -3,7 +3,8 @@ package cluster
 import (
 	"fmt"
 
-	"k8s.io/client-go/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 
@@ -15,8 +16,8 @@ import (
 )
 
 func (c *Cluster) loadResources() error {
-	ns := c.Metadata.Namespace
-	listOptions := v1.ListOptions{
+	ns := c.Namespace
+	listOptions := metav1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}
 
@@ -60,7 +61,7 @@ func (c *Cluster) loadResources() error {
 			continue
 		}
 		c.Secrets[secret.UID] = &secrets.Items[i]
-		c.logger.Debugf("secret loaded, uid: %s", secret.UID)
+		c.logger.Debugf("secret loaded, uid: %q", secret.UID)
 	}
 
 	statefulSets, err := c.KubeClient.StatefulSets(ns).List(listOptions)
@@ -79,19 +80,19 @@ func (c *Cluster) loadResources() error {
 
 func (c *Cluster) listResources() error {
 	if c.Statefulset != nil {
-		c.logger.Infof("Found statefulset: %s (uid: %s)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
+		c.logger.Infof("Found statefulset: %q (uid: %q)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}
 
 	for _, obj := range c.Secrets {
-		c.logger.Infof("Found secret: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("Found secret: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	if c.Endpoint != nil {
-		c.logger.Infof("Found endpoint: %s (uid: %s)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
+		c.logger.Infof("Found endpoint: %q (uid: %q)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
 	}
 
 	for role, service := range c.Service {
-		c.logger.Infof("Found %s service: %s (uid: %s)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
+		c.logger.Infof("Found %s service: %q (uid: %q)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
 	}
 
 	pods, err := c.listPods()
@@ -100,7 +101,7 @@ func (c *Cluster) listResources() error {
 	}
 
 	for _, obj := range pods {
-		c.logger.Infof("Found pod: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("Found pod: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	pvcs, err := c.listPersistentVolumeClaims()
@@ -109,7 +110,7 @@ func (c *Cluster) listResources() error {
 	}
 
 	for _, obj := range pvcs {
-		c.logger.Infof("Found PVC: %s (uid: %s)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("Found PVC: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	return nil
@@ -128,7 +129,7 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 		return nil, err
 	}
 	c.Statefulset = statefulSet
-	c.logger.Debugf("Created new statefulset '%s', uid: %s", util.NameFromMeta(statefulSet.ObjectMeta), statefulSet.UID)
+	c.logger.Debugf("Created new statefulset %q, uid: %q", util.NameFromMeta(statefulSet.ObjectMeta), statefulSet.UID)
 
 	return statefulSet, nil
 }
@@ -143,15 +144,15 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 
 	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
-		return fmt.Errorf("could not form patch for the statefulset '%s': %v", statefulSetName, err)
+		return fmt.Errorf("could not form patch for the statefulset %q: %v", statefulSetName, err)
 	}
 
 	statefulSet, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
 		c.Statefulset.Name,
-		api.MergePatchType,
+		types.MergePatchType,
 		patchData, "")
 	if err != nil {
-		return fmt.Errorf("could not patch statefulset '%s': %v", statefulSetName, err)
+		return fmt.Errorf("could not patch statefulset %q: %v", statefulSetName, err)
 	}
 	c.Statefulset = statefulSet
 
@@ -171,9 +172,9 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	orphanDepencies := true
 	oldStatefulset := c.Statefulset
 
-	options := v1.DeleteOptions{OrphanDependents: &orphanDepencies}
+	options := metav1.DeleteOptions{OrphanDependents: &orphanDepencies}
 	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
-		return fmt.Errorf("could not delete statefulset '%s': %v", statefulSetName, err)
+		return fmt.Errorf("could not delete statefulset %q: %v", statefulSetName, err)
 	}
 	// make sure we clear the stored statefulset status if the subsequent create fails.
 	c.Statefulset = nil
@@ -182,7 +183,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 
 	err := retryutil.Retry(constants.StatefulsetDeletionInterval, constants.StatefulsetDeletionTimeout,
 		func() (bool, error) {
-			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name)
+			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name, metav1.GetOptions{})
 
 			return err != nil, nil
 		})
@@ -193,7 +194,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	// create the new statefulset with the desired spec. It would take over the remaining pods.
 	createdStatefulset, err := c.KubeClient.StatefulSets(newStatefulSet.Namespace).Create(newStatefulSet)
 	if err != nil {
-		return fmt.Errorf("could not create statefulset '%s': %v", statefulSetName, err)
+		return fmt.Errorf("could not create statefulset %q: %v", statefulSetName, err)
 	}
 	// check that all the previous replicas were picked up.
 	if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
@@ -215,7 +216,7 @@ func (c *Cluster) deleteStatefulSet() error {
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("statefulset '%s' has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
+	c.logger.Infof("statefulset %q has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	c.Statefulset = nil
 
 	if err := c.deletePods(); err != nil {
@@ -262,19 +263,19 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		if role == Master {
 			// for the master service we need to re-create the endpoint as well. Get the up-to-date version of
 			// the addresses stored in it before the service is deleted (deletion of the service removes the endpooint)
-			currentEndpoint, err = c.KubeClient.Endpoints(c.Service[role].Namespace).Get(c.Service[role].Name)
+			currentEndpoint, err = c.KubeClient.Endpoints(c.Service[role].Namespace).Get(c.Service[role].Name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("could not get current cluster endpoints: %v", err)
 			}
 		}
 		err = c.KubeClient.Services(c.Service[role].Namespace).Delete(c.Service[role].Name, c.deleteOptions)
 		if err != nil {
-			return fmt.Errorf("could not delete service '%s': '%v'", serviceName, err)
+			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 		c.Endpoint = nil
 		svc, err := c.KubeClient.Services(newService.Namespace).Create(newService)
 		if err != nil {
-			return fmt.Errorf("could not create service '%s': '%v'", serviceName, err)
+			return fmt.Errorf("could not create service %q: %v", serviceName, err)
 		}
 		c.Service[role] = svc
 		if role == Master {
@@ -282,7 +283,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			endpointSpec := c.generateMasterEndpoints(currentEndpoint.Subsets)
 			ep, err := c.KubeClient.Endpoints(c.Service[role].Namespace).Create(endpointSpec)
 			if err != nil {
-				return fmt.Errorf("could not create endpoint '%s': '%v'", endpointName, err)
+				return fmt.Errorf("could not create endpoint %q: %v", endpointName, err)
 			}
 			c.Endpoint = ep
 		}
@@ -294,25 +295,25 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 		_, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(
 			c.Service[role].Name,
-			api.StrategicMergePatchType,
+			types.StrategicMergePatchType,
 			[]byte(annotationsPatchData), "")
 
 		if err != nil {
-			return fmt.Errorf("could not replace annotations for the service '%s': %v", serviceName, err)
+			return fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
 		}
 	}
 
 	patchData, err := specPatch(newService.Spec)
 	if err != nil {
-		return fmt.Errorf("could not form patch for the service '%s': %v", serviceName, err)
+		return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
 	}
 
 	svc, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(
 		c.Service[role].Name,
-		api.MergePatchType,
+		types.MergePatchType,
 		patchData, "")
 	if err != nil {
-		return fmt.Errorf("could not patch service '%s': %v", serviceName, err)
+		return fmt.Errorf("could not patch service %q: %v", serviceName, err)
 	}
 	c.Service[role] = svc
 
@@ -329,7 +330,7 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("%s service '%s' has been deleted", role, util.NameFromMeta(service.ObjectMeta))
+	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(service.ObjectMeta))
 	c.Service[role] = nil
 	return nil
 }
@@ -358,7 +359,7 @@ func (c *Cluster) deleteEndpoint() error {
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("endpoint '%s' has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
+	c.logger.Infof("endpoint %q has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
 	c.Endpoint = nil
 
 	return nil
@@ -371,11 +372,11 @@ func (c *Cluster) applySecrets() error {
 		secret, err := c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
 		if k8sutil.ResourceAlreadyExists(err) {
 			var userMap map[string]spec.PgUser
-			curSecret, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name)
+			curSecret, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
-			c.logger.Debugf("secret '%s' already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
+			c.logger.Debugf("secret %q already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
 				userMap = c.systemUsers
@@ -392,10 +393,10 @@ func (c *Cluster) applySecrets() error {
 			continue
 		} else {
 			if err != nil {
-				return fmt.Errorf("could not create secret for user '%s': %v", secretUsername, err)
+				return fmt.Errorf("could not create secret for user %q: %v", secretUsername, err)
 			}
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("Created new secret '%s', uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			c.logger.Debugf("Created new secret %q, uid: %q", util.NameFromMeta(secret.ObjectMeta), secret.UID)
 		}
 	}
 
@@ -403,12 +404,12 @@ func (c *Cluster) applySecrets() error {
 }
 
 func (c *Cluster) deleteSecret(secret *v1.Secret) error {
-	c.logger.Debugf("Deleting secret '%s'", util.NameFromMeta(secret.ObjectMeta))
+	c.logger.Debugf("Deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("secret '%s' has been deleted", util.NameFromMeta(secret.ObjectMeta))
+	c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
 	delete(c.Secrets, secret.UID)
 
 	return err

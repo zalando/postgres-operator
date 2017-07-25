@@ -11,10 +11,10 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"k8s.io/client-go/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
@@ -35,11 +35,8 @@ var (
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
-	KubeClient          k8sutil.KubernetesClient
-	RestClient          *rest.RESTClient
-	RestConfig          *rest.Config
-	TeamsAPIClient      *teams.API
 	OpConfig            config.Config
+	RestConfig          *rest.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
 }
 
@@ -65,8 +62,11 @@ type Cluster struct {
 	mu               sync.Mutex
 	masterLess       bool
 	userSyncStrategy spec.UserSyncer
-	deleteOptions    *v1.DeleteOptions
+	deleteOptions    *metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
+
+	teamsAPIClient *teams.API
+	KubeClient     k8sutil.KubernetesClient //TODO: move clients to the better place?
 }
 
 type compareStatefulsetResult struct {
@@ -77,8 +77,8 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
-	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Metadata.Name)
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
+	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Name)
 	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true
 
@@ -101,15 +101,17 @@ func New(cfg Config, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 		kubeResources:    kubeResources,
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &v1.DeleteOptions{OrphanDependents: &orphanDependents},
+		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
+		KubeClient:       kubeClient,
+		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger.Logger),
 	}
 
 	return cluster
 }
 
 func (c *Cluster) clusterName() spec.NamespacedName {
-	return util.NameFromMeta(c.Metadata)
+	return util.NameFromMeta(c.ObjectMeta)
 }
 
 func (c *Cluster) teamName() string {
@@ -125,8 +127,8 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 
-	_, err = c.RestClient.Patch(api.MergePatchType).
-		RequestURI(c.Metadata.GetSelfLink()).
+	_, err = c.KubeClient.RESTClient.Patch(types.MergePatchType).
+		RequestURI(c.GetSelfLink()).
 		Body(request).
 		DoRaw()
 
@@ -136,7 +138,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 
 	if err != nil {
-		c.logger.Warningf("could not set status for cluster '%s': %s", c.clusterName(), err)
+		c.logger.Warningf("could not set status for cluster %q: %v", c.clusterName(), err)
 	}
 }
 
@@ -179,7 +181,7 @@ func (c *Cluster) Create() error {
 	if err != nil {
 		return fmt.Errorf("could not create endpoint: %v", err)
 	}
-	c.logger.Infof("endpoint '%s' has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+	c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
 	for _, role := range []PostgresRole{Master, Replica} {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
@@ -189,7 +191,7 @@ func (c *Cluster) Create() error {
 		if err != nil {
 			return fmt.Errorf("could not create %s service: %v", role, err)
 		}
-		c.logger.Infof("%s service '%s' has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
+		c.logger.Infof("%s service %q has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
 	}
 
 	if err = c.initUsers(); err != nil {
@@ -206,12 +208,12 @@ func (c *Cluster) Create() error {
 	if err != nil {
 		return fmt.Errorf("could not create statefulset: %v", err)
 	}
-	c.logger.Infof("statefulset '%s' has been successfully created", util.NameFromMeta(ss.ObjectMeta))
+	c.logger.Infof("statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
 	c.logger.Info("Waiting for cluster being ready")
 
 	if err = c.waitStatefulsetPodsReady(); err != nil {
-		c.logger.Errorf("Failed to create cluster: %s", err)
+		c.logger.Errorf("Failed to create cluster: %v", err)
 		return err
 	}
 	c.logger.Infof("pods are ready")
@@ -232,7 +234,7 @@ func (c *Cluster) Create() error {
 
 	err = c.listResources()
 	if err != nil {
-		c.logger.Errorf("could not list resources: %s", err)
+		c.logger.Errorf("could not list resources: %v", err)
 	}
 
 	return nil
@@ -242,7 +244,7 @@ func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match
 	//TODO: improve comparison
 	match = true
 	if c.Service[role].Spec.Type != service.Spec.Type {
-		return false, fmt.Sprintf("new %s service's type %s doesn't match the current one %s",
+		return false, fmt.Sprintf("new %s service's type %q doesn't match the current one %q",
 			role, service.Spec.Type, c.Service[role].Spec.Type)
 	}
 	oldSourceRanges := c.Service[role].Spec.LoadBalancerSourceRanges
@@ -258,7 +260,7 @@ func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match
 	oldDNSAnnotation := c.Service[role].Annotations[constants.ZalandoDNSNameAnnotation]
 	newDNSAnnotation := service.Annotations[constants.ZalandoDNSNameAnnotation]
 	if oldDNSAnnotation != newDNSAnnotation {
-		return false, fmt.Sprintf("new %s service's '%s' annotation doesn't match the current one", role, constants.ZalandoDNSNameAnnotation)
+		return false, fmt.Sprintf("new %s service's %q annotation doesn't match the current one", role, constants.ZalandoDNSNameAnnotation)
 	}
 
 	return true, ""
@@ -289,7 +291,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 
-		c.logger.Warnf("statefulset '%s' has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
+		c.logger.Warnf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
 	}
 	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
@@ -332,12 +334,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		}
 		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
 			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %s doesn't match the current one", name))
+			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q doesn't match the current one", name))
 		}
 		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
 			name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
 			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %s doesn't match the current one", name))
+			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q doesn't match the current one", name))
 		}
 	}
 
@@ -404,8 +406,8 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	defer c.mu.Unlock()
 
 	c.setStatus(spec.ClusterStatusUpdating)
-	c.logger.Debugf("Cluster update from version %s to %s",
-		c.Metadata.ResourceVersion, newSpec.Metadata.ResourceVersion)
+	c.logger.Debugf("Cluster update from version %q to %q",
+		c.ResourceVersion, newSpec.ResourceVersion)
 
 	/* Make sure we update when this function exists */
 	defer func() {
@@ -430,7 +432,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 					if err != nil {
 						return fmt.Errorf("could not create new %s service: %v", role, err)
 					}
-					c.logger.Infof("%s service '%s' has been created", role, util.NameFromMeta(service.ObjectMeta))
+					c.logger.Infof("%s service %q has been created", role, util.NameFromMeta(service.ObjectMeta))
 				}
 			}
 			// only proceed further if both old and new load balancer were present
@@ -445,7 +447,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 				c.setStatus(spec.ClusterStatusUpdateFailed)
 				return fmt.Errorf("could not update %s service: %v", role, err)
 			}
-			c.logger.Infof("%s service '%s' has been updated", role, util.NameFromMeta(c.Service[role].ObjectMeta))
+			c.logger.Infof("%s service %q has been updated", role, util.NameFromMeta(c.Service[role].ObjectMeta))
 		}
 	}
 
@@ -470,11 +472,11 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 			}
 		}
 		//TODO: if there is a change in numberOfInstances, make sure Pods have been created/deleted
-		c.logger.Infof("statefulset '%s' has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
+		c.logger.Infof("statefulset %q has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	}
 
 	if c.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
-		c.logger.Warnf("Postgresql version change(%s -> %s) is not allowed",
+		c.logger.Warnf("Postgresql version change(%q -> %q) is not allowed",
 			c.Spec.PgVersion, newSpec.Spec.PgVersion)
 		//TODO: rewrite pg version in tpr spec
 	}

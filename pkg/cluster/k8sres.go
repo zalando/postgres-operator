@@ -1,14 +1,15 @@
 package cluster
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 
-	"encoding/json"
-	"k8s.io/client-go/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/util/intstr"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -198,7 +199,7 @@ PATRONI_INITDB_PARAMS:
 	}
 	result, err := json.Marshal(config)
 	if err != nil {
-		c.logger.Errorf("Cannot convert spilo configuration into JSON: %s", err)
+		c.logger.Errorf("Cannot convert spilo configuration into JSON: %v", err)
 		return ""
 	}
 	return string(result)
@@ -210,7 +211,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
-			Value: c.Metadata.Name,
+			Value: c.Name,
 		},
 		{
 			Name:  "PGROOT",
@@ -273,7 +274,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	}
 	privilegedMode := bool(true)
 	container := v1.Container{
-		Name:            c.Metadata.Name,
+		Name:            c.Name,
 		Image:           c.OpConfig.DockerImage,
 		ImagePullPolicy: v1.PullAlways,
 		Resources:       *resourceRequirements,
@@ -311,9 +312,9 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	}
 
 	template := v1.PodTemplateSpec{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Labels:    c.labelsSet(),
-			Namespace: c.Metadata.Name,
+			Namespace: c.Name,
 		},
 		Spec: podSpec,
 	}
@@ -337,14 +338,14 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 	}
 
 	statefulSet := &v1beta1.StatefulSet{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      c.Metadata.Name,
-			Namespace: c.Metadata.Namespace,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.Name,
+			Namespace: c.Namespace,
 			Labels:    c.labelsSet(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &spec.NumberOfInstances,
-			ServiceName:          c.Metadata.Name,
+			ServiceName:          c.Name,
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
 		},
@@ -354,7 +355,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
-	metadata := v1.ObjectMeta{
+	metadata := metav1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
 	if volumeStorageClass != "" {
@@ -386,7 +387,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 
 func (c *Cluster) generateUserSecrets() (secrets map[string]*v1.Secret) {
 	secrets = make(map[string]*v1.Secret, len(c.pgUsers))
-	namespace := c.Metadata.Namespace
+	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
 		secret := c.generateSingleUserSecret(namespace, pgUser)
@@ -412,7 +413,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	}
 	username := pgUser.Name
 	secret := v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.credentialSecretName(username),
 			Namespace: namespace,
 			Labels:    c.labelsSet(),
@@ -429,7 +430,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
 
 	dnsNameFunction := c.masterDnsName
-	name := c.Metadata.Name
+	name := c.Name
 	if role == Replica {
 		dnsNameFunction = c.replicaDnsName
 		name = name + "-repl"
@@ -450,7 +451,7 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	if (newSpec.UseLoadBalancer != nil && *newSpec.UseLoadBalancer) ||
 		(newSpec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
 
-		// safe default value: lock load balancer to only local address unless overriden explicitely.
+		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
 		allowedSourceRanges := newSpec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {
@@ -468,9 +469,9 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	}
 
 	service := &v1.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
-			Namespace:   c.Metadata.Namespace,
+			Namespace:   c.Namespace,
 			Labels:      c.roleLabelsSet(role),
 			Annotations: annotations,
 		},
@@ -482,9 +483,9 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 
 func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      c.Metadata.Name,
-			Namespace: c.Metadata.Namespace,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.Name,
+			Namespace: c.Namespace,
 			Labels:    c.roleLabelsSet(Master),
 		},
 	}

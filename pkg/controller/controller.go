@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -14,22 +15,25 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 )
 
 type Config struct {
 	RestConfig          *rest.Config
-	KubeClient          k8sutil.KubernetesClient
-	RestClient          *rest.RESTClient
-	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
+
+	NoDatabaseAccess bool
+	NoTeamsAPI       bool
+	ConfigMapName    spec.NamespacedName
+	Namespace        string
 }
 
 type Controller struct {
-	Config
-
+	config   Config
 	opConfig *config.Config
-	logger   *logrus.Entry
+
+	logger     *logrus.Entry
+	KubeClient k8sutil.KubernetesClient
+	RestClient rest.Interface // kubernetes API group REST client
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster
@@ -39,27 +43,128 @@ type Controller struct {
 	podInformer        cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
-	clusterEventQueues []*cache.FIFO
-
+	clusterEventQueues  []*cache.FIFO
 	lastClusterSyncTime int64
 }
 
-func NewController(controllerConfig *Config, operatorConfig *config.Config) *Controller {
+func NewController(controllerConfig *Config) *Controller {
 	logger := logrus.New()
 
-	if operatorConfig.DebugLogging {
-		logger.Level = logrus.DebugLevel
-	}
-
-	controllerConfig.TeamsAPIClient = teams.NewTeamsAPI(operatorConfig.TeamsAPIUrl, logger)
-
 	return &Controller{
-		Config:   *controllerConfig,
-		opConfig: operatorConfig,
+		config:   *controllerConfig,
+		opConfig: &config.Config{},
 		logger:   logger.WithField("pkg", "controller"),
 		clusters: make(map[spec.NamespacedName]*cluster.Cluster),
 		stopChs:  make(map[spec.NamespacedName]chan struct{}),
 		podCh:    make(chan spec.PodEvent),
+	}
+}
+
+func (c *Controller) initClients() {
+	client, err := k8sutil.ClientSet(c.config.RestConfig)
+	if err != nil {
+		c.logger.Fatalf("couldn't create client: %v", err)
+	}
+	c.KubeClient = k8sutil.NewFromKubernetesInterface(client)
+
+	c.RestClient, err = k8sutil.KubernetesRestClient(*c.config.RestConfig)
+	if err != nil {
+		c.logger.Fatalf("couldn't create rest client: %v", err)
+	}
+}
+
+func (c *Controller) initOperatorConfig() {
+	configMapData := make(map[string]string)
+
+	if c.config.ConfigMapName != (spec.NamespacedName{}) {
+		configMap, err := c.KubeClient.ConfigMaps(c.config.ConfigMapName.Namespace).
+			Get(c.config.ConfigMapName.Name, metav1.GetOptions{})
+		if err != nil {
+			panic(err)
+		}
+
+		configMapData = configMap.Data
+	} else {
+		c.logger.Infoln("No ConfigMap specified. Loading default values")
+	}
+
+	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
+		configMapData["namespace"] = c.config.Namespace
+	}
+	if c.config.NoDatabaseAccess {
+		configMapData["enable_database_access"] = "false"
+	}
+	if c.config.NoTeamsAPI {
+		configMapData["enable_teams_api"] = "false"
+	}
+
+	c.opConfig = config.NewFromMap(configMapData)
+}
+
+func (c *Controller) initController() {
+	c.initClients()
+	c.initOperatorConfig()
+
+	c.logger.Infof("Config: %s", c.opConfig.MustMarshal())
+
+	if c.opConfig.DebugLogging {
+		c.logger.Level = logrus.DebugLevel
+	}
+
+	if err := c.createTPR(); err != nil {
+		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
+	}
+
+	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
+		c.logger.Warningf("could not get infrastructure roles: %v", err)
+	} else {
+		c.config.InfrastructureRoles = infraRoles
+	}
+
+	// Postgresqls
+	c.postgresqlInformer = cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc:  c.clusterListFunc,
+			WatchFunc: c.clusterWatchFunc,
+		},
+		&spec.Postgresql{},
+		constants.QueueResyncPeriodTPR,
+		cache.Indexers{})
+
+	c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.postgresqlAdd,
+		UpdateFunc: c.postgresqlUpdate,
+		DeleteFunc: c.postgresqlDelete,
+	})
+
+	// Pods
+	podLw := &cache.ListWatch{
+		ListFunc:  c.podListFunc,
+		WatchFunc: c.podWatchFunc,
+	}
+
+	c.podInformer = cache.NewSharedIndexInformer(
+		podLw,
+		&v1.Pod{},
+		constants.QueueResyncPeriodPod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.podAdd,
+		UpdateFunc: c.podUpdate,
+		DeleteFunc: c.podDelete,
+	})
+
+	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
+	for i := range c.clusterEventQueues {
+		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
+			e, ok := obj.(spec.ClusterEvent)
+			if !ok {
+				return "", fmt.Errorf("could not cast to ClusterEvent")
+			}
+
+			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil
+		})
 	}
 }
 
@@ -76,69 +181,6 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	}
 
 	c.logger.Info("Started working in background")
-}
-
-func (c *Controller) initController() {
-	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
-	}
-
-	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %v", err)
-	} else {
-		c.InfrastructureRoles = infraRoles
-	}
-
-	// Postgresqls
-	clusterLw := &cache.ListWatch{
-		ListFunc:  c.clusterListFunc,
-		WatchFunc: c.clusterWatchFunc,
-	}
-	c.postgresqlInformer = cache.NewSharedIndexInformer(
-		clusterLw,
-		&spec.Postgresql{},
-		constants.QueueResyncPeriodTPR,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-
-	if err := c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.postgresqlAdd,
-		UpdateFunc: c.postgresqlUpdate,
-		DeleteFunc: c.postgresqlDelete,
-	}); err != nil {
-		c.logger.Fatalf("could not add event handlers: %v", err)
-	}
-
-	// Pods
-	podLw := &cache.ListWatch{
-		ListFunc:  c.podListFunc,
-		WatchFunc: c.podWatchFunc,
-	}
-
-	c.podInformer = cache.NewSharedIndexInformer(
-		podLw,
-		&v1.Pod{},
-		constants.QueueResyncPeriodPod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-
-	if err := c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.podAdd,
-		UpdateFunc: c.podUpdate,
-		DeleteFunc: c.podDelete,
-	}); err != nil {
-		c.logger.Fatalf("could not add event handlers: %v", err)
-	}
-
-	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
-	for i := range c.clusterEventQueues {
-		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
-			e, ok := obj.(spec.ClusterEvent)
-			if !ok {
-				return "", fmt.Errorf("could not cast to ClusterEvent")
-			}
-
-			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil
-		})
-	}
 }
 
 func (c *Controller) runInformers(stopCh <-chan struct{}) {

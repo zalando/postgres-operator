@@ -9,64 +9,41 @@ import (
 	"syscall"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
 var (
-	KubeConfigFile   string
-	podNamespace     string
-	configMapName    spec.NamespacedName
-	OutOfCluster     bool
-	noTeamsAPI       bool
-	noDatabaseAccess bool
-	version          string
+	KubeConfigFile string
+	OutOfCluster   bool
+	version        string
+
+	config controller.Config
 )
 
 func init() {
 	flag.StringVar(&KubeConfigFile, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
 	flag.BoolVar(&OutOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
-	flag.BoolVar(&noDatabaseAccess, "nodatabaseaccess", false, "Disable all access to the database from the operator side.")
-	flag.BoolVar(&noTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
+	flag.BoolVar(&config.NoDatabaseAccess, "nodatabaseaccess", false, "Disable all access to the database from the operator side.")
+	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
 
-	podNamespace = os.Getenv("MY_POD_NAMESPACE")
-	if podNamespace == "" {
-		podNamespace = "default"
+	config.Namespace = os.Getenv("MY_POD_NAMESPACE")
+	if config.Namespace == "" {
+		config.Namespace = "default"
 	}
 
 	configMap := os.Getenv("CONFIG_MAP_NAME")
 	if configMap != "" {
-		configMapName.Decode(configMap)
-	}
-}
-
-func ControllerConfig() *controller.Config {
-	restConfig, err := k8sutil.RestConfig(KubeConfigFile, OutOfCluster)
-	if err != nil {
-		log.Fatalf("Can't get REST config: %s", err)
-	}
-
-	client, err := k8sutil.ClientSet(restConfig)
-	if err != nil {
-		log.Fatalf("Can't create client: %s", err)
-	}
-
-	restClient, err := k8sutil.KubernetesRestClient(restConfig)
-	if err != nil {
-		log.Fatalf("Can't create rest client: %s", err)
-	}
-
-	return &controller.Config{
-		RestConfig: restConfig,
-		KubeClient: k8sutil.NewFromKubernetesInterface(client),
-		RestClient: restClient,
+		err := config.ConfigMapName.Decode(configMap)
+		if err != nil {
+			log.Fatalf("incorrect config map name")
+		}
 	}
 }
 
 func main() {
-	configMapData := make(map[string]string)
+	var err error
+
 	log.SetOutput(os.Stdout)
 	log.Printf("Spilo operator %s\n", version)
 
@@ -76,32 +53,13 @@ func main() {
 
 	wg := &sync.WaitGroup{} // Goroutines can add themselves to this to be waited on
 
-	controllerConfig := ControllerConfig()
-
-	if configMapName != (spec.NamespacedName{}) {
-		configMap, err := controllerConfig.KubeClient.ConfigMaps(configMapName.Namespace).Get(configMapName.Name)
-		if err != nil {
-			panic(err)
-		}
-
-		configMapData = configMap.Data
-	} else {
-		log.Printf("No ConfigMap specified. Loading default values")
+	config.RestConfig, err = k8sutil.RestConfig(KubeConfigFile, OutOfCluster)
+	if err != nil {
+		log.Fatalf("couldn't get REST config: %v", err)
 	}
-	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
-		configMapData["namespace"] = podNamespace
-	}
-	if noDatabaseAccess {
-		configMapData["enable_database_access"] = "false"
-	}
-	if noTeamsAPI {
-		configMapData["enable_teams_api"] = "false"
-	}
-	cfg := config.NewFromMap(configMapData)
 
-	log.Printf("Config: %s", cfg.MustMarshal())
+	c := controller.NewController(&config)
 
-	c := controller.NewController(controllerConfig, cfg)
 	c.Run(stop, wg)
 
 	sig := <-sigs

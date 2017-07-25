@@ -5,11 +5,11 @@ import (
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
@@ -21,7 +21,7 @@ type mockSecret struct {
 	v1core.SecretInterface
 }
 
-func (c *mockSecret) Get(name string) (*v1.Secret, error) {
+func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
 	if name != testInfrastructureRolesSecretName {
 		return nil, fmt.Errorf("NotFound")
 	}
@@ -48,7 +48,7 @@ func newMockKubernetesClient() k8sutil.KubernetesClient {
 }
 
 func newMockController() *Controller {
-	controller := NewController(&Config{}, &config.Config{})
+	controller := NewController(&Config{})
 	controller.opConfig.ClusterNameLabel = "cluster-name"
 	controller.opConfig.InfrastructureRolesSecretName =
 		spec.NamespacedName{v1.NamespaceDefault, testInfrastructureRolesSecretName}
@@ -70,7 +70,7 @@ func TestPodClusterName(t *testing.T) {
 		},
 		{
 			&v1.Pod{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Namespace: v1.NamespaceDefault,
 					Labels: map[string]string{
 						mockController.opConfig.ClusterNameLabel: "testcluster",

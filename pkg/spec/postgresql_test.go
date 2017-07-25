@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/api/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var parseTimeTests = []struct {
@@ -104,11 +103,11 @@ var unmarshalCluster = []struct {
   "kind": "Postgresql","apiVersion": "acid.zalan.do/v1",
   "metadata": {"name": "acid-testcluster1"}, "spec": {"teamId": 100}}`),
 	Postgresql{
-		TypeMeta: unversioned.TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			Kind:       "Postgresql",
 			APIVersion: "acid.zalan.do/v1",
 		},
-		Metadata: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "acid-testcluster1",
 		},
 		Status: ClusterStatusInvalid,
@@ -184,11 +183,11 @@ var unmarshalCluster = []struct {
   }
 }`),
 		Postgresql{
-			TypeMeta: unversioned.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Postgresql",
 				APIVersion: "acid.zalan.do/v1",
 			},
-			Metadata: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "acid-testcluster1",
 			},
 			Spec: PostgresSpec{
@@ -250,11 +249,11 @@ var unmarshalCluster = []struct {
 	{
 		[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "teapot-testcluster1"}, "spec": {"teamId": "acid"}}`),
 		Postgresql{
-			TypeMeta: unversioned.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "Postgresql",
 				APIVersion: "acid.zalan.do/v1",
 			},
-			Metadata: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: "teapot-testcluster1",
 			},
 			Spec:   PostgresSpec{TeamID: "acid"},
@@ -278,16 +277,16 @@ var postgresqlList = []struct {
 }{
 	{[]byte(`{"apiVersion":"v1","items":[{"apiVersion":"acid.zalan.do/v1","kind":"Postgresql","metadata":{"labels":{"team":"acid"},"name":"acid-testcluster42","namespace":"default","resourceVersion":"30446957","selfLink":"/apis/acid.zalan.do/v1/namespaces/default/postgresqls/acid-testcluster42","uid":"857cd208-33dc-11e7-b20a-0699041e4b03"},"spec":{"allowedSourceRanges":["185.85.220.0/22"],"numberOfInstances":1,"postgresql":{"version":"9.6"},"teamId":"acid","volume":{"size":"10Gi"}},"status":"Running"}],"kind":"List","metadata":{},"resourceVersion":"","selfLink":""}`),
 		PostgresqlList{
-			TypeMeta: unversioned.TypeMeta{
+			TypeMeta: metav1.TypeMeta{
 				Kind:       "List",
 				APIVersion: "v1",
 			},
 			Items: []Postgresql{{
-				TypeMeta: unversioned.TypeMeta{
+				TypeMeta: metav1.TypeMeta{
 					Kind:       "Postgresql",
 					APIVersion: "acid.zalan.do/v1",
 				},
-				Metadata: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:            "acid-testcluster42",
 					Namespace:       "default",
 					Labels:          map[string]string{"team": "acid"},
@@ -363,7 +362,7 @@ func TestClusterName(t *testing.T) {
 			continue
 		}
 		if name != tt.clusterName {
-			t.Errorf("Expected cluserName: %s, got: %s", tt.clusterName, name)
+			t.Errorf("Expected cluserName: %q, got: %q", tt.clusterName, name)
 		}
 	}
 }
@@ -400,7 +399,7 @@ func TestMarshalMaintenanceWindow(t *testing.T) {
 		}
 
 		if !bytes.Equal(s, tt.in) {
-			t.Errorf("Expected Marshal: %s, got: %s", string(tt.in), string(s))
+			t.Errorf("Expected Marshal: %q, got: %q", string(tt.in), string(s))
 		}
 	}
 }
@@ -435,7 +434,7 @@ func TestMarshal(t *testing.T) {
 			continue
 		}
 		if !bytes.Equal(m, tt.marshal) {
-			t.Errorf("Marshal Postgresql expected: %s, got: %s", string(tt.marshal), string(m))
+			t.Errorf("Marshal Postgresql expected: %q, got: %q", string(tt.marshal), string(m))
 		}
 	}
 }
@@ -446,8 +445,8 @@ func TestPostgresMeta(t *testing.T) {
 			t.Errorf("GetObjectKindMeta expected: %v, got: %v", tt.out.TypeMeta, a)
 		}
 
-		if a := tt.out.GetObjectMeta(); reflect.DeepEqual(a, tt.out.Metadata) {
-			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.Metadata, a)
+		if a := tt.out.GetObjectMeta(); reflect.DeepEqual(a, tt.out.ObjectMeta) {
+			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.ObjectMeta, a)
 		}
 	}
 }
@@ -476,8 +475,8 @@ func TestPostgresListMeta(t *testing.T) {
 			t.Errorf("GetObjectKindMeta expected: %v, got: %v", tt.out.TypeMeta, a)
 		}
 
-		if a := tt.out.GetListMeta(); reflect.DeepEqual(a, tt.out.Metadata) {
-			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.Metadata, a)
+		if a := tt.out.GetListMeta(); reflect.DeepEqual(a, tt.out.ListMeta) {
+			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.ListMeta, a)
 		}
 
 		return

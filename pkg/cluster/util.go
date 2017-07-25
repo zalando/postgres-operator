@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	"k8s.io/client-go/pkg/labels"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -76,11 +77,11 @@ func metadataAnnotationsPatch(annotations map[string]string) string {
 
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
-		c.logger.Infof("statefulset '%s' has been changed",
+		c.logger.Infof("statefulset %q has been changed",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("statefulset '%s' is not in the desired state and needs to be updated",
+		c.logger.Infof("statefulset %q is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
@@ -88,18 +89,18 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
-			c.logger.Infof("Reason: %s", reason)
+			c.logger.Infof("Reason: %q", reason)
 		}
 	}
 }
 
 func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("%s service '%s' has been changed",
+		c.logger.Infof("%s service %q has been changed",
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("%s service '%s  is not in the desired state and needs to be updated",
+		c.logger.Infof("%s service %q is not in the desired state and needs to be updated",
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	}
@@ -123,10 +124,10 @@ func (c *Cluster) getOAuthToken() (string, error) {
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
 	credentialsSecret, err := c.KubeClient.
 		Secrets(c.OpConfig.OAuthTokenSecretName.Namespace).
-		Get(c.OpConfig.OAuthTokenSecretName.Name)
+		Get(c.OpConfig.OAuthTokenSecretName.Name, metav1.GetOptions{})
 
 	if err != nil {
-		c.logger.Debugf("Oauth token secret name: %s", c.OpConfig.OAuthTokenSecretName)
+		c.logger.Debugf("Oauth token secret name: %q", c.OpConfig.OAuthTokenSecretName)
 		return "", fmt.Errorf("could not get credentials secret: %v", err)
 	}
 	data := credentialsSecret.Data
@@ -152,7 +153,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 		return []string{}, fmt.Errorf("could not get oauth token: %v", err)
 	}
 
-	teamInfo, err := c.TeamsAPIClient.TeamInfo(c.Spec.TeamID, token)
+	teamInfo, err := c.teamsAPIClient.TeamInfo(c.Spec.TeamID, token)
 	if err != nil {
 		return nil, fmt.Errorf("could not get team info: %v", err)
 	}
@@ -193,10 +194,10 @@ func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
 func (c *Cluster) waitStatefulsetReady() error {
 	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
-			listOptions := v1.ListOptions{
+			listOptions := metav1.ListOptions{
 				LabelSelector: c.labelsSet().String(),
 			}
-			ss, err := c.KubeClient.StatefulSets(c.Metadata.Namespace).List(listOptions)
+			ss, err := c.KubeClient.StatefulSets(c.Namespace).List(listOptions)
 			if err != nil {
 				return false, err
 			}
@@ -211,17 +212,17 @@ func (c *Cluster) waitStatefulsetReady() error {
 
 func (c *Cluster) waitPodLabelsReady() error {
 	ls := c.labelsSet()
-	namespace := c.Metadata.Namespace
+	namespace := c.Namespace
 
-	listOptions := v1.ListOptions{
+	listOptions := metav1.ListOptions{
 		LabelSelector: ls.String(),
 	}
-	masterListOption := v1.ListOptions{
+	masterListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
 			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
 		}).String(),
 	}
-	replicaListOption := v1.ListOptions{
+	replicaListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
 			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
 		}).String(),
@@ -277,7 +278,7 @@ func (c *Cluster) labelsSet() labels.Set {
 	for k, v := range c.OpConfig.ClusterLabels {
 		lbls[k] = v
 	}
-	lbls[c.OpConfig.ClusterNameLabel] = c.Metadata.Name
+	lbls[c.OpConfig.ClusterNameLabel] = c.Name
 
 	return labels.Set(lbls)
 }
@@ -307,7 +308,7 @@ func (c *Cluster) credentialSecretName(username string) string {
 	// and must start and end with an alphanumeric character
 	return fmt.Sprintf(constants.UserSecretTemplate,
 		strings.Replace(username, "_", "-", -1),
-		c.Metadata.Name)
+		c.Name)
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
