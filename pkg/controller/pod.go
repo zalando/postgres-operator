@@ -101,7 +101,6 @@ func (c *Controller) podDelete(obj interface{}) {
 
 func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	wg.Add(1)
 
 	c.logger.Debugln("Watching all pod events")
 	for {
