@@ -179,7 +179,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
-		go c.processClusterEventsQueue(stopCh, i, wg)
+		go c.processClusterEventsQueue(i, stopCh, wg)
 	}
 
 	c.logger.Info("Started working in background")

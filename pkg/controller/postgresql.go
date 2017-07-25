@@ -228,7 +228,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 	return nil
 }
 
-func (c *Controller) processClusterEventsQueue(stopCh <-chan struct{}, idx int, wg *sync.WaitGroup) {
+func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	go func() {
