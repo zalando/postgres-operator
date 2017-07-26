@@ -36,11 +36,11 @@ var (
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
 	OpConfig            config.Config
-	RestConfig          *rest.Config
+	RestConfig          *rest.Config `json:"-"`
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
 }
 
-type kubeResources struct {
+type KubeResources struct {
 	Service     map[PostgresRole]*v1.Service
 	Endpoint    *v1.Endpoints
 	Secrets     map[types.UID]*v1.Secret
@@ -50,7 +50,7 @@ type kubeResources struct {
 }
 
 type Cluster struct {
-	kubeResources
+	KubeResources
 	spec.Postgresql
 	Config
 	logger           *logrus.Entry
@@ -79,7 +79,7 @@ type compareStatefulsetResult struct {
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Name)
-	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
+	kubeResources := KubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -98,7 +98,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		pgUsers:          make(map[string]spec.PgUser),
 		systemUsers:      make(map[string]spec.PgUser),
 		podSubscribers:   make(map[spec.NamespacedName]chan spec.PodEvent),
-		kubeResources:    kubeResources,
+		KubeResources:    kubeResources,
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
