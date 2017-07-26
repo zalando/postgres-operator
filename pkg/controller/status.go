@@ -10,7 +10,7 @@ type controllerStatus struct {
 	ControllerConfig Config
 	OperatorConfig   config.Config
 	LastSyncTime     int64
-	ClustersRunning  int
+	Clusters  int
 }
 
 type clusterStatus struct {
@@ -49,6 +49,6 @@ func (c *Controller) Status() interface{} {
 		ControllerConfig: c.config,
 		OperatorConfig:   *c.opConfig,
 		LastSyncTime:     c.lastClusterSyncTime,
-		ClustersRunning:  len(c.clusters),
+		Clusters:  len(c.clusters),
 	}
 }
