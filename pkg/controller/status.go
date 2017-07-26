@@ -21,6 +21,7 @@ type clusterStatus struct {
 	Status    spec.PostgresStatus
 	Resources cluster.KubeResources
 	Spec      spec.PostgresSpec
+	Error     error
 }
 
 func (c *Controller) ClusterStatus(team, cluster string) interface{} {
@@ -41,6 +42,7 @@ func (c *Controller) ClusterStatus(team, cluster string) interface{} {
 		Status:    cl.Status,
 		Resources: cl.KubeResources,
 		Spec:      cl.Spec,
+		Error:	   cl.Error,
 	}
 }
 
