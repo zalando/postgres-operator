@@ -28,27 +28,11 @@ var (
 	teamURL          = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$")
 )
 
-func HandlerFunc(i interface{}) http.HandlerFunc {
-	b, err := json.Marshal(i)
-	if err != nil {
-		return func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Could not marshal %T: %v", i, err)
-		}
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
-	}
-}
-
 func New(controller ClusterInformer, port int, logger *logrus.Logger) *Server {
 	s := &Server{
 		logger:     logger.WithField("pkg", "apiserver"),
 		controller: controller,
 	}
-
 	mux := http.NewServeMux()
 
 	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
@@ -56,7 +40,18 @@ func New(controller ClusterInformer, port int, logger *logrus.Logger) *Server {
 	mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
 	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	mux.Handle("/status", HandlerFunc(s.controller.Status()))
+	mux.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
+		status := s.controller.Status()
+
+		b, err := json.Marshal(status)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Could not marshal controller status: %v", err)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
+	})
 	mux.HandleFunc("/clusters/", func(w http.ResponseWriter, req *http.Request) {
 		var resp interface{}
 		if matches := clusterStatusURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
