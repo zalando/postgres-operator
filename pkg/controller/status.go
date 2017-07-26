@@ -1,16 +1,16 @@
 package controller
 
 import (
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 )
 
 type controllerStatus struct {
 	ControllerConfig Config
 	OperatorConfig   config.Config
 	LastSyncTime     int64
-	Clusters  int
+	Clusters         int
 }
 
 type clusterStatus struct {
@@ -49,6 +49,6 @@ func (c *Controller) Status() interface{} {
 		ControllerConfig: c.config,
 		OperatorConfig:   *c.opConfig,
 		LastSyncTime:     c.lastClusterSyncTime,
-		Clusters:  len(c.clusters),
+		Clusters:         len(c.clusters),
 	}
 }
