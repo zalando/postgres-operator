@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -19,7 +20,8 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
-func (c *Controller) clusterResync(stopCh <-chan struct{}) {
+func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
 	ticker := time.NewTicker(c.opConfig.ResyncPeriod)
 
 	for {
@@ -226,12 +228,17 @@ func (c *Controller) processEvent(obj interface{}) error {
 	return nil
 }
 
-func (c *Controller) processClusterEventsQueue(idx int) {
-	for {
+func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	go func() {
 		if _, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(c.processEvent)); err != nil {
 			c.logger.Errorf("error when processing cluster events queue: %v", err)
 		}
-	}
+	}()
+
+	<-stopCh
+	c.clusterEventQueues[idx].Close()
 }
 
 func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
