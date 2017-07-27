@@ -238,6 +238,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	<-stopCh
+	c.clusterEventQueues[idx].Close()
 }
 
 func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
