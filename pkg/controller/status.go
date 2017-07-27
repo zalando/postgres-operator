@@ -42,7 +42,7 @@ func (c *Controller) ClusterStatus(team, cluster string) interface{} {
 		Status:    cl.Status,
 		Resources: cl.KubeResources,
 		Spec:      cl.Spec,
-		Error:	   cl.Error,
+		Error:     cl.Error,
 	}
 }
 

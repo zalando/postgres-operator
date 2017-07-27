@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
-	"sync"
 	"regexp"
+	"sync"
 
-	"github.com/Sirupsen/logrus"
 	"encoding/json"
+	"github.com/Sirupsen/logrus"
 )
 
 type ClusterInformer interface {
