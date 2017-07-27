@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"sync"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -97,7 +99,9 @@ func (c *Controller) podDelete(obj interface{}) {
 	c.podCh <- podEvent
 }
 
-func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}) {
+func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	c.logger.Debugln("Watching all pod events")
 	for {
 		select {
