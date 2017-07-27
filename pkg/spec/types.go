@@ -43,7 +43,6 @@ const (
 // PodEvent describes the event for a single Pod
 type PodEvent struct {
 	ResourceVersion string
-	ClusterName     NamespacedName
 	PodName         NamespacedName
 	PrevPod         *v1.Pod
 	CurPod          *v1.Pod
