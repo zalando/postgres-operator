@@ -22,7 +22,7 @@ var getUserSQL = `SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.r
 	 ORDER BY 1;`
 
 func (c *Cluster) pgConnectionString() string {
-	hostname := fmt.Sprintf("%s.%s.svc.cluster.local", c.Metadata.Name, c.Metadata.Namespace)
+	hostname := fmt.Sprintf("%s.%s.svc.cluster.local", c.Name, c.Namespace)
 	username := c.systemUsers[constants.SuperuserKeyName].Name
 	password := c.systemUsers[constants.SuperuserKeyName].Password
 

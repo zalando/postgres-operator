@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -14,21 +14,26 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
 type Config struct {
 	RestConfig          *rest.Config
-	KubeClient          *kubernetes.Clientset
-	RestClient          rest.Interface
-	TeamsAPIClient      *teams.API
 	InfrastructureRoles map[string]spec.PgUser
+
+	NoDatabaseAccess bool
+	NoTeamsAPI       bool
+	ConfigMapName    spec.NamespacedName
+	Namespace        string
 }
 
 type Controller struct {
-	Config
+	config   Config
 	opConfig *config.Config
-	logger   *logrus.Entry
+
+	logger     *logrus.Entry
+	KubeClient k8sutil.KubernetesClient
+	RestClient rest.Interface // kubernetes API group REST client
 
 	clustersMu sync.RWMutex
 	clusters   map[spec.NamespacedName]*cluster.Cluster
@@ -38,23 +43,16 @@ type Controller struct {
 	podInformer        cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
-	clusterEventQueues []*cache.FIFO
-
+	clusterEventQueues  []*cache.FIFO
 	lastClusterSyncTime int64
 }
 
-func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
+func NewController(controllerConfig *Config) *Controller {
 	logger := logrus.New()
 
-	if operatorConfig.DebugLogging {
-		logger.Level = logrus.DebugLevel
-	}
-
-	controllerConfig.TeamsAPIClient = teams.NewTeamsAPI(operatorConfig.TeamsAPIUrl, logger)
-
 	return &Controller{
-		Config:   *controllerConfig,
-		opConfig: operatorConfig,
+		config:   *controllerConfig,
+		opConfig: &config.Config{},
 		logger:   logger.WithField("pkg", "controller"),
 		clusters: make(map[spec.NamespacedName]*cluster.Cluster),
 		stopChs:  make(map[spec.NamespacedName]chan struct{}),
@@ -62,42 +60,76 @@ func New(controllerConfig *Config, operatorConfig *config.Config) *Controller {
 	}
 }
 
-func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
-	defer wg.Done()
-	wg.Add(1)
+func (c *Controller) initClients() {
+	client, err := k8sutil.ClientSet(c.config.RestConfig)
+	if err != nil {
+		c.logger.Fatalf("couldn't create client: %v", err)
+	}
+	c.KubeClient = k8sutil.NewFromKubernetesInterface(client)
 
-	c.initController()
+	c.RestClient, err = k8sutil.KubernetesRestClient(*c.config.RestConfig)
+	if err != nil {
+		c.logger.Fatalf("couldn't create rest client: %v", err)
+	}
+}
 
-	go c.runInformers(stopCh)
+func (c *Controller) initOperatorConfig() {
+	configMapData := make(map[string]string)
 
-	for i := range c.clusterEventQueues {
-		go c.processClusterEventsQueue(i)
+	if c.config.ConfigMapName != (spec.NamespacedName{}) {
+		configMap, err := c.KubeClient.ConfigMaps(c.config.ConfigMapName.Namespace).
+			Get(c.config.ConfigMapName.Name, metav1.GetOptions{})
+		if err != nil {
+			panic(err)
+		}
+
+		configMapData = configMap.Data
+	} else {
+		c.logger.Infoln("No ConfigMap specified. Loading default values")
 	}
 
-	c.logger.Info("Started working in background")
+	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
+		configMapData["namespace"] = c.config.Namespace
+	}
+	if c.config.NoDatabaseAccess {
+		configMapData["enable_database_access"] = "false"
+	}
+	if c.config.NoTeamsAPI {
+		configMapData["enable_teams_api"] = "false"
+	}
+
+	c.opConfig = config.NewFromMap(configMapData)
 }
 
 func (c *Controller) initController() {
+	c.initClients()
+	c.initOperatorConfig()
+
+	c.logger.Infof("Config: %s", c.opConfig.MustMarshal())
+
+	if c.opConfig.DebugLogging {
+		c.logger.Level = logrus.DebugLevel
+	}
+
 	if err := c.createTPR(); err != nil {
 		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
 	}
 
-	if infraRoles, err := c.getInfrastructureRoles(); err != nil {
+	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
-		c.InfrastructureRoles = infraRoles
+		c.config.InfrastructureRoles = infraRoles
 	}
 
 	// Postgresqls
-	clusterLw := &cache.ListWatch{
-		ListFunc:  c.clusterListFunc,
-		WatchFunc: c.clusterWatchFunc,
-	}
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
-		clusterLw,
+		&cache.ListWatch{
+			ListFunc:  c.clusterListFunc,
+			WatchFunc: c.clusterWatchFunc,
+		},
 		&spec.Postgresql{},
 		constants.QueueResyncPeriodTPR,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		cache.Indexers{})
 
 	c.postgresqlInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.postgresqlAdd,
@@ -134,6 +166,21 @@ func (c *Controller) initController() {
 			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil
 		})
 	}
+}
+
+func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+	wg.Add(1)
+
+	c.initController()
+
+	go c.runInformers(stopCh)
+
+	for i := range c.clusterEventQueues {
+		go c.processClusterEventsQueue(i)
+	}
+
+	c.logger.Info("Started working in background")
 }
 
 func (c *Controller) runInformers(stopCh <-chan struct{}) {

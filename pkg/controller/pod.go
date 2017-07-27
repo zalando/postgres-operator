@@ -1,7 +1,7 @@
 package controller
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
@@ -10,11 +10,11 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
-func (c *Controller) podListFunc(options meta_v1.ListOptions) (runtime.Object, error) {
+func (c *Controller) podListFunc(options metav1.ListOptions) (runtime.Object, error) {
 	var labelSelector string
 	var fieldSelector string
 
-	opts := meta_v1.ListOptions{
+	opts := metav1.ListOptions{
 		LabelSelector:   labelSelector,
 		FieldSelector:   fieldSelector,
 		Watch:           options.Watch,
@@ -22,14 +22,14 @@ func (c *Controller) podListFunc(options meta_v1.ListOptions) (runtime.Object, e
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.CoreV1().Pods(c.opConfig.Namespace).List(opts)
+	return c.KubeClient.Pods(c.opConfig.Namespace).List(opts)
 }
 
-func (c *Controller) podWatchFunc(options meta_v1.ListOptions) (watch.Interface, error) {
+func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
 	var labelSelector string
 	var fieldSelector string
 
-	opts := meta_v1.ListOptions{
+	opts := metav1.ListOptions{
 		LabelSelector:   labelSelector,
 		FieldSelector:   fieldSelector,
 		Watch:           options.Watch,
@@ -37,7 +37,7 @@ func (c *Controller) podWatchFunc(options meta_v1.ListOptions) (watch.Interface,
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.CoreV1Client.Pods(c.opConfig.Namespace).Watch(opts)
+	return c.KubeClient.Pods(c.opConfig.Namespace).Watch(opts)
 }
 
 func (c *Controller) podAdd(obj interface{}) {
@@ -107,7 +107,7 @@ func (c *Controller) podEventsDispatcher(stopCh <-chan struct{}) {
 			c.clustersMu.RUnlock()
 
 			if ok {
-				c.logger.Debugf("Sending %s event of pod '%s' to the '%s' cluster channel", event.EventType, event.PodName, event.ClusterName)
+				c.logger.Debugf("Sending %q event of pod %q to the %q cluster channel", event.EventType, event.PodName, event.ClusterName)
 				cluster.ReceivePodEvent(event)
 			}
 		case <-stopCh:
