@@ -401,7 +401,7 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
 // (i.e. service) is treated as an error.
-func (c *Cluster) Update(newSpec *spec.Postgresql) error {
+func (c *Cluster) Update(newSpec spec.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -411,7 +411,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 
 	/* Make sure we update when this function exists */
 	defer func() {
-		c.Postgresql = *newSpec
+		c.Postgresql = newSpec
 	}()
 
 	for _, role := range []PostgresRole{Master, Replica} {

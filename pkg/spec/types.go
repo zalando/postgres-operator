@@ -27,8 +27,8 @@ const (
 type ClusterEvent struct {
 	UID       types.UID
 	EventType EventType
-	OldSpec   *Postgresql
-	NewSpec   *Postgresql
+	OldSpec   Postgresql
+	NewSpec   Postgresql
 	WorkerID  uint32
 }
 
