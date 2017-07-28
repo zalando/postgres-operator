@@ -38,6 +38,7 @@ func (c *Cluster) loadResources() error {
 	}
 
 	endpoints, err := c.KubeClient.Endpoints(ns).List(listOptions)
+
 	if err != nil {
 		return fmt.Errorf("could not get list of endpoints: %v", err)
 	}

@@ -150,7 +150,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		logger.Infof("Creation of the %q cluster started", clusterName)
 
 		stopCh := make(chan struct{})
-		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
+		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, event.NewSpec, logger)
 		cl.Run(stopCh)
 
 		c.clustersMu.Lock()
@@ -206,7 +206,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
 			stopCh := make(chan struct{})
-			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
+			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, event.NewSpec, logger)
 			cl.Run(stopCh)
 
 			c.clustersMu.Lock()
@@ -232,13 +232,19 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	defer wg.Done()
 
 	go func() {
-		if _, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(c.processEvent)); err != nil {
-			c.logger.Errorf("error when processing cluster events queue: %v", err)
-		}
+		<-stopCh
+		c.clusterEventQueues[idx].Close()
 	}()
 
-	<-stopCh
-	c.clusterEventQueues[idx].Close()
+	for {
+		if _, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(c.processEvent)); err != nil {
+			if err == cache.FIFOClosedError {
+				return
+			}
+
+			c.logger.Errorf("error when processing cluster events queue: %v", err)
+		}
+	}
 }
 
 func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
@@ -272,16 +278,21 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	clusterEvent := spec.ClusterEvent{
 		EventType: eventType,
 		UID:       uid,
-		OldSpec:   old,
-		NewSpec:   new,
 		WorkerID:  workerID,
+	}
+	if old != nil {
+		clusterEvent.OldSpec = *old
+	}
+	if new != nil {
+		clusterEvent.NewSpec = *new
 	}
 	//TODO: if we delete cluster, discard all the previous events for the cluster
 
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		c.logger.WithField("worker", workerID).Errorf("error when queueing cluster event: %v", clusterEvent)
+	} else {
+		c.logger.WithField("worker", workerID).Infof("%q of the %q cluster has been queued", eventType, clusterName)
 	}
-	c.logger.WithField("worker", workerID).Infof("%q of the %q cluster has been queued", eventType, clusterName)
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
