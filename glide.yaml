@@ -1,22 +1,26 @@
 package: github.com/zalando-incubator/postgres-operator
 import:
 - package: github.com/Sirupsen/logrus
-  version: ^1.0.1
+  version: ^1.0.2
 - package: github.com/aws/aws-sdk-go
-  version: ^1.8.24
+  version: ^1.10.18
   subpackages:
   - aws
   - aws/session
   - service/ec2
 - package: github.com/lib/pq
 - package: github.com/motomux/pretty
+
+# Kubernetes
+- package: k8s.io/api
+  subpackages:
+  - apps/v1beta1
+  - core/v1
 - package: k8s.io/apimachinery
   subpackages:
   - pkg/api/errors
-  - pkg/api/meta
   - pkg/api/resource
   - pkg/apis/meta/v1
-  - pkg/fields
   - pkg/labels
   - pkg/runtime
   - pkg/runtime/schema
@@ -26,13 +30,13 @@ import:
   - pkg/util/remotecommand
   - pkg/watch
 - package: k8s.io/client-go
-  version: ^4.0.0-beta.0
+  version: master
   subpackages:
   - kubernetes
-  - pkg/api
-  - pkg/api/v1
-  - pkg/apis/apps/v1beta1
-  - pkg/apis/extensions/v1beta1
+  - kubernetes/scheme
+  - kubernetes/typed/apps/v1beta1
+  - kubernetes/typed/core/v1
+  - kubernetes/typed/extensions/v1beta1
   - rest
   - tools/cache
   - tools/clientcmd

@@ -1,8 +1,8 @@
-hash: 140e0c8a606d18ca405e9c50359cc673e4aa0cc88bcae5d7f83791e7002bd6a1
-updated: 2017-07-24T19:24:17.604824235+02:00
+hash: eb2d752e63f1fd8e028765df2ff0c6ac454ceb55786002434d468215312ec5f9
+updated: 2017-07-28T11:03:19.599558496+02:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: afd601335e2a72d43caa3af6bd2abe512fcc3bfd
+  version: 5e436e55ac5eddc739f26a2a209b3f4248ee8e0e
   subpackages:
   - aws
   - aws/awserr
@@ -33,11 +33,6 @@ imports:
   version: 782f4967f2dc4564575ca782fe2d04090b5faca8
   subpackages:
   - spew
-- name: github.com/docker/distribution
-  version: cd27f179f2c10c5d300e6d09025b538c475b0d51
-  subpackages:
-  - digest
-  - reference
 - name: github.com/docker/spdystream
   version: 449fdfce4d962303d702fec724ef0ad181c92528
   subpackages:
@@ -52,14 +47,10 @@ imports:
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-ini/ini
   version: 3d73f4b845efdf9989fffd4b4e562727744a34ba
-- name: github.com/go-openapi/analysis
-  version: b44dc874b601d9e4e2f6e19140e794ba24bead3b
 - name: github.com/go-openapi/jsonpointer
   version: 46af16f9f7b149af66e5d1bd010e3574dc06de98
 - name: github.com/go-openapi/jsonreference
   version: 13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272
-- name: github.com/go-openapi/loads
-  version: 18441dfa706d924a39a030ee2c3b1d8d81917b38
 - name: github.com/go-openapi/spec
   version: 6aced65f8501fe1217321abf0749d354824ba2ff
 - name: github.com/go-openapi/swag
@@ -71,8 +62,22 @@ imports:
   - sortkeys
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
+- name: github.com/golang/protobuf
+  version: 4bd1920723d7b7c925de087aa32e2187708897f7
+  subpackages:
+  - proto
+  - ptypes
+  - ptypes/any
+  - ptypes/duration
+  - ptypes/timestamp
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
+- name: github.com/googleapis/gnostic
+  version: 68f4ded48ba9414dab2ae69b3f0d69971da73aa5
+  subpackages:
+  - OpenAPIv2
+  - compiler
+  - extensions
 - name: github.com/hashicorp/golang-lru
   version: a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4
   subpackages:
@@ -118,15 +123,12 @@ imports:
 - name: golang.org/x/net
   version: f2499483f923065a842d38eb4c7f1927e6fc6e6d
   subpackages:
-  - html
-  - html/atom
   - http2
   - http2/hpack
   - idna
   - lex/httplex
-  - websocket
 - name: golang.org/x/sys
-  version: c4489faa6e5ab84c0ef40d6ee878f7a030281f0f
+  version: 35ef4487ce0a1ea5d4b616ffe71e34febe723695
   subpackages:
   - unix
 - name: golang.org/x/text
@@ -146,16 +148,36 @@ imports:
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+- name: k8s.io/api
+  version: 4d5cc6efc5e84aa19fb1bd3f911c16a6723c1bb7
+  subpackages:
+  - admissionregistration/v1alpha1
+  - apps/v1beta1
+  - authentication/v1
+  - authentication/v1beta1
+  - authorization/v1
+  - authorization/v1beta1
+  - autoscaling/v1
+  - autoscaling/v2alpha1
+  - batch/v1
+  - batch/v2alpha1
+  - certificates/v1beta1
+  - core/v1
+  - extensions/v1beta1
+  - networking/v1
+  - policy/v1beta1
+  - rbac/v1alpha1
+  - rbac/v1beta1
+  - settings/v1alpha1
+  - storage/v1
+  - storage/v1beta1
 - name: k8s.io/apimachinery
-  version: abe34e4f5b4413c282a83011892cbeea5b32223b
+  version: 6134cb2da6d90597b0434e349f90f94fafc9ae51
   subpackages:
   - pkg/api/equality
   - pkg/api/errors
   - pkg/api/meta
   - pkg/api/resource
-  - pkg/apimachinery
-  - pkg/apimachinery/announced
-  - pkg/apimachinery/registered
   - pkg/apis/meta/v1
   - pkg/apis/meta/v1/unstructured
   - pkg/apis/meta/v1alpha1
@@ -185,7 +207,6 @@ imports:
   - pkg/util/intstr
   - pkg/util/json
   - pkg/util/net
-  - pkg/util/rand
   - pkg/util/remotecommand
   - pkg/util/runtime
   - pkg/util/sets
@@ -198,7 +219,7 @@ imports:
   - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: df46f7f13b3da19b90b8b4f0d18b8adc6fbf28dc
+  version: 7c69e980210777a6292351ac6873de083526f08e
   subpackages:
   - discovery
   - kubernetes
@@ -223,43 +244,7 @@ imports:
   - kubernetes/typed/settings/v1alpha1
   - kubernetes/typed/storage/v1
   - kubernetes/typed/storage/v1beta1
-  - pkg/api
-  - pkg/api/v1
   - pkg/api/v1/ref
-  - pkg/apis/admissionregistration
-  - pkg/apis/admissionregistration/v1alpha1
-  - pkg/apis/apps
-  - pkg/apis/apps/v1beta1
-  - pkg/apis/authentication
-  - pkg/apis/authentication/v1
-  - pkg/apis/authentication/v1beta1
-  - pkg/apis/authorization
-  - pkg/apis/authorization/v1
-  - pkg/apis/authorization/v1beta1
-  - pkg/apis/autoscaling
-  - pkg/apis/autoscaling/v1
-  - pkg/apis/autoscaling/v2alpha1
-  - pkg/apis/batch
-  - pkg/apis/batch/v1
-  - pkg/apis/batch/v2alpha1
-  - pkg/apis/certificates
-  - pkg/apis/certificates/v1beta1
-  - pkg/apis/extensions
-  - pkg/apis/extensions/v1beta1
-  - pkg/apis/networking
-  - pkg/apis/networking/v1
-  - pkg/apis/policy
-  - pkg/apis/policy/v1beta1
-  - pkg/apis/rbac
-  - pkg/apis/rbac/v1alpha1
-  - pkg/apis/rbac/v1beta1
-  - pkg/apis/settings
-  - pkg/apis/settings/v1alpha1
-  - pkg/apis/storage
-  - pkg/apis/storage/v1
-  - pkg/apis/storage/v1beta1
-  - pkg/util
-  - pkg/util/parsers
   - pkg/version
   - rest
   - rest/watch
@@ -272,6 +257,7 @@ imports:
   - tools/metrics
   - tools/remotecommand
   - transport
+  - transport/spdy
   - util/cert
   - util/exec
   - util/flowcontrol

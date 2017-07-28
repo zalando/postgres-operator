@@ -5,8 +5,8 @@ import (
 	"hash/crc32"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
-	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	"k8s.io/api/core/v1"
+	extv1beta "k8s.io/api/apps/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"

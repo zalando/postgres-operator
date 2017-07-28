@@ -10,9 +10,9 @@ import (
 	v1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	extensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
@@ -72,7 +72,7 @@ func KubernetesRestClient(cfg rest.Config) (rest.Interface, error) {
 		Version: constants.TPRApiVersion,
 	}
 	cfg.APIPath = constants.K8sAPIPath
-	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	return rest.RESTClientFor(&cfg)
 }
