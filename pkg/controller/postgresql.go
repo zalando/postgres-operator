@@ -280,8 +280,9 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		c.logger.WithField("worker", workerID).Errorf("error when queueing cluster event: %v", clusterEvent)
+	} else {
+		c.logger.WithField("worker", workerID).Infof("%q of the %q cluster has been queued", eventType, clusterName)
 	}
-	c.logger.WithField("worker", workerID).Infof("%q of the %q cluster has been queued", eventType, clusterName)
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
