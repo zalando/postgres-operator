@@ -103,7 +103,7 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 			if !resizer.VolumeBelongsToProvider(pv) {
 				continue
 			}
-			totalCompatible += 1
+			totalCompatible++
 			if !resizer.IsConnectedToProvider() {
 				err := resizer.ConnectToProvider()
 				if err != nil {
@@ -115,13 +115,13 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 					}
 				}()
 			}
-			awsVolumeId, err := resizer.GetProviderVolumeID(pv)
+			awsVolumeID, err := resizer.GetProviderVolumeID(pv)
 			if err != nil {
 				return err
 			}
 			c.logger.Debugf("updating persistent volume %q to %d", pv.Name, newSize)
-			if err := resizer.ResizeVolume(awsVolumeId, newSize); err != nil {
-				return fmt.Errorf("could not resize EBS volume %q: %v", awsVolumeId, err)
+			if err := resizer.ResizeVolume(awsVolumeID, newSize); err != nil {
+				return fmt.Errorf("could not resize EBS volume %q: %v", awsVolumeID, err)
 			}
 			c.logger.Debugf("resizing the filesystem on the volume %q", pv.Name)
 			podName := getPodNameFromPersistentVolume(pv)
@@ -174,7 +174,7 @@ func (c *Cluster) listVolumesWithManifestSize(newVolume spec.Volume) ([]*v1.Pers
 func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedName {
 	namespace := pv.Spec.ClaimRef.Namespace
 	name := pv.Spec.ClaimRef.Name[len(constants.DataVolumeName)+1:]
-	return &spec.NamespacedName{namespace, name}
+	return &spec.NamespacedName{Namespace: namespace, Name: name}
 }
 
 func quantityToGigabyte(q resource.Quantity) int64 {

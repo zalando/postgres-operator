@@ -18,7 +18,7 @@ var (
 var teamsAPItc = []struct {
 	in     string
 	inCode int
-	out    *team
+	out    *Team
 	err    error
 }{
 	{`{
@@ -67,7 +67,7 @@ var teamsAPItc = []struct {
 "parent_team_id": "111221"
 }`,
 		200,
-		&team{
+		&Team{
 			Dn:           "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
 			ID:           "acid",
 			TeamName:     "ACID",
@@ -169,7 +169,7 @@ func TestInfo(t *testing.T) {
 	}
 }
 
-type mockHttpClient struct {
+type mockHTTPClient struct {
 }
 
 type mockBody struct {
@@ -183,7 +183,7 @@ func (b *mockBody) Close() error {
 	return fmt.Errorf("close error")
 }
 
-func (c *mockHttpClient) Do(req *http.Request) (*http.Response, error) {
+func (c *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	resp := http.Response{
 		Status:        "200 OK",
 		StatusCode:    200,
@@ -200,7 +200,7 @@ func TestHttpClientClose(t *testing.T) {
 	ts := httptest.NewServer(nil)
 
 	api := NewTeamsAPI(ts.URL, logger)
-	api.httpClient = &mockHttpClient{}
+	api.httpClient = &mockHTTPClient{}
 
 	_, err := api.TeamInfo("acid", token)
 	expError := fmt.Errorf("error when closing response: close error")

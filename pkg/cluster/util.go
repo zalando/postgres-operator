@@ -289,14 +289,14 @@ func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
 	return lbls
 }
 
-func (c *Cluster) masterDnsName() string {
+func (c *Cluster) masterDNSName() string {
 	return strings.ToLower(c.OpConfig.MasterDNSNameFormat.Format(
 		"cluster", c.Spec.ClusterName,
 		"team", c.teamName(),
 		"hostedzone", c.OpConfig.DbHostedZone))
 }
 
-func (c *Cluster) replicaDnsName() string {
+func (c *Cluster) replicaDNSName() string {
 	return strings.ToLower(c.OpConfig.ReplicaDNSNameFormat.Format(
 		"cluster", c.Spec.ClusterName,
 		"team", c.teamName(),

@@ -27,7 +27,10 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-ticker.C:
-			c.clusterListFunc(metav1.ListOptions{ResourceVersion: "0"})
+			_, err := c.clusterListFunc(metav1.ListOptions{ResourceVersion: "0"})
+			if err != nil {
+				c.logger.Errorf("could not list clusters: %v", err)
+			}
 		case <-stopCh:
 			return
 		}

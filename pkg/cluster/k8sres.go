@@ -429,10 +429,10 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 
 func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
 
-	dnsNameFunction := c.masterDnsName
+	dnsNameFunction := c.masterDNSName
 	name := c.Name
 	if role == Replica {
-		dnsNameFunction = c.replicaDnsName
+		dnsNameFunction = c.replicaDNSName
 		name = name + "-repl"
 	}
 

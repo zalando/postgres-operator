@@ -79,7 +79,7 @@ type compareStatefulsetResult struct {
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Name)
-	kubeResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
+	k8sResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -98,7 +98,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		pgUsers:          make(map[string]spec.PgUser),
 		systemUsers:      make(map[string]spec.PgUser),
 		podSubscribers:   make(map[spec.NamespacedName]chan spec.PodEvent),
-		kubeResources:    kubeResources,
+		kubeResources:    k8sResources,
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
@@ -242,7 +242,6 @@ func (c *Cluster) Create() error {
 
 func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
-	match = true
 	if c.Service[role].Spec.Type != service.Spec.Type {
 		return false, fmt.Sprintf("new %s service's type %q doesn't match the current one %q",
 			role, service.Spec.Type, c.Service[role].Spec.Type)
