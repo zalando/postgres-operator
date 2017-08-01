@@ -13,11 +13,14 @@ import (
 )
 
 var (
+	//KubeConfigFile contains path to the kubernetes cluster config file
 	KubeConfigFile string
-	OutOfCluster   bool
-	version        string
 
-	config controller.Config
+	//OutOfCluster denotes if operator is running outside the kubernetes cluster
+	OutOfCluster bool
+
+	version string
+	config  controller.Config
 )
 
 func init() {
