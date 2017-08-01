@@ -101,6 +101,7 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 		})
 }
 
+// DisconnectFromProvider closes connection to the EC2 instance
 func (c *EBSVolumeResizer) DisconnectFromProvider() error {
 	c.connection = nil
 	return nil

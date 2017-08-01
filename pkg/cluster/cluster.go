@@ -49,6 +49,7 @@ type kubeResources struct {
 	//PVCs are treated separately
 }
 
+// Cluster describes postgresql cluster
 type Cluster struct {
 	kubeResources
 	spec.Postgresql
@@ -164,7 +165,13 @@ func (c *Cluster) initUsers() error {
 func (c *Cluster) Create() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var err error
+	var (
+		err error
+
+		service *v1.Service
+		ep      *v1.Endpoints
+		ss      *v1beta1.StatefulSet
+	)
 
 	defer func() {
 		if err == nil {
@@ -177,17 +184,17 @@ func (c *Cluster) Create() error {
 	c.setStatus(spec.ClusterStatusCreating)
 
 	//TODO: service will create endpoint implicitly
-	ep, err := c.createEndpoint()
+	ep, err = c.createEndpoint()
 	if err != nil {
 		return fmt.Errorf("could not create endpoint: %v", err)
 	}
 	c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
-	for _, role := range []postgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+	for _, role := range []postgresRole{master, replica} {
+		if role == replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
-		service, err := c.createService(role)
+		service, err = c.createService(role)
 		if err != nil {
 			return fmt.Errorf("could not create %s service: %v", role, err)
 		}
@@ -204,7 +211,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("secrets have been successfully created")
 
-	ss, err := c.createStatefulSet()
+	ss, err = c.createStatefulSet()
 	if err != nil {
 		return fmt.Errorf("could not create statefulset: %v", err)
 	}
@@ -219,10 +226,12 @@ func (c *Cluster) Create() error {
 	c.logger.Infof("pods are ready")
 
 	if !(c.masterLess || c.databaseAccessDisabled()) {
-		if err := c.initDbConn(); err != nil {
+		err = c.initDbConn()
+		if err != nil {
 			return fmt.Errorf("could not init db connection: %v", err)
 		}
-		if err = c.createUsers(); err != nil {
+		err = c.createUsers()
+		if err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
 		c.logger.Infof("Users have been successfully created")
@@ -413,8 +422,8 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.Postgresql = *newSpec
 	}()
 
-	for _, role := range []postgresRole{Master, Replica} {
-		if role == Replica {
+	for _, role := range []postgresRole{master, replica} {
+		if role == replica {
 			if !newSpec.Spec.ReplicaLoadBalancer {
 				// old spec had a load balancer, but the new one doesn't
 				if c.Spec.ReplicaLoadBalancer {
@@ -512,8 +521,8 @@ func (c *Cluster) Delete() error {
 		return fmt.Errorf("could not delete endpoint: %v", err)
 	}
 
-	for _, role := range []postgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+	for _, role := range []postgresRole{master, replica} {
+		if role == replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
 		if err := c.deleteService(role); err != nil {

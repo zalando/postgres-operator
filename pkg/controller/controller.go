@@ -17,6 +17,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
+// Config describes configuration of the controller
 type Config struct {
 	RestConfig          *rest.Config
 	InfrastructureRoles map[string]spec.PgUser
@@ -27,6 +28,7 @@ type Config struct {
 	Namespace        string
 }
 
+// Controller represents operator controller
 type Controller struct {
 	config   Config
 	opConfig *config.Config
@@ -47,6 +49,7 @@ type Controller struct {
 	lastClusterSyncTime int64
 }
 
+// NewController creates a new controller
 func NewController(controllerConfig *Config) *Controller {
 	logger := logrus.New()
 
@@ -168,6 +171,7 @@ func (c *Controller) initController() {
 	}
 }
 
+// Run starts background controller processes
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 

@@ -34,8 +34,8 @@ func (c *Cluster) Sync() error {
 	}
 
 	c.logger.Debugf("Syncing services")
-	for _, role := range []postgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+	for _, role := range []postgresRole{master, replica} {
+		if role == replica && !c.Spec.ReplicaLoadBalancer {
 			if c.Service[role] != nil {
 				// delete the left over replica service
 				if err := c.deleteService(role); err != nil {

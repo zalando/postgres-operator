@@ -13,6 +13,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
+//ExecCommand executes arbitrary command inside the pod
 func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (string, error) {
 	var (
 		execOut bytes.Buffer

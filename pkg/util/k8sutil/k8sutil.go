@@ -18,6 +18,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
 
+// KubernetesClient describes getters for Kubernetes objects
 type KubernetesClient struct {
 	v1core.SecretsGetter
 	v1core.ServicesGetter
@@ -31,6 +32,7 @@ type KubernetesClient struct {
 	RESTClient rest.Interface
 }
 
+// NewFromKubernetesInterface creates KubernetesClient from kubernetes Interface
 func NewFromKubernetesInterface(src kubernetes.Interface) (c KubernetesClient) {
 	c = KubernetesClient{}
 	c.PodsGetter = src.CoreV1()
@@ -46,6 +48,7 @@ func NewFromKubernetesInterface(src kubernetes.Interface) (c KubernetesClient) {
 	return
 }
 
+// RestConfig creates REST config
 func RestConfig(kubeConfig string, outOfCluster bool) (*rest.Config, error) {
 	if outOfCluster {
 		return clientcmd.BuildConfigFromFlags("", kubeConfig)
@@ -54,18 +57,22 @@ func RestConfig(kubeConfig string, outOfCluster bool) (*rest.Config, error) {
 	return rest.InClusterConfig()
 }
 
+// ClientSet creates clientset using REST config
 func ClientSet(config *rest.Config) (client *kubernetes.Clientset, err error) {
 	return kubernetes.NewForConfig(config)
 }
 
+// ResourceAlreadyExists checks if error corresponds to Already exists error
 func ResourceAlreadyExists(err error) bool {
 	return apierrors.IsAlreadyExists(err)
 }
 
+// ResourceNotFound checks if error corresponds to Not found error
 func ResourceNotFound(err error) bool {
 	return apierrors.IsNotFound(err)
 }
 
+// KubernetesRestClient create kubernets Interface using REST config
 func KubernetesRestClient(cfg rest.Config) (rest.Interface, error) {
 	cfg.GroupVersion = &schema.GroupVersion{
 		Group:   constants.TPRGroup,
@@ -77,6 +84,7 @@ func KubernetesRestClient(cfg rest.Config) (rest.Interface, error) {
 	return rest.RESTClientFor(&cfg)
 }
 
+// WaitTPRReady waits until ThirdPartyResource is ready
 func WaitTPRReady(restclient rest.Interface, interval, timeout time.Duration, ns string) error {
 	return retryutil.Retry(interval, timeout, func() (bool, error) {
 		_, err := restclient.

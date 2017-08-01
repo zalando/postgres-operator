@@ -43,6 +43,7 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// API describes teams API
 type API struct {
 	httpClient
 	url    string
