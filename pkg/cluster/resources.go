@@ -29,7 +29,7 @@ func (c *Cluster) loadResources() error {
 		return fmt.Errorf("too many(%d) services for a cluster", len(services.Items))
 	}
 	for i, svc := range services.Items {
-		switch PostgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
+		switch postgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
 		case Replica:
 			c.Service[Replica] = &services.Items[i]
 		default:
@@ -230,7 +230,7 @@ func (c *Cluster) deleteStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
+func (c *Cluster) createService(role postgresRole) (*v1.Service, error) {
 	if c.Service[role] != nil {
 		return nil, fmt.Errorf("service already exists in the cluster")
 	}
@@ -245,7 +245,7 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	return service, nil
 }
 
-func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error {
+func (c *Cluster) updateService(role postgresRole, newService *v1.Service) error {
 	if c.Service[role] == nil {
 		return fmt.Errorf("there is no service in the cluster")
 	}
@@ -320,7 +320,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 	return nil
 }
 
-func (c *Cluster) deleteService(role PostgresRole) error {
+func (c *Cluster) deleteService(role postgresRole) error {
 	c.logger.Debugf("Deleting service %s", role)
 	if c.Service[role] == nil {
 		return fmt.Errorf("There is no %s service in the cluster", role)

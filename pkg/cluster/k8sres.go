@@ -427,7 +427,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
-func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec) *v1.Service {
 
 	dnsNameFunction := c.masterDNSName
 	name := c.Name

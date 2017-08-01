@@ -41,7 +41,7 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Service     map[PostgresRole]*v1.Service
+	Service     map[postgresRole]*v1.Service
 	Endpoint    *v1.Endpoints
 	Secrets     map[types.UID]*v1.Secret
 	Statefulset *v1beta1.StatefulSet
@@ -79,7 +79,7 @@ type compareStatefulsetResult struct {
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Name)
-	k8sResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[PostgresRole]*v1.Service)}
+	k8sResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[postgresRole]*v1.Service)}
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -183,7 +183,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
-	for _, role := range []PostgresRole{Master, Replica} {
+	for _, role := range []postgresRole{Master, Replica} {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
@@ -240,7 +240,7 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
-func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match bool, reason string) {
+func (c *Cluster) sameServiceWith(role postgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
 	if c.Service[role].Spec.Type != service.Spec.Type {
 		return false, fmt.Sprintf("new %s service's type %q doesn't match the current one %q",
@@ -413,7 +413,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.Postgresql = *newSpec
 	}()
 
-	for _, role := range []PostgresRole{Master, Replica} {
+	for _, role := range []postgresRole{Master, Replica} {
 		if role == Replica {
 			if !newSpec.Spec.ReplicaLoadBalancer {
 				// old spec had a load balancer, but the new one doesn't
@@ -512,7 +512,7 @@ func (c *Cluster) Delete() error {
 		return fmt.Errorf("could not delete endpoint: %v", err)
 	}
 
-	for _, role := range []PostgresRole{Master, Replica} {
+	for _, role := range []postgresRole{Master, Replica} {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
