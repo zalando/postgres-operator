@@ -8,12 +8,14 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
+// TPR describes ThirdPartyResource specific configuration parameters
 type TPR struct {
 	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
 	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
 	ResyncPeriod      time.Duration `name:"resync_period" default:"5m"`
 }
 
+// Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
 	ResourceCheckInterval  time.Duration     `name:"resource_check_interval" default:"3s"`
 	ResourceCheckTimeout   time.Duration     `name:"resource_check_timeout" default:"10m"`
@@ -28,6 +30,7 @@ type Resources struct {
 	DefaultMemoryLimit     string            `name:"default_memory_limit" default:"1Gi"`
 }
 
+// Auth describes authentication specific configuration parameters
 type Auth struct {
 	PamRoleName                   string              `name:"pam_rol_name" default:"zalandos"`
 	PamConfiguration              string              `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
@@ -38,6 +41,7 @@ type Auth struct {
 	ReplicationUsername           string              `name:"replication_username" default:"replication"`
 }
 
+// Config describes operator config
 type Config struct {
 	TPR
 	Resources
@@ -59,6 +63,7 @@ type Config struct {
 	Workers              uint32         `name:"workers" default:"4"`
 }
 
+// MustMarshal marshals the config or panics
 func (c Config) MustMarshal() string {
 	b, err := json.MarshalIndent(c, "", "\t")
 	if err != nil {
@@ -68,6 +73,7 @@ func (c Config) MustMarshal() string {
 	return string(b)
 }
 
+// NewFromMap creates Config from the map
 func NewFromMap(m map[string]string) *Config {
 	cfg := Config{}
 	fields, _ := structFields(&cfg)
@@ -91,6 +97,7 @@ func NewFromMap(m map[string]string) *Config {
 	return &cfg
 }
 
+// Copy creates a copy of the config
 func Copy(c *Config) Config {
 	cfg := *c
 

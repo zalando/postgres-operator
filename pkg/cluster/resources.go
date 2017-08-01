@@ -29,11 +29,11 @@ func (c *Cluster) loadResources() error {
 		return fmt.Errorf("too many(%d) services for a cluster", len(services.Items))
 	}
 	for i, svc := range services.Items {
-		switch PostgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
-		case Replica:
-			c.Service[Replica] = &services.Items[i]
+		switch postgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
+		case replica:
+			c.Service[replica] = &services.Items[i]
 		default:
-			c.Service[Master] = &services.Items[i]
+			c.Service[master] = &services.Items[i]
 		}
 	}
 
@@ -46,7 +46,7 @@ func (c *Cluster) loadResources() error {
 	}
 
 	for i, ep := range endpoints.Items {
-		if ep.Labels[c.OpConfig.PodRoleLabel] != string(Replica) {
+		if ep.Labels[c.OpConfig.PodRoleLabel] != string(replica) {
 			c.Endpoint = &endpoints.Items[i]
 			break
 		}
@@ -230,7 +230,7 @@ func (c *Cluster) deleteStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
+func (c *Cluster) createService(role postgresRole) (*v1.Service, error) {
 	if c.Service[role] != nil {
 		return nil, fmt.Errorf("service already exists in the cluster")
 	}
@@ -245,7 +245,7 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	return service, nil
 }
 
-func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error {
+func (c *Cluster) updateService(role postgresRole, newService *v1.Service) error {
 	if c.Service[role] == nil {
 		return fmt.Errorf("there is no service in the cluster")
 	}
@@ -260,7 +260,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			err             error
 		)
 
-		if role == Master {
+		if role == master {
 			// for the master service we need to re-create the endpoint as well. Get the up-to-date version of
 			// the addresses stored in it before the service is deleted (deletion of the service removes the endpooint)
 			currentEndpoint, err = c.KubeClient.Endpoints(c.Service[role].Namespace).Get(c.Service[role].Name, metav1.GetOptions{})
@@ -278,7 +278,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not create service %q: %v", serviceName, err)
 		}
 		c.Service[role] = svc
-		if role == Master {
+		if role == master {
 			// create the new endpoint using the addresses obtained from the previous one
 			endpointSpec := c.generateMasterEndpoints(currentEndpoint.Subsets)
 			ep, err := c.KubeClient.Endpoints(c.Service[role].Namespace).Create(endpointSpec)
@@ -320,7 +320,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 	return nil
 }
 
-func (c *Cluster) deleteService(role PostgresRole) error {
+func (c *Cluster) deleteService(role postgresRole) error {
 	c.logger.Debugf("Deleting service %s", role)
 	if c.Service[role] == nil {
 		return fmt.Errorf("There is no %s service in the cluster", role)

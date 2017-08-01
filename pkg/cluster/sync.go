@@ -34,8 +34,8 @@ func (c *Cluster) Sync() error {
 	}
 
 	c.logger.Debugf("Syncing services")
-	for _, role := range []PostgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+	for _, role := range []postgresRole{master, replica} {
+		if role == replica && !c.Spec.ReplicaLoadBalancer {
 			if c.Service[role] != nil {
 				// delete the left over replica service
 				if err := c.deleteService(role); err != nil {
@@ -87,7 +87,7 @@ func (c *Cluster) syncSecrets() error {
 	return err
 }
 
-func (c *Cluster) syncService(role PostgresRole) error {
+func (c *Cluster) syncService(role postgresRole) error {
 	cSpec := c.Spec
 	if c.Service[role] == nil {
 		c.logger.Infof("could not find the cluster's %s service", role)

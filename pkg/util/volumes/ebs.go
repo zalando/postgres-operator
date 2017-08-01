@@ -7,10 +7,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 // EBSVolumeResizer implements volume resizing interface for AWS EBS volumes.
@@ -20,7 +20,7 @@ type EBSVolumeResizer struct {
 
 // ConnectToProvider connects to AWS.
 func (c *EBSVolumeResizer) ConnectToProvider() error {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(constants.AWS_REGION)})
+	sess, err := session.NewSession(&aws.Config{Region: aws.String(constants.AWSRegion)})
 	if err != nil {
 		return fmt.Errorf("could not establish AWS session: %v", err)
 	}
@@ -52,21 +52,21 @@ func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string,
 }
 
 // ResizeVolume actually calls AWS API to resize the EBS volume if necessary.
-func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
+func (c *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 	/* first check if the volume is already of a requested size */
-	volumeOutput, err := c.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeId}})
+	volumeOutput, err := c.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeID}})
 	if err != nil {
 		return fmt.Errorf("could not get information about the volume: %v", err)
 	}
 	vol := volumeOutput.Volumes[0]
-	if *vol.VolumeId != volumeId {
-		return fmt.Errorf("describe volume %q returned information about a non-matching volume %q", volumeId, *vol.VolumeId)
+	if *vol.VolumeId != volumeID {
+		return fmt.Errorf("describe volume %q returned information about a non-matching volume %q", volumeID, *vol.VolumeId)
 	}
 	if *vol.Size == newSize {
 		// nothing to do
 		return nil
 	}
-	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeId}
+	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeID}
 	output, err := c.connection.ModifyVolume(&input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
@@ -74,7 +74,7 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 
 	state := *output.VolumeModification.ModificationState
 	if state == constants.EBSVolumeStateFailed {
-		return fmt.Errorf("could not modify persistent volume %q: modification state failed", volumeId)
+		return fmt.Errorf("could not modify persistent volume %q: modification state failed", volumeID)
 	}
 	if state == "" {
 		return fmt.Errorf("received empty modification status")
@@ -83,7 +83,7 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 		return nil
 	}
 	// wait until the volume reaches the "optimizing" or "completed" state
-	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []*string{&volumeId}}
+	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []*string{&volumeID}}
 	return retryutil.Retry(constants.EBSVolumeResizeWaitInterval, constants.EBSVolumeResizeWaitTimeout,
 		func() (bool, error) {
 			out, err := c.connection.DescribeVolumesModifications(&in)
@@ -91,16 +91,17 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeId string, newSize int64) error {
 				return false, fmt.Errorf("could not describe volume modification: %v", err)
 			}
 			if len(out.VolumesModifications) != 1 {
-				return false, fmt.Errorf("describe volume modification didn't return one record for volume %q", volumeId)
+				return false, fmt.Errorf("describe volume modification didn't return one record for volume %q", volumeID)
 			}
-			if *out.VolumesModifications[0].VolumeId != volumeId {
+			if *out.VolumesModifications[0].VolumeId != volumeID {
 				return false, fmt.Errorf("non-matching volume id when describing modifications: %q is different from %q",
-					*out.VolumesModifications[0].VolumeId, volumeId)
+					*out.VolumesModifications[0].VolumeId, volumeID)
 			}
 			return *out.VolumesModifications[0].ModificationState != constants.EBSVolumeStateModifying, nil
 		})
 }
 
+// DisconnectFromProvider closes connection to the EC2 instance
 func (c *EBSVolumeResizer) DisconnectFromProvider() error {
 	c.connection = nil
 	return nil
