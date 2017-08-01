@@ -13,16 +13,15 @@ import (
 )
 
 var (
-	KubeConfigFile string
-	OutOfCluster   bool
+	kubeConfigFile string
+	outOfCluster   bool
 	version        string
-
-	config controller.Config
+	config         controller.Config
 )
 
 func init() {
-	flag.StringVar(&KubeConfigFile, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
-	flag.BoolVar(&OutOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
+	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
+	flag.BoolVar(&outOfCluster, "outofcluster", false, "Whether the operator runs in- our outside of the Kubernetes cluster.")
 	flag.BoolVar(&config.NoDatabaseAccess, "nodatabaseaccess", false, "Disable all access to the database from the operator side.")
 	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
@@ -53,7 +52,7 @@ func main() {
 
 	wg := &sync.WaitGroup{} // Goroutines can add themselves to this to be waited on
 
-	config.RestConfig, err = k8sutil.RestConfig(KubeConfigFile, OutOfCluster)
+	config.RestConfig, err = k8sutil.RestConfig(kubeConfigFile, outOfCluster)
 	if err != nil {
 		log.Fatalf("couldn't get REST config: %v", err)
 	}
