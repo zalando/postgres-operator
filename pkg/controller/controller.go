@@ -108,7 +108,7 @@ func (c *Controller) initController() {
 	c.logger.Infof("Config: %s", c.opConfig.MustMarshal())
 
 	if c.opConfig.DebugLogging {
-		c.logger.Level = logrus.DebugLevel
+		c.logger.Logger.Level = logrus.DebugLevel
 	}
 
 	if err := c.createTPR(); err != nil {
