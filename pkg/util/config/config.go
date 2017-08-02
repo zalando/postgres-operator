@@ -32,7 +32,7 @@ type Resources struct {
 
 // Auth describes authentication specific configuration parameters
 type Auth struct {
-	PamRoleName                   string              `name:"pam_rol_name" default:"zalandos"`
+	PamRoleName                   string              `name:"pam_role_name" default:"zalandos"`
 	PamConfiguration              string              `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
 	TeamsAPIUrl                   string              `name:"teams_api_url" default:"https://teams.example.com/api/"`
 	OAuthTokenSecretName          spec.NamespacedName `name:"oauth_token_secret_name" default:"postgresql-operator"`
