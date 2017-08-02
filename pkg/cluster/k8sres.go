@@ -442,7 +442,7 @@ func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec)
 	}
 
 	if role == replica {
-		serviceSpec.Selector = map[string]string{c.OpConfig.PodRoleLabel: string(replica)}
+		serviceSpec.Selector = c.roleLabelsSet(role)
 	}
 
 	var annotations map[string]string
