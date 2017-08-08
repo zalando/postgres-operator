@@ -9,7 +9,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 )
 
-// EvenType contains type of the events for the TPRs and Pods received from Kubernetes
+// EventType contains type of the events for the TPRs and Pods received from Kubernetes
 type EventType string
 
 // NamespacedName describes the namespace/name pairs used in Kubernetes names.

@@ -10,6 +10,6 @@ type VolumeResizer interface {
 	IsConnectedToProvider() bool
 	VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
 	GetProviderVolumeID(pv *v1.PersistentVolume) (string, error)
-	ResizeVolume(providerVolumeId string, newSize int64) error
+	ResizeVolume(providerVolumeID string, newSize int64) error
 	DisconnectFromProvider() error
 }

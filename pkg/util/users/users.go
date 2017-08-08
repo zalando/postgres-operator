@@ -118,6 +118,10 @@ func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err 
 		grantStmt := produceGrantStmt(user)
 		resultStmt = append(resultStmt, grantStmt)
 	}
+	if len(resultStmt) == 0 {
+		return nil
+	}
+
 	query := fmt.Sprintf(doBlockStmt, strings.Join(resultStmt, ";"))
 
 	_, err = db.Query(query) // TODO: Try several times

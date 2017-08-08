@@ -1,5 +1,6 @@
 package constants
 
+// PostgreSQL specific constants
 const (
 	DataVolumeName    = "pgdata"
 	PodRoleMaster     = "master"

@@ -51,7 +51,7 @@ func newMockController() *Controller {
 	controller := NewController(&Config{})
 	controller.opConfig.ClusterNameLabel = "cluster-name"
 	controller.opConfig.InfrastructureRolesSecretName =
-		spec.NamespacedName{v1.NamespaceDefault, testInfrastructureRolesSecretName}
+		spec.NamespacedName{Namespace: v1.NamespaceDefault, Name: testInfrastructureRolesSecretName}
 	controller.opConfig.Workers = 4
 	controller.KubeClient = newMockKubernetesClient()
 	return controller
@@ -77,7 +77,7 @@ func TestPodClusterName(t *testing.T) {
 					},
 				},
 			},
-			spec.NamespacedName{v1.NamespaceDefault, "testcluster"},
+			spec.NamespacedName{Namespace: v1.NamespaceDefault, Name: "testcluster"},
 		},
 	}
 	for _, test := range testTable {
@@ -94,11 +94,11 @@ func TestClusterWorkerID(t *testing.T) {
 		expected uint32
 	}{
 		{
-			in:       spec.NamespacedName{"foo", "bar"},
+			in:       spec.NamespacedName{Namespace: "foo", Name: "bar"},
 			expected: 2,
 		},
 		{
-			in:       spec.NamespacedName{"default", "testcluster"},
+			in:       spec.NamespacedName{Namespace: "default", Name: "testcluster"},
 			expected: 3,
 		},
 	}
@@ -122,18 +122,17 @@ func TestGetInfrastructureRoles(t *testing.T) {
 			nil,
 		},
 		{
-			spec.NamespacedName{v1.NamespaceDefault, "null"},
+			spec.NamespacedName{Namespace: v1.NamespaceDefault, Name: "null"},
 			nil,
 			fmt.Errorf(`could not get infrastructure roles secret: NotFound`),
 		},
 		{
-			spec.NamespacedName{v1.NamespaceDefault, testInfrastructureRolesSecretName},
+			spec.NamespacedName{Namespace: v1.NamespaceDefault, Name: testInfrastructureRolesSecretName},
 			map[string]spec.PgUser{
 				"testrole": {
-					"testrole",
-					"testpassword",
-					nil,
-					[]string{"testinrole"},
+					Name:     "testrole",
+					Password: "testpassword",
+					MemberOf: []string{"testinrole"},
 				},
 			},
 			nil,

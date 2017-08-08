@@ -1,8 +1,8 @@
 package cluster
 
-type PostgresRole string
+type postgresRole string
 
 const (
-	Master  PostgresRole = "master"
-	Replica PostgresRole = "replica"
+	master  postgresRole = "master"
+	replica postgresRole = "replica"
 )

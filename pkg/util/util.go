@@ -20,7 +20,7 @@ const (
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 func init() {
-	rand.Seed(int64(time.Now().Unix()))
+	rand.Seed(time.Now().Unix())
 }
 
 // RandomPassword generates random alphanumeric password of a given length.

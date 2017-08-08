@@ -22,7 +22,7 @@ type infrastructureAccount struct {
 }
 
 // Team defines informaiton for a single team, including the list of members and infrastructure accounts.
-type team struct {
+type Team struct {
 	Dn           string   `json:"dn"`
 	ID           string   `json:"id"`
 	TeamName     string   `json:"id_name"`
@@ -43,6 +43,7 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// API describes teams API
 type API struct {
 	httpClient
 	url    string
@@ -61,7 +62,7 @@ func NewTeamsAPI(url string, log *logrus.Logger) *API {
 }
 
 // TeamInfo returns information about a given team using its ID and a token to authenticate to the API service.
-func (t *API) TeamInfo(teamID, token string) (tm *team, err error) {
+func (t *API) TeamInfo(teamID, token string) (tm *Team, err error) {
 	var (
 		req  *http.Request
 		resp *http.Response
@@ -103,7 +104,7 @@ func (t *API) TeamInfo(teamID, token string) (tm *team, err error) {
 		return
 	}
 
-	tm = &team{}
+	tm = &Team{}
 	d := json.NewDecoder(resp.Body)
 	err = d.Decode(tm)
 	if err != nil {
