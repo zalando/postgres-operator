@@ -45,7 +45,7 @@ type Controller struct {
 	podInformer        cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
-	clusterEventQueues  []*cache.FIFO
+	clusterEventQueues  []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime int64
 }
 

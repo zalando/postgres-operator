@@ -2,15 +2,20 @@ package apiserver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
 	"regexp"
 	"sync"
+	"time"
 
-	"encoding/json"
 	"github.com/Sirupsen/logrus"
 )
+
+const httpAPITimeout = time.Second * 30
+const shutdownTimeout = time.Second * 30
+const httpReadTimeout = time.Millisecond * 100
 
 type ClusterInformer interface {
 	Status() interface{}
@@ -40,42 +45,13 @@ func New(controller ClusterInformer, port int, logger *logrus.Logger) *Server {
 	mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
 	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	mux.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
-		status := s.controller.Status()
-
-		b, err := json.Marshal(status)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Could not marshal controller status: %v", err)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(b)
-	})
-	mux.HandleFunc("/clusters/", func(w http.ResponseWriter, req *http.Request) {
-		var resp interface{}
-		if matches := clusterStatusURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-			resp = s.controller.ClusterStatus(matches[0][1], matches[0][2])
-		} else if matches := teamURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-			// TODO
-		} else {
-			http.NotFound(w, req)
-			return
-		}
-
-		b, err := json.Marshal(resp)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Could not marshal %T: %v", resp, err)
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(b)
-		}
-	})
+	mux.HandleFunc("/status", s.status)
+	mux.HandleFunc("/clusters", s.clusters)
 
 	s.http = http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: mux,
+		Addr:        fmt.Sprintf(":%d", port),
+		Handler:     http.TimeoutHandler(mux, httpAPITimeout, ""),
+		ReadTimeout: httpReadTimeout,
 	}
 
 	return s
@@ -94,6 +70,44 @@ func (s *Server) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 	<-stopCh
 
-	ctx, _ := context.WithCancel(context.Background())
-	s.http.Shutdown(ctx)
+	ctx, _ := context.WithTimeout(context.Background(), shutdownTimeout)
+	err := s.http.Shutdown(ctx)
+	if err == context.DeadlineExceeded {
+		s.logger.Warnf("shutdown timeout exceeded. closing http server")
+		s.http.Close()
+	} else if err != nil {
+		s.logger.Errorf("could not shutdown http server", err)
+	}
+	s.logger.Infoln("http server shut down")
+}
+
+func (s *Server) status(w http.ResponseWriter, req *http.Request) {
+	status := s.controller.Status()
+
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(status)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		s.logger.Errorf("could not encode status: %v", err)
+	}
+}
+
+func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
+	var resp interface{}
+
+	if matches := clusterStatusURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
+		resp = s.controller.ClusterStatus(matches[0][1], matches[0][2])
+	} else if matches := teamURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
+		// TODO
+	} else {
+		http.NotFound(w, req)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		s.logger.Errorf("could not list clusters: %v", err)
+	}
 }
