@@ -649,3 +649,20 @@ func (c *Cluster) initInfrastructureRoles() error {
 	}
 	return nil
 }
+
+func (c *Cluster) GetStatus() Status {
+	return Status{
+		Config:  c.Config,
+		Cluster: c.Spec.ClusterName,
+		Team:    c.Spec.TeamID,
+		Status:  c.Status,
+		Spec:    c.Spec,
+
+		MasterService:  c.GetServiceMaster(),
+		ReplicaService: c.GetServiceReplica(),
+		Endpoint:       c.GetEndpoint(),
+		StatefulSet:    c.GetStatefulSet(),
+
+		Error: c.Error,
+	}
+}

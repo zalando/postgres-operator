@@ -3,9 +3,6 @@ package controller
 import (
 	"sync/atomic"
 
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -16,20 +13,6 @@ type controllerStatus struct {
 	OperatorConfig   config.Config
 	LastSyncTime     int64
 	Clusters         int
-}
-
-type clusterStatus struct {
-	Team           string
-	Cluster        string
-	MasterService  *v1.Service
-	ReplicaService *v1.Service
-	Endpoint       *v1.Endpoints
-	StatefulSet    *v1beta1.StatefulSet
-
-	Config cluster.Config
-	Status spec.PostgresStatus
-	Spec   spec.PostgresSpec
-	Error  error
 }
 
 func (c *Controller) ClusterStatus(team, cluster string) interface{} {
@@ -45,20 +28,7 @@ func (c *Controller) ClusterStatus(team, cluster string) interface{} {
 		return struct{}{}
 	}
 
-	return clusterStatus{
-		Config:  cl.Config,
-		Cluster: cl.Spec.ClusterName,
-		Team:    cl.Spec.TeamID,
-		Status:  cl.Status,
-		Spec:    cl.Spec,
-
-		MasterService:  cl.GetServiceMaster(),
-		ReplicaService: cl.GetServiceReplica(),
-		Endpoint:       cl.GetEndpoint(),
-		StatefulSet:    cl.GetStatefulSet(),
-
-		Error: cl.Error,
-	}
+	return cl.GetStatus()
 }
 
 func (c *Controller) TeamClustersStatus(team string) []interface{} {
@@ -77,27 +47,13 @@ func (c *Controller) TeamClustersStatus(team string) []interface{} {
 
 	var resp []interface{}
 	for _, cl := range clusters {
-		resp = append(resp,
-			clusterStatus{
-				Config:  cl.Config,
-				Cluster: cl.Spec.ClusterName,
-				Team:    cl.Spec.TeamID,
-				Status:  cl.Status,
-				Spec:    cl.Spec,
-
-				MasterService:  cl.GetServiceMaster(),
-				ReplicaService: cl.GetServiceReplica(),
-				Endpoint:       cl.GetEndpoint(),
-				StatefulSet:    cl.GetStatefulSet(),
-
-				Error: cl.Error,
-			})
+		resp = append(resp, cl.GetStatus())
 	}
 
 	return resp
 }
 
-func (c *Controller) Status() interface{} {
+func (c *Controller) GetStatus() interface{} {
 	c.clustersMu.RLock()
 	clustersCnt := len(c.clusters)
 	c.clustersMu.RUnlock()

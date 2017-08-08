@@ -20,7 +20,7 @@ const (
 )
 
 type ControllerInformer interface {
-	Status() interface{}
+	GetStatus() interface{}
 	ClusterStatus(team, cluster string) interface{}
 	TeamClustersStatus(team string) []interface{}
 }
@@ -85,10 +85,8 @@ func (s *Server) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 }
 
 func (s *Server) status(w http.ResponseWriter, req *http.Request) {
-	status := s.controller.Status()
-
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(status)
+	err := json.NewEncoder(w).Encode(s.controller.GetStatus())
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		s.logger.Errorf("could not encode status: %v", err)
