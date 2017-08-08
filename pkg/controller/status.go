@@ -19,7 +19,6 @@ type clusterStatus struct {
 
 	Config    cluster.Config
 	Status    spec.PostgresStatus
-	Resources cluster.KubeResources
 	Spec      spec.PostgresSpec
 	Error     error
 }
@@ -40,7 +39,6 @@ func (c *Controller) ClusterStatus(team, cluster string) interface{} {
 		Cluster:   cl.Spec.ClusterName,
 		Team:      cl.Spec.TeamID,
 		Status:    cl.Status,
-		Resources: cl.KubeResources,
 		Spec:      cl.Spec,
 		Error:     cl.Error,
 	}
