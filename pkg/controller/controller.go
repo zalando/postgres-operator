@@ -39,9 +39,10 @@ type Controller struct {
 	RestClient rest.Interface // kubernetes API group REST client
 	apiserver  *apiserver.Server
 
-	clustersMu sync.RWMutex
-	clusters   map[spec.NamespacedName]*cluster.Cluster
-	stopChs    map[spec.NamespacedName]chan struct{}
+	clustersMu   sync.RWMutex
+	clusters     map[spec.NamespacedName]*cluster.Cluster
+	teamClusters map[string][]spec.NamespacedName
+	stopChs      map[spec.NamespacedName]chan struct{}
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
@@ -56,12 +57,13 @@ func NewController(controllerConfig *Config) *Controller {
 	logger := logrus.New()
 
 	return &Controller{
-		config:   *controllerConfig,
-		opConfig: &config.Config{},
-		logger:   logger.WithField("pkg", "controller"),
-		clusters: make(map[spec.NamespacedName]*cluster.Cluster),
-		stopChs:  make(map[spec.NamespacedName]chan struct{}),
-		podCh:    make(chan spec.PodEvent),
+		config:       *controllerConfig,
+		opConfig:     &config.Config{},
+		logger:       logger.WithField("pkg", "controller"),
+		clusters:     make(map[spec.NamespacedName]*cluster.Cluster),
+		teamClusters: make(map[string][]spec.NamespacedName),
+		stopChs:      make(map[spec.NamespacedName]chan struct{}),
+		podCh:        make(chan spec.PodEvent),
 	}
 }
 

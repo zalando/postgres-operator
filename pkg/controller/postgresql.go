@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -155,11 +156,16 @@ func (c *Controller) processEvent(obj interface{}) error {
 		stopCh := make(chan struct{})
 		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
 		cl.Run(stopCh)
+		teamName := strings.ToLower(cl.Spec.TeamID)
 
-		c.clustersMu.Lock()
-		c.clusters[clusterName] = cl
-		c.stopChs[clusterName] = stopCh
-		c.clustersMu.Unlock()
+		func() {
+			defer c.clustersMu.Unlock()
+			c.clustersMu.Lock()
+
+			c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
+			c.clusters[clusterName] = cl
+			c.stopChs[clusterName] = stopCh
+		}()
 
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Errorf("could not create cluster: %v", err)
@@ -185,6 +191,8 @@ func (c *Controller) processEvent(obj interface{}) error {
 		cl.Error = nil
 		logger.Infof("Cluster %q has been updated", clusterName)
 	case spec.EventDelete:
+		teamName := strings.ToLower(cl.Spec.TeamID)
+
 		logger.Infof("Deletion of the %q cluster started", clusterName)
 		if !clusterFound {
 			logger.Errorf("Unknown cluster: %q", clusterName)
@@ -197,10 +205,21 @@ func (c *Controller) processEvent(obj interface{}) error {
 		}
 		close(c.stopChs[clusterName])
 
-		c.clustersMu.Lock()
-		delete(c.clusters, clusterName)
-		delete(c.stopChs, clusterName)
-		c.clustersMu.Unlock()
+		func() {
+			defer c.clustersMu.Unlock()
+			c.clustersMu.Lock()
+
+			delete(c.clusters, clusterName)
+			delete(c.stopChs, clusterName)
+			for i, val := range c.teamClusters[teamName] { // on relativel
+				if val == clusterName {
+					copy(c.teamClusters[teamName][i:], c.teamClusters[teamName][i+1:])
+					c.teamClusters[teamName][len(c.teamClusters[teamName])-1] = spec.NamespacedName{}
+					c.teamClusters[teamName] = c.teamClusters[teamName][:len(c.teamClusters[teamName])-1]
+					break
+				}
+			}
+		}()
 
 		logger.Infof("Cluster %q has been deleted", clusterName)
 	case spec.EventSync:
@@ -210,12 +229,17 @@ func (c *Controller) processEvent(obj interface{}) error {
 		if !clusterFound {
 			stopCh := make(chan struct{})
 			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
+			teamName := strings.ToLower(cl.Spec.TeamID)
 			cl.Run(stopCh)
 
-			c.clustersMu.Lock()
-			c.clusters[clusterName] = cl
-			c.stopChs[clusterName] = stopCh
-			c.clustersMu.Unlock()
+			func() {
+				c.clustersMu.Lock()
+				defer c.clustersMu.Unlock()
+
+				c.clusters[clusterName] = cl
+				c.stopChs[clusterName] = stopCh
+				c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
+			}()
 		}
 
 		if err := cl.Sync(); err != nil {

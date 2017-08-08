@@ -13,19 +13,22 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-const httpAPITimeout = time.Second * 30
-const shutdownTimeout = time.Second * 30
-const httpReadTimeout = time.Millisecond * 100
+const (
+	httpAPITimeout  = time.Minute * 1
+	shutdownTimeout = time.Second * 10
+	httpReadTimeout = time.Millisecond * 100
+)
 
-type ClusterInformer interface {
+type ControllerInformer interface {
 	Status() interface{}
 	ClusterStatus(team, cluster string) interface{}
+	TeamClustersStatus(team string) []interface{}
 }
 
 type Server struct {
 	logger     *logrus.Entry
 	http       http.Server
-	controller ClusterInformer
+	controller ControllerInformer
 }
 
 var (
@@ -33,7 +36,7 @@ var (
 	teamURL          = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$")
 )
 
-func New(controller ClusterInformer, port int, logger *logrus.Logger) *Server {
+func New(controller ControllerInformer, port int, logger *logrus.Logger) *Server {
 	s := &Server{
 		logger:     logger.WithField("pkg", "apiserver"),
 		controller: controller,
@@ -46,7 +49,7 @@ func New(controller ClusterInformer, port int, logger *logrus.Logger) *Server {
 	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 	mux.HandleFunc("/status", s.status)
-	mux.HandleFunc("/clusters", s.clusters)
+	mux.HandleFunc("/clusters/", s.clusters)
 
 	s.http = http.Server{
 		Addr:        fmt.Sprintf(":%d", port),
@@ -98,7 +101,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 	if matches := clusterStatusURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
 		resp = s.controller.ClusterStatus(matches[0][1], matches[0][2])
 	} else if matches := teamURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		// TODO
+		resp = s.controller.TeamClustersStatus(matches[0][1])
 	} else {
 		http.NotFound(w, req)
 		return

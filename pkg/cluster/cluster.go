@@ -41,7 +41,7 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Service     map[postgresRole]*v1.Service
+	Services    map[postgresRole]*v1.Service
 	Endpoint    *v1.Endpoints
 	Secrets     map[types.UID]*v1.Secret
 	Statefulset *v1beta1.StatefulSet
@@ -80,7 +80,7 @@ type compareStatefulsetResult struct {
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Name)
-	k8sResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[postgresRole]*v1.Service)}
+	k8sResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Services: make(map[postgresRole]*v1.Service)}
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -251,11 +251,11 @@ func (c *Cluster) Create() error {
 
 func (c *Cluster) sameServiceWith(role postgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
-	if c.Service[role].Spec.Type != service.Spec.Type {
+	if c.Services[role].Spec.Type != service.Spec.Type {
 		return false, fmt.Sprintf("new %s service's type %q doesn't match the current one %q",
-			role, service.Spec.Type, c.Service[role].Spec.Type)
+			role, service.Spec.Type, c.Services[role].Spec.Type)
 	}
-	oldSourceRanges := c.Service[role].Spec.LoadBalancerSourceRanges
+	oldSourceRanges := c.Services[role].Spec.LoadBalancerSourceRanges
 	newSourceRanges := service.Spec.LoadBalancerSourceRanges
 	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
 	if (len(oldSourceRanges) == 0) && (len(newSourceRanges) == 0) {
@@ -265,7 +265,7 @@ func (c *Cluster) sameServiceWith(role postgresRole, service *v1.Service) (match
 		return false, fmt.Sprintf("new %s service's LoadBalancerSourceRange doesn't match the current one", role)
 	}
 
-	oldDNSAnnotation := c.Service[role].Annotations[constants.ZalandoDNSNameAnnotation]
+	oldDNSAnnotation := c.Services[role].Annotations[constants.ZalandoDNSNameAnnotation]
 	newDNSAnnotation := service.Annotations[constants.ZalandoDNSNameAnnotation]
 	if oldDNSAnnotation != newDNSAnnotation {
 		return false, fmt.Sprintf("new %s service's %q annotation doesn't match the current one", role, constants.ZalandoDNSNameAnnotation)
@@ -450,12 +450,12 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		}
 		newService := c.generateService(role, &newSpec.Spec)
 		if match, reason := c.sameServiceWith(role, newService); !match {
-			c.logServiceChanges(role, c.Service[role], newService, true, reason)
+			c.logServiceChanges(role, c.Services[role], newService, true, reason)
 			if err := c.updateService(role, newService); err != nil {
 				c.setStatus(spec.ClusterStatusUpdateFailed)
 				return fmt.Errorf("could not update %s service: %v", role, err)
 			}
-			c.logger.Infof("%s service %q has been updated", role, util.NameFromMeta(c.Service[role].ObjectMeta))
+			c.logger.Infof("%s service %q has been updated", role, util.NameFromMeta(c.Services[role].ObjectMeta))
 		}
 	}
 

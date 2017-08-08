@@ -36,7 +36,7 @@ func (c *Cluster) Sync() error {
 	c.logger.Debugf("Syncing services")
 	for _, role := range []postgresRole{master, replica} {
 		if role == replica && !c.Spec.ReplicaLoadBalancer {
-			if c.Service[role] != nil {
+			if c.Services[role] != nil {
 				// delete the left over replica service
 				if err := c.deleteService(role); err != nil {
 					return fmt.Errorf("could not delete obsolete %s service: %v", role, err)
@@ -89,7 +89,7 @@ func (c *Cluster) syncSecrets() error {
 
 func (c *Cluster) syncService(role postgresRole) error {
 	cSpec := c.Spec
-	if c.Service[role] == nil {
+	if c.Services[role] == nil {
 		c.logger.Infof("could not find the cluster's %s service", role)
 		svc, err := c.createService(role)
 		if err != nil {
@@ -105,7 +105,7 @@ func (c *Cluster) syncService(role postgresRole) error {
 	if match {
 		return nil
 	}
-	c.logServiceChanges(role, c.Service[role], desiredSvc, false, reason)
+	c.logServiceChanges(role, c.Services[role], desiredSvc, false, reason)
 
 	if err := c.updateService(role, desiredSvc); err != nil {
 		return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
