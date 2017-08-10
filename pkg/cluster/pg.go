@@ -64,7 +64,10 @@ func (c *Cluster) initDbConn() (err error) {
 func (c *Cluster) closeDbConn() (err error) {
 	if c.pgDb != nil {
 		c.logger.Debug("closing database connection")
-		return c.pgDb.Close()
+		if err = c.pgDb.Close(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+		c.pgDb = nil
 	}
 	c.logger.Warning("attempted to close an empty db connection object")
 	return nil
