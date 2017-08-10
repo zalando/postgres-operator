@@ -415,10 +415,7 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 	return err
 }
 
-func (c *Cluster) createUsers() (err error) {
+func (c *Cluster) createRoles() (err error) {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
-	reqs := c.userSyncStrategy.ProduceSyncRequests(nil, c.pgUsers)
-	err = c.userSyncStrategy.ExecuteSyncRequests(reqs, c.pgDb)
-
-	return err
+	return c.syncRoles(false)
 }

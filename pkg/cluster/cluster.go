@@ -143,6 +143,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 }
 
+// initUsers populates c.systemUsers and c.pgUsers maps.
 func (c *Cluster) initUsers() error {
 	c.initSystemUsers()
 
@@ -204,7 +205,7 @@ func (c *Cluster) Create() error {
 	if err = c.initUsers(); err != nil {
 		return err
 	}
-	c.logger.Infof("User secrets have been initialized")
+	c.logger.Infof("Users have been initialized")
 
 	if err = c.applySecrets(); err != nil {
 		return fmt.Errorf("could not create secrets: %v", err)
@@ -226,11 +227,7 @@ func (c *Cluster) Create() error {
 	c.logger.Infof("pods are ready")
 
 	if !(c.masterLess || c.databaseAccessDisabled()) {
-		err = c.initDbConn()
-		if err != nil {
-			return fmt.Errorf("could not init db connection: %v", err)
-		}
-		err = c.createUsers()
+		err = c.createRoles()
 		if err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}

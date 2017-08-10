@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
@@ -19,8 +20,14 @@ func (c *Cluster) Sync() error {
 		c.logger.Errorf("could not load resources: %v", err)
 	}
 
+	if err = c.initUsers(); err != nil {
+		return err
+	}
+
 	c.logger.Debugf("Syncing secrets")
-	if err := c.syncSecrets(); err != nil {
+
+	//TODO: mind the secrets of the deleted/new users
+	if err := c.applySecrets(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not sync secrets: %v", err)
 		}
@@ -59,11 +66,8 @@ func (c *Cluster) Sync() error {
 	}
 
 	if !c.databaseAccessDisabled() {
-		if err := c.initDbConn(); err != nil {
-			return fmt.Errorf("could not init db connection: %v", err)
-		}
 		c.logger.Debugf("Syncing roles")
-		if err := c.syncRoles(); err != nil {
+		if err := c.syncRoles(true); err != nil {
 			return fmt.Errorf("could not sync roles: %v", err)
 		}
 	}
@@ -74,17 +78,6 @@ func (c *Cluster) Sync() error {
 	}
 
 	return nil
-}
-
-func (c *Cluster) syncSecrets() error {
-	//TODO: mind the secrets of the deleted/new users
-	if err := c.initUsers(); err != nil {
-		return err
-	}
-
-	err := c.applySecrets()
-
-	return err
 }
 
 func (c *Cluster) syncService(role postgresRole) error {
@@ -193,21 +186,31 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) syncRoles() error {
-	var userNames []string
+func (c *Cluster) syncRoles(readFromDatabase bool) error {
+	var (
+		err       error
+		dbUsers   spec.PgUserMap
+		userNames []string
+	)
 
-	if err := c.initUsers(); err != nil {
-		return err
-	}
-	for _, u := range c.pgUsers {
-		userNames = append(userNames, u.Name)
-	}
-	dbUsers, err := c.readPgUsersFromDatabase(userNames)
+	err = c.initDbConn()
 	if err != nil {
-		return fmt.Errorf("error getting users from the database: %v", err)
+		return fmt.Errorf("could not init db connection: %v", err)
 	}
+	defer c.closeDbConn()
+
+	if readFromDatabase {
+		for _, u := range c.pgUsers {
+			userNames = append(userNames, u.Name)
+		}
+		dbUsers, err = c.readPgUsersFromDatabase(userNames)
+		if err != nil {
+			return fmt.Errorf("error getting users from the database: %v", err)
+		}
+	}
+
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)
-	if err := c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
+	if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
 		return fmt.Errorf("error executing sync statements: %v", err)
 	}
 	return nil
