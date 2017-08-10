@@ -61,7 +61,7 @@ func (c *Cluster) loadResources() error {
 			continue
 		}
 		c.Secrets[secret.UID] = &secrets.Items[i]
-		c.logger.Debugf("secret loaded, uid: %q", secret.UID)
+		c.logger.Debugf("Secret loaded, uid: %q", secret.UID)
 	}
 
 	statefulSets, err := c.KubeClient.StatefulSets(ns).List(listOptions)
@@ -216,7 +216,7 @@ func (c *Cluster) deleteStatefulSet() error {
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("statefulset %q has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
+	c.logger.Infof("Statefulset %q has been deleted", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	c.Statefulset = nil
 
 	if err := c.deletePods(); err != nil {
@@ -359,7 +359,7 @@ func (c *Cluster) deleteEndpoint() error {
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("endpoint %q has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
+	c.logger.Infof("Endpoint %q has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
 	c.Endpoint = nil
 
 	return nil
@@ -376,7 +376,7 @@ func (c *Cluster) applySecrets() error {
 			if err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
-			c.logger.Debugf("secret %q already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
+			c.logger.Debugf("Secret %q already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
 				userMap = c.systemUsers
@@ -409,7 +409,7 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 	if err != nil {
 		return err
 	}
-	c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
+	c.logger.Infof("Secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
 	delete(c.Secrets, secret.UID)
 
 	return err

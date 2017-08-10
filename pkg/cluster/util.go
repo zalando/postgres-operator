@@ -77,15 +77,15 @@ func metadataAnnotationsPatch(annotations map[string]string) string {
 
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
-		c.logger.Infof("statefulset %q has been changed",
+		c.logger.Infof("Statefulset %q has been changed",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("statefulset %q is not in the desired state and needs to be updated",
+		c.logger.Infof("Statefulset %q is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+	c.logger.Debugf("Diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
@@ -113,7 +113,7 @@ func (c *Cluster) logServiceChanges(role postgresRole, old, new *v1.Service, isU
 
 func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
 	c.logger.Infof("Volume specification has been changed")
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
+	c.logger.Debugf("Diff\n%s\n", util.PrettyDiff(old, new))
 	if reason != "" {
 		c.logger.Infof("Reason: %s", reason)
 	}

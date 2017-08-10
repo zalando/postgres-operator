@@ -22,6 +22,7 @@ const (
 type ControllerInformer interface {
 	GetStatus() interface{}
 	ClusterStatus(team, cluster string) interface{}
+	ClusterLogs(team, cluster string) interface{}
 	TeamClustersStatus(team string) []interface{}
 }
 
@@ -33,6 +34,7 @@ type Server struct {
 
 var (
 	clusterStatusURL = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/?$")
+	clusterLogsURL   = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/logs/?$")
 	teamURL          = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$")
 )
 
@@ -66,22 +68,22 @@ func (s *Server) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	go func() {
 		err := s.http.ListenAndServe()
 		if err != http.ErrServerClosed {
-			s.logger.Fatalf("could not start http server: %v", err)
+			s.logger.Fatalf("Could not start http server: %v", err)
 		}
 	}()
-	s.logger.Infof("listening on %s", s.http.Addr)
+	s.logger.Infof("Listening on %s", s.http.Addr)
 
 	<-stopCh
 
 	ctx, _ := context.WithTimeout(context.Background(), shutdownTimeout)
 	err := s.http.Shutdown(ctx)
 	if err == context.DeadlineExceeded {
-		s.logger.Warnf("shutdown timeout exceeded. closing http server")
+		s.logger.Warnf("Shutdown timeout exceeded. closing http server")
 		s.http.Close()
 	} else if err != nil {
-		s.logger.Errorf("could not shutdown http server", err)
+		s.logger.Errorf("Could not shutdown http server", err)
 	}
-	s.logger.Infoln("http server shut down")
+	s.logger.Infoln("Http server shut down")
 }
 
 func (s *Server) status(w http.ResponseWriter, req *http.Request) {
@@ -89,7 +91,7 @@ func (s *Server) status(w http.ResponseWriter, req *http.Request) {
 	err := json.NewEncoder(w).Encode(s.controller.GetStatus())
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		s.logger.Errorf("could not encode status: %v", err)
+		s.logger.Errorf("Could not encode status: %v", err)
 	}
 }
 
@@ -100,6 +102,8 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		resp = s.controller.ClusterStatus(matches[0][1], matches[0][2])
 	} else if matches := teamURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
 		resp = s.controller.TeamClustersStatus(matches[0][1])
+	} else if matches := clusterLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
+		resp = s.controller.ClusterLogs(matches[0][1], matches[0][2])
 	} else {
 		http.NotFound(w, req)
 		return
@@ -109,6 +113,6 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		s.logger.Errorf("could not list clusters: %v", err)
+		s.logger.Errorf("Could not list clusters: %v", err)
 	}
 }

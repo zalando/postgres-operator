@@ -19,6 +19,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
 )
 
 func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
@@ -30,7 +31,7 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 		case <-ticker.C:
 			_, err := c.clusterListFunc(metav1.ListOptions{ResourceVersion: "0"})
 			if err != nil {
-				c.logger.Errorf("could not list clusters: %v", err)
+				c.logger.Errorf("Could not list clusters: %v", err)
 			}
 		case <-stopCh:
 			return
@@ -55,7 +56,7 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	err = json.Unmarshal(b, &list)
 
 	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
-		c.logger.Debugln("skipping resync of clusters")
+		c.logger.Debugln("Skipping resync of clusters")
 		return &list, err
 	}
 
@@ -132,13 +133,14 @@ func (c *Controller) processEvent(obj interface{}) error {
 	if !ok {
 		return fmt.Errorf("could not cast to ClusterEvent")
 	}
-	logger := c.logger.WithField("worker", event.WorkerID)
+	lg := c.logger.WithField("worker", event.WorkerID)
 
 	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync {
 		clusterName = util.NameFromMeta(event.NewSpec.ObjectMeta)
 	} else {
 		clusterName = util.NameFromMeta(event.OldSpec.ObjectMeta)
 	}
+	lg = lg.WithField("cluster-name", clusterName)
 
 	c.clustersMu.RLock()
 	cl, clusterFound := c.clusters[clusterName]
@@ -147,14 +149,14 @@ func (c *Controller) processEvent(obj interface{}) error {
 	switch event.EventType {
 	case spec.EventAdd:
 		if clusterFound {
-			logger.Debugf("Cluster %q already exists", clusterName)
+			lg.Debugf("Cluster already exists")
 			return nil
 		}
 
-		logger.Infof("Creation of the %q cluster started", clusterName)
+		lg.Infof("Creation of the cluster started")
 
 		stopCh := make(chan struct{})
-		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
+		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg.Logger)
 		cl.Run(stopCh)
 		teamName := strings.ToLower(cl.Spec.TeamID)
 
@@ -165,42 +167,43 @@ func (c *Controller) processEvent(obj interface{}) error {
 			c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
 			c.clusters[clusterName] = cl
 			c.stopChs[clusterName] = stopCh
+			c.clusterLogs[clusterName] = ringlog.New(c.opConfig.ClusterLogSize)
 		}()
 
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Errorf("could not create cluster: %v", err)
-			logger.Errorf("%v", cl.Error)
+			lg.Errorf("%v", cl.Error)
 
 			return nil
 		}
 
-		logger.Infof("Cluster %q has been created", clusterName)
+		lg.Infoln("Cluster has been created")
 	case spec.EventUpdate:
-		logger.Infof("Update of the %q cluster started", clusterName)
+		lg.Infoln("Update of the cluster started")
 
 		if !clusterFound {
-			logger.Warnf("Cluster %q does not exist", clusterName)
+			lg.Warnln("Cluster does not exist")
 			return nil
 		}
 		if err := cl.Update(event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not update cluster: %v", err)
-			logger.Errorf("%v", cl.Error)
+			lg.Errorf("%v", cl.Error)
 
 			return nil
 		}
 		cl.Error = nil
-		logger.Infof("Cluster %q has been updated", clusterName)
+		lg.Infoln("Cluster has been updated")
 	case spec.EventDelete:
 		teamName := strings.ToLower(cl.Spec.TeamID)
 
-		logger.Infof("Deletion of the %q cluster started", clusterName)
+		lg.Infoln("Deletion of the cluster started")
 		if !clusterFound {
-			logger.Errorf("Unknown cluster: %q", clusterName)
+			lg.Errorln("Unknown cluster")
 			return nil
 		}
 
 		if err := cl.Delete(); err != nil {
-			logger.Errorf("could not delete cluster %q: %v", clusterName, err)
+			lg.Errorf("could not delete cluster: %v", err)
 			return nil
 		}
 		close(c.stopChs[clusterName])
@@ -211,6 +214,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 			delete(c.clusters, clusterName)
 			delete(c.stopChs, clusterName)
+			delete(c.clusterLogs, clusterName)
 			for i, val := range c.teamClusters[teamName] { // on relativel
 				if val == clusterName {
 					copy(c.teamClusters[teamName][i:], c.teamClusters[teamName][i+1:])
@@ -221,14 +225,14 @@ func (c *Controller) processEvent(obj interface{}) error {
 			}
 		}()
 
-		logger.Infof("Cluster %q has been deleted", clusterName)
+		lg.Infoln("Cluster has been deleted")
 	case spec.EventSync:
-		logger.Infof("Syncing of the %q cluster started", clusterName)
+		lg.Infoln("Syncing of the cluster started")
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
 			stopCh := make(chan struct{})
-			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
+			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg.Logger)
 			teamName := strings.ToLower(cl.Spec.TeamID)
 			cl.Run(stopCh)
 
@@ -239,17 +243,18 @@ func (c *Controller) processEvent(obj interface{}) error {
 				c.clusters[clusterName] = cl
 				c.stopChs[clusterName] = stopCh
 				c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
+				c.clusterLogs[clusterName] = ringlog.New(c.opConfig.ClusterLogSize)
 			}()
 		}
 
 		if err := cl.Sync(); err != nil {
-			cl.Error = fmt.Errorf("could not sync cluster %q: %v", clusterName, err)
-			logger.Errorf("%v", cl.Error)
+			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
+			lg.Errorln("%v", cl.Error)
 			return nil
 		}
 		cl.Error = nil
 
-		logger.Infof("Cluster %q has been synced", clusterName)
+		lg.Infoln("Cluster has been synced")
 	}
 
 	return nil
@@ -269,7 +274,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 				return
 			}
 
-			c.logger.Errorf("error when processing cluster events queue: %v", err)
+			c.logger.Errorf("Error when processing cluster events queue: %v", err)
 		}
 	}
 }
@@ -314,13 +319,15 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		c.logger.WithField("worker", workerID).Errorf("error when queueing cluster event: %v", clusterEvent)
 	}
-	c.logger.WithField("worker", workerID).Infof("%q of the %q cluster has been queued", eventType, clusterName)
+	c.logger.WithField("worker", workerID).
+		WithField("cluster-name", clusterName).
+		Infof("%q event has been queued", eventType)
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
 	pg, ok := obj.(*spec.Postgresql)
 	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
+		c.logger.Errorf("Could not cast to postgresql spec")
 		return
 	}
 
@@ -331,11 +338,11 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	pgOld, ok := prev.(*spec.Postgresql)
 	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
+		c.logger.Errorf("Could not cast to postgresql spec")
 	}
 	pgNew, ok := cur.(*spec.Postgresql)
 	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
+		c.logger.Errorf("Could not cast to postgresql spec")
 	}
 	if pgOld.ResourceVersion == pgNew.ResourceVersion {
 		return
@@ -350,7 +357,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 func (c *Controller) postgresqlDelete(obj interface{}) {
 	pg, ok := obj.(*spec.Postgresql)
 	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
+		c.logger.Errorf("Could not cast to postgresql spec")
 		return
 	}
 

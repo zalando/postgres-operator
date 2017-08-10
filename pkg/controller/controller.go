@@ -16,6 +16,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
 )
 
 // Config describes configuration of the controller
@@ -41,6 +42,7 @@ type Controller struct {
 
 	clustersMu   sync.RWMutex
 	clusters     map[spec.NamespacedName]*cluster.Cluster
+	clusterLogs  map[spec.NamespacedName]ringlog.RingLogger
 	teamClusters map[string][]spec.NamespacedName
 	stopChs      map[spec.NamespacedName]chan struct{}
 
@@ -56,27 +58,31 @@ type Controller struct {
 func NewController(controllerConfig *Config) *Controller {
 	logger := logrus.New()
 
-	return &Controller{
+	c := &Controller{
 		config:       *controllerConfig,
 		opConfig:     &config.Config{},
 		logger:       logger.WithField("pkg", "controller"),
 		clusters:     make(map[spec.NamespacedName]*cluster.Cluster),
+		clusterLogs:  make(map[spec.NamespacedName]ringlog.RingLogger),
 		teamClusters: make(map[string][]spec.NamespacedName),
 		stopChs:      make(map[spec.NamespacedName]chan struct{}),
 		podCh:        make(chan spec.PodEvent),
 	}
+	logger.Hooks.Add(c)
+
+	return c
 }
 
 func (c *Controller) initClients() {
 	client, err := k8sutil.ClientSet(c.config.RestConfig)
 	if err != nil {
-		c.logger.Fatalf("couldn't create client: %v", err)
+		c.logger.Fatalf("Couldn't create client: %v", err)
 	}
 	c.KubeClient = k8sutil.NewFromKubernetesInterface(client)
 
 	c.RestClient, err = k8sutil.KubernetesRestClient(*c.config.RestConfig)
 	if err != nil {
-		c.logger.Fatalf("couldn't create rest client: %v", err)
+		c.logger.Fatalf("Couldn't create rest client: %v", err)
 	}
 }
 
@@ -119,11 +125,11 @@ func (c *Controller) initController() {
 	}
 
 	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
+		c.logger.Fatalf("Could not register ThirdPartyResource: %v", err)
 	}
 
 	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %v", err)
+		c.logger.Warningf("Could not get infrastructure roles: %v", err)
 	} else {
 		c.config.InfrastructureRoles = infraRoles
 	}

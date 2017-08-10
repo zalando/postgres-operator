@@ -62,6 +62,7 @@ type Config struct {
 	ReplicaDNSNameFormat stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	Workers              uint32         `name:"workers" default:"4"`
 	APIPort              int            `name:"api_port" default:"8080"`
+	ClusterLogSize       int            `name:"cluster_log_size" default:"100"`
 }
 
 // MustMarshal marshals the config or panics

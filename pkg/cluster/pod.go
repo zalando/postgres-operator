@@ -37,13 +37,13 @@ func (c *Cluster) deletePods() error {
 
 		c.logger.Debugf("Deleting pod %q", podName)
 		if err := c.deletePod(podName); err != nil {
-			c.logger.Errorf("could not delete pod %q: %v", podName, err)
+			c.logger.Errorf("Could not delete pod %q: %v", podName, err)
 		} else {
-			c.logger.Infof("pod %q has been deleted", podName)
+			c.logger.Infof("Pod %q has been deleted", podName)
 		}
 	}
 	if len(pods) > 0 {
-		c.logger.Debugln("pods have been deleted")
+		c.logger.Debugln("Pods have been deleted")
 	} else {
 		c.logger.Debugln("No pods to delete")
 	}
@@ -107,7 +107,7 @@ func (c *Cluster) recreatePod(pod v1.Pod) error {
 	if err := c.waitForPodLabel(ch); err != nil {
 		return err
 	}
-	c.logger.Infof("pod %q is ready", podName)
+	c.logger.Infof("Pod %q is ready", podName)
 
 	return nil
 }

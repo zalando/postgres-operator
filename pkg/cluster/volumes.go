@@ -38,7 +38,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 	for _, pvc := range pvcs {
 		c.logger.Debugf("Deleting PVC %q", util.NameFromMeta(pvc.ObjectMeta))
 		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, c.deleteOptions); err != nil {
-			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
+			c.logger.Warningf("Could not delete PersistentVolumeClaim: %v", err)
 		}
 	}
 	if len(pvcs) > 0 {
@@ -119,26 +119,26 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 			if err != nil {
 				return err
 			}
-			c.logger.Debugf("updating persistent volume %q to %d", pv.Name, newSize)
+			c.logger.Debugf("Updating persistent volume %q to %d", pv.Name, newSize)
 			if err := resizer.ResizeVolume(awsVolumeID, newSize); err != nil {
-				return fmt.Errorf("could not resize EBS volume %q: %v", awsVolumeID, err)
+				return fmt.Errorf("Could not resize EBS volume %q: %v", awsVolumeID, err)
 			}
-			c.logger.Debugf("resizing the filesystem on the volume %q", pv.Name)
+			c.logger.Debugf("Resizing the filesystem on the volume %q", pv.Name)
 			podName := getPodNameFromPersistentVolume(pv)
 			if err := c.resizePostgresFilesystem(podName, []filesystems.FilesystemResizer{&filesystems.Ext234Resize{}}); err != nil {
-				return fmt.Errorf("could not resize the filesystem on pod %q: %v", podName, err)
+				return fmt.Errorf("Could not resize the filesystem on pod %q: %v", podName, err)
 			}
-			c.logger.Debugf("filesystem resize successful on volume %q", pv.Name)
+			c.logger.Debugf("Filesystem resize successful on volume %q", pv.Name)
 			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
-			c.logger.Debugf("updating persistent volume definition for volume %q", pv.Name)
+			c.logger.Debugf("Updating persistent volume definition for volume %q", pv.Name)
 			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
-				return fmt.Errorf("could not update persistent volume: %q", err)
+				return fmt.Errorf("Could not update persistent volume: %q", err)
 			}
-			c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
+			c.logger.Debugf("Successfully updated persistent volume %q", pv.Name)
 		}
 	}
 	if len(pvs) > 0 && totalCompatible == 0 {
-		return fmt.Errorf("could not resize EBS volumes: persistent volumes are not compatible with existing resizing providers")
+		return fmt.Errorf("Could not resize EBS volumes: persistent volumes are not compatible with existing resizing providers")
 	}
 	return nil
 }

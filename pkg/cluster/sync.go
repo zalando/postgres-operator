@@ -16,7 +16,7 @@ func (c *Cluster) Sync() error {
 
 	err := c.loadResources()
 	if err != nil {
-		c.logger.Errorf("could not load resources: %v", err)
+		c.logger.Errorf("Could not load resources: %v", err)
 	}
 
 	c.logger.Debugf("Syncing secrets")
@@ -90,7 +90,7 @@ func (c *Cluster) syncSecrets() error {
 func (c *Cluster) syncService(role postgresRole) error {
 	cSpec := c.Spec
 	if c.Services[role] == nil {
-		c.logger.Infof("could not find the cluster's %s service", role)
+		c.logger.Infof("Could not find the cluster's %s service", role)
 		svc, err := c.createService(role)
 		if err != nil {
 			return fmt.Errorf("could not create missing %s service: %v", role, err)
@@ -117,7 +117,7 @@ func (c *Cluster) syncService(role postgresRole) error {
 
 func (c *Cluster) syncEndpoint() error {
 	if c.Endpoint == nil {
-		c.logger.Infof("could not find the cluster's endpoint")
+		c.logger.Infof("Could not find the cluster's endpoint")
 		ep, err := c.createEndpoint()
 		if err != nil {
 			return fmt.Errorf("could not create missing endpoint: %v", err)
@@ -133,7 +133,7 @@ func (c *Cluster) syncStatefulSet() error {
 	cSpec := c.Spec
 	var rollUpdate bool
 	if c.Statefulset == nil {
-		c.logger.Infof("could not find the cluster's statefulset")
+		c.logger.Infof("Could not find the cluster's statefulset")
 		pods, err := c.listPods()
 		if err != nil {
 			return fmt.Errorf("could not list pods of the statefulset: %v", err)
@@ -188,7 +188,7 @@ func (c *Cluster) syncStatefulSet() error {
 	if err := c.recreatePods(); err != nil {
 		return fmt.Errorf("could not recreate pods: %v", err)
 	}
-	c.logger.Infof("pods have been recreated")
+	c.logger.Infof("Pods have been recreated")
 
 	return nil
 }
@@ -225,6 +225,6 @@ func (c *Cluster) syncVolumes() error {
 	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
 		return fmt.Errorf("Could not sync volumes: %v", err)
 	}
-	c.logger.Infof("volumes have been synced successfully")
+	c.logger.Infof("Volumes have been synced successfully")
 	return nil
 }
