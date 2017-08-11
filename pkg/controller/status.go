@@ -163,3 +163,17 @@ func (c *Controller) Fire(e *logrus.Entry) error {
 
 	return nil
 }
+
+// ListQueue dumps cluster event queue of the provided worker
+func (c *Controller) ListQueue(workerID uint32) interface{} {
+	if workerID >= uint32(len(c.clusterEventQueues)) {
+		return nil
+	}
+
+	q := c.clusterEventQueues[workerID]
+	if q == nil {
+		return nil
+	}
+
+	return q.List()
+}

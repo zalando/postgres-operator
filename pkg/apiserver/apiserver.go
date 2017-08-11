@@ -27,6 +27,7 @@ type ControllerInformer interface {
 	ClusterLogs(team, cluster string) interface{}
 	TeamClustersStatus(team string) []interface{}
 	WorkerLogs(workerID uint32) interface{}
+	ListQueue(workerID uint32) interface{}
 }
 
 // Server describes HTTP API server
@@ -37,10 +38,11 @@ type Server struct {
 }
 
 var (
-	clusterStatusURL = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/?$")
-	clusterLogsURL   = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/logs/?$")
-	teamURL          = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$")
-	workerLogsURL    = regexp.MustCompile("^/workers/(?P<id>\\d+)/?$")
+	clusterStatusURL     = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/?$")
+	clusterLogsURL       = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/logs/?$")
+	teamURL              = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$")
+	workerLogsURL        = regexp.MustCompile("^/workers/(?P<id>\\d+)/logs/?$")
+	workerEventsQueueURL = regexp.MustCompile("^/workers/(?P<id>\\d+)/queue/?$")
 )
 
 // New creates new HTTP API server
@@ -133,6 +135,10 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 		workerID, _ := strconv.Atoi(matches[0][1])
 
 		resp = s.controller.WorkerLogs(uint32(workerID))
+	} else if matches := workerEventsQueueURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
+		workerID, _ := strconv.Atoi(matches[0][1])
+
+		resp = s.controller.ListQueue(uint32(workerID))
 	} else {
 		http.NotFound(w, req)
 		return

@@ -126,13 +126,9 @@ func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interfa
 	}), nil
 }
 
-func (c *Controller) processEvent(obj interface{}) error {
+func (c *Controller) processEvent(event spec.ClusterEvent) error {
 	var clusterName spec.NamespacedName
 
-	event, ok := obj.(spec.ClusterEvent)
-	if !ok {
-		return fmt.Errorf("could not cast to ClusterEvent")
-	}
 	lg := c.logger.WithField("worker", event.WorkerID)
 
 	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync {
@@ -269,13 +265,20 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}()
 
 	for {
-		if _, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(c.processEvent)); err != nil {
+		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}) error { return nil }))
+		if err != nil {
 			if err == cache.FIFOClosedError {
 				return
 			}
-
 			c.logger.Errorf("Error when processing cluster events queue: %v", err)
+			continue
 		}
+		event, ok := obj.(spec.ClusterEvent)
+		if !ok {
+			c.logger.Errorf("could not cast to ClusterEvent")
+		}
+
+		c.processEvent(event)
 	}
 }
 
