@@ -275,7 +275,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 		}
 		event, ok := obj.(spec.ClusterEvent)
 		if !ok {
-			c.logger.Errorf("could not cast to ClusterEvent")
+			c.logger.Errorf("Could not cast to ClusterEvent")
 		}
 
 		c.processEvent(event)
