@@ -2,8 +2,6 @@ package ringlog
 
 import (
 	"container/list"
-	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -12,17 +10,20 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
+// RingLogger describes ring logger methods
 type RingLogger interface {
-	Insert(level logrus.Level, t time.Time, workerId *uint32, clusterName spec.NamespacedName, message string) error
+	Insert(level logrus.Level, t time.Time, workerID *uint32, clusterName spec.NamespacedName, message string) error
 	Walk() []*LogEntry
 }
 
+// RingLog is a capped logger with fixed size
 type RingLog struct {
 	size int
 	list *list.List
 	mu   *sync.RWMutex
 }
 
+// LogEntry describes log entry in the RingLogger
 type LogEntry struct {
 	Time        time.Time
 	Level       logrus.Level
@@ -31,20 +32,7 @@ type LogEntry struct {
 	Message     string
 }
 
-func (e LogEntry) MarshalJSON() ([]byte, error) {
-	v := map[string]interface{}{
-		"Time":        e.Time,
-		"Level":       e.Level.String(),
-		"ClusterName": e.ClusterName,
-		"Message":     e.Message,
-	}
-	if e.Worker != nil {
-		v["Worker"] = fmt.Sprintf("%d", *e.Worker)
-	}
-
-	return json.Marshal(v)
-}
-
+// New creates new Ring logger
 func New(size int) *RingLog {
 	r := RingLog{
 		list: list.New(),
@@ -55,30 +43,30 @@ func New(size int) *RingLog {
 	return &r
 }
 
-func (r *RingLog) Insert(level logrus.Level, t time.Time, workerId *uint32, clusterName spec.NamespacedName, message string) error {
+// Insert inserts new LogEntry into the ring logger
+func (r *RingLog) Insert(level logrus.Level, t time.Time, workerID *uint32, clusterName spec.NamespacedName, message string) error {
 	l := &LogEntry{
 		Time:        t,
 		Level:       level,
 		ClusterName: clusterName,
-		Worker:      workerId,
+		Worker:      workerID,
 		Message:     message,
 	}
 
-	func() {
-		r.mu.Lock()
-		defer r.mu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-		r.list.PushBack(l)
-		if r.list.Len() > r.size {
-			r.list.Remove(r.list.Front())
-		}
-	}()
+	r.list.PushBack(l)
+	if r.list.Len() > r.size {
+		r.list.Remove(r.list.Front())
+	}
 
 	return nil
 }
 
+// Walk dumps all the LogEntries from the Ring logger
 func (r *RingLog) Walk() []*LogEntry {
-	res := make([]*LogEntry, r.size)
+	res := make([]*LogEntry, 0)
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -86,9 +74,9 @@ func (r *RingLog) Walk() []*LogEntry {
 	st := r.list.Front()
 	for i := 0; i < r.size; i++ {
 		if st == nil {
-			continue
+			return res
 		}
-		res[i] = (st.Value).(*LogEntry)
+		res = append(res, (st.Value).(*LogEntry))
 		st = st.Next()
 	}
 

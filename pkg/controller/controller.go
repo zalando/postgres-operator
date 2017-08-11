@@ -52,6 +52,8 @@ type Controller struct {
 
 	clusterEventQueues  []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime int64
+
+	workerLogs map[uint32]ringlog.RingLogger
 }
 
 // NewController creates a new controller
@@ -67,13 +69,14 @@ func NewController(controllerConfig *Config) *Controller {
 		teamClusters: make(map[string][]spec.NamespacedName),
 		stopChs:      make(map[spec.NamespacedName]chan struct{}),
 		podCh:        make(chan spec.PodEvent),
+		workerLogs:   make(map[uint32]ringlog.RingLogger),
 	}
 	logger.Hooks.Add(c)
 
 	return c
 }
 
-func (c *Controller) initClients() {
+func (c *Controller) initKubernetesClients() {
 	client, err := k8sutil.ClientSet(c.config.RestConfig)
 	if err != nil {
 		c.logger.Fatalf("Couldn't create client: %v", err)
@@ -115,7 +118,7 @@ func (c *Controller) initOperatorConfig() {
 }
 
 func (c *Controller) initController() {
-	c.initClients()
+	c.initKubernetesClients()
 	c.initOperatorConfig()
 
 	c.logger.Infof("Config: %s", c.opConfig.MustMarshal())
@@ -195,6 +198,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
+		c.workerLogs[uint32(i)] = ringlog.New(c.opConfig.ClusterLogSize)
 		go c.processClusterEventsQueue(i, stopCh, wg)
 	}
 

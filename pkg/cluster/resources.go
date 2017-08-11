@@ -372,9 +372,9 @@ func (c *Cluster) applySecrets() error {
 		secret, err := c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
 		if k8sutil.ResourceAlreadyExists(err) {
 			var userMap map[string]spec.PgUser
-			curSecret, err := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name, metav1.GetOptions{})
-			if err != nil {
-				return fmt.Errorf("could not get current secret: %v", err)
+			curSecret, err2 := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name, metav1.GetOptions{})
+			if err2 != nil {
+				return fmt.Errorf("could not get current secret: %v", err2)
 			}
 			c.logger.Debugf("Secret %q already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
@@ -423,18 +423,22 @@ func (c *Cluster) createUsers() (err error) {
 	return err
 }
 
+// GetServiceMaster returns cluster's kubernetes master Service
 func (c *Cluster) GetServiceMaster() *v1.Service {
 	return c.Services[master]
 }
 
+// GetServiceReplica returns cluster's kubernetes replica Service
 func (c *Cluster) GetServiceReplica() *v1.Service {
 	return c.Services[replica]
 }
 
+// GetEndpoint returns cluster's kubernetes Endpoint
 func (c *Cluster) GetEndpoint() *v1.Endpoints {
 	return c.Endpoint
 }
 
+// GetStatefulSet returns cluster's kubernetes StatefulSet
 func (c *Cluster) GetStatefulSet() *v1beta1.StatefulSet {
 	return c.Statefulset
 }

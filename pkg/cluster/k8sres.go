@@ -145,7 +145,7 @@ PATRONI_INITDB_PARAMS:
 					}
 				}
 			default:
-				c.logger.Warnf("Unsupported type for initdb configuration item %s: %T", defaultParam)
+				c.logger.Warnf("Unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
 				continue PATRONI_INITDB_PARAMS
 			}
 		}

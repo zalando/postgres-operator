@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/Sirupsen/logrus"
@@ -17,6 +18,7 @@ type controllerStatus struct {
 	Clusters         int
 }
 
+// ClusterStatus provides status of the cluster
 func (c *Controller) ClusterStatus(team, cluster string) interface{} {
 	clusterName := spec.NamespacedName{
 		Namespace: c.opConfig.Namespace,
@@ -33,6 +35,7 @@ func (c *Controller) ClusterStatus(team, cluster string) interface{} {
 	return cl.GetStatus()
 }
 
+// TeamClustersStatus dumps logs of all the team clusters
 func (c *Controller) TeamClustersStatus(team string) []interface{} {
 	var clusters []*cluster.Cluster
 	c.clustersMu.RLock()
@@ -55,7 +58,8 @@ func (c *Controller) TeamClustersStatus(team string) []interface{} {
 	return resp
 }
 
-func (c *Controller) GetStatus() interface{} {
+// ControllerStatus dumps current config and status of the controller
+func (c *Controller) ControllerStatus() interface{} {
 	c.clustersMu.RLock()
 	clustersCnt := len(c.clusters)
 	c.clustersMu.RUnlock()
@@ -68,6 +72,7 @@ func (c *Controller) GetStatus() interface{} {
 	}
 }
 
+// ClusterLogs dumps cluster ring logs
 func (c *Controller) ClusterLogs(team, cluster string) interface{} {
 	clusterName := spec.NamespacedName{
 		Namespace: c.opConfig.Namespace,
@@ -81,26 +86,64 @@ func (c *Controller) ClusterLogs(team, cluster string) interface{} {
 		return nil
 	}
 
-	return cl.Walk()
+	res := make([]interface{}, 0)
+	for _, e := range cl.Walk() {
+		v := map[string]interface{}{
+			"Time":    e.Time,
+			"Level":   e.Level.String(),
+			"Message": e.Message,
+		}
+		if e.Worker != nil {
+			v["Worker"] = fmt.Sprintf("%d", *e.Worker)
+		}
+
+		res = append(res, v)
+	}
+
+	return res
 }
 
+// WorkerLogs dumps logs of the worker
+func (c *Controller) WorkerLogs(workerID uint32) interface{} {
+	lg, ok := c.workerLogs[workerID]
+	if !ok {
+		return nil
+	}
+
+	res := make([]interface{}, 0)
+	for _, e := range lg.Walk() {
+		v := map[string]interface{}{
+			"Time":        e.Time,
+			"ClusterName": e.ClusterName.String(),
+			"Level":       e.Level.String(),
+			"Message":     e.Message,
+		}
+
+		res = append(res, v)
+	}
+
+	return res
+}
+
+// Levels returns logrus levels for which hook must fire
 func (c *Controller) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 
+// Fire is a logrus hook
 func (c *Controller) Fire(e *logrus.Entry) error {
 	var clusterName spec.NamespacedName
 
-	if v, ok := e.Data["cluster-name"]; !ok {
+	v, ok := e.Data["cluster-name"]
+	if !ok {
 		return nil
-	} else {
-		clusterName = v.(spec.NamespacedName)
 	}
+	clusterName = v.(spec.NamespacedName)
 
-	var workerId *uint32
-	if v, ok := e.Data["worker"]; ok {
+	var workerID *uint32
+	if v, hasWorker := e.Data["worker"]; hasWorker {
 		id := v.(uint32)
-		workerId = &id
+		workerID = &id
 	}
 
 	c.clustersMu.RLock()
@@ -110,7 +153,13 @@ func (c *Controller) Fire(e *logrus.Entry) error {
 		return nil
 	}
 
-	rl.Insert(e.Level, e.Time, workerId, clusterName, e.Message)
+	rl.Insert(e.Level, e.Time, workerID, clusterName, e.Message)
+	if workerID == nil {
+		return nil
+	}
+
+	c.workerLogs[*workerID]. // workerLogs map is immutable
+					Insert(e.Level, e.Time, workerID, clusterName, e.Message)
 
 	return nil
 }

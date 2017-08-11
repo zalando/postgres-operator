@@ -156,7 +156,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		lg.Infof("Creation of the cluster started")
 
 		stopCh := make(chan struct{})
-		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg.Logger)
+		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg)
 		cl.Run(stopCh)
 		teamName := strings.ToLower(cl.Spec.TeamID)
 
@@ -232,7 +232,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
 			stopCh := make(chan struct{})
-			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg.Logger)
+			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg)
 			teamName := strings.ToLower(cl.Spec.TeamID)
 			cl.Run(stopCh)
 
@@ -249,7 +249,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 		if err := cl.Sync(); err != nil {
 			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
-			lg.Errorln("%v", cl.Error)
+			lg.Error(cl.Error)
 			return nil
 		}
 		cl.Error = nil
@@ -302,7 +302,9 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	}
 
 	if clusterError != nil && eventType != spec.EventDelete {
-		c.logger.Debugf("Skipping %q event for invalid cluster %q (reason: %v)", eventType, clusterName, clusterError)
+		c.logger.
+			WithField("cluster-name", clusterName).
+			Debugf("Skipping %q event for the invalid cluster: %v", eventType, clusterError)
 		return
 	}
 
@@ -316,12 +318,12 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	}
 	//TODO: if we delete cluster, discard all the previous events for the cluster
 
+	lg := c.logger.WithField("worker", workerID).WithField("cluster-name", clusterName)
+	lg.Debugf("Adding %q event to the worker's queue", clusterEvent.EventType)
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
-		c.logger.WithField("worker", workerID).Errorf("error when queueing cluster event: %v", clusterEvent)
+		lg.Errorf("error when queueing cluster event: %v", clusterEvent)
 	}
-	c.logger.WithField("worker", workerID).
-		WithField("cluster-name", clusterName).
-		Infof("%q event has been queued", eventType)
+	lg.Infof("%q event has been queued", eventType)
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {

@@ -14,6 +14,7 @@ const (
 	replica postgresRole = "replica"
 )
 
+// Status describes status of the cluster
 type Status struct {
 	Team           string
 	Cluster        string

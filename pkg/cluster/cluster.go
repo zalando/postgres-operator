@@ -78,7 +78,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Logger) *Cluster {
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -137,7 +137,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 
 	if err != nil {
-		c.logger.Warningf("Could not set status for cluster %q: %v", c.clusterName(), err)
+		c.logger.Warningf("Could not set status for the cluster: %v", err)
 	}
 }
 
@@ -544,7 +544,7 @@ func (c *Cluster) Delete() error {
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
 func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
 	if err := c.podEventsQueue.Add(event); err != nil {
-		c.logger.Errorf("Error while receiving pod events: %v", err)
+		c.logger.Errorf("Error while receiving pod event: %v", err)
 	}
 }
 
@@ -576,7 +576,7 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 			return
 		default:
 			if _, err := c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent)); err != nil {
-				c.logger.Errorf("Error while processing pod event queeue %v", err)
+				c.logger.Errorf("Error while processing pod event queue %v", err)
 			}
 		}
 	}
@@ -648,6 +648,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 	return nil
 }
 
+// GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() Status {
 	return Status{
 		Config:  c.Config,
