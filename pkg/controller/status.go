@@ -175,5 +175,8 @@ func (c *Controller) ListQueue(workerID uint32) interface{} {
 		return nil
 	}
 
-	return q.List()
+	return map[string]interface{}{
+		"Keys": q.ListKeys(),
+		"List": q.List(),
+	}
 }
