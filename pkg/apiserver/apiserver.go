@@ -202,14 +202,15 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 
 func (s *Server) allQueues(w http.ResponseWriter, r *http.Request) {
 	workersCnt := s.controller.GetWorkersCnt()
-	resp := make(map[uint32]interface{}, workersCnt)
+	resp := make(map[uint32]*spec.QueueDump, workersCnt)
 	for i := uint32(0); i < workersCnt; i++ {
-		logs, err := s.controller.WorkerLogs(i)
+		queueDump, err := s.controller.ListQueue(i)
 		if err != nil {
 			s.respond(nil, err, w)
 			return
 		}
-		resp[i] = logs
+
+		resp[i] = queueDump
 	}
 
 	s.respond(resp, nil, w)
