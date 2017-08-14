@@ -30,27 +30,9 @@ func (c *Controller) ClusterStatus(team, cluster string) (*spec.ClusterStatus, e
 	return status, nil
 }
 
-// TeamClustersStatus dumps logs of all the team clusters
-func (c *Controller) TeamClustersStatus(team string) ([]*spec.ClusterStatus, error) {
-	c.clustersMu.RLock()
-
-	clusterNames, ok := c.teamClusters[team]
-	if !ok {
-		c.clustersMu.RUnlock()
-		return nil, fmt.Errorf("could not find clusters for the team")
-	}
-
-	var resp = make([]*spec.ClusterStatus, len(clusterNames))
-	for i, clName := range clusterNames {
-		cl := c.clusters[clName]
-
-		resp[i] = cl.GetStatus()
-		resp[i].Worker = c.clusterWorkerID(clName)
-
-	}
-	c.clustersMu.RUnlock()
-
-	return resp, nil
+// TeamClusterList returns team-clusters map
+func (c *Controller) TeamClusterList() map[string][]spec.NamespacedName {
+	return c.teamClusters
 }
 
 // GetConfig returns controller config

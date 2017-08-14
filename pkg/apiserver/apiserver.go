@@ -28,8 +28,8 @@ type ControllerInformer interface {
 	GetConfig() *spec.ControllerConfig
 	GetOperatorConfig() *config.Config
 	GetStatus() *spec.ControllerStatus
+	TeamClusterList() map[string][]spec.NamespacedName
 	ClusterStatus(team, cluster string) (*spec.ClusterStatus, error)
-	TeamClustersStatus(team string) ([]*spec.ClusterStatus, error)
 	ClusterLogs(team, cluster string) ([]*spec.LogEntry, error)
 	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
 	ListQueue(workerID uint32) (*spec.QueueDump, error)
@@ -142,9 +142,31 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 	if matches := clusterStatusURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
 		resp, err = s.controller.ClusterStatus(matches[0][1], matches[0][2])
 	} else if matches := teamURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		resp, err = s.controller.TeamClustersStatus(matches[0][1])
+		teamClusters := s.controller.TeamClusterList()
+		clusters, found := teamClusters[matches[0][1]]
+		if !found {
+			s.respond(nil, fmt.Errorf("could not find clusters for the team"), w)
+		}
+
+		clusterNames := make([]string, 0)
+		for _, cluster := range clusters {
+			clusterNames = append(clusterNames, cluster.Name[len(matches[0][1])+1:])
+		}
+
+		s.respond(clusterNames, nil, w)
+		return
 	} else if matches := clusterLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
 		resp, err = s.controller.ClusterLogs(matches[0][1], matches[0][2])
+	} else if req.URL.Path == "/clusters/" {
+		res := make(map[string][]string)
+		for team, clusters := range s.controller.TeamClusterList() {
+			for _, cluster := range clusters {
+				res[team] = append(res[team], cluster.Name[len(team)+1:])
+			}
+		}
+
+		s.respond(res, nil, w)
+		return
 	} else {
 		s.respond(nil, fmt.Errorf("page not found"), w)
 		return
