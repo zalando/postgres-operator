@@ -29,3 +29,5 @@ data:
   teams_api_url: http://fake-teams-api.default.svc.cluster.local
   workers: "4"
   enable_load_balancer: "true"
+  api_port: "8080"
+  ring_log_lines: "100"

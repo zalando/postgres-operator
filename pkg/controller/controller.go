@@ -10,69 +10,71 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
 )
-
-// Config describes configuration of the controller
-type Config struct {
-	RestConfig          *rest.Config
-	InfrastructureRoles map[string]spec.PgUser
-
-	NoDatabaseAccess bool
-	NoTeamsAPI       bool
-	ConfigMapName    spec.NamespacedName
-	Namespace        string
-}
 
 // Controller represents operator controller
 type Controller struct {
-	config   Config
+	config   spec.ControllerConfig
 	opConfig *config.Config
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
 	RestClient rest.Interface // kubernetes API group REST client
+	apiserver  *apiserver.Server
 
-	clustersMu sync.RWMutex
-	clusters   map[spec.NamespacedName]*cluster.Cluster
-	stopChs    map[spec.NamespacedName]chan struct{}
+	stopCh chan struct{}
+
+	clustersMu   sync.RWMutex
+	clusters     map[spec.NamespacedName]*cluster.Cluster
+	clusterLogs  map[spec.NamespacedName]ringlog.RingLogger
+	teamClusters map[string][]spec.NamespacedName
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
-	clusterEventQueues  []*cache.FIFO
+	clusterEventQueues  []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime int64
+
+	workerLogs map[uint32]ringlog.RingLogger
 }
 
 // NewController creates a new controller
-func NewController(controllerConfig *Config) *Controller {
+func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 	logger := logrus.New()
 
-	return &Controller{
-		config:   *controllerConfig,
-		opConfig: &config.Config{},
-		logger:   logger.WithField("pkg", "controller"),
-		clusters: make(map[spec.NamespacedName]*cluster.Cluster),
-		stopChs:  make(map[spec.NamespacedName]chan struct{}),
-		podCh:    make(chan spec.PodEvent),
+	c := &Controller{
+		config:       *controllerConfig,
+		opConfig:     &config.Config{},
+		logger:       logger.WithField("pkg", "controller"),
+		clusters:     make(map[spec.NamespacedName]*cluster.Cluster),
+		clusterLogs:  make(map[spec.NamespacedName]ringlog.RingLogger),
+		teamClusters: make(map[string][]spec.NamespacedName),
+		stopCh:       make(chan struct{}),
+		podCh:        make(chan spec.PodEvent),
 	}
+	logger.Hooks.Add(c)
+
+	return c
 }
 
-func (c *Controller) initClients() {
+func (c *Controller) initKubernetesClients() {
 	client, err := k8sutil.ClientSet(c.config.RestConfig)
 	if err != nil {
-		c.logger.Fatalf("couldn't create client: %v", err)
+		c.logger.Fatalf("Couldn't create client: %v", err)
 	}
 	c.KubeClient = k8sutil.NewFromKubernetesInterface(client)
 
 	c.RestClient, err = k8sutil.KubernetesRestClient(*c.config.RestConfig)
 	if err != nil {
-		c.logger.Fatalf("couldn't create rest client: %v", err)
+		c.logger.Fatalf("Couldn't create rest client: %v", err)
 	}
 }
 
@@ -105,7 +107,7 @@ func (c *Controller) initOperatorConfig() {
 }
 
 func (c *Controller) initController() {
-	c.initClients()
+	c.initKubernetesClients()
 	c.initOperatorConfig()
 
 	c.logger.Infof("Config: %s", c.opConfig.MustMarshal())
@@ -115,11 +117,11 @@ func (c *Controller) initController() {
 	}
 
 	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
+		c.logger.Fatalf("Could not register ThirdPartyResource: %v", err)
 	}
 
 	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %v", err)
+		c.logger.Warningf("Could not get infrastructure roles: %v", err)
 	} else {
 		c.config.InfrastructureRoles = infraRoles
 	}
@@ -159,6 +161,7 @@ func (c *Controller) initController() {
 	})
 
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
+	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
 		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
 			e, ok := obj.(spec.ClusterEvent)
@@ -169,19 +172,23 @@ func (c *Controller) initController() {
 			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil
 		})
 	}
+
+	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)
 }
 
 // Run starts background controller processes
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 
-	wg.Add(3)
+	wg.Add(4)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
+	go c.apiserver.Run(stopCh, wg)
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
+		c.workerLogs[uint32(i)] = ringlog.New(c.opConfig.RingLogLines)
 		go c.processClusterEventsQueue(i, stopCh, wg)
 	}
 

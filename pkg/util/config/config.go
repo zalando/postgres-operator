@@ -61,6 +61,8 @@ type Config struct {
 	MasterDNSNameFormat  stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	Workers              uint32         `name:"workers" default:"4"`
+	APIPort              int            `name:"api_port" default:"8080"`
+	RingLogLines         int            `name:"ring_log_lines" default:"100"`
 }
 
 // MustMarshal marshals the config or panics

@@ -17,7 +17,7 @@ func (c *Cluster) Sync() error {
 
 	err := c.loadResources()
 	if err != nil {
-		c.logger.Errorf("could not load resources: %v", err)
+		c.logger.Errorf("Could not load resources: %v", err)
 	}
 
 	if err = c.initUsers(); err != nil {
@@ -43,7 +43,7 @@ func (c *Cluster) Sync() error {
 	c.logger.Debugf("Syncing services")
 	for _, role := range []postgresRole{master, replica} {
 		if role == replica && !c.Spec.ReplicaLoadBalancer {
-			if c.Service[role] != nil {
+			if c.Services[role] != nil {
 				// delete the left over replica service
 				if err := c.deleteService(role); err != nil {
 					return fmt.Errorf("could not delete obsolete %s service: %v", role, err)
@@ -82,8 +82,8 @@ func (c *Cluster) Sync() error {
 
 func (c *Cluster) syncService(role postgresRole) error {
 	cSpec := c.Spec
-	if c.Service[role] == nil {
-		c.logger.Infof("could not find the cluster's %s service", role)
+	if c.Services[role] == nil {
+		c.logger.Infof("Could not find the cluster's %s service", role)
 		svc, err := c.createService(role)
 		if err != nil {
 			return fmt.Errorf("could not create missing %s service: %v", role, err)
@@ -98,7 +98,7 @@ func (c *Cluster) syncService(role postgresRole) error {
 	if match {
 		return nil
 	}
-	c.logServiceChanges(role, c.Service[role], desiredSvc, false, reason)
+	c.logServiceChanges(role, c.Services[role], desiredSvc, false, reason)
 
 	if err := c.updateService(role, desiredSvc); err != nil {
 		return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
@@ -110,7 +110,7 @@ func (c *Cluster) syncService(role postgresRole) error {
 
 func (c *Cluster) syncEndpoint() error {
 	if c.Endpoint == nil {
-		c.logger.Infof("could not find the cluster's endpoint")
+		c.logger.Infof("Could not find the cluster's endpoint")
 		ep, err := c.createEndpoint()
 		if err != nil {
 			return fmt.Errorf("could not create missing endpoint: %v", err)
@@ -126,7 +126,7 @@ func (c *Cluster) syncStatefulSet() error {
 	cSpec := c.Spec
 	var rollUpdate bool
 	if c.Statefulset == nil {
-		c.logger.Infof("could not find the cluster's statefulset")
+		c.logger.Infof("Could not find the cluster's statefulset")
 		pods, err := c.listPods()
 		if err != nil {
 			return fmt.Errorf("could not list pods of the statefulset: %v", err)
@@ -181,7 +181,7 @@ func (c *Cluster) syncStatefulSet() error {
 	if err := c.recreatePods(); err != nil {
 		return fmt.Errorf("could not recreate pods: %v", err)
 	}
-	c.logger.Infof("pods have been recreated")
+	c.logger.Infof("Pods have been recreated")
 
 	return nil
 }
@@ -228,6 +228,6 @@ func (c *Cluster) syncVolumes() error {
 	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
 		return fmt.Errorf("Could not sync volumes: %v", err)
 	}
-	c.logger.Infof("volumes have been synced successfully")
+	c.logger.Infof("Volumes have been synced successfully")
 	return nil
 }

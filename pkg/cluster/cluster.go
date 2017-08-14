@@ -41,7 +41,7 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Service     map[postgresRole]*v1.Service
+	Services    map[postgresRole]*v1.Service
 	Endpoint    *v1.Endpoints
 	Secrets     map[types.UID]*v1.Secret
 	Statefulset *v1beta1.StatefulSet
@@ -79,8 +79,6 @@ type compareStatefulsetResult struct {
 
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
-	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Name)
-	k8sResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[postgresRole]*v1.Service)}
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -95,18 +93,18 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 	cluster := &Cluster{
 		Config:           cfg,
 		Postgresql:       pgSpec,
-		logger:           lg,
 		pgUsers:          make(map[string]spec.PgUser),
 		systemUsers:      make(map[string]spec.PgUser),
 		podSubscribers:   make(map[spec.NamespacedName]chan spec.PodEvent),
-		kubeResources:    k8sResources,
+		kubeResources:    kubeResources{Secrets: make(map[types.UID]*v1.Secret), Services: make(map[postgresRole]*v1.Service)},
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
-		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger.Logger),
+		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger),
 	}
+	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 
 	return cluster
 }
@@ -124,7 +122,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	c.Status = status
 	b, err := json.Marshal(status)
 	if err != nil {
-		c.logger.Fatalf("could not marshal status: %v", err)
+		c.logger.Fatalf("Could not marshal status: %v", err)
 	}
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 
@@ -134,12 +132,12 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 		DoRaw()
 
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Warningf("could not set status for the non-existing cluster")
+		c.logger.Warningf("Could not set status for the non-existing cluster")
 		return
 	}
 
 	if err != nil {
-		c.logger.Warningf("could not set status for cluster %q: %v", c.clusterName(), err)
+		c.logger.Warningf("Could not set status for the cluster: %v", err)
 	}
 }
 
@@ -189,7 +187,7 @@ func (c *Cluster) Create() error {
 	if err != nil {
 		return fmt.Errorf("could not create endpoint: %v", err)
 	}
-	c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+	c.logger.Infof("Endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
 	for _, role := range []postgresRole{master, replica} {
 		if role == replica && !c.Spec.ReplicaLoadBalancer {
@@ -210,21 +208,21 @@ func (c *Cluster) Create() error {
 	if err = c.applySecrets(); err != nil {
 		return fmt.Errorf("could not create secrets: %v", err)
 	}
-	c.logger.Infof("secrets have been successfully created")
+	c.logger.Infof("Secrets have been successfully created")
 
 	ss, err = c.createStatefulSet()
 	if err != nil {
 		return fmt.Errorf("could not create statefulset: %v", err)
 	}
-	c.logger.Infof("statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
+	c.logger.Infof("Statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
-	c.logger.Info("Waiting for cluster being ready")
+	c.logger.Info("Waiting for the cluster being ready")
 
 	if err = c.waitStatefulsetPodsReady(); err != nil {
 		c.logger.Errorf("Failed to create cluster: %v", err)
 		return err
 	}
-	c.logger.Infof("pods are ready")
+	c.logger.Infof("Pods are ready")
 
 	if !(c.masterLess || c.databaseAccessDisabled()) {
 		err = c.createRoles()
@@ -240,7 +238,7 @@ func (c *Cluster) Create() error {
 
 	err = c.listResources()
 	if err != nil {
-		c.logger.Errorf("could not list resources: %v", err)
+		c.logger.Errorf("Could not list resources: %v", err)
 	}
 
 	return nil
@@ -248,11 +246,11 @@ func (c *Cluster) Create() error {
 
 func (c *Cluster) sameServiceWith(role postgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
-	if c.Service[role].Spec.Type != service.Spec.Type {
+	if c.Services[role].Spec.Type != service.Spec.Type {
 		return false, fmt.Sprintf("new %s service's type %q doesn't match the current one %q",
-			role, service.Spec.Type, c.Service[role].Spec.Type)
+			role, service.Spec.Type, c.Services[role].Spec.Type)
 	}
-	oldSourceRanges := c.Service[role].Spec.LoadBalancerSourceRanges
+	oldSourceRanges := c.Services[role].Spec.LoadBalancerSourceRanges
 	newSourceRanges := service.Spec.LoadBalancerSourceRanges
 	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
 	if (len(oldSourceRanges) == 0) && (len(newSourceRanges) == 0) {
@@ -262,7 +260,7 @@ func (c *Cluster) sameServiceWith(role postgresRole, service *v1.Service) (match
 		return false, fmt.Sprintf("new %s service's LoadBalancerSourceRange doesn't match the current one", role)
 	}
 
-	oldDNSAnnotation := c.Service[role].Annotations[constants.ZalandoDNSNameAnnotation]
+	oldDNSAnnotation := c.Services[role].Annotations[constants.ZalandoDNSNameAnnotation]
 	newDNSAnnotation := service.Annotations[constants.ZalandoDNSNameAnnotation]
 	if oldDNSAnnotation != newDNSAnnotation {
 		return false, fmt.Sprintf("new %s service's %q annotation doesn't match the current one", role, constants.ZalandoDNSNameAnnotation)
@@ -296,7 +294,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 
-		c.logger.Warnf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
+		c.logger.Warnf("Statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
 	}
 	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
@@ -388,7 +386,7 @@ func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (e
 
 func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
 	if b == nil || (len(b.Requests) == 0) {
-		return (len(a.Requests) == 0)
+		return len(a.Requests) == 0
 	}
 	for k, v := range a.Requests {
 		if (&v).Cmp(b.Requests[k]) != 0 {
@@ -428,7 +426,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 					if err != nil {
 						return fmt.Errorf("could not delete obsolete %s service: %v", role, err)
 					}
-					c.logger.Infof("deleted obsolete %s service", role)
+					c.logger.Infof("Deleted obsolete %s service", role)
 				}
 			} else {
 				if !c.Spec.ReplicaLoadBalancer {
@@ -447,12 +445,12 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		}
 		newService := c.generateService(role, &newSpec.Spec)
 		if match, reason := c.sameServiceWith(role, newService); !match {
-			c.logServiceChanges(role, c.Service[role], newService, true, reason)
+			c.logServiceChanges(role, c.Services[role], newService, true, reason)
 			if err := c.updateService(role, newService); err != nil {
 				c.setStatus(spec.ClusterStatusUpdateFailed)
 				return fmt.Errorf("could not update %s service: %v", role, err)
 			}
-			c.logger.Infof("%s service %q has been updated", role, util.NameFromMeta(c.Service[role].ObjectMeta))
+			c.logger.Infof("%s service %q has been updated", role, util.NameFromMeta(c.Services[role].ObjectMeta))
 		}
 	}
 
@@ -477,7 +475,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 			}
 		}
 		//TODO: if there is a change in numberOfInstances, make sure Pods have been created/deleted
-		c.logger.Infof("statefulset %q has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
+		c.logger.Infof("Statefulset %q has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	}
 
 	if c.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
@@ -501,7 +499,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		if err := c.resizeVolumes(newSpec.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
 			return fmt.Errorf("Could not update volumes: %v", err)
 		}
-		c.logger.Infof("volumes have been updated successfully")
+		c.logger.Infof("Volumes have been updated successfully")
 	}
 
 	c.setStatus(spec.ClusterStatusRunning)
@@ -543,14 +541,14 @@ func (c *Cluster) Delete() error {
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
 func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
 	if err := c.podEventsQueue.Add(event); err != nil {
-		c.logger.Errorf("error when receiving pod events: %v", err)
+		c.logger.Errorf("Error while receiving pod event: %v", err)
 	}
 }
 
 func (c *Cluster) processPodEvent(obj interface{}) error {
 	event, ok := obj.(spec.PodEvent)
 	if !ok {
-		return fmt.Errorf("could not cast to PodEvent")
+		return fmt.Errorf("Could not cast to PodEvent")
 	}
 
 	c.podSubscribersMu.RLock()
@@ -575,7 +573,7 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 			return
 		default:
 			if _, err := c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent)); err != nil {
-				c.logger.Errorf("error when processing pod event queeue %v", err)
+				c.logger.Errorf("Error while processing pod event queue %v", err)
 			}
 		}
 	}
@@ -645,4 +643,21 @@ func (c *Cluster) initInfrastructureRoles() error {
 		c.pgUsers[username] = data
 	}
 	return nil
+}
+
+// GetStatus provides status of the cluster
+func (c *Cluster) GetStatus() *spec.ClusterStatus {
+	return &spec.ClusterStatus{
+		Cluster: c.Spec.ClusterName,
+		Team:    c.Spec.TeamID,
+		Status:  c.Status,
+		Spec:    c.Spec,
+
+		MasterService:  c.GetServiceMaster(),
+		ReplicaService: c.GetServiceReplica(),
+		Endpoint:       c.GetEndpoint(),
+		StatefulSet:    c.GetStatefulSet(),
+
+		Error: c.Error,
+	}
 }

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	logger = logrus.New()
+	logger = logrus.New().WithField("pkg", "teamsapi")
 	token  = "ec45b1cfbe7100c6315d183a3eb6cec0M2U1LWJkMzEtZDgzNzNmZGQyNGM3IiwiYXV0aF90aW1lIjoxNDkzNzMwNzQ1LCJpc3MiOiJodHRwcz"
 )
 

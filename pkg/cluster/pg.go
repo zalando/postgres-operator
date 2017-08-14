@@ -50,7 +50,7 @@ func (c *Cluster) initDbConn() (err error) {
 		err = conn.Ping()
 		if err != nil {
 			if err2 := conn.Close(); err2 != nil {
-				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err2)
+				c.logger.Errorf("Error while closing PostgreSQL connection after another error: %v", err2)
 			}
 			return err
 		}
