@@ -47,8 +47,10 @@ var (
 	clusterStatusURL     = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/?$`)
 	clusterLogsURL       = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/logs/?$`)
 	teamURL              = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$`)
-	workerLogsURL        = regexp.MustCompile(`^/workers/(?P<id>\\d+)/logs/?$`)
-	workerEventsQueueURL = regexp.MustCompile(`^/workers/(?P<id>\\d+)/queue/?$`)
+	workerLogsURL        = regexp.MustCompile(`^/workers/(?P<id>\d+)/logs/?$`)
+	workerEventsQueueURL = regexp.MustCompile(`^/workers/(?P<id>\d+)/queue/?$`)
+	workerAllQueue       = regexp.MustCompile(`^/workers/all/queue/?$`)
+	clustersURL          = "/clusters/"
 )
 
 // New creates new HTTP API server
@@ -65,7 +67,6 @@ func New(controller ControllerInformer, port int, logger *logrus.Logger) *Server
 	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 
-	mux.Handle("/workers/all/queue/", http.HandlerFunc(s.allQueues))
 	mux.Handle("/status/", http.HandlerFunc(s.controllerStatus))
 	mux.Handle("/config/", http.HandlerFunc(s.operatorConfig))
 
@@ -157,7 +158,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		return
 	} else if matches := clusterLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
 		resp, err = s.controller.ClusterLogs(matches[0][1], matches[0][2])
-	} else if req.URL.Path == "/clusters/" {
+	} else if req.URL.Path == clustersURL {
 		res := make(map[string][]string)
 		for team, clusters := range s.controller.TeamClusterList() {
 			for _, cluster := range clusters {
@@ -180,7 +181,10 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 		resp interface{}
 		err  error
 	)
-	if matches := workerLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
+	if workerAllQueue.MatchString(req.URL.Path) {
+		s.allQueues(w, req)
+		return
+	} else if matches := workerLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
 		workerID, _ := strconv.Atoi(matches[0][1])
 
 		resp, err = s.controller.WorkerLogs(uint32(workerID))
