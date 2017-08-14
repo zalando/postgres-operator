@@ -30,4 +30,4 @@ data:
   workers: "4"
   enable_load_balancer: "true"
   api_port: "8080"
-  cluster_log_size: "100"
+  ring_log_lines: "100"
