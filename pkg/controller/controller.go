@@ -29,11 +29,12 @@ type Controller struct {
 	RestClient rest.Interface // kubernetes API group REST client
 	apiserver  *apiserver.Server
 
+	stopCh chan struct{}
+
 	clustersMu   sync.RWMutex
 	clusters     map[spec.NamespacedName]*cluster.Cluster
 	clusterLogs  map[spec.NamespacedName]ringlog.RingLogger
 	teamClusters map[string][]spec.NamespacedName
-	stopChs      map[spec.NamespacedName]chan struct{}
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
@@ -56,7 +57,7 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 		clusters:     make(map[spec.NamespacedName]*cluster.Cluster),
 		clusterLogs:  make(map[spec.NamespacedName]ringlog.RingLogger),
 		teamClusters: make(map[string][]spec.NamespacedName),
-		stopChs:      make(map[spec.NamespacedName]chan struct{}),
+		stopCh:       make(chan struct{}),
 		podCh:        make(chan spec.PodEvent),
 	}
 	logger.Hooks.Add(c)
