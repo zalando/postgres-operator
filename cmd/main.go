@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
@@ -16,7 +17,7 @@ var (
 	kubeConfigFile string
 	outOfCluster   bool
 	version        string
-	config         controller.Config
+	config         spec.ControllerConfig
 )
 
 func init() {

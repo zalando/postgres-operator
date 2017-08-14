@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 )
 
 const (
@@ -22,12 +25,15 @@ const (
 
 // ControllerInformer describes stats methods of a controller
 type ControllerInformer interface {
-	ControllerStatus() interface{}
-	ClusterStatus(team, cluster string) interface{}
-	ClusterLogs(team, cluster string) interface{}
-	TeamClustersStatus(team string) []interface{}
-	WorkerLogs(workerID uint32) interface{}
-	ListQueue(workerID uint32) interface{}
+	GetConfig() *spec.ControllerConfig
+	GetOperatorConfig() *config.Config
+	GetStatus() *spec.ControllerStatus
+	ClusterStatus(team, cluster string) (*spec.ClusterStatus, error)
+	TeamClustersStatus(team string) ([]*spec.ClusterStatus, error)
+	ClusterLogs(team, cluster string) ([]*spec.LogEntry, error)
+	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
+	ListQueue(workerID uint32) (*spec.QueueDump, error)
+	GetWorkersCnt() uint32
 }
 
 // Server describes HTTP API server
@@ -38,11 +44,11 @@ type Server struct {
 }
 
 var (
-	clusterStatusURL     = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/?$")
-	clusterLogsURL       = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/logs/?$")
-	teamURL              = regexp.MustCompile("^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$")
-	workerLogsURL        = regexp.MustCompile("^/workers/(?P<id>\\d+)/logs/?$")
-	workerEventsQueueURL = regexp.MustCompile("^/workers/(?P<id>\\d+)/queue/?$")
+	clusterStatusURL     = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/?$`)
+	clusterLogsURL       = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/logs/?$`)
+	teamURL              = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$`)
+	workerLogsURL        = regexp.MustCompile(`^/workers/(?P<id>\\d+)/logs/?$`)
+	workerEventsQueueURL = regexp.MustCompile(`^/workers/(?P<id>\\d+)/queue/?$`)
 )
 
 // New creates new HTTP API server
@@ -59,7 +65,10 @@ func New(controller ControllerInformer, port int, logger *logrus.Logger) *Server
 	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 
-	mux.HandleFunc("/status", s.status)
+	mux.Handle("/workers/all/queue/", http.HandlerFunc(s.allQueues))
+	mux.Handle("/status/", http.HandlerFunc(s.controllerStatus))
+	mux.Handle("/config/", http.HandlerFunc(s.operatorConfig))
+
 	mux.HandleFunc("/clusters/", s.clusters)
 	mux.HandleFunc("/workers/", s.workers)
 
@@ -98,56 +107,84 @@ func (s *Server) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	s.logger.Infoln("Http server shut down")
 }
 
-func (s *Server) status(w http.ResponseWriter, req *http.Request) {
+func (s *Server) respond(obj interface{}, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(s.controller.ControllerStatus())
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		s.logger.Errorf("Could not encode status: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error()})
+		return
 	}
+
+	err = json.NewEncoder(w).Encode(obj)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		s.logger.Errorf("Could not encode: %v", err)
+	}
+}
+
+func (s *Server) controllerStatus(w http.ResponseWriter, req *http.Request) {
+	s.respond(s.controller.GetStatus(), nil, w)
+}
+
+func (s *Server) operatorConfig(w http.ResponseWriter, req *http.Request) {
+	s.respond(map[string]interface{}{
+		"controller": s.controller.GetConfig(),
+		"operator":   s.controller.GetOperatorConfig(),
+	}, nil, w)
 }
 
 func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
-	var resp interface{}
+	var (
+		resp interface{}
+		err  error
+	)
 
 	if matches := clusterStatusURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		resp = s.controller.ClusterStatus(matches[0][1], matches[0][2])
+		resp, err = s.controller.ClusterStatus(matches[0][1], matches[0][2])
 	} else if matches := teamURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		resp = s.controller.TeamClustersStatus(matches[0][1])
+		resp, err = s.controller.TeamClustersStatus(matches[0][1])
 	} else if matches := clusterLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		resp = s.controller.ClusterLogs(matches[0][1], matches[0][2])
+		resp, err = s.controller.ClusterLogs(matches[0][1], matches[0][2])
 	} else {
-		http.NotFound(w, req)
+		s.respond(nil, fmt.Errorf("page not found"), w)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		s.logger.Errorf("Could not list clusters: %v", err)
-	}
+	s.respond(resp, err, w)
 }
 
 func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
-	var resp interface{}
+	var (
+		resp interface{}
+		err  error
+	)
 	if matches := workerLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
 		workerID, _ := strconv.Atoi(matches[0][1])
 
-		resp = s.controller.WorkerLogs(uint32(workerID))
+		resp, err = s.controller.WorkerLogs(uint32(workerID))
 	} else if matches := workerEventsQueueURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
 		workerID, _ := strconv.Atoi(matches[0][1])
 
-		resp = s.controller.ListQueue(uint32(workerID))
+		resp, err = s.controller.ListQueue(uint32(workerID))
 	} else {
-		http.NotFound(w, req)
+		s.respond(nil, fmt.Errorf("page not found"), w)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		s.logger.Errorf("Could not list clusters: %v", err)
+	s.respond(resp, err, w)
+}
+
+func (s *Server) allQueues(w http.ResponseWriter, r *http.Request) {
+	workersCnt := s.controller.GetWorkersCnt()
+	resp := make(map[uint32]interface{}, workersCnt)
+	for i := uint32(0); i < workersCnt; i++ {
+		logs, err := s.controller.WorkerLogs(i)
+		if err != nil {
+			s.respond(nil, err, w)
+			return
+		}
+		resp[i] = logs
 	}
+
+	s.respond(resp, nil, w)
 }

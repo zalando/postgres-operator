@@ -19,20 +19,9 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
 )
 
-// Config describes configuration of the controller
-type Config struct {
-	RestConfig          *rest.Config `json:"-"`
-	InfrastructureRoles map[string]spec.PgUser
-
-	NoDatabaseAccess bool
-	NoTeamsAPI       bool
-	ConfigMapName    spec.NamespacedName
-	Namespace        string
-}
-
 // Controller represents operator controller
 type Controller struct {
-	config   Config
+	config   spec.ControllerConfig
 	opConfig *config.Config
 
 	logger     *logrus.Entry
@@ -57,7 +46,7 @@ type Controller struct {
 }
 
 // NewController creates a new controller
-func NewController(controllerConfig *Config) *Controller {
+func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 	logger := logrus.New()
 
 	c := &Controller{
@@ -69,7 +58,6 @@ func NewController(controllerConfig *Config) *Controller {
 		teamClusters: make(map[string][]spec.NamespacedName),
 		stopChs:      make(map[spec.NamespacedName]chan struct{}),
 		podCh:        make(chan spec.PodEvent),
-		workerLogs:   make(map[uint32]ringlog.RingLogger),
 	}
 	logger.Hooks.Add(c)
 
@@ -172,6 +160,7 @@ func (c *Controller) initController() {
 	})
 
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
+	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
 		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
 			e, ok := obj.(spec.ClusterEvent)
@@ -198,7 +187,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
-		c.workerLogs[uint32(i)] = ringlog.New(c.opConfig.ClusterLogSize)
+		c.workerLogs[uint32(i)] = ringlog.New(c.opConfig.RingLogLines)
 		go c.processClusterEventsQueue(i, stopCh, wg)
 	}
 

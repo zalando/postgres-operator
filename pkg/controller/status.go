@@ -6,20 +6,12 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 )
 
-type controllerStatus struct {
-	ControllerConfig Config
-	OperatorConfig   config.Config
-	LastSyncTime     int64
-	Clusters         int
-}
-
 // ClusterStatus provides status of the cluster
-func (c *Controller) ClusterStatus(team, cluster string) interface{} {
+func (c *Controller) ClusterStatus(team, cluster string) (*spec.ClusterStatus, error) {
 	clusterName := spec.NamespacedName{
 		Namespace: c.opConfig.Namespace,
 		Name:      team + "-" + cluster,
@@ -29,100 +21,101 @@ func (c *Controller) ClusterStatus(team, cluster string) interface{} {
 	cl, ok := c.clusters[clusterName]
 	c.clustersMu.RUnlock()
 	if !ok {
-		return struct{}{}
+		return nil, fmt.Errorf("could not find cluster")
 	}
 
-	return cl.GetStatus()
+	status := cl.GetStatus()
+	status.Worker = c.clusterWorkerID(clusterName)
+
+	return status, nil
 }
 
 // TeamClustersStatus dumps logs of all the team clusters
-func (c *Controller) TeamClustersStatus(team string) []interface{} {
-	var clusters []*cluster.Cluster
+func (c *Controller) TeamClustersStatus(team string) ([]*spec.ClusterStatus, error) {
 	c.clustersMu.RLock()
 
 	clusterNames, ok := c.teamClusters[team]
 	if !ok {
 		c.clustersMu.RUnlock()
-		return nil
+		return nil, fmt.Errorf("could not find clusters for the team")
 	}
-	for _, cl := range clusterNames {
-		clusters = append(clusters, c.clusters[cl])
+
+	var resp = make([]*spec.ClusterStatus, len(clusterNames))
+	for i, clName := range clusterNames {
+		cl := c.clusters[clName]
+
+		resp[i] = cl.GetStatus()
+		resp[i].Worker = c.clusterWorkerID(clName)
+
 	}
 	c.clustersMu.RUnlock()
 
-	var resp []interface{}
-	for _, cl := range clusters {
-		resp = append(resp, cl.GetStatus())
-	}
-
-	return resp
+	return resp, nil
 }
 
-// ControllerStatus dumps current config and status of the controller
-func (c *Controller) ControllerStatus() interface{} {
+// GetConfig returns controller config
+func (c *Controller) GetConfig() *spec.ControllerConfig {
+	return &c.config
+}
+
+// GetOperatorConfig returns operator config
+func (c *Controller) GetOperatorConfig() *config.Config {
+	return c.opConfig
+}
+
+// GetStatus dumps current config and status of the controller
+func (c *Controller) GetStatus() *spec.ControllerStatus {
 	c.clustersMu.RLock()
 	clustersCnt := len(c.clusters)
 	c.clustersMu.RUnlock()
 
-	return controllerStatus{
-		ControllerConfig: c.config,
-		OperatorConfig:   *c.opConfig,
-		LastSyncTime:     atomic.LoadInt64(&c.lastClusterSyncTime),
-		Clusters:         clustersCnt,
+	return &spec.ControllerStatus{
+		LastSyncTime: atomic.LoadInt64(&c.lastClusterSyncTime),
+		Clusters:     clustersCnt,
 	}
 }
 
 // ClusterLogs dumps cluster ring logs
-func (c *Controller) ClusterLogs(team, cluster string) interface{} {
+func (c *Controller) ClusterLogs(team, name string) ([]*spec.LogEntry, error) {
 	clusterName := spec.NamespacedName{
 		Namespace: c.opConfig.Namespace,
-		Name:      team + "-" + cluster,
+		Name:      team + "-" + name,
 	}
 
 	c.clustersMu.RLock()
 	cl, ok := c.clusterLogs[clusterName]
 	c.clustersMu.RUnlock()
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("could not find cluster")
 	}
 
-	res := make([]interface{}, 0)
+	res := make([]*spec.LogEntry, 0)
 	for _, e := range cl.Walk() {
-		v := map[string]interface{}{
-			"Time":    e.Time,
-			"Level":   e.Level.String(),
-			"Message": e.Message,
-		}
-		if e.Worker != nil {
-			v["Worker"] = fmt.Sprintf("%d", *e.Worker)
-		}
+		logEntry := e.(*spec.LogEntry)
+		logEntry.ClusterName = nil
 
-		res = append(res, v)
+		res = append(res, logEntry)
 	}
 
-	return res
+	return res, nil
 }
 
 // WorkerLogs dumps logs of the worker
-func (c *Controller) WorkerLogs(workerID uint32) interface{} {
+func (c *Controller) WorkerLogs(workerID uint32) ([]*spec.LogEntry, error) {
 	lg, ok := c.workerLogs[workerID]
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("could not find worker")
 	}
 
-	res := make([]interface{}, 0)
+	res := make([]*spec.LogEntry, 0)
 	for _, e := range lg.Walk() {
-		v := map[string]interface{}{
-			"Time":        e.Time,
-			"ClusterName": e.ClusterName.String(),
-			"Level":       e.Level.String(),
-			"Message":     e.Message,
-		}
+		logEntry := e.(*spec.LogEntry)
+		logEntry.Worker = nil
 
-		res = append(res, v)
+		res = append(res, logEntry)
 	}
 
-	return res
+	return res, nil
 }
 
 // Levels returns logrus levels for which hook must fire
@@ -139,44 +132,49 @@ func (c *Controller) Fire(e *logrus.Entry) error {
 		return nil
 	}
 	clusterName = v.(spec.NamespacedName)
-
-	var workerID *uint32
-	if v, hasWorker := e.Data["worker"]; hasWorker {
-		id := v.(uint32)
-		workerID = &id
-	}
-
 	c.clustersMu.RLock()
-	rl, ok := c.clusterLogs[clusterName]
+	clusterRingLog, ok := c.clusterLogs[clusterName]
 	c.clustersMu.RUnlock()
 	if !ok {
 		return nil
 	}
 
-	rl.Insert(e.Level, e.Time, workerID, clusterName, e.Message)
-	if workerID == nil {
-		return nil
+	logEntry := &spec.LogEntry{
+		Time:        e.Time,
+		Level:       e.Level,
+		ClusterName: &clusterName,
+		Message:     e.Message,
 	}
 
-	c.workerLogs[*workerID]. // workerLogs map is immutable
-					Insert(e.Level, e.Time, workerID, clusterName, e.Message)
+	if v, hasWorker := e.Data["worker"]; hasWorker {
+		id := v.(uint32)
+
+		logEntry.Worker = &id
+	}
+	clusterRingLog.Insert(logEntry)
+
+	if logEntry.Worker == nil {
+		return nil
+	}
+	c.workerLogs[*logEntry.Worker].Insert(logEntry) // workerLogs map is immutable. No need to lock it
 
 	return nil
 }
 
 // ListQueue dumps cluster event queue of the provided worker
-func (c *Controller) ListQueue(workerID uint32) interface{} {
+func (c *Controller) ListQueue(workerID uint32) (*spec.QueueDump, error) {
 	if workerID >= uint32(len(c.clusterEventQueues)) {
-		return nil
+		return nil, fmt.Errorf("could not find worker")
 	}
 
 	q := c.clusterEventQueues[workerID]
-	if q == nil {
-		return nil
-	}
+	return &spec.QueueDump{
+		Keys: q.ListKeys(),
+		List: q.List(),
+	}, nil
+}
 
-	return map[string]interface{}{
-		"Keys": q.ListKeys(),
-		"List": q.List(),
-	}
+// GetWorkersCnt returns number of the workers
+func (c *Controller) GetWorkersCnt() uint32 {
+	return c.opConfig.Workers
 }

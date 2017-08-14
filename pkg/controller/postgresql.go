@@ -126,7 +126,7 @@ func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interfa
 	}), nil
 }
 
-func (c *Controller) processEvent(event spec.ClusterEvent) error {
+func (c *Controller) processEvent(event spec.ClusterEvent) {
 	var clusterName spec.NamespacedName
 
 	lg := c.logger.WithField("worker", event.WorkerID)
@@ -146,7 +146,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) error {
 	case spec.EventAdd:
 		if clusterFound {
 			lg.Debugf("Cluster already exists")
-			return nil
+			return
 		}
 
 		lg.Infof("Creation of the cluster started")
@@ -163,14 +163,14 @@ func (c *Controller) processEvent(event spec.ClusterEvent) error {
 			c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
 			c.clusters[clusterName] = cl
 			c.stopChs[clusterName] = stopCh
-			c.clusterLogs[clusterName] = ringlog.New(c.opConfig.ClusterLogSize)
+			c.clusterLogs[clusterName] = ringlog.New(c.opConfig.RingLogLines)
 		}()
 
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Errorf("could not create cluster: %v", err)
 			lg.Errorf("%v", cl.Error)
 
-			return nil
+			return
 		}
 
 		lg.Infoln("Cluster has been created")
@@ -179,13 +179,13 @@ func (c *Controller) processEvent(event spec.ClusterEvent) error {
 
 		if !clusterFound {
 			lg.Warnln("Cluster does not exist")
-			return nil
+			return
 		}
 		if err := cl.Update(event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not update cluster: %v", err)
 			lg.Errorf("%v", cl.Error)
 
-			return nil
+			return
 		}
 		cl.Error = nil
 		lg.Infoln("Cluster has been updated")
@@ -195,12 +195,12 @@ func (c *Controller) processEvent(event spec.ClusterEvent) error {
 		lg.Infoln("Deletion of the cluster started")
 		if !clusterFound {
 			lg.Errorln("Unknown cluster")
-			return nil
+			return
 		}
 
 		if err := cl.Delete(); err != nil {
 			lg.Errorf("could not delete cluster: %v", err)
-			return nil
+			return
 		}
 		close(c.stopChs[clusterName])
 
@@ -239,21 +239,19 @@ func (c *Controller) processEvent(event spec.ClusterEvent) error {
 				c.clusters[clusterName] = cl
 				c.stopChs[clusterName] = stopCh
 				c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
-				c.clusterLogs[clusterName] = ringlog.New(c.opConfig.ClusterLogSize)
+				c.clusterLogs[clusterName] = ringlog.New(c.opConfig.RingLogLines)
 			}()
 		}
 
 		if err := cl.Sync(); err != nil {
 			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
 			lg.Error(cl.Error)
-			return nil
+			return
 		}
 		cl.Error = nil
 
 		lg.Infoln("Cluster has been synced")
 	}
-
-	return nil
 }
 
 func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, wg *sync.WaitGroup) {

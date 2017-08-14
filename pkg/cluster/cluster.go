@@ -36,7 +36,7 @@ var (
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
 	OpConfig            config.Config
-	RestConfig          *rest.Config           `json:"-"`
+	RestConfig          *rest.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
 }
 
@@ -649,9 +649,8 @@ func (c *Cluster) initInfrastructureRoles() error {
 }
 
 // GetStatus provides status of the cluster
-func (c *Cluster) GetStatus() Status {
-	return Status{
-		Config:  c.Config,
+func (c *Cluster) GetStatus() *spec.ClusterStatus {
+	return &spec.ClusterStatus{
 		Cluster: c.Spec.ClusterName,
 		Team:    c.Spec.TeamID,
 		Status:  c.Status,
