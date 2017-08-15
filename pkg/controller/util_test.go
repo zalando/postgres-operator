@@ -48,7 +48,7 @@ func newMockKubernetesClient() k8sutil.KubernetesClient {
 }
 
 func newMockController() *Controller {
-	controller := NewController(&Config{})
+	controller := NewController(&spec.ControllerConfig{})
 	controller.opConfig.ClusterNameLabel = "cluster-name"
 	controller.opConfig.InfrastructureRolesSecretName =
 		spec.NamespacedName{Namespace: v1.NamespaceDefault, Name: testInfrastructureRolesSecretName}
