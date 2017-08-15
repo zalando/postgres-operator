@@ -4,9 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/Sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	"k8s.io/client-go/rest"
 )
 
@@ -71,6 +74,42 @@ type PgSyncUserRequest struct {
 type UserSyncer interface {
 	ProduceSyncRequests(dbUsers PgUserMap, newUsers PgUserMap) (req []PgSyncUserRequest)
 	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
+}
+
+// LogEntry describes log entry in the RingLogger
+type LogEntry struct {
+	Time        time.Time
+	Level       logrus.Level
+	ClusterName *NamespacedName `json:",omitempty"`
+	Worker      *uint32         `json:",omitempty"`
+	Message     string
+}
+
+// ClusterStatus describes status of the cluster
+type ClusterStatus struct {
+	Team           string
+	Cluster        string
+	MasterService  *v1.Service
+	ReplicaService *v1.Service
+	Endpoint       *v1.Endpoints
+	StatefulSet    *v1beta1.StatefulSet
+
+	Worker uint32
+	Status PostgresStatus
+	Spec   PostgresSpec
+	Error  error
+}
+
+// ControllerStatus describes status of the controller
+type ControllerStatus struct {
+	LastSyncTime int64
+	Clusters     int
+}
+
+// QueueDump describes cache.FIFO queue
+type QueueDump struct {
+	Keys []string
+	List []interface{}
 }
 
 // ControllerConfig describes configuration of the controller

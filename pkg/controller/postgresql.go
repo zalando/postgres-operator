@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,6 +20,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
 )
 
 func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
@@ -124,6 +127,21 @@ func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interfa
 	}), nil
 }
 
+func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *spec.Postgresql) *cluster.Cluster {
+	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg)
+	cl.Run(c.stopCh)
+	teamName := strings.ToLower(cl.Spec.TeamID)
+
+	defer c.clustersMu.Unlock()
+	c.clustersMu.Lock()
+
+	c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
+	c.clusters[clusterName] = cl
+	c.clusterLogs[clusterName] = ringlog.New(c.opConfig.RingLogLines)
+
+	return cl
+}
+
 func (c *Controller) processEvent(obj interface{}) error {
 	var clusterName spec.NamespacedName
 
@@ -153,14 +171,7 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 		lg.Infof("creation of the cluster started")
 
-		stopCh := make(chan struct{})
-		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg)
-		cl.Run(stopCh)
-
-		c.clustersMu.Lock()
-		c.clusters[clusterName] = cl
-		c.stopChs[clusterName] = stopCh
-		c.clustersMu.Unlock()
+		cl = c.addCluster(lg, clusterName, event.NewSpec)
 
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Errorf("could not create cluster: %v", err)
@@ -186,7 +197,9 @@ func (c *Controller) processEvent(obj interface{}) error {
 		cl.Error = nil
 		lg.Infoln("cluster has been updated")
 	case spec.EventDelete:
-		lg.Infof("deletion of the %q cluster started", clusterName)
+		teamName := strings.ToLower(cl.Spec.TeamID)
+
+		lg.Infoln("Deletion of the cluster started")
 		if !clusterFound {
 			lg.Errorf("unknown cluster: %q", clusterName)
 			return nil
@@ -196,12 +209,22 @@ func (c *Controller) processEvent(obj interface{}) error {
 			lg.Errorf("could not delete cluster: %v", err)
 			return nil
 		}
-		close(c.stopChs[clusterName])
 
-		c.clustersMu.Lock()
-		delete(c.clusters, clusterName)
-		delete(c.stopChs, clusterName)
-		c.clustersMu.Unlock()
+		func() {
+			defer c.clustersMu.Unlock()
+			c.clustersMu.Lock()
+
+			delete(c.clusters, clusterName)
+			delete(c.clusterLogs, clusterName)
+			for i, val := range c.teamClusters[teamName] { // on relativel
+				if val == clusterName {
+					copy(c.teamClusters[teamName][i:], c.teamClusters[teamName][i+1:])
+					c.teamClusters[teamName][len(c.teamClusters[teamName])-1] = spec.NamespacedName{}
+					c.teamClusters[teamName] = c.teamClusters[teamName][:len(c.teamClusters[teamName])-1]
+					break
+				}
+			}
+		}()
 
 		lg.Infof("cluster has been deleted")
 	case spec.EventSync:
@@ -209,18 +232,11 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
-			stopCh := make(chan struct{})
-			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg)
-			cl.Run(stopCh)
-
-			c.clustersMu.Lock()
-			c.clusters[clusterName] = cl
-			c.stopChs[clusterName] = stopCh
-			c.clustersMu.Unlock()
+			cl = c.addCluster(lg, clusterName, event.NewSpec)
 		}
 
 		if err := cl.Sync(); err != nil {
-			cl.Error = fmt.Errorf("could not sync cluster %q: %v", clusterName, err)
+			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
 			lg.Error(cl.Error)
 			return nil
 		}

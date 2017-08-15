@@ -419,3 +419,23 @@ func (c *Cluster) createRoles() (err error) {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
 	return c.syncRoles(false)
 }
+
+// GetServiceMaster returns cluster's kubernetes master Service
+func (c *Cluster) GetServiceMaster() *v1.Service {
+	return c.Service[master]
+}
+
+// GetServiceReplica returns cluster's kubernetes replica Service
+func (c *Cluster) GetServiceReplica() *v1.Service {
+	return c.Service[replica]
+}
+
+// GetEndpoint returns cluster's kubernetes Endpoint
+func (c *Cluster) GetEndpoint() *v1.Endpoints {
+	return c.Endpoint
+}
+
+// GetStatefulSet returns cluster's kubernetes StatefulSet
+func (c *Cluster) GetStatefulSet() *v1beta1.StatefulSet {
+	return c.Statefulset
+}

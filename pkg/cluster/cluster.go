@@ -644,3 +644,20 @@ func (c *Cluster) initInfrastructureRoles() error {
 	}
 	return nil
 }
+
+// GetStatus provides status of the cluster
+func (c *Cluster) GetStatus() *spec.ClusterStatus {
+	return &spec.ClusterStatus{
+		Cluster: c.Spec.ClusterName,
+		Team:    c.Spec.TeamID,
+		Status:  c.Status,
+		Spec:    c.Spec,
+
+		MasterService:  c.GetServiceMaster(),
+		ReplicaService: c.GetServiceReplica(),
+		Endpoint:       c.GetEndpoint(),
+		StatefulSet:    c.GetStatefulSet(),
+
+		Error: c.Error,
+	}
+}
