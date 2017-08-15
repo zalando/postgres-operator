@@ -7,6 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
 )
 
 // EventType contains type of the events for the TPRs and Pods received from Kubernetes
@@ -70,6 +71,17 @@ type PgSyncUserRequest struct {
 type UserSyncer interface {
 	ProduceSyncRequests(dbUsers PgUserMap, newUsers PgUserMap) (req []PgSyncUserRequest)
 	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
+}
+
+// ControllerConfig describes configuration of the controller
+type ControllerConfig struct {
+	RestConfig          *rest.Config `json:"-"`
+	InfrastructureRoles map[string]PgUser
+
+	NoDatabaseAccess bool
+	NoTeamsAPI       bool
+	ConfigMapName    NamespacedName
+	Namespace        string
 }
 
 func (n NamespacedName) String() string {
