@@ -69,7 +69,7 @@ func (t *API) TeamInfo(teamID, token string) (tm *Team, err error) {
 	)
 
 	url := fmt.Sprintf("%s/teams/%s", t.url, teamID)
-	t.logger.Debugf("Request url: %s", url)
+	t.logger.Debugf("request url: %s", url)
 	req, err = http.NewRequest("GET", url, nil)
 	if err != nil {
 		return

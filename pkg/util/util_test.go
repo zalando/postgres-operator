@@ -48,7 +48,7 @@ func TestRandomPassword(t *testing.T) {
 	const pwdLength = 10
 	pwd := RandomPassword(pwdLength)
 	if a := len(pwd); a != pwdLength {
-		t.Errorf("Password length expected: %d, got: %d", pwdLength, a)
+		t.Errorf("password length expected: %d, got: %d", pwdLength, a)
 	}
 }
 

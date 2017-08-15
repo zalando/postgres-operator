@@ -89,7 +89,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
-			c.logger.Infof("Reason: %q", reason)
+			c.logger.Infof("reason: %q", reason)
 		}
 	}
 }
@@ -107,15 +107,15 @@ func (c *Cluster) logServiceChanges(role postgresRole, old, new *v1.Service, isU
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if reason != "" {
-		c.logger.Infof("Reason: %s", reason)
+		c.logger.Infof("reason: %s", reason)
 	}
 }
 
 func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
-	c.logger.Infof("Volume specification has been changed")
+	c.logger.Infof("volume specification has been changed")
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
 	if reason != "" {
-		c.logger.Infof("Reason: %s", reason)
+		c.logger.Infof("reason: %s", reason)
 	}
 }
 
@@ -127,7 +127,7 @@ func (c *Cluster) getOAuthToken() (string, error) {
 		Get(c.OpConfig.OAuthTokenSecretName.Name, metav1.GetOptions{})
 
 	if err != nil {
-		c.logger.Debugf("Oauth token secret name: %q", c.OpConfig.OAuthTokenSecretName)
+		c.logger.Debugf("oauth token secret name: %q", c.OpConfig.OAuthTokenSecretName)
 		return "", fmt.Errorf("could not get credentials secret: %v", err)
 	}
 	data := credentialsSecret.Data
@@ -144,7 +144,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 		return nil, fmt.Errorf("no teamId specified")
 	}
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debug("Team API is disabled, returning empty list of members")
+		c.logger.Debug("team API is disabled, returning empty list of members")
 		return []string{}, nil
 	}
 

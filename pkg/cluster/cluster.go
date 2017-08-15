@@ -205,7 +205,7 @@ func (c *Cluster) Create() error {
 	if err = c.initUsers(); err != nil {
 		return err
 	}
-	c.logger.Infof("Users have been initialized")
+	c.logger.Infof("users have been initialized")
 
 	if err = c.applySecrets(); err != nil {
 		return fmt.Errorf("could not create secrets: %v", err)
@@ -218,10 +218,10 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
-	c.logger.Info("Waiting for cluster being ready")
+	c.logger.Info("waiting for cluster being ready")
 
 	if err = c.waitStatefulsetPodsReady(); err != nil {
-		c.logger.Errorf("Failed to create cluster: %v", err)
+		c.logger.Errorf("failed to create cluster: %v", err)
 		return err
 	}
 	c.logger.Infof("pods are ready")
@@ -231,10 +231,10 @@ func (c *Cluster) Create() error {
 		if err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
-		c.logger.Infof("Users have been successfully created")
+		c.logger.Infof("users have been successfully created")
 	} else {
 		if c.masterLess {
-			c.logger.Warnln("Cluster is masterless")
+			c.logger.Warnln("cluster is masterless")
 		}
 	}
 
@@ -411,7 +411,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	defer c.mu.Unlock()
 
 	c.setStatus(spec.ClusterStatusUpdating)
-	c.logger.Debugf("Cluster update from version %q to %q",
+	c.logger.Debugf("cluster update from version %q to %q",
 		c.ResourceVersion, newSpec.ResourceVersion)
 
 	/* Make sure we update when this function exists */
@@ -481,25 +481,25 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	}
 
 	if c.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
-		c.logger.Warnf("Postgresql version change(%q -> %q) is not allowed",
+		c.logger.Warnf("postgresql version change(%q -> %q) is not allowed",
 			c.Spec.PgVersion, newSpec.Spec.PgVersion)
 		//TODO: rewrite pg version in tpr spec
 	}
 
 	if cmp.rollingUpdate {
-		c.logger.Infof("Rolling update is needed")
+		c.logger.Infof("rolling update is needed")
 		// TODO: wait for actual streaming to the replica
 		if err := c.recreatePods(); err != nil {
 			c.setStatus(spec.ClusterStatusUpdateFailed)
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
-		c.logger.Infof("Rolling update has been finished")
+		c.logger.Infof("rolling update has been finished")
 	}
 
 	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
 		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
 		if err := c.resizeVolumes(newSpec.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
-			return fmt.Errorf("Could not update volumes: %v", err)
+			return fmt.Errorf("could not update volumes: %v", err)
 		}
 		c.logger.Infof("volumes have been updated successfully")
 	}

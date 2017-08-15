@@ -93,7 +93,7 @@ func (n *NamespacedName) Decode(value string) error {
 	}
 
 	if name.Name == "" {
-		return fmt.Errorf("Incorrect namespaced name")
+		return fmt.Errorf("incorrect namespaced name")
 	}
 
 	*n = NamespacedName(name)
