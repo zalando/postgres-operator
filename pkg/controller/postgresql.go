@@ -131,13 +131,14 @@ func (c *Controller) processEvent(obj interface{}) error {
 	if !ok {
 		return fmt.Errorf("could not cast to ClusterEvent")
 	}
-	logger := c.logger.WithField("worker", event.WorkerID)
+	lg := c.logger.WithField("worker", event.WorkerID)
 
 	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync {
 		clusterName = util.NameFromMeta(event.NewSpec.ObjectMeta)
 	} else {
 		clusterName = util.NameFromMeta(event.OldSpec.ObjectMeta)
 	}
+	lg = lg.WithField("cluster-name", clusterName)
 
 	c.clustersMu.RLock()
 	cl, clusterFound := c.clusters[clusterName]
@@ -146,14 +147,14 @@ func (c *Controller) processEvent(obj interface{}) error {
 	switch event.EventType {
 	case spec.EventAdd:
 		if clusterFound {
-			logger.Debugf("cluster %q already exists", clusterName)
+			lg.Debugf("cluster already exists")
 			return nil
 		}
 
-		logger.Infof("creation of the %q cluster started", clusterName)
+		lg.Infof("creation of the cluster started")
 
 		stopCh := make(chan struct{})
-		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
+		cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg)
 		cl.Run(stopCh)
 
 		c.clustersMu.Lock()
@@ -163,36 +164,36 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Errorf("could not create cluster: %v", err)
-			logger.Errorf("%v", cl.Error)
+			lg.Error(cl.Error)
 
 			return nil
 		}
 
-		logger.Infof("cluster %q has been created", clusterName)
+		lg.Infoln("cluster has been created")
 	case spec.EventUpdate:
-		logger.Infof("update of the %q cluster started", clusterName)
+		lg.Infoln("update of the cluster started")
 
 		if !clusterFound {
-			logger.Warnf("cluster %q does not exist", clusterName)
+			lg.Warnln("cluster does not exist")
 			return nil
 		}
 		if err := cl.Update(event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not update cluster: %v", err)
-			logger.Errorf("%v", cl.Error)
+			lg.Error(cl.Error)
 
 			return nil
 		}
 		cl.Error = nil
-		logger.Infof("cluster %q has been updated", clusterName)
+		lg.Infoln("cluster has been updated")
 	case spec.EventDelete:
-		logger.Infof("deletion of the %q cluster started", clusterName)
+		lg.Infof("deletion of the %q cluster started", clusterName)
 		if !clusterFound {
-			logger.Errorf("unknown cluster: %q", clusterName)
+			lg.Errorf("unknown cluster: %q", clusterName)
 			return nil
 		}
 
 		if err := cl.Delete(); err != nil {
-			logger.Errorf("could not delete cluster %q: %v", clusterName, err)
+			lg.Errorf("could not delete cluster: %v", err)
 			return nil
 		}
 		close(c.stopChs[clusterName])
@@ -202,14 +203,14 @@ func (c *Controller) processEvent(obj interface{}) error {
 		delete(c.stopChs, clusterName)
 		c.clustersMu.Unlock()
 
-		logger.Infof("cluster %q has been deleted", clusterName)
+		lg.Infof("cluster has been deleted")
 	case spec.EventSync:
-		logger.Infof("syncing of the %q cluster started", clusterName)
+		lg.Infof("syncing of the cluster started")
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
 			stopCh := make(chan struct{})
-			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, logger)
+			cl = cluster.New(c.makeClusterConfig(), c.KubeClient, *event.NewSpec, lg)
 			cl.Run(stopCh)
 
 			c.clustersMu.Lock()
@@ -220,12 +221,12 @@ func (c *Controller) processEvent(obj interface{}) error {
 
 		if err := cl.Sync(); err != nil {
 			cl.Error = fmt.Errorf("could not sync cluster %q: %v", clusterName, err)
-			logger.Errorf("%v", cl.Error)
+			lg.Error(cl.Error)
 			return nil
 		}
 		cl.Error = nil
 
-		logger.Infof("cluster %q has been synced", clusterName)
+		lg.Infof("cluster has been synced")
 	}
 
 	return nil
@@ -273,7 +274,9 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	}
 
 	if clusterError != nil && eventType != spec.EventDelete {
-		c.logger.Debugf("skipping %q event for invalid cluster %q (reason: %v)", eventType, clusterName, clusterError)
+		c.logger.
+			WithField("cluster-name", clusterName).
+			Debugf("skipping %q event for the invalid cluster: %v", eventType, clusterError)
 		return
 	}
 
@@ -287,10 +290,11 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 	}
 	//TODO: if we delete cluster, discard all the previous events for the cluster
 
+	lg := c.logger.WithField("worker", workerID).WithField("cluster-name", clusterName)
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
-		c.logger.WithField("worker", workerID).Errorf("error when queueing cluster event: %v", clusterEvent)
+		lg.Errorf("error when queueing cluster event: %v", clusterEvent)
 	}
-	c.logger.WithField("worker", workerID).Infof("%q of the %q cluster has been queued", eventType, clusterName)
+	lg.Infof("%q event has been queued", eventType)
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {

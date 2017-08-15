@@ -79,8 +79,6 @@ type compareStatefulsetResult struct {
 
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
-	lg := logger.WithField("pkg", "cluster").WithField("cluster-name", pgSpec.Name)
-	k8sResources := kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[postgresRole]*v1.Service)}
 	orphanDependents := true
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -95,18 +93,18 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 	cluster := &Cluster{
 		Config:           cfg,
 		Postgresql:       pgSpec,
-		logger:           lg,
 		pgUsers:          make(map[string]spec.PgUser),
 		systemUsers:      make(map[string]spec.PgUser),
 		podSubscribers:   make(map[spec.NamespacedName]chan spec.PodEvent),
-		kubeResources:    k8sResources,
+		kubeResources:    kubeResources{Secrets: make(map[types.UID]*v1.Secret), Service: make(map[postgresRole]*v1.Service)},
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
-		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger.Logger),
+		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger),
 	}
+	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 
 	return cluster
 }
@@ -139,7 +137,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 
 	if err != nil {
-		c.logger.Warningf("could not set status for cluster %q: %v", c.clusterName(), err)
+		c.logger.Warningf("could not set status for the cluster: %v", err)
 	}
 }
 
@@ -218,7 +216,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
-	c.logger.Info("waiting for cluster being ready")
+	c.logger.Info("waiting for the cluster being ready")
 
 	if err = c.waitStatefulsetPodsReady(); err != nil {
 		c.logger.Errorf("failed to create cluster: %v", err)
@@ -575,7 +573,7 @@ func (c *Cluster) processPodEventQueue(stopCh <-chan struct{}) {
 			return
 		default:
 			if _, err := c.podEventsQueue.Pop(cache.PopProcessFunc(c.processPodEvent)); err != nil {
-				c.logger.Errorf("error when processing pod event queeue %v", err)
+				c.logger.Errorf("error when processing pod event queue %v", err)
 			}
 		}
 	}

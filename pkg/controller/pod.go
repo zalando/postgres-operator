@@ -45,7 +45,10 @@ func (c *Controller) dispatchPodEvent(clusterName spec.NamespacedName, event spe
 	cluster, ok := c.clusters[clusterName]
 	c.clustersMu.RUnlock()
 	if ok {
-		c.logger.Debugf("sending %q event of pod %q to the %q cluster channel", event.EventType, event.PodName, clusterName)
+		c.logger.WithField("cluster-name", clusterName).
+			Debugf("sending %q event of pod %q to the cluster channel",
+				event.EventType,
+				event.PodName)
 		cluster.ReceivePodEvent(event)
 	}
 }

@@ -51,7 +51,7 @@ type API struct {
 }
 
 // NewTeamsAPI creates an object to query the team API.
-func NewTeamsAPI(url string, log *logrus.Logger) *API {
+func NewTeamsAPI(url string, log *logrus.Entry) *API {
 	t := API{
 		url:        strings.TrimRight(url, "/"),
 		httpClient: &http.Client{},
