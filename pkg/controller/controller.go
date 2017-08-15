@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -26,6 +27,7 @@ type Controller struct {
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
 	RestClient rest.Interface // kubernetes API group REST client
+	apiserver  *apiserver.Server
 
 	stopCh chan struct{}
 
@@ -170,16 +172,19 @@ func (c *Controller) initController() {
 			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil
 		})
 	}
+
+	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)
 }
 
 // Run starts background controller processes
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 
-	wg.Add(3)
+	wg.Add(4)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
+	go c.apiserver.Run(stopCh, wg)
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
