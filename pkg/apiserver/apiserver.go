@@ -14,6 +14,7 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 )
 
@@ -24,7 +25,7 @@ const (
 )
 
 // ControllerInformer describes stats methods of a controller
-type ControllerInformer interface {
+type controllerInformer interface {
 	GetConfig() *spec.ControllerConfig
 	GetOperatorConfig() *config.Config
 	GetStatus() *spec.ControllerStatus
@@ -40,7 +41,7 @@ type ControllerInformer interface {
 type Server struct {
 	logger     *logrus.Entry
 	http       http.Server
-	controller ControllerInformer
+	controller controllerInformer
 }
 
 var (
@@ -54,7 +55,7 @@ var (
 )
 
 // New creates new HTTP API server
-func New(controller ControllerInformer, port int, logger *logrus.Logger) *Server {
+func New(controller controllerInformer, port int, logger *logrus.Logger) *Server {
 	s := &Server{
 		logger:     logger.WithField("pkg", "apiserver"),
 		controller: controller,
@@ -140,24 +141,24 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		err  error
 	)
 
-	if matches := clusterStatusURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		resp, err = s.controller.ClusterStatus(matches[0][1], matches[0][2])
-	} else if matches := teamURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
+	if matches := util.FindNamedStringSubmatch(clusterStatusURL, req.URL.Path); matches != nil {
+		resp, err = s.controller.ClusterStatus(matches["team"], matches["cluster"])
+	} else if matches := util.FindNamedStringSubmatch(teamURL, req.URL.Path); matches != nil {
 		teamClusters := s.controller.TeamClusterList()
-		clusters, found := teamClusters[matches[0][1]]
+		clusters, found := teamClusters[matches["team"]]
 		if !found {
 			s.respond(nil, fmt.Errorf("could not find clusters for the team"), w)
 		}
 
 		clusterNames := make([]string, 0)
 		for _, cluster := range clusters {
-			clusterNames = append(clusterNames, cluster.Name[len(matches[0][1])+1:])
+			clusterNames = append(clusterNames, cluster.Name[len(matches["team"])+1:])
 		}
 
 		s.respond(clusterNames, nil, w)
 		return
-	} else if matches := clusterLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		resp, err = s.controller.ClusterLogs(matches[0][1], matches[0][2])
+	} else if matches := util.FindNamedStringSubmatch(clusterLogsURL, req.URL.Path); matches != nil {
+		resp, err = s.controller.ClusterLogs(matches["team"], matches["cluster"])
 	} else if req.URL.Path == clustersURL {
 		res := make(map[string][]string)
 		for team, clusters := range s.controller.TeamClusterList() {
@@ -181,15 +182,16 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 		resp interface{}
 		err  error
 	)
+
 	if workerAllQueue.MatchString(req.URL.Path) {
 		s.allQueues(w, req)
 		return
-	} else if matches := workerLogsURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		workerID, _ := strconv.Atoi(matches[0][1])
+	} else if matches := util.FindNamedStringSubmatch(workerLogsURL, req.URL.Path); matches != nil {
+		workerID, _ := strconv.Atoi(matches["id"])
 
 		resp, err = s.controller.WorkerLogs(uint32(workerID))
-	} else if matches := workerEventsQueueURL.FindAllStringSubmatch(req.URL.Path, -1); matches != nil {
-		workerID, _ := strconv.Atoi(matches[0][1])
+	} else if matches := util.FindNamedStringSubmatch(workerEventsQueueURL, req.URL.Path); matches != nil {
+		workerID, _ := strconv.Atoi(matches["id"])
 
 		resp, err = s.controller.ListQueue(uint32(workerID))
 	} else {

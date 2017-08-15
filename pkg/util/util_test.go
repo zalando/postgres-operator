@@ -6,6 +6,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"regexp"
+
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
@@ -42,6 +44,17 @@ var substractTest = []struct {
 }{
 	{[]string{"a", "b", "c", "d"}, []string{"a", "b", "c", "d"}, []string{}, true},
 	{[]string{"a", "b", "c", "d"}, []string{"a", "bb", "c", "d"}, []string{"b"}, false},
+}
+
+var substringMatch = []struct {
+	inRegex *regexp.Regexp
+	inStr   string
+	out     map[string]string
+}{
+	{regexp.MustCompile(`aaaa (?P<num>\d+) bbbb`), "aaaa 123 bbbb", map[string]string{"num": "123"}},
+	{regexp.MustCompile(`aaaa (?P<num>\d+) bbbb`), "a aa 123 bbbb", nil},
+	{regexp.MustCompile(`aaaa \d+ bbbb`), "aaaa 123 bbbb", nil},
+	{regexp.MustCompile(`aaaa (\d+) bbbb`), "aaaa 123 bbbb", nil},
 }
 
 func TestRandomPassword(t *testing.T) {
@@ -97,6 +110,15 @@ func TestSubstractSlices(t *testing.T) {
 			continue
 		} else if !reflect.DeepEqual(actualRes, tt.out) {
 			t.Errorf("SubstractStringSlices expected res: %v, got: %v", tt.out, actualRes)
+		}
+	}
+}
+
+func TestFindNamedStringSubmatch(t *testing.T) {
+	for _, tt := range substringMatch {
+		actualRes := FindNamedStringSubmatch(tt.inRegex, tt.inStr)
+		if !reflect.DeepEqual(actualRes, tt.out) {
+			t.Errorf("FindNamedStringSubmatch expected: %#v, got: %#v", tt.out, actualRes)
 		}
 	}
 }
