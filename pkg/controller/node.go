@@ -1,11 +1,12 @@
 package controller
 
 import (
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
+
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
 func (c *Controller) nodeListFunc(options metav1.ListOptions) (runtime.Object, error) {

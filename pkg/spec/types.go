@@ -21,10 +21,11 @@ type NamespacedName types.NamespacedName
 
 // Possible values for the EventType
 const (
-	EventAdd    EventType = "ADD"
-	EventUpdate EventType = "UPDATE"
-	EventDelete EventType = "DELETE"
-	EventSync   EventType = "SYNC"
+	EventAdd            EventType = "ADD"
+	EventUpdate         EventType = "UPDATE"
+	EventDelete         EventType = "DELETE"
+	EventSync           EventType = "SYNC"
+	EventRollingUpgrade EventType = "ROLLINGUPGRADE"
 )
 
 // ClusterEvent carries the payload of the Cluster TPR events.
