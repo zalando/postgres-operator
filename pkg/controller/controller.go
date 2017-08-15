@@ -38,6 +38,7 @@ type Controller struct {
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
+	nodesInformer      cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
 	clusterEventQueues  []*cache.FIFO // [workerID]Queue
@@ -106,26 +107,7 @@ func (c *Controller) initOperatorConfig() {
 	c.opConfig = config.NewFromMap(configMapData)
 }
 
-func (c *Controller) initController() {
-	c.initClients()
-	c.initOperatorConfig()
-
-	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
-
-	if c.opConfig.DebugLogging {
-		c.logger.Logger.Level = logrus.DebugLevel
-	}
-
-	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
-	}
-
-	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %v", err)
-	} else {
-		c.config.InfrastructureRoles = infraRoles
-	}
-
+func (c *Controller) initSharedInformers() {
 	// Postgresqls
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -160,6 +142,46 @@ func (c *Controller) initController() {
 		DeleteFunc: c.podDelete,
 	})
 
+	// Kubernetes Nodes
+	nodeLw := &cache.ListWatch{
+		ListFunc:  c.nodeListFunc,
+		WatchFunc: c.nodeWatchFunc,
+	}
+
+	c.nodesInformer = cache.NewSharedIndexInformer(
+		nodeLw,
+		&v1.Node{},
+		constants.QueueResyncPeriodNode,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	c.nodesInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.nodeAdd,
+		UpdateFunc: c.nodeUpdate,
+		DeleteFunc: c.nodeDelete,
+	})
+}
+
+func (c *Controller) initController() {
+	c.initClients()
+	c.initOperatorConfig()
+	c.initSharedInformers()
+
+	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
+
+	if c.opConfig.DebugLogging {
+		c.logger.Logger.Level = logrus.DebugLevel
+	}
+
+	if err := c.createTPR(); err != nil {
+		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
+	}
+
+	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
+		c.logger.Warningf("could not get infrastructure roles: %v", err)
+	} else {
+		c.config.InfrastructureRoles = infraRoles
+	}
+
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
 	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
@@ -180,11 +202,12 @@ func (c *Controller) initController() {
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 
-	wg.Add(4)
+	wg.Add(5)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
 	go c.apiserver.Run(stopCh, wg)
+	go c.kubeNodesInformer(stopCh, wg)
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
@@ -205,4 +228,10 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 	defer wg.Done()
 
 	c.postgresqlInformer.Run(stopCh)
+}
+
+func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	c.nodesInformer.Run(stopCh)
 }
