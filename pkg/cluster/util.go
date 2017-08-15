@@ -235,13 +235,13 @@ func (c *Cluster) waitPodLabelsReady() error {
 
 	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
-			masterPods, err := c.KubeClient.Pods(namespace).List(masterListOption)
-			if err != nil {
-				return false, err
+			masterPods, err2 := c.KubeClient.Pods(namespace).List(masterListOption)
+			if err2 != nil {
+				return false, err2
 			}
-			replicaPods, err := c.KubeClient.Pods(namespace).List(replicaListOption)
-			if err != nil {
-				return false, err
+			replicaPods, err2 := c.KubeClient.Pods(namespace).List(replicaListOption)
+			if err2 != nil {
+				return false, err2
 			}
 			if len(masterPods.Items) > 1 {
 				return false, fmt.Errorf("too many masters")
