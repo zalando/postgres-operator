@@ -80,19 +80,19 @@ func (c *Cluster) loadResources() error {
 
 func (c *Cluster) listResources() error {
 	if c.Statefulset != nil {
-		c.logger.Infof("Found statefulset: %q (uid: %q)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
+		c.logger.Infof("found statefulset: %q (uid: %q)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}
 
 	for _, obj := range c.Secrets {
-		c.logger.Infof("Found secret: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("found secret: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	if c.Endpoint != nil {
-		c.logger.Infof("Found endpoint: %q (uid: %q)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
+		c.logger.Infof("found endpoint: %q (uid: %q)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
 	}
 
 	for role, service := range c.Service {
-		c.logger.Infof("Found %s service: %q (uid: %q)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
+		c.logger.Infof("found %s service: %q (uid: %q)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
 	}
 
 	pods, err := c.listPods()
@@ -101,7 +101,7 @@ func (c *Cluster) listResources() error {
 	}
 
 	for _, obj := range pods {
-		c.logger.Infof("Found pod: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("found pod: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	pvcs, err := c.listPersistentVolumeClaims()
@@ -110,7 +110,7 @@ func (c *Cluster) listResources() error {
 	}
 
 	for _, obj := range pvcs {
-		c.logger.Infof("Found PVC: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("found PVC: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
 	}
 
 	return nil
@@ -129,7 +129,7 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 		return nil, err
 	}
 	c.Statefulset = statefulSet
-	c.logger.Debugf("Created new statefulset %q, uid: %q", util.NameFromMeta(statefulSet.ObjectMeta), statefulSet.UID)
+	c.logger.Debugf("created new statefulset %q, uid: %q", util.NameFromMeta(statefulSet.ObjectMeta), statefulSet.UID)
 
 	return statefulSet, nil
 }
@@ -140,7 +140,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	}
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
 
-	c.logger.Debugf("Updating statefulset")
+	c.logger.Debugf("updating statefulset")
 
 	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
@@ -166,7 +166,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	}
 
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
-	c.logger.Debugf("Replacing statefulset")
+	c.logger.Debugf("replacing statefulset")
 
 	// Delete the current statefulset without deleting the pods
 	orphanDepencies := true
@@ -179,7 +179,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	// make sure we clear the stored statefulset status if the subsequent create fails.
 	c.Statefulset = nil
 	// wait until the statefulset is truly deleted
-	c.logger.Debugf("Waiting for the statefulset to be deleted")
+	c.logger.Debugf("waiting for the statefulset to be deleted")
 
 	err := retryutil.Retry(constants.StatefulsetDeletionInterval, constants.StatefulsetDeletionTimeout,
 		func() (bool, error) {
@@ -199,7 +199,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	// check that all the previous replicas were picked up.
 	if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
 		createdStatefulset.Status.Replicas != oldStatefulset.Status.Replicas {
-		c.logger.Warnf("Number of pods for the old and updated Statefulsets is not identical")
+		c.logger.Warnf("number of pods for the old and updated Statefulsets is not identical")
 	}
 
 	c.Statefulset = createdStatefulset
@@ -207,7 +207,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 }
 
 func (c *Cluster) deleteStatefulSet() error {
-	c.logger.Debugln("Deleting statefulset")
+	c.logger.Debugln("deleting statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
 	}
@@ -321,9 +321,9 @@ func (c *Cluster) updateService(role postgresRole, newService *v1.Service) error
 }
 
 func (c *Cluster) deleteService(role postgresRole) error {
-	c.logger.Debugf("Deleting service %s", role)
+	c.logger.Debugf("deleting service %s", role)
 	if c.Service[role] == nil {
-		return fmt.Errorf("There is no %s service in the cluster", role)
+		return fmt.Errorf("there is no %s service in the cluster", role)
 	}
 	service := c.Service[role]
 	err := c.KubeClient.Services(service.Namespace).Delete(service.Name, c.deleteOptions)
@@ -351,7 +351,7 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 }
 
 func (c *Cluster) deleteEndpoint() error {
-	c.logger.Debugln("Deleting endpoint")
+	c.logger.Debugln("deleting endpoint")
 	if c.Endpoint == nil {
 		return fmt.Errorf("there is no endpoint in the cluster")
 	}
@@ -396,7 +396,7 @@ func (c *Cluster) applySecrets() error {
 				return fmt.Errorf("could not create secret for user %q: %v", secretUsername, err)
 			}
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("Created new secret %q, uid: %q", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			c.logger.Debugf("created new secret %q, uid: %q", util.NameFromMeta(secret.ObjectMeta), secret.UID)
 		}
 	}
 
@@ -404,7 +404,7 @@ func (c *Cluster) applySecrets() error {
 }
 
 func (c *Cluster) deleteSecret(secret *v1.Secret) error {
-	c.logger.Debugf("Deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
+	c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, c.deleteOptions)
 	if err != nil {
 		return err

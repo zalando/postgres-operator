@@ -88,7 +88,7 @@ func (c *Controller) initOperatorConfig() {
 
 		configMapData = configMap.Data
 	} else {
-		c.logger.Infoln("No ConfigMap specified. Loading default values")
+		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
 	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
@@ -108,7 +108,7 @@ func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
 
-	c.logger.Infof("Config: %s", c.opConfig.MustMarshal())
+	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
 
 	if c.opConfig.DebugLogging {
 		c.logger.Logger.Level = logrus.DebugLevel
@@ -185,7 +185,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 		go c.processClusterEventsQueue(i, stopCh, wg)
 	}
 
-	c.logger.Info("Started working in background")
+	c.logger.Info("started working in background")
 }
 
 func (c *Controller) runPodInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {

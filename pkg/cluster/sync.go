@@ -24,7 +24,7 @@ func (c *Cluster) Sync() error {
 		return err
 	}
 
-	c.logger.Debugf("Syncing secrets")
+	c.logger.Debugf("syncing secrets")
 
 	//TODO: mind the secrets of the deleted/new users
 	if err := c.applySecrets(); err != nil {
@@ -33,14 +33,14 @@ func (c *Cluster) Sync() error {
 		}
 	}
 
-	c.logger.Debugf("Syncing endpoints")
+	c.logger.Debugf("syncing endpoints")
 	if err := c.syncEndpoint(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not sync endpoints: %v", err)
 		}
 	}
 
-	c.logger.Debugf("Syncing services")
+	c.logger.Debugf("syncing services")
 	for _, role := range []postgresRole{master, replica} {
 		if role == replica && !c.Spec.ReplicaLoadBalancer {
 			if c.Service[role] != nil {
@@ -58,7 +58,7 @@ func (c *Cluster) Sync() error {
 		}
 	}
 
-	c.logger.Debugf("Syncing statefulsets")
+	c.logger.Debugf("syncing statefulsets")
 	if err := c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not sync statefulsets: %v", err)
@@ -66,13 +66,13 @@ func (c *Cluster) Sync() error {
 	}
 
 	if !c.databaseAccessDisabled() {
-		c.logger.Debugf("Syncing roles")
+		c.logger.Debugf("syncing roles")
 		if err := c.syncRoles(true); err != nil {
 			return fmt.Errorf("could not sync roles: %v", err)
 		}
 	}
 
-	c.logger.Debugf("Syncing persistent volumes")
+	c.logger.Debugf("syncing persistent volumes")
 	if err := c.syncVolumes(); err != nil {
 		return fmt.Errorf("could not sync persistent volumes: %v", err)
 	}
@@ -88,7 +88,7 @@ func (c *Cluster) syncService(role postgresRole) error {
 		if err != nil {
 			return fmt.Errorf("could not create missing %s service: %v", role, err)
 		}
-		c.logger.Infof("Created missing %s service %q", role, util.NameFromMeta(svc.ObjectMeta))
+		c.logger.Infof("created missing %s service %q", role, util.NameFromMeta(svc.ObjectMeta))
 
 		return nil
 	}
@@ -115,7 +115,7 @@ func (c *Cluster) syncEndpoint() error {
 		if err != nil {
 			return fmt.Errorf("could not create missing endpoint: %v", err)
 		}
-		c.logger.Infof("Created missing endpoint %q", util.NameFromMeta(ep.ObjectMeta))
+		c.logger.Infof("created missing endpoint %q", util.NameFromMeta(ep.ObjectMeta))
 		return nil
 	}
 
@@ -133,7 +133,7 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 
 		if len(pods) > 0 {
-			c.logger.Infof("Found pods without the statefulset: trigger rolling update")
+			c.logger.Infof("found pods without the statefulset: trigger rolling update")
 			rollUpdate = true
 		}
 		ss, err := c.createStatefulSet()
@@ -144,7 +144,7 @@ func (c *Cluster) syncStatefulSet() error {
 		if err != nil {
 			return fmt.Errorf("cluster is not ready: %v", err)
 		}
-		c.logger.Infof("Created missing statefulset %q", util.NameFromMeta(ss.ObjectMeta))
+		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(ss.ObjectMeta))
 		if !rollUpdate {
 			return nil
 		}
@@ -173,11 +173,11 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 
 		if !cmp.rollingUpdate {
-			c.logger.Debugln("No rolling update is needed")
+			c.logger.Debugln("no rolling update is needed")
 			return nil
 		}
 	}
-	c.logger.Debugln("Performing rolling update")
+	c.logger.Debugln("performing rolling update")
 	if err := c.recreatePods(); err != nil {
 		return fmt.Errorf("could not recreate pods: %v", err)
 	}
@@ -226,7 +226,7 @@ func (c *Cluster) syncVolumes() error {
 		return nil
 	}
 	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
-		return fmt.Errorf("Could not sync volumes: %v", err)
+		return fmt.Errorf("could not sync volumes: %v", err)
 	}
 	c.logger.Infof("volumes have been synced successfully")
 	return nil

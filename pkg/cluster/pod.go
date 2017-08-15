@@ -26,7 +26,7 @@ func (c *Cluster) listPods() ([]v1.Pod, error) {
 }
 
 func (c *Cluster) deletePods() error {
-	c.logger.Debugln("Deleting pods")
+	c.logger.Debugln("deleting pods")
 	pods, err := c.listPods()
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func (c *Cluster) deletePods() error {
 	for _, obj := range pods {
 		podName := util.NameFromMeta(obj.ObjectMeta)
 
-		c.logger.Debugf("Deleting pod %q", podName)
+		c.logger.Debugf("deleting pod %q", podName)
 		if err := c.deletePod(podName); err != nil {
 			c.logger.Errorf("could not delete pod %q: %v", podName, err)
 		} else {
@@ -45,7 +45,7 @@ func (c *Cluster) deletePods() error {
 	if len(pods) > 0 {
 		c.logger.Debugln("pods have been deleted")
 	} else {
-		c.logger.Debugln("No pods to delete")
+		c.logger.Debugln("no pods to delete")
 	}
 
 	return nil
@@ -71,7 +71,7 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	defer c.podSubscribersMu.Unlock()
 
 	if _, ok := c.podSubscribers[podName]; !ok {
-		panic("Subscriber for pod '" + podName.String() + "' is not found")
+		panic("subscriber for pod '" + podName.String() + "' is not found")
 	}
 
 	close(c.podSubscribers[podName])
@@ -124,7 +124,7 @@ func (c *Cluster) recreatePods() error {
 	if err != nil {
 		return fmt.Errorf("could not get the list of pods: %v", err)
 	}
-	c.logger.Infof("There are %d pods in the cluster to recreate", len(pods.Items))
+	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
 
 	var masterPod v1.Pod
 	for _, pod := range pods.Items {
@@ -140,11 +140,11 @@ func (c *Cluster) recreatePods() error {
 		}
 	}
 	if masterPod.Name == "" {
-		c.logger.Warningln("No master pod in the cluster")
+		c.logger.Warningln("no master pod in the cluster")
 	} else {
 		//TODO: do manual failover
 		//TODO: specify master, leave new master empty
-		c.logger.Infof("Recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
+		c.logger.Infof("recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
 		if err := c.recreatePod(masterPod); err != nil {
 			return fmt.Errorf("could not recreate master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
