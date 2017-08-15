@@ -239,7 +239,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		cl.Error = nil
 
 		lg.Infof("cluster has been synced")
-	case spec.EventRollingUpgrade:
+	case spec.EventMigration:
 		lg.Infof("rolling upgrade of the cluster started")
 
 		// no race condition because a cluster is always processed by single worker
@@ -247,7 +247,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			cl = c.addCluster(lg, clusterName, event.NewSpec)
 		}
 
-		if err := cl.RollingUpgrade(); err != nil {
+		if err := cl.Migration(); err != nil {
 			cl.Error = fmt.Errorf("could not rolling upgrade cluster: %v", err)
 			lg.Error(cl.Error)
 			return

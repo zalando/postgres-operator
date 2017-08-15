@@ -1,6 +1,7 @@
 package cluster
 
-// RollingUpgrade ...
-func (c *Cluster) RollingUpgrade() error {
+// Migration performs operations on the Pod during kubernetes cluster upgrade
+func (c *Cluster) Migration() error {
+	//TODO
 	return nil
 }

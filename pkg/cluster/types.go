@@ -27,7 +27,7 @@ type Interface interface {
 	Create() error
 	Update(*spec.Postgresql) error
 	Delete() error
-	RollingUpgrade() error
+	Migration() error
 
 	Run(<-chan struct{})
 }
