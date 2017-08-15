@@ -15,6 +15,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
 )
 
 // Controller represents operator controller
@@ -26,9 +27,12 @@ type Controller struct {
 	KubeClient k8sutil.KubernetesClient
 	RestClient rest.Interface // kubernetes API group REST client
 
-	clustersMu sync.RWMutex
-	clusters   map[spec.NamespacedName]*cluster.Cluster
-	stopChs    map[spec.NamespacedName]chan struct{}
+	stopCh chan struct{}
+
+	clustersMu   sync.RWMutex
+	clusters     map[spec.NamespacedName]*cluster.Cluster
+	clusterLogs  map[spec.NamespacedName]ringlog.RingLogger
+	teamClusters map[string][]spec.NamespacedName
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
@@ -36,6 +40,8 @@ type Controller struct {
 
 	clusterEventQueues  []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime int64
+
+	workerLogs map[uint32]ringlog.RingLogger
 }
 
 // NewController creates a new controller
@@ -43,12 +49,16 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 	logger := logrus.New()
 
 	c := &Controller{
-		config:   *controllerConfig,
-		opConfig: &config.Config{},
-		logger:   logger.WithField("pkg", "controller"),
-		clusters: make(map[spec.NamespacedName]*cluster.Cluster),
-		podCh:    make(chan spec.PodEvent),
+		config:       *controllerConfig,
+		opConfig:     &config.Config{},
+		logger:       logger.WithField("pkg", "controller"),
+		clusters:     make(map[spec.NamespacedName]*cluster.Cluster),
+		clusterLogs:  make(map[spec.NamespacedName]ringlog.RingLogger),
+		teamClusters: make(map[string][]spec.NamespacedName),
+		stopCh:       make(chan struct{}),
+		podCh:        make(chan spec.PodEvent),
 	}
+	logger.Hooks.Add(c)
 
 	return c
 }
@@ -149,6 +159,7 @@ func (c *Controller) initController() {
 	})
 
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
+	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
 		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
 			e, ok := obj.(spec.ClusterEvent)
@@ -172,6 +183,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
+		c.workerLogs[uint32(i)] = ringlog.New(c.opConfig.RingLogLines)
 		go c.processClusterEventsQueue(i, stopCh, wg)
 	}
 
