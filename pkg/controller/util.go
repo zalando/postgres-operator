@@ -53,9 +53,9 @@ func (c *Controller) createTPR() error {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return err
 		}
-		c.logger.Infof("ThirdPartyResource %q is already registered", constants.TPRName)
+		c.logger.Infof("thirdPartyResource %q is already registered", constants.TPRName)
 	} else {
-		c.logger.Infof("ThirdPartyResource %q' has been registered", constants.TPRName)
+		c.logger.Infof("thirdPartyResource %q' has been registered", constants.TPRName)
 	}
 
 	return k8sutil.WaitTPRReady(c.RestClient, c.opConfig.TPR.ReadyWaitInterval, c.opConfig.TPR.ReadyWaitTimeout, c.opConfig.Namespace)
@@ -71,7 +71,7 @@ func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (r
 		Secrets(rolesSecret.Namespace).
 		Get(rolesSecret.Name, metav1.GetOptions{})
 	if err != nil {
-		c.logger.Debugf("Infrastructure roles secret name: %q", *rolesSecret)
+		c.logger.Debugf("infrastructure roles secret name: %q", *rolesSecret)
 		return nil, fmt.Errorf("could not get infrastructure roles secret: %v", err)
 	}
 
@@ -99,7 +99,7 @@ Users:
 				case "inrole":
 					t.MemberOf = append(t.MemberOf, s)
 				default:
-					c.logger.Warnf("Unknown key %q", p)
+					c.logger.Warnf("unknown key %q", p)
 				}
 			}
 		}

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	logger = logrus.New()
+	logger = logrus.New().WithField("pkg", "teamsapi")
 	token  = "ec45b1cfbe7100c6315d183a3eb6cec0M2U1LWJkMzEtZDgzNzNmZGQyNGM3IiwiYXV0aF90aW1lIjoxNDkzNzMwNzQ1LCJpc3MiOiJodHRwcz"
 )
 
@@ -146,11 +146,11 @@ func TestInfo(t *testing.T) {
 		func() {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Header.Get("Authorization") != "Bearer "+token {
-					t.Errorf("Authorization token is wrong or not provided")
+					t.Errorf("authorization token is wrong or not provided")
 				}
 				w.WriteHeader(tc.inCode)
 				if _, err := fmt.Fprint(w, tc.in); err != nil {
-					t.Errorf("Error writing teams api response %v", err)
+					t.Errorf("error writing teams api response %v", err)
 				}
 			}))
 			defer ts.Close()
@@ -158,12 +158,12 @@ func TestInfo(t *testing.T) {
 
 			actual, err := api.TeamInfo("acid", token)
 			if err != nil && err.Error() != tc.err.Error() {
-				t.Errorf("Expected error: %v, got: %v", tc.err, err)
+				t.Errorf("expected error: %v, got: %v", tc.err, err)
 				return
 			}
 
 			if !reflect.DeepEqual(actual, tc.out) {
-				t.Errorf("Expected %#v, got: %#v", tc.out, actual)
+				t.Errorf("expected %#v, got: %#v", tc.out, actual)
 			}
 		}()
 	}
@@ -205,7 +205,7 @@ func TestHttpClientClose(t *testing.T) {
 	_, err := api.TeamInfo("acid", token)
 	expError := fmt.Errorf("error when closing response: close error")
 	if err.Error() != expError.Error() {
-		t.Errorf("Expected error: %v, got: %v", expError, err)
+		t.Errorf("expected error: %v, got: %v", expError, err)
 	}
 }
 
@@ -214,12 +214,12 @@ func TestRequest(t *testing.T) {
 		api := NewTeamsAPI(tc.url, logger)
 		resp, err := api.TeamInfo("acid", token)
 		if resp != nil {
-			t.Errorf("Response expected to be nil")
+			t.Errorf("response expected to be nil")
 			continue
 		}
 
 		if err.Error() != tc.err.Error() {
-			t.Errorf("Expected error: %v, got: %v", tc.err, err)
+			t.Errorf("expected error: %v, got: %v", tc.err, err)
 		}
 	}
 }

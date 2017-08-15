@@ -30,13 +30,13 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 }
 
 func (c *Cluster) deletePersistenVolumeClaims() error {
-	c.logger.Debugln("Deleting PVCs")
+	c.logger.Debugln("deleting PVCs")
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {
 		return err
 	}
 	for _, pvc := range pvcs {
-		c.logger.Debugf("Deleting PVC %q", util.NameFromMeta(pvc.ObjectMeta))
+		c.logger.Debugf("deleting PVC %q", util.NameFromMeta(pvc.ObjectMeta))
 		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, c.deleteOptions); err != nil {
 			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
 		}
@@ -44,7 +44,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 	if len(pvcs) > 0 {
 		c.logger.Debugln("PVCs have been deleted")
 	} else {
-		c.logger.Debugln("No PVCs to delete")
+		c.logger.Debugln("no PVCs to delete")
 	}
 
 	return nil
@@ -66,7 +66,7 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 				return nil, fmt.Errorf("could not convert last part of the persistent volume claim name %q to a number", pvc.Name)
 			}
 			if int32(pvcNumber) > lastPodIndex {
-				c.logger.Debugf("Skipping persistent volume %q corresponding to a non-running pods", pvc.Name)
+				c.logger.Debugf("skipping persistent volume %q corresponding to a non-running pods", pvc.Name)
 				continue
 			}
 		}

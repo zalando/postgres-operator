@@ -145,7 +145,7 @@ PATRONI_INITDB_PARAMS:
 					}
 				}
 			default:
-				c.logger.Warnf("Unsupported type for initdb configuration item %s: %T", defaultParam)
+				c.logger.Warnf("unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
 				continue PATRONI_INITDB_PARAMS
 			}
 		}
@@ -199,7 +199,7 @@ PATRONI_INITDB_PARAMS:
 	}
 	result, err := json.Marshal(config)
 	if err != nil {
-		c.logger.Errorf("Cannot convert spilo configuration into JSON: %v", err)
+		c.logger.Errorf("cannot convert spilo configuration into JSON: %v", err)
 		return ""
 	}
 	return string(result)

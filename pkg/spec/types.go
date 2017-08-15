@@ -7,6 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
 )
 
 // EventType contains type of the events for the TPRs and Pods received from Kubernetes
@@ -72,6 +73,17 @@ type UserSyncer interface {
 	ExecuteSyncRequests(req []PgSyncUserRequest, db *sql.DB) error
 }
 
+// ControllerConfig describes configuration of the controller
+type ControllerConfig struct {
+	RestConfig          *rest.Config `json:"-"`
+	InfrastructureRoles map[string]PgUser
+
+	NoDatabaseAccess bool
+	NoTeamsAPI       bool
+	ConfigMapName    NamespacedName
+	Namespace        string
+}
+
 func (n NamespacedName) String() string {
 	return types.NamespacedName(n).String()
 }
@@ -93,7 +105,7 @@ func (n *NamespacedName) Decode(value string) error {
 	}
 
 	if name.Name == "" {
-		return fmt.Errorf("Incorrect namespaced name")
+		return fmt.Errorf("incorrect namespaced name")
 	}
 
 	*n = NamespacedName(name)

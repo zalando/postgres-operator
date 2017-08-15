@@ -17,20 +17,9 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
-// Config describes configuration of the controller
-type Config struct {
-	RestConfig          *rest.Config
-	InfrastructureRoles map[string]spec.PgUser
-
-	NoDatabaseAccess bool
-	NoTeamsAPI       bool
-	ConfigMapName    spec.NamespacedName
-	Namespace        string
-}
-
 // Controller represents operator controller
 type Controller struct {
-	config   Config
+	config   spec.ControllerConfig
 	opConfig *config.Config
 
 	logger     *logrus.Entry
@@ -45,22 +34,23 @@ type Controller struct {
 	podInformer        cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
-	clusterEventQueues  []*cache.FIFO
+	clusterEventQueues  []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime int64
 }
 
 // NewController creates a new controller
-func NewController(controllerConfig *Config) *Controller {
+func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 	logger := logrus.New()
 
-	return &Controller{
+	c := &Controller{
 		config:   *controllerConfig,
 		opConfig: &config.Config{},
 		logger:   logger.WithField("pkg", "controller"),
 		clusters: make(map[spec.NamespacedName]*cluster.Cluster),
-		stopChs:  make(map[spec.NamespacedName]chan struct{}),
 		podCh:    make(chan spec.PodEvent),
 	}
+
+	return c
 }
 
 func (c *Controller) initClients() {
@@ -88,7 +78,7 @@ func (c *Controller) initOperatorConfig() {
 
 		configMapData = configMap.Data
 	} else {
-		c.logger.Infoln("No ConfigMap specified. Loading default values")
+		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
 	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
@@ -108,7 +98,7 @@ func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
 
-	c.logger.Infof("Config: %s", c.opConfig.MustMarshal())
+	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
 
 	if c.opConfig.DebugLogging {
 		c.logger.Logger.Level = logrus.DebugLevel
@@ -185,7 +175,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 		go c.processClusterEventsQueue(i, stopCh, wg)
 	}
 
-	c.logger.Info("Started working in background")
+	c.logger.Info("started working in background")
 }
 
 func (c *Controller) runPodInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
