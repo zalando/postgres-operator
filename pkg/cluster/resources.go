@@ -31,9 +31,9 @@ func (c *Cluster) loadResources() error {
 	for i, svc := range services.Items {
 		switch postgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
 		case replica:
-			c.Service[replica] = &services.Items[i]
+			c.Services[replica] = &services.Items[i]
 		default:
-			c.Service[master] = &services.Items[i]
+			c.Services[master] = &services.Items[i]
 		}
 	}
 
@@ -91,7 +91,7 @@ func (c *Cluster) listResources() error {
 		c.logger.Infof("found endpoint: %q (uid: %q)", util.NameFromMeta(c.Endpoint.ObjectMeta), c.Endpoint.UID)
 	}
 
-	for role, service := range c.Service {
+	for role, service := range c.Services {
 		c.logger.Infof("found %s service: %q (uid: %q)", role, util.NameFromMeta(service.ObjectMeta), service.UID)
 	}
 
@@ -231,7 +231,7 @@ func (c *Cluster) deleteStatefulSet() error {
 }
 
 func (c *Cluster) createService(role postgresRole) (*v1.Service, error) {
-	if c.Service[role] != nil {
+	if c.Services[role] != nil {
 		return nil, fmt.Errorf("service already exists in the cluster")
 	}
 	serviceSpec := c.generateService(role, &c.Spec)
@@ -241,18 +241,18 @@ func (c *Cluster) createService(role postgresRole) (*v1.Service, error) {
 		return nil, err
 	}
 
-	c.Service[role] = service
+	c.Services[role] = service
 	return service, nil
 }
 
 func (c *Cluster) updateService(role postgresRole, newService *v1.Service) error {
-	if c.Service[role] == nil {
+	if c.Services[role] == nil {
 		return fmt.Errorf("there is no service in the cluster")
 	}
-	serviceName := util.NameFromMeta(c.Service[role].ObjectMeta)
+	serviceName := util.NameFromMeta(c.Services[role].ObjectMeta)
 	endpointName := util.NameFromMeta(c.Endpoint.ObjectMeta)
 	// TODO: check if it possible to change the service type with a patch in future versions of Kubernetes
-	if newService.Spec.Type != c.Service[role].Spec.Type {
+	if newService.Spec.Type != c.Services[role].Spec.Type {
 		// service type has changed, need to replace the service completely.
 		// we cannot use just pach the current service, since it may contain attributes incompatible with the new type.
 		var (
@@ -263,12 +263,12 @@ func (c *Cluster) updateService(role postgresRole, newService *v1.Service) error
 		if role == master {
 			// for the master service we need to re-create the endpoint as well. Get the up-to-date version of
 			// the addresses stored in it before the service is deleted (deletion of the service removes the endpooint)
-			currentEndpoint, err = c.KubeClient.Endpoints(c.Service[role].Namespace).Get(c.Service[role].Name, metav1.GetOptions{})
+			currentEndpoint, err = c.KubeClient.Endpoints(c.Services[role].Namespace).Get(c.Services[role].Name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("could not get current cluster endpoints: %v", err)
 			}
 		}
-		err = c.KubeClient.Services(c.Service[role].Namespace).Delete(c.Service[role].Name, c.deleteOptions)
+		err = c.KubeClient.Services(c.Services[role].Namespace).Delete(c.Services[role].Name, c.deleteOptions)
 		if err != nil {
 			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
@@ -277,11 +277,11 @@ func (c *Cluster) updateService(role postgresRole, newService *v1.Service) error
 		if err != nil {
 			return fmt.Errorf("could not create service %q: %v", serviceName, err)
 		}
-		c.Service[role] = svc
+		c.Services[role] = svc
 		if role == master {
 			// create the new endpoint using the addresses obtained from the previous one
 			endpointSpec := c.generateMasterEndpoints(currentEndpoint.Subsets)
-			ep, err := c.KubeClient.Endpoints(c.Service[role].Namespace).Create(endpointSpec)
+			ep, err := c.KubeClient.Endpoints(c.Services[role].Namespace).Create(endpointSpec)
 			if err != nil {
 				return fmt.Errorf("could not create endpoint %q: %v", endpointName, err)
 			}
@@ -293,8 +293,8 @@ func (c *Cluster) updateService(role postgresRole, newService *v1.Service) error
 	if len(newService.ObjectMeta.Annotations) > 0 {
 		annotationsPatchData := metadataAnnotationsPatch(newService.ObjectMeta.Annotations)
 
-		_, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(
-			c.Service[role].Name,
+		_, err := c.KubeClient.Services(c.Services[role].Namespace).Patch(
+			c.Services[role].Name,
 			types.StrategicMergePatchType,
 			[]byte(annotationsPatchData), "")
 
@@ -308,30 +308,30 @@ func (c *Cluster) updateService(role postgresRole, newService *v1.Service) error
 		return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
 	}
 
-	svc, err := c.KubeClient.Services(c.Service[role].Namespace).Patch(
-		c.Service[role].Name,
+	svc, err := c.KubeClient.Services(c.Services[role].Namespace).Patch(
+		c.Services[role].Name,
 		types.MergePatchType,
 		patchData, "")
 	if err != nil {
 		return fmt.Errorf("could not patch service %q: %v", serviceName, err)
 	}
-	c.Service[role] = svc
+	c.Services[role] = svc
 
 	return nil
 }
 
 func (c *Cluster) deleteService(role postgresRole) error {
 	c.logger.Debugf("deleting service %s", role)
-	if c.Service[role] == nil {
+	if c.Services[role] == nil {
 		return fmt.Errorf("there is no %s service in the cluster", role)
 	}
-	service := c.Service[role]
+	service := c.Services[role]
 	err := c.KubeClient.Services(service.Namespace).Delete(service.Name, c.deleteOptions)
 	if err != nil {
 		return err
 	}
 	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(service.ObjectMeta))
-	c.Service[role] = nil
+	c.Services[role] = nil
 	return nil
 }
 
@@ -422,12 +422,12 @@ func (c *Cluster) createRoles() (err error) {
 
 // GetServiceMaster returns cluster's kubernetes master Service
 func (c *Cluster) GetServiceMaster() *v1.Service {
-	return c.Service[master]
+	return c.Services[master]
 }
 
 // GetServiceReplica returns cluster's kubernetes replica Service
 func (c *Cluster) GetServiceReplica() *v1.Service {
-	return c.Service[replica]
+	return c.Services[replica]
 }
 
 // GetEndpoint returns cluster's kubernetes Endpoint
