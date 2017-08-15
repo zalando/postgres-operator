@@ -133,7 +133,7 @@ var requestsURLtc = []struct {
 }{
 	{
 		"coffee://localhost/",
-		fmt.Errorf(`get coffee://localhost/teams/acid: unsupported protocol scheme "coffee"`),
+		fmt.Errorf(`Get coffee://localhost/teams/acid: unsupported protocol scheme "coffee"`),
 	},
 	{
 		"http://192.168.0.%31/",
