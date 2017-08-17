@@ -93,7 +93,7 @@ func (s *Server) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 			s.logger.Fatalf("Could not start http server: %v", err)
 		}
 	}()
-	s.logger.Infof("Listening on %s", s.http.Addr)
+	s.logger.Infof("listening on %s", s.http.Addr)
 
 	<-stopCh
 

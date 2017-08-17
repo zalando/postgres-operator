@@ -6,6 +6,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -169,7 +170,7 @@ func (c *Controller) initController() {
 				return "", fmt.Errorf("could not cast to ClusterEvent")
 			}
 
-			return fmt.Sprintf("%s-%s", e.EventType, e.UID), nil
+			return queueClusterKey(e.EventType, e.UID), nil
 		})
 	}
 
@@ -205,4 +206,8 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 	defer wg.Done()
 
 	c.postgresqlInformer.Run(stopCh)
+}
+
+func queueClusterKey(eventType spec.EventType, uid types.UID) string {
+	return fmt.Sprintf("%s-%s", eventType, uid)
 }
