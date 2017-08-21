@@ -303,7 +303,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 			Privileged: &privilegedMode,
 		},
 	}
-	terminateGracePeriodSeconds := int64(30)
+	terminateGracePeriodSeconds := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
 
 	podSpec := v1.PodSpec{
 		ServiceAccountName:            c.OpConfig.ServiceAccountName,
