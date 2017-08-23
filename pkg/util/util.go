@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
 
@@ -70,4 +71,30 @@ OUTER:
 		result = append(result, vala)
 	}
 	return result, len(result) == 0
+}
+
+func FindNamedStringSubmatch(r *regexp.Regexp, s string) map[string]string {
+	matches := r.FindStringSubmatch(s)
+	grNames := r.SubexpNames()
+
+	if matches == nil {
+		return nil
+	}
+
+	groupMatches := 0
+	res := make(map[string]string, len(grNames))
+	for i, n := range grNames {
+		if n == "" {
+			continue
+		}
+
+		res[n] = matches[i]
+		groupMatches++
+	}
+
+	if groupMatches == 0 {
+		return nil
+	}
+
+	return res
 }

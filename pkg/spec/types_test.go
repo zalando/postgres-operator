@@ -22,10 +22,10 @@ func TestNamespacedNameDecode(t *testing.T) {
 		var actual NamespacedName
 		err := actual.Decode(tt.s)
 		if err != nil {
-			t.Errorf("Decode error: %v", err)
+			t.Errorf("decode error: %v", err)
 		}
 		if actual != tt.expected {
-			t.Errorf("Expected: %v, got %#v", tt.expected, actual)
+			t.Errorf("expected: %v, got %#v", tt.expected, actual)
 		}
 	}
 }
@@ -36,10 +36,10 @@ func TestNamespacedNameMarshal(t *testing.T) {
 
 		m, err := actual.MarshalJSON()
 		if err != nil {
-			t.Errorf("Marshal error: %v", err)
+			t.Errorf("marshal error: %v", err)
 		}
 		if bytes.Equal(m, tt.expectedMarshal) {
-			t.Errorf("Expected marshal: %v, got %#v", tt.expected, actual)
+			t.Errorf("expected marshal: %v, got %#v", tt.expected, actual)
 		}
 	}
 }
@@ -49,7 +49,7 @@ func TestNamespacedNameError(t *testing.T) {
 		var actual NamespacedName
 		err := actual.Decode(tt)
 		if err == nil {
-			t.Errorf("Error expected for %q, got: %#v", tt, actual)
+			t.Errorf("error expected for %q, got: %#v", tt, actual)
 		}
 	}
 }

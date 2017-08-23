@@ -145,7 +145,7 @@ PATRONI_INITDB_PARAMS:
 					}
 				}
 			default:
-				c.logger.Warnf("Unsupported type for initdb configuration item %s: %T", defaultParam)
+				c.logger.Warnf("unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
 				continue PATRONI_INITDB_PARAMS
 			}
 		}
@@ -199,7 +199,7 @@ PATRONI_INITDB_PARAMS:
 	}
 	result, err := json.Marshal(config)
 	if err != nil {
-		c.logger.Errorf("Cannot convert spilo configuration into JSON: %v", err)
+		c.logger.Errorf("cannot convert spilo configuration into JSON: %v", err)
 		return ""
 	}
 	return string(result)
@@ -303,7 +303,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 			Privileged: &privilegedMode,
 		},
 	}
-	terminateGracePeriodSeconds := int64(30)
+	terminateGracePeriodSeconds := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
 
 	podSpec := v1.PodSpec{
 		ServiceAccountName:            c.OpConfig.ServiceAccountName,
