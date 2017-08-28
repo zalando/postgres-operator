@@ -51,6 +51,12 @@ type Patroni struct {
 	MaximumLagOnFailover float32           `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
 }
 
+// CloneDescription describes which cluster the new should clone and up to which point in time
+type CloneDescription struct {
+	ClusterName  string `json:"cluster"`
+	EndTimestamp string `json:"timestamp"`
+}
+
 type userFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
@@ -79,14 +85,15 @@ type Postgresql struct {
 
 // PostgresSpec defines the specification for the PostgreSQL TPR.
 type PostgresSpec struct {
-	PostgresqlParam `json:"postgresql"`
-	Volume          `json:"volume,omitempty"`
-	Patroni         `json:"patroni,omitempty"`
-	Resources       `json:"resources,omitempty"`
+	PostgresqlParam  `json:"postgresql"`
+	Volume           `json:"volume,omitempty"`
+	Patroni          `json:"patroni,omitempty"`
+	Resources        `json:"resources,omitempty"`
+	CloneDescription `json:"clone,omitempty"`
 
 	TeamID              string   `json:"teamId"`
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
-	// EnableLoadBalancer  is a pointer, since it is importat to know if that parameters is omitted from the manifest
+	// EnableLoadBalancer  is a pointer, since it is important to know if that parameters is omitted from the manifest
 	UseLoadBalancer     *bool                `json:"useLoadBalancer,omitempty"`
 	ReplicaLoadBalancer bool                 `json:"replicaLoadBalancer,omitempty"`
 	NumberOfInstances   int32                `json:"numberOfInstances"`

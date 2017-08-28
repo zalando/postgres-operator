@@ -205,7 +205,10 @@ PATRONI_INITDB_PARAMS:
 	return string(result)
 }
 
-func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements, pgParameters *spec.PostgresqlParam, patroniParameters *spec.Patroni) *v1.PodTemplateSpec {
+func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements,
+	pgParameters *spec.PostgresqlParam,
+	patroniParameters *spec.Patroni,
+	cloneDescription *spec.CloneDescription) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -272,6 +275,13 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	if c.OpConfig.WALES3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 	}
+	if cloneDescription.ClusterName != "" {
+		// TODO: validate the cluster name against the team-cluster convention
+		cloneVars := c.generateCloneEnvironment(cloneDescription)
+		for _, v := range cloneVars {
+			envVars = append(envVars, v)
+		}
+	}
 	privilegedMode := bool(true)
 	container := v1.Container{
 		Name:            c.Name,
@@ -331,7 +341,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 		return nil, err
 	}
 
-	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni)
+	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni, &spec.CloneDescription)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, err
@@ -494,4 +504,58 @@ func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpo
 	}
 
 	return endpoints
+}
+
+func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) []v1.EnvVar {
+	result := make([]v1.EnvVar, 0)
+	if description.ClusterName == "" {
+		return result
+	}
+	cluster := description.ClusterName
+	result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
+	if description.EndTimestamp == "" {
+		// cloning with basebackup, make a connection string to the cluster to clone from
+		host, port := c.getClusterServiceConnectionParameters(cluster)
+		user, password, err := c.getClusterSecretCredentials(cluster)
+		if err != nil {
+			c.logger.Warning("could not acquire connection string of the cluster %q to clone: %v", cluster, err)
+			return result
+		}
+		// TODO: make some/all of those constants
+		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_BASEBACKUP"})
+		result = append(result, v1.EnvVar{Name: "CLONE_HOST", Value: host})
+		result = append(result, v1.EnvVar{Name: "CLONE_PORT", Value: port})
+		result = append(result, v1.EnvVar{Name: "CLONE_USER", Value: user})
+		result = append(result, v1.EnvVar{Name: "CLONE_PASSWORD", Value: password})
+	} else {
+		// cloning with S3, find out the bucket to clone
+		clone_wal_s3_bucket := c.OpConfig.WALES3Bucket
+		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: clone_wal_s3_bucket})
+		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
+	}
+	return result
+}
+
+// getClusterServiceConnectionParameters fetches cluster host name and port
+// TODO: perhaps we need to query the service (i.e. if non-standard port is used?)
+func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (host string, port string) {
+	host = clusterName
+	port = "5432"
+	return
+}
+
+// getClusterSecretCredentials fetches the superuser (postgres) password from the cluster's secret
+// XXX: there is an assumption that the secrets to fetch are in the cluster's namespace
+func (c *Cluster) getClusterSecretCredentials(clusterName string) (user string, password string, err error) {
+	superUser := c.OpConfig.SuperUsername
+	password = ""
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(c.credentialSecretNameForCluster(superUser, clusterName),
+		metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+	// XXX: do we need to base64 decode it?
+	password = string(secret.Data["password"])
+	return superUser, password, nil
 }
