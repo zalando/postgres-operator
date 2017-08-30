@@ -137,7 +137,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 
 	if err != nil {
-		c.logger.Warningf("could not set %q status for the cluster: %v", err)
+		c.logger.Warningf("could not set %q status for the cluster: %v", status, err)
 	}
 }
 
