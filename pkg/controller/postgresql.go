@@ -181,7 +181,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		lg.Infoln("update of the cluster started")
 
 		if !clusterFound {
-			lg.Warnln("cluster does not exist")
+			lg.Warningln("cluster does not exist")
 			return
 		}
 		if err := cl.Update(event.NewSpec); err != nil {

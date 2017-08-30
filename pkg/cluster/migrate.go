@@ -55,7 +55,7 @@ func (c *Cluster) Migrate() error {
 		case replica:
 			replicaPods = append(replicaPods, &allPods[i])
 		default:
-			c.logger.Warnf("pod %q has no role", util.NameFromMeta(pod.ObjectMeta))
+			c.logger.Warningf("pod %q has no role", util.NameFromMeta(pod.ObjectMeta))
 		}
 	}
 
@@ -96,7 +96,7 @@ func (c *Cluster) Migrate() error {
 		c.logger.Debugf("moving %q pod", util.NameFromMeta(pod.ObjectMeta))
 
 		if err := c.movePod(&pod); err != nil {
-			c.logger.Warnf("could not move pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
+			c.logger.Warningf("could not move pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 			continue
 		}
 

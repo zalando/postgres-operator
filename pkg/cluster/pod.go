@@ -191,7 +191,7 @@ func (c *Cluster) recreatePods() error {
 	}
 
 	if masterPod == nil {
-		c.logger.Warnln("no master pod in the cluster")
+		c.logger.Warningln("no master pod in the cluster")
 	} else {
 		//TODO: do manual failover
 		//TODO: specify master, leave new master empty

@@ -178,7 +178,7 @@ func (c *Controller) initController() {
 	}
 
 	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
-		c.logger.Warnf("could not get infrastructure roles: %v", err)
+		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.config.InfrastructureRoles = infraRoles
 	}
