@@ -63,12 +63,12 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("could not read response: %v", err)
-	}
-
 	if resp.StatusCode != http.StatusOK {
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("could not read response: %v", err)
+		}
+
 		return fmt.Errorf("patroni returned '%s'", string(bodyBytes))
 	}
 
