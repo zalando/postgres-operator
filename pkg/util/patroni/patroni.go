@@ -48,7 +48,11 @@ func (p *Patroni) apiURL(masterPod *v1.Pod) string {
 // Failover does manual failover via patroni api
 func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 	buf := &bytes.Buffer{}
+
 	err := json.NewEncoder(buf).Encode(map[string]string{"leader": master.Name, "member": candidate})
+	if err != nil {
+		return fmt.Errorf("could not encode json: %v", err)
+	}
 
 	request, err := http.NewRequest(http.MethodPost, p.apiURL(master)+failoverPath, buf)
 	if err != nil {
