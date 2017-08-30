@@ -69,7 +69,7 @@ func (c *Cluster) closeDbConn() (err error) {
 		}
 		c.pgDb = nil
 	}
-	c.logger.Warning("attempted to close an empty db connection object")
+	c.logger.Warn("attempted to close an empty db connection object")
 	return nil
 }
 

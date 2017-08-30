@@ -99,7 +99,7 @@ Users:
 				case "inrole":
 					t.MemberOf = append(t.MemberOf, s)
 				default:
-					c.logger.Warnf("unknown key %q", p)
+					c.logger.Warningf("unknown key %q", p)
 				}
 			}
 		}

@@ -199,7 +199,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	// check that all the previous replicas were picked up.
 	if newStatefulSet.Spec.Replicas == oldStatefulset.Spec.Replicas &&
 		createdStatefulset.Status.Replicas != oldStatefulset.Status.Replicas {
-		c.logger.Warnf("number of pods for the old and updated Statefulsets is not identical")
+		c.logger.Warningf("number of pods for the old and updated Statefulsets is not identical")
 	}
 
 	c.Statefulset = createdStatefulset

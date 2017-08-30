@@ -137,7 +137,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 
 	if err != nil {
-		c.logger.Warningf("could not set %q status for the cluster: %v", status, err)
+		c.logger.Warningf("could not set %q status for the cluster: %v", err)
 	}
 }
 
@@ -294,7 +294,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 
-		c.logger.Warnf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
+		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
 	}
 	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
@@ -479,7 +479,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	}
 
 	if c.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
-		c.logger.Warnf("postgresql version change(%q -> %q) is not allowed",
+		c.logger.Warningf("postgresql version change(%q -> %q) is not allowed",
 			c.Spec.PgVersion, newSpec.Spec.PgVersion)
 		//TODO: rewrite pg version in tpr spec
 	}
