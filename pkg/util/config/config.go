@@ -17,17 +17,18 @@ type TPR struct {
 
 // Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
-	ResourceCheckInterval  time.Duration     `name:"resource_check_interval" default:"3s"`
-	ResourceCheckTimeout   time.Duration     `name:"resource_check_timeout" default:"10m"`
-	PodLabelWaitTimeout    time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
-	PodDeletionWaitTimeout time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
-	ClusterLabels          map[string]string `name:"cluster_labels" default:"application:spilo"`
-	ClusterNameLabel       string            `name:"cluster_name_label" default:"cluster-name"`
-	PodRoleLabel           string            `name:"pod_role_label" default:"spilo-role"`
-	DefaultCPURequest      string            `name:"default_cpu_request" default:"100m"`
-	DefaultMemoryRequest   string            `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit        string            `name:"default_cpu_limit" default:"3"`
-	DefaultMemoryLimit     string            `name:"default_memory_limit" default:"1Gi"`
+	ResourceCheckInterval   time.Duration     `name:"resource_check_interval" default:"3s"`
+	ResourceCheckTimeout    time.Duration     `name:"resource_check_timeout" default:"10m"`
+	PodLabelWaitTimeout     time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
+	PodDeletionWaitTimeout  time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
+	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
+	ClusterNameLabel        string            `name:"cluster_name_label" default:"cluster-name"`
+	PodRoleLabel            string            `name:"pod_role_label" default:"spilo-role"`
+	DefaultCPURequest       string            `name:"default_cpu_request" default:"100m"`
+	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
+	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
+	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
 }
 
 // Auth describes authentication specific configuration parameters
@@ -64,7 +65,7 @@ type Config struct {
 	APIPort              int            `name:"api_port" default:"8080"`
 	RingLogLines         int            `name:"ring_log_lines" default:"100"`
 
-	PodTerminateGracePeriod time.Duration `name:"pod_terminate_grace_period" default:"5m"`
+	OldNodeLabel map[string]string `name:"old_node_label" default:"version:old"`
 }
 
 // MustMarshal marshals the config or panics
@@ -108,6 +109,11 @@ func Copy(c *Config) Config {
 	cfg.ClusterLabels = make(map[string]string, len(c.ClusterLabels))
 	for k, v := range c.ClusterLabels {
 		cfg.ClusterLabels[k] = v
+	}
+
+	cfg.OldNodeLabel = make(map[string]string, len(c.OldNodeLabel))
+	for k, v := range c.OldNodeLabel {
+		cfg.OldNodeLabel[k] = v
 	}
 
 	return cfg

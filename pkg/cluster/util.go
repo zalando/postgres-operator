@@ -161,15 +161,17 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
+func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *postgresRole) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
-			role := c.podSpiloRole(podEvent.CurPod)
-			// We cannot assume any role of the newly created pod. Normally, for a multi-pod cluster
-			// we should observe the 'replica' value, but it could be that some pods are not allowed
-			// to promote, therefore, the new pod could be a master as well.
-			if role == constants.PodRoleMaster || role == constants.PodRoleReplica {
+			podRole := c.podPostgresRole(podEvent.CurPod)
+
+			if role == nil {
+				if podRole == master || podRole == replica {
+					return nil
+				}
+			} else if *role == podRole {
 				return nil
 			}
 		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
@@ -219,12 +221,12 @@ func (c *Cluster) waitPodLabelsReady() error {
 	}
 	masterListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
+			c.OpConfig.PodRoleLabel: string(master),
 		}).String(),
 	}
 	replicaListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
+			c.OpConfig.PodRoleLabel: string(replica),
 		}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
@@ -311,6 +313,6 @@ func (c *Cluster) credentialSecretName(username string) string {
 		c.Name)
 }
 
-func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
-	return pod.Labels[c.OpConfig.PodRoleLabel]
+func (c *Cluster) podPostgresRole(pod *v1.Pod) postgresRole {
+	return postgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 }

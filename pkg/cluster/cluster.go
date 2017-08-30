@@ -23,6 +23,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/patroni"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
@@ -55,6 +56,7 @@ type Cluster struct {
 	spec.Postgresql
 	Config
 	logger           *logrus.Entry
+	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
 	podSubscribers   map[spec.NamespacedName]chan spec.PodEvent
@@ -105,6 +107,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger),
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
+	cluster.patroni = patroni.New(cluster.logger)
 
 	return cluster
 }
@@ -132,12 +135,12 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 		DoRaw()
 
 	if k8sutil.ResourceNotFound(err) {
-		c.logger.Warningf("could not set %q status for the non-existing cluster", status)
+		c.logger.Warnf("could not set %q status for the non-existing cluster", status)
 		return
 	}
 
 	if err != nil {
-		c.logger.Warningf("could not set %q status for the cluster: %v", status, err)
+		c.logger.Warnf("could not set %q status for the cluster: %v", err)
 	}
 }
 
@@ -660,4 +663,33 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 
 		Error: c.Error,
 	}
+}
+
+// ManualFailover does manual failover to a candidate pod
+func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
+	podLabelErr := make(chan error)
+	defer close(podLabelErr)
+
+	go func() {
+		ch := c.registerPodSubscriber(candidate)
+		defer c.unregisterPodSubscriber(candidate)
+		role := master
+		podLabelErr <- c.waitForPodLabel(ch, &role)
+	}()
+
+	if c.patroni == nil {
+		c.logger.Fatalf("patroni is not set")
+	}
+
+	if err := c.patroni.Failover(curMaster, candidate.Name); err != nil {
+		return fmt.Errorf("could not failover: %v", err)
+	} else {
+		c.logger.Debugln("successfully failed over")
+	}
+
+	if err := <-podLabelErr; err != nil {
+		return fmt.Errorf("could not get master pod label: %v", err)
+	}
+
+	return nil
 }

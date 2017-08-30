@@ -6,6 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/pkg/api/v1"
 
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
@@ -35,7 +36,7 @@ func (c *Controller) nodeAdd(obj interface{}) {
 		return
 	}
 
-	c.logger.Infof("new node has been added: %q", util.NameFromMeta(node.ObjectMeta))
+	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
 }
 
 func (c *Controller) nodeUpdate(prev, cur interface{}) {
@@ -49,10 +50,22 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		return
 	}
 
-	c.logger.Infof("node %q has been updated: %+v -> %+v",
-		util.NameFromMeta(nodeCur.ObjectMeta),
-		nodePrev.Labels,
-		nodeCur.Labels)
+	if util.MapContains(nodeCur.Labels, c.opConfig.OldNodeLabel) && !util.MapContains(nodePrev.Labels, c.opConfig.OldNodeLabel) {
+		c.logger.Infof("node %q (%s) has been marked with old labels", util.NameFromMeta(nodeCur.ObjectMeta), nodeCur.Spec.ProviderID)
+
+		clusters, err := c.getClustersToMigrate(nodeCur.Name)
+		if err != nil {
+			c.logger.Errorf("could not get list of postgresql clusters to migrate: %v", err)
+		}
+
+		for _, cl := range clusters {
+			c.clustersMu.RLock()
+			cl := c.clusters[cl]
+			c.clustersMu.RUnlock()
+
+			c.queueClusterEvent(nil, &cl.Postgresql, spec.EventMigration)
+		}
+	}
 }
 
 func (c *Controller) nodeDelete(obj interface{}) {
@@ -61,5 +74,5 @@ func (c *Controller) nodeDelete(obj interface{}) {
 		return
 	}
 
-	c.logger.Infof("node has been deleted: %q", util.NameFromMeta(node.ObjectMeta))
+	c.logger.Debugf("node has been deleted: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
 }

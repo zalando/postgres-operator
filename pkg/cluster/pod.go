@@ -8,21 +8,72 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
-	ns := c.Namespace
 	listOptions := metav1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}
 
-	pods, err := c.KubeClient.Pods(ns).List(listOptions)
+	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)
 	if err != nil {
 		return nil, fmt.Errorf("could not get list of pods: %v", err)
 	}
 
 	return pods.Items, nil
+}
+
+func (c *Cluster) getRolePods(role postgresRole) ([]v1.Pod, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.roleLabelsSet(role).String(),
+	}
+
+	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)
+	if err != nil {
+		return nil, fmt.Errorf("could not get list of pods: %v", err)
+	}
+
+	if len(pods.Items) == 0 {
+		return nil, fmt.Errorf("no pods")
+	}
+
+	if role == master && len(pods.Items) > 1 {
+		return nil, fmt.Errorf("too many masters")
+	}
+
+	return pods.Items, nil
+}
+
+// movePod moves pod from old kubernetes node to the new one
+func (c *Cluster) movePod(pod *v1.Pod) error {
+	podName := util.NameFromMeta(pod.ObjectMeta)
+	c.logger.Debugf("old %q pod's node: %q", pod.Name, pod.Spec.NodeName)
+
+	err := c.recreatePod(podName)
+	if err != nil {
+		return fmt.Errorf("could not recreate pod: %v", err)
+	}
+
+	newPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+	c.logger.Debugf("new %q pod's node: %q", pod.Name, newPod.Spec.NodeName)
+	if err != nil {
+		return fmt.Errorf("could not get pod: %v", err)
+	}
+	if pod.Spec.NodeName == newPod.Spec.NodeName {
+		return fmt.Errorf("pod didn't move to the new node")
+	} else {
+		c.logger.Infof("pod %q moved from %q to %q", podName, pod.Spec.NodeName, newPod.Spec.NodeName)
+	}
+
+	node, err := c.KubeClient.Nodes().Get(newPod.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("could not get node of the pod: %v", err)
+	}
+	if util.MapContains(node.Labels, c.OpConfig.OldNodeLabel) {
+		return fmt.Errorf("pod is still on the old kubernetes node")
+	}
+
+	return nil
 }
 
 func (c *Cluster) deletePods() error {
@@ -91,20 +142,18 @@ func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.P
 	return ch
 }
 
-func (c *Cluster) recreatePod(pod v1.Pod) error {
-	podName := util.NameFromMeta(pod.ObjectMeta)
-
+func (c *Cluster) recreatePod(podName spec.NamespacedName) error {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
-	if err := c.KubeClient.Pods(pod.Namespace).Delete(pod.Name, c.deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, c.deleteOptions); err != nil {
 		return fmt.Errorf("could not delete pod: %v", err)
 	}
 
 	if err := c.waitForPodDeletion(ch); err != nil {
 		return err
 	}
-	if err := c.waitForPodLabel(ch); err != nil {
+	if err := c.waitForPodLabel(ch, nil); err != nil {
 		return err
 	}
 	c.logger.Infof("pod %q is ready", podName)
@@ -126,27 +175,29 @@ func (c *Cluster) recreatePods() error {
 	}
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
 
-	var masterPod v1.Pod
-	for _, pod := range pods.Items {
-		role := c.podSpiloRole(&pod)
+	var masterPod *v1.Pod
+	for i, pod := range pods.Items {
+		role := c.podPostgresRole(&pod)
 
-		if role == constants.PodRoleMaster {
-			masterPod = pod
+		if role == master {
+			masterPod = &pods.Items[i]
 			continue
 		}
 
-		if err := c.recreatePod(pod); err != nil {
+		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
+		if err := c.recreatePod(podName); err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 		}
 	}
-	if masterPod.Name == "" {
-		c.logger.Warningln("no master pod in the cluster")
+
+	if masterPod == nil {
+		c.logger.Warnln("no master pod in the cluster")
 	} else {
 		//TODO: do manual failover
 		//TODO: specify master, leave new master empty
 		c.logger.Infof("recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
-		if err := c.recreatePod(masterPod); err != nil {
+		if err := c.recreatePod(util.NameFromMeta(masterPod.ObjectMeta)); err != nil {
 			return fmt.Errorf("could not recreate master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
 		}
 	}

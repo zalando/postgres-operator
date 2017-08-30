@@ -5,6 +5,7 @@ import (
 	"hash/crc32"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api/v1"
 	extv1beta "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 
@@ -121,4 +122,35 @@ func (c *Controller) podClusterName(pod *v1.Pod) spec.NamespacedName {
 	}
 
 	return spec.NamespacedName{}
+}
+
+func (c *Controller) getClustersToMigrate(nodeName string) ([]spec.NamespacedName, error) {
+	clusters := make([]spec.NamespacedName, 0)
+
+	opts := metav1.ListOptions{
+		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),
+	}
+	pods, err := c.KubeClient.Pods(c.opConfig.Namespace).List(opts)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch list of pods: %v", err)
+	}
+
+forLoop:
+	for _, pod := range pods.Items {
+		if pod.Spec.NodeName != nodeName {
+			continue
+		}
+
+		podClusterName := c.podClusterName(&pod)
+
+		for _, cl := range clusters {
+			if cl == podClusterName {
+				break forLoop
+			}
+		}
+
+		clusters = append(clusters, podClusterName)
+	}
+
+	return clusters, nil
 }

@@ -38,7 +38,7 @@ func (c *Cluster) deletePersistenVolumeClaims() error {
 	for _, pvc := range pvcs {
 		c.logger.Debugf("deleting PVC %q", util.NameFromMeta(pvc.ObjectMeta))
 		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, c.deleteOptions); err != nil {
-			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
+			c.logger.Warnf("could not delete PersistentVolumeClaim: %v", err)
 		}
 	}
 	if len(pvcs) > 0 {
