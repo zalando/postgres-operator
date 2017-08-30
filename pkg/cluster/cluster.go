@@ -23,6 +23,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/patroni"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
@@ -55,6 +56,7 @@ type Cluster struct {
 	spec.Postgresql
 	Config
 	logger           *logrus.Entry
+	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
 	podSubscribers   map[spec.NamespacedName]chan spec.PodEvent
@@ -105,6 +107,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger),
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
+	cluster.patroni = patroni.New(cluster.logger)
 
 	return cluster
 }
