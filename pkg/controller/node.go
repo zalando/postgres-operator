@@ -50,8 +50,12 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		return
 	}
 
-	if util.MapContains(nodeCur.Labels, c.opConfig.OldNodeLabel) && !util.MapContains(nodePrev.Labels, c.opConfig.OldNodeLabel) {
-		c.logger.Infof("node %q (%s) has been marked with old labels", util.NameFromMeta(nodeCur.ObjectMeta), nodeCur.Spec.ProviderID)
+	if val, ok := nodeCur.Labels["master"]; ok && val == "true" {
+		return
+	}
+
+	if nodePrev.Spec.Unschedulable != nodeCur.Spec.Unschedulable && nodeCur.Spec.Unschedulable == true {
+		c.logger.Infof("node %q became unschedulable", util.NameFromMeta(nodeCur.ObjectMeta))
 
 		clusters, err := c.getClustersToMigrate(nodeCur.Name)
 		if err != nil {

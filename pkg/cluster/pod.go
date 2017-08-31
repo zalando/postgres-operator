@@ -69,8 +69,9 @@ func (c *Cluster) movePod(pod *v1.Pod) error {
 	if err != nil {
 		return fmt.Errorf("could not get node of the pod: %v", err)
 	}
-	if util.MapContains(node.Labels, c.OpConfig.OldNodeLabel) {
-		return fmt.Errorf("pod is still on the old kubernetes node")
+
+	if node.Spec.Unschedulable == true {
+		return fmt.Errorf("pod remained on the unschedable node")
 	}
 
 	return nil

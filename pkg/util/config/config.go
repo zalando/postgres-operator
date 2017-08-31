@@ -64,8 +64,6 @@ type Config struct {
 	Workers              uint32         `name:"workers" default:"4"`
 	APIPort              int            `name:"api_port" default:"8080"`
 	RingLogLines         int            `name:"ring_log_lines" default:"100"`
-
-	OldNodeLabel map[string]string `name:"old_node_label" default:"version:old"`
 }
 
 // MustMarshal marshals the config or panics
@@ -109,11 +107,6 @@ func Copy(c *Config) Config {
 	cfg.ClusterLabels = make(map[string]string, len(c.ClusterLabels))
 	for k, v := range c.ClusterLabels {
 		cfg.ClusterLabels[k] = v
-	}
-
-	cfg.OldNodeLabel = make(map[string]string, len(c.OldNodeLabel))
-	for k, v := range c.OldNodeLabel {
-		cfg.OldNodeLabel[k] = v
 	}
 
 	return cfg
