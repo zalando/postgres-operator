@@ -85,10 +85,10 @@ type Postgresql struct {
 
 // PostgresSpec defines the specification for the PostgreSQL TPR.
 type PostgresSpec struct {
-	PostgresqlParam  `json:"postgresql"`
-	Volume           `json:"volume,omitempty"`
-	Patroni          `json:"patroni,omitempty"`
-	Resources        `json:"resources,omitempty"`
+	PostgresqlParam `json:"postgresql"`
+	Volume          `json:"volume,omitempty"`
+	Patroni         `json:"patroni,omitempty"`
+	Resources       `json:"resources,omitempty"`
 
 	TeamID              string   `json:"teamId"`
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
@@ -98,7 +98,7 @@ type PostgresSpec struct {
 	NumberOfInstances   int32                `json:"numberOfInstances"`
 	Users               map[string]userFlags `json:"users"`
 	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone 				CloneDescription 	 `json:"clone"`
+	Clone               CloneDescription     `json:"clone"`
 	ClusterName         string               `json:"-"`
 }
 
