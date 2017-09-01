@@ -677,10 +677,6 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 		podLabelErr <- c.waitForPodLabel(ch, &role)
 	}()
 
-	if c.patroni == nil {
-		c.logger.Fatalf("patroni is not set")
-	}
-
 	if err := c.patroni.Failover(curMaster, candidate.Name); err != nil {
 		return fmt.Errorf("could not failover: %v", err)
 	} else {
