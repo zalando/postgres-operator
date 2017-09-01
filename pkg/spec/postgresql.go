@@ -53,8 +53,8 @@ type Patroni struct {
 
 // CloneDescription describes which cluster the new should clone and up to which point in time
 type CloneDescription struct {
-	ClusterName  string `json:"cluster"`
-	EndTimestamp string `json:"timestamp"`
+	ClusterName  string `json:"cluster,omitempty"`
+	EndTimestamp string `json:"timestamp,omitempty"`
 }
 
 type userFlags []string
@@ -89,7 +89,7 @@ type PostgresSpec struct {
 	Volume           `json:"volume,omitempty"`
 	Patroni          `json:"patroni,omitempty"`
 	Resources        `json:"resources,omitempty"`
-	CloneDescription `json:"clone,omitempty"`
+	CloneDescription `json:"clone"`
 
 	TeamID              string   `json:"teamId"`
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
