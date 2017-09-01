@@ -668,20 +668,26 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 // ManualFailover does manual failover to a candidate pod
 func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
 	podLabelErr := make(chan error)
+	stopCh := make(chan struct{})
 	defer close(podLabelErr)
 
 	go func() {
 		ch := c.registerPodSubscriber(candidate)
 		defer c.unregisterPodSubscriber(candidate)
 		role := master
-		podLabelErr <- c.waitForPodLabel(ch, &role)
+		select {
+		case <-stopCh:
+		case podLabelErr <- c.waitForPodLabel(ch, &role):
+		}
 	}()
 
 	if err := c.patroni.Failover(curMaster, candidate.Name); err != nil {
+		close(stopCh)
 		return fmt.Errorf("could not failover: %v", err)
 	} else {
 		c.logger.Debugln("successfully failed over")
 	}
+	defer close(stopCh)
 
 	if err := <-podLabelErr; err != nil {
 		return fmt.Errorf("could not get master pod label: %v", err)
