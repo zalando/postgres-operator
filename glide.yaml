@@ -26,7 +26,7 @@ import:
   - pkg/util/remotecommand
   - pkg/watch
 - package: k8s.io/client-go
-  version: ^4.0.0-beta.0
+  version: ^4.0.0
   subpackages:
   - kubernetes
   - pkg/api
