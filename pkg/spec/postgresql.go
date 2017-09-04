@@ -243,6 +243,13 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 		tmp2.Error = err
 		tmp2.Status = ClusterStatusInvalid
 	}
+	// The assumption below is that a cluster to clone, if any, belongs to the same team
+	if tmp2.Spec.Clone.ClusterName != "" {
+		_, err := extractClusterName(tmp2.Spec.Clone.ClusterName, tmp2.Spec.TeamID)
+		if err != nil {
+			tmp2.Error = fmt.Errorf(" %s for the cluster to clone")
+		}
+	}
 	*p = tmp2
 
 	return nil
