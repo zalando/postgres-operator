@@ -46,6 +46,27 @@ type spiloConfiguration struct {
 	Bootstrap            pgBootstrap            `json:"bootstrap"`
 }
 
+func (c *Cluster) containerName() string {
+	return c.Name
+}
+
+func (c *Cluster) statefulSetName() string {
+	return c.Name
+}
+
+func (c *Cluster) endpointName() string {
+	return c.Name
+}
+
+func (c *Cluster) serviceName(role postgresRole) string {
+	name := c.Name
+	if role == replica {
+		name = name + "-repl"
+	}
+
+	return name
+}
+
 func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRequirements, error) {
 	var err error
 
@@ -274,7 +295,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	}
 	privilegedMode := bool(true)
 	container := v1.Container{
-		Name:            c.Name,
+		Name:            c.containerName(),
 		Image:           c.OpConfig.DockerImage,
 		ImagePullPolicy: v1.PullAlways,
 		Resources:       *resourceRequirements,
@@ -314,7 +335,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    c.labelsSet(),
-			Namespace: c.Name,
+			Namespace: c.Namespace,
 		},
 		Spec: podSpec,
 	}
@@ -339,13 +360,13 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.Name,
+			Name:      c.statefulSetName(),
 			Namespace: c.Namespace,
 			Labels:    c.labelsSet(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &spec.NumberOfInstances,
-			ServiceName:          c.Name,
+			ServiceName:          c.serviceName(master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
 		},
@@ -428,12 +449,12 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 }
 
 func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec) *v1.Service {
+	var dnsName string
 
-	dnsNameFunction := c.masterDNSName
-	name := c.Name
-	if role == replica {
-		dnsNameFunction = c.replicaDNSName
-		name = name + "-repl"
+	if role == master {
+		dnsName = c.masterDNSName()
+	} else {
+		dnsName = c.replicaDNSName()
 	}
 
 	serviceSpec := v1.ServiceSpec{
@@ -462,15 +483,14 @@ func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec)
 		serviceSpec.LoadBalancerSourceRanges = sourceRanges
 
 		annotations = map[string]string{
-			constants.ZalandoDNSNameAnnotation: dnsNameFunction(),
+			constants.ZalandoDNSNameAnnotation: dnsName,
 			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 		}
-
 	}
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
+			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
 			Labels:      c.roleLabelsSet(role),
 			Annotations: annotations,
@@ -484,7 +504,7 @@ func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec)
 func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.Name,
+			Name:      c.endpointName(),
 			Namespace: c.Namespace,
 			Labels:    c.roleLabelsSet(master),
 		},
