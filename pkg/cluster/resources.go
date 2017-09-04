@@ -16,45 +16,33 @@ import (
 )
 
 func (c *Cluster) loadResources() error {
+	var err error
 	ns := c.Namespace
-	listOptions := metav1.ListOptions{
-		LabelSelector: c.labelsSet().String(),
+
+	masterService, err := c.KubeClient.Services(ns).Get(c.serviceName(master), metav1.GetOptions{})
+	if err == nil {
+		c.Services[master] = masterService
+	} else if !k8sutil.ResourceNotFound(err) {
+		c.logger.Errorf("could not get master service: %v", err)
 	}
 
-	services, err := c.KubeClient.Services(ns).List(listOptions)
+	replicaService, err := c.KubeClient.Services(ns).Get(c.serviceName(replica), metav1.GetOptions{})
+	if err == nil {
+		c.Services[replica] = replicaService
+	} else if !k8sutil.ResourceNotFound(err) {
+		c.logger.Errorf("could not get replica service: %v", err)
+	}
+
+	ep, err := c.KubeClient.Endpoints(ns).Get(c.endpointName(), metav1.GetOptions{})
+	if err == nil {
+		c.Endpoint = ep
+	} else if !k8sutil.ResourceNotFound(err) {
+		c.logger.Errorf("could not get endpoint: %v", err)
+	}
+
+	secrets, err := c.KubeClient.Secrets(ns).List(metav1.ListOptions{LabelSelector: c.labelsSet().String()})
 	if err != nil {
-		return fmt.Errorf("could not get list of services: %v", err)
-	}
-	if len(services.Items) > 2 {
-		return fmt.Errorf("too many(%d) services for a cluster", len(services.Items))
-	}
-	for i, svc := range services.Items {
-		switch postgresRole(svc.Labels[c.OpConfig.PodRoleLabel]) {
-		case replica:
-			c.Services[replica] = &services.Items[i]
-		default:
-			c.Services[master] = &services.Items[i]
-		}
-	}
-
-	endpoints, err := c.KubeClient.Endpoints(ns).List(listOptions)
-	if err != nil {
-		return fmt.Errorf("could not get list of endpoints: %v", err)
-	}
-	if len(endpoints.Items) > 2 {
-		return fmt.Errorf("too many(%d) endpoints for a cluster", len(endpoints.Items))
-	}
-
-	for i, ep := range endpoints.Items {
-		if ep.Labels[c.OpConfig.PodRoleLabel] != string(replica) {
-			c.Endpoint = &endpoints.Items[i]
-			break
-		}
-	}
-
-	secrets, err := c.KubeClient.Secrets(ns).List(listOptions)
-	if err != nil {
-		return fmt.Errorf("could not get list of secrets: %v", err)
+		c.logger.Errorf("could not get list of secrets: %v", err)
 	}
 	for i, secret := range secrets.Items {
 		if _, ok := c.Secrets[secret.UID]; ok {
@@ -64,15 +52,11 @@ func (c *Cluster) loadResources() error {
 		c.logger.Debugf("secret loaded, uid: %q", secret.UID)
 	}
 
-	statefulSets, err := c.KubeClient.StatefulSets(ns).List(listOptions)
-	if err != nil {
-		return fmt.Errorf("could not get list of statefulsets: %v", err)
-	}
-	if len(statefulSets.Items) > 1 {
-		return fmt.Errorf("too many(%d) statefulsets for a cluster", len(statefulSets.Items))
-	}
-	if len(statefulSets.Items) == 1 {
-		c.Statefulset = &statefulSets.Items[0]
+	ss, err := c.KubeClient.StatefulSets(ns).Get(c.statefulSetName(), metav1.GetOptions{})
+	if err == nil {
+		c.Statefulset = ss
+	} else if !k8sutil.ResourceNotFound(err) {
+		c.logger.Errorf("could not get statefulset: %v", err)
 	}
 
 	return nil
