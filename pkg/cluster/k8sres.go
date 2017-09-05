@@ -285,7 +285,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	container := v1.Container{
 		Name:            c.Name,
 		Image:           c.OpConfig.DockerImage,
-		ImagePullPolicy: v1.PullAlways,
+		ImagePullPolicy: v1.PullIfNotPresent,
 		Resources:       *resourceRequirements,
 		Ports: []v1.ContainerPort{
 			{
@@ -519,13 +519,14 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_BASEBACKUP"})
 		result = append(result, v1.EnvVar{Name: "CLONE_HOST", Value: host})
 		result = append(result, v1.EnvVar{Name: "CLONE_PORT", Value: port})
-		result = append(result, v1.EnvVar{Name: "CLONE_USER", Value: c.OpConfig.SuperUsername})
+		// TODO: assume replication user name is the same for all clusters, fetch it from secrets otherwise
+		result = append(result, v1.EnvVar{Name: "CLONE_USER", Value: c.OpConfig.ReplicationUsername})
 		result = append(result,
 			v1.EnvVar{Name: "CLONE_PASSWORD",
 				ValueFrom: &v1.EnvVarSource{
 					SecretKeyRef: &v1.SecretKeySelector{
 						LocalObjectReference: v1.LocalObjectReference{
-							Name: c.credentialSecretNameForCluster(c.OpConfig.SuperUsername,
+							Name: c.credentialSecretNameForCluster(c.OpConfig.ReplicationUsername,
 								description.ClusterName),
 						},
 						Key: "password",
