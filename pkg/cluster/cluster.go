@@ -42,7 +42,7 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Services    map[postgresRole]*v1.Service
+	Services    map[PostgresRole]*v1.Service
 	Endpoint    *v1.Endpoints
 	Secrets     map[types.UID]*v1.Secret
 	Statefulset *v1beta1.StatefulSet
@@ -98,7 +98,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		pgUsers:          make(map[string]spec.PgUser),
 		systemUsers:      make(map[string]spec.PgUser),
 		podSubscribers:   make(map[spec.NamespacedName]chan spec.PodEvent),
-		kubeResources:    kubeResources{Secrets: make(map[types.UID]*v1.Secret), Services: make(map[postgresRole]*v1.Service)},
+		kubeResources:    kubeResources{Secrets: make(map[types.UID]*v1.Secret), Services: make(map[PostgresRole]*v1.Service)},
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
@@ -192,8 +192,8 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
-	for _, role := range []postgresRole{master, replica} {
-		if role == replica && !c.Spec.ReplicaLoadBalancer {
+	for _, role := range []PostgresRole{Master, Replica} {
+		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
 		service, err = c.createService(role)
@@ -247,7 +247,7 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
-func (c *Cluster) sameServiceWith(role postgresRole, service *v1.Service) (match bool, reason string) {
+func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
 	if c.Services[role].Spec.Type != service.Spec.Type {
 		return false, fmt.Sprintf("new %s service's type %q doesn't match the current one %q",
@@ -420,8 +420,8 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.Postgresql = *newSpec
 	}()
 
-	for _, role := range []postgresRole{master, replica} {
-		if role == replica {
+	for _, role := range []PostgresRole{Master, Replica} {
+		if role == Replica {
 			if !newSpec.Spec.ReplicaLoadBalancer {
 				// old spec had a load balancer, but the new one doesn't
 				if c.Spec.ReplicaLoadBalancer {
@@ -519,8 +519,8 @@ func (c *Cluster) Delete() error {
 		return fmt.Errorf("could not delete endpoint: %v", err)
 	}
 
-	for _, role := range []postgresRole{master, replica} {
-		if role == replica && !c.Spec.ReplicaLoadBalancer {
+	for _, role := range []PostgresRole{Master, Replica} {
+		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
 		if err := c.deleteService(role); err != nil {
@@ -674,7 +674,7 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 	go func() {
 		ch := c.registerPodSubscriber(candidate)
 		defer c.unregisterPodSubscriber(candidate)
-		role := master
+		role := Master
 		select {
 		case <-stopCh:
 		case podLabelErr <- c.waitForPodLabel(ch, &role):
@@ -684,13 +684,13 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 	if err := c.patroni.Failover(curMaster, candidate.Name); err != nil {
 		close(stopCh)
 		return fmt.Errorf("could not failover: %v", err)
-	} else {
-		c.logger.Debugln("successfully failed over")
 	}
+	c.logger.Debugln("successfully failed over")
+
 	defer close(stopCh)
 
 	if err := <-podLabelErr; err != nil {
-		return fmt.Errorf("could not get master pod label: %v", err)
+		return fmt.Errorf("could not get Master pod label: %v", err)
 	}
 
 	return nil

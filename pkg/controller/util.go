@@ -137,7 +137,13 @@ func (c *Controller) getClustersToMigrate(nodeName string) ([]spec.NamespacedNam
 
 forLoop:
 	for _, pod := range pods.Items {
+		role := cluster.PostgresRole(pod.Labels[c.opConfig.PodRoleLabel])
+
 		if pod.Spec.NodeName != nodeName {
+			continue
+		}
+
+		if role != cluster.Master {
 			continue
 		}
 
@@ -145,7 +151,7 @@ forLoop:
 
 		for _, cl := range clusters {
 			if cl == podClusterName {
-				break forLoop
+				continue forLoop
 			}
 		}
 

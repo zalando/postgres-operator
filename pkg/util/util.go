@@ -100,7 +100,7 @@ func FindNamedStringSubmatch(r *regexp.Regexp, s string) map[string]string {
 	return res
 }
 
-// MapContains returns true if and only if haystack contains all the keys from needle and corrisponding values match
+// MapContains returns true if and only if haystack contains all the keys from needle and corresponding values match
 func MapContains(haystack, needle map[string]string) bool {
 	if len(haystack) < len(needle) {
 		return false

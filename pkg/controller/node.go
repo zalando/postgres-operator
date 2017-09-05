@@ -54,7 +54,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		return
 	}
 
-	if nodePrev.Spec.Unschedulable != nodeCur.Spec.Unschedulable && nodeCur.Spec.Unschedulable == true {
+	if nodePrev.Spec.Unschedulable != nodeCur.Spec.Unschedulable && nodeCur.Spec.Unschedulable {
 		c.logger.Infof("node %q became unschedulable", util.NameFromMeta(nodeCur.ObjectMeta))
 
 		clusters, err := c.getClustersToMigrate(nodeCur.Name)

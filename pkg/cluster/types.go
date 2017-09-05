@@ -1,8 +1,12 @@
 package cluster
 
-type postgresRole string
+// PostgresRole describes role of the node
+type PostgresRole string
 
 const (
-	master  postgresRole = "master"
-	replica postgresRole = "replica"
+	// Master role
+	Master PostgresRole = "master"
+
+	// Replica role
+	Replica PostgresRole = "replica"
 )

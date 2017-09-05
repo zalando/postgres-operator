@@ -94,7 +94,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 	}
 }
 
-func (c *Cluster) logServiceChanges(role postgresRole, old, new *v1.Service, isUpdate bool, reason string) {
+func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("%s service %q has been changed",
 			role, util.NameFromMeta(old.ObjectMeta),
@@ -161,14 +161,14 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *postgresRole) error {
+func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRole) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
-			podRole := c.podPostgresRole(podEvent.CurPod)
+			podRole := PostgresRole(podEvent.CurPod.Labels[c.OpConfig.PodRoleLabel])
 
 			if role == nil {
-				if podRole == master || podRole == replica {
+				if podRole == Master || podRole == Replica {
 					return nil
 				}
 			} else if *role == podRole {
@@ -221,12 +221,12 @@ func (c *Cluster) waitPodLabelsReady() error {
 	}
 	masterListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: string(master),
+			c.OpConfig.PodRoleLabel: string(Master),
 		}).String(),
 	}
 	replicaListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: string(replica),
+			c.OpConfig.PodRoleLabel: string(Replica),
 		}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
@@ -285,7 +285,7 @@ func (c *Cluster) labelsSet() labels.Set {
 	return labels.Set(lbls)
 }
 
-func (c *Cluster) roleLabelsSet(role postgresRole) labels.Set {
+func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
 	lbls := c.labelsSet()
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
 	return lbls
@@ -311,8 +311,4 @@ func (c *Cluster) credentialSecretName(username string) string {
 	return fmt.Sprintf(constants.UserSecretTemplate,
 		strings.Replace(username, "_", "-", -1),
 		c.Name)
-}
-
-func (c *Cluster) podPostgresRole(pod *v1.Pod) postgresRole {
-	return postgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 }

@@ -16,15 +16,15 @@ func replicaKillCandidate(pods []*v1.Pod) *v1.Pod {
 
 // Migrate performs migration of the master pod to the new kubernetes node
 func (c *Cluster) Migrate() error {
-	var err error
-
 	allPods, err := c.listPods()
 	if err != nil {
 		return fmt.Errorf("could not get list of cluster pods: %v", err)
 	}
 
 	if len(allPods) == 1 {
-		pods, err := c.getRolePods(master)
+		var pods []v1.Pod
+
+		pods, err = c.getRolePods(Master)
 		if err != nil {
 			return fmt.Errorf("could not get pod to move")
 		}
@@ -33,12 +33,8 @@ func (c *Cluster) Migrate() error {
 			return fmt.Errorf("could not move pod: %v", err)
 		}
 
-		masterPods, err := c.getRolePods(master)
-		if err != nil {
-			return fmt.Errorf("could not get master pod: %v", err)
-		}
-		if len(masterPods) == 0 {
-			return fmt.Errorf("no master running in the cluster")
+		if _, err = c.getRolePods(Master); err != nil {
+			return fmt.Errorf("could not get Master pod: %v", err)
 		}
 
 		return nil
@@ -47,12 +43,12 @@ func (c *Cluster) Migrate() error {
 	replicaPods := make([]*v1.Pod, 0)
 	var curMasterPod *v1.Pod
 	for i, pod := range allPods {
-		role := c.podPostgresRole(&pod)
+		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
 		switch role {
-		case master:
+		case Master:
 			curMasterPod = &allPods[i]
-		case replica:
+		case Replica:
 			replicaPods = append(replicaPods, &allPods[i])
 		default:
 			c.logger.Warningf("pod %q has no role", util.NameFromMeta(pod.ObjectMeta))
@@ -60,7 +56,7 @@ func (c *Cluster) Migrate() error {
 	}
 
 	if curMasterPod == nil {
-		return fmt.Errorf("could not find master pod in the cluster")
+		return fmt.Errorf("could not find Master pod in the cluster")
 	}
 
 	futureMaster := replicaKillCandidate(replicaPods)
@@ -73,23 +69,19 @@ func (c *Cluster) Migrate() error {
 		return fmt.Errorf("could not failover: %v", err)
 	}
 
-	masterPods, err := c.getRolePods(master)
+	masterPods, err := c.getRolePods(Master)
 	if err != nil {
-		return fmt.Errorf("could not get master pod: %v", err)
-	}
-	if len(masterPods) > 1 {
-		return fmt.Errorf("too many masters")
+		return fmt.Errorf("could not get Master pod: %v", err)
 	}
 	masterPodName := util.NameFromMeta(masterPods[0].ObjectMeta)
-	c.logger.Debugf("master pod is there: %q", masterPodName)
 
 	if masterPodName != util.NameFromMeta(futureMaster.ObjectMeta) {
-		return fmt.Errorf("master supposed to be on the new node")
+		return fmt.Errorf("Master supposed to be on the new node")
 	}
 
 	for _, pod := range allPods {
 		if masterPodName == util.NameFromMeta(pod.ObjectMeta) {
-			c.logger.Debugf("skipping master pod: %q", util.NameFromMeta(pod.ObjectMeta))
+			c.logger.Debugf("skipping Master pod: %q", util.NameFromMeta(pod.ObjectMeta))
 			continue
 		}
 
