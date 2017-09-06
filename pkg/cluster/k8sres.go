@@ -58,9 +58,9 @@ func (c *Cluster) endpointName() string {
 	return c.Name
 }
 
-func (c *Cluster) serviceName(role postgresRole) string {
+func (c *Cluster) serviceName(role PostgresRole) string {
 	name := c.Name
-	if role == replica {
+	if role == Replica {
 		name = name + "-repl"
 	}
 
@@ -366,7 +366,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &spec.NumberOfInstances,
-			ServiceName:          c.serviceName(master),
+			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
 		},

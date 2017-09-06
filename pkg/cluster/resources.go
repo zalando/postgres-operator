@@ -19,14 +19,14 @@ func (c *Cluster) loadResources() error {
 	var err error
 	ns := c.Namespace
 
-	masterService, err := c.KubeClient.Services(ns).Get(c.serviceName(master), metav1.GetOptions{})
+	masterService, err := c.KubeClient.Services(ns).Get(c.serviceName(Master), metav1.GetOptions{})
 	if err == nil {
 		c.Services[Master] = masterService
 	} else if !k8sutil.ResourceNotFound(err) {
 		c.logger.Errorf("could not get master service: %v", err)
 	}
 
-	replicaService, err := c.KubeClient.Services(ns).Get(c.serviceName(replica), metav1.GetOptions{})
+	replicaService, err := c.KubeClient.Services(ns).Get(c.serviceName(Replica), metav1.GetOptions{})
 	if err == nil {
 		c.Services[Replica] = replicaService
 	} else if !k8sutil.ResourceNotFound(err) {
