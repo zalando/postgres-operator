@@ -200,6 +200,11 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		lg.Infoln("deletion of the cluster started")
 
 		teamName := strings.ToLower(cl.Spec.TeamID)
+
+		if err := cl.Delete(); err != nil {
+			lg.Errorf("could not delete cluster: %v", err)
+		}
+
 		func() {
 			defer c.clustersMu.Unlock()
 			c.clustersMu.Lock()
@@ -215,11 +220,6 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 				}
 			}
 		}()
-
-		if err := cl.Delete(); err != nil {
-			lg.Errorf("could not delete cluster: %v", err)
-			return
-		}
 
 		lg.Infof("cluster has been deleted")
 	case spec.EventSync:
