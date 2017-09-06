@@ -44,36 +44,32 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	return pods.Items, nil
 }
 
-// movePod moves pod from old kubernetes node to the new one
-func (c *Cluster) movePod(pod *v1.Pod) error {
+// MovePod moves pod from old kubernetes node to the new one
+func (c *Cluster) MovePod(pod *v1.Pod) (*v1.Node, error) {
 	podName := util.NameFromMeta(pod.ObjectMeta)
-	c.logger.Debugf("old %q pod's node: %q", pod.Name, pod.Spec.NodeName)
+	c.logger.Debugf("moving pod %q out of %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 
 	err := c.recreatePod(podName)
 	if err != nil {
-		return fmt.Errorf("could not recreate pod: %v", err)
+		return nil, fmt.Errorf("could not recreate pod: %v", err)
 	}
 
 	newPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
 	c.logger.Debugf("new %q pod's node: %q", pod.Name, newPod.Spec.NodeName)
 	if err != nil {
-		return fmt.Errorf("could not get pod: %v", err)
+		return nil, fmt.Errorf("could not get pod: %v", err)
 	}
 	if pod.Spec.NodeName == newPod.Spec.NodeName {
-		return fmt.Errorf("pod didn't move to the new node")
+		return nil, fmt.Errorf("pod didn't move to the new node")
 	}
 	c.logger.Infof("pod %q moved from %q to %q", podName, pod.Spec.NodeName, newPod.Spec.NodeName)
 
 	node, err := c.KubeClient.Nodes().Get(newPod.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("could not get node of the pod: %v", err)
+		return nil, fmt.Errorf("could not get node of the pod: %v", err)
 	}
 
-	if node.Spec.Unschedulable {
-		return fmt.Errorf("pod remained on the unschedable node")
-	}
-
-	return nil
+	return node, nil
 }
 
 func (c *Cluster) deletePods() error {

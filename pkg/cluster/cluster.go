@@ -695,3 +695,11 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 
 	return nil
 }
+
+func (c *Cluster) Lock() {
+	c.mu.Lock()
+}
+
+func (c *Cluster) Unlock() {
+	c.mu.Unlock()
+}

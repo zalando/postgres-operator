@@ -29,6 +29,7 @@ type Resources struct {
 	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
 	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
 	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
+	CordonedNodeLabel       map[string]string `name:"cordoned_node_label" default:"eol:true"`
 }
 
 // Auth describes authentication specific configuration parameters

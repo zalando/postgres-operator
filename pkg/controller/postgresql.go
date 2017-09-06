@@ -147,7 +147,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 
 	lg := c.logger.WithField("worker", event.WorkerID)
 
-	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync || event.EventType == spec.EventMigration {
+	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync {
 		clusterName = util.NameFromMeta(event.NewSpec.ObjectMeta)
 	} else {
 		clusterName = util.NameFromMeta(event.OldSpec.ObjectMeta)
@@ -238,23 +238,6 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		cl.Error = nil
 
 		lg.Infof("cluster has been synced")
-	case spec.EventMigration:
-		lg.Infof("migration of the cluster started")
-
-		// no race condition because a cluster is always processed by single worker
-		if !clusterFound {
-			lg.Errorf("cluster does not exist")
-			return
-		}
-
-		if err := cl.Migrate(); err != nil {
-			cl.Error = fmt.Errorf("could not migrate cluster: %v", err)
-			lg.Error(cl.Error)
-			return
-		}
-		cl.Error = nil
-
-		lg.Infof("cluster has been migrated")
 	}
 }
 

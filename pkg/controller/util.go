@@ -124,38 +124,47 @@ func (c *Controller) podClusterName(pod *v1.Pod) spec.NamespacedName {
 	return spec.NamespacedName{}
 }
 
-func (c *Controller) getClustersToMigrate(nodeName string) ([]spec.NamespacedName, error) {
-	clusters := make([]spec.NamespacedName, 0)
+func (c *Controller) getNodePods(nodeName string) ([]*v1.Pod, error) {
+	pods := make([]*v1.Pod, 0)
 
 	opts := metav1.ListOptions{
 		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),
 	}
-	pods, err := c.KubeClient.Pods(c.opConfig.Namespace).List(opts)
+	podList, err := c.KubeClient.Pods(c.opConfig.Namespace).List(opts)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch list of pods: %v", err)
 	}
 
-forLoop:
-	for _, pod := range pods.Items {
-		role := cluster.PostgresRole(pod.Labels[c.opConfig.PodRoleLabel])
-
+	for i, pod := range podList.Items {
 		if pod.Spec.NodeName != nodeName {
 			continue
 		}
 
-		if role != cluster.Master {
-			continue
-		}
+		pods = append(pods, &podList.Items[i])
+	}
 
-		podClusterName := c.podClusterName(&pod)
+	return pods, nil
+}
 
-		for _, cl := range clusters {
+func (c *Controller) getPodsClusters(pods []*v1.Pod) ([]*cluster.Cluster, error) {
+	clusterNames := make([]spec.NamespacedName, 0)
+
+forLoop:
+	for _, pod := range pods {
+		podClusterName := c.podClusterName(pod)
+
+		for _, cl := range clusterNames {
 			if cl == podClusterName {
 				continue forLoop
 			}
 		}
 
-		clusters = append(clusters, podClusterName)
+		clusterNames = append(clusterNames, podClusterName)
+	}
+
+	clusters := make([]*cluster.Cluster, len(clusterNames))
+	for i, clusterName := range clusterNames {
+		clusters[i] = c.clusters[clusterName]
 	}
 
 	return clusters, nil
