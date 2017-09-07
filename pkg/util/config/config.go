@@ -38,7 +38,7 @@ type Auth struct {
 	OAuthTokenSecretName          spec.NamespacedName `name:"oauth_token_secret_name" default:"postgresql-operator"`
 	InfrastructureRolesSecretName spec.NamespacedName `name:"infrastructure_roles_secret_name"`
 	SuperUsername                 string              `name:"super_username" default:"postgres"`
-	ReplicationUsername           string              `name:"replication_username" default:"replication"`
+	ReplicationUsername           string              `name:"replication_username" default:"standby"`
 }
 
 // Config describes operator config
