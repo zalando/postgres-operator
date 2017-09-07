@@ -247,7 +247,9 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	if tmp2.Spec.Clone.ClusterName != "" {
 		_, err := extractClusterName(tmp2.Spec.Clone.ClusterName, tmp2.Spec.TeamID)
 		if err != nil {
-			tmp2.Error = fmt.Errorf(" %s for the cluster to clone", err)
+			tmp2.Error = fmt.Errorf("%s for the cluster to clone", err)
+			tmp2.Spec.Clone = CloneDescription{}
+			tmp2.Status = ClusterStatusInvalid
 		}
 	}
 	*p = tmp2
