@@ -261,6 +261,10 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 			},
 		},
 		{
+			Name:  "PGUSER_SUPERUSER",
+			Value: c.OpConfig.SuperUsername,
+		},
+		{
 			Name: "PGPASSWORD_SUPERUSER",
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -270,6 +274,10 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 					Key: "password",
 				},
 			},
+		},
+		{
+			Name:  "PGUSER_STANDBY",
+			Value: c.OpConfig.ReplicationUsername,
 		},
 		{
 			Name: "PGPASSWORD_STANDBY",
