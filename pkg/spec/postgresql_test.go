@@ -278,9 +278,9 @@ var unmarshalCluster = []struct {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "acid-testcluster1",
 			},
-			Spec:   PostgresSpec{
-				TeamID: "acid",
-				Clone: CloneDescription{},
+			Spec: PostgresSpec{
+				TeamID:      "acid",
+				Clone:       CloneDescription{},
 				ClusterName: "testcluster1",
 			},
 			Status: ClusterStatusInvalid,

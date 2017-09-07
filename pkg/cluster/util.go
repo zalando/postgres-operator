@@ -307,12 +307,12 @@ func (c *Cluster) credentialSecretName(username string) string {
 	return c.credentialSecretNameForCluster(username, c.Name)
 }
 
-func (c *Cluster) credentialSecretNameForCluster(username string, clustername string) string {
+func (c *Cluster) credentialSecretNameForCluster(username string, clusterName string) string {
 	// secret  must consist of lower case alphanumeric characters, '-' or '.',
 	// and must start and end with an alphanumeric character
 	return fmt.Sprintf(constants.UserSecretTemplate,
 		strings.Replace(username, "_", "-", -1),
-		clustername)
+		clusterName)
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
