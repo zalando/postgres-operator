@@ -102,8 +102,9 @@ type ClusterStatus struct {
 
 // ControllerStatus describes status of the controller
 type ControllerStatus struct {
-	LastSyncTime int64
-	Clusters     int
+	LastSyncTime    int64
+	Clusters        int
+	WorkerQueueSize map[int]int
 }
 
 // QueueDump describes cache.FIFO queue
