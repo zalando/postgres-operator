@@ -51,9 +51,15 @@ func (c *Controller) GetStatus() *spec.ControllerStatus {
 	clustersCnt := len(c.clusters)
 	c.clustersMu.RUnlock()
 
+	queueSizes := make(map[int]int, c.opConfig.Workers)
+	for workerID, queue := range c.clusterEventQueues {
+		queueSizes[workerID] = len(queue.ListKeys())
+	}
+
 	return &spec.ControllerStatus{
-		LastSyncTime: atomic.LoadInt64(&c.lastClusterSyncTime),
-		Clusters:     clustersCnt,
+		LastSyncTime:    atomic.LoadInt64(&c.lastClusterSyncTime),
+		Clusters:        clustersCnt,
+		WorkerQueueSize: queueSizes,
 	}
 }
 

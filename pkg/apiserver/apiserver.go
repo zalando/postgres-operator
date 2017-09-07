@@ -101,7 +101,7 @@ func (s *Server) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer cancel()
 	err := s.http.Shutdown(ctx)
 	if err == context.DeadlineExceeded {
-		s.logger.Warnf("Shutdown timeout exceeded. closing http server")
+		s.logger.Warningf("Shutdown timeout exceeded. closing http server")
 		s.http.Close()
 	} else if err != nil {
 		s.logger.Errorf("Could not shutdown http server: %v", err)
