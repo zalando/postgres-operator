@@ -281,7 +281,7 @@ func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string)
 	return
 }
 
-func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
+func (c *Cluster) sameStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
 	reasons := make([]string, 0)
 	var match, needsRollUpdate, needsReplace bool
 
@@ -291,15 +291,16 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		match = false
 		reasons = append(reasons, "new statefulset's number of replicas doesn't match the current one")
 	}
+
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
-
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
 	}
+
 	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
 	// and the combined effect of all the changes should be applied.
 	// TODO: log all reasons for changing the statefulset, not just the last one.
@@ -315,6 +316,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's terminationGracePeriodSeconds  doesn't match the current one")
 	}
+	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Affinity, statefulSet.Spec.Template.Spec.Affinity) {
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod affinity doesn't match the current one")
+	}
+
 	// Some generated fields like creationTimestamp make it not possible to use DeepCompare on Spec.Template.ObjectMeta
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Labels, statefulSet.Spec.Template.Labels) {
 		needsReplace = true
@@ -330,6 +337,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's volumeClaimTemplates contains different number of volumes to the old one")
 	}
+
 	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
 		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
 		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
@@ -461,7 +469,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	if err != nil {
 		return fmt.Errorf("could not generate statefulset: %v", err)
 	}
-	cmp := c.compareStatefulSetWith(newStatefulSet)
+	cmp := c.sameStatefulSetWith(newStatefulSet)
 
 	if !cmp.match {
 		c.logStatefulSetChanges(c.Statefulset, newStatefulSet, true, cmp.reasons)
@@ -667,6 +675,7 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 
 // ManualFailover does manual failover to a candidate pod
 func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
+	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
 	podLabelErr := make(chan error)
 	stopCh := make(chan struct{})
 	defer close(podLabelErr)
@@ -674,7 +683,9 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 	go func() {
 		ch := c.registerPodSubscriber(candidate)
 		defer c.unregisterPodSubscriber(candidate)
+
 		role := Master
+
 		select {
 		case <-stopCh:
 		case podLabelErr <- c.waitForPodLabel(ch, &role):

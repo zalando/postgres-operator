@@ -226,6 +226,26 @@ PATRONI_INITDB_PARAMS:
 	return string(result)
 }
 
+func (c *Cluster) nodeAffinity() *v1.Affinity {
+	matchExpressions := make([]v1.NodeSelectorRequirement, 0)
+	for k, v := range c.OpConfig.CordonedNodeLabel {
+		matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
+			Key:      k,
+			Operator: v1.NodeSelectorOpNotIn,
+			Values:   []string{v},
+		})
+	}
+
+	return &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{{
+				Weight:     100,
+				Preference: v1.NodeSelectorTerm{MatchExpressions: matchExpressions}},
+			},
+		},
+	}
+}
+
 func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements, pgParameters *spec.PostgresqlParam, patroniParameters *spec.Patroni) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
@@ -330,6 +350,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		ServiceAccountName:            c.OpConfig.ServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
+		Affinity:                      c.nodeAffinity(),
 	}
 
 	template := v1.PodTemplateSpec{

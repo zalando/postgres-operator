@@ -156,7 +156,7 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
 
-		cmp := c.compareStatefulSetWith(desiredSS)
+		cmp := c.sameStatefulSetWith(desiredSS)
 		if cmp.match {
 			return nil
 		}
