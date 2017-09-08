@@ -51,6 +51,12 @@ type Patroni struct {
 	MaximumLagOnFailover float32           `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
 }
 
+// CloneDescription describes which cluster the new should clone and up to which point in time
+type CloneDescription struct {
+	ClusterName  string `json:"cluster,omitempty"`
+	EndTimestamp string `json:"timestamp,omitempty"`
+}
+
 type userFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
@@ -86,12 +92,13 @@ type PostgresSpec struct {
 
 	TeamID              string   `json:"teamId"`
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
-	// EnableLoadBalancer  is a pointer, since it is importat to know if that parameters is omitted from the manifest
+	// EnableLoadBalancer  is a pointer, since it is important to know if that parameters is omitted from the manifest
 	UseLoadBalancer     *bool                `json:"useLoadBalancer,omitempty"`
 	ReplicaLoadBalancer bool                 `json:"replicaLoadBalancer,omitempty"`
 	NumberOfInstances   int32                `json:"numberOfInstances"`
 	Users               map[string]userFlags `json:"users"`
 	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+	Clone               CloneDescription     `json:"clone"`
 	ClusterName         string               `json:"-"`
 }
 
@@ -235,6 +242,15 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	} else {
 		tmp2.Error = err
 		tmp2.Status = ClusterStatusInvalid
+	}
+	// The assumption below is that a cluster to clone, if any, belongs to the same team
+	if tmp2.Spec.Clone.ClusterName != "" {
+		_, err := extractClusterName(tmp2.Spec.Clone.ClusterName, tmp2.Spec.TeamID)
+		if err != nil {
+			tmp2.Error = fmt.Errorf("%s for the cluster to clone", err)
+			tmp2.Spec.Clone = CloneDescription{}
+			tmp2.Status = ClusterStatusInvalid
+		}
 	}
 	*p = tmp2
 
