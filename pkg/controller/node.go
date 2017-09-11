@@ -79,6 +79,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		}
 	}
 
+	clusters := make(map[*cluster.Cluster]struct{}, 0)
 	masterPods := make(map[*v1.Pod]*cluster.Cluster, 0)
 	replicaPods := make(map[*v1.Pod]*cluster.Cluster, 0)
 	for _, p := range nodePods {
@@ -105,6 +106,11 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 			continue
 		}
 
+		_, ok = clusters[cl]
+		if !ok {
+			clusters[cl] = struct{}{}
+		}
+
 		if cluster.PostgresRole(role) == cluster.Master {
 			masterPods[pod] = cl
 		} else {
@@ -122,6 +128,10 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		}
 	}
 
+	for cl, _ := range clusters {
+		cl.Lock()
+	}
+
 	for pod, cl := range masterPods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
@@ -136,6 +146,10 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		if err := cl.MigrateReplicaPod(podName); err != nil {
 			c.logger.Errorf("could not move %q replica pod: %v", podName, err)
 		}
+	}
+
+	for cl, _ := range clusters {
+		cl.Unlock()
 	}
 
 	c.logger.Infof("pods have been moved out from the %q node", util.NameFromMeta(nodeCur.ObjectMeta))
