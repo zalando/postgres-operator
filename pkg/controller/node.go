@@ -1,9 +1,6 @@
 package controller
 
 import (
-	"fmt"
-	"math/rand"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -11,7 +8,6 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
@@ -44,22 +40,6 @@ func (c *Controller) nodeAdd(obj interface{}) {
 	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
 }
 
-func masterCandidate(replicas []*v1.Pod) *v1.Pod {
-	return replicas[rand.Intn(len(replicas))]
-}
-
-func (c *Controller) migratePod(cl *cluster.Cluster, pod *v1.Pod) error {
-	newNode, err := cl.MovePod(pod)
-	if err != nil {
-		return fmt.Errorf("could not migrate pod: %v", err)
-	}
-	if util.MapContains(newNode.Labels, c.opConfig.CordonedNodeLabel) {
-		return fmt.Errorf("migrated to another cordoned node")
-	}
-
-	return nil
-}
-
 func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	nodePrev, ok := prev.(*v1.Node)
 	if !ok {
@@ -76,12 +56,12 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	}
 
 	if !(nodePrev.Spec.Unschedulable != nodeCur.Spec.Unschedulable &&
-		nodeCur.Spec.Unschedulable && util.MapContains(nodeCur.Labels, c.opConfig.CordonedNodeLabel)) {
+		nodeCur.Spec.Unschedulable && util.MapContains(nodeCur.Labels, c.opConfig.CordonedNodeLabels)) {
 		return
 	}
 
 	c.logger.Infof("node %q became unschedulable and has EOL labels: %q", util.NameFromMeta(nodeCur.ObjectMeta),
-		c.opConfig.CordonedNodeLabel)
+		c.opConfig.CordonedNodeLabels)
 
 	opts := metav1.ListOptions{
 		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),
@@ -92,83 +72,73 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		return
 	}
 
-	clusterReplicas := make(map[spec.NamespacedName][]*v1.Pod, 0)
 	nodePods := make([]*v1.Pod, 0)
 	for i, pod := range podList.Items {
-		if pod.Spec.NodeName == nodeCur.Name {
+		if pod.Spec.NodeName != nodeCur.Name {
 			nodePods = append(nodePods, &podList.Items[i])
-		}
-
-		clusterName := c.podClusterName(&pod)
-		role := cluster.PostgresRole(pod.Labels[c.opConfig.PodRoleLabel])
-		if role != cluster.Replica {
-			continue
-		}
-
-		if _, ok := clusterReplicas[clusterName]; !ok {
-			clusterReplicas[clusterName] = []*v1.Pod{&podList.Items[i]}
-		} else {
-			clusterReplicas[clusterName] = append(clusterReplicas[clusterName], &podList.Items[i])
 		}
 	}
 
-	c.movePods(nodePods, clusterReplicas)
-}
+	masterPods := make(map[*v1.Pod]*cluster.Cluster, 0)
+	replicaPods := make(map[*v1.Pod]*cluster.Cluster, 0)
+	for _, p := range nodePods {
+		podName := util.NameFromMeta(p.ObjectMeta)
 
-func (c *Controller) movePods(nodePods []*v1.Pod, clusterReplicas map[spec.NamespacedName][]*v1.Pod) error {
-	c.logger.Debugf("%d pods to migrate", len(nodePods))
+		pod, err := c.KubeClient.Pods(p.Namespace).Get(p.Name, metav1.GetOptions{})
+		if err != nil {
+			c.logger.Errorf("could not get pod: %v", err)
+		}
 
-	for _, pod := range nodePods {
-		podName := util.NameFromMeta(pod.ObjectMeta)
-		clusterName := c.podClusterName(pod)
-		if clusterName == (spec.NamespacedName{}) {
-			c.logger.Errorf("pod %q does not belong to any cluster: %q", podName, clusterName)
+		role, ok := pod.Labels[c.opConfig.PodRoleLabel]
+		if !ok {
+			c.logger.Warningf("%q pod has no role", podName)
 			continue
 		}
 
-		c.logger.Debugf("moving %q pod", podName)
+		clusterName := c.podClusterName(pod)
 
 		c.clustersMu.RLock()
 		cl, ok := c.clusters[clusterName]
 		c.clustersMu.RUnlock()
 		if !ok {
-			c.logger.Errorf("orphaned pod: %q", podName)
+			c.logger.Warningf("orphaned %q pod", podName)
 			continue
 		}
 
-		switch cluster.PostgresRole(pod.Labels[c.opConfig.PodRoleLabel]) {
-		case cluster.Master:
-			if cl.Spec.NumberOfInstances == 1 { // single node cluster
-				if err := c.migratePod(cl, pod); err != nil {
-					c.logger.Errorf("could not migrate pod: %v", err)
-					continue
-				}
+		if cluster.PostgresRole(role) == cluster.Master {
+			masterPods[pod] = cl
+		} else {
+			replicaPods[pod] = cl
+		}
 
-				c.logger.Infof("replica-less cluster %q has been migrated", clusterName)
-			} else { // migrate replica first
-				newMasterPod := masterCandidate(clusterReplicas[clusterName])
-				if err := c.migratePod(cl, newMasterPod); err != nil {
-					c.logger.Errorf("could not migrate pod: %v", err)
-				}
-				if err := cl.ManualFailover(pod, util.NameFromMeta(newMasterPod.ObjectMeta)); err != nil {
-					c.logger.Errorf("could not failover from %q to %q",
-						podName, util.NameFromMeta(newMasterPod.ObjectMeta))
-				}
+		if !ok {
+			c.logger.Warningf("%q pod is orphaned", podName)
+			continue
+		}
 
-				c.logger.Info("master of the %q cluster has been migrated to a new node", clusterName)
-			}
-		case cluster.Replica:
-			if err := c.migratePod(cl, pod); err != nil {
-				c.logger.Errorf("could not migrate replica pod: %v", err)
-			}
-
-			c.logger.Infof("replica pod %q of the %q cluster has been migrated", podName, clusterName)
-		default:
-			c.logger.Errorf("a %q cluster pod with no role: %q", clusterName, podName)
+		if util.MapContains(pod.Labels, c.opConfig.CordonedNodeLabels) {
+			c.logger.Debugf("pod %q moved out of the old node", podName)
+			continue
 		}
 	}
 
-	return nil
+	for pod, cl := range masterPods {
+		podName := util.NameFromMeta(pod.ObjectMeta)
+
+		if err := cl.MigrateMasterPod(podName); err != nil {
+			c.logger.Errorf("could not move %q master pod: %v", podName, err)
+		}
+	}
+
+	for pod, cl := range replicaPods {
+		podName := util.NameFromMeta(pod.ObjectMeta)
+
+		if err := cl.MigrateReplicaPod(podName); err != nil {
+			c.logger.Errorf("could not move %q replica pod: %v", podName, err)
+		}
+	}
+
+	c.logger.Infof("pods have been moved out from the %q node", util.NameFromMeta(nodeCur.ObjectMeta))
 }
 
 func (c *Controller) nodeDelete(obj interface{}) {
