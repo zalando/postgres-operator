@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"math/rand"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
@@ -42,34 +43,6 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	}
 
 	return pods.Items, nil
-}
-
-// MovePod moves pod from old kubernetes node to the new one
-func (c *Cluster) MovePod(pod *v1.Pod) (*v1.Node, error) {
-	podName := util.NameFromMeta(pod.ObjectMeta)
-	c.logger.Debugf("moving pod %q out of %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
-
-	err := c.recreatePod(podName)
-	if err != nil {
-		return nil, fmt.Errorf("could not recreate pod: %v", err)
-	}
-
-	newPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
-	c.logger.Debugf("new %q pod's node: %q", pod.Name, newPod.Spec.NodeName)
-	if err != nil {
-		return nil, fmt.Errorf("could not get pod: %v", err)
-	}
-	if pod.Spec.NodeName == newPod.Spec.NodeName {
-		return nil, fmt.Errorf("pod didn't move to the new node")
-	}
-	c.logger.Infof("pod %q moved from %q to %q", podName, pod.Spec.NodeName, newPod.Spec.NodeName)
-
-	node, err := c.KubeClient.Nodes().Get(newPod.Spec.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("could not get node of the pod: %v", err)
-	}
-
-	return node, nil
 }
 
 func (c *Cluster) deletePods() error {
@@ -114,6 +87,7 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 }
 
 func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
+	c.logger.Debugf("unsubscribing from %q pod events", podName)
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
@@ -126,6 +100,7 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 }
 
 func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.PodEvent {
+	c.logger.Debugf("subscribing to %q pod", podName)
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
@@ -136,6 +111,112 @@ func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.P
 	c.podSubscribers[podName] = ch
 
 	return ch
+}
+
+func (c *Cluster) movePod(pod *v1.Pod) (*v1.Pod, error) {
+	podName := util.NameFromMeta(pod.ObjectMeta)
+	if err := c.recreatePod(podName); err != nil {
+		return nil, fmt.Errorf("could not move old master pod: %v", err)
+	}
+
+	newPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not get pod: %v", err)
+	}
+
+	if newPod.Spec.NodeName == pod.Spec.NodeName {
+		return nil, fmt.Errorf("pod %q didn't move to a new node", podName)
+	}
+
+	node, err := c.KubeClient.Nodes().Get(newPod.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not get node %q: %v", pod.Spec.NodeName, err)
+	}
+
+	if util.MapContains(node.Labels, c.OpConfig.CordonedNodeLabels) {
+		return nil, fmt.Errorf("pod moved to %q node, which is not a non-cordoned node", node.Name)
+	}
+	c.logger.Infof("poo %q moved from %q to %q node", podName)
+
+	return newPod, nil
+}
+
+func (c *Cluster) masterCandidate() (*v1.Pod, error) {
+	replicas, err := c.getRolePods(Replica)
+	if err != nil {
+		return nil, fmt.Errorf("could not get replica pods: %v", err)
+	}
+
+	return &replicas[rand.Intn(len(replicas))], nil
+}
+
+// MigrateMasterPod migrates master pod via failover to a replica
+func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
+	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+
+	if err != nil {
+		return fmt.Errorf("could not get pod: %v", err)
+	}
+	c.logger.Debugf("moving pod %q out of the %q node", podName, oldMaster.Spec.NodeName)
+
+	oldNode, err := c.KubeClient.Nodes().Get(oldMaster.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("could not get %q node: %v", oldMaster.Spec.NodeName, err)
+	}
+
+	if !util.MapContains(oldNode.Labels, c.OpConfig.CordonedNodeLabels) {
+		c.logger.Debugf("pod is already on a non-cordoned node")
+		return nil
+	}
+
+	if role := PostgresRole(oldMaster.Labels[c.OpConfig.PodRoleLabel]); role != Master {
+		c.logger.Warningf("pod %q is not a master", podName)
+		return nil
+	}
+
+	masterCandidatePod, err := c.masterCandidate()
+	if err != nil {
+		return fmt.Errorf("could not get new master candidate: %v", err)
+	}
+
+	if pod, err := c.movePod(masterCandidatePod); err != nil {
+		return fmt.Errorf("could not move pod: %v", err)
+	} else {
+		c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
+	}
+
+	masterCandidateName := util.NameFromMeta(masterCandidatePod.ObjectMeta)
+	if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
+		return fmt.Errorf("could not failover to %q: %v", masterCandidateName, err)
+	}
+
+	if pod, err := c.movePod(oldMaster); err != nil {
+		return fmt.Errorf("could not move pod: %v", err)
+	} else {
+		c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
+	}
+
+	return nil
+}
+
+// MigrateReplicaPod recreates pod on a new
+func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName) error {
+	replicaPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("could not get pod: %v", err)
+	}
+
+	if role := PostgresRole(replicaPod.Labels[c.OpConfig.PodRoleLabel]); role != Replica {
+		return fmt.Errorf("pod %q is not a replica", podName)
+	}
+
+	if pod, err := c.movePod(replicaPod); err != nil {
+		return fmt.Errorf("could not move pod: %v", err)
+	} else {
+		c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
+	}
+
+	return nil
 }
 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) error {
