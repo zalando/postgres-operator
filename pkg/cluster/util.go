@@ -94,7 +94,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 	}
 }
 
-func (c *Cluster) logServiceChanges(role postgresRole, old, new *v1.Service, isUpdate bool, reason string) {
+func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("%s service %q has been changed",
 			role, util.NameFromMeta(old.ObjectMeta),
@@ -283,7 +283,7 @@ func (c *Cluster) labelsSet() labels.Set {
 	return labels.Set(lbls)
 }
 
-func (c *Cluster) roleLabelsSet(role postgresRole) labels.Set {
+func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
 	lbls := c.labelsSet()
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
 	return lbls

@@ -58,9 +58,9 @@ func (c *Cluster) endpointName() string {
 	return c.Name
 }
 
-func (c *Cluster) serviceName(role postgresRole) string {
+func (c *Cluster) serviceName(role PostgresRole) string {
 	name := c.Name
-	if role == replica {
+	if role == Replica {
 		name = name + "-repl"
 	}
 
@@ -383,7 +383,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &spec.NumberOfInstances,
-			ServiceName:          c.serviceName(master),
+			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
 		},
@@ -465,10 +465,10 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
-func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
 	var dnsName string
 
-	if role == master {
+	if role == Master {
 		dnsName = c.masterDNSName()
 	} else {
 		dnsName = c.replicaDNSName()
@@ -479,7 +479,7 @@ func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec)
 		Type:  v1.ServiceTypeClusterIP,
 	}
 
-	if role == replica {
+	if role == Replica {
 		serviceSpec.Selector = c.roleLabelsSet(role)
 	}
 
@@ -523,7 +523,7 @@ func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpo
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.endpointName(),
 			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(master),
+			Labels:    c.roleLabelsSet(Master),
 		},
 	}
 	if len(subsets) > 0 {
