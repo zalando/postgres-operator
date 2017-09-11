@@ -125,7 +125,7 @@ func (c *Cluster) movePod(pod *v1.Pod) (*v1.Pod, error) {
 	}
 
 	if newPod.Spec.NodeName == pod.Spec.NodeName {
-		return nil, fmt.Errorf("pod %q didn't move to a new node", podName)
+		return nil, fmt.Errorf("pod %q remained on the same node", podName)
 	}
 
 	node, err := c.KubeClient.Nodes().Get(newPod.Spec.NodeName, metav1.GetOptions{})
