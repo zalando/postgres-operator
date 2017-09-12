@@ -79,9 +79,9 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		}
 	}
 
-	clusters := make(map[*cluster.Cluster]struct{}, 0)
-	masterPods := make(map[*v1.Pod]*cluster.Cluster, 0)
-	replicaPods := make(map[*v1.Pod]*cluster.Cluster, 0)
+	clusters := make(map[*cluster.Cluster]struct{})
+	masterPods := make(map[*v1.Pod]*cluster.Cluster)
+	replicaPods := make(map[*v1.Pod]*cluster.Cluster)
 	for _, p := range nodePods {
 		podName := util.NameFromMeta(p.ObjectMeta)
 
@@ -128,7 +128,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		}
 	}
 
-	for cl, _ := range clusters {
+	for cl := range clusters {
 		cl.Lock()
 	}
 
@@ -148,7 +148,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		}
 	}
 
-	for cl, _ := range clusters {
+	for cl := range clusters {
 		cl.Unlock()
 	}
 

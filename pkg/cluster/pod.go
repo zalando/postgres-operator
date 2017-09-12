@@ -179,22 +179,22 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get new master candidate: %v", err)
 	}
 
-	if pod, err := c.movePod(masterCandidatePod); err != nil {
+	pod, err := c.movePod(masterCandidatePod)
+	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
-	} else {
-		c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 	}
+	c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 
 	masterCandidateName := util.NameFromMeta(masterCandidatePod.ObjectMeta)
 	if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
 		return fmt.Errorf("could not failover to %q: %v", masterCandidateName, err)
 	}
 
-	if pod, err := c.movePod(oldMaster); err != nil {
+	pod, err = c.movePod(oldMaster)
+	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
-	} else {
-		c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 	}
+	c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 
 	return nil
 }
@@ -210,11 +210,11 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("pod %q is not a replica", podName)
 	}
 
-	if pod, err := c.movePod(replicaPod); err != nil {
+	pod, err := c.movePod(replicaPod)
+	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
-	} else {
-		c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 	}
+	c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 
 	return nil
 }

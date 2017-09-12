@@ -325,10 +325,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 	}
 	if cloneDescription.ClusterName != "" {
-		cloneVars := c.generateCloneEnvironment(cloneDescription)
-		for _, v := range cloneVars {
-			envVars = append(envVars, v)
-		}
+		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 	privilegedMode := bool(true)
 	container := v1.Container{
@@ -584,9 +581,9 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
-		clone_wal_s3_bucket := c.OpConfig.WALES3Bucket
+		cloneWalS3Bucket := c.OpConfig.WALES3Bucket
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: clone_wal_s3_bucket})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: cloneWalS3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
 	}
 	return result
