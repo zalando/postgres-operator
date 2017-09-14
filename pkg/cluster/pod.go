@@ -263,19 +263,19 @@ func (c *Cluster) recreatePods() error {
 
 		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
 		if err := c.recreatePod(podName); err != nil {
-			return fmt.Errorf("could not recreate Replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
+			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 		}
 	}
 
 	if masterPod == nil {
-		c.logger.Warningln("no Master pod in the cluster")
+		c.logger.Warningln("no master pod in the cluster")
 	} else {
 		//TODO: do manual failover
 		//TODO: specify master, leave new master empty
-		c.logger.Infof("recreating Master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
+		c.logger.Infof("recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
 		if err := c.recreatePod(util.NameFromMeta(masterPod.ObjectMeta)); err != nil {
-			return fmt.Errorf("could not recreate Master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
+			return fmt.Errorf("could not recreate master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
 		}
 	}
 

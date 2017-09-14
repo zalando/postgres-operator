@@ -701,7 +701,7 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 	defer close(stopCh)
 
 	if err := <-podLabelErr; err != nil {
-		return fmt.Errorf("could not get Master pod label: %v", err)
+		return fmt.Errorf("could not get master pod label: %v", err)
 	}
 
 	return nil
