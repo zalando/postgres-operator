@@ -262,10 +262,6 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 			Value: constants.PostgresDataPath,
 		},
 		{
-			Name:  "ETCD_HOST",
-			Value: c.OpConfig.EtcdHost,
-		},
-		{
 			Name: "POD_IP",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
@@ -324,6 +320,13 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	if c.OpConfig.WALES3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 	}
+
+	if c.OpConfig.EtcdHost == "" {
+		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
+	} else {
+		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
+	}
+
 	if cloneDescription.ClusterName != "" {
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
