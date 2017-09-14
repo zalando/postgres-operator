@@ -148,6 +148,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		clusters, found := teamClusters[matches["team"]]
 		if !found {
 			s.respond(nil, fmt.Errorf("could not find clusters for the team"), w)
+			return
 		}
 
 		clusterNames := make([]string, 0)

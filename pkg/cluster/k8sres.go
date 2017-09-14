@@ -58,9 +58,9 @@ func (c *Cluster) endpointName() string {
 	return c.Name
 }
 
-func (c *Cluster) serviceName(role postgresRole) string {
+func (c *Cluster) serviceName(role PostgresRole) string {
 	name := c.Name
-	if role == replica {
+	if role == Replica {
 		name = name + "-repl"
 	}
 
@@ -226,7 +226,10 @@ PATRONI_INITDB_PARAMS:
 	return string(result)
 }
 
-func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements, pgParameters *spec.PostgresqlParam, patroniParameters *spec.Patroni) *v1.PodTemplateSpec {
+func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements,
+	pgParameters *spec.PostgresqlParam,
+	patroniParameters *spec.Patroni,
+	cloneDescription *spec.CloneDescription) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -237,10 +240,6 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		{
 			Name:  "PGROOT",
 			Value: constants.PostgresDataPath,
-		},
-		{
-			Name:  "ETCD_HOST",
-			Value: c.OpConfig.EtcdHost,
 		},
 		{
 			Name: "POD_IP",
@@ -301,11 +300,21 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	if c.OpConfig.WALES3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 	}
+
+	if c.OpConfig.EtcdHost == "" {
+		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
+	} else {
+		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
+	}
+
+	if cloneDescription.ClusterName != "" {
+		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
+	}
 	privilegedMode := bool(true)
 	container := v1.Container{
 		Name:            c.containerName(),
 		Image:           c.OpConfig.DockerImage,
-		ImagePullPolicy: v1.PullAlways,
+		ImagePullPolicy: v1.PullIfNotPresent,
 		Resources:       *resourceRequirements,
 		Ports: []v1.ContainerPort{
 			{
@@ -357,13 +366,13 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
 	resourceRequirements, err := c.resourceRequirements(spec.Resources)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni)
+	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
 	statefulSet := &v1beta1.StatefulSet{
@@ -374,7 +383,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &spec.NumberOfInstances,
-			ServiceName:          c.serviceName(master),
+			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
 		},
@@ -456,10 +465,10 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
-func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
 	var dnsName string
 
-	if role == master {
+	if role == Master {
 		dnsName = c.masterDNSName()
 	} else {
 		dnsName = c.replicaDNSName()
@@ -470,7 +479,7 @@ func (c *Cluster) generateService(role postgresRole, newSpec *spec.PostgresSpec)
 		Type:  v1.ServiceTypeClusterIP,
 	}
 
-	if role == replica {
+	if role == Replica {
 		serviceSpec.Selector = c.roleLabelsSet(role)
 	}
 
@@ -514,7 +523,7 @@ func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpo
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.endpointName(),
 			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(master),
+			Labels:    c.roleLabelsSet(Master),
 		},
 	}
 	if len(subsets) > 0 {
@@ -522,4 +531,51 @@ func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpo
 	}
 
 	return endpoints
+}
+
+func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) []v1.EnvVar {
+	result := make([]v1.EnvVar, 0)
+	if description.ClusterName == "" {
+		return result
+	}
+	cluster := description.ClusterName
+	result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
+	if description.EndTimestamp == "" {
+		// cloning with basebackup, make a connection string to the cluster to clone from
+		host, port := c.getClusterServiceConnectionParameters(cluster)
+		// TODO: make some/all of those constants
+		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_BASEBACKUP"})
+		result = append(result, v1.EnvVar{Name: "CLONE_HOST", Value: host})
+		result = append(result, v1.EnvVar{Name: "CLONE_PORT", Value: port})
+		// TODO: assume replication user name is the same for all clusters, fetch it from secrets otherwise
+		result = append(result, v1.EnvVar{Name: "CLONE_USER", Value: c.OpConfig.ReplicationUsername})
+		result = append(result,
+			v1.EnvVar{Name: "CLONE_PASSWORD",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: c.credentialSecretNameForCluster(c.OpConfig.ReplicationUsername,
+								description.ClusterName),
+						},
+						Key: "password",
+					},
+				},
+			})
+	} else {
+		// cloning with S3, find out the bucket to clone
+		clone_wal_s3_bucket := c.OpConfig.WALES3Bucket
+		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: clone_wal_s3_bucket})
+		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
+	}
+	return result
+}
+
+// getClusterServiceConnectionParameters fetches cluster host name and port
+// TODO: perhaps we need to query the service (i.e. if non-standard port is used?)
+// TODO: handle clusters in different namespaces
+func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (host string, port string) {
+	host = clusterName
+	port = "5432"
+	return
 }

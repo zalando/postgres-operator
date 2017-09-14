@@ -94,7 +94,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 	}
 }
 
-func (c *Cluster) logServiceChanges(role postgresRole, old, new *v1.Service, isUpdate bool, reason string) {
+func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
 		c.logger.Infof("%s service %q has been changed",
 			role, util.NameFromMeta(old.ObjectMeta),
@@ -283,7 +283,7 @@ func (c *Cluster) labelsSet() labels.Set {
 	return labels.Set(lbls)
 }
 
-func (c *Cluster) roleLabelsSet(role postgresRole) labels.Set {
+func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
 	lbls := c.labelsSet()
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
 	return lbls
@@ -304,11 +304,15 @@ func (c *Cluster) replicaDNSName() string {
 }
 
 func (c *Cluster) credentialSecretName(username string) string {
+	return c.credentialSecretNameForCluster(username, c.Name)
+}
+
+func (c *Cluster) credentialSecretNameForCluster(username string, clusterName string) string {
 	// secret  must consist of lower case alphanumeric characters, '-' or '.',
 	// and must start and end with an alphanumeric character
 	return fmt.Sprintf(constants.UserSecretTemplate,
 		strings.Replace(username, "_", "-", -1),
-		c.Name)
+		clusterName)
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
