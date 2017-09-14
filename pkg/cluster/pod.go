@@ -113,10 +113,22 @@ func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.P
 	return ch
 }
 
-func (c *Cluster) movePod(pod *v1.Pod) (*v1.Pod, error) {
+func (c *Cluster) movePodOffCordonedNode(pod *v1.Pod) (*v1.Pod, error) {
 	podName := util.NameFromMeta(pod.ObjectMeta)
+
+	node, err := c.KubeClient.Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not get %q node: %v", pod.Spec.NodeName, err)
+	}
+
+	if !util.MapContains(node.Labels, c.OpConfig.CordonedNodeLabels) {
+		c.logger.Infof("%q pod is already on a non-cordoned node", podName)
+
+		return pod, nil
+	}
+
 	if err := c.recreatePod(podName); err != nil {
-		return nil, fmt.Errorf("could not move old master pod: %v", err)
+		return nil, fmt.Errorf("could not move pod: %v", err)
 	}
 
 	newPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
@@ -125,18 +137,20 @@ func (c *Cluster) movePod(pod *v1.Pod) (*v1.Pod, error) {
 	}
 
 	if newPod.Spec.NodeName == pod.Spec.NodeName {
-		return nil, fmt.Errorf("pod %q remained on the same node", podName)
+		return nil, fmt.Errorf("%q pod remained on the same node", podName)
 	}
 
-	node, err := c.KubeClient.Nodes().Get(newPod.Spec.NodeName, metav1.GetOptions{})
+	node, err = c.KubeClient.Nodes().Get(newPod.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("could not get node %q: %v", pod.Spec.NodeName, err)
+		return nil, fmt.Errorf("could not get %q node: %v", pod.Spec.NodeName, err)
 	}
 
 	if util.MapContains(node.Labels, c.OpConfig.CordonedNodeLabels) {
-		return nil, fmt.Errorf("pod moved to %q node, which is not a non-cordoned node", node.Name)
+		c.logger.Warningf("%q pod moved to the %q node, which is a cordoned node", podName, node.Name)
+		return newPod, nil
 	}
-	c.logger.Infof("poo %q moved from %q to %q node", podName)
+
+	c.logger.Infof("%q pod moved from %q to %q node", podName, pod.Spec.NodeName, newPod.Spec.NodeName)
 
 	return newPod, nil
 }
@@ -179,7 +193,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get new master candidate: %v", err)
 	}
 
-	pod, err := c.movePod(masterCandidatePod)
+	pod, err := c.movePodOffCordonedNode(masterCandidatePod)
 	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
@@ -190,7 +204,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not failover to %q: %v", masterCandidateName, err)
 	}
 
-	pod, err = c.movePod(oldMaster)
+	pod, err = c.movePodOffCordonedNode(oldMaster)
 	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
@@ -210,7 +224,7 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("pod %q is not a replica", podName)
 	}
 
-	pod, err := c.movePod(replicaPod)
+	pod, err := c.movePodOffCordonedNode(replicaPod)
 	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
 	}

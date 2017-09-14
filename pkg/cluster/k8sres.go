@@ -238,9 +238,8 @@ func (c *Cluster) nodeAffinity() *v1.Affinity {
 
 	return &v1.Affinity{
 		NodeAffinity: &v1.NodeAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{{
-				Weight:     100,
-				Preference: v1.NodeSelectorTerm{MatchExpressions: matchExpressions}},
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{{MatchExpressions: matchExpressions}},
 			},
 		},
 	}

@@ -82,13 +82,8 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	clusters := make(map[*cluster.Cluster]struct{})
 	masterPods := make(map[*v1.Pod]*cluster.Cluster)
 	replicaPods := make(map[*v1.Pod]*cluster.Cluster)
-	for _, p := range nodePods {
-		podName := util.NameFromMeta(p.ObjectMeta)
-
-		pod, err := c.KubeClient.Pods(p.Namespace).Get(p.Name, metav1.GetOptions{})
-		if err != nil {
-			c.logger.Errorf("could not get pod: %v", err)
-		}
+	for _, pod := range nodePods {
+		podName := util.NameFromMeta(pod.ObjectMeta)
 
 		role, ok := pod.Labels[c.opConfig.PodRoleLabel]
 		if !ok {
@@ -115,16 +110,6 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 			masterPods[pod] = cl
 		} else {
 			replicaPods[pod] = cl
-		}
-
-		if !ok {
-			c.logger.Warningf("%q pod is orphaned", podName)
-			continue
-		}
-
-		if util.MapContains(pod.Labels, c.opConfig.CordonedNodeLabels) {
-			c.logger.Debugf("pod %q moved out of the old node", podName)
-			continue
 		}
 	}
 
