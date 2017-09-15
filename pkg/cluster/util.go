@@ -21,25 +21,46 @@ func isValidUsername(username string) bool {
 	return userRegexp.MatchString(username)
 }
 
-func normalizeUserFlags(userFlags []string) (flags []string, err error) {
+func isValidFlag(flag string) bool {
+	for _, validFlag := range []string{constants.RoleFlagSuperuser, constants.RoleFlagLogin, constants.RoleFlagCreateDB,
+		constants.RoleFlagInherit, constants.RoleFlagReplication, constants.RoleFlagByPassRLS} {
+		if flag == validFlag || flag == "NO"+validFlag {
+			return true
+		}
+	}
+	return false
+}
+
+func invertFlag(flag string) string {
+	if flag[:2] == "NO" {
+		return flag[2:]
+	}
+	return "NO" + flag
+}
+
+func normalizeUserFlags(userFlags []string) ([]string, error) {
 	uniqueFlags := make(map[string]bool)
 	addLogin := true
 
 	for _, flag := range userFlags {
 		if !alphaNumericRegexp.MatchString(flag) {
-			err = fmt.Errorf("user flag '%v' is not alphanumeric", flag)
-			return
+			return nil, fmt.Errorf("user flag %q is not alphanumeric", flag)
 		}
+
 		flag = strings.ToUpper(flag)
 		if _, ok := uniqueFlags[flag]; !ok {
+			if !isValidFlag(flag) {
+				return nil, fmt.Errorf("user flag %q is not valid", flag)
+			}
+			invFlag := invertFlag(flag)
+			if uniqueFlags[invFlag] {
+				return nil, fmt.Errorf("conflicting user flags: %q and %q", flag, invFlag)
+			}
 			uniqueFlags[flag] = true
 		}
 	}
-	if uniqueFlags[constants.RoleFlagLogin] && uniqueFlags[constants.RoleFlagNoLogin] {
-		return nil, fmt.Errorf("conflicting or redundant flags: LOGIN and NOLOGIN")
-	}
 
-	flags = []string{}
+	flags := []string{}
 	for k := range uniqueFlags {
 		if k == constants.RoleFlagNoLogin || k == constants.RoleFlagLogin {
 			addLogin = false
@@ -55,7 +76,7 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 		flags = append(flags, constants.RoleFlagLogin)
 	}
 
-	return
+	return flags, nil
 }
 
 func specPatch(spec interface{}) ([]byte, error) {

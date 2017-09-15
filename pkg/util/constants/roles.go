@@ -12,4 +12,6 @@ const (
 	RoleFlagNoLogin        = "NOLOGIN"
 	RoleFlagCreateRole     = "CREATEROLE"
 	RoleFlagCreateDB       = "CREATEDB"
+	RoleFlagReplication    = "REPLICATION"
+	RoleFlagByPassRLS      = "BYPASSRLS"
 )
