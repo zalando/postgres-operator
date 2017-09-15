@@ -34,36 +34,33 @@ func isValidFlag(flag string) bool {
 func invertFlag(flag string) string {
 	if flag[:2] == "NO" {
 		return flag[2:]
-	} else {
-		return "NO" + flag
 	}
+	return "NO" + flag
 }
 
-func normalizeUserFlags(userFlags []string) (flags []string, err error) {
+func normalizeUserFlags(userFlags []string) ([]string, error) {
 	uniqueFlags := make(map[string]bool)
 	addLogin := true
 
 	for _, flag := range userFlags {
 		if !alphaNumericRegexp.MatchString(flag) {
-			err = fmt.Errorf("user flag %q is not alphanumeric", flag)
-			return
+			return nil, fmt.Errorf("user flag %q is not alphanumeric", flag)
 		}
+
 		flag = strings.ToUpper(flag)
 		if _, ok := uniqueFlags[flag]; !ok {
 			if !isValidFlag(flag) {
-				err = fmt.Errorf("user flag %q is not valid", flag)
-				return
+				return nil, fmt.Errorf("user flag %q is not valid", flag)
 			}
 			invFlag := invertFlag(flag)
 			if uniqueFlags[invFlag] {
-				err = fmt.Errorf("conflicting user flags: %q and %q", flag, invFlag)
-				return
+				return nil, fmt.Errorf("conflicting user flags: %q and %q", flag, invFlag)
 			}
 			uniqueFlags[flag] = true
 		}
 	}
 
-	flags = []string{}
+	flags := []string{}
 	for k := range uniqueFlags {
 		if k == constants.RoleFlagNoLogin || k == constants.RoleFlagLogin {
 			addLogin = false
@@ -79,7 +76,7 @@ func normalizeUserFlags(userFlags []string) (flags []string, err error) {
 		flags = append(flags, constants.RoleFlagLogin)
 	}
 
-	return
+	return flags, nil
 }
 
 func specPatch(spec interface{}) ([]byte, error) {
