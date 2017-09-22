@@ -213,7 +213,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	return nil
 }
 
-// MigrateReplicaPod recreates pod on a new
+// MigrateReplicaPod recreates pod on a new node
 func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName) error {
 	replicaPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
 	if err != nil {
