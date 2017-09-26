@@ -77,6 +77,7 @@ OUTER:
 	return result, len(result) == 0
 }
 
+// FindNamedStringSubmatch returns a map of strings holding the text of the matches of the r regular expression
 func FindNamedStringSubmatch(r *regexp.Regexp, s string) map[string]string {
 	matches := r.FindStringSubmatch(s)
 	grNames := r.SubexpNames()
