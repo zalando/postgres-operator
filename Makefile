@@ -59,7 +59,7 @@ scm-source.json: .git
 	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
 tools:
-	@go get -u honnef.co/go/staticcheck/cmd/staticcheck
+	@go get -u honnef.co/go/tools/staticcheck
 	@go get -u github.com/Masterminds/glide
 
 fmt:
