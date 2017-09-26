@@ -28,7 +28,7 @@ func New(size int) *RingLog {
 	return &r
 }
 
-// Insert inserts new LogEntry into the ring logger
+// Insert inserts new entry into the ring logger
 func (r *RingLog) Insert(obj interface{}) {
 	r.Lock()
 	defer r.Unlock()
@@ -39,7 +39,7 @@ func (r *RingLog) Insert(obj interface{}) {
 	}
 }
 
-// Walk dumps all the LogEntries from the Ring logger
+// Walk dumps all the entries from the Ring logger
 func (r *RingLog) Walk() []interface{} {
 	res := make([]interface{}, 0)
 
