@@ -331,9 +331,12 @@ func (c *Cluster) credentialSecretName(username string) string {
 func (c *Cluster) credentialSecretNameForCluster(username string, clusterName string) string {
 	// secret  must consist of lower case alphanumeric characters, '-' or '.',
 	// and must start and end with an alphanumeric character
-	return fmt.Sprintf(constants.UserSecretTemplate,
-		strings.Replace(username, "_", "-", -1),
-		clusterName)
+
+	return c.OpConfig.SecretNameTemplate.Format(
+		"username", strings.Replace(username, "_", "-", -1),
+		"clustername", clusterName,
+		"tprkind", constants.TPRKind,
+		"tprgroup", constants.TPRGroup)
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {

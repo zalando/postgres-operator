@@ -12,6 +12,7 @@ data:
   dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
   docker_image: registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4
   etcd_host: etcd-client.default.svc.cluster.local:2379
+  secret_name_template: '{username}.{clustername}.credentials.{tprkind}.{tprgroup}'
   infrastructure_roles_secret_name: postgresql-infrastructure-roles
   oauth_token_secret_name: postgresql-operator
   pam_configuration: |
