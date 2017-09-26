@@ -298,6 +298,7 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 
 	workerID := c.clusterWorkerID(clusterName)
 	clusterEvent := spec.ClusterEvent{
+		EventTime: time.Now(),
 		EventType: eventType,
 		UID:       uid,
 		OldSpec:   old,

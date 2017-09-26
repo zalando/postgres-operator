@@ -48,8 +48,7 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 func (c *Controller) createTPR() error {
 	tpr := thirdPartyResource(constants.TPRName)
 
-	_, err := c.KubeClient.ThirdPartyResources().Create(tpr)
-	if err != nil {
+	if _, err := c.KubeClient.ThirdPartyResources().Create(tpr); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return err
 		}
