@@ -101,6 +101,13 @@ type ClusterStatus struct {
 	Error  error
 }
 
+// Diff describes diff
+type Diff struct {
+	EventTime   time.Time
+	ProcessTime time.Time
+	Diff        []string
+}
+
 // ControllerStatus describes status of the controller
 type ControllerStatus struct {
 	LastSyncTime    int64

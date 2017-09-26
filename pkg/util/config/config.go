@@ -46,23 +46,24 @@ type Config struct {
 	TPR
 	Resources
 	Auth
-	Namespace            string         `name:"namespace"`
-	EtcdHost             string         `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
-	DockerImage          string         `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
-	ServiceAccountName   string         `name:"service_account_name" default:"operator"`
-	DbHostedZone         string         `name:"db_hosted_zone" default:"db.example.com"`
-	EtcdScope            string         `name:"etcd_scope" default:"service"`
-	WALES3Bucket         string         `name:"wal_s3_bucket"`
-	KubeIAMRole          string         `name:"kube_iam_role"`
-	DebugLogging         bool           `name:"debug_logging" default:"true"`
-	EnableDBAccess       bool           `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI       bool           `name:"enable_teams_api" default:"true"`
-	EnableLoadBalancer   bool           `name:"enable_load_balancer" default:"true"`
-	MasterDNSNameFormat  stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
-	ReplicaDNSNameFormat stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
-	Workers              uint32         `name:"workers" default:"4"`
-	APIPort              int            `name:"api_port" default:"8080"`
-	RingLogLines         int            `name:"ring_log_lines" default:"100"`
+	Namespace             string         `name:"namespace"`
+	EtcdHost              string         `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
+	DockerImage           string         `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
+	ServiceAccountName    string         `name:"service_account_name" default:"operator"`
+	DbHostedZone          string         `name:"db_hosted_zone" default:"db.example.com"`
+	EtcdScope             string         `name:"etcd_scope" default:"service"`
+	WALES3Bucket          string         `name:"wal_s3_bucket"`
+	KubeIAMRole           string         `name:"kube_iam_role"`
+	DebugLogging          bool           `name:"debug_logging" default:"true"`
+	EnableDBAccess        bool           `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI        bool           `name:"enable_teams_api" default:"true"`
+	EnableLoadBalancer    bool           `name:"enable_load_balancer" default:"true"`
+	MasterDNSNameFormat   stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
+	ReplicaDNSNameFormat  stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	Workers               uint32         `name:"workers" default:"4"`
+	APIPort               int            `name:"api_port" default:"8080"`
+	RingLogLines          int            `name:"ring_log_lines" default:"100"`
+	ClusterHistoryEntries int            `name:"cluster_history_entries" default:"1000"`
 
 	PodTerminateGracePeriod time.Duration `name:"pod_terminate_grace_period" default:"5m"`
 }
