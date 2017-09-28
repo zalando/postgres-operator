@@ -32,6 +32,7 @@ type controllerInformer interface {
 	TeamClusterList() map[string][]spec.NamespacedName
 	ClusterStatus(team, cluster string) (*spec.ClusterStatus, error)
 	ClusterLogs(team, cluster string) ([]*spec.LogEntry, error)
+	ClusterHistory(team, cluster string) ([]*spec.Diff, error)
 	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
 	ListQueue(workerID uint32) (*spec.QueueDump, error)
 	GetWorkersCnt() uint32
@@ -47,6 +48,7 @@ type Server struct {
 var (
 	clusterStatusURL     = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/?$`)
 	clusterLogsURL       = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/logs/?$`)
+	clusterHistoryURL    = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9]*)/history/?$`)
 	teamURL              = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$`)
 	workerLogsURL        = regexp.MustCompile(`^/workers/(?P<id>\d+)/logs/?$`)
 	workerEventsQueueURL = regexp.MustCompile(`^/workers/(?P<id>\d+)/queue/?$`)
@@ -160,6 +162,8 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		return
 	} else if matches := util.FindNamedStringSubmatch(clusterLogsURL, req.URL.Path); matches != nil {
 		resp, err = s.controller.ClusterLogs(matches["team"], matches["cluster"])
+	} else if matches := util.FindNamedStringSubmatch(clusterHistoryURL, req.URL.Path); matches != nil {
+		resp, err = s.controller.ClusterHistory(matches["team"], matches["cluster"])
 	} else if req.URL.Path == clustersURL {
 		res := make(map[string][]string)
 		for team, clusters := range s.controller.TeamClusterList() {
@@ -171,8 +175,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		s.respond(res, nil, w)
 		return
 	} else {
-		s.respond(nil, fmt.Errorf("page not found"), w)
-		return
+		err = fmt.Errorf("page not found")
 	}
 
 	s.respond(resp, err, w)

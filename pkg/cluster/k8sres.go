@@ -555,9 +555,11 @@ func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpo
 
 func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) []v1.EnvVar {
 	result := make([]v1.EnvVar, 0)
+
 	if description.ClusterName == "" {
 		return result
 	}
+
 	cluster := description.ClusterName
 	result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
 	if description.EndTimestamp == "" {
@@ -583,11 +585,11 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
-		cloneWalS3Bucket := c.OpConfig.WALES3Bucket
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: cloneWalS3Bucket})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
 	}
+
 	return result
 }
 
