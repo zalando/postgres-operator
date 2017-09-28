@@ -138,12 +138,14 @@ func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedNam
 	c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
 	c.clusters[clusterName] = cl
 	c.clusterLogs[clusterName] = ringlog.New(c.opConfig.RingLogLines)
+	c.clusterHistory[clusterName] = ringlog.New(c.opConfig.ClusterHistoryEntries)
 
 	return cl
 }
 
 func (c *Controller) processEvent(event spec.ClusterEvent) {
 	var clusterName spec.NamespacedName
+	var clHistory ringlog.RingLogger
 
 	lg := c.logger.WithField("worker", event.WorkerID)
 
@@ -156,6 +158,9 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 
 	c.clustersMu.RLock()
 	cl, clusterFound := c.clusters[clusterName]
+	if clusterFound {
+		clHistory = c.clusterHistory[clusterName]
+	}
 	c.clustersMu.RUnlock()
 
 	switch event.EventType {
@@ -192,6 +197,12 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		}
 		cl.Error = nil
 		lg.Infoln("cluster has been updated")
+
+		clHistory.Insert(&spec.Diff{
+			EventTime:   event.EventTime,
+			ProcessTime: time.Now(),
+			Diff:        util.Diff(event.OldSpec, event.NewSpec),
+		})
 	case spec.EventDelete:
 		if !clusterFound {
 			lg.Errorf("unknown cluster: %q", clusterName)
@@ -211,6 +222,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 
 			delete(c.clusters, clusterName)
 			delete(c.clusterLogs, clusterName)
+			delete(c.clusterHistory, clusterName)
 			for i, val := range c.teamClusters[teamName] {
 				if val == clusterName {
 					copy(c.teamClusters[teamName][i:], c.teamClusters[teamName][i+1:])
@@ -298,6 +310,7 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 
 	workerID := c.clusterWorkerID(clusterName)
 	clusterEvent := spec.ClusterEvent{
+		EventTime: time.Now(),
 		EventType: eventType,
 		UID:       uid,
 		OldSpec:   old,

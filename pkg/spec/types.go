@@ -29,6 +29,7 @@ const (
 
 // ClusterEvent carries the payload of the Cluster TPR events.
 type ClusterEvent struct {
+	EventTime time.Time
 	UID       types.UID
 	EventType EventType
 	OldSpec   *Postgresql
@@ -98,6 +99,13 @@ type ClusterStatus struct {
 	Status PostgresStatus
 	Spec   PostgresSpec
 	Error  error
+}
+
+// Diff describes diff
+type Diff struct {
+	EventTime   time.Time
+	ProcessTime time.Time
+	Diff        []string
 }
 
 // ControllerStatus describes status of the controller

@@ -166,3 +166,25 @@ func (c *Controller) ListQueue(workerID uint32) (*spec.QueueDump, error) {
 func (c *Controller) GetWorkersCnt() uint32 {
 	return c.opConfig.Workers
 }
+
+// ClusterHistory dumps history of cluster changes
+func (c *Controller) ClusterHistory(team, name string) ([]*spec.Diff, error) {
+	clusterName := spec.NamespacedName{
+		Namespace: c.opConfig.Namespace,
+		Name:      team + "-" + name,
+	}
+
+	c.clustersMu.RLock()
+	cl, ok := c.clusterHistory[clusterName]
+	c.clustersMu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("could not find cluster")
+	}
+
+	res := make([]*spec.Diff, 0)
+	for _, e := range cl.Walk() {
+		res = append(res, e.(*spec.Diff))
+	}
+
+	return res, nil
+}

@@ -32,10 +32,11 @@ type Controller struct {
 
 	stopCh chan struct{}
 
-	clustersMu   sync.RWMutex
-	clusters     map[spec.NamespacedName]*cluster.Cluster
-	clusterLogs  map[spec.NamespacedName]ringlog.RingLogger
-	teamClusters map[string][]spec.NamespacedName
+	clustersMu     sync.RWMutex
+	clusters       map[spec.NamespacedName]*cluster.Cluster
+	clusterLogs    map[spec.NamespacedName]ringlog.RingLogger
+	clusterHistory map[spec.NamespacedName]ringlog.RingLogger // history of the cluster changes
+	teamClusters   map[string][]spec.NamespacedName
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
@@ -52,14 +53,15 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 	logger := logrus.New()
 
 	c := &Controller{
-		config:       *controllerConfig,
-		opConfig:     &config.Config{},
-		logger:       logger.WithField("pkg", "controller"),
-		clusters:     make(map[spec.NamespacedName]*cluster.Cluster),
-		clusterLogs:  make(map[spec.NamespacedName]ringlog.RingLogger),
-		teamClusters: make(map[string][]spec.NamespacedName),
-		stopCh:       make(chan struct{}),
-		podCh:        make(chan spec.PodEvent),
+		config:         *controllerConfig,
+		opConfig:       &config.Config{},
+		logger:         logger.WithField("pkg", "controller"),
+		clusters:       make(map[spec.NamespacedName]*cluster.Cluster),
+		clusterLogs:    make(map[spec.NamespacedName]ringlog.RingLogger),
+		clusterHistory: make(map[spec.NamespacedName]ringlog.RingLogger),
+		teamClusters:   make(map[string][]spec.NamespacedName),
+		stopCh:         make(chan struct{}),
+		podCh:          make(chan spec.PodEvent),
 	}
 	logger.Hooks.Add(c)
 

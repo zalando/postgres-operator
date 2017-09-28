@@ -32,4 +32,5 @@ data:
   enable_load_balancer: "true"
   api_port: "8080"
   ring_log_lines: "100"
+  cluster_history_entries: "1000"
   pod_terminate_grace_period: 5m

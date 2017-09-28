@@ -52,10 +52,14 @@ func PGUserPassword(user spec.PgUser) string {
 	return md5prefix + hex.EncodeToString(s[:])
 }
 
+// Diff returns diffs between 2 objects
+func Diff(a, b interface{}) []string {
+	return pretty.Diff(a, b)
+}
+
 // PrettyDiff shows the diff between 2 objects in an easy to understand format. It is mainly used for debugging output.
-func PrettyDiff(a, b interface{}) (result string) {
-	diff := pretty.Diff(a, b)
-	return strings.Join(diff, "\n")
+func PrettyDiff(a, b interface{}) string {
+	return strings.Join(Diff(a, b), "\n")
 }
 
 // SubstractStringSlices finds elements in a that are not in b and return them as a result slice.
@@ -73,6 +77,7 @@ OUTER:
 	return result, len(result) == 0
 }
 
+// FindNamedStringSubmatch returns a map of strings holding the text of the matches of the r regular expression
 func FindNamedStringSubmatch(r *regexp.Regexp, s string) map[string]string {
 	matches := r.FindStringSubmatch(s)
 	grNames := r.SubexpNames()
