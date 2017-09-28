@@ -85,8 +85,8 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 		if err2 := rows.Close(); err2 != nil {
 			err = fmt.Errorf("error when closing query cursor: %v", err2)
 		}
-
 	}()
+
 	for rows.Next() {
 		var (
 			rolname, rolpassword                                          string
