@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -65,6 +66,10 @@ func (c *Cluster) serviceName(role PostgresRole) string {
 	}
 
 	return name
+}
+
+func (c *Cluster) podDisruptionBudgetName() string {
+	return c.OpConfig.PDBNameFormat.Format("cluster", c.Spec.ClusterName)
 }
 
 func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRequirements, error) {
@@ -591,6 +596,25 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 	}
 
 	return result
+}
+
+func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
+	minAvailable := intstr.FromInt(1)
+	matchLabels := c.OpConfig.ClusterLabels
+	matchLabels[c.OpConfig.ClusterNameLabel] = c.Name
+
+	return &policybeta1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: c.podDisruptionBudgetName(),
+			Namespace: c.Namespace,
+		},
+		Spec: policybeta1.PodDisruptionBudgetSpec{
+			MinAvailable: &minAvailable,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: matchLabels,
+			},
+		},
+	}
 }
 
 // getClusterServiceConnectionParameters fetches cluster host name and port

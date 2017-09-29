@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
@@ -42,10 +43,11 @@ type Config struct {
 }
 
 type kubeResources struct {
-	Services    map[PostgresRole]*v1.Service
-	Endpoint    *v1.Endpoints
-	Secrets     map[types.UID]*v1.Secret
-	Statefulset *v1beta1.StatefulSet
+	Services            map[PostgresRole]*v1.Service
+	Endpoint            *v1.Endpoints
+	Secrets             map[types.UID]*v1.Secret
+	Statefulset         *v1beta1.StatefulSet
+	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
 }
@@ -238,6 +240,12 @@ func (c *Cluster) Create() error {
 			c.logger.Warningln("cluster is masterless")
 		}
 	}
+
+	pdb, err := c.createPodDisruptionBudget()
+	if err != nil {
+		return fmt.Errorf("could not create pod disruption budget: %v", err)
+	}
+	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
 	err = c.listResources()
 	if err != nil {
@@ -513,6 +521,15 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logger.Infof("volumes have been updated successfully")
 	}
 
+	newPDB := c.generatePodDisruptionBudget()
+	if match, reason := c.samePDBWith(newPDB); !match {
+		c.logPDBChanges(c.PodDisruptionBudget, newPDB, true, reason)
+		if err := c.updatePodDisruptionBudget(newPDB); err != nil {
+			c.setStatus(spec.ClusterStatusUpdateFailed)
+			return fmt.Errorf("could not update pod disruption budget: %v", err)
+		}
+	}
+
 	c.setStatus(spec.ClusterStatusRunning)
 
 	return nil
@@ -544,6 +561,10 @@ func (c *Cluster) Delete() error {
 		if err := c.deleteSecret(obj); err != nil {
 			return fmt.Errorf("could not delete secret: %v", err)
 		}
+	}
+
+	if err := c.deletePodDisruptionBudget(); err != nil {
+		return fmt.Errorf("could not delete pod disruption budget: %v", err)
 	}
 
 	return nil
@@ -664,10 +685,11 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 		Status:  c.Status,
 		Spec:    c.Spec,
 
-		MasterService:  c.GetServiceMaster(),
-		ReplicaService: c.GetServiceReplica(),
-		Endpoint:       c.GetEndpoint(),
-		StatefulSet:    c.GetStatefulSet(),
+		MasterService:       c.GetServiceMaster(),
+		ReplicaService:      c.GetServiceReplica(),
+		Endpoint:            c.GetEndpoint(),
+		StatefulSet:         c.GetStatefulSet(),
+		PodDisruptionBudget: c.GetPodDisruptionBudget(),
 
 		Error: c.Error,
 	}

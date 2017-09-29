@@ -34,7 +34,7 @@ type Resources struct {
 
 // Auth describes authentication specific configuration parameters
 type Auth struct {
-	SecretNameTemplate            stringTemplate      `name:"secret_name_template" default:"{username}.{clustername}.credentials.{tprkind}.{tprgroup}"`
+	SecretNameTemplate            stringTemplate      `name:"secret_name_template" default:"{username}.{cluster}.credentials.{tprkind}.{tprgroup}"`
 	PamRoleName                   string              `name:"pam_role_name" default:"zalandos"`
 	PamConfiguration              string              `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
 	TeamsAPIUrl                   string              `name:"teams_api_url" default:"https://teams.example.com/api/"`
@@ -63,6 +63,7 @@ type Config struct {
 	EnableLoadBalancer    bool           `name:"enable_load_balancer" default:"true"`
 	MasterDNSNameFormat   stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat  stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	PDBNameFormat		  stringTemplate `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	Workers               uint32         `name:"workers" default:"4"`
 	APIPort               int            `name:"api_port" default:"8080"`
 	RingLogLines          int            `name:"ring_log_lines" default:"100"`
