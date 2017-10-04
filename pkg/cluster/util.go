@@ -3,6 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -182,15 +183,17 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent) error {
+func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRole) error {
 	for {
 		select {
 		case podEvent := <-podEvents:
-			role := c.podSpiloRole(podEvent.CurPod)
-			// We cannot assume any role of the newly created pod. Normally, for a multi-pod cluster
-			// we should observe the 'replica' value, but it could be that some pods are not allowed
-			// to promote, therefore, the new pod could be a master as well.
-			if role == constants.PodRoleMaster || role == constants.PodRoleReplica {
+			podRole := PostgresRole(podEvent.CurPod.Labels[c.OpConfig.PodRoleLabel])
+
+			if role == nil {
+				if podRole == Master || podRole == Replica {
+					return nil
+				}
+			} else if *role == podRole {
 				return nil
 			}
 		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
@@ -341,4 +344,8 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
 	return pod.Labels[c.OpConfig.PodRoleLabel]
+}
+
+func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
+	return replicas[rand.Intn(len(replicas))]
 }
