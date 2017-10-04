@@ -3,6 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -352,4 +353,12 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 		"cluster", clusterName,
 		"tprkind", constants.TPRKind,
 		"tprgroup", constants.TPRGroup)
+}
+
+func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
+	return pod.Labels[c.OpConfig.PodRoleLabel]
+}
+
+func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
+	return replicas[rand.Intn(len(replicas))]
 }

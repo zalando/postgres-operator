@@ -14,7 +14,8 @@ spec:
     - createdb
   allowedSourceRanges: #Load balancer source ranges
   - 127.0.0.1/32
-
+  databases:
+    foo: zalando
 #Expert section
   postgresql:
     version: "9.6"

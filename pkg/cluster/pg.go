@@ -11,7 +11,8 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
-var getUserSQL = `SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.rolinherit,
+const (
+	getUserSQL = `SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.rolinherit,
 	        a.rolcreaterole, a.rolcreatedb, a.rolcanlogin,
 	        ARRAY(SELECT b.rolname
 	              FROM pg_catalog.pg_auth_members m
@@ -20,6 +21,10 @@ var getUserSQL = `SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.r
 	 FROM pg_catalog.pg_authid a
 	 WHERE a.rolname = ANY($1)
 	 ORDER BY 1;`
+
+	getDatabasesSQL   = `SELECT datname, a.rolname AS owner FROM pg_database d INNER JOIN pg_authid a ON a.oid = d.datdba;`
+	createDatabaseSQL = `CREATE DATABASE "%s" OWNER "%s";`
+)
 
 func (c *Cluster) pgConnectionString() string {
 	hostname := fmt.Sprintf("%s.%s.svc.cluster.local", c.Name, c.Namespace)
@@ -104,6 +109,88 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 	}
 
 	return users, nil
+}
+
+func (c *Cluster) getDatabases() (map[string]string, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	dbs := make(map[string]string, 0)
+
+	if err := c.initDbConn(); err != nil {
+		return nil, fmt.Errorf("could not init db connection")
+	}
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close db connection: %v", err)
+		}
+	}()
+
+	if rows, err = c.pgDb.Query(getDatabasesSQL); err != nil {
+		return nil, fmt.Errorf("could not query database: %v", err)
+	}
+
+	defer func() {
+		if err2 := rows.Close(); err2 != nil {
+			err = fmt.Errorf("error when closing query cursor: %v", err2)
+		}
+	}()
+
+	for rows.Next() {
+		var datname, owner string
+
+		err := rows.Scan(&datname, &owner)
+		if err != nil {
+			return nil, fmt.Errorf("error when processing row: %v", err)
+		}
+		dbs[datname] = owner
+	}
+
+	return dbs, nil
+}
+
+func (c *Cluster) createDatabases() error {
+	newDbs := c.Spec.Databases
+	curDbs, err := c.getDatabases()
+	if err != nil {
+		return fmt.Errorf("could not get current databases: %v", err)
+	}
+	for datname := range curDbs {
+		delete(newDbs, datname)
+	}
+
+	if len(newDbs) == 0 {
+		return nil
+	}
+
+	if err := c.initDbConn(); err != nil {
+		return fmt.Errorf("could not init db connection")
+	}
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close db connection: %v", err)
+		}
+	}()
+
+	for datname, owner := range newDbs {
+		if _, ok := c.pgUsers[owner]; !ok {
+			c.logger.Infof("skipping creationg of the %q database, user %q does not exist", datname, owner)
+			continue
+		}
+
+		if !alphaNumericRegexp.MatchString(datname) {
+			c.logger.Infof("database %q has invalid name", datname)
+			continue
+		}
+		c.logger.Infof("creating database %q with owner %q", datname, owner)
+
+		if _, err = c.pgDb.Query(fmt.Sprintf(createDatabaseSQL, datname, owner)); err != nil {
+			return fmt.Errorf("could not query database: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool) (result []string) {

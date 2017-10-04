@@ -267,6 +267,7 @@ func (c *Cluster) recreatePods() error {
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
 
 	var masterPod *v1.Pod
+	replicas := make([]spec.NamespacedName, 0)
 	for i, pod := range pods.Items {
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
@@ -279,12 +280,17 @@ func (c *Cluster) recreatePods() error {
 		if err := c.recreatePod(podName); err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 		}
+
+		replicas = append(replicas, util.NameFromMeta(pod.ObjectMeta))
 	}
 
 	if masterPod == nil {
 		c.logger.Warningln("no master pod in the cluster")
 	} else {
-		//TODO: do manual failover
+		err := c.ManualFailover(masterPod, masterCandidate(replicas))
+		if err != nil {
+			return fmt.Errorf("could not perform manual failover: %v", err)
+		}
 		//TODO: specify master, leave new master empty
 		c.logger.Infof("recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 

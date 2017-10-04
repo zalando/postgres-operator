@@ -230,10 +230,14 @@ func (c *Cluster) Create() error {
 	c.logger.Infof("pods are ready")
 
 	if !(c.masterLess || c.databaseAccessDisabled()) {
-		err = c.createRoles()
-		if err != nil {
+		if err := c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
+
+		if err := c.createDatabases(); err != nil {
+			return fmt.Errorf("could not create databases: %v", err)
+		}
+
 		c.logger.Infof("users have been successfully created")
 	} else {
 		if c.masterLess {
@@ -718,7 +722,7 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 		close(stopCh)
 		return fmt.Errorf("could not failover: %v", err)
 	}
-	c.logger.Debugln("successfully failed over")
+	c.logger.Debugf("successfully failed over from %q to %q", curMaster.Name, candidate)
 
 	defer close(stopCh)
 
