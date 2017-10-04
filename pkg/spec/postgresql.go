@@ -100,6 +100,7 @@ type PostgresSpec struct {
 	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
 	Clone               CloneDescription     `json:"clone"`
 	ClusterName         string               `json:"-"`
+	Databases           map[string]string    `json:"databases,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.
