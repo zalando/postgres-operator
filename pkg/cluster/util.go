@@ -355,10 +355,6 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 		"tprgroup", constants.TPRGroup)
 }
 
-func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
-	return pod.Labels[c.OpConfig.PodRoleLabel]
-}
-
 func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
 	return replicas[rand.Intn(len(replicas))]
 }
