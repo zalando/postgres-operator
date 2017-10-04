@@ -233,7 +233,7 @@ PATRONI_INITDB_PARAMS:
 
 func (c *Cluster) nodeAffinity() *v1.Affinity {
 	matchExpressions := make([]v1.NodeSelectorRequirement, 0)
-	for k, v := range c.OpConfig.CordonedNodeLabels {
+	for k, v := range c.OpConfig.EOLNodeLabel {
 		matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
 			Key:      k,
 			Operator: v1.NodeSelectorOpNotIn,

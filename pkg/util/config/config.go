@@ -29,7 +29,7 @@ type Resources struct {
 	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
 	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
 	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
-	CordonedNodeLabels      map[string]string `name:"cordoned_node_label" default:"eol:true"`
+	EOLNodeLabel            map[string]string `name:"eol_node_label" default:"eol:true"`
 }
 
 // Auth describes authentication specific configuration parameters
@@ -63,7 +63,7 @@ type Config struct {
 	EnableLoadBalancer    bool           `name:"enable_load_balancer" default:"true"`
 	MasterDNSNameFormat   stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat  stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
-	PDBNameFormat		  stringTemplate `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	PDBNameFormat         stringTemplate `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	Workers               uint32         `name:"workers" default:"4"`
 	APIPort               int            `name:"api_port" default:"8080"`
 	RingLogLines          int            `name:"ring_log_lines" default:"100"`

@@ -35,3 +35,4 @@ data:
   cluster_history_entries: "1000"
   pod_terminate_grace_period: 5m
   pdb_name_format: "postgres-{cluster}-pdb"
+  eol_node_label: "eol:true"

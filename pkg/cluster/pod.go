@@ -121,7 +121,7 @@ func (c *Cluster) movePodOffCordonedNode(pod *v1.Pod) (*v1.Pod, error) {
 		return nil, fmt.Errorf("could not get %q node: %v", pod.Spec.NodeName, err)
 	}
 
-	if !util.MapContains(node.Labels, c.OpConfig.CordonedNodeLabels) {
+	if !util.MapContains(node.Labels, c.OpConfig.EOLNodeLabel) {
 		c.logger.Infof("%q pod is already on a non-cordoned node", podName)
 
 		return pod, nil
@@ -145,7 +145,7 @@ func (c *Cluster) movePodOffCordonedNode(pod *v1.Pod) (*v1.Pod, error) {
 		return nil, fmt.Errorf("could not get %q node: %v", pod.Spec.NodeName, err)
 	}
 
-	if util.MapContains(node.Labels, c.OpConfig.CordonedNodeLabels) {
+	if util.MapContains(node.Labels, c.OpConfig.EOLNodeLabel) {
 		c.logger.Warningf("%q pod moved to the %q node, which is a cordoned node", podName, node.Name)
 		return newPod, nil
 	}
@@ -178,7 +178,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get %q node: %v", oldMaster.Spec.NodeName, err)
 	}
 
-	if !util.MapContains(oldNode.Labels, c.OpConfig.CordonedNodeLabels) {
+	if !util.MapContains(oldNode.Labels, c.OpConfig.EOLNodeLabel) {
 		c.logger.Debugf("pod is already on a non-cordoned node")
 		return nil
 	}

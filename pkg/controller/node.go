@@ -56,12 +56,12 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	}
 
 	if !(nodePrev.Spec.Unschedulable != nodeCur.Spec.Unschedulable &&
-		nodeCur.Spec.Unschedulable && util.MapContains(nodeCur.Labels, c.opConfig.CordonedNodeLabels)) {
+		nodeCur.Spec.Unschedulable && util.MapContains(nodeCur.Labels, c.opConfig.EOLNodeLabel)) {
 		return
 	}
 
 	c.logger.Infof("node %q became unschedulable and has EOL labels: %q", util.NameFromMeta(nodeCur.ObjectMeta),
-		c.opConfig.CordonedNodeLabels)
+		c.opConfig.EOLNodeLabel)
 
 	opts := metav1.ListOptions{
 		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),
