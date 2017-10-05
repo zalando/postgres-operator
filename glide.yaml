@@ -10,7 +10,11 @@ import:
   - service/ec2
 - package: github.com/lib/pq
 - package: github.com/motomux/pretty
+- package: k8s.io/apiextensions-apiserver
+  subpackages:
+  - pkg/client/clientset/clientset
 - package: k8s.io/apimachinery
+  version: release-1.7
   subpackages:
   - pkg/api/errors
   - pkg/api/meta
