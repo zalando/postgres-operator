@@ -1,21 +1,21 @@
 package k8sutil
 
 import (
-	"time"
+	"fmt"
 
+	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	extensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -28,24 +28,10 @@ type KubernetesClient struct {
 	v1core.PersistentVolumeClaimsGetter
 	v1core.ConfigMapsGetter
 	v1beta1.StatefulSetsGetter
-	extensions.ThirdPartyResourcesGetter
-	RESTClient rest.Interface
-}
+	apiextbeta1.CustomResourceDefinitionsGetter
 
-// NewFromKubernetesInterface creates KubernetesClient from kubernetes Interface
-func NewFromKubernetesInterface(src kubernetes.Interface) (c KubernetesClient) {
-	c = KubernetesClient{}
-	c.PodsGetter = src.CoreV1()
-	c.ServicesGetter = src.CoreV1()
-	c.EndpointsGetter = src.CoreV1()
-	c.SecretsGetter = src.CoreV1()
-	c.ConfigMapsGetter = src.CoreV1()
-	c.PersistentVolumeClaimsGetter = src.CoreV1()
-	c.PersistentVolumesGetter = src.CoreV1()
-	c.StatefulSetsGetter = src.AppsV1beta1()
-	c.ThirdPartyResourcesGetter = src.ExtensionsV1beta1()
-	c.RESTClient = src.CoreV1().RESTClient()
-	return
+	RESTClient rest.Interface
+	CRDREST    rest.Interface
 }
 
 // RestConfig creates REST config
@@ -55,11 +41,6 @@ func RestConfig(kubeConfig string, outOfCluster bool) (*rest.Config, error) {
 	}
 
 	return rest.InClusterConfig()
-}
-
-// ClientSet creates clientset using REST config
-func ClientSet(config *rest.Config) (client *kubernetes.Clientset, err error) {
-	return kubernetes.NewForConfig(config)
 }
 
 // ResourceAlreadyExists checks if error corresponds to Already exists error
@@ -72,32 +53,45 @@ func ResourceNotFound(err error) bool {
 	return apierrors.IsNotFound(err)
 }
 
-// KubernetesRestClient create kubernets Interface using REST config
-func KubernetesRestClient(cfg rest.Config) (rest.Interface, error) {
-	cfg.GroupVersion = &schema.GroupVersion{
-		Group:   constants.TPRGroup,
-		Version: constants.TPRApiVersion,
+func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
+	kubeClient := KubernetesClient{}
+
+	client, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return kubeClient, fmt.Errorf("could not get clientset: %v", err)
 	}
-	cfg.APIPath = constants.K8sAPIPath
-	cfg.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
-	return rest.RESTClientFor(&cfg)
-}
+	kubeClient.PodsGetter = client.CoreV1()
+	kubeClient.ServicesGetter = client.CoreV1()
+	kubeClient.EndpointsGetter = client.CoreV1()
+	kubeClient.SecretsGetter = client.CoreV1()
+	kubeClient.ConfigMapsGetter = client.CoreV1()
+	kubeClient.PersistentVolumeClaimsGetter = client.CoreV1()
+	kubeClient.PersistentVolumesGetter = client.CoreV1()
+	kubeClient.StatefulSetsGetter = client.AppsV1beta1()
+	kubeClient.RESTClient = client.CoreV1().RESTClient()
 
-// WaitTPRReady waits until ThirdPartyResource is ready
-func WaitTPRReady(restclient rest.Interface, interval, timeout time.Duration, ns string) error {
-	return retryutil.Retry(interval, timeout, func() (bool, error) {
-		_, err := restclient.
-			Get().
-			Namespace(ns).
-			Resource(constants.ResourceName).
-			DoRaw()
-		if err != nil {
-			if ResourceNotFound(err) { // not set up yet. wait more.
-				return false, nil
-			}
-			return false, err
-		}
-		return true, nil
-	})
+	cfg2 := *cfg
+	cfg2.GroupVersion = &schema.GroupVersion{
+		Group:   constants.CRDGroup,
+		Version: constants.CRDApiVersion,
+	}
+	cfg2.APIPath = constants.K8sAPIPath
+	cfg2.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+
+	crd, err := rest.RESTClientFor(&cfg2)
+	if err != nil {
+		return kubeClient, fmt.Errorf("could not get rest client: %v", err)
+	}
+	kubeClient.CRDREST = crd
+
+	apiextClient, err := apiextclient.NewForConfig(cfg)
+	if err != nil {
+		return kubeClient, fmt.Errorf("could not create api client:%v", err)
+	}
+
+	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1beta1()
+
+	return kubeClient, nil
+
 }
