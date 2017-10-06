@@ -2,7 +2,9 @@
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
-
+ifeq ("$(shell uname)", "Darwin")
+BUILD_FLAGS += -i
+endif
 CGO_ENABLED ?= 0
 ifeq ($(RACE),1)
 	BUILD_FLAGS += -race -a
