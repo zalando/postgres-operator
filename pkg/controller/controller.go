@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
@@ -27,7 +26,6 @@ type Controller struct {
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
-	RestClient rest.Interface // kubernetes API group REST client
 	apiserver  *apiserver.Server
 
 	stopCh chan struct{}
@@ -69,15 +67,11 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 }
 
 func (c *Controller) initClients() {
-	client, err := k8sutil.ClientSet(c.config.RestConfig)
-	if err != nil {
-		c.logger.Fatalf("couldn't create client: %v", err)
-	}
-	c.KubeClient = k8sutil.NewFromKubernetesInterface(client)
+	var err error
 
-	c.RestClient, err = k8sutil.KubernetesRestClient(*c.config.RestConfig)
+	c.KubeClient, err = k8sutil.NewFromConfig(c.config.RestConfig)
 	if err != nil {
-		c.logger.Fatalf("couldn't create rest client: %v", err)
+		c.logger.Fatalf("could not create kubernetes clients: %v", err)
 	}
 }
 
@@ -119,8 +113,8 @@ func (c *Controller) initController() {
 		c.logger.Logger.Level = logrus.DebugLevel
 	}
 
-	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
+	if err := c.createCRD(); err != nil {
+		c.logger.Fatalf("could not register CustomResourceDefinition: %v", err)
 	}
 
 	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
