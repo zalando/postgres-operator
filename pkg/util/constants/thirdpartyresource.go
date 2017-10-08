@@ -1,11 +1,10 @@
 package constants
 
-// Different properties of the PostgreSQL Third Party Resources
+// Different properties of the PostgreSQL Custom Resource Definition
 const (
-	TPRKind        = "postgresql"
-	TPRGroup       = "acid.zalan.do"
-	TPRDescription = "Managed PostgreSQL clusters"
-	TPRApiVersion  = "v1"
-	TPRName        = TPRKind + "." + TPRGroup
-	ResourceName   = TPRKind + "s"
+	CRDKind       = "postgresql"
+	CRDResource   = "postgresqls"
+	CRDShort      = "pg"
+	CRDGroup      = "acid.zalan.do"
+	CRDApiVersion = "v1"
 )

@@ -5,8 +5,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/zalando-incubator/postgres-operator)](https://goreportcard.com/report/github.com/zalando-incubator/postgres-operator)
 
 The Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
-During the initial run it registers the [Third Party Resource (TPR)](https://kubernetes.io/docs/user-guide/thirdpartyresources/) for Postgres.
-The Postgresql TPR is essentially the schema that describes the contents of the manifests for deploying individual Postgres clusters using Statefulsets and Patroni.
+During the initial run it registers the [Custom Resource Definition (CRD)](https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions) for Postgres.
+The Postgresql CRD is essentially the schema that describes the contents of the manifests for deploying individual Postgres clusters using Statefulsets and Patroni.
 
 Once the operator is running, it performs the following actions:
 
@@ -127,12 +127,12 @@ The last line changes the docker image tag in the manifest to the one the operat
 the serviceAccountName definition, as the ServiceAccount is not defined in minikube (neither it should, as one has admin
 permissions there).
 
-### Check if ThirdPartyResource has been registered
+### Check if CustomResourceDefinition has been registered
 
-    $ kubectl --context minikube   get thirdpartyresources
+    $ kubectl --context minikube   get crd
 
-    NAME                       DESCRIPTION                   VERSION(S)
-    postgresql.acid.zalan.do   Managed PostgreSQL clusters   v1
+	NAME                          KIND
+	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
 
 
 ### Create a new spilo cluster

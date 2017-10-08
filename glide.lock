@@ -1,8 +1,8 @@
-hash: 285cea8ceeee9bfe82c59c750a1020922a77efa7a50d8217f58b1b328c8b256e
-updated: 2017-09-01T11:31:43.738137376+02:00
+hash: 42ffa063321a691ec1de30532989e66e81fb7a080d6d4867bbb2c9d7f2a008ce
+updated: 2017-10-06T15:06:00.742579+02:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: b79a722cb7aba0edd9bd2256361ae2e15e98f8ad
+  version: da415b5fa0ff3f91d4707348a8ea1be53f700c22
   subpackages:
   - aws
   - aws/awserr
@@ -51,7 +51,7 @@ imports:
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-ini/ini
-  version: e7fea39b01aea8d5671f6858f0532f56e8bff3a5
+  version: c787282c39ac1fc618827141a1f762240def08a3
 - name: github.com/go-openapi/analysis
   version: b44dc874b601d9e4e2f6e19140e794ba24bead3b
 - name: github.com/go-openapi/jsonpointer
@@ -88,7 +88,7 @@ imports:
 - name: github.com/kr/text
   version: 7cafcd837844e784b526369c9bce262804aebc60
 - name: github.com/lib/pq
-  version: 4a82388ebc5138c8289fe9bc602cb0b3e32cd617
+  version: b77235e3890a962fe8a6f8c4c7198679ca7814e7
   subpackages:
   - oid
 - name: github.com/mailru/easyjson
@@ -112,7 +112,7 @@ imports:
   subpackages:
   - codec
 - name: golang.org/x/crypto
-  version: d172538b2cfce0c13cee31e647d0367aa8cd2486
+  version: 9419663f5a44be8b34ca85f08abc5fe1be11f8a3
   subpackages:
   - ssh/terminal
 - name: golang.org/x/net
@@ -126,6 +126,7 @@ imports:
   version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
   subpackages:
   - unix
+  - windows
 - name: golang.org/x/text
   version: 2910a502d2bf9e43193af9d68ca516529614eed3
   subpackages:
@@ -143,8 +144,16 @@ imports:
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
   version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+- name: k8s.io/apiextensions-apiserver
+  version: fcd622fe88a4a6efcb5aea9e94ee87324ac1b036
+  subpackages:
+  - pkg/apis/apiextensions
+  - pkg/apis/apiextensions/v1beta1
+  - pkg/client/clientset/clientset
+  - pkg/client/clientset/clientset/scheme
+  - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 - name: k8s.io/apimachinery
-  version: 1fd2e63a9a370677308a42f24fd40c86438afddf
+  version: 8ab5f3d8a330c2e9baaf84e39042db8d49034ae2
   subpackages:
   - pkg/api/equality
   - pkg/api/errors
