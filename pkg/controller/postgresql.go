@@ -44,10 +44,10 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	var list spec.PostgresqlList
 	var activeClustersCnt, failedClustersCnt int
 
-	req := c.RestClient.
+	req := c.KubeClient.CRDREST.
 		Get().
 		Namespace(c.opConfig.Namespace).
-		Resource(constants.ResourceName).
+		Resource(constants.CRDResource).
 		VersionedParams(&options, metav1.ParameterCodec)
 
 	b, err := req.DoRaw()
@@ -109,10 +109,10 @@ func (d *tprDecoder) Decode() (action watch.EventType, object runtime.Object, er
 
 func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
 	options.Watch = true
-	r, err := c.RestClient.
+	r, err := c.KubeClient.CRDREST.
 		Get().
 		Namespace(c.opConfig.Namespace).
-		Resource(constants.ResourceName).
+		Resource(constants.CRDResource).
 		VersionedParams(&options, metav1.ParameterCodec).
 		FieldsSelectorParam(nil).
 		Stream()

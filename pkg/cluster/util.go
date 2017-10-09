@@ -338,8 +338,8 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 	return c.OpConfig.SecretNameTemplate.Format(
 		"username", strings.Replace(username, "_", "-", -1),
 		"clustername", clusterName,
-		"tprkind", constants.TPRKind,
-		"tprgroup", constants.TPRGroup)
+		"tprkind", constants.CRDKind,
+		"tprgroup", constants.CRDGroup)
 }
 
 func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
