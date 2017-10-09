@@ -32,6 +32,8 @@ type Controller struct {
 
 	stopCh chan struct{}
 
+	curWorkerID    uint32 //initialized with 0
+	clusterWorkers map[spec.NamespacedName]uint32
 	clustersMu     sync.RWMutex
 	clusters       map[spec.NamespacedName]*cluster.Cluster
 	clusterLogs    map[spec.NamespacedName]ringlog.RingLogger

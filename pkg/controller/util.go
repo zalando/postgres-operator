@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"hash/crc32"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
@@ -42,7 +41,20 @@ func thirdPartyResource(TPRName string) *extv1beta.ThirdPartyResource {
 }
 
 func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
-	return crc32.ChecksumIEEE([]byte(clusterName.String())) % c.opConfig.Workers
+	workerId, ok := c.clusterWorkers[clusterName]
+	if ok {
+		return workerId
+	}
+
+	c.clusterWorkers[clusterName] = c.curWorkerID
+
+	if c.curWorkerID == c.opConfig.Workers-1 {
+		c.curWorkerID = 0
+	} else {
+		c.curWorkerID++
+	}
+
+	return c.clusterWorkers[clusterName]
 }
 
 func (c *Controller) createTPR() error {
