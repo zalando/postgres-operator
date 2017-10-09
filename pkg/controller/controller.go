@@ -56,6 +56,7 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 		config:         *controllerConfig,
 		opConfig:       &config.Config{},
 		logger:         logger.WithField("pkg", "controller"),
+		clusterWorkers: make(map[spec.NamespacedName]uint32),
 		clusters:       make(map[spec.NamespacedName]*cluster.Cluster),
 		clusterLogs:    make(map[spec.NamespacedName]ringlog.RingLogger),
 		clusterHistory: make(map[spec.NamespacedName]ringlog.RingLogger),
