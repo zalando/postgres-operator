@@ -8,8 +8,8 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
-// TPR describes ThirdPartyResource specific configuration parameters
-type TPR struct {
+// CRD describes CustomResourceDefinition specific configuration parameters
+type CRD struct {
 	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
 	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
 	ResyncPeriod      time.Duration `name:"resync_period" default:"5m"`
@@ -44,7 +44,7 @@ type Auth struct {
 
 // Config describes operator config
 type Config struct {
-	TPR
+	CRD
 	Resources
 	Auth
 	Namespace             string         `name:"namespace"`

@@ -1,6 +1,6 @@
 package cluster
 
-// Postgres ThirdPartyResource object i.e. Spilo
+// Postgres CustomResourceDefinition object i.e. Spilo
 
 import (
 	"database/sql"
@@ -130,8 +130,10 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
 
-	_, err = c.KubeClient.RESTClient.Patch(types.MergePatchType).
-		RequestURI(c.GetSelfLink()).
+	_, err = c.KubeClient.CRDREST.Patch(types.MergePatchType).
+		Namespace(c.Namespace).
+		Resource(constants.CRDResource).
+		Name(c.Name).
 		Body(request).
 		DoRaw()
 
