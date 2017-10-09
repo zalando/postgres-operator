@@ -174,10 +174,16 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	if err != nil {
 		return []string{}, fmt.Errorf("could not get oauth token: %v", err)
 	}
+	if len(token) == 0 {
+		return []string{}, fmt.Errorf("could not get oauth token: empty token")
+	}
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(c.Spec.TeamID, token)
 	if err != nil {
 		return nil, fmt.Errorf("could not get team info: %v", err)
+	}
+	if len(teamInfo.Members) == 0 {
+		c.logger.Warningf("team API returned empty list of members for the %q team", c.Spec.TeamID)
 	}
 
 	return teamInfo.Members, nil

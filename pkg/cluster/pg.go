@@ -175,19 +175,19 @@ func (c *Cluster) createDatabases() error {
 
 	for datname, owner := range newDbs {
 		if _, ok := c.pgUsers[owner]; !ok {
-			c.logger.Infof("skipping creation of the %q database, user %q does not exist", datname, owner)
+			c.logger.Warningf("skipping creation of the %q database, user %q does not exist", datname, owner)
 			continue
 		}
 
 		if !databaseNameRegexp.MatchString(datname) {
-			c.logger.Infof("database %q has invalid name", datname)
+			c.logger.Warningf("database %q has invalid name", datname)
 			continue
 		}
-		c.logger.Infof("creating database %q with owner %q", datname, owner)
 
 		if _, err = c.pgDb.Query(fmt.Sprintf(createDatabaseSQL, datname, owner)); err != nil {
 			return fmt.Errorf("could not query database: %v", err)
 		}
+		c.logger.Infof("database %q with the owner %q has been created", datname, owner)
 	}
 
 	return nil

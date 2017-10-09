@@ -54,7 +54,7 @@ func (c *Controller) createCRD() error {
 
 	if _, err := c.KubeClient.CustomResourceDefinitions().Create(crd); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not create customResourceDefinition: %v", err)
+			c.logger.Warningf("could not create customResourceDefinition: %v", err)
 		}
 		c.logger.Infof("customResourceDefinition %q is already registered", crd.Name)
 	} else {
