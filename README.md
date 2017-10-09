@@ -152,3 +152,34 @@ We can use the generated secret of the `postgres` robot user to connect to our `
     $ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
     $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-testcluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
     $ psql -U postgres
+
+### Debugging the operator itself
+
+There is a web interface in the operator to observe its internal state. The operator listens on port 8080. It is possible to expose it to the localhost:8080 by doing:
+
+    $ kubectl --context minikube port-forward $(kubectl --context minikube get pod -l name=postgres-operator -o jsonpath={.items..metadata.name}) 8080:8080
+    
+The inner 'query' gets the name of the postgres operator pod, and the outer enables port forwarding. Afterwards, you can access the operator API with:
+
+    $ curl http://127.0.0.1:8080/$endpoint| jq .
+
+The available endpoints are listed below. Note that the worker ID is an integer from 0 up to 'workers' - 1 (value configured in the operator configuration and defaults to 4) 
+
+* /workers/all/queue - state of the workers queue (cluster events to process)
+* /workers/$id/queue - state of the queue for the worker $id
+* /workers/$id/logs - log of the operations performed by a given worker
+* /clusters/ - list of teams and clusters known to the operator
+* /workers/clusters/$team - list of clusters for the given team
+* /workers/cluster/$team/$clustername - detailed status of the cluster, including the specifications for CRD, master and replica services, endpoints and statefulsets, as well as any errors and the worker that cluster is assigned to.
+* /workers/cluster/$team/$clustername/logs/ - logs of all operations performed to the cluster so far.
+* /workers/cluster/$team/$clustername/history/ - history of cluster changes triggered by the changes of the manifest (shows the somewhat obscure diff and what exactly has triggered the change)
+
+The operator also supports pprof endpoints listed at the [pprof package](https://golang.org/pkg/net/http/pprof/), such as:
+
+* /debug/pprof/
+* /debug/pprof/cmdline
+* /debug/pprof/profile
+* /debug/pprof/symbol
+* /debug/pprof/trace
+
+
