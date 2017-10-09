@@ -143,7 +143,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	return nil
 }
 
-// replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL TPR.
+// replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL CRD.
 func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")

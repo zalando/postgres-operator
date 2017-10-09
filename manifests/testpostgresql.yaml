@@ -1,5 +1,5 @@
 apiVersion: "acid.zalan.do/v1"
-kind: "Postgresql"
+kind: postgresql
 
 metadata:
   name: acid-testcluster
