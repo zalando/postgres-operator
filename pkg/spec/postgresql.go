@@ -73,7 +73,7 @@ const (
 	ClusterStatusInvalid      PostgresStatus = "Invalid"
 )
 
-// Postgresql defines PostgreSQL Third Party (resource) Object.
+// Postgresql defines PostgreSQL Custom Resource Definition Object.
 type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
