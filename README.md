@@ -169,10 +169,10 @@ The available endpoints are listed below. Note that the worker ID is an integer 
 * /workers/$id/queue - state of the queue for the worker $id
 * /workers/$id/logs - log of the operations performed by a given worker
 * /clusters/ - list of teams and clusters known to the operator
-* /workers/clusters/$team - list of clusters for the given team
-* /workers/cluster/$team/$clustername - detailed status of the cluster, including the specifications for CRD, master and replica services, endpoints and statefulsets, as well as any errors and the worker that cluster is assigned to.
-* /workers/cluster/$team/$clustername/logs/ - logs of all operations performed to the cluster so far.
-* /workers/cluster/$team/$clustername/history/ - history of cluster changes triggered by the changes of the manifest (shows the somewhat obscure diff and what exactly has triggered the change)
+* /clusters/$team - list of clusters for the given team
+* /cluster/$team/$clustername - detailed status of the cluster, including the specifications for CRD, master and replica services, endpoints and statefulsets, as well as any errors and the worker that cluster is assigned to.
+* /cluster/$team/$clustername/logs/ - logs of all operations performed to the cluster so far.
+* /cluster/$team/$clustername/history/ - history of cluster changes triggered by the changes of the manifest (shows the somewhat obscure diff and what exactly has triggered the change)
 
 The operator also supports pprof endpoints listed at the [pprof package](https://golang.org/pkg/net/http/pprof/), such as:
 
