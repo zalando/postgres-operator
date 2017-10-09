@@ -146,9 +146,11 @@ func (c *Cluster) recreatePods() error {
 	if masterPod.Name == "" {
 		c.logger.Warningln("no master pod in the cluster")
 	} else {
-		err := c.ManualFailover(&masterPod, masterCandidate(replicas))
-		if err != nil {
-			return fmt.Errorf("could not perform manual failover: %v", err)
+		if len(replicas) > 0 {
+			err := c.ManualFailover(&masterPod, masterCandidate(replicas))
+			if err != nil {
+				return fmt.Errorf("could not perform manual failover: %v", err)
+			}
 		}
 		//TODO: specify master, leave new master empty
 		c.logger.Infof("recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
