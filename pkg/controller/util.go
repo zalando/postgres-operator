@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"hash/crc32"
 
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,20 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 }
 
 func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
-	return crc32.ChecksumIEEE([]byte(clusterName.String())) % c.opConfig.Workers
+	workerId, ok := c.clusterWorkers[clusterName]
+	if ok {
+		return workerId
+	}
+
+	c.clusterWorkers[clusterName] = c.curWorkerID
+
+	if c.curWorkerID == c.opConfig.Workers-1 {
+		c.curWorkerID = 0
+	} else {
+		c.curWorkerID++
+	}
+
+	return c.clusterWorkers[clusterName]
 }
 
 func (c *Controller) createCRD() error {
