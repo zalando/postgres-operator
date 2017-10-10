@@ -2,6 +2,9 @@ package cluster
 
 import (
 	"fmt"
+	"reflect"
+
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -77,6 +80,11 @@ func (c *Cluster) Sync() error {
 		return fmt.Errorf("could not sync persistent volumes: %v", err)
 	}
 
+	c.logger.Debug("syncing pod disruption budgets")
+	if err := c.syncPodDisruptionBudget(); err != nil {
+		return fmt.Errorf("could not sync pod disruption budget: %v", err)
+	}
+
 	return nil
 }
 
@@ -122,6 +130,20 @@ func (c *Cluster) syncEndpoint() error {
 	return nil
 }
 
+func (c *Cluster) syncPodDisruptionBudget() error {
+	if c.PodDisruptionBudget == nil {
+		c.logger.Infof("could not find the cluster's pod disruption budget")
+		pdb, err := c.createPodDisruptionBudget()
+		if err != nil {
+			return fmt.Errorf("could not create pod disruption budget: %v", err)
+		}
+		c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
+		return nil
+	}
+
+	return nil
+}
+
 func (c *Cluster) syncStatefulSet() error {
 	cSpec := c.Spec
 	var rollUpdate bool
@@ -156,7 +178,7 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
 
-		cmp := c.compareStatefulSetWith(desiredSS)
+		cmp := c.sameStatefulSetWith(desiredSS)
 		if cmp.match {
 			return nil
 		}
@@ -228,6 +250,17 @@ func (c *Cluster) syncVolumes() error {
 	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
 		return fmt.Errorf("could not sync volumes: %v", err)
 	}
+
 	c.logger.Infof("volumes have been synced successfully")
+
 	return nil
+}
+
+func (c *Cluster) samePDBWith(pdb *policybeta1.PodDisruptionBudget) (match bool, reason string) {
+	match = reflect.DeepEqual(pdb.Spec, c.PodDisruptionBudget.Spec)
+	if !match {
+		reason = "new service spec doesn't match the current one"
+	}
+
+	return
 }
