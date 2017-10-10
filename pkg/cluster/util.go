@@ -350,9 +350,9 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 
 	return c.OpConfig.SecretNameTemplate.Format(
 		"username", strings.Replace(username, "_", "-", -1),
-		"cluster", clusterName,
-		"tprkind", constants.TPRKind,
-		"tprgroup", constants.TPRGroup)
+		"clustername", clusterName,
+		"tprkind", constants.CRDKind,
+		"tprgroup", constants.CRDGroup)
 }
 
 func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {

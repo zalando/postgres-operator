@@ -165,21 +165,21 @@ func (c *Cluster) createDatabases() error {
 	}
 
 	if err := c.initDbConn(); err != nil {
-		return fmt.Errorf("could not init db connection")
+		return fmt.Errorf("could not init database connection")
 	}
 	defer func() {
 		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close db connection: %v", err)
+			c.logger.Errorf("could not close database connection: %v", err)
 		}
 	}()
 
 	for datname, owner := range newDbs {
 		if _, ok := c.pgUsers[owner]; !ok {
-			c.logger.Infof("skipping creationg of the %q database, user %q does not exist", datname, owner)
+			c.logger.Infof("skipping creation of the %q database, user %q does not exist", datname, owner)
 			continue
 		}
 
-		if !alphaNumericRegexp.MatchString(datname) {
+		if !databaseNameRegexp.MatchString(datname) {
 			c.logger.Infof("database %q has invalid name", datname)
 			continue
 		}

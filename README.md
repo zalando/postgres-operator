@@ -5,8 +5,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/zalando-incubator/postgres-operator)](https://goreportcard.com/report/github.com/zalando-incubator/postgres-operator)
 
 The Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
-During the initial run it registers the [Third Party Resource (TPR)](https://kubernetes.io/docs/user-guide/thirdpartyresources/) for Postgres.
-The Postgresql TPR is essentially the schema that describes the contents of the manifests for deploying individual Postgres clusters using Statefulsets and Patroni.
+During the initial run it registers the [Custom Resource Definition (CRD)](https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions) for Postgres.
+The Postgresql CRD is essentially the schema that describes the contents of the manifests for deploying individual Postgres clusters using Statefulsets and Patroni.
 
 Once the operator is running, it performs the following actions:
 
@@ -127,12 +127,12 @@ The last line changes the docker image tag in the manifest to the one the operat
 the serviceAccountName definition, as the ServiceAccount is not defined in minikube (neither it should, as one has admin
 permissions there).
 
-### Check if ThirdPartyResource has been registered
+### Check if CustomResourceDefinition has been registered
 
-    $ kubectl --context minikube   get thirdpartyresources
+    $ kubectl --context minikube   get crd
 
-    NAME                       DESCRIPTION                   VERSION(S)
-    postgresql.acid.zalan.do   Managed PostgreSQL clusters   v1
+	NAME                          KIND
+	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
 
 
 ### Create a new spilo cluster
@@ -152,3 +152,34 @@ We can use the generated secret of the `postgres` robot user to connect to our `
     $ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
     $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-testcluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
     $ psql -U postgres
+
+### Debugging the operator itself
+
+There is a web interface in the operator to observe its internal state. The operator listens on port 8080. It is possible to expose it to the localhost:8080 by doing:
+
+    $ kubectl --context minikube port-forward $(kubectl --context minikube get pod -l name=postgres-operator -o jsonpath={.items..metadata.name}) 8080:8080
+    
+The inner 'query' gets the name of the postgres operator pod, and the outer enables port forwarding. Afterwards, you can access the operator API with:
+
+    $ curl http://127.0.0.1:8080/$endpoint| jq .
+
+The available endpoints are listed below. Note that the worker ID is an integer from 0 up to 'workers' - 1 (value configured in the operator configuration and defaults to 4) 
+
+* /workers/all/queue - state of the workers queue (cluster events to process)
+* /workers/$id/queue - state of the queue for the worker $id
+* /workers/$id/logs - log of the operations performed by a given worker
+* /clusters/ - list of teams and clusters known to the operator
+* /clusters/$team - list of clusters for the given team
+* /cluster/$team/$clustername - detailed status of the cluster, including the specifications for CRD, master and replica services, endpoints and statefulsets, as well as any errors and the worker that cluster is assigned to.
+* /cluster/$team/$clustername/logs/ - logs of all operations performed to the cluster so far.
+* /cluster/$team/$clustername/history/ - history of cluster changes triggered by the changes of the manifest (shows the somewhat obscure diff and what exactly has triggered the change)
+
+The operator also supports pprof endpoints listed at the [pprof package](https://golang.org/pkg/net/http/pprof/), such as:
+
+* /debug/pprof/
+* /debug/pprof/cmdline
+* /debug/pprof/profile
+* /debug/pprof/symbol
+* /debug/pprof/trace
+
+

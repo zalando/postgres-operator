@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
@@ -27,11 +26,12 @@ type Controller struct {
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
-	RestClient rest.Interface // kubernetes API group REST client
 	apiserver  *apiserver.Server
 
 	stopCh chan struct{}
 
+	curWorkerID    uint32 //initialized with 0
+	clusterWorkers map[spec.NamespacedName]uint32
 	clustersMu     sync.RWMutex
 	clusters       map[spec.NamespacedName]*cluster.Cluster
 	clusterLogs    map[spec.NamespacedName]ringlog.RingLogger
@@ -57,6 +57,7 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 		config:         *controllerConfig,
 		opConfig:       &config.Config{},
 		logger:         logger.WithField("pkg", "controller"),
+		clusterWorkers: make(map[spec.NamespacedName]uint32),
 		clusters:       make(map[spec.NamespacedName]*cluster.Cluster),
 		clusterLogs:    make(map[spec.NamespacedName]ringlog.RingLogger),
 		clusterHistory: make(map[spec.NamespacedName]ringlog.RingLogger),
@@ -70,15 +71,11 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 }
 
 func (c *Controller) initClients() {
-	client, err := k8sutil.ClientSet(c.config.RestConfig)
-	if err != nil {
-		c.logger.Fatalf("couldn't create client: %v", err)
-	}
-	c.KubeClient = k8sutil.NewFromKubernetesInterface(client)
+	var err error
 
-	c.RestClient, err = k8sutil.KubernetesRestClient(*c.config.RestConfig)
+	c.KubeClient, err = k8sutil.NewFromConfig(c.config.RestConfig)
 	if err != nil {
-		c.logger.Fatalf("couldn't create rest client: %v", err)
+		c.logger.Fatalf("could not create kubernetes clients: %v", err)
 	}
 }
 
@@ -108,6 +105,43 @@ func (c *Controller) initOperatorConfig() {
 	}
 
 	c.opConfig = config.NewFromMap(configMapData)
+}
+
+func (c *Controller) initController() {
+	c.initClients()
+	c.initOperatorConfig()
+	c.initSharedInformers()
+
+	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
+
+	if c.opConfig.DebugLogging {
+		c.logger.Logger.Level = logrus.DebugLevel
+	}
+
+	if err := c.createCRD(); err != nil {
+		c.logger.Fatalf("could not register CustomResourceDefinition: %v", err)
+	}
+
+	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
+		c.logger.Warningf("could not get infrastructure roles: %v", err)
+	} else {
+		c.config.InfrastructureRoles = infraRoles
+	}
+
+	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
+	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
+	for i := range c.clusterEventQueues {
+		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
+			e, ok := obj.(spec.ClusterEvent)
+			if !ok {
+				return "", fmt.Errorf("could not cast to ClusterEvent")
+			}
+
+			return queueClusterKey(e.EventType, e.UID), nil
+		})
+	}
+
+	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)
 }
 
 func (c *Controller) initSharedInformers() {
@@ -164,42 +198,6 @@ func (c *Controller) initSharedInformers() {
 	})
 }
 
-func (c *Controller) initController() {
-	c.initClients()
-	c.initOperatorConfig()
-	c.initSharedInformers()
-
-	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
-
-	if c.opConfig.DebugLogging {
-		c.logger.Logger.Level = logrus.DebugLevel
-	}
-
-	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
-	}
-
-	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %v", err)
-	} else {
-		c.config.InfrastructureRoles = infraRoles
-	}
-
-	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
-	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
-	for i := range c.clusterEventQueues {
-		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
-			e, ok := obj.(spec.ClusterEvent)
-			if !ok {
-				return "", fmt.Errorf("could not cast to ClusterEvent")
-			}
-
-			return queueClusterKey(e.EventType, e.UID), nil
-		})
-	}
-
-	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)
-}
 
 // Run starts background controller processes
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
