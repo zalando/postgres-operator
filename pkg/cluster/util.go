@@ -350,7 +350,7 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 
 	return c.OpConfig.SecretNameTemplate.Format(
 		"username", strings.Replace(username, "_", "-", -1),
-		"clustername", clusterName,
+		"cluster", clusterName,
 		"tprkind", constants.CRDKind,
 		"tprgroup", constants.CRDGroup)
 }
