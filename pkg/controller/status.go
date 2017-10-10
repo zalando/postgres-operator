@@ -6,7 +6,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 )
 
@@ -165,6 +167,24 @@ func (c *Controller) ListQueue(workerID uint32) (*spec.QueueDump, error) {
 // GetWorkersCnt returns number of the workers
 func (c *Controller) GetWorkersCnt() uint32 {
 	return c.opConfig.Workers
+}
+
+//WorkerStatus provides status of the worker
+func (c *Controller) WorkerStatus(workerID uint32) (*spec.WorkerStatus, error) {
+	obj, ok := c.curWorkerCluster.Load(workerID)
+	if !ok || obj == nil {
+		return nil, fmt.Errorf("worker has no status")
+	}
+
+	cl, ok := obj.(*cluster.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("could not cast to Cluster struct")
+	}
+
+	return &spec.WorkerStatus{
+		CurrentCluster: util.NameFromMeta(cl.ObjectMeta),
+		CurrentProcess: cl.GetCurrentProcess(),
+	}, nil
 }
 
 // ClusterHistory dumps history of cluster changes
