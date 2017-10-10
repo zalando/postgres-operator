@@ -100,8 +100,7 @@ func metadataAnnotationsPatch(annotations map[string]string) string {
 
 func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta),
-		)
+		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
 		c.logger.Infof("pod disruption budget %q is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
@@ -113,8 +112,7 @@ func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpd
 
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
-		c.logger.Infof("statefulset %q has been changed", util.NameFromMeta(old.ObjectMeta),
-		)
+		c.logger.Infof("statefulset %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
 		c.logger.Infof("statefulset %q is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),

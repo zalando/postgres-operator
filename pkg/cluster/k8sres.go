@@ -605,7 +605,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 
 	return &policybeta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: c.podDisruptionBudgetName(),
+			Name:      c.podDisruptionBudgetName(),
 			Namespace: c.Namespace,
 		},
 		Spec: policybeta1.PodDisruptionBudgetSpec{

@@ -198,7 +198,6 @@ func (c *Controller) initSharedInformers() {
 	})
 }
 
-
 // Run starts background controller processes
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
