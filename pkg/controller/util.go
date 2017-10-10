@@ -29,9 +29,9 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 }
 
 func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
-	workerId, ok := c.clusterWorkers[clusterName]
+	workerID, ok := c.clusterWorkers[clusterName]
 	if ok {
-		return workerId
+		return workerID
 	}
 
 	c.clusterWorkers[clusterName] = c.curWorkerID

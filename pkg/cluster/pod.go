@@ -52,6 +52,7 @@ func (c *Cluster) deletePods() error {
 }
 
 func (c *Cluster) deletePod(podName spec.NamespacedName) error {
+	c.setProcessName("deleting %q pod", podName)
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
@@ -93,6 +94,7 @@ func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.P
 
 func (c *Cluster) recreatePod(pod v1.Pod) error {
 	podName := util.NameFromMeta(pod.ObjectMeta)
+	c.setProcessName("recreating %q pod", podName)
 
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
@@ -113,6 +115,7 @@ func (c *Cluster) recreatePod(pod v1.Pod) error {
 }
 
 func (c *Cluster) recreatePods() error {
+	c.setProcessName("recreating pods")
 	ls := c.labelsSet()
 	namespace := c.Namespace
 
