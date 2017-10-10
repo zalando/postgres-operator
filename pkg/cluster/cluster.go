@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,6 +72,7 @@ type Cluster struct {
 
 	teamsAPIClient *teams.API
 	KubeClient     k8sutil.KubernetesClient //TODO: move clients to the better place?
+	currentProcess spec.Process
 }
 
 type compareStatefulsetResult struct {
@@ -122,6 +124,13 @@ func (c *Cluster) teamName() string {
 	return c.Spec.TeamID
 }
 
+func (c *Cluster) setProcessName(procName string, args ...interface{}) {
+	c.currentProcess = spec.Process{
+		Name:      fmt.Sprintf(procName, args...),
+		StartTime: time.Now(),
+	}
+}
+
 func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	c.Status = status
 	b, err := json.Marshal(status)
@@ -149,6 +158,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
 func (c *Cluster) initUsers() error {
+	c.setProcessName("initializing users")
 	c.initSystemUsers()
 
 	if err := c.initInfrastructureRoles(); err != nil {
@@ -188,7 +198,7 @@ func (c *Cluster) Create() error {
 
 	c.setStatus(spec.ClusterStatusCreating)
 
-	//TODO: service will create endpoint implicitly
+	//service will create endpoint implicitly
 	ep, err = c.createEndpoint()
 	if err != nil {
 		return fmt.Errorf("could not create endpoint: %v", err)
@@ -231,11 +241,11 @@ func (c *Cluster) Create() error {
 	c.logger.Infof("pods are ready")
 
 	if !(c.masterLess || c.databaseAccessDisabled()) {
-		if err := c.createRoles(); err != nil {
+		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
 
-		if err := c.createDatabases(); err != nil {
+		if err = c.createDatabases(); err != nil {
 			return fmt.Errorf("could not create databases: %v", err)
 		}
 
@@ -250,6 +260,7 @@ func (c *Cluster) Create() error {
 	if err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
 	}
+	c.setProcessName("")
 
 	return nil
 }
@@ -513,6 +524,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	}
 
 	c.setStatus(spec.ClusterStatusRunning)
+	c.setProcessName("")
 
 	return nil
 }
@@ -544,6 +556,7 @@ func (c *Cluster) Delete() error {
 			return fmt.Errorf("could not delete secret: %v", err)
 		}
 	}
+	c.setProcessName("")
 
 	return nil
 }
@@ -655,6 +668,11 @@ func (c *Cluster) initInfrastructureRoles() error {
 	return nil
 }
 
+// GetCurrentProcess provides name of the last process of the cluster
+func (c *Cluster) GetCurrentProcess() spec.Process {
+	return c.currentProcess
+}
+
 // GetStatus provides status of the cluster
 func (c *Cluster) GetStatus() *spec.ClusterStatus {
 	return &spec.ClusterStatus{
@@ -667,6 +685,7 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 		ReplicaService: c.GetServiceReplica(),
 		Endpoint:       c.GetEndpoint(),
 		StatefulSet:    c.GetStatefulSet(),
+		CurrentProcess: c.GetCurrentProcess(),
 
 		Error: c.Error,
 	}

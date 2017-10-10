@@ -36,6 +36,7 @@ type controllerInformer interface {
 	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
 	ListQueue(workerID uint32) (*spec.QueueDump, error)
 	GetWorkersCnt() uint32
+	WorkerStatus(workerID uint32) (*spec.WorkerStatus, error)
 }
 
 // Server describes HTTP API server
@@ -52,7 +53,9 @@ var (
 	teamURL              = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$`)
 	workerLogsURL        = regexp.MustCompile(`^/workers/(?P<id>\d+)/logs/?$`)
 	workerEventsQueueURL = regexp.MustCompile(`^/workers/(?P<id>\d+)/queue/?$`)
+	workerStatusURL      = regexp.MustCompile(`^/workers/(?P<id>\d+)/status/?$`)
 	workerAllQueue       = regexp.MustCompile(`^/workers/all/queue/?$`)
+	workerAllStatus      = regexp.MustCompile(`^/workers/all/status/?$`)
 	clustersURL          = "/clusters/"
 )
 
@@ -198,6 +201,13 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 		workerID, _ := strconv.Atoi(matches["id"])
 
 		resp, err = s.controller.ListQueue(uint32(workerID))
+	} else if matches := util.FindNamedStringSubmatch(workerStatusURL, req.URL.Path); matches != nil {
+		workerID, _ := strconv.Atoi(matches["id"])
+
+		resp, err = s.controller.WorkerStatus(uint32(workerID))
+	} else if workerAllStatus.MatchString(req.URL.Path) {
+		s.allWorkers(w, req)
+		return
 	} else {
 		s.respond(nil, fmt.Errorf("page not found"), w)
 		return
@@ -217,6 +227,21 @@ func (s *Server) allQueues(w http.ResponseWriter, r *http.Request) {
 		}
 
 		resp[i] = queueDump
+	}
+
+	s.respond(resp, nil, w)
+}
+
+func (s *Server) allWorkers(w http.ResponseWriter, r *http.Request) {
+	workersCnt := s.controller.GetWorkersCnt()
+	resp := make(map[uint32]*spec.WorkerStatus, workersCnt)
+	for i := uint32(0); i < workersCnt; i++ {
+		status, err := s.controller.WorkerStatus(i)
+		if err != nil {
+			continue
+		}
+
+		resp[i] = status
 	}
 
 	s.respond(resp, nil, w)

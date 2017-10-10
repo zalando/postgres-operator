@@ -82,6 +82,8 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 
 // resizeVolumes resize persistent volumes compatible with the given resizer interface
 func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.VolumeResizer) error {
+	c.setProcessName("resizing volumes")
+
 	totalCompatible := 0
 	newQuantity, err := resource.ParseQuantity(newVolume.Size)
 	if err != nil {

@@ -101,6 +101,7 @@ func (c *Cluster) listResources() error {
 }
 
 func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
+	c.setProcessName("creating statefulset")
 	if c.Statefulset != nil {
 		return nil, fmt.Errorf("statefulset already exists in the cluster")
 	}
@@ -119,6 +120,7 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 }
 
 func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
 	}
@@ -145,6 +147,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 
 // replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL CRD.
 func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+	c.setProcessName("replacing statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
 	}
@@ -191,6 +194,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 }
 
 func (c *Cluster) deleteStatefulSet() error {
+	c.setProcessName("deleting statefulset")
 	c.logger.Debugln("deleting statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
@@ -215,6 +219,8 @@ func (c *Cluster) deleteStatefulSet() error {
 }
 
 func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
+	c.setProcessName("creating %v service", role)
+
 	if c.Services[role] != nil {
 		return nil, fmt.Errorf("service already exists in the cluster")
 	}
@@ -230,6 +236,7 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 }
 
 func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error {
+	c.setProcessName("updating %v service", role)
 	if c.Services[role] == nil {
 		return fmt.Errorf("there is no service in the cluster")
 	}
@@ -320,6 +327,7 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 }
 
 func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
+	c.setProcessName("creating endpoint")
 	if c.Endpoint != nil {
 		return nil, fmt.Errorf("endpoint already exists in the cluster")
 	}
@@ -335,6 +343,7 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 }
 
 func (c *Cluster) deleteEndpoint() error {
+	c.setProcessName("deleting endpoint")
 	c.logger.Debugln("deleting endpoint")
 	if c.Endpoint == nil {
 		return fmt.Errorf("there is no endpoint in the cluster")
@@ -350,6 +359,7 @@ func (c *Cluster) deleteEndpoint() error {
 }
 
 func (c *Cluster) applySecrets() error {
+	c.setProcessName("applying secrets")
 	secrets := c.generateUserSecrets()
 
 	for secretUsername, secretSpec := range secrets {
@@ -388,6 +398,7 @@ func (c *Cluster) applySecrets() error {
 }
 
 func (c *Cluster) deleteSecret(secret *v1.Secret) error {
+	c.setProcessName("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
 	c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(secret.Name, c.deleteOptions)
 	if err != nil {
