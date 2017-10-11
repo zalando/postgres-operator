@@ -86,6 +86,12 @@ type LogEntry struct {
 	Message     string
 }
 
+// Process describes process of the cluster
+type Process struct {
+	Name      string
+	StartTime time.Time
+}
+
 // ClusterStatus describes status of the cluster
 type ClusterStatus struct {
 	Team           string
@@ -95,10 +101,17 @@ type ClusterStatus struct {
 	Endpoint       *v1.Endpoints
 	StatefulSet    *v1beta1.StatefulSet
 
-	Worker uint32
-	Status PostgresStatus
-	Spec   PostgresSpec
-	Error  error
+	CurrentProcess Process
+	Worker         uint32
+	Status         PostgresStatus
+	Spec           PostgresSpec
+	Error          error
+}
+
+// WorkerStatus describes status of the worker
+type WorkerStatus struct {
+	CurrentCluster NamespacedName
+	CurrentProcess Process
 }
 
 // Diff describes diff
