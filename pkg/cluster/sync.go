@@ -187,6 +187,8 @@ func (c *Cluster) syncStatefulSet() error {
 }
 
 func (c *Cluster) syncRoles(readFromDatabase bool) error {
+	c.setProcessName("syncing roles")
+
 	var (
 		err       error
 		dbUsers   spec.PgUserMap

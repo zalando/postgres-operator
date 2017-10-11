@@ -46,6 +46,7 @@ func (c *Cluster) databaseAccessDisabled() bool {
 }
 
 func (c *Cluster) initDbConn() (err error) {
+	c.setProcessName("initializing db connection")
 	if c.pgDb == nil {
 		conn, err := sql.Open("postgres", c.pgConnectionString())
 		if err != nil {
@@ -67,6 +68,7 @@ func (c *Cluster) initDbConn() (err error) {
 }
 
 func (c *Cluster) closeDbConn() (err error) {
+	c.setProcessName("closing db connection")
 	if c.pgDb != nil {
 		c.logger.Debug("closing database connection")
 		if err = c.pgDb.Close(); err != nil {
@@ -81,6 +83,7 @@ func (c *Cluster) closeDbConn() (err error) {
 }
 
 func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUserMap, err error) {
+	c.setProcessName("reading users from the db")
 	var rows *sql.Rows
 	users = make(spec.PgUserMap)
 	if rows, err = c.pgDb.Query(getUserSQL, pq.Array(userNames)); err != nil {
@@ -116,13 +119,13 @@ func (c *Cluster) getDatabases() (map[string]string, error) {
 		rows *sql.Rows
 		err  error
 	)
-	dbs := make(map[string]string, 0)
+	dbs := make(map[string]string)
 
-	if err := c.initDbConn(); err != nil {
+	if err = c.initDbConn(); err != nil {
 		return nil, fmt.Errorf("could not init db connection")
 	}
 	defer func() {
-		if err := c.closeDbConn(); err != nil {
+		if err = c.closeDbConn(); err != nil {
 			c.logger.Errorf("could not close db connection: %v", err)
 		}
 	}()
@@ -151,6 +154,8 @@ func (c *Cluster) getDatabases() (map[string]string, error) {
 }
 
 func (c *Cluster) createDatabases() error {
+	c.setProcessName("creating databases")
+
 	newDbs := c.Spec.Databases
 	curDbs, err := c.getDatabases()
 	if err != nil {
@@ -164,11 +169,11 @@ func (c *Cluster) createDatabases() error {
 		return nil
 	}
 
-	if err := c.initDbConn(); err != nil {
+	if err = c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
 	}
 	defer func() {
-		if err := c.closeDbConn(); err != nil {
+		if err = c.closeDbConn(); err != nil {
 			c.logger.Errorf("could not close database connection: %v", err)
 		}
 	}()
