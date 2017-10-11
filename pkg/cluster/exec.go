@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"bytes"
-	"strings"
 	"fmt"
 	"strings"
 
