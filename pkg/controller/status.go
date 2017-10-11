@@ -173,7 +173,7 @@ func (c *Controller) GetWorkersCnt() uint32 {
 func (c *Controller) WorkerStatus(workerID uint32) (*spec.WorkerStatus, error) {
 	obj, ok := c.curWorkerCluster.Load(workerID)
 	if !ok || obj == nil {
-		return nil, fmt.Errorf("worker has no status")
+		return nil, nil
 	}
 
 	cl, ok := obj.(*cluster.Cluster)
