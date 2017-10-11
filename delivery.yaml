@@ -4,9 +4,12 @@ build_steps:
         apt-get install -y make git apt-transport-https ca-certificates curl
     - desc: 'Install go'
       cmd: |
-        add-apt-repository ppa:longsleep/golang-backports
-        apt-get update
-        apt-get install -y golang-go
+        cd /tmp
+        wget -q https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz -O go.tar.gz
+        tar -xf go.tar.gz
+        mv go /usr/local
+        ln -s /usr/local/go/bin/go /usr/bin/go
+        go version
     - desc: 'Install Docker'
       cmd: |
         curl -sSL https://get.docker.com/ | sh

@@ -178,7 +178,7 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
 
-		cmp := c.sameStatefulSetWith(desiredSS)
+		cmp := c.compareStatefulSetWith(desiredSS)
 		if cmp.match {
 			return nil
 		}
@@ -209,6 +209,8 @@ func (c *Cluster) syncStatefulSet() error {
 }
 
 func (c *Cluster) syncRoles(readFromDatabase bool) error {
+	c.setProcessName("syncing roles")
+
 	var (
 		err       error
 		dbUsers   spec.PgUserMap
