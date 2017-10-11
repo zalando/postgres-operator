@@ -3,7 +3,7 @@ dist: trusty
 language: go
 
 go:
-  - 1.8
+  - 1.9
 
 before_install:
   - go get github.com/Masterminds/glide
