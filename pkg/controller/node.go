@@ -55,8 +55,8 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		return
 	}
 
-	if !(nodePrev.Spec.Unschedulable != nodeCur.Spec.Unschedulable &&
-		nodeCur.Spec.Unschedulable && util.MapContains(nodeCur.Labels, c.opConfig.EOLNodeLabel)) {
+	if nodePrev.Spec.Unschedulable && util.MapContains(nodePrev.Labels, c.opConfig.EOLNodeLabel) ||
+		!nodeCur.Spec.Unschedulable || !util.MapContains(nodeCur.Labels, c.opConfig.EOLNodeLabel) {
 		return
 	}
 

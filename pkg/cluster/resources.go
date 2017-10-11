@@ -72,7 +72,7 @@ func (c *Cluster) loadResources() error {
 
 func (c *Cluster) listResources() error {
 	if c.PodDisruptionBudget != nil {
-		c.logger.Info("found pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta), c.PodDisruptionBudget.UID)
+		c.logger.Infof("found pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta), c.PodDisruptionBudget.UID)
 	}
 
 	if c.Statefulset != nil {
