@@ -216,10 +216,15 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 }
 
 // MigrateReplicaPod recreates pod on a new node
-func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName) error {
+func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName string) error {
 	replicaPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("could not get pod: %v", err)
+	}
+
+	if replicaPod.Spec.NodeName != fromNodeName {
+		c.logger.Infof("pod %q has already migrated to node %q", podName, replicaPod.Spec.NodeName )
+		return nil
 	}
 
 	if role := PostgresRole(replicaPod.Labels[c.OpConfig.PodRoleLabel]); role != Replica {

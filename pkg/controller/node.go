@@ -131,7 +131,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	for pod, cl := range replicaPods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
-		if err := cl.MigrateReplicaPod(podName); err != nil {
+		if err := cl.MigrateReplicaPod(podName, nodeCur.Name); err != nil {
 			c.logger.Errorf("could not move replica pod %q: %v", podName, err)
 			movedPods--
 		}
