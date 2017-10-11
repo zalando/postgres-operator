@@ -260,7 +260,6 @@ func (c *Cluster) Create() error {
 	if err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
 	}
-	c.setProcessName("")
 
 	return nil
 }
@@ -524,7 +523,6 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	}
 
 	c.setStatus(spec.ClusterStatusRunning)
-	c.setProcessName("")
 
 	return nil
 }
@@ -556,7 +554,6 @@ func (c *Cluster) Delete() error {
 			return fmt.Errorf("could not delete secret: %v", err)
 		}
 	}
-	c.setProcessName("")
 
 	return nil
 }
