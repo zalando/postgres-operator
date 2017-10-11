@@ -73,6 +73,7 @@ type Cluster struct {
 	teamsAPIClient *teams.API
 	KubeClient     k8sutil.KubernetesClient //TODO: move clients to the better place?
 	currentProcess spec.Process
+	processMu		sync.RWMutex
 }
 
 type compareStatefulsetResult struct {
@@ -125,6 +126,8 @@ func (c *Cluster) teamName() string {
 }
 
 func (c *Cluster) setProcessName(procName string, args ...interface{}) {
+	c.processMu.Lock()
+	defer c.processMu.Unlock()
 	c.currentProcess = spec.Process{
 		Name:      fmt.Sprintf(procName, args...),
 		StartTime: time.Now(),
@@ -667,6 +670,9 @@ func (c *Cluster) initInfrastructureRoles() error {
 
 // GetCurrentProcess provides name of the last process of the cluster
 func (c *Cluster) GetCurrentProcess() spec.Process {
+	c.processMu.RLock()
+	defer c.processMu.RUnlock()
+
 	return c.currentProcess
 }
 
