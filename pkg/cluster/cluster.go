@@ -73,7 +73,7 @@ type Cluster struct {
 	teamsAPIClient *teams.API
 	KubeClient     k8sutil.KubernetesClient //TODO: move clients to the better place?
 	currentProcess spec.Process
-	processMu		sync.RWMutex
+	processMu      sync.RWMutex
 }
 
 type compareStatefulsetResult struct {
