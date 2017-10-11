@@ -202,9 +202,15 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 
 		resp, err = s.controller.ListQueue(uint32(workerID))
 	} else if matches := util.FindNamedStringSubmatch(workerStatusURL, req.URL.Path); matches != nil {
-		workerID, _ := strconv.Atoi(matches["id"])
+		var workerStatus *spec.WorkerStatus
 
-		resp, err = s.controller.WorkerStatus(uint32(workerID))
+		workerID, _ := strconv.Atoi(matches["id"])
+		workerStatus, err = s.controller.WorkerStatus(uint32(workerID))
+		if workerStatus == nil {
+			resp = "idle"
+		} else {
+			resp = workerStatus
+		}
 	} else if workerAllStatus.MatchString(req.URL.Path) {
 		s.allWorkers(w, req)
 		return
@@ -234,14 +240,19 @@ func (s *Server) allQueues(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) allWorkers(w http.ResponseWriter, r *http.Request) {
 	workersCnt := s.controller.GetWorkersCnt()
-	resp := make(map[uint32]*spec.WorkerStatus, workersCnt)
+	resp := make(map[uint32]interface{}, workersCnt)
 	for i := uint32(0); i < workersCnt; i++ {
 		status, err := s.controller.WorkerStatus(i)
 		if err != nil {
+			s.respond(nil, err, w)
 			continue
 		}
 
-		resp[i] = status
+		if status == nil {
+			resp[i] = "idle"
+		} else {
+			resp[i] = status
+		}
 	}
 
 	s.respond(resp, nil, w)
