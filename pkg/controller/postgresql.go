@@ -86,16 +86,16 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	return &list, err
 }
 
-type tprDecoder struct {
+type crdDecoder struct {
 	dec   *json.Decoder
 	close func() error
 }
 
-func (d *tprDecoder) Close() {
+func (d *crdDecoder) Close() {
 	d.close()
 }
 
-func (d *tprDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {
+func (d *crdDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {
 	var e struct {
 		Type   watch.EventType
 		Object spec.Postgresql
@@ -121,7 +121,7 @@ func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interfa
 		return nil, err
 	}
 
-	return watch.NewStreamWatcher(&tprDecoder{
+	return watch.NewStreamWatcher(&crdDecoder{
 		dec:   json.NewDecoder(r),
 		close: r.Close,
 	}), nil
@@ -163,6 +163,8 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 	}
 	c.clustersMu.RUnlock()
 
+	defer c.curWorkerCluster.Store(event.WorkerID, nil)
+
 	switch event.EventType {
 	case spec.EventAdd:
 		if clusterFound {
@@ -173,6 +175,8 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		lg.Infof("creation of the cluster started")
 
 		cl = c.addCluster(lg, clusterName, event.NewSpec)
+
+		c.curWorkerCluster.Store(event.WorkerID, cl)
 
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Errorf("could not create cluster: %v", err)
@@ -189,6 +193,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			lg.Warnln("cluster does not exist")
 			return
 		}
+		c.curWorkerCluster.Store(event.WorkerID, cl)
 		if err := cl.Update(event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
@@ -212,6 +217,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 
 		teamName := strings.ToLower(cl.Spec.TeamID)
 
+		c.curWorkerCluster.Store(event.WorkerID, cl)
 		if err := cl.Delete(); err != nil {
 			lg.Errorf("could not delete cluster: %v", err)
 		}
@@ -242,6 +248,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			cl = c.addCluster(lg, clusterName, event.NewSpec)
 		}
 
+		c.curWorkerCluster.Store(event.WorkerID, cl)
 		if err := cl.Sync(); err != nil {
 			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
 			lg.Error(cl.Error)
