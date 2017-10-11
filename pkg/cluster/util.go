@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -97,11 +98,21 @@ func metadataAnnotationsPatch(annotations map[string]string) string {
 	return fmt.Sprintf(constants.ServiceMetadataAnnotationReplaceFormat, annotationsString)
 }
 
-func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
+func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("statefulset %q has been changed",
+		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta))
+	} else {
+		c.logger.Infof("pod disruption budget %q is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
 		)
+	}
+
+	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+}
+
+func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
+	if isUpdate {
+		c.logger.Infof("statefulset %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
 		c.logger.Infof("statefulset %q is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
@@ -243,12 +254,12 @@ func (c *Cluster) waitPodLabelsReady() error {
 	}
 	masterListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
+			c.OpConfig.PodRoleLabel: string(Master),
 		}).String(),
 	}
 	replicaListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
+			c.OpConfig.PodRoleLabel: string(Replica),
 		}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
@@ -338,13 +349,9 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 
 	return c.OpConfig.SecretNameTemplate.Format(
 		"username", strings.Replace(username, "_", "-", -1),
-		"clustername", clusterName,
+		"cluster", clusterName,
 		"tprkind", constants.CRDKind,
 		"tprgroup", constants.CRDGroup)
-}
-
-func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
-	return pod.Labels[c.OpConfig.PodRoleLabel]
 }
 
 func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {

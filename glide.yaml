@@ -17,10 +17,8 @@ import:
   version: release-1.7
   subpackages:
   - pkg/api/errors
-  - pkg/api/meta
   - pkg/api/resource
   - pkg/apis/meta/v1
-  - pkg/fields
   - pkg/labels
   - pkg/runtime
   - pkg/runtime/schema
@@ -33,6 +31,10 @@ import:
   version: ^4.0.0
   subpackages:
   - kubernetes
+  - kubernetes/scheme
+  - kubernetes/typed/apps/v1beta1
+  - kubernetes/typed/core/v1
+  - kubernetes/typed/extensions/v1beta1
   - pkg/api
   - pkg/api/v1
   - pkg/apis/apps/v1beta1

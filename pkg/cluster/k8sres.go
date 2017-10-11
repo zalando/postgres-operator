@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -65,6 +66,10 @@ func (c *Cluster) serviceName(role PostgresRole) string {
 	}
 
 	return name
+}
+
+func (c *Cluster) podDisruptionBudgetName() string {
+	return c.OpConfig.PDBNameFormat.Format("cluster", c.Spec.ClusterName)
 }
 
 func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRequirements, error) {
@@ -226,6 +231,25 @@ PATRONI_INITDB_PARAMS:
 	return string(result)
 }
 
+func (c *Cluster) nodeAffinity() *v1.Affinity {
+	matchExpressions := make([]v1.NodeSelectorRequirement, 0)
+	for k, v := range c.OpConfig.EOLNodeLabel {
+		matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
+			Key:      k,
+			Operator: v1.NodeSelectorOpNotIn,
+			Values:   []string{v},
+		})
+	}
+
+	return &v1.Affinity{
+		NodeAffinity: &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{{MatchExpressions: matchExpressions}},
+			},
+		},
+	}
+}
+
 func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements,
 	pgParameters *spec.PostgresqlParam,
 	patroniParameters *spec.Patroni,
@@ -347,6 +371,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		ServiceAccountName:            c.OpConfig.ServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
+		Affinity:                      c.nodeAffinity(),
 	}
 
 	template := v1.PodTemplateSpec{
@@ -571,6 +596,25 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 	}
 
 	return result
+}
+
+func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
+	minAvailable := intstr.FromInt(1)
+	matchLabels := c.OpConfig.ClusterLabels
+	matchLabels[c.OpConfig.ClusterNameLabel] = c.Name
+
+	return &policybeta1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.podDisruptionBudgetName(),
+			Namespace: c.Namespace,
+		},
+		Spec: policybeta1.PodDisruptionBudgetSpec{
+			MinAvailable: &minAvailable,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: matchLabels,
+			},
+		},
+	}
 }
 
 // getClusterServiceConnectionParameters fetches cluster host name and port
