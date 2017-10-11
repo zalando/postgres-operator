@@ -184,6 +184,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 }
 
 func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRole) error {
+	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
 		case podEvent := <-podEvents:
@@ -196,20 +197,21 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRo
 			} else if *role == podRole {
 				return nil
 			}
-		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
+		case <-timeout:
 			return fmt.Errorf("pod label wait timeout")
 		}
 	}
 }
 
 func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
+	timeout := time.After(c.OpConfig.PodDeletionWaitTimeout)
 	for {
 		select {
 		case podEvent := <-podEvents:
 			if podEvent.EventType == spec.EventDelete {
 				return nil
 			}
-		case <-time.After(c.OpConfig.PodDeletionWaitTimeout):
+		case <-timeout:
 			return fmt.Errorf("pod deletion wait timeout")
 		}
 	}
