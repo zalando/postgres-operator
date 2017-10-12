@@ -115,7 +115,7 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 func (p *Patroni) Status(pod *v1.Pod) (*Status, error) {
 	status := &Status{}
 
-	request, err := http.NewRequest(http.MethodPost, apiURL(pod)+failoverPath, nil)
+	request, err := http.NewRequest(http.MethodGet, apiURL(pod), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not make new request: %v", err)
 	}
