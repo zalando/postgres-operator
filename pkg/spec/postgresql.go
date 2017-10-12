@@ -68,6 +68,7 @@ const (
 	ClusterStatusCreating     PostgresStatus = "Creating"
 	ClusterStatusUpdating     PostgresStatus = "Updating"
 	ClusterStatusUpdateFailed PostgresStatus = "UpdateFailed"
+	ClusterStatusSyncFailed   PostgresStatus = "SyncFailed"
 	ClusterStatusAddFailed    PostgresStatus = "CreateFailed"
 	ClusterStatusRunning      PostgresStatus = "Running"
 	ClusterStatusInvalid      PostgresStatus = "Invalid"
