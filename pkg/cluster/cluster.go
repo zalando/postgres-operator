@@ -435,7 +435,7 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	c.logger.Debugf("cluster update from version %q to %q",
 		c.ResourceVersion, newSpec.ResourceVersion)
 
-	/* Make sure we update when this function exists */
+	/* Make sure we update when this function exits */
 	defer func() {
 		c.Postgresql = *newSpec
 	}()
