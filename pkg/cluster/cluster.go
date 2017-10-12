@@ -644,7 +644,11 @@ func (c *Cluster) initHumanUsers() error {
 		return fmt.Errorf("could not get list of team members: %v", err)
 	}
 	for _, username := range teamMembers {
-		flags := []string{constants.RoleFlagLogin, constants.RoleFlagSuperuser}
+		flags := []string{constants.RoleFlagLogin}
+		if c.OpConfig.EnableTeamsSuperuser {
+			flags = flags.append(constants.RoleFlagSuperuser)
+		}
+
 		memberOf := []string{c.OpConfig.PamRoleName}
 		c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
 	}
