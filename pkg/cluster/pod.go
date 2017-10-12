@@ -165,7 +165,7 @@ func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 			}
 		}
 	}
-
+	c.logger.Debug("no available master candidates on live nodes")
 	return &replicas[rand.Intn(len(replicas))], nil
 }
 
