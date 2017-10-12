@@ -645,11 +645,17 @@ func (c *Cluster) initHumanUsers() error {
 	}
 	for _, username := range teamMembers {
 		flags := []string{constants.RoleFlagLogin}
-		if c.OpConfig.EnableTeamsSuperuser {
+		memberOf := []string{c.OpConfig.PamRoleName}
+
+		if c.OpConfig.EnableTeamSuperuser {
 			flags = append(flags, constants.RoleFlagSuperuser)
 		}
+		else {
+			if c.OpConfig.TeamAdminRole != "" {
+				memberOf = append(memberOf, c.OpConfig.TeamAdminRole)
+			}
+		}
 
-		memberOf := []string{c.OpConfig.PamRoleName}
 		c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
 	}
 
