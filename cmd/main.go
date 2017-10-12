@@ -27,7 +27,7 @@ func init() {
 	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
 
-	config.Namespace = os.Getenv("MY_POD_NAMESPACE")
+	config.Namespace = os.Getenv("WATCH_NAMESPACE")
 	if config.Namespace == "" {
 		config.Namespace = "default"
 	}
