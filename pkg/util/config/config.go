@@ -58,6 +58,8 @@ type Config struct {
 	DebugLogging          bool           `name:"debug_logging" default:"true"`
 	EnableDBAccess        bool           `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI        bool           `name:"enable_teams_api" default:"true"`
+	EnableTeamSuperuser   bool           `name:"enable_team_superuser" default:"false"`
+	TeamAdminRole         string         `name:"team_admin_role" default:"admin"`
 	EnableLoadBalancer    bool           `name:"enable_load_balancer" default:"true"`
 	MasterDNSNameFormat   stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat  stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`

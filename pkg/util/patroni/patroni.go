@@ -21,6 +21,7 @@ const (
 // Interface describe patroni methods
 type Interface interface {
 	Failover(master *v1.Pod, candidate string) error
+	Status(pod *v1.Pod) (*Status, error)
 }
 
 // Patroni API client
@@ -31,13 +32,13 @@ type Patroni struct {
 
 //XlogSpec...
 type XlogSpec struct {
-	Location string `json:"location"`
+	Location uint64 `json:"location"`
 }
 
 //ReplicationSpec describes replication specific parameters
 type ReplicationSpec struct {
 	State           string `json:"state"`
-	SyncPriority    int    `json:"sync_priority"`
+	SyncPriority    uint   `json:"sync_priority"`
 	SyncState       string `json:"sync_state"`
 	Usename         string `json:"usename"`
 	ApplicationName string `json:"application_name"`
@@ -52,14 +53,14 @@ type PatroniSpec struct {
 
 // Status describes status returned by patroni API
 type Status struct {
-	State                    string          `json:"state"`
-	Xlog                     XlogSpec        `json:"xlog"`
-	ServerVersion            string          `json:"server_version"`
-	Role                     string          `json:"role"`
-	Replication              ReplicationSpec `json:"replication"`
-	DatabaseSystemIdentifier uint64          `json:"database_system_identifier"`
-	PostmasterStartTime      time.Time       `json:"postmaster_start_time"`
-	Patroni                  PatroniSpec	 `json:"patroni"`
+	State                    string            `json:"state"`
+	Xlog                     XlogSpec          `json:"xlog"`
+	ServerVersion            uint64            `json:"server_version"`
+	Role                     string            `json:"role"`
+	Replication              []ReplicationSpec `json:"replication"`
+	DatabaseSystemIdentifier string            `json:"database_system_identifier"`
+	PostmasterStartTime      string            `json:"postmaster_start_time"`
+	Patroni                  PatroniSpec       `json:"patroni"`
 }
 
 // New create patroni
@@ -112,6 +113,7 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 	return nil
 }
 
+// Status returns patroni status
 func (p *Patroni) Status(pod *v1.Pod) (*Status, error) {
 	status := &Status{}
 

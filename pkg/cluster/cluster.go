@@ -316,7 +316,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
-
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
 	}
@@ -432,10 +431,8 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	defer c.mu.Unlock()
 
 	c.setStatus(spec.ClusterStatusUpdating)
-	c.logger.Debugf("cluster update from version %q to %q",
-		c.ResourceVersion, newSpec.ResourceVersion)
 
-	/* Make sure we update when this function exists */
+	/* Make sure we update when this function exits */
 	defer func() {
 		c.Postgresql = *newSpec
 	}()
@@ -644,8 +641,17 @@ func (c *Cluster) initHumanUsers() error {
 		return fmt.Errorf("could not get list of team members: %v", err)
 	}
 	for _, username := range teamMembers {
-		flags := []string{constants.RoleFlagLogin, constants.RoleFlagSuperuser}
+		flags := []string{constants.RoleFlagLogin}
 		memberOf := []string{c.OpConfig.PamRoleName}
+
+		if c.OpConfig.EnableTeamSuperuser {
+			flags = append(flags, constants.RoleFlagSuperuser)
+		} else {
+			if c.OpConfig.TeamAdminRole != "" {
+				memberOf = append(memberOf, c.OpConfig.TeamAdminRole)
+			}
+		}
+
 		c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
 	}
 

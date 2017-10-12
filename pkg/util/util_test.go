@@ -46,6 +46,18 @@ var substractTest = []struct {
 	{[]string{"a", "b", "c", "d"}, []string{"a", "bb", "c", "d"}, []string{"b"}, false},
 }
 
+var mapContaintsTest = []struct {
+	inA map[string]string
+	inB map[string]string
+	out bool
+}{
+	{map[string]string{"1": "a", "2": "b", "3": "c", "4": "c"}, map[string]string{"1": "a", "2": "b", "3": "c"}, true},
+	{map[string]string{"1": "a", "2": "b", "3": "c", "4": "c"}, map[string]string{"1": "a", "2": "b", "3": "d"}, false},
+	{map[string]string{}, map[string]string{}, true},
+	{map[string]string{"3": "c", "4": "c"}, map[string]string{"1": "a", "2": "b", "3": "c"}, false},
+	{map[string]string{"3": "c", "4": "c"}, map[string]string{}, true},
+}
+
 var substringMatch = []struct {
 	inRegex *regexp.Regexp
 	inStr   string
@@ -119,6 +131,15 @@ func TestFindNamedStringSubmatch(t *testing.T) {
 		actualRes := FindNamedStringSubmatch(tt.inRegex, tt.inStr)
 		if !reflect.DeepEqual(actualRes, tt.out) {
 			t.Errorf("FindNamedStringSubmatch expected: %#v, got: %#v", tt.out, actualRes)
+		}
+	}
+}
+
+func TestMapContains(t *testing.T) {
+	for _, tt := range mapContaintsTest {
+		res := MapContains(tt.inA, tt.inB)
+		if res != tt.out {
+			t.Errorf("MapContains expected: %#v, got: %#v", tt.out, res)
 		}
 	}
 }
