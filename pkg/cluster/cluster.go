@@ -646,7 +646,7 @@ func (c *Cluster) initHumanUsers() error {
 	for _, username := range teamMembers {
 		flags := []string{constants.RoleFlagLogin}
 		if c.OpConfig.EnableTeamsSuperuser {
-			flags = flags.append(constants.RoleFlagSuperuser)
+			flags = append(flags, constants.RoleFlagSuperuser)
 		}
 
 		memberOf := []string{c.OpConfig.PamRoleName}
