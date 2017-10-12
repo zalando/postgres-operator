@@ -11,32 +11,45 @@ import (
 
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
 // Unlike the update, sync does not error out if some objects do not exist and takes care of creating them.
-func (c *Cluster) Sync() error {
+func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	err := c.loadResources()
+	c.Postgresql = *newSpec
+
+	err = c.loadResources()
 	if err != nil {
 		c.logger.Errorf("could not load resources: %v", err)
 	}
 
+	defer func() {
+		if err != nil {
+			c.setStatus(spec.ClusterStatusSyncFailed)
+		} else if c.Status != spec.ClusterStatusRunning {
+			c.setStatus(spec.ClusterStatusRunning)
+		}
+	}()
+
 	if err = c.initUsers(); err != nil {
-		return err
+		err = fmt.Errorf("could not init users: %v", err)
+		return
 	}
 
 	c.logger.Debugf("syncing secrets")
 
 	//TODO: mind the secrets of the deleted/new users
-	if err := c.applySecrets(); err != nil {
+	if err = c.applySecrets(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not sync secrets: %v", err)
+			err = fmt.Errorf("could not sync secrets: %v", err)
+			return
 		}
 	}
 
 	c.logger.Debugf("syncing endpoints")
-	if err := c.syncEndpoint(); err != nil {
+	if err = c.syncEndpoint(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not sync endpoints: %v", err)
+			err = fmt.Errorf("could not sync endpoints: %v", err)
+			return
 		}
 	}
 
@@ -45,39 +58,44 @@ func (c *Cluster) Sync() error {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			if c.Services[role] != nil {
 				// delete the left over replica service
-				if err := c.deleteService(role); err != nil {
-					return fmt.Errorf("could not delete obsolete %s service: %v", role, err)
+				if err = c.deleteService(role); err != nil {
+					err = fmt.Errorf("could not delete obsolete %s service: %v", role, err)
+					return
 				}
 			}
 			continue
 		}
-		if err := c.syncService(role); err != nil {
+		if err = c.syncService(role); err != nil {
 			if !k8sutil.ResourceAlreadyExists(err) {
-				return fmt.Errorf("coud not sync %s service: %v", role, err)
+				err = fmt.Errorf("coud not sync %s service: %v", role, err)
+				return
 			}
 		}
 	}
 
 	c.logger.Debugf("syncing statefulsets")
-	if err := c.syncStatefulSet(); err != nil {
+	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not sync statefulsets: %v", err)
+			err = fmt.Errorf("could not sync statefulsets: %v", err)
+			return
 		}
 	}
 
 	if !c.databaseAccessDisabled() {
 		c.logger.Debugf("syncing roles")
-		if err := c.syncRoles(true); err != nil {
-			return fmt.Errorf("could not sync roles: %v", err)
+		if err = c.syncRoles(true); err != nil {
+			err = fmt.Errorf("could not sync roles: %v", err)
+			return
 		}
 	}
 
 	c.logger.Debugf("syncing persistent volumes")
-	if err := c.syncVolumes(); err != nil {
-		return fmt.Errorf("could not sync persistent volumes: %v", err)
+	if err = c.syncVolumes(); err != nil {
+		err = fmt.Errorf("could not sync persistent volumes: %v", err)
+		return
 	}
 
-	return nil
+	return
 }
 
 func (c *Cluster) syncService(role PostgresRole) error {
