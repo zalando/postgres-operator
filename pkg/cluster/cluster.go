@@ -649,8 +649,7 @@ func (c *Cluster) initHumanUsers() error {
 
 		if c.OpConfig.EnableTeamSuperuser {
 			flags = append(flags, constants.RoleFlagSuperuser)
-		}
-		else {
+		} else {
 			if c.OpConfig.TeamAdminRole != "" {
 				memberOf = append(memberOf, c.OpConfig.TeamAdminRole)
 			}
