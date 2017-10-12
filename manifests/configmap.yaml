@@ -30,7 +30,7 @@ data:
   enable_teams_api: "false"
   enable_team_superuser: "false"
   team_admin_role: "admin"
-  # teams_api_url: http://fake-teams-api.default.svc.cluster.local
+  teams_api_url: http://fake-teams-api.default.svc.cluster.local
   workers: "4"
   enable_load_balancer: "true"
   api_port: "8080"
