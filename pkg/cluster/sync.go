@@ -11,9 +11,11 @@ import (
 
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
 // Unlike the update, sync does not error out if some objects do not exist and takes care of creating them.
-func (c *Cluster) Sync() (err error) {
+func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	c.Postgresql = *newSpec
 
 	err = c.loadResources()
 	if err != nil {
