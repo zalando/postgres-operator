@@ -26,5 +26,6 @@ _testmain.go
 /.glide/
 /build/
 /docker/build/
+.idea
 
 scm-source.json
