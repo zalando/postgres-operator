@@ -118,14 +118,10 @@ func (c *Cluster) movePodOffCordonedNode(pod *v1.Pod) (*v1.Pod, error) {
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	c.setProcessName("recreating %q pod", podName)
 
-	node, err := c.KubeClient.Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
-	if err != nil {
+	if eol, err := c.podIsEndOfLife(pod); err != nil {
 		return nil, fmt.Errorf("could not get %q node: %v", pod.Spec.NodeName, err)
-	}
-
-	if !util.MapContains(node.Labels, c.OpConfig.EOLNodeLabel) {
-		c.logger.Infof("%q pod is already on a non-cordoned node", podName)
-
+	} else if !eol {
+		c.logger.Infof("%q pod is already on a live node", podName)
 		return pod, nil
 	}
 
@@ -142,13 +138,10 @@ func (c *Cluster) movePodOffCordonedNode(pod *v1.Pod) (*v1.Pod, error) {
 		return nil, fmt.Errorf("%q pod remained on the same node", podName)
 	}
 
-	node, err = c.KubeClient.Nodes().Get(newPod.Spec.NodeName, metav1.GetOptions{})
-	if err != nil {
+	if eol, err := c.podIsEndOfLife(newPod); err != nil {
 		return nil, fmt.Errorf("could not get %q node: %v", pod.Spec.NodeName, err)
-	}
-
-	if util.MapContains(node.Labels, c.OpConfig.EOLNodeLabel) {
-		c.logger.Warningf("%q pod moved to the %q node, which is a cordoned node", podName, node.Name)
+	} else if eol {
+		c.logger.Warningf("%q pod moved to the %q node, which is end of life", podName, newPod.Spec.NodeName)
 		return newPod, nil
 	}
 
@@ -157,10 +150,20 @@ func (c *Cluster) movePodOffCordonedNode(pod *v1.Pod) (*v1.Pod, error) {
 	return newPod, nil
 }
 
-func (c *Cluster) masterCandidate() (*v1.Pod, error) {
+func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 	replicas, err := c.getRolePods(Replica)
 	if err != nil {
 		return nil, fmt.Errorf("could not get replica pods: %v", err)
+	}
+
+	for i, pod := range replicas {
+		// look for replicas running on live nodes. Ignore errors when querying the nodes.
+		if pod.Spec.NodeName != oldNodeName {
+			eol, err := c.podIsEndOfLife(&pod)
+			if err == nil && !eol {
+				return &replicas[i], nil
+			}
+		}
 	}
 
 	return &replicas[rand.Intn(len(replicas))], nil
@@ -175,12 +178,9 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 	c.logger.Debugf("moving pod %q out of the %q node", podName, oldMaster.Spec.NodeName)
 
-	oldNode, err := c.KubeClient.Nodes().Get(oldMaster.Spec.NodeName, metav1.GetOptions{})
-	if err != nil {
+	if eol, err := c.podIsEndOfLife(oldMaster); err != nil {
 		return fmt.Errorf("could not get %q node: %v", oldMaster.Spec.NodeName, err)
-	}
-
-	if !util.MapContains(oldNode.Labels, c.OpConfig.EOLNodeLabel) {
+	} else if !eol {
 		c.logger.Debugf("pod is already on a non-cordoned node")
 		return nil
 	}
@@ -190,7 +190,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return nil
 	}
 
-	masterCandidatePod, err := c.masterCandidate()
+	masterCandidatePod, err := c.masterCandidate(oldMaster.Spec.NodeName)
 	if err != nil {
 		return fmt.Errorf("could not get new master candidate: %v", err)
 	}
@@ -223,7 +223,7 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 	}
 
 	if replicaPod.Spec.NodeName != fromNodeName {
-		c.logger.Infof("pod %q has already migrated to node %q", podName, replicaPod.Spec.NodeName )
+		c.logger.Infof("pod %q has already migrated to node %q", podName, replicaPod.Spec.NodeName)
 		return nil
 	}
 
@@ -310,4 +310,13 @@ func (c *Cluster) recreatePods() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) podIsEndOfLife(pod *v1.Pod) (bool, error) {
+	node, err := c.KubeClient.Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return node.Spec.Unschedulable || util.MapContains(node.Labels, c.OpConfig.EOLNodeLabel), nil
+
 }
