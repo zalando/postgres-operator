@@ -41,6 +41,7 @@ type Controller struct {
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
+	nodesInformer      cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
 	clusterEventQueues  []*cache.FIFO // [workerID]Queue
@@ -111,6 +112,7 @@ func (c *Controller) initOperatorConfig() {
 func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
+	c.initSharedInformers()
 
 	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
 
@@ -128,6 +130,23 @@ func (c *Controller) initController() {
 		c.config.InfrastructureRoles = infraRoles
 	}
 
+	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
+	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
+	for i := range c.clusterEventQueues {
+		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
+			e, ok := obj.(spec.ClusterEvent)
+			if !ok {
+				return "", fmt.Errorf("could not cast to ClusterEvent")
+			}
+
+			return queueClusterKey(e.EventType, e.UID), nil
+		})
+	}
+
+	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)
+}
+
+func (c *Controller) initSharedInformers() {
 	// Postgresqls
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -162,31 +181,35 @@ func (c *Controller) initController() {
 		DeleteFunc: c.podDelete,
 	})
 
-	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
-	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
-	for i := range c.clusterEventQueues {
-		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
-			e, ok := obj.(spec.ClusterEvent)
-			if !ok {
-				return "", fmt.Errorf("could not cast to ClusterEvent")
-			}
-
-			return queueClusterKey(e.EventType, e.UID), nil
-		})
+	// Kubernetes Nodes
+	nodeLw := &cache.ListWatch{
+		ListFunc:  c.nodeListFunc,
+		WatchFunc: c.nodeWatchFunc,
 	}
 
-	c.apiserver = apiserver.New(c, c.opConfig.APIPort, c.logger.Logger)
+	c.nodesInformer = cache.NewSharedIndexInformer(
+		nodeLw,
+		&v1.Node{},
+		constants.QueueResyncPeriodNode,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	c.nodesInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.nodeAdd,
+		UpdateFunc: c.nodeUpdate,
+		DeleteFunc: c.nodeDelete,
+	})
 }
 
 // Run starts background controller processes
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 
-	wg.Add(4)
+	wg.Add(5)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
 	go c.apiserver.Run(stopCh, wg)
+	go c.kubeNodesInformer(stopCh, wg)
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
@@ -211,4 +234,10 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 
 func queueClusterKey(eventType spec.EventType, uid types.UID) string {
 	return fmt.Sprintf("%s-%s", eventType, uid)
+}
+
+func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	c.nodesInformer.Run(stopCh)
 }
