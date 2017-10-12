@@ -21,6 +21,7 @@ const (
 // Interface describe patroni methods
 type Interface interface {
 	Failover(master *v1.Pod, candidate string) error
+	Status(pod *v1.Pod) (*Status, error)
 }
 
 // Patroni API client
