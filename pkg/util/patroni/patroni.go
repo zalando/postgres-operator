@@ -21,12 +21,46 @@ const (
 // Interface describe patroni methods
 type Interface interface {
 	Failover(master *v1.Pod, candidate string) error
+	Status(pod *v1.Pod) (*Status, error)
 }
 
 // Patroni API client
 type Patroni struct {
 	httpClient *http.Client
 	logger     *logrus.Entry
+}
+
+//XlogSpec...
+type XlogSpec struct {
+	Location uint64 `json:"location"`
+}
+
+//ReplicationSpec describes replication specific parameters
+type ReplicationSpec struct {
+	State           string `json:"state"`
+	SyncPriority    uint   `json:"sync_priority"`
+	SyncState       string `json:"sync_state"`
+	Usename         string `json:"usename"`
+	ApplicationName string `json:"application_name"`
+	ClientAddr      string `json:"client_addr"`
+}
+
+// PatroniSpec describes patroni specific parameters
+type PatroniSpec struct {
+	Scope   string `json:"scope"`
+	Version string `json:"version"`
+}
+
+// Status describes status returned by patroni API
+type Status struct {
+	State                    string            `json:"state"`
+	Xlog                     XlogSpec          `json:"xlog"`
+	ServerVersion            uint64            `json:"server_version"`
+	Role                     string            `json:"role"`
+	Replication              []ReplicationSpec `json:"replication"`
+	DatabaseSystemIdentifier string            `json:"database_system_identifier"`
+	PostmasterStartTime      string            `json:"postmaster_start_time"`
+	Patroni                  PatroniSpec       `json:"patroni"`
 }
 
 // New create patroni
@@ -41,7 +75,7 @@ func New(logger *logrus.Entry) *Patroni {
 	}
 }
 
-func (p *Patroni) apiURL(masterPod *v1.Pod) string {
+func apiURL(masterPod *v1.Pod) string {
 	return fmt.Sprintf("http://%s:%d", masterPod.Status.PodIP, apiPort)
 }
 
@@ -54,7 +88,7 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 		return fmt.Errorf("could not encode json: %v", err)
 	}
 
-	request, err := http.NewRequest(http.MethodPost, p.apiURL(master)+failoverPath, buf)
+	request, err := http.NewRequest(http.MethodPost, apiURL(master)+failoverPath, buf)
 	if err != nil {
 		return fmt.Errorf("could not create request: %v", err)
 	}
@@ -77,4 +111,26 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 	}
 
 	return nil
+}
+
+// Status returns patroni status
+func (p *Patroni) Status(pod *v1.Pod) (*Status, error) {
+	status := &Status{}
+
+	request, err := http.NewRequest(http.MethodGet, apiURL(pod), nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not make new request: %v", err)
+	}
+
+	resp, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("could not make request: %v", err)
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(status)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse team API response: %v", err)
+	}
+
+	return status, nil
 }
