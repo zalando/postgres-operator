@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -27,7 +28,9 @@ type KubernetesClient struct {
 	v1core.PersistentVolumesGetter
 	v1core.PersistentVolumeClaimsGetter
 	v1core.ConfigMapsGetter
+	v1core.NodesGetter
 	v1beta1.StatefulSetsGetter
+	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
 
 	RESTClient rest.Interface
@@ -69,7 +72,9 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.ConfigMapsGetter = client.CoreV1()
 	kubeClient.PersistentVolumeClaimsGetter = client.CoreV1()
 	kubeClient.PersistentVolumesGetter = client.CoreV1()
+	kubeClient.NodesGetter = client.CoreV1()
 	kubeClient.StatefulSetsGetter = client.AppsV1beta1()
+	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 
 	cfg2 := *cfg
