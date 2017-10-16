@@ -158,10 +158,6 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 		return fmt.Errorf("could not get master candidate pod: %v", err)
 	}
 
-	if c.podSpiloRole(masterCandidatePod) == Master {
-		return nil
-	}
-
 	// some sanity check
 	if !util.MapContains(masterCandidatePod.Labels, c.OpConfig.ClusterLabels) ||
 		!util.MapContains(masterCandidatePod.Labels, map[string]string{c.OpConfig.ClusterNameLabel: c.Name}) {
@@ -185,7 +181,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	//scale down
 	if *c.Statefulset.Spec.Replicas > *newStatefulSet.Spec.Replicas {
 		if err := c.preScaleDown(newStatefulSet); err != nil {
-			return fmt.Errorf("could not scale down: %v", err)
+			c.logger.Warningf("could not scale down: %v", err)
 		}
 	}
 	c.logger.Debugf("updating statefulset")
