@@ -95,11 +95,11 @@ func TestClusterWorkerID(t *testing.T) {
 	}{
 		{
 			in:       spec.NamespacedName{Namespace: "foo", Name: "bar"},
-			expected: 2,
+			expected: 0,
 		},
 		{
 			in:       spec.NamespacedName{Namespace: "default", Name: "testcluster"},
-			expected: 3,
+			expected: 1,
 		},
 	}
 	for _, test := range testTable {

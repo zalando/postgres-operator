@@ -15,7 +15,7 @@ spec:
         image: pierone.stups.zalan.do/acid/postgres-operator:workerassgn
         imagePullPolicy: IfNotPresent
         env:
-        - name: MY_POD_NAMESPACE
+        - name: WATCH_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace

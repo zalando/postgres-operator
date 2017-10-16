@@ -27,6 +27,9 @@ data:
   resource_check_timeout: 10m
   resync_period: 5m
   super_username: postgres
+  enable_teams_api: "false"
+  enable_team_superuser: "false"
+  team_admin_role: "admin"
   teams_api_url: http://fake-teams-api.default.svc.cluster.local
   workers: "4"
   enable_load_balancer: "true"

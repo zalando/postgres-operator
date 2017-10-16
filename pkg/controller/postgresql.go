@@ -44,10 +44,10 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	var list spec.PostgresqlList
 	var activeClustersCnt, failedClustersCnt int
 
-	req := c.RestClient.
+	req := c.KubeClient.CRDREST.
 		Get().
 		Namespace(c.opConfig.Namespace).
-		Resource(constants.ResourceName).
+		Resource(constants.CRDResource).
 		VersionedParams(&options, metav1.ParameterCodec)
 
 	b, err := req.DoRaw()
@@ -57,7 +57,6 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	err = json.Unmarshal(b, &list)
 
 	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
-		c.logger.Debugln("skipping resync of clusters")
 		return &list, err
 	}
 
@@ -86,16 +85,16 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	return &list, err
 }
 
-type tprDecoder struct {
+type crdDecoder struct {
 	dec   *json.Decoder
 	close func() error
 }
 
-func (d *tprDecoder) Close() {
+func (d *crdDecoder) Close() {
 	d.close()
 }
 
-func (d *tprDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {
+func (d *crdDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {
 	var e struct {
 		Type   watch.EventType
 		Object spec.Postgresql
@@ -109,10 +108,10 @@ func (d *tprDecoder) Decode() (action watch.EventType, object runtime.Object, er
 
 func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
 	options.Watch = true
-	r, err := c.RestClient.
+	r, err := c.KubeClient.CRDREST.
 		Get().
 		Namespace(c.opConfig.Namespace).
-		Resource(constants.ResourceName).
+		Resource(constants.CRDResource).
 		VersionedParams(&options, metav1.ParameterCodec).
 		FieldsSelectorParam(nil).
 		Stream()
@@ -121,7 +120,7 @@ func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interfa
 		return nil, err
 	}
 
-	return watch.NewStreamWatcher(&tprDecoder{
+	return watch.NewStreamWatcher(&crdDecoder{
 		dec:   json.NewDecoder(r),
 		close: r.Close,
 	}), nil
@@ -163,6 +162,8 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 	}
 	c.clustersMu.RUnlock()
 
+	defer c.curWorkerCluster.Store(event.WorkerID, nil)
+
 	switch event.EventType {
 	case spec.EventAdd:
 		if clusterFound {
@@ -173,6 +174,8 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		lg.Infof("creation of the cluster started")
 
 		cl = c.addCluster(lg, clusterName, event.NewSpec)
+
+		c.curWorkerCluster.Store(event.WorkerID, cl)
 
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Errorf("could not create cluster: %v", err)
@@ -189,6 +192,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			lg.Warningln("cluster does not exist")
 			return
 		}
+		c.curWorkerCluster.Store(event.WorkerID, cl)
 		if err := cl.Update(event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
@@ -212,6 +216,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 
 		teamName := strings.ToLower(cl.Spec.TeamID)
 
+		c.curWorkerCluster.Store(event.WorkerID, cl)
 		if err := cl.Delete(); err != nil {
 			lg.Errorf("could not delete cluster: %v", err)
 		}
@@ -242,7 +247,8 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			cl = c.addCluster(lg, clusterName, event.NewSpec)
 		}
 
-		if err := cl.Sync(); err != nil {
+		c.curWorkerCluster.Store(event.WorkerID, cl)
+		if err := cl.Sync(event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
 			lg.Error(cl.Error)
 			return

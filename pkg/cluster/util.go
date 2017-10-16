@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -98,22 +97,10 @@ func metadataAnnotationsPatch(annotations map[string]string) string {
 	return fmt.Sprintf(constants.ServiceMetadataAnnotationReplaceFormat, annotationsString)
 }
 
-func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpdate bool, reason string) {
-	if isUpdate {
-		c.logger.Infof("pod disruption budget %q has been changed", util.NameFromMeta(old.ObjectMeta),
-		)
-	} else {
-		c.logger.Infof("pod disruption budget %q is not in the desired state and needs to be updated",
-			util.NameFromMeta(old.ObjectMeta),
-		)
-	}
-
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
-}
-
 func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
-		c.logger.Infof("statefulset %q has been changed", util.NameFromMeta(old.ObjectMeta),
+		c.logger.Infof("statefulset %q has been changed",
+			util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
 		c.logger.Infof("statefulset %q is not in the desired state and needs to be updated",
@@ -197,6 +184,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 }
 
 func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRole) error {
+	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
 		case podEvent := <-podEvents:
@@ -209,20 +197,21 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRo
 			} else if *role == podRole {
 				return nil
 			}
-		case <-time.After(c.OpConfig.PodLabelWaitTimeout):
+		case <-timeout:
 			return fmt.Errorf("pod label wait timeout")
 		}
 	}
 }
 
 func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
+	timeout := time.After(c.OpConfig.PodDeletionWaitTimeout)
 	for {
 		select {
 		case podEvent := <-podEvents:
 			if podEvent.EventType == spec.EventDelete {
 				return nil
 			}
-		case <-time.After(c.OpConfig.PodDeletionWaitTimeout):
+		case <-timeout:
 			return fmt.Errorf("pod deletion wait timeout")
 		}
 	}
@@ -297,6 +286,7 @@ func (c *Cluster) waitPodLabelsReady() error {
 }
 
 func (c *Cluster) waitStatefulsetPodsReady() error {
+	c.setProcessName("waiting for the pods of the statefulset")
 	// TODO: wait for the first Pod only
 	if err := c.waitStatefulsetReady(); err != nil {
 		return fmt.Errorf("statuful set error: %v", err)
@@ -350,9 +340,13 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 
 	return c.OpConfig.SecretNameTemplate.Format(
 		"username", strings.Replace(username, "_", "-", -1),
-		"cluster", clusterName,
-		"tprkind", constants.TPRKind,
-		"tprgroup", constants.TPRGroup)
+		"clustername", clusterName,
+		"tprkind", constants.CRDKind,
+		"tprgroup", constants.CRDGroup)
+}
+
+func (c *Cluster) podSpiloRole(pod *v1.Pod) PostgresRole {
+	return PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 }
 
 func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {

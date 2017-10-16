@@ -3,6 +3,7 @@ package cluster
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
@@ -15,6 +16,8 @@ import (
 
 //ExecCommand executes arbitrary command inside the pod
 func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (string, error) {
+	c.setProcessName("executing command %q", strings.Join(command, " "))
+
 	var (
 		execOut bytes.Buffer
 		execErr bytes.Buffer

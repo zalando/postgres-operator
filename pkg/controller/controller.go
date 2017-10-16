@@ -8,7 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
@@ -27,20 +26,21 @@ type Controller struct {
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
-	RestClient rest.Interface // kubernetes API group REST client
 	apiserver  *apiserver.Server
 
 	stopCh chan struct{}
 
-	clustersMu     sync.RWMutex
-	clusters       map[spec.NamespacedName]*cluster.Cluster
-	clusterLogs    map[spec.NamespacedName]ringlog.RingLogger
-	clusterHistory map[spec.NamespacedName]ringlog.RingLogger // history of the cluster changes
-	teamClusters   map[string][]spec.NamespacedName
+	curWorkerID      uint32 //initialized with 0
+	curWorkerCluster sync.Map
+	clusterWorkers   map[spec.NamespacedName]uint32
+	clustersMu       sync.RWMutex
+	clusters         map[spec.NamespacedName]*cluster.Cluster
+	clusterLogs      map[spec.NamespacedName]ringlog.RingLogger
+	clusterHistory   map[spec.NamespacedName]ringlog.RingLogger // history of the cluster changes
+	teamClusters     map[string][]spec.NamespacedName
 
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
-	nodesInformer      cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
 	clusterEventQueues  []*cache.FIFO // [workerID]Queue
@@ -54,15 +54,17 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 	logger := logrus.New()
 
 	c := &Controller{
-		config:         *controllerConfig,
-		opConfig:       &config.Config{},
-		logger:         logger.WithField("pkg", "controller"),
-		clusters:       make(map[spec.NamespacedName]*cluster.Cluster),
-		clusterLogs:    make(map[spec.NamespacedName]ringlog.RingLogger),
-		clusterHistory: make(map[spec.NamespacedName]ringlog.RingLogger),
-		teamClusters:   make(map[string][]spec.NamespacedName),
-		stopCh:         make(chan struct{}),
-		podCh:          make(chan spec.PodEvent),
+		config:           *controllerConfig,
+		opConfig:         &config.Config{},
+		logger:           logger.WithField("pkg", "controller"),
+		curWorkerCluster: sync.Map{},
+		clusterWorkers:   make(map[spec.NamespacedName]uint32),
+		clusters:         make(map[spec.NamespacedName]*cluster.Cluster),
+		clusterLogs:      make(map[spec.NamespacedName]ringlog.RingLogger),
+		clusterHistory:   make(map[spec.NamespacedName]ringlog.RingLogger),
+		teamClusters:     make(map[string][]spec.NamespacedName),
+		stopCh:           make(chan struct{}),
+		podCh:            make(chan spec.PodEvent),
 	}
 	logger.Hooks.Add(c)
 
@@ -70,15 +72,11 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 }
 
 func (c *Controller) initClients() {
-	client, err := k8sutil.ClientSet(c.config.RestConfig)
-	if err != nil {
-		c.logger.Fatalf("couldn't create client: %v", err)
-	}
-	c.KubeClient = k8sutil.NewFromKubernetesInterface(client)
+	var err error
 
-	c.RestClient, err = k8sutil.KubernetesRestClient(*c.config.RestConfig)
+	c.KubeClient, err = k8sutil.NewFromConfig(c.config.RestConfig)
 	if err != nil {
-		c.logger.Fatalf("couldn't create rest client: %v", err)
+		c.logger.Fatalf("could not create kubernetes clients: %v", err)
 	}
 }
 
@@ -110,7 +108,26 @@ func (c *Controller) initOperatorConfig() {
 	c.opConfig = config.NewFromMap(configMapData)
 }
 
-func (c *Controller) initSharedInformers() {
+func (c *Controller) initController() {
+	c.initClients()
+	c.initOperatorConfig()
+
+	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
+
+	if c.opConfig.DebugLogging {
+		c.logger.Logger.Level = logrus.DebugLevel
+	}
+
+	if err := c.createCRD(); err != nil {
+		c.logger.Fatalf("could not register CustomResourceDefinition: %v", err)
+	}
+
+	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
+		c.logger.Warningf("could not get infrastructure roles: %v", err)
+	} else {
+		c.config.InfrastructureRoles = infraRoles
+	}
+
 	// Postgresqls
 	c.postgresqlInformer = cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -145,46 +162,6 @@ func (c *Controller) initSharedInformers() {
 		DeleteFunc: c.podDelete,
 	})
 
-	// Kubernetes Nodes
-	nodeLw := &cache.ListWatch{
-		ListFunc:  c.nodeListFunc,
-		WatchFunc: c.nodeWatchFunc,
-	}
-
-	c.nodesInformer = cache.NewSharedIndexInformer(
-		nodeLw,
-		&v1.Node{},
-		constants.QueueResyncPeriodNode,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-
-	c.nodesInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.nodeAdd,
-		UpdateFunc: c.nodeUpdate,
-		DeleteFunc: c.nodeDelete,
-	})
-}
-
-func (c *Controller) initController() {
-	c.initClients()
-	c.initOperatorConfig()
-	c.initSharedInformers()
-
-	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
-
-	if c.opConfig.DebugLogging {
-		c.logger.Logger.Level = logrus.DebugLevel
-	}
-
-	if err := c.createTPR(); err != nil {
-		c.logger.Fatalf("could not register ThirdPartyResource: %v", err)
-	}
-
-	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
-		c.logger.Warningf("could not get infrastructure roles: %v", err)
-	} else {
-		c.config.InfrastructureRoles = infraRoles
-	}
-
 	c.clusterEventQueues = make([]*cache.FIFO, c.opConfig.Workers)
 	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
@@ -205,12 +182,11 @@ func (c *Controller) initController() {
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 
-	wg.Add(5)
+	wg.Add(4)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
 	go c.apiserver.Run(stopCh, wg)
-	go c.kubeNodesInformer(stopCh, wg)
 
 	for i := range c.clusterEventQueues {
 		wg.Add(1)
@@ -235,10 +211,4 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 
 func queueClusterKey(eventType spec.EventType, uid types.UID) string {
 	return fmt.Sprintf("%s-%s", eventType, uid)
-}
-
-func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	c.nodesInformer.Run(stopCh)
 }
