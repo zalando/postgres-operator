@@ -57,7 +57,6 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	err = json.Unmarshal(b, &list)
 
 	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
-		c.logger.Debugln("skipping resync of clusters")
 		return &list, err
 	}
 
@@ -249,7 +248,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Sync(); err != nil {
+		if err := cl.Sync(event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
 			lg.Error(cl.Error)
 			return
