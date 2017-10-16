@@ -431,8 +431,6 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 	defer c.mu.Unlock()
 
 	c.setStatus(spec.ClusterStatusUpdating)
-	c.logger.Debugf("cluster update from version %q to %q",
-		c.ResourceVersion, newSpec.ResourceVersion)
 
 	/* Make sure we update when this function exits */
 	defer func() {
