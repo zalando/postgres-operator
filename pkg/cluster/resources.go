@@ -128,7 +128,7 @@ func getPodNumb(podName string) (int32, error) {
 	}
 
 	postfix := parts[len(parts)-1]
-	res, err := strconv.ParseInt(postfix, 10, 64)
+	res, err := strconv.ParseInt(postfix, 10, 32)
 	if err != nil {
 		return 0, fmt.Errorf("couldn not parse postfix: %v", err)
 	}
