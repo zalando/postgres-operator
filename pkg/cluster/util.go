@@ -245,12 +245,12 @@ func (c *Cluster) waitPodLabelsReady() error {
 	}
 	masterListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
+			c.OpConfig.PodRoleLabel: string(Master),
 		}).String(),
 	}
 	replicaListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
+			c.OpConfig.PodRoleLabel: string(Replica),
 		}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
