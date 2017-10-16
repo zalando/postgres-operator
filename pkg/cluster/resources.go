@@ -148,8 +148,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 	}
 
 	//Check if scale down affects current master pod
-	if (*c.Statefulset.Spec.Replicas < podNum+1) ||
-		(*newStatefulSet.Spec.Replicas > podNum+1) {
+	if *newStatefulSet.Spec.Replicas >= podNum+1 {
 		return nil
 	}
 
