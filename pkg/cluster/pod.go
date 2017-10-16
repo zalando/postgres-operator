@@ -8,7 +8,6 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
@@ -92,14 +91,13 @@ func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.P
 	return ch
 }
 
-func (c *Cluster) recreatePod(pod v1.Pod) error {
-	podName := util.NameFromMeta(pod.ObjectMeta)
+func (c *Cluster) recreatePod(podName spec.NamespacedName) error {
 	c.setProcessName("recreating %q pod", podName)
 
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
-	if err := c.KubeClient.Pods(pod.Namespace).Delete(pod.Name, c.deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, c.deleteOptions); err != nil {
 		return fmt.Errorf("could not delete pod: %v", err)
 	}
 
@@ -129,28 +127,29 @@ func (c *Cluster) recreatePods() error {
 	}
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
 
-	var masterPod v1.Pod
+	var masterPod *v1.Pod
 	replicas := make([]spec.NamespacedName, 0)
-	for _, pod := range pods.Items {
-		role := c.podSpiloRole(&pod)
+	for i, pod := range pods.Items {
+		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
-		if role == constants.PodRoleMaster {
-			masterPod = pod
+		if role == Master {
+			masterPod = &pods.Items[i]
 			continue
 		}
 
-		if err := c.recreatePod(pod); err != nil {
+		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
+		if err := c.recreatePod(podName); err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 		}
 
 		replicas = append(replicas, util.NameFromMeta(pod.ObjectMeta))
 	}
 
-	if masterPod.Name == "" {
+	if masterPod == nil {
 		c.logger.Warningln("no master pod in the cluster")
 	} else {
 		if len(replicas) > 0 {
-			err := c.ManualFailover(&masterPod, masterCandidate(replicas))
+			err := c.ManualFailover(masterPod, masterCandidate(replicas))
 			if err != nil {
 				return fmt.Errorf("could not perform manual failover: %v", err)
 			}
@@ -158,7 +157,7 @@ func (c *Cluster) recreatePods() error {
 		//TODO: specify master, leave new master empty
 		c.logger.Infof("recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
-		if err := c.recreatePod(masterPod); err != nil {
+		if err := c.recreatePod(util.NameFromMeta(masterPod.ObjectMeta)); err != nil {
 			return fmt.Errorf("could not recreate master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
 		}
 	}
