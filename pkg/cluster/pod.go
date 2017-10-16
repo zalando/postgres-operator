@@ -11,14 +11,34 @@ import (
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
-	ns := c.Namespace
 	listOptions := metav1.ListOptions{
 		LabelSelector: c.labelsSet().String(),
 	}
 
-	pods, err := c.KubeClient.Pods(ns).List(listOptions)
+	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)
 	if err != nil {
 		return nil, fmt.Errorf("could not get list of pods: %v", err)
+	}
+
+	return pods.Items, nil
+}
+
+func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.roleLabelsSet(role).String(),
+	}
+
+	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)
+	if err != nil {
+		return nil, fmt.Errorf("could not get list of pods: %v", err)
+	}
+
+	if len(pods.Items) == 0 {
+		return nil, fmt.Errorf("no pods")
+	}
+
+	if role == Master && len(pods.Items) > 1 {
+		return nil, fmt.Errorf("too many masters")
 	}
 
 	return pods.Items, nil

@@ -103,3 +103,19 @@ func FindNamedStringSubmatch(r *regexp.Regexp, s string) map[string]string {
 
 	return res
 }
+
+// MapContains returns true if and only if haystack contains all the keys from the needle with matching corresponding values
+func MapContains(haystack, needle map[string]string) bool {
+	if len(haystack) < len(needle) {
+		return false
+	}
+
+	for k, v := range needle {
+		v2, ok := haystack[k]
+		if !ok || v2 != v {
+			return false
+		}
+	}
+
+	return true
+}
