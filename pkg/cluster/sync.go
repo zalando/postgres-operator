@@ -98,9 +98,8 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		return
 	}
 
-	return
 	c.logger.Debug("syncing pod disruption budgets")
-	if err := c.syncPodDisruptionBudget(); err != nil {
+	if err = c.syncPodDisruptionBudget(); err != nil {
 		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
 		return
 	}
