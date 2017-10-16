@@ -11,12 +11,7 @@ import (
 )
 
 func (c *Controller) podListFunc(options metav1.ListOptions) (runtime.Object, error) {
-	var labelSelector string
-	var fieldSelector string
-
 	opts := metav1.ListOptions{
-		LabelSelector:   labelSelector,
-		FieldSelector:   fieldSelector,
 		Watch:           options.Watch,
 		ResourceVersion: options.ResourceVersion,
 		TimeoutSeconds:  options.TimeoutSeconds,
@@ -26,12 +21,7 @@ func (c *Controller) podListFunc(options metav1.ListOptions) (runtime.Object, er
 }
 
 func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
-	var labelSelector string
-	var fieldSelector string
-
 	opts := metav1.ListOptions{
-		LabelSelector:   labelSelector,
-		FieldSelector:   fieldSelector,
 		Watch:           options.Watch,
 		ResourceVersion: options.ResourceVersion,
 		TimeoutSeconds:  options.TimeoutSeconds,
