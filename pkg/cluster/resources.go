@@ -159,7 +159,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 		return fmt.Errorf("could not get master candidate pod: %v", err)
 	}
 
-	if c.podSpiloRole(masterCandidatePod) == string(Master) {
+	if c.podSpiloRole(masterCandidatePod) == Master {
 		return nil
 	}
 
