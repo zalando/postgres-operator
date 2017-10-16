@@ -245,12 +245,12 @@ func (c *Cluster) waitPodLabelsReady() error {
 	}
 	masterListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleMaster,
+			c.OpConfig.PodRoleLabel: string(Master),
 		}).String(),
 	}
 	replicaListOption := metav1.ListOptions{
 		LabelSelector: labels.Merge(ls, labels.Set{
-			c.OpConfig.PodRoleLabel: constants.PodRoleReplica,
+			c.OpConfig.PodRoleLabel: string(Replica),
 		}).String(),
 	}
 	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
@@ -345,8 +345,8 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 		"tprgroup", constants.CRDGroup)
 }
 
-func (c *Cluster) podSpiloRole(pod *v1.Pod) string {
-	return pod.Labels[c.OpConfig.PodRoleLabel]
+func (c *Cluster) podSpiloRole(pod *v1.Pod) PostgresRole {
+	return PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 }
 
 func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
