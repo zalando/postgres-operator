@@ -2,6 +2,8 @@ package cluster
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -119,6 +121,56 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	return statefulSet, nil
 }
 
+func getPodIndex(podName string) (int32, error) {
+	parts := strings.Split(podName, "-")
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("pod has no index part")
+	}
+
+	postfix := parts[len(parts)-1]
+	res, err := strconv.ParseInt(postfix, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("could not parse pod index: %v", err)
+	}
+
+	return int32(res), nil
+}
+
+func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
+	masterPod, err := c.getRolePods(Master)
+	if err != nil {
+		return fmt.Errorf("could not get master pod: %v", err)
+	}
+
+	podNum, err := getPodIndex(masterPod[0].Name)
+	if err != nil {
+		return fmt.Errorf("could not get pod number: %v", err)
+	}
+
+	//Check if scale down affects current master pod
+	if *newStatefulSet.Spec.Replicas >= podNum+1 {
+		return nil
+	}
+
+	podName := fmt.Sprintf("%s-0", c.Statefulset.Name)
+	masterCandidatePod, err := c.KubeClient.Pods(c.OpConfig.Namespace).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("could not get master candidate pod: %v", err)
+	}
+
+	// some sanity check
+	if !util.MapContains(masterCandidatePod.Labels, c.OpConfig.ClusterLabels) ||
+		!util.MapContains(masterCandidatePod.Labels, map[string]string{c.OpConfig.ClusterNameLabel: c.Name}) {
+		return fmt.Errorf("pod %q does not belong to cluster", podName)
+	}
+
+	if err := c.patroni.Failover(&masterPod[0], masterCandidatePod.Name); err != nil {
+		return fmt.Errorf("could not failover: %v", err)
+	}
+
+	return nil
+}
+
 func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
@@ -126,6 +178,12 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	}
 	statefulSetName := util.NameFromMeta(c.Statefulset.ObjectMeta)
 
+	//scale down
+	if *c.Statefulset.Spec.Replicas > *newStatefulSet.Spec.Replicas {
+		if err := c.preScaleDown(newStatefulSet); err != nil {
+			c.logger.Warningf("could not scale down: %v", err)
+		}
+	}
 	c.logger.Debugf("updating statefulset")
 
 	patchData, err := specPatch(newStatefulSet.Spec)
