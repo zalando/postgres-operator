@@ -121,16 +121,16 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	return statefulSet, nil
 }
 
-func getPodNumb(podName string) (int32, error) {
+func getPodIndex(podName string) (int32, error) {
 	parts := strings.Split(podName, "-")
 	if len(parts) == 0 {
-		return 0, fmt.Errorf("no postfix")
+		return 0, fmt.Errorf("pod has no index part")
 	}
 
 	postfix := parts[len(parts)-1]
 	res, err := strconv.ParseInt(postfix, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("couldn not parse postfix: %v", err)
+		return 0, fmt.Errorf("couldn not parse pod index: %v", err)
 	}
 
 	return int32(res), nil
@@ -142,14 +142,13 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 		return fmt.Errorf("could not get master pod: %v", err)
 	}
 
-	podNum, err := getPodNumb(masterPod[0].Name)
+	podNum, err := getPodIndex(masterPod[0].Name)
 	if err != nil {
 		return fmt.Errorf("could not get pod number: %v", err)
 	}
 
 	//Check if scale down affects current master pod
-	if (*c.Statefulset.Spec.Replicas < podNum+1) ||
-		(*newStatefulSet.Spec.Replicas > podNum+1) {
+	if *newStatefulSet.Spec.Replicas >= podNum+1 {
 		return nil
 	}
 
