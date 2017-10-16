@@ -129,7 +129,7 @@ func (p *Patroni) Status(pod *v1.Pod) (*Status, error) {
 
 	err = json.NewDecoder(resp.Body).Decode(status)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse team API response: %v", err)
+		return nil, fmt.Errorf("could not parse response from patroni: %v", err)
 	}
 
 	return status, nil
