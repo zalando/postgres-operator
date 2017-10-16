@@ -2,6 +2,9 @@ package cluster
 
 import (
 	"fmt"
+	"reflect"
+
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -95,6 +98,12 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		return
 	}
 
+	c.logger.Debug("syncing pod disruption budgets")
+	if err = c.syncPodDisruptionBudget(); err != nil {
+		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
+		return
+	}
+
 	return
 }
 
@@ -134,6 +143,20 @@ func (c *Cluster) syncEndpoint() error {
 			return fmt.Errorf("could not create missing endpoint: %v", err)
 		}
 		c.logger.Infof("created missing endpoint %q", util.NameFromMeta(ep.ObjectMeta))
+		return nil
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPodDisruptionBudget() error {
+	if c.PodDisruptionBudget == nil {
+		c.logger.Infof("could not find the cluster's pod disruption budget")
+		pdb, err := c.createPodDisruptionBudget()
+		if err != nil {
+			return fmt.Errorf("could not create pod disruption budget: %v", err)
+		}
+		c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
 		return nil
 	}
 
@@ -248,6 +271,17 @@ func (c *Cluster) syncVolumes() error {
 	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
 		return fmt.Errorf("could not sync volumes: %v", err)
 	}
+
 	c.logger.Infof("volumes have been synced successfully")
+
 	return nil
+}
+
+func (c *Cluster) samePDBWith(pdb *policybeta1.PodDisruptionBudget) (match bool, reason string) {
+	match = reflect.DeepEqual(pdb.Spec, c.PodDisruptionBudget.Spec)
+	if !match {
+		reason = "new service spec doesn't match the current one"
+	}
+
+	return
 }
