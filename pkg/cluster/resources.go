@@ -119,6 +119,33 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	return statefulSet, nil
 }
 
+func (c *Cluster) scaleDown(newStatefulSet *v1beta1.StatefulSet) error {
+	podName := fmt.Sprintf("%s-0", c.Statefulset.Name) //TODO:
+	masterCandidatePod, err := c.KubeClient.Pods(c.OpConfig.Namespace).Get(podName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("could not get master candidate pod: %v", err)
+	}
+
+	//TODO: check if the pod is master pod
+
+	// some sanity check
+	if !util.MapContains(masterCandidatePod.Labels, c.OpConfig.ClusterLabels) ||
+		!util.MapContains(masterCandidatePod.Labels, map[string]string{c.OpConfig.ClusterNameLabel:c.Name}) {
+		return fmt.Errorf("pod %q does not belong to cluster", podName)
+	}
+
+	masterPod, err := c.getRolePods(Master)
+	if err != nil {
+		return fmt.Errorf("could not get master pod: %v", err)
+	}
+
+	if err := c.patroni.Failover(&masterPod[0], masterCandidatePod.Name); err != nil {
+		return fmt.Errorf("could not failover: %v", err)
+	}
+
+	return nil
+}
+
 func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
@@ -131,6 +158,11 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	patchData, err := specPatch(newStatefulSet.Spec)
 	if err != nil {
 		return fmt.Errorf("could not form patch for the statefulset %q: %v", statefulSetName, err)
+	}
+
+	//Scale down
+	if *c.Statefulset.Spec.Replicas > *newStatefulSet.Spec.Replicas {
+		c.scaleDown(newStatefulSet)
 	}
 
 	statefulSet, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(

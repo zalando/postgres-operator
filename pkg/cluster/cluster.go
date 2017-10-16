@@ -316,7 +316,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
-
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
 	}

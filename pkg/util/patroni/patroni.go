@@ -113,6 +113,7 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 	return nil
 }
 
+// Status returns patroni status
 func (p *Patroni) Status(pod *v1.Pod) (*Status, error) {
 	status := &Status{}
 
