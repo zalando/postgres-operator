@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -61,10 +62,21 @@ func (c *Cluster) loadResources() error {
 		c.logger.Errorf("could not get statefulset: %v", err)
 	}
 
+	pdb, err := c.KubeClient.PodDisruptionBudgets(ns).Get(c.podDisruptionBudgetName(), metav1.GetOptions{})
+	if err == nil {
+		c.PodDisruptionBudget = pdb
+	} else if !k8sutil.ResourceNotFound(err) {
+		c.logger.Errorf("could not get pod disruption budget: %v", err)
+	}
+
 	return nil
 }
 
 func (c *Cluster) listResources() error {
+	if c.PodDisruptionBudget != nil {
+		c.logger.Infof("found pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta), c.PodDisruptionBudget.UID)
+	}
+
 	if c.Statefulset != nil {
 		c.logger.Infof("found statefulset: %q (uid: %q)", util.NameFromMeta(c.Statefulset.ObjectMeta), c.Statefulset.UID)
 	}
@@ -400,6 +412,54 @@ func (c *Cluster) createEndpoint() (*v1.Endpoints, error) {
 	return endpoints, nil
 }
 
+func (c *Cluster) createPodDisruptionBudget() (*policybeta1.PodDisruptionBudget, error) {
+	if c.PodDisruptionBudget != nil {
+		return nil, fmt.Errorf("pod disruption budget already exists in the cluster")
+	}
+	podDisruptionBudgetSpec := c.generatePodDisruptionBudget()
+	podDisruptionBudget, err := c.KubeClient.
+		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).
+		Create(podDisruptionBudgetSpec)
+
+	if err != nil {
+		return nil, err
+	}
+	c.PodDisruptionBudget = podDisruptionBudget
+
+	return podDisruptionBudget, nil
+}
+
+func (c *Cluster) updatePodDisruptionBudget(pdb *policybeta1.PodDisruptionBudget) error {
+	if c.podEventsQueue == nil {
+		return fmt.Errorf("there is no pod disruption budget in the cluster")
+	}
+
+	newPdb, err := c.KubeClient.PodDisruptionBudgets(pdb.Namespace).Update(pdb)
+	if err != nil {
+		return fmt.Errorf("could not update pod disruption budget: %v", err)
+	}
+	c.PodDisruptionBudget = newPdb
+
+	return nil
+}
+
+func (c *Cluster) deletePodDisruptionBudget() error {
+	c.logger.Debug("deleting pod disruption budget")
+	if c.PodDisruptionBudget == nil {
+		return fmt.Errorf("there is no pod disruption budget in the cluster")
+	}
+	err := c.KubeClient.
+		PodDisruptionBudgets(c.PodDisruptionBudget.Namespace).
+		Delete(c.PodDisruptionBudget.Namespace, c.deleteOptions)
+	if err != nil {
+		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+	}
+	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
+	c.PodDisruptionBudget = nil
+
+	return nil
+}
+
 func (c *Cluster) deleteEndpoint() error {
 	c.setProcessName("deleting endpoint")
 	c.logger.Debugln("deleting endpoint")
@@ -408,7 +468,7 @@ func (c *Cluster) deleteEndpoint() error {
 	}
 	err := c.KubeClient.Endpoints(c.Endpoint.Namespace).Delete(c.Endpoint.Name, c.deleteOptions)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not delete endpoint: %v", err)
 	}
 	c.logger.Infof("endpoint %q has been deleted", util.NameFromMeta(c.Endpoint.ObjectMeta))
 	c.Endpoint = nil
@@ -491,4 +551,9 @@ func (c *Cluster) GetEndpoint() *v1.Endpoints {
 // GetStatefulSet returns cluster's kubernetes StatefulSet
 func (c *Cluster) GetStatefulSet() *v1beta1.StatefulSet {
 	return c.Statefulset
+}
+
+// GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
+func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
+	return c.PodDisruptionBudget
 }
