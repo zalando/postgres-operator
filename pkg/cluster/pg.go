@@ -57,6 +57,7 @@ func (c *Cluster) initDbConn() error {
 		return err
 	}
 
+	c.logger.Debug("new database connection")
 	err = retryutil.Retry(0, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
 			err := conn.Ping()
@@ -66,6 +67,7 @@ func (c *Cluster) initDbConn() error {
 
 			if err2 := conn.Close(); err2 != nil {
 				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err2)
+				return false, err2
 			}
 
 			if _, ok := err.(*net.OpError); ok {
@@ -77,7 +79,6 @@ func (c *Cluster) initDbConn() error {
 	if err != nil {
 		return fmt.Errorf("could not init db connection: %v", err)
 	}
-	c.logger.Debug("new database connection")
 
 	c.pgDb = conn
 
