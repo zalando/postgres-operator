@@ -71,6 +71,7 @@ func (c *Cluster) initDbConn() error {
 			}
 
 			if _, ok := err.(*net.OpError); ok {
+				c.logger.Errorf("could not connect to PostgreSQL database: %v", err)
 				return false, nil
 			}
 			return false, err
