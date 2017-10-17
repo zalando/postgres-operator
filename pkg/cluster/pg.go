@@ -3,12 +3,14 @@ package cluster
 import (
 	"database/sql"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/lib/pq"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
 
 const (
@@ -27,14 +29,13 @@ const (
 )
 
 func (c *Cluster) pgConnectionString() string {
-	hostname := fmt.Sprintf("%s.%s.svc.cluster.local", c.Name, c.Namespace)
-	username := c.systemUsers[constants.SuperuserKeyName].Name
 	password := c.systemUsers[constants.SuperuserKeyName].Password
 
-	return fmt.Sprintf("host='%s' dbname=postgres sslmode=require user='%s' password='%s'",
-		hostname,
-		username,
-		strings.Replace(password, "$", "\\$", -1))
+	return fmt.Sprintf("host='%s' dbname=postgres sslmode=require user='%s' password='%s' connect_timeout='%d'",
+		fmt.Sprintf("%s.%s.svc.cluster.local", c.Name, c.Namespace),
+		c.systemUsers[constants.SuperuserKeyName].Name,
+		strings.Replace(password, "$", "\\$", -1),
+		constants.PostgresConnectTimeout)
 }
 
 func (c *Cluster) databaseAccessDisabled() bool {
@@ -45,24 +46,42 @@ func (c *Cluster) databaseAccessDisabled() bool {
 	return !c.OpConfig.EnableDBAccess
 }
 
-func (c *Cluster) initDbConn() (err error) {
+func (c *Cluster) initDbConn() error {
 	c.setProcessName("initializing db connection")
-	if c.pgDb == nil {
-		conn, err := sql.Open("postgres", c.pgConnectionString())
-		if err != nil {
-			return err
-		}
-		c.logger.Debug("new database connection")
-		err = conn.Ping()
-		if err != nil {
+	if c.pgDb != nil {
+		return nil
+	}
+
+	conn, err := sql.Open("postgres", c.pgConnectionString())
+	if err != nil {
+		return err
+	}
+
+	c.logger.Debug("new database connection")
+	err = retryutil.Retry(0, constants.PostgresConnectRetryTimeout,
+		func() (bool, error) {
+			err := conn.Ping()
+			if err == nil {
+				return true, nil
+			}
+
 			if err2 := conn.Close(); err2 != nil {
 				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err2)
+				return false, err2
 			}
-			return err
-		}
 
-		c.pgDb = conn
+			if _, ok := err.(*net.OpError); ok {
+				c.logger.Errorf("could not connect to PostgreSQL database: %v", err)
+				return false, nil
+			}
+			return false, err
+		})
+
+	if err != nil {
+		return fmt.Errorf("could not init db connection: %v", err)
 	}
+
+	c.pgDb = conn
 
 	return nil
 }
