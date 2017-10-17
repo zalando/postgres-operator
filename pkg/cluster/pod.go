@@ -72,7 +72,7 @@ func (c *Cluster) deletePods() error {
 }
 
 func (c *Cluster) deletePod(podName spec.NamespacedName) error {
-	c.setProcessName("deleting %q pod", podName)
+	c.setProcessName("deleting pod %q", podName)
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
@@ -88,7 +88,7 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 }
 
 func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
-	c.logger.Debugf("unsubscribing from %q pod events", podName)
+	c.logger.Debugf("unsubscribing from pod %q events", podName)
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
@@ -101,7 +101,7 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 }
 
 func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.PodEvent {
-	c.logger.Debugf("subscribing to %q pod", podName)
+	c.logger.Debugf("subscribing to pod %q", podName)
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
@@ -114,16 +114,18 @@ func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.P
 	return ch
 }
 
-func (c *Cluster) movePodOffCordonedNode(pod *v1.Pod) (*v1.Pod, error) {
+func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
 	podName := util.NameFromMeta(pod.ObjectMeta)
-	c.setProcessName("recreating %q pod", podName)
 
 	if eol, err := c.podIsEndOfLife(pod); err != nil {
-		return nil, fmt.Errorf("could not get %q node: %v", pod.Spec.NodeName, err)
+		return nil, fmt.Errorf("could not get node %q: %v", pod.Spec.NodeName, err)
 	} else if !eol {
-		c.logger.Infof("%q pod is already on a live node", podName)
+		c.logger.Infof("pod %q is already on a live node", podName)
 		return pod, nil
 	}
+
+	c.setProcessName("moving pod %q out of end-of-life node %q", podName, pod.Spec.NodeName)
+	c.logger.Infof("moving pod %q out of the end-of-life node %q", podName, pod.Spec.NodeName)
 
 	if err := c.recreatePod(podName); err != nil {
 		return nil, fmt.Errorf("could not move pod: %v", err)
@@ -135,17 +137,17 @@ func (c *Cluster) movePodOffCordonedNode(pod *v1.Pod) (*v1.Pod, error) {
 	}
 
 	if newPod.Spec.NodeName == pod.Spec.NodeName {
-		return nil, fmt.Errorf("%q pod remained on the same node", podName)
+		return nil, fmt.Errorf("pod %q remained on the same node", podName)
 	}
 
 	if eol, err := c.podIsEndOfLife(newPod); err != nil {
-		return nil, fmt.Errorf("could not get %q node: %v", pod.Spec.NodeName, err)
+		return nil, fmt.Errorf("could not get node %q: %v", pod.Spec.NodeName, err)
 	} else if eol {
-		c.logger.Warningf("%q pod moved to the %q node, which is end of life", podName, newPod.Spec.NodeName)
+		c.logger.Warningf("pod %q moved to end-of-life node %q", podName, newPod.Spec.NodeName)
 		return newPod, nil
 	}
 
-	c.logger.Infof("%q pod moved from %q to %q node", podName, pod.Spec.NodeName, newPod.Spec.NodeName)
+	c.logger.Infof("pod %q moved from node %q to node %q", podName, pod.Spec.NodeName, newPod.Spec.NodeName)
 
 	return newPod, nil
 }
@@ -176,12 +178,13 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	if err != nil {
 		return fmt.Errorf("could not get pod: %v", err)
 	}
-	c.logger.Debugf("moving pod %q out of the %q node", podName, oldMaster.Spec.NodeName)
+
+	c.logger.Info("migrating master pod %q", podName)
 
 	if eol, err := c.podIsEndOfLife(oldMaster); err != nil {
-		return fmt.Errorf("could not get %q node: %v", oldMaster.Spec.NodeName, err)
+		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
 	} else if !eol {
-		c.logger.Debugf("pod is already on a non-cordoned node")
+		c.logger.Debugf("pod is already on a live node")
 		return nil
 	}
 
@@ -195,22 +198,20 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get new master candidate: %v", err)
 	}
 
-	pod, err := c.movePodOffCordonedNode(masterCandidatePod)
+	pod, err := c.movePodFromEndOfLifeNode(masterCandidatePod)
 	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
-	c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 
-	masterCandidateName := util.NameFromMeta(masterCandidatePod.ObjectMeta)
+	masterCandidateName := util.NameFromMeta(pod.ObjectMeta)
 	if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
-		return fmt.Errorf("could not failover to %q: %v", masterCandidateName, err)
+		return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
 	}
 
-	pod, err = c.movePodOffCordonedNode(oldMaster)
+	_, err = c.movePodFromEndOfLifeNode(oldMaster)
 	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
-	c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 
 	return nil
 }
@@ -222,6 +223,8 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 		return fmt.Errorf("could not get pod: %v", err)
 	}
 
+	c.logger.Info("migrating replica pod %q", podName)
+
 	if replicaPod.Spec.NodeName != fromNodeName {
 		c.logger.Infof("pod %q has already migrated to node %q", podName, replicaPod.Spec.NodeName)
 		return nil
@@ -231,11 +234,10 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 		return fmt.Errorf("pod %q is not a replica", podName)
 	}
 
-	pod, err := c.movePodOffCordonedNode(replicaPod)
+	_, err = c.movePodFromEndOfLifeNode(replicaPod)
 	if err != nil {
 		return fmt.Errorf("could not move pod: %v", err)
 	}
-	c.logger.Infof("pod %q has been moved to %q node", util.NameFromMeta(pod.ObjectMeta), pod.Spec.NodeName)
 
 	return nil
 }
@@ -254,7 +256,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) error {
 	if err := c.waitForPodLabel(ch, nil); err != nil {
 		return err
 	}
-	c.logger.Infof("pod %q is ready", podName)
+	c.logger.Infof("pod %q has been recreated", podName)
 
 	return nil
 }

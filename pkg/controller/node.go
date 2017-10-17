@@ -141,11 +141,14 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		cl.Unlock()
 	}
 
-	if leftPods := len(nodePods) - movedPods; leftPods <= 0 {
-		c.logger.Infof("all pods have been moved out from the %q node", util.NameFromMeta(nodeCur.ObjectMeta))
-	} else {
-		c.logger.Warnf("%d pods have not been moved out from the %q node",
-			leftPods, util.NameFromMeta(nodeCur.ObjectMeta))
+	totalPods := len(nodePods)
+
+	c.logger.Infof("%d/%d pods have been moved out from the %q node",
+		movedPods, totalPods, util.NameFromMeta(nodeCur.ObjectMeta))
+
+	if leftPods := totalPods - movedPods; leftPods > 0 {
+		c.logger.Warnf("could not move %d/%d pods from the %q node",
+			leftPods, totalPods, util.NameFromMeta(nodeCur.ObjectMeta))
 	}
 }
 
