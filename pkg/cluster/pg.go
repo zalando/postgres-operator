@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/lib/pq"
 
@@ -35,7 +36,7 @@ func (c *Cluster) pgConnectionString() string {
 		fmt.Sprintf("%s.%s.svc.cluster.local", c.Name, c.Namespace),
 		c.systemUsers[constants.SuperuserKeyName].Name,
 		strings.Replace(password, "$", "\\$", -1),
-		constants.PostgresConnectTimeout)
+		constants.PostgresConnectTimeout/time.Second)
 }
 
 func (c *Cluster) databaseAccessDisabled() bool {
@@ -52,33 +53,36 @@ func (c *Cluster) initDbConn() error {
 		return nil
 	}
 
-	conn, err := sql.Open("postgres", c.pgConnectionString())
-	if err != nil {
-		return err
-	}
+	var conn *sql.DB
+	connstring := c.pgConnectionString()
 
-	c.logger.Debug("new database connection")
-	err = retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
+	finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
-			err := conn.Ping()
+			var err error
+			conn, err = sql.Open("postgres", connstring)
 			if err == nil {
-				return true, nil
+				err = conn.Ping()
 			}
 
-			if err2 := conn.Close(); err2 != nil {
-				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err2)
-				return false, err2
+			if err == nil {
+				return true, nil
 			}
 
 			if _, ok := err.(*net.OpError); ok {
 				c.logger.Errorf("could not connect to PostgreSQL database: %v", err)
 				return false, nil
 			}
+
+			if err2 := conn.Close(); err2 != nil {
+				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err)
+				return false, err2
+			}
+
 			return false, err
 		})
 
-	if err != nil {
-		return fmt.Errorf("could not init db connection: %v", err)
+	if finalerr != nil {
+		return fmt.Errorf("could not init db connection: %v", finalerr)
 	}
 
 	c.pgDb = conn
