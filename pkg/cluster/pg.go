@@ -53,11 +53,11 @@ func (c *Cluster) initDbConn() error {
 	}
 
 	var conn *sql.DB
-
-	c.logger.Debug("establishing new database connection")
-	if finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
+	connstring := c.pgConnectionString()
+	c.logger.Debug("establishing new database connection to %q", connstring)
+	finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
-			conn, err := sql.Open("postgres", c.pgConnectionString())
+			conn, err := sql.Open("postgres", connstring)
 			if err == nil {
 				err = conn.Ping()
 			}
@@ -77,7 +77,9 @@ func (c *Cluster) initDbConn() error {
 			}
 
 			return false, err
-		}); finalerr != nil {
+		})
+
+	if finalerr != nil {
 		return fmt.Errorf("could not init db connection: %v", finalerr)
 	}
 
