@@ -12,7 +12,7 @@ spec:
       serviceAccountName: operator
       containers:
       - name: postgres-operator
-        image: pierone.example.com/acid/postgres-operator:0.1
+        image: pierone.stups.zalan.do/acid/postgres-operator:workerassgn
         imagePullPolicy: IfNotPresent
         env:
         - name: WATCH_NAMESPACE
