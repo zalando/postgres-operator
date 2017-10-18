@@ -179,7 +179,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get pod: %v", err)
 	}
 
-	c.logger.Info("migrating master pod %q", podName)
+	c.logger.Infof("migrating master pod %q", podName)
 
 	if eol, err := c.podIsEndOfLife(oldMaster); err != nil {
 		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
@@ -223,7 +223,7 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 		return fmt.Errorf("could not get pod: %v", err)
 	}
 
-	c.logger.Info("migrating replica pod %q", podName)
+	c.logger.Infof("migrating replica pod %q", podName)
 
 	if replicaPod.Spec.NodeName != fromNodeName {
 		c.logger.Infof("pod %q has already migrated to node %q", podName, replicaPod.Spec.NodeName)
