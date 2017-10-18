@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/lib/pq"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
-	"time"
 )
 
 const (
