@@ -52,33 +52,33 @@ func (c *Cluster) initDbConn() error {
 		return nil
 	}
 
-	conn, err := sql.Open("postgres", c.pgConnectionString())
-	if err != nil {
-		return err
-	}
+	var conn *sql.DB
 
-	c.logger.Debug("new database connection")
-	err = retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
+	c.logger.Debug("establishing new database connection")
+	if finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
-			err := conn.Ping()
+			conn, err := sql.Open("postgres", c.pgConnectionString())
 			if err == nil {
-				return true, nil
+				err = conn.Ping()
 			}
 
-			if err2 := conn.Close(); err2 != nil {
-				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err2)
-				return false, err2
+			if err == nil {
+				return true, nil
 			}
 
 			if _, ok := err.(*net.OpError); ok {
 				c.logger.Errorf("could not connect to PostgreSQL database: %v", err)
 				return false, nil
 			}
-			return false, err
-		})
 
-	if err != nil {
-		return fmt.Errorf("could not init db connection: %v", err)
+			if err2 := conn.Close(); err2 != nil {
+				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err)
+				return false, err2
+			}
+
+			return false, err
+		}); finalerr != nil {
+		return fmt.Errorf("could not init db connection: %v", finalerr)
 	}
 
 	c.pgDb = conn
