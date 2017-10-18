@@ -58,7 +58,7 @@ func (c *Cluster) initDbConn() error {
 	}
 
 	c.logger.Debug("new database connection")
-	err = retryutil.Retry(0, constants.PostgresConnectRetryTimeout,
+	err = retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
 			err := conn.Ping()
 			if err == nil {
