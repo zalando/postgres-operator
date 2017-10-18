@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
 )
 
@@ -94,12 +95,13 @@ type Process struct {
 
 // ClusterStatus describes status of the cluster
 type ClusterStatus struct {
-	Team           string
-	Cluster        string
-	MasterService  *v1.Service
-	ReplicaService *v1.Service
-	Endpoint       *v1.Endpoints
-	StatefulSet    *v1beta1.StatefulSet
+	Team                string
+	Cluster             string
+	MasterService       *v1.Service
+	ReplicaService      *v1.Service
+	Endpoint            *v1.Endpoints
+	StatefulSet         *v1beta1.StatefulSet
+	PodDisruptionBudget *policyv1beta1.PodDisruptionBudget
 
 	CurrentProcess Process
 	Worker         uint32
