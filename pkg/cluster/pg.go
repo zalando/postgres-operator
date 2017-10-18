@@ -36,7 +36,7 @@ func (c *Cluster) pgConnectionString() string {
 		fmt.Sprintf("%s.%s.svc.cluster.local", c.Name, c.Namespace),
 		c.systemUsers[constants.SuperuserKeyName].Name,
 		strings.Replace(password, "$", "\\$", -1),
-		constants.PostgresConnectTimeout / time.Second)
+		constants.PostgresConnectTimeout/time.Second)
 }
 
 func (c *Cluster) databaseAccessDisabled() bool {
@@ -55,18 +55,13 @@ func (c *Cluster) initDbConn() error {
 
 	var conn *sql.DB
 	connstring := c.pgConnectionString()
-	c.logger.Debugf("establishing new database connection to %q", connstring)
 
 	finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
 			var err error
 			conn, err = sql.Open("postgres", connstring)
 			if err == nil {
-				c.logger.Debugf("connection established", connstring)
 				err = conn.Ping()
-				if err == nil {
-					c.logger.Debugf("ping sucessful", connstring)
-				}
 			}
 
 			if err == nil {
