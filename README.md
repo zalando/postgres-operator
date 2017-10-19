@@ -61,7 +61,7 @@ have to change the service account references in the postgres-operator manifest 
 
     $ kubectl --context minikube create -f manifests/serviceaccount.yaml
 
-Next deploy the postgers-operator from the Docker Image Zalando is using:
+Next deploy the postgers-operator from the Docker image Zalando is using:
 
     $ kubectl --context minikube create -f manifests/postgres-operator.yaml
 
