@@ -61,16 +61,11 @@ have to change the service account references in the postgres-operator manifest 
 
     $ kubectl --context minikube create -f manifests/serviceaccount.yaml
 
-Next deploy the postgers-operator from the Docker Image Zalando is using today, see postgres-operator.yaml
+Next deploy the postgers-operator from the Docker Image Zalando is using:
 
     $ kubectl --context minikube create -f manifests/postgres-operator.yaml
 
-If you perfer to do it yourself the following steps will get you the docker image built and deployed.
-
-    $ eval $(minikube docker-env)
-    $ export TAG=$(git describe --tags --always --dirty)
-    $ make docker
-    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
+If you perfer to build the image yourself follow up down below.
 
 ### Check if CustomResourceDefinition has been registered
 
@@ -143,6 +138,16 @@ Building the operator binary (for testing the out-of-cluster option):
     $ make
 
 The binary will be placed into the build directory.
+
+### Deploying self build image
+
+The fastest way to run your docker image locally is to reuse the docker from minikube.
+The following steps will get you the docker image built and deployed.
+
+    $ eval $(minikube docker-env)
+    $ export TAG=$(git describe --tags --always --dirty)
+    $ make docker
+    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
 
 ### Debugging the operator itself
 
