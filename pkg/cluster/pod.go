@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"math/rand"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/pkg/api/v1"
@@ -71,7 +72,7 @@ func (c *Cluster) deletePods() error {
 }
 
 func (c *Cluster) deletePod(podName spec.NamespacedName) error {
-	c.setProcessName("deleting %q pod", podName)
+	c.setProcessName("deleting pod %q", podName)
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
@@ -87,6 +88,7 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 }
 
 func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
+	c.logger.Debugf("unsubscribing from pod %q events", podName)
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
@@ -99,6 +101,7 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 }
 
 func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.PodEvent {
+	c.logger.Debugf("subscribing to pod %q", podName)
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
@@ -111,9 +114,135 @@ func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.P
 	return ch
 }
 
-func (c *Cluster) recreatePod(podName spec.NamespacedName) error {
-	c.setProcessName("recreating %q pod", podName)
+func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
+	podName := util.NameFromMeta(pod.ObjectMeta)
 
+	if eol, err := c.podIsEndOfLife(pod); err != nil {
+		return nil, fmt.Errorf("could not get node %q: %v", pod.Spec.NodeName, err)
+	} else if !eol {
+		c.logger.Infof("pod %q is already on a live node", podName)
+		return pod, nil
+	}
+
+	c.setProcessName("moving pod %q out of end-of-life node %q", podName, pod.Spec.NodeName)
+	c.logger.Infof("moving pod %q out of the end-of-life node %q", podName, pod.Spec.NodeName)
+
+	if err := c.recreatePod(podName); err != nil {
+		return nil, fmt.Errorf("could not move pod: %v", err)
+	}
+
+	newPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not get pod: %v", err)
+	}
+
+	if newPod.Spec.NodeName == pod.Spec.NodeName {
+		return nil, fmt.Errorf("pod %q remained on the same node", podName)
+	}
+
+	if eol, err := c.podIsEndOfLife(newPod); err != nil {
+		return nil, fmt.Errorf("could not get node %q: %v", pod.Spec.NodeName, err)
+	} else if eol {
+		c.logger.Warningf("pod %q moved to end-of-life node %q", podName, newPod.Spec.NodeName)
+		return newPod, nil
+	}
+
+	c.logger.Infof("pod %q moved from node %q to node %q", podName, pod.Spec.NodeName, newPod.Spec.NodeName)
+
+	return newPod, nil
+}
+
+func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
+	replicas, err := c.getRolePods(Replica)
+	if err != nil {
+		return nil, fmt.Errorf("could not get replica pods: %v", err)
+	}
+
+	for i, pod := range replicas {
+		// look for replicas running on live nodes. Ignore errors when querying the nodes.
+		if pod.Spec.NodeName != oldNodeName {
+			eol, err := c.podIsEndOfLife(&pod)
+			if err == nil && !eol {
+				return &replicas[i], nil
+			}
+		}
+	}
+	c.logger.Debug("no available master candidates on live nodes")
+	return &replicas[rand.Intn(len(replicas))], nil
+}
+
+// MigrateMasterPod migrates master pod via failover to a replica
+func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
+	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+
+	if err != nil {
+		return fmt.Errorf("could not get pod: %v", err)
+	}
+
+	c.logger.Infof("migrating master pod %q", podName)
+
+	if eol, err := c.podIsEndOfLife(oldMaster); err != nil {
+		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
+	} else if !eol {
+		c.logger.Debugf("pod is already on a live node")
+		return nil
+	}
+
+	if role := PostgresRole(oldMaster.Labels[c.OpConfig.PodRoleLabel]); role != Master {
+		c.logger.Warningf("pod %q is not a master", podName)
+		return nil
+	}
+
+	masterCandidatePod, err := c.masterCandidate(oldMaster.Spec.NodeName)
+	if err != nil {
+		return fmt.Errorf("could not get new master candidate: %v", err)
+	}
+
+	pod, err := c.movePodFromEndOfLifeNode(masterCandidatePod)
+	if err != nil {
+		return fmt.Errorf("could not move pod: %v", err)
+	}
+
+	masterCandidateName := util.NameFromMeta(pod.ObjectMeta)
+	if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
+		return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+	}
+
+	_, err = c.movePodFromEndOfLifeNode(oldMaster)
+	if err != nil {
+		return fmt.Errorf("could not move pod: %v", err)
+	}
+
+	return nil
+}
+
+// MigrateReplicaPod recreates pod on a new node
+func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName string) error {
+	replicaPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("could not get pod: %v", err)
+	}
+
+	c.logger.Infof("migrating replica pod %q", podName)
+
+	if replicaPod.Spec.NodeName != fromNodeName {
+		c.logger.Infof("pod %q has already migrated to node %q", podName, replicaPod.Spec.NodeName)
+		return nil
+	}
+
+	if role := PostgresRole(replicaPod.Labels[c.OpConfig.PodRoleLabel]); role != Replica {
+		return fmt.Errorf("pod %q is not a replica", podName)
+	}
+
+	_, err = c.movePodFromEndOfLifeNode(replicaPod)
+	if err != nil {
+		return fmt.Errorf("could not move pod: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) recreatePod(podName spec.NamespacedName) error {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
@@ -127,7 +256,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) error {
 	if err := c.waitForPodLabel(ch, nil); err != nil {
 		return err
 	}
-	c.logger.Infof("pod %q is ready", podName)
+	c.logger.Infof("pod %q has been recreated", podName)
 
 	return nil
 }
@@ -183,4 +312,13 @@ func (c *Cluster) recreatePods() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) podIsEndOfLife(pod *v1.Pod) (bool, error) {
+	node, err := c.KubeClient.Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return node.Spec.Unschedulable || util.MapContains(node.Labels, c.OpConfig.EOLNodeLabel), nil
+
 }
