@@ -278,6 +278,11 @@ func (c *Cluster) syncVolumes() error {
 }
 
 func (c *Cluster) samePDBWith(pdb *policybeta1.PodDisruptionBudget) (match bool, reason string) {
+	if c.PodDisruptionBudget == nil {
+		match = false
+		reason = "pdb does not exist"
+		return
+	}
 	match = reflect.DeepEqual(pdb.Spec, c.PodDisruptionBudget.Spec)
 	if !match {
 		reason = "new service spec doesn't match the current one"
