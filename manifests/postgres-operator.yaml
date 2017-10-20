@@ -12,7 +12,7 @@ spec:
       serviceAccountName: operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:661b141
+        image: registry.opensource.zalan.do/acid/postgres-operator:c17aabb
         imagePullPolicy: IfNotPresent
         env:
         - name: WATCH_NAMESPACE
