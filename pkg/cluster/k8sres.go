@@ -600,9 +600,6 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 
 func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
-	matchLabels := c.OpConfig.ClusterLabels
-	matchLabels[c.OpConfig.ClusterNameLabel] = c.Name
-	matchLabels[c.OpConfig.PodRoleLabel] = string(Master)
 
 	return &policybeta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -612,7 +609,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: matchLabels,
+				MatchLabels: c.roleLabelsSet(Master),
 			},
 		},
 	}
