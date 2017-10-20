@@ -231,6 +231,12 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("secrets have been successfully created")
 
+	pdb, err := c.createPodDisruptionBudget()
+	if err != nil {
+		return fmt.Errorf("could not create pod disruption budget: %v", err)
+	}
+	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
+
 	ss, err = c.createStatefulSet()
 	if err != nil {
 		return fmt.Errorf("could not create statefulset: %v", err)
@@ -260,12 +266,6 @@ func (c *Cluster) Create() error {
 			c.logger.Warnln("cluster is masterless")
 		}
 	}
-
-	pdb, err := c.createPodDisruptionBudget()
-	if err != nil {
-		return fmt.Errorf("could not create pod disruption budget: %v", err)
-	}
-	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
 	err = c.listResources()
 	if err != nil {
