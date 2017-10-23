@@ -99,7 +99,7 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	}
 
 	c.logger.Debug("syncing pod disruption budgets")
-	if err = c.syncPodDisruptionBudget(); err != nil {
+	if err = c.syncPodDisruptionBudget(false); err != nil {
 		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
 		return
 	}
@@ -149,7 +149,7 @@ func (c *Cluster) syncEndpoint() error {
 	return nil
 }
 
-func (c *Cluster) syncPodDisruptionBudget() error {
+func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	if c.PodDisruptionBudget == nil {
 		c.logger.Infof("could not find the cluster's pod disruption budget")
 		pdb, err := c.createPodDisruptionBudget()
@@ -158,8 +158,15 @@ func (c *Cluster) syncPodDisruptionBudget() error {
 		}
 		c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
 		return nil
+	} else {
+		newPDB := c.generatePodDisruptionBudget()
+		if match, reason := c.samePDBWith(newPDB); !match {
+			c.logPDBChanges(c.PodDisruptionBudget, newPDB, isUpdate, reason)
+			if err := c.updatePodDisruptionBudget(newPDB); err != nil {
+				return err
+			}
+		}
 	}
-
 	return nil
 }
 
@@ -278,11 +285,6 @@ func (c *Cluster) syncVolumes() error {
 }
 
 func (c *Cluster) samePDBWith(pdb *policybeta1.PodDisruptionBudget) (match bool, reason string) {
-	if c.PodDisruptionBudget == nil {
-		match = false
-		reason = "pdb does not exist"
-		return
-	}
 	match = reflect.DeepEqual(pdb.Spec, c.PodDisruptionBudget.Spec)
 	if !match {
 		reason = "new service spec doesn't match the current one"

@@ -69,7 +69,7 @@ func (c *Cluster) serviceName(role PostgresRole) string {
 }
 
 func (c *Cluster) podDisruptionBudgetName() string {
-	return c.OpConfig.PDBNameFormat.Format("cluster", c.Spec.ClusterName)
+	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
 
 func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRequirements, error) {
@@ -605,6 +605,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.podDisruptionBudgetName(),
 			Namespace: c.Namespace,
+			Labels:    c.labelsSet(),
 		},
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
