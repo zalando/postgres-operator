@@ -536,13 +536,9 @@ func (c *Cluster) Update(newSpec *spec.Postgresql) error {
 		c.logger.Infof("volumes have been updated successfully")
 	}
 
-	newPDB := c.generatePodDisruptionBudget()
-	if match, reason := c.samePDBWith(newPDB); !match {
-		c.logPDBChanges(c.PodDisruptionBudget, newPDB, true, reason)
-		if err := c.updatePodDisruptionBudget(newPDB); err != nil {
-			c.setStatus(spec.ClusterStatusUpdateFailed)
-			return fmt.Errorf("could not update pod disruption budget: %v", err)
-		}
+	if err := c.syncPodDisruptionBudget(true); err != nil {
+		c.setStatus(spec.ClusterStatusUpdateFailed)
+		return fmt.Errorf("could not update pod disruption budget: %v", err)
 	}
 
 	c.setStatus(spec.ClusterStatusRunning)
