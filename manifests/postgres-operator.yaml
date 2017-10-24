@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: postgres-operator
@@ -9,7 +9,7 @@ spec:
       labels:
         name: postgres-operator
     spec:
-      serviceAccountName: operator
+      # serviceAccountName: operator
       containers:
       - name: postgres-operator
         image: registry.opensource.zalan.do/acid/postgres-operator:c17aabb
