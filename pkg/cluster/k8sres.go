@@ -250,6 +250,22 @@ func (c *Cluster) nodeAffinity() *v1.Affinity {
 	}
 }
 
+func (c *Cluster) tolerations() []v1.Toleration {
+	podToleration := c.Config.OpConfig.PodToleration
+	if (len(podToleration["key"]) > 0 || len(podToleration["operator"]) > 0 || len(podToleration["value"]) > 0 || len(podToleration["effect"]) > 0) {
+		return []v1.Toleration{
+			{
+				Key:      podToleration["key"],
+				Operator: v1.TolerationOperator(podToleration["operator"]),
+				Value:    podToleration["value"],
+				Effect:   v1.TaintEffect(podToleration["effect"]),
+			},
+		}
+	} else {
+		return []v1.Toleration{}
+	}
+}
+
 func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements,
 	pgParameters *spec.PostgresqlParam,
 	patroniParameters *spec.Patroni,
@@ -372,6 +388,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
 		Affinity:                      c.nodeAffinity(),
+		Tolerations:                   c.tolerations(),
 	}
 
 	template := v1.PodTemplateSpec{

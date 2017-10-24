@@ -7,6 +7,7 @@ data:
   cluster_labels: application:spilo
   cluster_name_label: version
   pod_role_label: spilo-role
+  toleration: "key:postgres,operator:Exists,effect:NoSchedule"
   db_hosted_zone: db.example.com
   debug_logging: "true"
   dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
