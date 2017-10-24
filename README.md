@@ -27,6 +27,76 @@ it manages and updates them with the new docker images; afterwards, all pods fro
 This project is currently in development. It is used internally by Zalando in order to run staging databases on Kubernetes.
 Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
 
+## Running and testing the operator
+
+The best way to test the operator is to run it in minikube. Minikube is a tool to run Kubernetes cluster locally.
+
+### Installing and starting minikube
+
+See [minikube installation guide](https://github.com/kubernetes/minikube/releases)
+
+Make sure you use the latest version of Minikube.
+After the installation, issue the
+
+    $ minikube start
+
+Note: if you are running on a Mac, make sure to use the [xhyve driver](https://github.com/kubernetes/minikube/blob/master/docs/drivers.md#xhyve-driver)
+instead of the default docker-machine one for performance reasons.
+
+One you have it started successfully, use [the quickstart guide](https://github.com/kubernetes/minikube#quickstart) in order
+to test your that your setup is working.
+
+Note: if you use multiple kubernetes clusters, you can switch to minikube with `kubectl config use-context minikube`
+
+### Create ConfigMap
+
+ConfigMap is used to store configuration of the operator
+
+    $ kubectl --context minikube  create -f manifests/configmap.yaml
+
+### Deploying the operator
+
+First you need to install the service account definition in your minikube cluster.
+
+    $ kubectl --context minikube create -f manifests/serviceaccount.yaml
+
+Next deploy the postgers-operator from the Docker image Zalando is using:
+
+    $ kubectl --context minikube create -f manifests/postgres-operator.yaml
+
+If you perfer to build the image yourself follow up down below.
+
+### Check if CustomResourceDefinition has been registered
+
+    $ kubectl --context minikube   get crd
+
+	NAME                          KIND
+	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
+
+
+### Create a new spilo cluster
+
+    $ kubectl --context minikube  create -f manifests/minimal-postgres-manifest.yaml
+
+### Watch Pods being created
+
+    $ kubectl --context minikube  get pods -w --show-labels
+
+### Connect to PostgreSQL
+
+We can use the generated secret of the `postgres` robot user to connect to our `acid-test-cluster` master running in Minikube:
+
+    $ export HOST_PORT=$(minikube service acid-test-cluster --url | sed 's,.*/,,')
+    $ export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
+    $ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
+    $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-test-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+    $ psql -U postgres
+
+
+# Setup development environment
+
+The following steps guide you through the setup to work on the operator itself.
+
 ## Setting up Go
 
 Postgres operator is written in Go. Use the [installation instructions](https://golang.org/doc/install#install) if you don't have Go on your system.
@@ -68,102 +138,27 @@ Building the operator binary (for testing the out-of-cluster option):
 
 The binary will be placed into the build directory.
 
-## Testing the operator
+### Deploying self build image
 
-The best way to test the operator is to run it in minikube. Minikube is a tool to run Kubernetes cluster locally.
-
-### Installing and starting minikube
-
-See [minikube installation guide](https://github.com/kubernetes/minikube/releases)
-
-Make sure you use the latest version of Minikube.
-After the installation, issue the
-
-    $ minikube start
-
-Note: if you are running on a Mac, make sure to use the [xhyve driver](https://github.com/kubernetes/minikube/blob/master/DRIVERS.md#xhyve-driver)
-instead of the default docker-machine one for performance reasons.
-
-One you have it started successfully, use [the quickstart guide](https://github.com/kubernetes/minikube#quickstart) in order
-to test your that your setup is working.
-
-Note: if you use multiple kubernetes clusters, you can switch to minikube with `kubectl config use-context minikube`
-
-### Deploy etcd
-
-Etcd is required to deploy the operator.
-
-    $ kubectl --context minikube  create -f https://raw.githubusercontent.com/coreos/etcd/master/hack/kubernetes-deploy/etcd.yml
-
-### Create ConfigMap
-
-ConfigMap is used to store configuration of the operator
-
-    $ kubectl --context minikube  create -f manifests/configmap.yaml
-
-### Deploy fake Teams API
-
-Teams API is used as a source of human users.
-
-    $ kubectl --context minikube  create -f manifests/fake-teams-api.yaml
-
-### Deploying the operator
-
-You need to install the service account definition in your minikube cluster. You can run without it, but then you
-have to change the service account references in the postgres-operator manifest as well.
-
-    $ kubectl --context minikube create -f manifests/serviceaccount.yaml
-
-The fastest way to run your docker image locally is to reuse the docker from minikube. That way, there is no need to
-pull docker images from pierone or push them, as the image is essentially there once you build it. The following steps
-will get you the docker image built and deployed.
+The fastest way to run your docker image locally is to reuse the docker from minikube.
+The following steps will get you the docker image built and deployed.
 
     $ eval $(minikube docker-env)
     $ export TAG=$(git describe --tags --always --dirty)
     $ make docker
     $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
 
-The last line changes the docker image tag in the manifest to the one the operator image has been built with and removes
-the serviceAccountName definition, as the ServiceAccount is not defined in minikube (neither it should, as one has admin
-permissions there).
-
-### Check if CustomResourceDefinition has been registered
-
-    $ kubectl --context minikube   get crd
-
-	NAME                          KIND
-	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
-
-
-### Create a new spilo cluster
-
-    $ kubectl --context minikube  create -f manifests/testpostgresql.yaml
-
-### Watch Pods being created
-
-    $ kubectl --context minikube  get pods -w --show-labels
-
-### Connect to PostgreSQL
-
-We can use the generated secret of the `postgres` robot user to connect to our `acid-testcluster` master running in Minikube:
-
-    $ export HOST_PORT=$(minikube service acid-testcluster --url | sed 's,.*/,,')
-    $ export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
-    $ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
-    $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-testcluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d)
-    $ psql -U postgres
-
 ### Debugging the operator itself
 
 There is a web interface in the operator to observe its internal state. The operator listens on port 8080. It is possible to expose it to the localhost:8080 by doing:
 
     $ kubectl --context minikube port-forward $(kubectl --context minikube get pod -l name=postgres-operator -o jsonpath={.items..metadata.name}) 8080:8080
-    
+
 The inner 'query' gets the name of the postgres operator pod, and the outer enables port forwarding. Afterwards, you can access the operator API with:
 
     $ curl http://127.0.0.1:8080/$endpoint| jq .
 
-The available endpoints are listed below. Note that the worker ID is an integer from 0 up to 'workers' - 1 (value configured in the operator configuration and defaults to 4) 
+The available endpoints are listed below. Note that the worker ID is an integer from 0 up to 'workers' - 1 (value configured in the operator configuration and defaults to 4)
 
 * /workers/all/queue - state of the workers queue (cluster events to process)
 * /workers/$id/queue - state of the queue for the worker $id
@@ -181,5 +176,3 @@ The operator also supports pprof endpoints listed at the [pprof package](https:/
 * /debug/pprof/profile
 * /debug/pprof/symbol
 * /debug/pprof/trace
-
-

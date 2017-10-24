@@ -11,8 +11,8 @@ data:
   debug_logging: "true"
   dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
   docker_image: registry.opensource.zalan.do/acid/demospilo-10:1.3-p3
+  secret_name_template: '{username}.{cluster}.credentials'
   etcd_host: ""
-  secret_name_template: '{username}.{cluster}.credentials.{tprkind}.{tprgroup}'
   infrastructure_roles_secret_name: postgresql-infrastructure-roles
   oauth_token_secret_name: postgresql-operator
   pam_configuration: |

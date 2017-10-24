@@ -2,7 +2,7 @@ apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 
 metadata:
-  name: acid-testcluster17
+  name: acid-test-cluster
 spec:
   teamId: "ACID"
   volume:
@@ -18,7 +18,7 @@ spec:
     foo: zalando
 #Expert section
   postgresql:
-    version: "9.6"
+    version: "10"
     parameters:
       shared_buffers: "32MB"
       max_connections: "10"

@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: postgres-operator
@@ -12,7 +12,7 @@ spec:
       serviceAccountName: operator
       containers:
       - name: postgres-operator
-        image: pierone.stups.zalan.do/acid/postgres-operator:workerassgn
+        image: registry.opensource.zalan.do/acid/postgres-operator:c17aabb
         imagePullPolicy: IfNotPresent
         env:
         - name: WATCH_NAMESPACE

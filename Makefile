@@ -11,14 +11,13 @@ endif
 LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
 LDFLAGS ?= -X=main.version=$(VERSION)
 DOCKERFILE = docker/Dockerfile
-IMAGE ?= pierone.example.com/acid/$(BINARY)
+IMAGE ?= registry.opensource.zalan.do/acid/$(BINARY)
 TAG ?= $(VERSION)
 GITHEAD = $(shell git rev-parse --short HEAD)
 GITURL = $(shell git config --get remote.origin.url)
 GITSTATUS = $(shell git status --porcelain || echo "no changes")
 SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
-IMAGE ?= pierone.example.com/acid/$(BINARY)
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
 
