@@ -40,7 +40,7 @@ After the installation, issue the
 
     $ minikube start
 
-Note: if you are running on a Mac, make sure to use the [xhyve driver](https://github.com/kubernetes/minikube/blob/master/DRIVERS.md#xhyve-driver)
+Note: if you are running on a Mac, make sure to use the [xhyve driver](https://github.com/kubernetes/minikube/blob/master/docs/drivers.md#xhyve-driver)
 instead of the default docker-machine one for performance reasons.
 
 One you have it started successfully, use [the quickstart guide](https://github.com/kubernetes/minikube#quickstart) in order
