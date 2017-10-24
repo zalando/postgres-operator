@@ -56,8 +56,7 @@ ConfigMap is used to store configuration of the operator
 
 ### Deploying the operator
 
-You need to install the service account definition in your minikube cluster. You can run without it, but then you
-have to change the service account references in the postgres-operator manifest as well.
+First you need to install the service account definition in your minikube cluster.
 
     $ kubectl --context minikube create -f manifests/serviceaccount.yaml
 
@@ -77,7 +76,7 @@ If you perfer to build the image yourself follow up down below.
 
 ### Create a new spilo cluster
 
-    $ kubectl --context minikube  create -f manifests/testpostgresql.yaml
+    $ kubectl --context minikube  create -f manifests/minimal-postgres-manifest.yaml
 
 ### Watch Pods being created
 
