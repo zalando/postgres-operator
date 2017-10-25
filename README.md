@@ -84,12 +84,12 @@ If you perfer to build the image yourself follow up down below.
 
 ### Connect to PostgreSQL
 
-We can use the generated secret of the `postgres` robot user to connect to our `acid-test-cluster` master running in Minikube:
+We can use the generated secret of the `postgres` robot user to connect to our `acid-minimal-cluster` master running in Minikube:
 
-    $ export HOST_PORT=$(minikube service acid-test-cluster --url | sed 's,.*/,,')
+    $ export HOST_PORT=$(minikube service acid-minimal-cluster --url | sed 's,.*/,,')
     $ export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
     $ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
-    $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-test-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+    $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
     $ psql -U postgres
 
 
