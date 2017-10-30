@@ -361,6 +361,13 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	if cloneDescription.ClusterName != "" {
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
+
+	envFromSource := []v1.EnvFromSource{}
+	if c.OpConfig.PodEnvironmentConfigMap != "" {
+		configMapRef := v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: c.OpConfig.PodEnvironmentConfigMap}}
+		envFromSource = append(envFromSource, v1.EnvFromSource{ConfigMapRef: &configMapRef})
+	}
+
 	privilegedMode := true
 	container := v1.Container{
 		Name:            c.containerName(),
@@ -388,6 +395,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 			},
 		},
 		Env: envVars,
+		EnvFrom: envFromSource,
 		SecurityContext: &v1.SecurityContext{
 			Privileged: &privilegedMode,
 		},
