@@ -193,7 +193,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			return
 		}
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Update(event.NewSpec); err != nil {
+		if err := cl.Update(event.OldSpec, event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
 

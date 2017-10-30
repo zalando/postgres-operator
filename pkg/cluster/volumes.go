@@ -146,11 +146,11 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 }
 
 func (c *Cluster) volumesNeedResizing(newVolume spec.Volume) (bool, error) {
-	volumes, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
+	vols, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
 	if err != nil {
 		return false, err
 	}
-	for _, pv := range volumes {
+	for _, pv := range vols {
 		currentSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
 		if currentSize != manifestSize {
 			return true, nil

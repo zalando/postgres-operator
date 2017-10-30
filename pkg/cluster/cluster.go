@@ -28,7 +28,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/patroni"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
 
 var (
@@ -226,7 +225,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("users have been initialized")
 
-	if err = c.applySecrets(); err != nil {
+	if err = c.syncSecrets(); err != nil {
 		return fmt.Errorf("could not create secrets: %v", err)
 	}
 	c.logger.Infof("secrets have been successfully created")
@@ -267,46 +266,11 @@ func (c *Cluster) Create() error {
 		}
 	}
 
-	err = c.listResources()
-	if err != nil {
+	if err := c.listResources(); err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
 	}
 
 	return nil
-}
-
-func (c *Cluster) sameServiceWith(role PostgresRole, service *v1.Service) (match bool, reason string) {
-	//TODO: improve comparison
-	if c.Services[role].Spec.Type != service.Spec.Type {
-		return false, fmt.Sprintf("new %s service's type %q doesn't match the current one %q",
-			role, service.Spec.Type, c.Services[role].Spec.Type)
-	}
-	oldSourceRanges := c.Services[role].Spec.LoadBalancerSourceRanges
-	newSourceRanges := service.Spec.LoadBalancerSourceRanges
-	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
-	if (len(oldSourceRanges) == 0) && (len(newSourceRanges) == 0) {
-		return true, ""
-	}
-	if !reflect.DeepEqual(oldSourceRanges, newSourceRanges) {
-		return false, fmt.Sprintf("new %s service's LoadBalancerSourceRange doesn't match the current one", role)
-	}
-
-	oldDNSAnnotation := c.Services[role].Annotations[constants.ZalandoDNSNameAnnotation]
-	newDNSAnnotation := service.Annotations[constants.ZalandoDNSNameAnnotation]
-	if oldDNSAnnotation != newDNSAnnotation {
-		return false, fmt.Sprintf("new %s service's %q annotation doesn't match the current one", role, constants.ZalandoDNSNameAnnotation)
-	}
-
-	return true, ""
-}
-
-func (c *Cluster) sameVolumeWith(volume spec.Volume) (match bool, reason string) {
-	if !reflect.DeepEqual(c.Spec.Volume, volume) {
-		reason = "new volume's specification doesn't match the current one"
-	} else {
-		match = true
-	}
-	return
 }
 
 func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
@@ -406,6 +370,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	if needsRollUpdate || needsReplace {
 		match = false
 	}
+
 	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
 }
 
@@ -417,12 +382,13 @@ func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (e
 	if equal && (b != nil) {
 		equal = compareResoucesAssumeFirstNotNil(b, a)
 	}
+
 	return
 }
 
 func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
 	if b == nil || (len(b.Requests) == 0) {
-		return (len(a.Requests) == 0)
+		return len(a.Requests) == 0
 	}
 	for k, v := range a.Requests {
 		if (&v).Cmp(b.Requests[k]) != 0 {
@@ -440,105 +406,74 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
 // (i.e. service) is treated as an error.
-func (c *Cluster) Update(newSpec *spec.Postgresql) error {
+func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.setStatus(spec.ClusterStatusUpdating)
-
-	/* Make sure we update when this function exits */
-	defer func() {
-		c.Postgresql = *newSpec
-	}()
+	c.Postgresql = *newSpec
 
 	for _, role := range []PostgresRole{Master, Replica} {
-		if role == Replica {
-			if !newSpec.Spec.ReplicaLoadBalancer {
-				// old spec had a load balancer, but the new one doesn't
-				if c.Spec.ReplicaLoadBalancer {
-					err := c.deleteService(role)
-					if err != nil {
-						return fmt.Errorf("could not delete obsolete %s service: %v", role, err)
-					}
-					c.logger.Infof("deleted obsolete %s service", role)
-				}
-			} else {
-				if !c.Spec.ReplicaLoadBalancer {
-					// old spec didn't have a load balancer, but the one does
-					service, err := c.createService(role)
-					if err != nil {
-						return fmt.Errorf("could not create new %s service: %v", role, err)
-					}
-					c.logger.Infof("%s service %q has been created", role, util.NameFromMeta(service.ObjectMeta))
+		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+			if c.Services[role] != nil {
+				// delete the left over replica service
+				if err := c.deleteService(role); err != nil {
+					c.logger.Errorf("could not delete obsolete %s service: %v", role, err)
 				}
 			}
-			// only proceed further if both old and new load balancer were present
-			if !(newSpec.Spec.ReplicaLoadBalancer && c.Spec.ReplicaLoadBalancer) {
-				continue
-			}
+			continue
 		}
-		newService := c.generateService(role, &newSpec.Spec)
-		if match, reason := c.sameServiceWith(role, newService); !match {
-			c.logServiceChanges(role, c.Services[role], newService, true, reason)
-			if err := c.updateService(role, newService); err != nil {
-				c.setStatus(spec.ClusterStatusUpdateFailed)
-				return fmt.Errorf("could not update %s service: %v", role, err)
+
+		if err := c.syncService(role); err != nil {
+			if !k8sutil.ResourceAlreadyExists(err) {
+				c.logger.Errorf("coud not sync %s service: %v", role, err)
 			}
-			c.logger.Infof("%s service %q has been updated", role, util.NameFromMeta(c.Services[role].ObjectMeta))
 		}
 	}
 
-	newStatefulSet, err := c.generateStatefulSet(newSpec.Spec)
-	if err != nil {
-		return fmt.Errorf("could not generate statefulset: %v", err)
-	}
-	cmp := c.compareStatefulSetWith(newStatefulSet)
-
-	if !cmp.match {
-		c.logStatefulSetChanges(c.Statefulset, newStatefulSet, true, cmp.reasons)
-		//TODO: mind the case of updating allowedSourceRanges
-		if !cmp.replace {
-			if err := c.updateStatefulSet(newStatefulSet); err != nil {
-				c.setStatus(spec.ClusterStatusUpdateFailed)
-				return fmt.Errorf("could not upate statefulset: %v", err)
-			}
-		} else {
-			if err := c.replaceStatefulSet(newStatefulSet); err != nil {
-				c.setStatus(spec.ClusterStatusUpdateFailed)
-				return fmt.Errorf("could not replace statefulset: %v", err)
+	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances ||
+		!reflect.DeepEqual(oldSpec.Spec.Patroni, newSpec.Spec.Patroni) ||
+		!reflect.DeepEqual(oldSpec.Spec.Resources, newSpec.Spec.Resources) {
+		c.logger.Debugf("syncing statefulsets")
+		if err := c.syncStatefulSet(); err != nil {
+			if !k8sutil.ResourceAlreadyExists(err) {
+				c.logger.Errorf("could not sync statefulsets: %v", err)
 			}
 		}
-		//TODO: if there is a change in numberOfInstances, make sure Pods have been created/deleted
-		c.logger.Infof("statefulset %q has been updated", util.NameFromMeta(c.Statefulset.ObjectMeta))
 	}
 
-	if c.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
+	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
 		c.logger.Warningf("postgresql version change(%q -> %q) is not allowed",
 			c.Spec.PgVersion, newSpec.Spec.PgVersion)
-		//TODO: rewrite pg version in tpr spec
 	}
 
-	if cmp.rollingUpdate {
-		c.logger.Infof("rolling update is needed")
-		// TODO: wait for actual streaming to the replica
-		if err := c.recreatePods(); err != nil {
-			c.setStatus(spec.ClusterStatusUpdateFailed)
-			return fmt.Errorf("could not recreate pods: %v", err)
+	if oldSpec.Spec.Size != newSpec.Spec.Size {
+		c.logger.Debugf("syncing persistent volumes")
+		if err := c.syncVolumes(); err != nil {
+			c.logger.Errorf("could not sync persistent volumes: %v", err)
 		}
-		c.logger.Infof("rolling update has been finished")
 	}
 
-	if match, reason := c.sameVolumeWith(newSpec.Spec.Volume); !match {
-		c.logVolumeChanges(c.Spec.Volume, newSpec.Spec.Volume, reason)
-		if err := c.resizeVolumes(newSpec.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
-			return fmt.Errorf("could not update volumes: %v", err)
+	if !reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) {
+		if err := c.initUsers(); err != nil {
+			c.logger.Errorf("could not init users: %v", err)
 		}
-		c.logger.Infof("volumes have been updated successfully")
-	}
 
-	if err := c.syncPodDisruptionBudget(true); err != nil {
-		c.setStatus(spec.ClusterStatusUpdateFailed)
-		return fmt.Errorf("could not update pod disruption budget: %v", err)
+		c.logger.Debugf("syncing secrets")
+
+		//TODO: mind the secrets of the deleted/new users
+		if err := c.syncSecrets(); err != nil {
+			if !k8sutil.ResourceAlreadyExists(err) {
+				c.logger.Errorf("could not sync secrets: %v", err)
+			}
+		}
+
+		if !c.databaseAccessDisabled() {
+			c.logger.Debugf("syncing roles")
+			if err := c.syncRoles(true); err != nil {
+				c.logger.Errorf("could not sync roles: %v", err)
+			}
+		}
 	}
 
 	c.setStatus(spec.ClusterStatusRunning)
@@ -638,6 +573,10 @@ func (c *Cluster) initSystemUsers() {
 }
 
 func (c *Cluster) initRobotUsers() error {
+	curUsers := make(map[string]struct{})
+	for k := range c.pgUsers {
+		curUsers[k] = struct{}{}
+	}
 	for username, userFlags := range c.Spec.Users {
 		if !isValidUsername(username) {
 			return fmt.Errorf("invalid username: '%v'", username)
@@ -648,11 +587,24 @@ func (c *Cluster) initRobotUsers() error {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
 
+		if _, ok := c.pgUsers[username]; !ok {
+			delete(c.pgUsers, username)
+		}
+
+		delete(curUsers, username)
+		if u, ok := c.pgUsers[username]; ok {
+			u.Flags = flags
+			continue
+		}
 		c.pgUsers[username] = spec.PgUser{
 			Name:     username,
 			Password: util.RandomPassword(constants.PasswordLength),
 			Flags:    flags,
 		}
+	}
+
+	for k := range curUsers {
+		delete(c.pgUsers, k)
 	}
 
 	return nil

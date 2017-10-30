@@ -149,7 +149,7 @@ func (c *Cluster) generateSpiloJSONConfiguration(pg *spec.PostgresqlParam, patro
 	// maps and normal string items in the array of initdb options. We need
 	// both to convert the initial key-value to strings when necessary, and
 	// to de-duplicate the options supplied.
-PATRONI_INITDB_PARAMS:
+PatroniInitDBParams:
 	for _, k := range initdbOptionNames {
 		v := patroni.InitDB[k]
 		for i, defaultParam := range config.Bootstrap.Initdb {
@@ -159,7 +159,7 @@ PATRONI_INITDB_PARAMS:
 					for k1 := range defaultParam.(map[string]string) {
 						if k1 == k {
 							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
-							continue PATRONI_INITDB_PARAMS
+							continue PatroniInitDBParams
 						}
 					}
 				}
@@ -167,12 +167,12 @@ PATRONI_INITDB_PARAMS:
 				{
 					/* if the option already occurs in the list */
 					if defaultParam.(string) == v {
-						continue PATRONI_INITDB_PARAMS
+						continue PatroniInitDBParams
 					}
 				}
 			default:
 				c.logger.Warningf("unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
-				continue PATRONI_INITDB_PARAMS
+				continue PatroniInitDBParams
 			}
 		}
 		// The following options are known to have no parameters
@@ -334,7 +334,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	if cloneDescription.ClusterName != "" {
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
-	privilegedMode := bool(true)
+	privilegedMode := true
 	container := v1.Container{
 		Name:            c.containerName(),
 		Image:           c.OpConfig.DockerImage,
@@ -388,14 +388,14 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	return &template
 }
 
-func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
-	resourceRequirements, err := c.resourceRequirements(spec.Resources)
+func (c *Cluster) generateStatefulSet() (*v1beta1.StatefulSet, error) {
+	resourceRequirements, err := c.resourceRequirements(c.Spec.Resources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone)
-	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
+	podTemplate := c.generatePodTemplate(resourceRequirements, &c.Spec.PostgresqlParam, &c.Spec.Patroni, &c.Spec.Clone)
+	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(c.Spec.Volume.Size, c.Spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
@@ -407,7 +407,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 			Labels:    c.labelsSet(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
-			Replicas:             &spec.NumberOfInstances,
+			Replicas:             &c.Spec.NumberOfInstances,
 			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
