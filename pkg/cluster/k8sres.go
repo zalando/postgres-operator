@@ -250,7 +250,12 @@ func (c *Cluster) nodeAffinity() *v1.Affinity {
 	}
 }
 
-func (c *Cluster) tolerations() []v1.Toleration {
+func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration {
+	// allow to override tolerations by postgresql manifest
+	if len(*tolerationsSpec) > 0 {
+		return *tolerationsSpec
+	}
+
 	podToleration := c.Config.OpConfig.PodToleration
 	if (len(podToleration["key"]) > 0 || len(podToleration["operator"]) > 0 || len(podToleration["value"]) > 0 || len(podToleration["effect"]) > 0) {
 		return []v1.Toleration{
@@ -267,6 +272,7 @@ func (c *Cluster) tolerations() []v1.Toleration {
 }
 
 func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements,
+	tolerationsSpec *[]v1.Toleration,
 	pgParameters *spec.PostgresqlParam,
 	patroniParameters *spec.Patroni,
 	cloneDescription *spec.CloneDescription) *v1.PodTemplateSpec {
@@ -388,7 +394,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
 		Affinity:                      c.nodeAffinity(),
-		Tolerations:                   c.tolerations(),
+		Tolerations:                   c.tolerations(tolerationsSpec),
 	}
 
 	template := v1.PodTemplateSpec{
@@ -411,7 +417,7 @@ func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.Stateful
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone)
+	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)

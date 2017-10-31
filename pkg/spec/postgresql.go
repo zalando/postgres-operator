@@ -7,6 +7,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.
@@ -102,6 +103,7 @@ type PostgresSpec struct {
 	Clone               CloneDescription     `json:"clone"`
 	ClusterName         string               `json:"-"`
 	Databases           map[string]string    `json:"databases,omitempty"`
+	Tolerations         []v1.Toleration      `json:"tolerations,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.

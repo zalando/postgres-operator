@@ -119,6 +119,21 @@ data:
   ...
 ```
 
+Or you can specify and/or overwrite the tolerations for each postgres instance in the postgres manifest:
+
+```
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-minimal-cluster
+spec:
+  teamId: "ACID"
+  tolerations:
+  - key: postgres
+    operator: Exists
+    effect: NoSchedule
+```
+
 Please be ware that the taint and toleration only ensures that no other pod gets scheduled to the "postgres" node but not that Postgres pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
 
 
