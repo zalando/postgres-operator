@@ -55,8 +55,13 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) endpointName() string {
-	return c.Name
+func (c *Cluster) endpointName(role PostgresRole) string {
+	name := c.Name
+	if role == Replica {
+		name = name + "-repl"
+	}
+
+	return name
 }
 
 func (c *Cluster) serviceName(role PostgresRole) string {
@@ -543,12 +548,12 @@ func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v
 	return service
 }
 
-func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
+func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.endpointName(),
+			Name:      c.endpointName(role),
 			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(Master),
+			Labels:    c.roleLabelsSet(role),
 		},
 	}
 	if len(subsets) > 0 {

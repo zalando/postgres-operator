@@ -45,7 +45,7 @@ type Config struct {
 
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
-	Endpoint            *v1.Endpoints
+	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *v1beta1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
@@ -98,12 +98,15 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 	})
 
 	cluster := &Cluster{
-		Config:           cfg,
-		Postgresql:       pgSpec,
-		pgUsers:          make(map[string]spec.PgUser),
-		systemUsers:      make(map[string]spec.PgUser),
-		podSubscribers:   make(map[spec.NamespacedName]chan spec.PodEvent),
-		kubeResources:    kubeResources{Secrets: make(map[types.UID]*v1.Secret), Services: make(map[PostgresRole]*v1.Service)},
+		Config:         cfg,
+		Postgresql:     pgSpec,
+		pgUsers:        make(map[string]spec.PgUser),
+		systemUsers:    make(map[string]spec.PgUser),
+		podSubscribers: make(map[spec.NamespacedName]chan spec.PodEvent),
+		kubeResources: kubeResources{
+			Secrets:   make(map[types.UID]*v1.Secret),
+			Services:  make(map[PostgresRole]*v1.Service),
+			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
 		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
@@ -202,17 +205,16 @@ func (c *Cluster) Create() error {
 
 	c.setStatus(spec.ClusterStatusCreating)
 
-	//service will create endpoint implicitly
-	ep, err = c.createEndpoint()
-	if err != nil {
-		return fmt.Errorf("could not create endpoint: %v", err)
-	}
-	c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
-
 	for _, role := range []PostgresRole{Master, Replica} {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
+		ep, err = c.createEndpoint(role)
+		if err != nil {
+			return fmt.Errorf("could not create %s endpoint: %v", role, err)
+		}
+		c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+
 		service, err = c.createService(role)
 		if err != nil {
 			return fmt.Errorf("could not create %s service: %v", role, err)
@@ -419,23 +421,11 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 	}
 
 	// Service
-	for _, role := range []PostgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			if c.Services[role] != nil {
-				// delete the left over replica service
-				if err := c.deleteService(role); err != nil {
-					c.logger.Errorf("could not delete obsolete %s service: %v", role, err)
-				}
-			}
-			continue
-		}
-
-		if !reflect.DeepEqual(c.generateService(role, &oldSpec.Spec), c.generateService(role, &newSpec.Spec)) {
-			if err := c.syncService(role); err != nil {
-				if !k8sutil.ResourceAlreadyExists(err) {
-					c.logger.Errorf("coud not sync %s service: %v", role, err)
-				}
-			}
+	if !reflect.DeepEqual(c.generateService(Master, &oldSpec.Spec), c.generateService(Master, &newSpec.Spec)) ||
+		!reflect.DeepEqual(c.generateService(Replica, &oldSpec.Spec), c.generateService(Replica, &newSpec.Spec)) ||
+		oldSpec.Spec.ReplicaLoadBalancer != oldSpec.Spec.ReplicaLoadBalancer {
+		if err := c.syncServices(); err != nil {
+			c.logger.Errorf("could not sync services: %v", err)
 		}
 	}
 
@@ -513,14 +503,15 @@ func (c *Cluster) Delete() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if err := c.deleteEndpoint(); err != nil {
-		return fmt.Errorf("could not delete endpoint: %v", err)
-	}
-
 	for _, role := range []PostgresRole{Master, Replica} {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
+
+		if err := c.deleteEndpoint(role); err != nil {
+			return fmt.Errorf("could not delete %s endpoint: %v", role, err)
+		}
+
 		if err := c.deleteService(role); err != nil {
 			return fmt.Errorf("could not delete %s service: %v", role, err)
 		}
@@ -694,7 +685,8 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 
 		MasterService:       c.GetServiceMaster(),
 		ReplicaService:      c.GetServiceReplica(),
-		Endpoint:            c.GetEndpoint(),
+		MasterEndpoint:      c.GetEndpointMaster(),
+		ReplicaEndpoint:     c.GetEndpointReplica(),
 		StatefulSet:         c.GetStatefulSet(),
 		PodDisruptionBudget: c.GetPodDisruptionBudget(),
 		CurrentProcess:      c.GetCurrentProcess(),

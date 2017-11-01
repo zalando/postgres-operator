@@ -37,38 +37,14 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 
 	//TODO: mind the secrets of the deleted/new users
 	if err = c.syncSecrets(); err != nil {
-		if !k8sutil.ResourceAlreadyExists(err) {
-			err = fmt.Errorf("could not sync secrets: %v", err)
-			return
-		}
-	}
-
-	c.logger.Debugf("syncing endpoints")
-	if err = c.syncEndpoint(); err != nil {
-		if !k8sutil.ResourceAlreadyExists(err) {
-			err = fmt.Errorf("could not sync endpoints: %v", err)
-			return
-		}
+		err = fmt.Errorf("could not sync secrets: %v", err)
+		return
 	}
 
 	c.logger.Debugf("syncing services")
-	for _, role := range []PostgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			if c.Services[role] != nil {
-				// delete the left over replica service
-				if err = c.deleteService(role); err != nil {
-					err = fmt.Errorf("could not delete obsolete %s service: %v", role, err)
-					return
-				}
-			}
-			continue
-		}
-		if err = c.syncService(role); err != nil {
-			if !k8sutil.ResourceAlreadyExists(err) {
-				err = fmt.Errorf("coud not sync %s service: %v", role, err)
-				return
-			}
-		}
+	if err = c.syncServices(); err != nil {
+		err = fmt.Errorf("could not sync services: %v", err)
+		return
 	}
 
 	c.logger.Debugf("syncing statefulsets")
@@ -102,89 +78,139 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	return
 }
 
-func (c *Cluster) syncService(role PostgresRole) error {
-	var err error
+func (c *Cluster) syncServices() error {
+	for _, role := range []PostgresRole{Master, Replica} {
+		c.logger.Debugf("syncing %s service", role)
 
-	c.setProcessName("syncing %s service", role)
-
-	c.Services[role], err = c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{})
-	if err != nil && !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get %s service: %v", role, err)
-	}
-
-	cSpec := c.Spec
-	if c.Services[role] == nil {
-		c.logger.Infof("could not find the cluster's %s service", role)
-		svc, err := c.createService(role)
-		if err != nil {
-			return fmt.Errorf("could not create missing %s service: %v", role, err)
+		if err := c.syncEndpoint(role); err != nil {
+			return fmt.Errorf("could not sync %s endpont: %v", role, err)
 		}
-		c.logger.Infof("created missing %s service %q", role, util.NameFromMeta(svc.ObjectMeta))
 
-		return nil
+		if err := c.syncService(role); err != nil {
+			return fmt.Errorf("could not sync %s service: %v", role, err)
+		}
 	}
-
-	desiredSvc := c.generateService(role, &cSpec)
-	match, reason := k8sutil.SameService(c.Services[role], desiredSvc)
-	if match {
-		return nil
-	}
-	c.logServiceChanges(role, c.Services[role], desiredSvc, false, reason)
-
-	if err := c.updateService(role, desiredSvc); err != nil {
-		return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
-	}
-	c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 
 	return nil
 }
 
-func (c *Cluster) syncEndpoint() error {
-	var err error
-	c.Endpoint, err = c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(), metav1.GetOptions{})
-	if err != nil && !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get endpoint: %v", err)
-	}
+func (c *Cluster) syncService(role PostgresRole) error {
+	c.setProcessName("syncing %s service", role)
 
-	if c.Endpoint == nil {
-		c.logger.Infof("could not find the cluster's endpoint")
-		ep, err := c.createEndpoint()
-		if err != nil {
-			return fmt.Errorf("could not create missing endpoint: %v", err)
+	svc, err := c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{})
+	if err == nil {
+		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+			if err := c.deleteService(role); err != nil {
+				return fmt.Errorf("could not delete %s service", role)
+			}
 		}
-		c.logger.Infof("created missing endpoint %q", util.NameFromMeta(ep.ObjectMeta))
+
+		desiredSvc := c.generateService(role, &c.Spec)
+		match, reason := k8sutil.SameService(svc, desiredSvc)
+		if match {
+			c.Services[role] = svc
+			return nil
+		}
+		c.logServiceChanges(role, svc, desiredSvc, false, reason)
+
+		if err := c.updateService(role, desiredSvc); err != nil {
+			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
+		}
+		c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 
 		return nil
+	} else if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get %s service: %v", role, err)
+	}
+
+	// Service does not exist
+	if role == Replica && !c.Spec.ReplicaLoadBalancer {
+		return nil
+	}
+
+	c.logger.Infof("could not find the cluster's %s service", role)
+
+	if svc, err := c.createService(role); err != nil {
+		if k8sutil.ResourceAlreadyExists(err) {
+			c.logger.Infof("%s service %q already exists", role, util.NameFromMeta(svc.ObjectMeta))
+		} else {
+			return fmt.Errorf("could not create missing %s service: %v", role, err)
+		}
+	} else {
+		c.logger.Infof("created missing %s service %q", role, util.NameFromMeta(svc.ObjectMeta))
+		c.Services[role] = svc
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncEndpoint(role PostgresRole) error {
+	c.setProcessName("syncing %s endpoint", role)
+
+	ep, err := c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
+	if err == nil {
+		if role == Replica && !c.Spec.ReplicaLoadBalancer {
+			if err := c.deleteEndpoint(role); err != nil {
+				return fmt.Errorf("could not delete %s endpoint", role)
+			}
+		}
+
+		c.Endpoints[role] = ep
+		return nil
+	} else if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get %s endpoint: %v", role, err)
+	}
+
+	// Endpoint does not exist
+	if role == Replica && !c.Spec.ReplicaLoadBalancer {
+		return nil
+	}
+
+	c.logger.Infof("could not find the cluster's %s endpoint", role)
+
+	if ep, err := c.createEndpoint(role); err != nil {
+		if k8sutil.ResourceAlreadyExists(err) {
+			c.logger.Infof("%s endpoint %q already exists", role, util.NameFromMeta(ep.ObjectMeta))
+		} else {
+			return fmt.Errorf("could not create missing %s endpoint: %v", role, err)
+		}
+	} else {
+		c.logger.Infof("created missing %s endpoint %q", role, util.NameFromMeta(ep.ObjectMeta))
+		c.Endpoints[role] = ep
 	}
 
 	return nil
 }
 
 func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
-	var err error
-
-	c.PodDisruptionBudget, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).
-		Get(c.podDisruptionBudgetName(), metav1.GetOptions{})
-	if err != nil && !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get pod disruption budget: %v", err)
-	}
-
-	if c.PodDisruptionBudget == nil {
-		c.logger.Infof("could not find the cluster's pod disruption budget")
-		pdb, err := c.createPodDisruptionBudget()
-		if err != nil {
-			return fmt.Errorf("could not create pod disruption budget: %v", err)
-		}
-		c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
-		return nil
-	} else {
+	pdb, err := c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(c.podDisruptionBudgetName(), metav1.GetOptions{})
+	if err == nil {
+		c.PodDisruptionBudget = pdb
 		newPDB := c.generatePodDisruptionBudget()
-		if match, reason := k8sutil.SamePDB(c.PodDisruptionBudget, newPDB); !match {
-			c.logPDBChanges(c.PodDisruptionBudget, newPDB, isUpdate, reason)
+		if match, reason := k8sutil.SamePDB(pdb, newPDB); !match {
+			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
 			if err := c.updatePodDisruptionBudget(newPDB); err != nil {
 				return err
 			}
+		} else {
+			c.PodDisruptionBudget = pdb
 		}
+
+		return nil
+	} else if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get pod disruption budget: %v", err)
+	}
+
+	c.logger.Infof("could not find the cluster's pod disruption budget")
+	if pdb, err = c.createPodDisruptionBudget(); err != nil {
+		if k8sutil.ResourceAlreadyExists(err) {
+			c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
+		} else {
+			return fmt.Errorf("could not create pod disruption budget: %v", err)
+		}
+	} else {
+		c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
+		c.PodDisruptionBudget = pdb
 	}
 
 	return nil
@@ -201,7 +227,7 @@ func (c *Cluster) syncStatefulSet() error {
 		return fmt.Errorf("could not get statefulset: %v", err)
 	}
 
-	if c.Statefulset == nil {
+	if err != nil && k8sutil.ResourceNotFound(err) {
 		c.logger.Infof("could not find the cluster's statefulset")
 		pods, err := c.listPods()
 		if err != nil {
@@ -212,14 +238,16 @@ func (c *Cluster) syncStatefulSet() error {
 			c.logger.Infof("found pods without the statefulset: trigger rolling update")
 			rollUpdate = true
 		}
+
 		ss, err := c.createStatefulSet()
 		if err != nil {
 			return fmt.Errorf("could not create missing statefulset: %v", err)
 		}
-		err = c.waitStatefulsetPodsReady()
-		if err != nil {
+
+		if err = c.waitStatefulsetPodsReady(); err != nil {
 			return fmt.Errorf("cluster is not ready: %v", err)
 		}
+
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(ss.ObjectMeta))
 		if !rollUpdate {
 			return nil
