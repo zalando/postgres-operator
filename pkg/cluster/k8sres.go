@@ -388,14 +388,14 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	return &template
 }
 
-func (c *Cluster) generateStatefulSet() (*v1beta1.StatefulSet, error) {
-	resourceRequirements, err := c.resourceRequirements(c.Spec.Resources)
+func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
+	resourceRequirements, err := c.resourceRequirements(spec.Resources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	podTemplate := c.generatePodTemplate(resourceRequirements, &c.Spec.PostgresqlParam, &c.Spec.Patroni, &c.Spec.Clone)
-	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(c.Spec.Volume.Size, c.Spec.Volume.StorageClass)
+	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone)
+	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
@@ -407,7 +407,7 @@ func (c *Cluster) generateStatefulSet() (*v1beta1.StatefulSet, error) {
 			Labels:    c.labelsSet(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
-			Replicas:             &c.Spec.NumberOfInstances,
+			Replicas:             &spec.NumberOfInstances,
 			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
@@ -490,7 +490,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
-func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v1.Service {
 	var dnsName string
 
 	if role == Master {
@@ -511,12 +511,12 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	var annotations map[string]string
 
 	// Examine the per-cluster load balancer setting, if it is not defined - check the operator configuration.
-	if (newSpec.UseLoadBalancer != nil && *newSpec.UseLoadBalancer) ||
-		(newSpec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
+	if (spec.UseLoadBalancer != nil && *spec.UseLoadBalancer) ||
+		(spec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
 
 		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
-		allowedSourceRanges := newSpec.AllowedSourceRanges
+		allowedSourceRanges := spec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {
 			sourceRanges = allowedSourceRanges
 		}

@@ -165,11 +165,11 @@ func (c *Cluster) listVolumesWithManifestSize(newVolume spec.Volume) ([]*v1.Pers
 		return nil, 0, fmt.Errorf("could not parse volume size from the manifest: %v", err)
 	}
 	manifestSize := quantityToGigabyte(newSize)
-	volumes, err := c.listPersistentVolumes()
+	vols, err := c.listPersistentVolumes()
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not list persistent volumes: %v", err)
 	}
-	return volumes, manifestSize, nil
+	return vols, manifestSize, nil
 }
 
 // getPodNameFromPersistentVolume returns a pod name that it extracts from the volume claim ref.

@@ -228,7 +228,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 	/* TODO: should check that we need to replace the statefulset */
 	if !rollUpdate {
-		desiredSS, err := c.generateStatefulSet()
+		desiredSS, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}

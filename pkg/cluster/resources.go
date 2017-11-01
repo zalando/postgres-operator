@@ -13,63 +13,8 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
-
-func (c *Cluster) loadResources() error {
-	var err error
-	ns := c.Namespace
-
-	masterService, err := c.KubeClient.Services(ns).Get(c.serviceName(Master), metav1.GetOptions{})
-	if err == nil {
-		c.Services[Master] = masterService
-	} else if !k8sutil.ResourceNotFound(err) {
-		c.logger.Errorf("could not get master service: %v", err)
-	}
-
-	replicaService, err := c.KubeClient.Services(ns).Get(c.serviceName(Replica), metav1.GetOptions{})
-	if err == nil {
-		c.Services[Replica] = replicaService
-	} else if !k8sutil.ResourceNotFound(err) {
-		c.logger.Errorf("could not get replica service: %v", err)
-	}
-
-	ep, err := c.KubeClient.Endpoints(ns).Get(c.endpointName(), metav1.GetOptions{})
-	if err == nil {
-		c.Endpoint = ep
-	} else if !k8sutil.ResourceNotFound(err) {
-		c.logger.Errorf("could not get endpoint: %v", err)
-	}
-
-	secrets, err := c.KubeClient.Secrets(ns).List(metav1.ListOptions{LabelSelector: c.labelsSet().String()})
-	if err != nil {
-		c.logger.Errorf("could not get list of secrets: %v", err)
-	}
-	for i, secret := range secrets.Items {
-		if _, ok := c.Secrets[secret.UID]; ok {
-			continue
-		}
-		c.Secrets[secret.UID] = &secrets.Items[i]
-		c.logger.Debugf("secret loaded, uid: %q", secret.UID)
-	}
-
-	ss, err := c.KubeClient.StatefulSets(ns).Get(c.statefulSetName(), metav1.GetOptions{})
-	if err == nil {
-		c.Statefulset = ss
-	} else if !k8sutil.ResourceNotFound(err) {
-		c.logger.Errorf("could not get statefulset: %v", err)
-	}
-
-	pdb, err := c.KubeClient.PodDisruptionBudgets(ns).Get(c.podDisruptionBudgetName(), metav1.GetOptions{})
-	if err == nil {
-		c.PodDisruptionBudget = pdb
-	} else if !k8sutil.ResourceNotFound(err) {
-		c.logger.Errorf("could not get pod disruption budget: %v", err)
-	}
-
-	return nil
-}
 
 func (c *Cluster) listResources() error {
 	if c.PodDisruptionBudget != nil {
@@ -118,7 +63,7 @@ func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	if c.Statefulset != nil {
 		return nil, fmt.Errorf("statefulset already exists in the cluster")
 	}
-	statefulSetSpec, err := c.generateStatefulSet()
+	statefulSetSpec, err := c.generateStatefulSet(&c.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate statefulset: %v", err)
 	}

@@ -176,7 +176,7 @@ func (c *Cluster) getDatabases() (map[string]string, error) {
 	return dbs, nil
 }
 
-func (c *Cluster) createDatabases() error {
+func (c *Cluster) syncDbs() error {
 	c.setProcessName("creating databases")
 
 	newDbs := c.Spec.Databases

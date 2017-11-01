@@ -255,8 +255,8 @@ func (c *Cluster) Create() error {
 			return fmt.Errorf("could not create users: %v", err)
 		}
 
-		if err = c.createDatabases(); err != nil {
-			return fmt.Errorf("could not create databases: %v", err)
+		if err = c.syncDbs(); err != nil {
+			return fmt.Errorf("could not sync databases: %v", err)
 		}
 
 		c.logger.Infof("users have been successfully created")
@@ -413,6 +413,12 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 	c.setStatus(spec.ClusterStatusUpdating)
 	c.Postgresql = *newSpec
 
+	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
+		c.logger.Warningf("postgresql version change(%q -> %q) is not allowed",
+			c.Spec.PgVersion, newSpec.Spec.PgVersion)
+	}
+
+	// Service
 	for _, role := range []PostgresRole{Master, Replica} {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			if c.Services[role] != nil {
@@ -424,36 +430,16 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 			continue
 		}
 
-		if err := c.syncService(role); err != nil {
-			if !k8sutil.ResourceAlreadyExists(err) {
-				c.logger.Errorf("coud not sync %s service: %v", role, err)
+		if !reflect.DeepEqual(c.generateService(role, &oldSpec.Spec), c.generateService(role, &newSpec.Spec)) {
+			if err := c.syncService(role); err != nil {
+				if !k8sutil.ResourceAlreadyExists(err) {
+					c.logger.Errorf("coud not sync %s service: %v", role, err)
+				}
 			}
 		}
 	}
 
-	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances ||
-		!reflect.DeepEqual(oldSpec.Spec.Patroni, newSpec.Spec.Patroni) ||
-		!reflect.DeepEqual(oldSpec.Spec.Resources, newSpec.Spec.Resources) {
-		c.logger.Debugf("syncing statefulsets")
-		if err := c.syncStatefulSet(); err != nil {
-			if !k8sutil.ResourceAlreadyExists(err) {
-				c.logger.Errorf("could not sync statefulsets: %v", err)
-			}
-		}
-	}
-
-	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
-		c.logger.Warningf("postgresql version change(%q -> %q) is not allowed",
-			c.Spec.PgVersion, newSpec.Spec.PgVersion)
-	}
-
-	if oldSpec.Spec.Size != newSpec.Spec.Size {
-		c.logger.Debugf("syncing persistent volumes")
-		if err := c.syncVolumes(); err != nil {
-			c.logger.Errorf("could not sync persistent volumes: %v", err)
-		}
-	}
-
+	// Secrets
 	if !reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) {
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
@@ -473,6 +459,47 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 			if err := c.syncRoles(true); err != nil {
 				c.logger.Errorf("could not sync roles: %v", err)
 			}
+		}
+	}
+
+	// Volume
+	if oldSpec.Spec.Size != newSpec.Spec.Size {
+		c.logger.Debugf("syncing persistent volumes")
+		c.logVolumeChanges(oldSpec.Spec.Volume, newSpec.Spec.Volume)
+
+		if err := c.syncVolumes(); err != nil {
+			c.logger.Errorf("could not sync persistent volumes: %v", err)
+		}
+	}
+
+	// Statefulset
+	func() {
+		oldSs, err := c.generateStatefulSet(&oldSpec.Spec)
+		if err != nil {
+			c.logger.Errorf("could not generate old statefulset spec")
+			return
+		}
+
+		newSs, err := c.generateStatefulSet(&newSpec.Spec)
+		if err != nil {
+			c.logger.Errorf("could not generate new statefulset spec")
+			return
+		}
+
+		if !reflect.DeepEqual(oldSs, newSs) {
+			c.logger.Debugf("syncing statefulsets")
+			if err := c.syncStatefulSet(); err != nil {
+				if !k8sutil.ResourceAlreadyExists(err) {
+					c.logger.Errorf("could not sync statefulsets: %v", err)
+				}
+			}
+		}
+	}()
+
+	// Databases
+	if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
+		if err := c.syncDbs(); err != nil {
+			c.logger.Errorf("could not sync databases: %v", err)
 		}
 	}
 
