@@ -13,6 +13,7 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
 
@@ -385,10 +386,7 @@ func (c *Cluster) updatePodDisruptionBudget(pdb *policybeta1.PodDisruptionBudget
 		return fmt.Errorf("there is no pod disruption budget in the cluster")
 	}
 
-	err := c.KubeClient.
-		PodDisruptionBudgets(c.PodDisruptionBudget.Namespace).
-		Delete(c.PodDisruptionBudget.Name, c.deleteOptions)
-	if err != nil {
+	if err := c.deletePodDisruptionBudget(); err != nil {
 		return fmt.Errorf("could not delete pod disruption budget: %v", err)
 	}
 
@@ -408,6 +406,8 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 	if c.PodDisruptionBudget == nil {
 		return fmt.Errorf("there is no pod disruption budget in the cluster")
 	}
+
+	pdbName := util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta)
 	err := c.KubeClient.
 		PodDisruptionBudgets(c.PodDisruptionBudget.Namespace).
 		Delete(c.PodDisruptionBudget.Name, c.deleteOptions)
@@ -416,6 +416,22 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 	}
 	c.logger.Infof("pod disruption budget %q has been deleted", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta))
 	c.PodDisruptionBudget = nil
+
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+		func() (bool, error) {
+			_, err2 := c.KubeClient.PodDisruptionBudgets(pdbName.Namespace).Get(pdbName.Name, metav1.GetOptions{})
+			if err2 == nil {
+				return false, nil
+			}
+			if k8sutil.ResourceNotFound(err2) {
+				return true, nil
+			} else {
+				return false, err2
+			}
+		})
+	if err != nil {
+		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+	}
 
 	return nil
 }

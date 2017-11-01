@@ -122,6 +122,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	} else if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s service: %v", role, err)
 	}
+	c.Services[role] = nil
 
 	// Service does not exist
 	if role == Replica && !c.Spec.ReplicaLoadBalancer {
@@ -160,6 +161,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	} else if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s endpoint: %v", role, err)
 	}
+	c.Endpoints[role] = nil
 
 	// Endpoint does not exist
 	if role == Replica && !c.Spec.ReplicaLoadBalancer {
@@ -200,6 +202,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	} else if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get pod disruption budget: %v", err)
 	}
+	c.PodDisruptionBudget = nil
 
 	c.logger.Infof("could not find the cluster's pod disruption budget")
 	if pdb, err = c.createPodDisruptionBudget(); err != nil {

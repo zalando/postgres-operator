@@ -559,6 +559,9 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 	if len(subsets) > 0 {
 		endpoints.Subsets = subsets
 	}
+	if role == Master {
+		//TODO: set ip of the master pod
+	}
 
 	return endpoints
 }
