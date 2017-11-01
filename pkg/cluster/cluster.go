@@ -255,12 +255,12 @@ func (c *Cluster) Create() error {
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
+		c.logger.Infof("users have been successfully created")
 
 		if err = c.createDatabases(); err != nil {
 			return fmt.Errorf("could not create databases: %v", err)
 		}
-
-		c.logger.Infof("users have been successfully created")
+		c.logger.Infof("databases have been successfully created")
 	} else {
 		if c.masterLess {
 			c.logger.Warnln("cluster is masterless")

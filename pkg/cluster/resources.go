@@ -557,3 +557,13 @@ func (c *Cluster) GetStatefulSet() *v1beta1.StatefulSet {
 func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
 }
+
+func (c *Cluster) createDatabases() error {
+	c.setProcessName("creating databases")
+	for datname, owner := range c.Spec.Databases {
+		if err := c.executeCreateDatabase(datname, owner); err != nil {
+			return err
+		}
+	}
+	return nil
+}
