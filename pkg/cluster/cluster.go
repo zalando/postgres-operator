@@ -258,7 +258,7 @@ func (c *Cluster) Create() error {
 		}
 		c.logger.Infof("users have been successfully created")
 
-		if err = c.syncDbs(); err != nil {
+		if err = c.syncDatabases(); err != nil {
 			return fmt.Errorf("could not sync databases: %v", err)
 		}
 		c.logger.Infof("databases have been successfully created")
@@ -505,7 +505,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 	// Databases
 	if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
 		c.logger.Infof("syncing databases")
-		if err := c.syncDbs(); err != nil {
+		if err := c.syncDatabases(); err != nil {
 			c.logger.Errorf("could not sync databases: %v", err)
 			updateFailed = true
 		}
