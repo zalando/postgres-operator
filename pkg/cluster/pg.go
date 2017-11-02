@@ -25,8 +25,9 @@ const (
 	 WHERE a.rolname = ANY($1)
 	 ORDER BY 1;`
 
-	getDatabasesSQL   = `SELECT datname, a.rolname AS owner FROM pg_database d INNER JOIN pg_authid a ON a.oid = d.datdba;`
-	createDatabaseSQL = `CREATE DATABASE "%s" OWNER "%s";`
+	getDatabasesSQL       = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
+	createDatabaseSQL     = `CREATE DATABASE "%s" OWNER "%s";`
+	alterDatabaseOwnerSQL = `ALTER DATABASE "%s" OWNER TO "%s";`
 )
 
 func (c *Cluster) pgConnectionString() string {
@@ -137,21 +138,14 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 	return users, nil
 }
 
+// getDatabases returns the map of current databases with owners
+// The caller is responsible for opening and closing the database connection
 func (c *Cluster) getDatabases() (map[string]string, error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
 	dbs := make(map[string]string)
-
-	if err = c.initDbConn(); err != nil {
-		return nil, fmt.Errorf("could not init db connection")
-	}
-	defer func() {
-		if err = c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close db connection: %v", err)
-		}
-	}()
 
 	if rows, err = c.pgDb.Query(getDatabasesSQL); err != nil {
 		return nil, fmt.Errorf("could not query database: %v", err)
@@ -176,49 +170,44 @@ func (c *Cluster) getDatabases() (map[string]string, error) {
 	return dbs, nil
 }
 
-func (c *Cluster) createDatabases() error {
-	c.setProcessName("creating databases")
-
-	newDbs := c.Spec.Databases
-	curDbs, err := c.getDatabases()
-	if err != nil {
-		return fmt.Errorf("could not get current databases: %v", err)
-	}
-	for datname := range curDbs {
-		delete(newDbs, datname)
-	}
-
-	if len(newDbs) == 0 {
+// executeCreateDatabase creates new database with the given owner.
+// The caller is responsible for openinging and closing the database connection.
+func (c *Cluster) executeCreateDatabase(datname, owner string) error {
+	if !c.databaseNameOwnerValid(datname, owner) {
 		return nil
 	}
+	c.logger.Infof("creating database %q with owner %q", datname, owner)
 
-	if err = c.initDbConn(); err != nil {
-		return fmt.Errorf("could not init database connection")
+	if _, err := c.pgDb.Query(fmt.Sprintf(createDatabaseSQL, datname, owner)); err != nil {
+		return fmt.Errorf("could not execute create database: %v", err)
 	}
-	defer func() {
-		if err = c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection: %v", err)
-		}
-	}()
-
-	for datname, owner := range newDbs {
-		if _, ok := c.pgUsers[owner]; !ok {
-			c.logger.Infof("skipping creation of the %q database, user %q does not exist", datname, owner)
-			continue
-		}
-
-		if !databaseNameRegexp.MatchString(datname) {
-			c.logger.Infof("database %q has invalid name", datname)
-			continue
-		}
-		c.logger.Infof("creating database %q with owner %q", datname, owner)
-
-		if _, err = c.pgDb.Query(fmt.Sprintf(createDatabaseSQL, datname, owner)); err != nil {
-			return fmt.Errorf("could not query database: %v", err)
-		}
-	}
-
 	return nil
+}
+
+// executeCreateDatabase changes the owner of the given database.
+// The caller is responsible for openinging and closing the database connection.
+func (c *Cluster) executeAlterDatabaseOwner(datname string, owner string) error {
+	if !c.databaseNameOwnerValid(datname, owner) {
+		return nil
+	}
+	c.logger.Infof("changing database %q owner to %q", datname, owner)
+	if _, err := c.pgDb.Query(fmt.Sprintf(alterDatabaseOwnerSQL, datname, owner)); err != nil {
+		return fmt.Errorf("could not execute alter database owner: %v", err)
+	}
+	return nil
+}
+
+func (c *Cluster) databaseNameOwnerValid(datname, owner string) bool {
+	if _, ok := c.pgUsers[owner]; !ok {
+		c.logger.Infof("skipping creation of the %q database, user %q does not exist", datname, owner)
+		return false
+	}
+
+	if !databaseNameRegexp.MatchString(datname) {
+		c.logger.Infof("database %q has invalid name", datname)
+		return false
+	}
+	return true
 }
 
 func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool) (result []string) {

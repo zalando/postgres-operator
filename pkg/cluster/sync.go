@@ -90,6 +90,11 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 			err = fmt.Errorf("could not sync roles: %v", err)
 			return
 		}
+		c.logger.Debugf("syncing databases")
+		if err = c.syncDatabases(); err != nil {
+			err = fmt.Errorf("could not sync databases: %v", err)
+			return
+		}
 	}
 
 	c.logger.Debugf("syncing persistent volumes")
@@ -291,4 +296,51 @@ func (c *Cluster) samePDBWith(pdb *policybeta1.PodDisruptionBudget) (match bool,
 	}
 
 	return
+}
+
+func (c *Cluster) syncDatabases() error {
+	c.setProcessName("syncing databases")
+
+	createDatabases := make(map[string]string)
+	alterOwnerDatabases := make(map[string]string)
+
+	if err := c.initDbConn(); err != nil {
+		return fmt.Errorf("could not init database connection")
+	}
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}()
+
+	currentDatabases, err := c.getDatabases()
+	if err != nil {
+		return fmt.Errorf("could not get current databases: %v", err)
+	}
+
+	for datname, newOwner := range c.Spec.Databases {
+		currentOwner, exists := currentDatabases[datname]
+		if !exists {
+			createDatabases[datname] = newOwner
+		} else if currentOwner != newOwner {
+			alterOwnerDatabases[datname] = newOwner
+		}
+	}
+
+	if len(createDatabases)+len(alterOwnerDatabases) == 0 {
+		return nil
+	}
+
+	for datname, owner := range createDatabases {
+		if err = c.executeCreateDatabase(datname, owner); err != nil {
+			return err
+		}
+	}
+	for datname, owner := range alterOwnerDatabases {
+		if err = c.executeAlterDatabaseOwner(datname, owner); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
