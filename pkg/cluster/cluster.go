@@ -172,7 +172,7 @@ func (c *Cluster) initUsers() error {
 		return fmt.Errorf("could not init infrastructure roles: %v", err)
 	}
 
-	if err := c.initRobotUsers(); err != nil {
+	if err := c.syncRobotUsers(); err != nil {
 		return fmt.Errorf("could not init robot users: %v", err)
 	}
 
@@ -409,14 +409,24 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
 // (i.e. service) is treated as an error.
 func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
+	updateFailed := false
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.setStatus(spec.ClusterStatusUpdating)
 	c.Postgresql = *newSpec
 
+	defer func() {
+		if updateFailed {
+			c.setStatus(spec.ClusterStatusUpdateFailed)
+		} else if c.Status != spec.ClusterStatusRunning {
+			c.setStatus(spec.ClusterStatusRunning)
+		}
+	}()
+
 	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
-		c.logger.Warningf("postgresql version change(%q -> %q) is not allowed", oldSpec.Spec.PgVersion, newSpec.Spec.PgVersion)
+		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", oldSpec.Spec.PgVersion, newSpec.Spec.PgVersion)
 		//we need that hack to generate statefulset with the old version
 		newSpec.Spec.PgVersion = oldSpec.Spec.PgVersion
 	}
@@ -428,29 +438,30 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 		c.logger.Debugf("syncing services")
 		if err := c.syncServices(); err != nil {
 			c.logger.Errorf("could not sync services: %v", err)
+			updateFailed = true
 		}
 	}
 
-	// Secrets
 	if !reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) {
 		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
+			updateFailed = true
 		}
 
 		c.logger.Debugf("syncing secrets")
 
 		//TODO: mind the secrets of the deleted/new users
 		if err := c.syncSecrets(); err != nil {
-			if !k8sutil.ResourceAlreadyExists(err) {
-				c.logger.Errorf("could not sync secrets: %v", err)
-			}
+			c.logger.Errorf("could not sync secrets: %v", err)
+			updateFailed = true
 		}
 
 		if !c.databaseAccessDisabled() {
 			c.logger.Debugf("syncing roles")
 			if err := c.syncRoles(true); err != nil {
 				c.logger.Errorf("could not sync roles: %v", err)
+				updateFailed = true
 			}
 		}
 	}
@@ -462,6 +473,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 
 		if err := c.syncVolumes(); err != nil {
 			c.logger.Errorf("could not sync persistent volumes: %v", err)
+			updateFailed = true
 		}
 	}
 
@@ -470,21 +482,22 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 		oldSs, err := c.generateStatefulSet(&oldSpec.Spec)
 		if err != nil {
 			c.logger.Errorf("could not generate old statefulset spec")
+			updateFailed = true
 			return
 		}
 
 		newSs, err := c.generateStatefulSet(&newSpec.Spec)
 		if err != nil {
 			c.logger.Errorf("could not generate new statefulset spec")
+			updateFailed = true
 			return
 		}
 
 		if !reflect.DeepEqual(oldSs, newSs) {
 			c.logger.Debugf("syncing statefulsets")
 			if err := c.syncStatefulSet(); err != nil {
-				if !k8sutil.ResourceAlreadyExists(err) {
-					c.logger.Errorf("could not sync statefulsets: %v", err)
-				}
+				c.logger.Errorf("could not sync statefulsets: %v", err)
+				updateFailed = true
 			}
 		}
 	}()
@@ -494,10 +507,9 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 		c.logger.Infof("syncing databases")
 		if err := c.syncDbs(); err != nil {
 			c.logger.Errorf("could not sync databases: %v", err)
+			updateFailed = true
 		}
 	}
-
-	c.setStatus(spec.ClusterStatusRunning)
 
 	return nil
 }
@@ -594,7 +606,7 @@ func (c *Cluster) initSystemUsers() {
 	}
 }
 
-func (c *Cluster) initRobotUsers() error {
+func (c *Cluster) syncRobotUsers() error {
 	curUsers := make(map[string]struct{})
 	for k := range c.pgUsers {
 		curUsers[k] = struct{}{}
@@ -613,11 +625,11 @@ func (c *Cluster) initRobotUsers() error {
 			delete(c.pgUsers, username)
 		}
 
-		delete(curUsers, username)
 		if u, ok := c.pgUsers[username]; ok {
 			u.Flags = flags
 			continue
 		}
+		delete(curUsers, username)
 		c.pgUsers[username] = spec.PgUser{
 			Name:     username,
 			Password: util.RandomPassword(constants.PasswordLength),
