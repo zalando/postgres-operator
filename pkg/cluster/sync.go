@@ -304,6 +304,15 @@ func (c *Cluster) syncDatabases() error {
 	createDatabases := make(map[string]string)
 	alterOwnerDatabases := make(map[string]string)
 
+	if err := c.initDbConn(); err != nil {
+		return fmt.Errorf("could not init database connection")
+	}
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}()
+
 	currentDatabases, err := c.getDatabases()
 	if err != nil {
 		return fmt.Errorf("could not get current databases: %v", err)
@@ -321,15 +330,6 @@ func (c *Cluster) syncDatabases() error {
 	if len(createDatabases)+len(alterOwnerDatabases) == 0 {
 		return nil
 	}
-
-	if err = c.initDbConn(); err != nil {
-		return fmt.Errorf("could not init database connection")
-	}
-	defer func() {
-		if err = c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection: %v", err)
-		}
-	}()
 
 	for datname, owner := range createDatabases {
 		if err = c.executeCreateDatabase(datname, owner); err != nil {

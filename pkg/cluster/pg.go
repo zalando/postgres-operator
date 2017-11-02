@@ -138,21 +138,14 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 	return users, nil
 }
 
+// getDatabases returns the map of current databases with owners
+// The caller is responsbile for openinging and closing the database connection
 func (c *Cluster) getDatabases() (map[string]string, error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
 	dbs := make(map[string]string)
-
-	if err = c.initDbConn(); err != nil {
-		return nil, fmt.Errorf("could not init db connection")
-	}
-	defer func() {
-		if err = c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close db connection: %v", err)
-		}
-	}()
 
 	if rows, err = c.pgDb.Query(getDatabasesSQL); err != nil {
 		return nil, fmt.Errorf("could not query database: %v", err)
