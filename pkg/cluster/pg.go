@@ -139,7 +139,7 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 }
 
 // getDatabases returns the map of current databases with owners
-// The caller is responsbile for opening and closing the database connection
+// The caller is responsible for opening and closing the database connection
 func (c *Cluster) getDatabases() (map[string]string, error) {
 	var (
 		rows *sql.Rows
