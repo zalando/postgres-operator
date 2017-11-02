@@ -423,7 +423,8 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 	// Service
 	if !reflect.DeepEqual(c.generateService(Master, &oldSpec.Spec), c.generateService(Master, &newSpec.Spec)) ||
 		!reflect.DeepEqual(c.generateService(Replica, &oldSpec.Spec), c.generateService(Replica, &newSpec.Spec)) ||
-		oldSpec.Spec.ReplicaLoadBalancer != oldSpec.Spec.ReplicaLoadBalancer {
+		oldSpec.Spec.ReplicaLoadBalancer != newSpec.Spec.ReplicaLoadBalancer {
+		c.logger.Debugf("syncing services")
 		if err := c.syncServices(); err != nil {
 			c.logger.Errorf("could not sync services: %v", err)
 		}
@@ -431,6 +432,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 
 	// Secrets
 	if !reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) {
+		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
 		}
@@ -488,6 +490,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 
 	// Databases
 	if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
+		c.logger.Infof("syncing databases")
 		if err := c.syncDbs(); err != nil {
 			c.logger.Errorf("could not sync databases: %v", err)
 		}
