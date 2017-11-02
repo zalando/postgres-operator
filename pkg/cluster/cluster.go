@@ -417,7 +417,8 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 
 	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
 		c.logger.Warningf("postgresql version change(%q -> %q) is not allowed", oldSpec.Spec.PgVersion, newSpec.Spec.PgVersion)
-		return nil
+		//we need that hack to generate statefulset with the old version
+		newSpec.Spec.PgVersion = oldSpec.Spec.PgVersion
 	}
 
 	// Service
