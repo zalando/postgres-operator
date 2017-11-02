@@ -134,6 +134,12 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err := c.createService(role); err != nil {
 		if k8sutil.ResourceAlreadyExists(err) {
 			c.logger.Infof("%s service %q already exists", role, util.NameFromMeta(svc.ObjectMeta))
+			svc, err := c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{})
+			if err == nil {
+				c.Services[role] = svc
+			} else {
+				c.logger.Infof("could not fetch existing %s service: %v", role, err)
+			}
 		} else {
 			return fmt.Errorf("could not create missing %s service: %v", role, err)
 		}
@@ -173,6 +179,12 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	if ep, err := c.createEndpoint(role); err != nil {
 		if k8sutil.ResourceAlreadyExists(err) {
 			c.logger.Infof("%s endpoint %q already exists", role, util.NameFromMeta(ep.ObjectMeta))
+			ep, err := c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
+			if err == nil {
+				c.Endpoints[role] = ep
+			} else {
+				c.logger.Infof("could not fetch existing %s endpoint: %v", role, err)
+			}
 		} else {
 			return fmt.Errorf("could not create missing %s endpoint: %v", role, err)
 		}
