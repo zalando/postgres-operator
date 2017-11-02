@@ -2,8 +2,10 @@ package cluster
 
 import (
 	"fmt"
+	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -59,6 +61,11 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		c.logger.Debugf("syncing roles")
 		if err = c.syncRoles(true); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)
+			return
+		}
+		c.logger.Debugf("syncing databases")
+		if err = c.syncDatabases(); err != nil {
+			err = fmt.Errorf("could not sync databases: %v", err)
 			return
 		}
 	}
@@ -394,6 +401,62 @@ func (c *Cluster) syncVolumes() error {
 	}
 
 	c.logger.Infof("volumes have been synced successfully")
+
+	return nil
+}
+
+func (c *Cluster) samePDBWith(pdb *policybeta1.PodDisruptionBudget) (match bool, reason string) {
+	match = reflect.DeepEqual(pdb.Spec, c.PodDisruptionBudget.Spec)
+	if !match {
+		reason = "new service spec doesn't match the current one"
+	}
+
+	return
+}
+
+func (c *Cluster) syncDatabases() error {
+	c.setProcessName("syncing databases")
+
+	createDatabases := make(map[string]string)
+	alterOwnerDatabases := make(map[string]string)
+
+	if err := c.initDbConn(); err != nil {
+		return fmt.Errorf("could not init database connection")
+	}
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}()
+
+	currentDatabases, err := c.getDatabases()
+	if err != nil {
+		return fmt.Errorf("could not get current databases: %v", err)
+	}
+
+	for datname, newOwner := range c.Spec.Databases {
+		currentOwner, exists := currentDatabases[datname]
+		if !exists {
+			createDatabases[datname] = newOwner
+		} else if currentOwner != newOwner {
+			alterOwnerDatabases[datname] = newOwner
+		}
+	}
+
+	if len(createDatabases)+len(alterOwnerDatabases) == 0 {
+		return nil
+	}
+
+	for datname, owner := range createDatabases {
+		if err = c.executeCreateDatabase(datname, owner); err != nil {
+			return err
+		}
+	}
+	for datname, owner := range alterOwnerDatabases {
+		if err = c.executeAlterDatabaseOwner(datname, owner); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
