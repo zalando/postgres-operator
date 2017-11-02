@@ -93,6 +93,50 @@ We can use the generated secret of the `postgres` robot user to connect to our `
     $ psql -U postgres
 
 
+### Configuration Options
+
+The operator can be configured with the provided ConfigMap (`manifests/configmap.yaml`).
+
+#### Use Taints and Tolerations for Dedicated Postgres Nodes
+
+To ensure Postgres pods are running on nodes without any other application pods, you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) and configure the required toleration in the operator ConfigMap.
+
+As an example you can set following node taint:
+
+```
+$ kubectl taint nodes <nodeName> postgres=:NoSchedule
+```
+
+And configure the toleration for the Postgres pods by adding following line to the ConfigMap:
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  toleration: "key:postgres,operator:Exists,effect:NoSchedule"
+  ...
+```
+
+Or you can specify and/or overwrite the tolerations for each postgres instance in the postgres manifest:
+
+```
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-minimal-cluster
+spec:
+  teamId: "ACID"
+  tolerations:
+  - key: postgres
+    operator: Exists
+    effect: NoSchedule
+```
+
+Please be ware that the taint and toleration only ensures that no other pod gets scheduled to the "postgres" node but not that Postgres pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
+
+
 # Setup development environment
 
 The following steps guide you through the setup to work on the operator itself.
