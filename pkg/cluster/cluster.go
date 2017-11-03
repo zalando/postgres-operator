@@ -621,10 +621,6 @@ func (c *Cluster) syncRobotUsers() error {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
 
-		if _, ok := c.pgUsers[username]; !ok {
-			delete(c.pgUsers, username)
-		}
-
 		if u, ok := c.pgUsers[username]; ok {
 			u.Flags = flags
 			continue
