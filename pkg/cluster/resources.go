@@ -352,7 +352,11 @@ func (c *Cluster) createEndpoint(role PostgresRole) (*v1.Endpoints, error) {
 	if c.Endpoints[role] != nil {
 		return nil, fmt.Errorf("%s endpoint already exists in the cluster", role)
 	}
-	endpointsSpec := c.generateEndpoint(role, nil)
+	subsets := make([]v1.EndpointSubset, 0)
+	if role == Master {
+		//TODO: set subsets to the master
+	}
+	endpointsSpec := c.generateEndpoint(role, subsets)
 
 	endpoints, err := c.KubeClient.Endpoints(endpointsSpec.Namespace).Create(endpointsSpec)
 	if err != nil {

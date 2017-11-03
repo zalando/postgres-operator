@@ -374,9 +374,6 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
 	}
-	if pgOld.ResourceVersion == pgNew.ResourceVersion {
-		return
-	}
 	if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
 		return
 	}

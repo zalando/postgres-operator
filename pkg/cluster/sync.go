@@ -176,7 +176,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	}
 	c.Endpoints[role] = nil
 
-	// Endpoint does not exist
 	if role == Replica && !c.Spec.ReplicaLoadBalancer {
 		return nil
 	}
