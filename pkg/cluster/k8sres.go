@@ -55,8 +55,13 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) endpointName() string {
-	return c.Name
+func (c *Cluster) endpointName(role PostgresRole) string {
+	name := c.Name
+	if role == Replica {
+		name = name + "-repl"
+	}
+
+	return name
 }
 
 func (c *Cluster) serviceName(role PostgresRole) string {
@@ -149,7 +154,7 @@ func (c *Cluster) generateSpiloJSONConfiguration(pg *spec.PostgresqlParam, patro
 	// maps and normal string items in the array of initdb options. We need
 	// both to convert the initial key-value to strings when necessary, and
 	// to de-duplicate the options supplied.
-PATRONI_INITDB_PARAMS:
+PatroniInitDBParams:
 	for _, k := range initdbOptionNames {
 		v := patroni.InitDB[k]
 		for i, defaultParam := range config.Bootstrap.Initdb {
@@ -159,7 +164,7 @@ PATRONI_INITDB_PARAMS:
 					for k1 := range defaultParam.(map[string]string) {
 						if k1 == k {
 							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
-							continue PATRONI_INITDB_PARAMS
+							continue PatroniInitDBParams
 						}
 					}
 				}
@@ -167,12 +172,12 @@ PATRONI_INITDB_PARAMS:
 				{
 					/* if the option already occurs in the list */
 					if defaultParam.(string) == v {
-						continue PATRONI_INITDB_PARAMS
+						continue PatroniInitDBParams
 					}
 				}
 			default:
 				c.logger.Warningf("unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
-				continue PATRONI_INITDB_PARAMS
+				continue PatroniInitDBParams
 			}
 		}
 		// The following options are known to have no parameters
@@ -356,7 +361,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	if cloneDescription.ClusterName != "" {
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
-	privilegedMode := bool(true)
+	privilegedMode := true
 	container := v1.Container{
 		Name:            c.containerName(),
 		Image:           c.OpConfig.DockerImage,
@@ -411,7 +416,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	return &template
 }
 
-func (c *Cluster) generateStatefulSet(spec spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
+func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
 	resourceRequirements, err := c.resourceRequirements(spec.Resources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
@@ -513,7 +518,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
-func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v1.Service {
 	var dnsName string
 
 	if role == Master {
@@ -534,12 +539,12 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	var annotations map[string]string
 
 	// Examine the per-cluster load balancer setting, if it is not defined - check the operator configuration.
-	if (newSpec.UseLoadBalancer != nil && *newSpec.UseLoadBalancer) ||
-		(newSpec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
+	if (spec.UseLoadBalancer != nil && *spec.UseLoadBalancer) ||
+		(spec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
 
 		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
-		allowedSourceRanges := newSpec.AllowedSourceRanges
+		allowedSourceRanges := spec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {
 			sourceRanges = allowedSourceRanges
 		}
@@ -566,12 +571,12 @@ func (c *Cluster) generateService(role PostgresRole, newSpec *spec.PostgresSpec)
 	return service
 }
 
-func (c *Cluster) generateMasterEndpoints(subsets []v1.EndpointSubset) *v1.Endpoints {
+func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.endpointName(),
+			Name:      c.endpointName(role),
 			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(Master),
+			Labels:    c.roleLabelsSet(role),
 		},
 	}
 	if len(subsets) > 0 {

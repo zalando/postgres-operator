@@ -193,7 +193,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			return
 		}
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Update(event.NewSpec); err != nil {
+		if err := cl.Update(event.OldSpec, event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
 
@@ -373,9 +373,6 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	pgNew, ok := cur.(*spec.Postgresql)
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
-	}
-	if pgOld.ResourceVersion == pgNew.ResourceVersion {
-		return
 	}
 	if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
 		return

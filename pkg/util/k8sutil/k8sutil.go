@@ -2,6 +2,7 @@ package k8sutil
 
 import (
 	"fmt"
+	"reflect"
 
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
@@ -9,10 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
+	"k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
+	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -99,5 +102,43 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1beta1()
 
 	return kubeClient, nil
+}
 
+// SameService compares the Services
+func SameService(cur, new *v1.Service) (match bool, reason string) {
+	//TODO: improve comparison
+	if cur.Spec.Type != new.Spec.Type {
+		return false, fmt.Sprintf("new service's type %q doesn't match the current one %q",
+			new.Spec.Type, cur.Spec.Type)
+	}
+
+	oldSourceRanges := cur.Spec.LoadBalancerSourceRanges
+	newSourceRanges := new.Spec.LoadBalancerSourceRanges
+
+	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
+	if (len(oldSourceRanges) == 0) && (len(newSourceRanges) == 0) {
+		return true, ""
+	}
+	if !reflect.DeepEqual(oldSourceRanges, newSourceRanges) {
+		return false, "new service's LoadBalancerSourceRange doesn't match the current one"
+	}
+
+	oldDNSAnnotation := cur.Annotations[constants.ZalandoDNSNameAnnotation]
+	newDNSAnnotation := new.Annotations[constants.ZalandoDNSNameAnnotation]
+	if oldDNSAnnotation != newDNSAnnotation {
+		return false, fmt.Sprintf("new service's %q annotation doesn't match the current one", constants.ZalandoDNSNameAnnotation)
+	}
+
+	return true, ""
+}
+
+// SamePDB compares the PodDisruptionBudgets
+func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason string) {
+	//TODO: improve comparison
+	match = reflect.DeepEqual(new.Spec, cur.Spec)
+	if !match {
+		reason = "new service spec doesn't match the current one"
+	}
+
+	return
 }

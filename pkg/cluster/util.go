@@ -144,12 +144,9 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 	}
 }
 
-func (c *Cluster) logVolumeChanges(old, new spec.Volume, reason string) {
+func (c *Cluster) logVolumeChanges(old, new spec.Volume) {
 	c.logger.Infof("volume specification has been changed")
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
-	if reason != "" {
-		c.logger.Infof("reason: %s", reason)
-	}
 }
 
 func (c *Cluster) getOAuthToken() (string, error) {
