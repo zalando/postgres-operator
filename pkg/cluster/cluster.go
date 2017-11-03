@@ -607,7 +607,7 @@ func (c *Cluster) initSystemUsers() {
 }
 
 // syncRobotUsers syncs adds users from the operator Spec
-// to the lsit of users known to the operator.
+// to the list of users known to the operator.
 func (c *Cluster) syncRobotUsers() error {
 	for newUsername, newUserFlags := range c.Spec.Users {
 		if !isValidUsername(newUsername) {
