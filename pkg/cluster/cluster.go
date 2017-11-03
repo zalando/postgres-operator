@@ -606,41 +606,36 @@ func (c *Cluster) initSystemUsers() {
 	}
 }
 
+// syncRobotUsers syncs adds users from the operator Spec
+// to the lsit of users known to the operator.
 func (c *Cluster) syncRobotUsers() error {
-	curUsers := make(map[string]struct{})
-	for k := range c.pgUsers {
-		curUsers[k] = struct{}{}
-	}
-	for username, userFlags := range c.Spec.Users {
-		if !isValidUsername(username) {
-			return fmt.Errorf("invalid username: '%v'", username)
+	for newUsername, newUserFlags := range c.Spec.Users {
+		if !isValidUsername(newUsername) {
+			return fmt.Errorf("invalid username: %q", newUsername)
 		}
 
-		flags, err := normalizeUserFlags(userFlags)
+		newUserFlagsNormalized, err := normalizeUserFlags(newUserFlags)
 		if err != nil {
-			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
+			return fmt.Errorf("invalid flags for user %q: %v", newUsername, err)
 		}
 
-		if _, ok := c.pgUsers[username]; !ok {
-			delete(c.pgUsers, username)
-		}
-
-		if u, ok := c.pgUsers[username]; ok {
-			u.Flags = flags
-			continue
-		}
-		delete(curUsers, username)
-		c.pgUsers[username] = spec.PgUser{
-			Name:     username,
-			Password: util.RandomPassword(constants.PasswordLength),
-			Flags:    flags,
+		if _, ok := c.pgUsers[newUsername]; !ok {
+			c.pgUsers[newUsername] = spec.PgUser{
+				Name:     newUsername,
+				Password: util.RandomPassword(constants.PasswordLength),
+				Flags:    newUserFlagsNormalized,
+			}
+		} else {
+			existingUser := c.pgUsers[newUsername]
+			deletedFlags, addedFlags := util.SymmetricDifferenceStringSlices(existingUser.Flags, newUserFlagsNormalized)
+			if len(deletedFlags)+len(addedFlags) == 0 {
+				continue
+			}
+			existingUser.Flags = newUserFlagsNormalized
+			c.logger.Infof("changed flags of user %q, deleted: %v, added: %v",
+				newUsername, deletedFlags, addedFlags)
 		}
 	}
-
-	for k := range curUsers {
-		delete(c.pgUsers, k)
-	}
-
 	return nil
 }
 

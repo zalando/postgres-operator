@@ -77,6 +77,33 @@ OUTER:
 	return result, len(result) == 0
 }
 
+// SymmetricDifferenceStringSlices finds elements in the first slice that are not in the second one and vice versa.
+func SymmetricDifferenceStringSlices(listA []string, listB []string) (onlyInFirst []string, onlyInSecond []string) {
+	mapA := make(map[string]bool)
+	mapB := make(map[string]bool)
+
+	onlyInFirst = []string{}
+	onlyInSecond = []string{}
+
+	for _, val := range listA {
+		mapA[val] = true
+	}
+	for _, val := range listB {
+		if _, ok := mapA[val]; !ok {
+			mapB[val] = true
+		} else {
+			delete(mapA, val)
+		}
+	}
+	for key := range mapA {
+		onlyInFirst = append(onlyInFirst, key)
+	}
+	for key := range mapB {
+		onlyInSecond = append(onlyInSecond, key)
+	}
+	return
+}
+
 // FindNamedStringSubmatch returns a map of strings holding the text of the matches of the r regular expression
 func FindNamedStringSubmatch(r *regexp.Regexp, s string) map[string]string {
 	matches := r.FindStringSubmatch(s)
