@@ -65,12 +65,13 @@ type Config struct {
 	TeamAdminRole         string         `name:"team_admin_role" default:"admin"`
 	EnableLoadBalancer    bool           `name:"enable_load_balancer" default:"true"`
 	MasterDNSNameFormat   stringTemplate `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
-	ReplicaDNSNameFormat  stringTemplate `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
-	PDBNameFormat         stringTemplate `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
-	Workers               uint32         `name:"workers" default:"4"`
-	APIPort               int            `name:"api_port" default:"8080"`
-	RingLogLines          int            `name:"ring_log_lines" default:"100"`
-	ClusterHistoryEntries int            `name:"cluster_history_entries" default:"1000"`
+	ReplicaDNSNameFormat  stringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	PDBNameFormat         stringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	Workers               uint32            `name:"workers" default:"4"`
+	APIPort               int               `name:"api_port" default:"8080"`
+	RingLogLines          int               `name:"ring_log_lines" default:"100"`
+	ClusterHistoryEntries int               `name:"cluster_history_entries" default:"1000"`
+	APIRolesParameters    map[string]string `name:"api_roles_configuration" default:"log_statement:all"`
 
 	PodTerminateGracePeriod time.Duration `name:"pod_terminate_grace_period" default:"5m"`
 }
