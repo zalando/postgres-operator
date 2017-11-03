@@ -359,7 +359,11 @@ func (c *Cluster) syncRoles(readFromDatabase bool) error {
 	if err != nil {
 		return fmt.Errorf("could not init db connection: %v", err)
 	}
-	defer c.closeDbConn()
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close db connection: %v", err)
+		}
+	}()
 
 	if readFromDatabase {
 		for _, u := range c.pgUsers {

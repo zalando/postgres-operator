@@ -39,3 +39,4 @@ data:
   pod_terminate_grace_period: 5m
   pdb_name_format: "postgres-{cluster}-pdb"
   eol_node_label: "eol:true"
+  api_roles_configuration: "log_statement:all"

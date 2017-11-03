@@ -44,6 +44,7 @@ type syncUserOperation int
 const (
 	PGSyncUserAdd = iota
 	PGsyncUserAlter
+	PGSyncAlterSet // handle ALTER ROLE SET parameter = value
 )
 
 // PodEvent describes the event for a single Pod
@@ -61,6 +62,7 @@ type PgUser struct {
 	Password string
 	Flags    []string
 	MemberOf []string
+	Parameters map[string]string
 }
 
 // PgUserMap maps user names to the definitions.

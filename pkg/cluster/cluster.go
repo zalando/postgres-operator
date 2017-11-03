@@ -645,7 +645,12 @@ func (c *Cluster) initHumanUsers() error {
 			}
 		}
 
-		c.pgUsers[username] = spec.PgUser{Name: username, Flags: flags, MemberOf: memberOf}
+		c.pgUsers[username] = spec.PgUser{
+			Name: username,
+			Flags: flags,
+			MemberOf: memberOf,
+			Parameters: c.OpConfig.APIRolesParameters,
+		}
 	}
 
 	return nil
