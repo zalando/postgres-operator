@@ -201,6 +201,14 @@ The following steps will get you the docker image built and deployed.
     $ make docker
     $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
 
+
+### Operator Configuration Parameters
+
+* api_roles_configuration - a map represented as *"key1:value1,key2:value2"*
+of configuration parameters applied to the roles fetched from the API.
+By default is set to *"log_statement:all"*. See [PostgreSQL documentation on ALTER ROLE .. SET](https://www.postgresql.org/docs/current/static/sql-alterrole.html) for to learn about the available options.
+
+
 ### Debugging the operator itself
 
 There is a web interface in the operator to observe its internal state. The operator listens on port 8080. It is possible to expose it to the localhost:8080 by doing:
