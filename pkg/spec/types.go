@@ -58,10 +58,10 @@ type PodEvent struct {
 
 // PgUser contains information about a single user.
 type PgUser struct {
-	Name     string
-	Password string
-	Flags    []string
-	MemberOf []string
+	Name       string
+	Password   string
+	Flags      []string
+	MemberOf   []string
 	Parameters map[string]string
 }
 

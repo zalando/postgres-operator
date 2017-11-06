@@ -11,14 +11,14 @@ import (
 )
 
 const (
-	createUserSQL    = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s %s;`
-	alterUserSQL     = `ALTER ROLE "%s" %s`
+	createUserSQL        = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s %s;`
+	alterUserSQL         = `ALTER ROLE "%s" %s`
 	alterRoleResetAllSQL = `ALTER ROLE "%s" RESET ALL`
-	alterRoleSetSQL	 = `ALTER ROLE "%s" SET %s TO %s`
-	grantToUserSQL   = `GRANT %s TO "%s"`
-	doBlockStmt      = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
-	passwordTemplate = "ENCRYPTED PASSWORD '%s'"
-	inRoleTemplate   = `IN ROLE %s`
+	alterRoleSetSQL      = `ALTER ROLE "%s" SET %s TO %s`
+	grantToUserSQL       = `GRANT %s TO "%s"`
+	doBlockStmt          = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
+	passwordTemplate     = "ENCRYPTED PASSWORD '%s'"
+	inRoleTemplate       = `IN ROLE %s`
 )
 
 // DefaultUserSyncStrategy implements a user sync strategy that merges already existing database users
@@ -173,7 +173,7 @@ func produceAlterStmt(user spec.PgUser) string {
 func produceAlterRoleSetStmts(user spec.PgUser) []string {
 	result := make([]string, 0)
 	result = append(result, fmt.Sprintf(alterRoleResetAllSQL, user.Name))
-	for key, value := range(user.Parameters) {
+	for key, value := range user.Parameters {
 		result = append(result, fmt.Sprintf(alterRoleSetSQL, user.Name, key, quoteValue(value)))
 	}
 	return result
@@ -196,7 +196,7 @@ func quoteMemberList(user spec.PgUser) string {
 func quoteValue(val string) string {
 	if (strings.HasPrefix(val, `"`) && strings.HasSuffix(val, `"`)) ||
 		(strings.HasPrefix(val, `'`) && strings.HasSuffix(val, `'`)) {
-			return val
+		return val
 	}
-	return fmt.Sprintf(`"%s"`, strings.Trim(val," "))
+	return fmt.Sprintf(`"%s"`, strings.Trim(val, " "))
 }

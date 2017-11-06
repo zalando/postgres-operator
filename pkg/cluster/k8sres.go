@@ -262,7 +262,7 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 	}
 
 	podToleration := c.Config.OpConfig.PodToleration
-	if (len(podToleration["key"]) > 0 || len(podToleration["operator"]) > 0 || len(podToleration["value"]) > 0 || len(podToleration["effect"]) > 0) {
+	if len(podToleration["key"]) > 0 || len(podToleration["operator"]) > 0 || len(podToleration["value"]) > 0 || len(podToleration["effect"]) > 0 {
 		return []v1.Toleration{
 			{
 				Key:      podToleration["key"],
