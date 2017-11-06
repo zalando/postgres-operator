@@ -14,7 +14,7 @@ const (
 	createUserSQL    = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s %s;`
 	alterUserSQL     = `ALTER ROLE "%s" %s`
 	alterRoleResetAllSQL = `ALTER ROLE "%s" RESET ALL`
-	alterRoleSetSQL	 = `ALTER ROLE "%s" SET "%s" TO "%s"`
+	alterRoleSetSQL	 = `ALTER ROLE "%s" SET %s TO %s`
 	grantToUserSQL   = `GRANT %s TO "%s"`
 	doBlockStmt      = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
 	passwordTemplate = "ENCRYPTED PASSWORD '%s'"
@@ -96,7 +96,7 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 	queries := produceAlterRoleSetStmts(user)
 	query := fmt.Sprintf(doBlockStmt, strings.Join(queries, ";"))
 	if _, err = db.Query(query); err != nil {
-		err = fmt.Errorf("dB error: %v, query: %q", err, query)
+		err = fmt.Errorf("dB error: %v, query: %s", err, query)
 		return
 	}
 	return
@@ -122,7 +122,7 @@ func (s DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err
 
 	_, err = db.Query(query) // TODO: Try several times
 	if err != nil {
-		err = fmt.Errorf("dB error: %v, query: %q", err, query)
+		err = fmt.Errorf("dB error: %v, query: %s", err, query)
 		return
 	}
 
@@ -148,7 +148,7 @@ func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err 
 
 	_, err = db.Query(query) // TODO: Try several times
 	if err != nil {
-		err = fmt.Errorf("dB error: %v query %q", err, query)
+		err = fmt.Errorf("dB error: %v query %s", err, query)
 		return
 	}
 
@@ -157,7 +157,7 @@ func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err 
 
 func produceAlterStmt(user spec.PgUser) string {
 	// ALTER ROLE ... LOGIN ENCRYPTED PASSWORD ..
-	result := make([]string, 1)
+	result := make([]string, 0)
 	password := user.Password
 	flags := user.Flags
 
@@ -171,10 +171,10 @@ func produceAlterStmt(user spec.PgUser) string {
 }
 
 func produceAlterRoleSetStmts(user spec.PgUser) []string {
-	result := make([]string, 1)
+	result := make([]string, 0)
 	result = append(result, fmt.Sprintf(alterRoleResetAllSQL, user.Name))
 	for key, value := range(user.Parameters) {
-		result = append(result, fmt.Sprintf(alterRoleSetSQL, user.Name, key, value))
+		result = append(result, fmt.Sprintf(alterRoleSetSQL, user.Name, key, quoteValue(value)))
 	}
 	return result
 }
@@ -190,4 +190,13 @@ func quoteMemberList(user spec.PgUser) string {
 		memberof = append(memberof, fmt.Sprintf(`"%s"`, member))
 	}
 	return strings.Join(memberof, ",")
+}
+
+// quoteVal quotes values to be used at ALTER ROLE SET param = value if necessary
+func quoteValue(val string) string {
+	if (strings.HasPrefix(val, `"`) && strings.HasSuffix(val, `"`)) ||
+		(strings.HasPrefix(val, `'`) && strings.HasSuffix(val, `'`)) {
+			return val
+	}
+	return fmt.Sprintf(`"%s"`, strings.Trim(val," "))
 }
