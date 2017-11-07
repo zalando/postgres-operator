@@ -1,12 +1,12 @@
-# postgres operator
+# Postgres Operator
 
 [![Build Status](https://travis-ci.org/zalando-incubator/postgres-operator.svg?branch=master)](https://travis-ci.org/zalando-incubator/postgres-operator)
 [![Coverage Status](https://coveralls.io/repos/github/zalando-incubator/postgres-operator/badge.svg)](https://coveralls.io/github/zalando-incubator/postgres-operator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zalando-incubator/postgres-operator)](https://goreportcard.com/report/github.com/zalando-incubator/postgres-operator)
 
-The Postgres operator manages Postgres clusters in Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
+The Postgres operator manages PostgreSQL clusters on Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
 During the initial run it registers the [Custom Resource Definition (CRD)](https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions) for Postgres.
-The Postgresql CRD is essentially the schema that describes the contents of the manifests for deploying individual Postgresql clusters using Statefulsets and Patroni.
+The Postgresql CRD is essentially the schema that describes the contents of the manifests for deploying individual Postgresql clusters using Statefulsets and [Patroni](https://github.com/zalando/patroni).
 
 Once the operator is running, it performs the following actions:
 
