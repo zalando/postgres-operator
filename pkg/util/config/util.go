@@ -185,9 +185,6 @@ func getMapPairsFromString(value string) (pairs []string , err error) {
 	state := Plain
 	var start, quote int
 
-	if value == "" {
-		return
-	}
 	for i, ch := range(strings.Split(value, "")) {
 		if ch == `"` {
 			if state == Plain {
@@ -208,14 +205,16 @@ func getMapPairsFromString(value string) (pairs []string , err error) {
 			}
 		}
 		if ch == "," && state == Plain {
-			pairs = append(pairs, value[start:i])
-			start = i
+			pairs = append(pairs, strings.Trim(value[start:i]," \t"))
+			start = i + 1
 		}
 	}
 	if state != Plain {
-		err = fmt.Errorf("unclosed quote starting at position %d", quote)
+		err = fmt.Errorf("unclosed quote starting at position %d", quote + 1)
+		pairs = nil
+	} else {
+		pairs = append(pairs, strings.Trim(value[start:], " \t"))
 	}
-	pairs = append(pairs, value[start:])
 	return
 }
 
