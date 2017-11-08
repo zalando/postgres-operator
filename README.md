@@ -6,21 +6,25 @@
 
 The Postgres operator manages PostgreSQL clusters on Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
 During the initial run it registers the [Custom Resource Definition (CRD)](https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions) for Postgres.
-The Postgresql CRD is essentially the schema that describes the contents of the manifests for deploying individual Postgresql clusters using Statefulsets and [Patroni](https://github.com/zalando/patroni).
+The PostgreSQL CRD is essentially the schema that describes the contents of the manifests for deploying individual 
+PostgreSQL clusters using StatefulSets and [Patroni](https://github.com/zalando/patroni).
 
 Once the operator is running, it performs the following actions:
 
-* watches for new Postgres cluster manifests and deploys corresponding clusters.
-* watches for updates to existing manifests and changes corresponding properties of the running clusters.
-* watches for deletes of the existing manifests and deletes corresponding database clusters.
-* acts on an update to the operator definition itself and changes the running clusters when necessary (i.e. when the docker image inside the operator definition has been updated.)
-* periodically checks running clusters against the manifests and acts on the differences found.
+* watches for new PostgreSQL cluster manifests and deploys corresponding clusters
+* watches for updates to existing manifests and changes corresponding properties of the running clusters
+* watches for deletes of the existing manifests and deletes corresponding clusters
+* acts on an update to the operator definition itself and changes the running clusters when necessary 
+  (i.e. when the docker image inside the operator definition has been updated)
+* periodically checks running clusters against the manifests and acts on the differences found
 
-For instance, when the user creates a new custom object of type postgresql by submitting a new manifest with kubectl, the operator fetches that object and creates the corresponding kubernetes structures (StatefulSets, Services, Secrets) according to its definition.
+For instance, when the user creates a new custom object of type ``postgresql`` by submitting a new manifest with 
+``kubectl``, the operator fetches that object and creates the corresponding Kubernetes structures 
+(StatefulSets, Services, Secrets) according to its definition.
 
-Another example is changing the docker image inside the operator. In this case, the operator first goes to all Statefulsets
-it manages and updates them with the new docker images; afterwards, all pods from each Statefulset are killed one by one
-(rolling upgrade) and the replacements are spawned automatically by each Statefulset with the new docker image.
+Another example is changing the docker image inside the operator. In this case, the operator first goes to all StatefulSets
+it manages and updates them with the new docker images; afterwards, all pods from each StatefulSet are killed one by one
+(rolling upgrade) and the replacements are spawned automatically by each StatefulSet with the new docker image.
 
 ## Status
 
@@ -29,42 +33,44 @@ Please, report any issues discovered to https://github.com/zalando-incubator/pos
 
 ## Running and testing the operator
 
-The best way to test the operator is to run it in minikube. Minikube is a tool to run Kubernetes cluster locally.
+The best way to test the operator is to run it in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/). 
+Minikube is a tool to run Kubernetes cluster locally.
 
 ### Installing and starting minikube
 
 See [minikube installation guide](https://github.com/kubernetes/minikube/releases)
 
 Make sure you use the latest version of Minikube.
-After the installation, issue the
+
+After the installation, issue
 
     $ minikube start
 
 Note: if you are running on a Mac, make sure to use the [xhyve driver](https://github.com/kubernetes/minikube/blob/master/docs/drivers.md#xhyve-driver)
 instead of the default docker-machine one for performance reasons.
 
-One you have it started successfully, use [the quickstart guide](https://github.com/kubernetes/minikube#quickstart) in order
+Once you have it started successfully, use [the quickstart guide](https://github.com/kubernetes/minikube#quickstart) in order
 to test your that your setup is working.
 
-Note: if you use multiple kubernetes clusters, you can switch to minikube with `kubectl config use-context minikube`
+Note: if you use multiple Kubernetes clusters, you can switch to Minikube with `kubectl config use-context minikube`
 
 ### Create ConfigMap
 
-ConfigMap is used to store configuration of the operator
+ConfigMap is used to store the configuration of the operator
 
     $ kubectl --context minikube  create -f manifests/configmap.yaml
 
 ### Deploying the operator
 
-First you need to install the service account definition in your minikube cluster.
+First you need to install the service account definition in your Minikube cluster.
 
     $ kubectl --context minikube create -f manifests/serviceaccount.yaml
 
-Next deploy the postgers-operator from the Docker image Zalando is using:
+Next deploy the postgres-operator from the docker image Zalando is using:
 
     $ kubectl --context minikube create -f manifests/postgres-operator.yaml
 
-If you perfer to build the image yourself follow up down below.
+If you prefer to build the image yourself follow up down below.
 
 ### Check if CustomResourceDefinition has been registered
 
@@ -74,11 +80,11 @@ If you perfer to build the image yourself follow up down below.
 	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
 
 
-### Create a new spilo cluster
+### Create a new Spilo cluster
 
     $ kubectl --context minikube  create -f manifests/minimal-postgres-manifest.yaml
 
-### Watch Pods being created
+### Watch pods being created
 
     $ kubectl --context minikube  get pods -w --show-labels
 
@@ -97,9 +103,11 @@ We can use the generated secret of the `postgres` robot user to connect to our `
 
 The operator can be configured with the provided ConfigMap (`manifests/configmap.yaml`).
 
-#### Use Taints and Tolerations for Dedicated Postgres Nodes
+#### Use taints and tolerations for dedicated PostgreSQL nodes
 
-To ensure Postgres pods are running on nodes without any other application pods, you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) and configure the required toleration in the operator ConfigMap.
+To ensure Postgres pods are running on nodes without any other application pods, you can use 
+[taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) and configure the 
+required toleration in the operator ConfigMap.
 
 As an example you can set following node taint:
 
@@ -107,7 +115,7 @@ As an example you can set following node taint:
 $ kubectl taint nodes <nodeName> postgres=:NoSchedule
 ```
 
-And configure the toleration for the Postgres pods by adding following line to the ConfigMap:
+And configure the toleration for the PostgreSQL pods by adding following line to the ConfigMap:
 
 ```
 apiVersion: v1
@@ -119,7 +127,7 @@ data:
   ...
 ```
 
-Or you can specify and/or overwrite the tolerations for each postgres instance in the postgres manifest:
+Or you can specify and/or overwrite the tolerations for each PostgreSQL instance in the manifest:
 
 ```
 apiVersion: "acid.zalan.do/v1"
@@ -134,7 +142,8 @@ spec:
     effect: NoSchedule
 ```
 
-Please be ware that the taint and toleration only ensures that no other pod gets scheduled to the "postgres" node but not that Postgres pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
+Please be aware that the taint and toleration only ensures that no other pod gets scheduled to a PostgreSQL node 
+but not that PostgreSQL pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
 
 
 # Setup development environment
