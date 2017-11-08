@@ -238,29 +238,20 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 }
 
 func (c *Cluster) syncStatefulSet() error {
-	var (
-		err        error
-		rollUpdate bool
-	)
-	c.Statefulset, err = c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
 
-	if err != nil && !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get statefulset: %v", err)
-	}
-
-	if err != nil && k8sutil.ResourceNotFound(err) {
+	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
+	if err != nil {
+		if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not get statefulset: %v", err)
+		}
+		// statefulset does not exist, try to re-create it
 		c.logger.Infof("could not find the cluster's statefulset")
 		pods, err := c.listPods()
 		if err != nil {
 			return fmt.Errorf("could not list pods of the statefulset: %v", err)
 		}
 
-		if len(pods) > 0 {
-			c.logger.Infof("found pods without the statefulset: trigger rolling update")
-			rollUpdate = true
-		}
-
-		ss, err := c.createStatefulSet()
+		sset, err = c.createStatefulSet()
 		if err != nil {
 			return fmt.Errorf("could not create missing statefulset: %v", err)
 		}
@@ -269,14 +260,16 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("cluster is not ready: %v", err)
 		}
 
-		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(ss.ObjectMeta))
-		if !rollUpdate {
+		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
+		if len(pods) <= 0 {
 			return nil
 		}
-	}
+		c.logger.Infof("found pods without the statefulset: trigger rolling update")
 
-	/* TODO: should check that we need to replace the statefulset */
-	if !rollUpdate {
+	} else {
+		// statefulset is alrady there, make sure we use its definition in order to compare with the spec.
+		c.Statefulset = sset
+
 		desiredSS, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
@@ -303,6 +296,8 @@ func (c *Cluster) syncStatefulSet() error {
 			return nil
 		}
 	}
+	// if we get here we also need to re-create the pods (either leftovers from the old
+	// statefulset or those that got their configuration from the outdated statefulset)
 	c.logger.Debugln("performing rolling update")
 	if err := c.recreatePods(); err != nil {
 		return fmt.Errorf("could not recreate pods: %v", err)
