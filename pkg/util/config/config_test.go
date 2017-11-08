@@ -1,13 +1,13 @@
 package config
 
 import (
-	"testing"
-	"reflect"
 	"fmt"
+	"reflect"
+	"testing"
 )
 
 var getMapPairsFromStringTest = []struct {
-	in string
+	in       string
 	expected []string
 	err      error
 }{
@@ -15,7 +15,7 @@ var getMapPairsFromStringTest = []struct {
 	{`log_statement:none, search_path:'"$user", public'`, []string{"log_statement:none", `search_path:'"$user", public'`}, nil},
 	{`search_path:'"$user"`, nil, fmt.Errorf("unclosed quote starting at position 13")},
 	{"", []string{""}, nil},
-	{",,log_statement:all	,", []string{"","","log_statement:all", ""}, nil},
+	{",,log_statement:all	,", []string{"", "", "log_statement:all", ""}, nil},
 }
 
 func TestGetMapPairsFromString(t *testing.T) {
@@ -29,4 +29,3 @@ func TestGetMapPairsFromString(t *testing.T) {
 		}
 	}
 }
-

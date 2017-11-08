@@ -173,8 +173,8 @@ func produceAlterStmt(user spec.PgUser) string {
 func produceAlterRoleSetStmts(user spec.PgUser) []string {
 	result := make([]string, 0)
 	result = append(result, fmt.Sprintf(alterRoleResetAllSQL, user.Name))
-	for key, value := range user.Parameters {
-		result = append(result, fmt.Sprintf(alterRoleSetSQL, user.Name, key, quoteValue(value)))
+	for name, value := range user.Parameters {
+		result = append(result, fmt.Sprintf(alterRoleSetSQL, user.Name, name, quoteParameterValue(name, value)))
 	}
 	return result
 }
@@ -193,10 +193,25 @@ func quoteMemberList(user spec.PgUser) string {
 }
 
 // quoteVal quotes values to be used at ALTER ROLE SET param = value if necessary
-func quoteValue(val string) string {
-	if (strings.HasPrefix(val, `"`) && strings.HasSuffix(val, `"`)) ||
-		(strings.HasPrefix(val, `'`) && strings.HasSuffix(val, `'`)) {
+func quoteParameterValue(name, val string) string {
+	start := val[0]
+	end := val[len(val)-1]
+	if name == "search_path" {
+		// strip single quotes from the search_path. Those are required in the YAML configuration
+		// to quote values containing commas, as otherwise NewFromMap would treat each comma-separated
+		// part of such string as a separate map entry. However, a search_path is interpreted as a list
+		// only if it is not quoted, otherwise it is treated as a single value. Therefore, we strip
+		// single quotes here. Note that you can still use double quotes in order to escape schemas
+		// containing spaces (but something more complex, like double quotes inside double quotes or spaces
+		// in the schema name would break the parsing code in the operator.)
+		if start == '\'' && end == '\'' {
+			return fmt.Sprintf("%s", val[1:len(val)-1])
+		} else {
+			return val
+		}
+	}
+	if (start == '"' && end == '"') || (start == '\'' && end == '\'') {
 		return val
 	}
-	return fmt.Sprintf(`"%s"`, strings.Trim(val, " "))
+	return fmt.Sprintf(`'%s'`, strings.Trim(val, " "))
 }

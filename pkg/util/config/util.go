@@ -169,10 +169,10 @@ func processField(value string, field reflect.Value) error {
 	return nil
 }
 
-
 type parserState int
+
 const (
-	Plain parserState  = iota
+	Plain parserState = iota
 	DoubleQuoted
 	SingleQuoted
 )
@@ -180,12 +180,12 @@ const (
 // Split the pair candidates by commas not located inside open quotes
 // Escape characters are not supported for simplicity, as we don't
 // expect to find them inside the map values for our use cases
-func getMapPairsFromString(value string) (pairs []string , err error) {
+func getMapPairsFromString(value string) (pairs []string, err error) {
 	pairs = make([]string, 0)
 	state := Plain
 	var start, quote int
 
-	for i, ch := range(strings.Split(value, "")) {
+	for i, ch := range strings.Split(value, "") {
 		if ch == `"` {
 			if state == Plain {
 				state = DoubleQuoted
@@ -205,12 +205,12 @@ func getMapPairsFromString(value string) (pairs []string , err error) {
 			}
 		}
 		if ch == "," && state == Plain {
-			pairs = append(pairs, strings.Trim(value[start:i]," \t"))
+			pairs = append(pairs, strings.Trim(value[start:i], " \t"))
 			start = i + 1
 		}
 	}
 	if state != Plain {
-		err = fmt.Errorf("unclosed quote starting at position %d", quote + 1)
+		err = fmt.Errorf("unclosed quote starting at position %d", quote+1)
 		pairs = nil
 	} else {
 		pairs = append(pairs, strings.Trim(value[start:], " \t"))
