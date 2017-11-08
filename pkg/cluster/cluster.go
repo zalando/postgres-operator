@@ -648,7 +648,7 @@ func (c *Cluster) initHumanUsers() error {
 			Name:       username,
 			Flags:      flags,
 			MemberOf:   memberOf,
-			Parameters: c.OpConfig.APIRolesParameters,
+			Parameters: c.OpConfig.TeamAPIRoleConfiguration,
 		}
 	}
 

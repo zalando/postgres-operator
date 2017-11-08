@@ -50,30 +50,29 @@ type Config struct {
 	CRD
 	Resources
 	Auth
-	Namespace             string            `name:"namespace"`
-	EtcdHost              string            `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
-	DockerImage           string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
-	ServiceAccountName    string            `name:"service_account_name" default:"operator"`
-	DbHostedZone          string            `name:"db_hosted_zone" default:"db.example.com"`
-	EtcdScope             string            `name:"etcd_scope" default:"service"`
-	WALES3Bucket          string            `name:"wal_s3_bucket"`
-	KubeIAMRole           string            `name:"kube_iam_role"`
-	DebugLogging          bool              `name:"debug_logging" default:"true"`
-	EnableDBAccess        bool              `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI        bool              `name:"enable_teams_api" default:"true"`
-	EnableTeamSuperuser   bool              `name:"enable_team_superuser" default:"false"`
-	TeamAdminRole         string            `name:"team_admin_role" default:"admin"`
-	EnableLoadBalancer    bool              `name:"enable_load_balancer" default:"true"`
-	MasterDNSNameFormat   stringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
-	ReplicaDNSNameFormat  stringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
-	PDBNameFormat         stringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
-	Workers               uint32            `name:"workers" default:"4"`
-	APIPort               int               `name:"api_port" default:"8080"`
-	RingLogLines          int               `name:"ring_log_lines" default:"100"`
-	ClusterHistoryEntries int               `name:"cluster_history_entries" default:"1000"`
-	APIRolesParameters    map[string]string `name:"api_roles_configuration" default:"log_statement:'all'"`
-
-	PodTerminateGracePeriod time.Duration `name:"pod_terminate_grace_period" default:"5m"`
+	Namespace                string            `name:"namespace"`
+	EtcdHost                 string            `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
+	DockerImage              string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
+	ServiceAccountName       string            `name:"service_account_name" default:"operator"`
+	DbHostedZone             string            `name:"db_hosted_zone" default:"db.example.com"`
+	EtcdScope                string            `name:"etcd_scope" default:"service"`
+	WALES3Bucket             string            `name:"wal_s3_bucket"`
+	KubeIAMRole              string            `name:"kube_iam_role"`
+	DebugLogging             bool              `name:"debug_logging" default:"true"`
+	EnableDBAccess           bool              `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI           bool              `name:"enable_teams_api" default:"true"`
+	EnableTeamSuperuser      bool              `name:"enable_team_superuser" default:"false"`
+	TeamAdminRole            string            `name:"team_admin_role" default:"admin"`
+	EnableLoadBalancer       bool              `name:"enable_load_balancer" default:"true"`
+	MasterDNSNameFormat      stringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
+	ReplicaDNSNameFormat     stringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	PDBNameFormat            stringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	Workers                  uint32            `name:"workers" default:"4"`
+	APIPort                  int               `name:"api_port" default:"8080"`
+	RingLogLines             int               `name:"ring_log_lines" default:"100"`
+	ClusterHistoryEntries    int               `name:"cluster_history_entries" default:"1000"`
+	TeamAPIRoleConfiguration map[string]string `name:"team_api_role_configuration" default:"log_statement:'all'"`
+	PodTerminateGracePeriod  time.Duration 	   `name:"pod_terminate_grace_period" default:"5m"`
 }
 
 // MustMarshal marshals the config or panics
