@@ -204,7 +204,7 @@ The following steps will get you the docker image built and deployed.
 
 ### Operator Configuration Parameters
 
-* api_roles_configuration - a map represented as *"key1:value1,key2:value2"*
+* team_api_role_configuration - a map represented as *"key1:value1,key2:value2"*
 of configuration parameters applied to the roles fetched from the API.
 By default is set to *"log_statement:all"*. See [PostgreSQL documentation on ALTER ROLE .. SET](https://www.postgresql.org/docs/current/static/sql-alterrole.html) for to learn about the available options.
 
