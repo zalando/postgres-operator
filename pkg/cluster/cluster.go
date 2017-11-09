@@ -375,6 +375,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's container environment doesn't match the current one")
 	}
+	if !reflect.DeepEqual(container1.EnvFrom, container2.EnvFrom) {
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's container environment sources doesn't match the current one")
+	}
 
 	if needsRollUpdate || needsReplace {
 		match = false
