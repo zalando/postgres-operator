@@ -1,0 +1,36 @@
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ric
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: operator
+  namespace: ric
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: postgres-operator
+  namespace: ric
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: postgres-operator
+    spec:
+      serviceAccountName: operator
+      containers:
+      - name: postgres-operator
+        image: registry.opensource.zalan.do/acid/postgres-operator:c17aabb
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONFIG_MAP_NAME
+          value: "default/postgres-operator"

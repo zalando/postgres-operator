@@ -1,0 +1,24 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: ric-minimal-cluster
+  namespace: ric
+spec:
+  teamId: "RIC"
+  volume:
+    size: 1Gi
+  numberOfInstances: 1
+  users:
+    # database owner
+    zalando:
+    - superuser
+    - createdb
+
+    # role for application foo
+    foo_user:
+  
+  #databases: name->owner
+  databases:
+    foo: zalando
+  postgresql:
+    version: "10"
