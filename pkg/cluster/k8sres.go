@@ -479,6 +479,11 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 func (c *Cluster) generateUserSecrets() (secrets map[string]*v1.Secret) {
 	secrets = make(map[string]*v1.Secret, len(c.pgUsers))
 	namespace := c.Namespace
+
+	if c.Spec.UsersSecretsNamespace != "" {
+		namespace = c.Spec.UsersSecretsNamespace
+	}
+
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
 		secret := c.generateSingleUserSecret(namespace, pgUser)

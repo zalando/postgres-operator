@@ -92,8 +92,9 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	TeamID              string   `json:"teamId"`
-	AllowedSourceRanges []string `json:"allowedSourceRanges"`
+	UsersSecretsNamespace string   `json:"usersSecretsNamespace"`
+	TeamID                string   `json:"teamId"`
+	AllowedSourceRanges   []string `json:"allowedSourceRanges"`
 	// EnableLoadBalancer  is a pointer, since it is important to know if that parameters is omitted from the manifest
 	UseLoadBalancer     *bool                `json:"useLoadBalancer,omitempty"`
 	ReplicaLoadBalancer bool                 `json:"replicaLoadBalancer,omitempty"`

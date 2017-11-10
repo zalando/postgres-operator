@@ -1,0 +1,23 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: postgres-operator
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: postgres-operator
+    spec:
+      serviceAccountName: operator
+      containers:
+      - name: postgres-operator
+        image: nboukeffa/postgres-operator:ce40e45-dirty
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: WATCH_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONFIG_MAP_NAME
+          value: "postgres-operator"
