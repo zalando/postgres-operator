@@ -280,7 +280,8 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	tolerationsSpec *[]v1.Toleration,
 	pgParameters *spec.PostgresqlParam,
 	patroniParameters *spec.Patroni,
-	cloneDescription *spec.CloneDescription) *v1.PodTemplateSpec {
+	cloneDescription *spec.CloneDescription,
+	dockerImage *string) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -362,9 +363,13 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 	privilegedMode := true
+	containerImage := c.OpConfig.DockerImage
+	if dockerImage != nil && *dockerImage != "" {
+		containerImage = *dockerImage
+	}
 	container := v1.Container{
 		Name:            c.containerName(),
-		Image:           c.OpConfig.DockerImage,
+		Image:           containerImage,
 		ImagePullPolicy: v1.PullIfNotPresent,
 		Resources:       *resourceRequirements,
 		Ports: []v1.ContainerPort{
@@ -422,7 +427,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone)
+	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
