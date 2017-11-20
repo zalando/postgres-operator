@@ -495,6 +495,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 
 		if !reflect.DeepEqual(oldSs, newSs) {
 			c.logger.Debugf("syncing statefulsets")
+			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet
 			if err := c.syncStatefulSet(); err != nil {
 				c.logger.Errorf("could not sync statefulsets: %v", err)
 				updateFailed = true
