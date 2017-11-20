@@ -175,6 +175,7 @@ const (
 	Plain parserState = iota
 	DoubleQuoted
 	SingleQuoted
+	Escape
 )
 
 // Split the pair candidates by commas not located inside open quotes
@@ -186,6 +187,9 @@ func getMapPairsFromString(value string) (pairs []string, err error) {
 	var start, quote int
 
 	for i, ch := range strings.Split(value, "") {
+		if (ch == `"` || ch == `'`) && i > 0 && value[i-1] == '\\' {
+			fmt.Printf("Parser warning: ecape character '\\' have no effect on quotes inside the configuration value %s\n", value)
+		}
 		if ch == `"` {
 			if state == Plain {
 				state = DoubleQuoted
@@ -210,7 +214,7 @@ func getMapPairsFromString(value string) (pairs []string, err error) {
 		}
 	}
 	if state != Plain {
-		err = fmt.Errorf("unclosed quote starting at position %d", quote+1)
+		err = fmt.Errorf("unmatched quote starting at position %d", quote+1)
 		pairs = nil
 	} else {
 		pairs = append(pairs, strings.Trim(value[start:], " \t"))
