@@ -13,7 +13,7 @@ var getMapPairsFromStringTest = []struct {
 }{
 	{"log_statement:all, work_mem:'4GB'", []string{"log_statement:all", "work_mem:'4GB'"}, nil},
 	{`log_statement:none, search_path:'"$user", public'`, []string{"log_statement:none", `search_path:'"$user", public'`}, nil},
-	{`search_path:'"$user"`, nil, fmt.Errorf("unclosed quote starting at position 13")},
+	{`search_path:'"$user"`, nil, fmt.Errorf("unmatched quote starting at position 13")},
 	{"", []string{""}, nil},
 	{",,log_statement:all	,", []string{"", "", "log_statement:all", ""}, nil},
 }
