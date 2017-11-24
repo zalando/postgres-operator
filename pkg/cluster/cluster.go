@@ -617,11 +617,19 @@ func (c *Cluster) initRobotUsers() error {
 		if err != nil {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
-
-		c.pgUsers[username] = spec.PgUser{
-			Name:     username,
-			Password: util.RandomPassword(constants.PasswordLength),
-			Flags:    flags,
+		if _, present := c.pgUsers[username]; !present {
+			c.pgUsers[username] = spec.PgUser{
+				Name:     username,
+				Password: util.RandomPassword(constants.PasswordLength),
+				Flags:    flags,
+			}
+		} else {
+			// avoid overwriting the password if the user is already there. The flags should be
+			// merged here, but since there is no mechanism to define them for non-robot roles
+			// they are assigned from the robot user.
+			c.logger.Debugf("merging user %q data", username)
+			user := c.pgUsers[username]
+			user.Flags = flags
 		}
 	}
 
@@ -643,6 +651,10 @@ func (c *Cluster) initHumanUsers() error {
 			if c.OpConfig.TeamAdminRole != "" {
 				memberOf = append(memberOf, c.OpConfig.TeamAdminRole)
 			}
+		}
+
+		if _, present := c.pgUsers[username]; present {
+			c.logger.Warnf("overwriting existing user %q with the data from the teams API")
 		}
 
 		c.pgUsers[username] = spec.PgUser{
