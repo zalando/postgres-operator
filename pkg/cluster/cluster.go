@@ -654,7 +654,7 @@ func (c *Cluster) initHumanUsers() error {
 		}
 
 		if _, present := c.pgUsers[username]; present {
-			c.logger.Warnf("overwriting existing user %q with the data from the teams API")
+			c.logger.Warnf("overwriting existing user %q with the data from the teams API", username)
 		}
 
 		c.pgUsers[username] = spec.PgUser{
