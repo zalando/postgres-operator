@@ -16,12 +16,12 @@ import (
 
 const (
 	getUserSQL = `SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.rolinherit,
-	        a.rolcreaterole, a.rolcreatedb, a.rolcanlogin,
+	        a.rolcreaterole, a.rolcreatedb, a.rolcanlogin, s.setconfig,
 	        ARRAY(SELECT b.rolname
 	              FROM pg_catalog.pg_auth_members m
 	              JOIN pg_catalog.pg_authid b ON (m.roleid = b.oid)
 	             WHERE m.member = a.oid) as memberof
-	 FROM pg_catalog.pg_authid a
+	 FROM pg_catalog.pg_authid a LEFT JOIN pg_db_role_setting s ON (a.oid = s.setrole AND s.setdatabase = 0::oid)
 	 WHERE a.rolname = ANY($1)
 	 ORDER BY 1;`
 
@@ -85,6 +85,9 @@ func (c *Cluster) initDbConn() error {
 	if finalerr != nil {
 		return fmt.Errorf("could not init db connection: %v", finalerr)
 	}
+	// Limit ourselves to a single connection and allow no idle connections.
+	conn.SetMaxOpenConns(1)
+	conn.SetMaxIdleConns(-1)
 
 	c.pgDb = conn
 
@@ -123,16 +126,26 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 		var (
 			rolname, rolpassword                                          string
 			rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool
-			memberof                                                      []string
+			roloptions, memberof                                          []string
 		)
 		err := rows.Scan(&rolname, &rolpassword, &rolsuper, &rolinherit,
-			&rolcreaterole, &rolcreatedb, &rolcanlogin, pq.Array(&memberof))
+			&rolcreaterole, &rolcreatedb, &rolcanlogin, pq.Array(&roloptions), pq.Array(&memberof))
 		if err != nil {
 			return nil, fmt.Errorf("error when processing user rows: %v", err)
 		}
 		flags := makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin)
 		// XXX: the code assumes the password we get from pg_authid is always MD5
-		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof}
+		parameters := make(map[string]string)
+		for _, option := range roloptions {
+			fields := strings.Split(option, "=")
+			if len(fields) != 2 {
+				c.logger.Warningf("skipping malformed option: %q", option)
+				continue
+			}
+			parameters[fields[0]] = fields[1]
+		}
+
+		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof, Parameters: parameters}
 	}
 
 	return users, nil
