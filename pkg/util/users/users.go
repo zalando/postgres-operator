@@ -60,7 +60,7 @@ func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
 				r.User.Name = newUser.Name
 				reqs = append(reqs, r)
 			}
-			if !reflect.DeepEqual(dbUser.Parameters, newUser.Parameters) {
+			if len(newUser.Parameters) > 0 && !reflect.DeepEqual(dbUser.Parameters, newUser.Parameters) {
 				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncAlterSet, User: newUser})
 			}
 		}
@@ -95,7 +95,7 @@ func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserReque
 func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql.DB) (err error) {
 	queries := produceAlterRoleSetStmts(user)
 	query := fmt.Sprintf(doBlockStmt, strings.Join(queries, ";"))
-	if _, err = db.Query(query); err != nil {
+	if err = runQueryDiscardResult(db, query); err != nil {
 		err = fmt.Errorf("dB error: %v, query: %s", err, query)
 		return
 	}
@@ -120,7 +120,7 @@ func (s DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err
 	}
 	query := fmt.Sprintf(createUserSQL, user.Name, strings.Join(userFlags, " "), userPassword)
 
-	_, err = db.Query(query) // TODO: Try several times
+	err = runQueryDiscardResult(db, query) // TODO: Try several times
 	if err != nil {
 		err = fmt.Errorf("dB error: %v, query: %s", err, query)
 		return
@@ -146,7 +146,7 @@ func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err 
 
 	query := fmt.Sprintf(doBlockStmt, strings.Join(resultStmt, ";"))
 
-	_, err = db.Query(query) // TODO: Try several times
+	err = runQueryDiscardResult(db, query) // TODO: Try several times
 	if err != nil {
 		err = fmt.Errorf("dB error: %v query %s", err, query)
 		return
@@ -214,4 +214,12 @@ func quoteParameterValue(name, val string) string {
 		return val
 	}
 	return fmt.Sprintf(`'%s'`, strings.Trim(val, " "))
+}
+
+func runQueryDiscardResult(db *sql.DB, sql string) error {
+	rows, err := db.Query(sql)
+	if rows != nil {
+		rows.Close()
+	}
+	return err
 }
