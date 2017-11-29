@@ -31,6 +31,7 @@ type Resources struct {
 	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
 	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
 	EOLNodeLabel            map[string]string `name:"eol_node_label" default:"eol:true"`
+	PodEnvironmentConfigMap string            `name:"pod_environment_configmap" default:""`
 }
 
 // Auth describes authentication specific configuration parameters

@@ -145,6 +145,38 @@ spec:
 Please be aware that the taint and toleration only ensures that no other pod gets scheduled to a PostgreSQL node 
 but not that PostgreSQL pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
 
+#### Custom Pod Environment Variables
+
+It is possible to configure a config map which is used by the Postgres pods as an additional provider for environment variables.
+
+One use case is to customize the Spilo image and configure it with environment variables. The config map with the additional settings is configured in the operator's main config map:
+
+**postgres-operator ConfigMap**
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  # referencing config map with custom settings
+  pod_environment_configmap: postgres-pod-config
+  ...
+```
+
+**referenced ConfigMap `postgres-pod-config`**
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-pod-config
+  namespace: default
+data:
+  MY_CUSTOM_VAR: value
+```
+
+This ConfigMap is then added as a source of environment variables to the Postgres StatefulSet/pods.
 
 # Setup development environment
 
