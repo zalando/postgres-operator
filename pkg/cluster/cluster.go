@@ -610,12 +610,12 @@ func (c *Cluster) initSystemUsers() {
 func (c *Cluster) initRobotUsers() error {
 	for username, userFlags := range c.Spec.Users {
 		if !isValidUsername(username) {
-			return fmt.Errorf("invalid username: '%v'", username)
+			return fmt.Errorf("invalid username: %q", username)
 		}
 
 		flags, err := normalizeUserFlags(userFlags)
 		if err != nil {
-			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
+			return fmt.Errorf("invalid flags for user %q: %v", username, err)
 		}
 		if _, present := c.pgUsers[username]; !present {
 			c.pgUsers[username] = spec.PgUser{
@@ -630,6 +630,7 @@ func (c *Cluster) initRobotUsers() error {
 			c.logger.Debugf("merging user %q data", username)
 			user := c.pgUsers[username]
 			user.Flags = flags
+			c.pgUsers[username] = user
 		}
 	}
 

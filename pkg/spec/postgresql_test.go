@@ -226,7 +226,7 @@ var unmarshalCluster = []struct {
 				TeamID:              "ACID",
 				AllowedSourceRanges: []string{"127.0.0.1/32"},
 				NumberOfInstances:   2,
-				Users:               map[string]userFlags{"zalando": {"superuser", "createdb"}},
+				Users:               map[string]UserFlags{"zalando": {"superuser", "createdb"}},
 				MaintenanceWindows: []MaintenanceWindow{{
 					Everyday:  false,
 					Weekday:   time.Monday,

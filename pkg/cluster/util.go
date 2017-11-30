@@ -17,6 +17,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
+	"sort"
 )
 
 func isValidUsername(username string) bool {
@@ -77,7 +78,7 @@ func normalizeUserFlags(userFlags []string) ([]string, error) {
 	if addLogin {
 		flags = append(flags, constants.RoleFlagLogin)
 	}
-
+	sort.Strings(flags)
 	return flags, nil
 }
 
