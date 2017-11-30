@@ -38,5 +38,6 @@ data:
   cluster_history_entries: "1000"
   pod_terminate_grace_period: 5m
   pdb_name_format: "postgres-{cluster}-pdb"
-  eol_node_label: "eol:true"
+  node_eol_label: "lifecycle-status:pending-decommission"
+  node_readiness_label: "lifecycle-status:ready"
   team_api_role_configuration: "log_statement:all"

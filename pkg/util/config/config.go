@@ -30,7 +30,8 @@ type Resources struct {
 	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
 	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
 	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
-	EOLNodeLabel            map[string]string `name:"eol_node_label" default:"eol:true"`
+	NodeEOLLabel            map[string]string `name:"node_eol_label" default:"lifecycle-status:pending-decommission"`
+	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:"lifecycle-status:ready"`
 }
 
 // Auth describes authentication specific configuration parameters
