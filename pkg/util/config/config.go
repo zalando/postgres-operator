@@ -30,7 +30,7 @@ type Resources struct {
 	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
 	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
 	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
-	NodeEOLLabel            map[string]string `name:"node_eol_label" default:"lifecycle-status:pending-decommission"`
+	NodeEOLLabel            map[string]string `name:"node_eol_label" default:"lifecycle-status:decomission-pending"`
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:"lifecycle-status:ready"`
 }
 
