@@ -55,13 +55,13 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		return
 	}
 
-	if nodePrev.Spec.Unschedulable && util.MapContains(nodePrev.Labels, c.opConfig.EOLNodeLabel) ||
-		!nodeCur.Spec.Unschedulable || !util.MapContains(nodeCur.Labels, c.opConfig.EOLNodeLabel) {
+	if nodePrev.Spec.Unschedulable && util.MapContains(nodePrev.Labels, c.opConfig.NodeEOLLabel) ||
+		!nodeCur.Spec.Unschedulable || !util.MapContains(nodeCur.Labels, c.opConfig.NodeEOLLabel) {
 		return
 	}
 
 	c.logger.Infof("node %q became unschedulable and has EOL labels: %q", util.NameFromMeta(nodeCur.ObjectMeta),
-		c.opConfig.EOLNodeLabel)
+		c.opConfig.NodeEOLLabel)
 
 	opts := metav1.ListOptions{
 		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),

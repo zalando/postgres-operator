@@ -319,6 +319,6 @@ func (c *Cluster) podIsEndOfLife(pod *v1.Pod) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return node.Spec.Unschedulable || util.MapContains(node.Labels, c.OpConfig.EOLNodeLabel), nil
+	return node.Spec.Unschedulable || util.MapContains(node.Labels, c.OpConfig.NodeEOLLabel), nil
 
 }
