@@ -629,7 +629,7 @@ func (c *Cluster) initRobotUsers() error {
 			// avoid overwriting the password if the user is already there. The flags should be
 			// merged here, but since there is no mechanism to define them for non-robot roles
 			// they are assigned from the robot user.
-			c.logger.Debugf("merging user %q data", username)
+			c.logger.Debugf("merging manifest and infrastructure user %q data", username)
 			user := c.pgUsers[username]
 			user.Flags = flags
 			c.pgUsers[username] = user
