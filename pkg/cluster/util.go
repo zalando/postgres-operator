@@ -16,9 +16,45 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 	"sort"
 )
+
+// OAuthTokenGetter provides the method for fetching OAuth tokens
+type OAuthTokenGetter interface {
+	getOAuthToken() (string, error)
+}
+
+// OAuthTokenGetter enables fetching OAuth tokens by reading Kubernetes secrets
+type SecretOauthTokenGetter struct {
+	kubeClient           *k8sutil.KubernetesClient
+	OAuthTokenSecretName spec.NamespacedName
+}
+
+func NewSecretOauthTokenGetter(kubeClient *k8sutil.KubernetesClient,
+	OAuthTokenSecretName spec.NamespacedName) *SecretOauthTokenGetter {
+	return &SecretOauthTokenGetter{kubeClient, OAuthTokenSecretName}
+}
+
+func (g *SecretOauthTokenGetter) getOAuthToken() (string, error) {
+	//TODO: we can move this function to the Controller in case it will be needed there. As for now we use it only in the Cluster
+	// Temporary getting postgresql-operator secret from the NamespaceDefault
+	credentialsSecret, err := g.kubeClient.
+		Secrets(g.OAuthTokenSecretName.Namespace).
+		Get(g.OAuthTokenSecretName.Name, metav1.GetOptions{})
+
+	if err != nil {
+		return "", fmt.Errorf("could not get credentials secret: %v", err)
+	}
+	data := credentialsSecret.Data
+
+	if string(data["read-only-token-type"]) != "Bearer" {
+		return "", fmt.Errorf("wrong token type: %v", data["read-only-token-type"])
+	}
+
+	return string(data["read-only-token-secret"]), nil
+}
 
 func isValidUsername(username string) bool {
 	return userRegexp.MatchString(username)
@@ -150,26 +186,6 @@ func (c *Cluster) logVolumeChanges(old, new spec.Volume) {
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
 }
 
-func (c *Cluster) getOAuthToken() (string, error) {
-	//TODO: we can move this function to the Controller in case it will be needed there. As for now we use it only in the Cluster
-	// Temporary getting postgresql-operator secret from the NamespaceDefault
-	credentialsSecret, err := c.KubeClient.
-		Secrets(c.OpConfig.OAuthTokenSecretName.Namespace).
-		Get(c.OpConfig.OAuthTokenSecretName.Name, metav1.GetOptions{})
-
-	if err != nil {
-		c.logger.Debugf("oauth token secret name: %q", c.OpConfig.OAuthTokenSecretName)
-		return "", fmt.Errorf("could not get credentials secret: %v", err)
-	}
-	data := credentialsSecret.Data
-
-	if string(data["read-only-token-type"]) != "Bearer" {
-		return "", fmt.Errorf("wrong token type: %v", data["read-only-token-type"])
-	}
-
-	return string(data["read-only-token-secret"]), nil
-}
-
 func (c *Cluster) getTeamMembers() ([]string, error) {
 	if c.Spec.TeamID == "" {
 		return nil, fmt.Errorf("no teamId specified")
@@ -179,7 +195,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 		return []string{}, nil
 	}
 
-	token, err := c.getOAuthToken()
+	token, err := c.oauthTokenGetter.getOAuthToken()
 	if err != nil {
 		return []string{}, fmt.Errorf("could not get oauth token: %v", err)
 	}
