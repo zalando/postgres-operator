@@ -43,6 +43,10 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+type Interface interface {
+	TeamInfo(teamID, token string) (tm *Team, err error)
+}
+
 // API describes teams API
 type API struct {
 	httpClient

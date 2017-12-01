@@ -71,10 +71,11 @@ type Cluster struct {
 	deleteOptions    *metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
-	teamsAPIClient *teams.API
-	KubeClient     k8sutil.KubernetesClient //TODO: move clients to the better place?
-	currentProcess spec.Process
-	processMu      sync.RWMutex
+	teamsAPIClient   teams.Interface
+	oauthTokenGetter OAuthTokenGetter
+	KubeClient       k8sutil.KubernetesClient //TODO: move clients to the better place?
+	currentProcess   spec.Process
+	processMu        sync.RWMutex
 }
 
 type compareStatefulsetResult struct {
@@ -112,9 +113,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
-		teamsAPIClient:   teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger),
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
+	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
+	cluster.oauthTokenGetter = NewSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
 	cluster.patroni = patroni.New(cluster.logger)
 
 	return cluster
