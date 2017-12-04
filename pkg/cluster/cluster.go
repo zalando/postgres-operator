@@ -168,6 +168,11 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 // initUsers populates c.systemUsers and c.pgUsers maps.
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
+
+	// clear our the previous state of the cluster users (in case we are running a sync).
+	c.systemUsers = map[string]spec.PgUser{}
+	c.pgUsers = map[string]spec.PgUser{}
+
 	c.initSystemUsers()
 
 	if err := c.initInfrastructureRoles(); err != nil {
