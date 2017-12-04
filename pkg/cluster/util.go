@@ -60,6 +60,19 @@ func isValidUsername(username string) bool {
 	return userRegexp.MatchString(username)
 }
 
+func (c *Cluster) isProtectedUsername(username string) bool {
+	for _, protected := range c.OpConfig.ProtectedRoles {
+		if username == protected {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Cluster) isSystemUsername(username string) bool {
+	return (username == c.OpConfig.SuperUsername || username == c.OpConfig.ReplicationUsername)
+}
+
 func isValidFlag(flag string) bool {
 	for _, validFlag := range []string{constants.RoleFlagSuperuser, constants.RoleFlagLogin, constants.RoleFlagCreateDB,
 		constants.RoleFlagInherit, constants.RoleFlagReplication, constants.RoleFlagByPassRLS} {

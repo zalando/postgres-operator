@@ -74,6 +74,7 @@ type Config struct {
 	ClusterHistoryEntries    int               `name:"cluster_history_entries" default:"1000"`
 	TeamAPIRoleConfiguration map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
 	PodTerminateGracePeriod  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	ProtectedRoles           []string          `name:"protected_role_names" default:"admin"`
 }
 
 // MustMarshal marshals the config or panics

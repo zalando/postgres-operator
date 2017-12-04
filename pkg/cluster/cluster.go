@@ -615,6 +615,9 @@ func (c *Cluster) initRobotUsers() error {
 			return fmt.Errorf("invalid username: %q", username)
 		}
 
+		if c.avoidProtectedOrSystemRole(username, "manifest robot role") {
+			continue
+		}
 		flags, err := normalizeUserFlags(userFlags)
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
@@ -648,6 +651,9 @@ func (c *Cluster) initHumanUsers() error {
 		flags := []string{constants.RoleFlagLogin}
 		memberOf := []string{c.OpConfig.PamRoleName}
 
+		if c.avoidProtectedOrSystemRole(username, "API role") {
+			continue
+		}
 		if c.OpConfig.EnableTeamSuperuser {
 			flags = append(flags, constants.RoleFlagSuperuser)
 		} else {
@@ -677,6 +683,9 @@ func (c *Cluster) initInfrastructureRoles() error {
 		if !isValidUsername(username) {
 			return fmt.Errorf("invalid username: '%v'", username)
 		}
+		if c.avoidProtectedOrSystemRole(username, "infrastructure role") {
+			continue
+		}
 		flags, err := normalizeUserFlags(data.Flags)
 		if err != nil {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
@@ -685,6 +694,18 @@ func (c *Cluster) initInfrastructureRoles() error {
 		c.pgUsers[username] = data
 	}
 	return nil
+}
+
+func (c *Cluster) avoidProtectedOrSystemRole(username, purpose string) bool {
+	if c.isProtectedUsername(username) {
+		c.logger.Warnf("cannot initialize a new %s with the name of the protected user %q", purpose, username)
+		return true
+	}
+	if c.isSystemUsername(username) {
+		c.logger.Warnf("cannot initialize a new %s with the name of the system user %q", purpose, username)
+		return true
+	}
+	return false
 }
 
 // GetCurrentProcess provides name of the last process of the cluster
