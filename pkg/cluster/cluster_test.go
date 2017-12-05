@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"reflect"
@@ -11,7 +12,10 @@ import (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
-var cl = New(Config{}, k8sutil.KubernetesClient{}, spec.Postgresql{}, logger)
+var cl = New(Config{OpConfig: config.Config{ProtectedRoles: []string{"admin"},
+	Auth: config.Auth{SuperUsername: "postgres",
+		ReplicationUsername: "standby"}}},
+	k8sutil.KubernetesClient{}, spec.Postgresql{}, logger)
 
 func TestInitRobotUsers(t *testing.T) {
 	testName := "TestInitRobotUsers"
@@ -46,6 +50,12 @@ func TestInitRobotUsers(t *testing.T) {
 			manifestUsers: map[string]spec.UserFlags{"foobar": {"inherit", "noinherit"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`conflicting user flags: "NOINHERIT" and "INHERIT"`),
+		},
+		{
+			manifestUsers: map[string]spec.UserFlags{"admin": {"superuser"}, "postgres": {"createdb"}},
+			infraRoles:    map[string]spec.PgUser{},
+			result:        map[string]spec.PgUser{},
+			err:           nil,
 		},
 	}
 	for _, tt := range tests {
@@ -108,6 +118,11 @@ func TestInitHumanUsers(t *testing.T) {
 			teamRoles: []string{"foo"},
 			result: map[string]spec.PgUser{"foo": {Name: "foo", MemberOf: []string{cl.OpConfig.PamRoleName}, Flags: []string{"LOGIN", "SUPERUSER"}},
 				"bar": {Name: "bar", Flags: []string{"NOLOGIN"}}},
+		},
+		{
+			existingRoles: map[string]spec.PgUser{},
+			teamRoles:     []string{"admin", "standby"},
+			result:        map[string]spec.PgUser{},
 		},
 	}
 
