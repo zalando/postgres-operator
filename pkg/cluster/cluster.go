@@ -620,7 +620,7 @@ func (c *Cluster) initRobotUsers() error {
 			return fmt.Errorf("invalid username: %q", username)
 		}
 
-		if c.avoidProtectedOrSystemRole(username, "manifest robot role") {
+		if c.shouldAvoidProtectedOrSystemRole(username, "manifest robot role") {
 			continue
 		}
 		flags, err := normalizeUserFlags(userFlags)
@@ -656,7 +656,7 @@ func (c *Cluster) initHumanUsers() error {
 		flags := []string{constants.RoleFlagLogin}
 		memberOf := []string{c.OpConfig.PamRoleName}
 
-		if c.avoidProtectedOrSystemRole(username, "API role") {
+		if c.shouldAvoidProtectedOrSystemRole(username, "API role") {
 			continue
 		}
 		if c.OpConfig.EnableTeamSuperuser {
@@ -688,7 +688,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 		if !isValidUsername(username) {
 			return fmt.Errorf("invalid username: '%v'", username)
 		}
-		if c.avoidProtectedOrSystemRole(username, "infrastructure role") {
+		if c.shouldAvoidProtectedOrSystemRole(username, "infrastructure role") {
 			continue
 		}
 		flags, err := normalizeUserFlags(data.Flags)
@@ -701,7 +701,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 	return nil
 }
 
-func (c *Cluster) avoidProtectedOrSystemRole(username, purpose string) bool {
+func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) bool {
 	if c.isProtectedUsername(username) {
 		c.logger.Warnf("cannot initialize a new %s with the name of the protected user %q", purpose, username)
 		return true
