@@ -7,14 +7,20 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
+	"k8s.io/client-go/pkg/api/v1"
 	"reflect"
 	"testing"
 )
 
+const (
+	superUserName       = "postgres"
+	replicationUserName = "standby"
+)
+
 var logger = logrus.New().WithField("test", "cluster")
 var cl = New(Config{OpConfig: config.Config{ProtectedRoles: []string{"admin"},
-	Auth: config.Auth{SuperUsername: "postgres",
-		ReplicationUsername: "standby"}}},
+	Auth: config.Auth{SuperUsername: superUserName,
+		ReplicationUsername: replicationUserName}}},
 	k8sutil.KubernetesClient{}, spec.Postgresql{}, logger)
 
 func TestInitRobotUsers(t *testing.T) {
@@ -52,7 +58,7 @@ func TestInitRobotUsers(t *testing.T) {
 				`conflicting user flags: "NOINHERIT" and "INHERIT"`),
 		},
 		{
-			manifestUsers: map[string]spec.UserFlags{"admin": {"superuser"}, "postgres": {"createdb"}},
+			manifestUsers: map[string]spec.UserFlags{"admin": {"superuser"}, superUserName: {"createdb"}},
 			infraRoles:    map[string]spec.PgUser{},
 			result:        map[string]spec.PgUser{},
 			err:           nil,
@@ -121,7 +127,7 @@ func TestInitHumanUsers(t *testing.T) {
 		},
 		{
 			existingRoles: map[string]spec.PgUser{},
-			teamRoles:     []string{"admin", "standby"},
+			teamRoles:     []string{"admin", replicationUserName},
 			result:        map[string]spec.PgUser{},
 		},
 	}
@@ -135,6 +141,36 @@ func TestInitHumanUsers(t *testing.T) {
 
 		if !reflect.DeepEqual(cl.pgUsers, tt.result) {
 			t.Errorf("%s expects %#v, got %#v", testName, tt.result, cl.pgUsers)
+		}
+	}
+}
+
+func TestShouldDeleteSecret(t *testing.T) {
+	testName := "TestShouldDeleteSecret"
+
+	tests := []struct {
+		secret  *v1.Secret
+		outcome bool
+	}{
+		{
+			secret:  &v1.Secret{Data: map[string][]byte{"username": []byte("foobar")}},
+			outcome: true,
+		},
+		{
+			secret: &v1.Secret{Data: map[string][]byte{"username": []byte(superUserName)}},
+
+			outcome: false,
+		},
+		{
+			secret:  &v1.Secret{Data: map[string][]byte{"username": []byte(replicationUserName)}},
+			outcome: false,
+		},
+	}
+
+	for _, tt := range tests {
+		if outcome, username := cl.shouldDeleteSecret(tt.secret); outcome != tt.outcome {
+			t.Errorf("%s expects the check for deletion of the username %q secret to return %t, got %t",
+				testName, username, tt.outcome, outcome)
 		}
 	}
 }

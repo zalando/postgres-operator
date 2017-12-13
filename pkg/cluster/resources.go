@@ -473,7 +473,7 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 
 func (c *Cluster) createRoles() (err error) {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
-	return c.syncRoles(false)
+	return c.syncRoles()
 }
 
 // GetServiceMaster returns cluster's kubernetes master Service

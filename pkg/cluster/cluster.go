@@ -466,7 +466,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 
 		if !c.databaseAccessDisabled() {
 			c.logger.Debugf("syncing roles")
-			if err := c.syncRoles(true); err != nil {
+			if err := c.syncRoles(); err != nil {
 				c.logger.Errorf("could not sync roles: %v", err)
 				updateFailed = true
 			}
@@ -488,14 +488,14 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 	func() {
 		oldSs, err := c.generateStatefulSet(&oldSpec.Spec)
 		if err != nil {
-			c.logger.Errorf("could not generate old statefulset spec")
+			c.logger.Errorf("could not generate old statefulset spec: %v", err)
 			updateFailed = true
 			return
 		}
 
 		newSs, err := c.generateStatefulSet(&newSpec.Spec)
 		if err != nil {
-			c.logger.Errorf("could not generate new statefulset spec")
+			c.logger.Errorf("could not generate new statefulset spec: %v", err)
 			updateFailed = true
 			return
 		}
@@ -523,9 +523,31 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 }
 
 // Delete deletes the cluster and cleans up all objects associated with it (including statefulsets).
+// The deletion order here is somewhat significant, because Patroni, when running with the Kubernetes
+// DCS, reuses the master's endpoint to store the leader related metadata. If we remove the endpoint
+// before the pods, it will be re-created by the current master pod and will remain, obstructing the
+// creation of the new cluster with the same name. Therefore, the endpoints should be deleted last.
 func (c *Cluster) Delete() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if err := c.deleteStatefulSet(); err != nil {
+		return fmt.Errorf("could not delete statefulset: %v", err)
+	}
+
+	for _, obj := range c.Secrets {
+		if delete, user := c.shouldDeleteSecret(obj); !delete {
+			c.logger.Infof("not removing secret %q for the system user %q", obj.GetName(), user)
+			continue
+		}
+		if err := c.deleteSecret(obj); err != nil {
+			return fmt.Errorf("could not delete secret: %v", err)
+		}
+	}
+
+	if err := c.deletePodDisruptionBudget(); err != nil {
+		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
@@ -539,20 +561,6 @@ func (c *Cluster) Delete() error {
 		if err := c.deleteService(role); err != nil {
 			return fmt.Errorf("could not delete %s service: %v", role, err)
 		}
-	}
-
-	if err := c.deleteStatefulSet(); err != nil {
-		return fmt.Errorf("could not delete statefulset: %v", err)
-	}
-
-	for _, obj := range c.Secrets {
-		if err := c.deleteSecret(obj); err != nil {
-			return fmt.Errorf("could not delete secret: %v", err)
-		}
-	}
-
-	if err := c.deletePodDisruptionBudget(); err != nil {
-		return fmt.Errorf("could not delete pod disruption budget: %v", err)
 	}
 
 	return nil
@@ -783,4 +791,9 @@ func (c *Cluster) Lock() {
 // Unlock unlocks the cluster
 func (c *Cluster) Unlock() {
 	c.mu.Unlock()
+}
+
+func (c *Cluster) shouldDeleteSecret(secret *v1.Secret) (delete bool, userName string) {
+	secretUser := string(secret.Data["username"])
+	return (secretUser != c.OpConfig.ReplicationUsername && secretUser != c.OpConfig.SuperUsername), secretUser
 }
