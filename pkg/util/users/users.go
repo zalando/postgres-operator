@@ -95,7 +95,7 @@ func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserReque
 func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql.DB) (err error) {
 	queries := produceAlterRoleSetStmts(user)
 	query := fmt.Sprintf(doBlockStmt, strings.Join(queries, ";"))
-	if err = runQueryDiscardResult(db, query); err != nil {
+	if _, err = db.Exec(query); err != nil {
 		err = fmt.Errorf("dB error: %v, query: %s", err, query)
 		return
 	}
@@ -120,7 +120,7 @@ func (s DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err
 	}
 	query := fmt.Sprintf(createUserSQL, user.Name, strings.Join(userFlags, " "), userPassword)
 
-	err = runQueryDiscardResult(db, query) // TODO: Try several times
+	_, err = db.Exec(query) // TODO: Try several times
 	if err != nil {
 		err = fmt.Errorf("dB error: %v, query: %s", err, query)
 		return
@@ -146,7 +146,7 @@ func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err 
 
 	query := fmt.Sprintf(doBlockStmt, strings.Join(resultStmt, ";"))
 
-	err = runQueryDiscardResult(db, query) // TODO: Try several times
+	_, err = db.Exec(query) // TODO: Try several times
 	if err != nil {
 		err = fmt.Errorf("dB error: %v query %s", err, query)
 		return
@@ -214,12 +214,4 @@ func quoteParameterValue(name, val string) string {
 		return val
 	}
 	return fmt.Sprintf(`'%s'`, strings.Trim(val, " "))
-}
-
-func runQueryDiscardResult(db *sql.DB, sql string) error {
-	rows, err := db.Query(sql)
-	if rows != nil {
-		rows.Close()
-	}
-	return err
 }

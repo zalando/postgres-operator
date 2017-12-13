@@ -191,7 +191,7 @@ func (c *Cluster) executeCreateDatabase(datname, owner string) error {
 	}
 	c.logger.Infof("creating database %q with owner %q", datname, owner)
 
-	if _, err := c.pgDb.Query(fmt.Sprintf(createDatabaseSQL, datname, owner)); err != nil {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(createDatabaseSQL, datname, owner)); err != nil {
 		return fmt.Errorf("could not execute create database: %v", err)
 	}
 	return nil
@@ -204,7 +204,7 @@ func (c *Cluster) executeAlterDatabaseOwner(datname string, owner string) error 
 		return nil
 	}
 	c.logger.Infof("changing database %q owner to %q", datname, owner)
-	if _, err := c.pgDb.Query(fmt.Sprintf(alterDatabaseOwnerSQL, datname, owner)); err != nil {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(alterDatabaseOwnerSQL, datname, owner)); err != nil {
 		return fmt.Errorf("could not execute alter database owner: %v", err)
 	}
 	return nil

@@ -59,7 +59,7 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 
 	if !c.databaseAccessDisabled() {
 		c.logger.Debugf("syncing roles")
-		if err = c.syncRoles(true); err != nil {
+		if err = c.syncRoles(); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)
 			return
 		}
@@ -346,7 +346,7 @@ func (c *Cluster) syncSecrets() error {
 	return nil
 }
 
-func (c *Cluster) syncRoles(readFromDatabase bool) error {
+func (c *Cluster) syncRoles() error {
 	c.setProcessName("syncing roles")
 
 	var (
@@ -365,14 +365,12 @@ func (c *Cluster) syncRoles(readFromDatabase bool) error {
 		}
 	}()
 
-	if readFromDatabase {
-		for _, u := range c.pgUsers {
-			userNames = append(userNames, u.Name)
-		}
-		dbUsers, err = c.readPgUsersFromDatabase(userNames)
-		if err != nil {
-			return fmt.Errorf("error getting users from the database: %v", err)
-		}
+	for _, u := range c.pgUsers {
+		userNames = append(userNames, u.Name)
+	}
+	dbUsers, err = c.readPgUsersFromDatabase(userNames)
+	if err != nil {
+		return fmt.Errorf("error getting users from the database: %v", err)
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)
