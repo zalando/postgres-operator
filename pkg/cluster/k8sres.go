@@ -281,7 +281,8 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	pgParameters *spec.PostgresqlParam,
 	patroniParameters *spec.Patroni,
 	cloneDescription *spec.CloneDescription,
-	dockerImage *string) *v1.PodTemplateSpec {
+	dockerImage *string,
+	extraEnv map[string]string) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -363,10 +364,23 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 
-	envFromSource := []v1.EnvFromSource{}
-	if c.OpConfig.PodEnvironmentConfigMap != "" {
-		configMapRef := v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: c.OpConfig.PodEnvironmentConfigMap}}
-		envFromSource = append(envFromSource, v1.EnvFromSource{ConfigMapRef: &configMapRef})
+	var names []string
+	// handle environment variables from the PodEnvironmentConfigMap. We don't use envSource here as it is impossible
+	// to track any changes to the object envSource points to. In order to emulate the envSource behavior, however, we
+	// need to make sure that PodConfigMap variables doesn't override those we set explicitely from the configuration
+	// parameters
+	envVarsMap := make(map[string]string)
+	for _, envVar := range envVars {
+		envVarsMap[envVar.Name] = envVar.Value
+	}
+	for name := range extraEnv {
+		if _, ok := envVarsMap[name]; !ok {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		envVars = append(envVars, v1.EnvVar{Name: name, Value: extraEnv[name]})
 	}
 
 	privilegedMode := true
@@ -400,7 +414,6 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 			},
 		},
 		Env: envVars,
-		EnvFrom: envFromSource,
 		SecurityContext: &v1.SecurityContext{
 			Privileged: &privilegedMode,
 		},
@@ -434,8 +447,15 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
-
-	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage)
+	var extraEnv map[string]string
+	if c.OpConfig.PodEnvironmentConfigMap != "" {
+		if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{}); err != nil {
+			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+		} else {
+			extraEnv = cm.Data
+		}
+	}
+	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, extraEnv)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
