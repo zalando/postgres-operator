@@ -137,11 +137,17 @@ Users:
 					c.logger.Warningf("unknown key %q", p)
 				}
 			}
+
+			delete(data, key)
 		}
 
 		if t.Name != "" {
 			result[t.Name] = t
 		}
+	}
+
+	if len(data) != 0 {
+		c.logger.Warningf("Unprocessed entries in the infrastructure roles' secret. That may mean infrastructure-roles.yaml has incorrect format; see the file in the Postgres operator repo for the expected format.")
 	}
 
 	return result, nil
