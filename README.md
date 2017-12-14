@@ -178,6 +178,8 @@ data:
 
 This ConfigMap is then added as a source of environment variables to the Postgres StatefulSet/pods.
 
+:exclamation: Note that there are environment variables defined by the operator itself in order to pass parameters to the Spilo image. The values from the operator for those variables will take precedence over those defined in the `pod_environment_configmap`.
+
 # Setup development environment
 
 The following steps guide you through the setup to work on the operator itself.
