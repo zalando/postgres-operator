@@ -282,7 +282,7 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	patroniParameters *spec.Patroni,
 	cloneDescription *spec.CloneDescription,
 	dockerImage *string,
-	extraEnv map[string]string) *v1.PodTemplateSpec {
+	customPodEnvVars map[string]string) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -373,14 +373,17 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	for _, envVar := range envVars {
 		envVarsMap[envVar.Name] = envVar.Value
 	}
-	for name := range extraEnv {
+	for name := range customPodEnvVars {
 		if _, ok := envVarsMap[name]; !ok {
 			names = append(names, name)
+		} else {
+			c.logger.Warningf("variable %q value from %q is ignored: conflict with the definition from the operator",
+				name, c.OpConfig.PodEnvironmentConfigMap)
 		}
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		envVars = append(envVars, v1.EnvVar{Name: name, Value: extraEnv[name]})
+		envVars = append(envVars, v1.EnvVar{Name: name, Value: customPodEnvVars[name]})
 	}
 
 	privilegedMode := true
@@ -447,15 +450,15 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
-	var extraEnv map[string]string
+	var customPodEnvVars map[string]string
 	if c.OpConfig.PodEnvironmentConfigMap != "" {
 		if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{}); err != nil {
 			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
 		} else {
-			extraEnv = cm.Data
+			customPodEnvVars = cm.Data
 		}
 	}
-	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, extraEnv)
+	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
