@@ -48,7 +48,7 @@ type spiloConfiguration struct {
 }
 
 func (c *Cluster) containerName() string {
-	return c.Name
+	return "postgres"
 }
 
 func (c *Cluster) statefulSetName() string {
