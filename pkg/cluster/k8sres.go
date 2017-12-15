@@ -464,6 +464,8 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
+	numberOfInstances := c.getNumberOfInstances(spec)
+
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.statefulSetName(),
@@ -471,7 +473,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			Labels:    c.labelsSet(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
-			Replicas:             &spec.NumberOfInstances,
+			Replicas:             &numberOfInstances,
 			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
@@ -479,6 +481,25 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	}
 
 	return statefulSet, nil
+}
+
+func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) (newcur int32) {
+	min := c.OpConfig.MinInstances
+	max := c.OpConfig.MaxInstances
+	cur := spec.NumberOfInstances
+	newcur = cur
+
+	if max >= 0 && newcur > max {
+		newcur = max
+	}
+	if min >= 0 && newcur < min {
+		newcur = min
+	}
+	if newcur != cur {
+		c.logger.Infof("adjusted number of instances from %d to %d (min: %d, max: %d)", cur, newcur, min, max)
+	}
+
+	return
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {

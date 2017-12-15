@@ -267,7 +267,7 @@ func (c *Cluster) syncStatefulSet() error {
 		c.logger.Infof("found pods without the statefulset: trigger rolling update")
 
 	} else {
-		// statefulset is alrady there, make sure we use its definition in order to compare with the spec.
+		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
 		desiredSS, err := c.generateStatefulSet(&c.Spec)
