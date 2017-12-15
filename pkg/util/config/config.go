@@ -136,7 +136,7 @@ func validate(cfg *Config) (err error) {
 			cfg.MinInstances, cfg.MaxInstances)
 	}
 	if cfg.Workers == 0 {
-		err = fmt.Errorf("number of works should be higher than 0")
+		err = fmt.Errorf("number of workers should be higher than 0")
 	}
 	return
 }

@@ -180,6 +180,12 @@ This ConfigMap is then added as a source of environment variables to the Postgre
 
 :exclamation: Note that there are environment variables defined by the operator itself in order to pass parameters to the Spilo image. The values from the operator for those variables will take precedence over those defined in the `pod_environment_configmap`.
 
+### Limiting the number of instances in clusters with `min_instances` and `max_instances`
+
+As a preventive measure, one can restrict the minimum and the maximum number of instances permitted by each Postgres cluster managed by the operator.
+If either `min_instances` or `max_instances` is set to a non-zero value, the operator may adjust the number of instances specified in the cluster manifest to match either the min or the max boundary.
+For instance, of a cluster manifest has 1 instance and the min_instances is set to 3, the cluster will be created with 3 instances. By default, both parameters are set to -1.
+
 # Setup development environment
 
 The following steps guide you through the setup to work on the operator itself.

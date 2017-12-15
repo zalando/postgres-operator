@@ -464,7 +464,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
-	numberOfInstaces := c.getNumberOfInstances(spec)
+	numberOfInstances := c.getNumberOfInstances(spec)
 
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -473,7 +473,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			Labels:    c.labelsSet(),
 		},
 		Spec: v1beta1.StatefulSetSpec{
-			Replicas:             &numberOfInstaces,
+			Replicas:             &numberOfInstances,
 			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
@@ -496,7 +496,7 @@ func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) (newcur int32) {
 		newcur = min
 	}
 	if newcur != cur {
-		c.logger.Infof("adjusted number of instances to %d (min: %d, max: %d)", newcur, min, max)
+		c.logger.Infof("adjusted number of instances from %d to %d (min: %d, max: %d)", cur, newcur, min, max)
 	}
 
 	return
