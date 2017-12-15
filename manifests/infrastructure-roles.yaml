@@ -1,5 +1,9 @@
 apiVersion: v1
 data:
+  # required format (w/o quotes): 'propertyNumber: value'
+  # allowed properties: 'user', 'password', 'inrole'
+  # numbers >= 1 are mandatory
+  
   # robot_zmon_acid_monitoring
   user1: cm9ib3Rfem1vbl9hY2lkX21vbml0b3Jpbmc=
   # robot_zmon
