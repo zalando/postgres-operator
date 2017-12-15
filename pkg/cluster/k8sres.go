@@ -489,10 +489,10 @@ func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) (newcur int32) {
 	cur := spec.NumberOfInstances
 	newcur = cur
 
-	if max > 0 && newcur > max {
+	if max >= 0 && newcur > max {
 		newcur = max
 	}
-	if min > 0 && newcur < min {
+	if min >= 0 && newcur < min {
 		newcur = min
 	}
 	if newcur != cur {

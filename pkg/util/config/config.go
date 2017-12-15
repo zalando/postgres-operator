@@ -132,7 +132,8 @@ func Copy(c *Config) Config {
 
 func validate(cfg *Config) (err error) {
 	if cfg.MinInstances > 0 && cfg.MaxInstances > 0 && cfg.MinInstances > cfg.MaxInstances {
-		err = fmt.Errorf("minimum number of instances %d is set higher than the maximum number %d")
+		err = fmt.Errorf("minimum number of instances %d is set higher than the maximum number %d",
+			cfg.MinInstances, cfg.MaxInstances)
 	}
 	if cfg.Workers == 0 {
 		err = fmt.Errorf("number of works should be higher than 0")
