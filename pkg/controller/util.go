@@ -147,7 +147,9 @@ Users:
 	}
 
 	if len(data) != 0 {
-		c.logger.Warningf("Unprocessed entries in the infrastructure roles' secret. That may mean infrastructure-roles.yaml has incorrect format; see the file in the Postgres operator repo for the expected format.")
+		c.logger.Warningf("%d unprocessed entries in the infrastructure roles' secret", len(data))
+		c.logger.Info(`infrastructure role entries should be in the {key}{id} format, where {key} can be either of "user", "password", "inrole" and the {id} a monotonically increasing integer starting with 1`)
+		c.logger.Debugf("unprocessed entries: %#v", data)
 	}
 
 	return result, nil
