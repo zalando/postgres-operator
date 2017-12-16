@@ -28,7 +28,8 @@ it manages and updates them with the new docker images; afterwards, all pods fro
 
 ## Status
 
-This project is currently in development. It is used internally by Zalando in order to run staging databases on Kubernetes.
+This project is currently in active development. It is however already used internally by Zalando in order to run Postgres databases on Kubernetes in larger numbers for staging environments and a smaller number of production databases. In this environment the operator is deployed to multiple Kubernetes clusters, where users deploy manifests via our CI/CD infrastructure.
+
 Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
 
 ## Running and testing the operator
