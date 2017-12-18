@@ -12,6 +12,7 @@ spec:
     zalando:
     - superuser
     - createdb
+  useLoadBalancer: true
   allowedSourceRanges: #Load balancer source ranges
   - 127.0.0.1/32
   databases:
@@ -42,7 +43,6 @@ spec:
     loop_wait: &loop_wait 10
     retry_timeout: 10
     maximum_lag_on_failover: 33554432
-    useLoadBalancer: true
   maintenanceWindows:
   - 01:00-06:00 #UTC
   - Sat:00:00-04:00
