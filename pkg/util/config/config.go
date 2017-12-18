@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"fmt"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
@@ -32,6 +33,8 @@ type Resources struct {
 	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
 	PodEnvironmentConfigMap string            `name:"pod_environment_configmap" default:""`
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:"lifecycle-status:ready"`
+	MaxInstances            int32             `name:"max_instances" default:"-1"`
+	MinInstances            int32             `name:"min_instances" default:"-1"`
 }
 
 // Auth describes authentication specific configuration parameters
@@ -107,6 +110,9 @@ func NewFromMap(m map[string]string) *Config {
 			panic(err)
 		}
 	}
+	if err := validate(&cfg); err != nil {
+		panic(err)
+	}
 
 	return &cfg
 }
@@ -121,4 +127,15 @@ func Copy(c *Config) Config {
 	}
 
 	return cfg
+}
+
+func validate(cfg *Config) (err error) {
+	if cfg.MinInstances > 0 && cfg.MaxInstances > 0 && cfg.MinInstances > cfg.MaxInstances {
+		err = fmt.Errorf("minimum number of instances %d is set higher than the maximum number %d",
+			cfg.MinInstances, cfg.MaxInstances)
+	}
+	if cfg.Workers == 0 {
+		err = fmt.Errorf("number of workers should be higher than 0")
+	}
+	return
 }
