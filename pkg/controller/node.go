@@ -39,7 +39,7 @@ func (c *Controller) nodeAdd(obj interface{}) {
 
 	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
 	// check if the node became not ready while the operator was down (otherwise we would have caught it in nodeUpdate)
-	if node.Spec.Unschedulable && !util.MapContains(node.Labels, c.opConfig.NodeReadinessLabel) {
+	if !c.nodeIsReady(node) {
 		c.movePodsOffNode(node)
 	}
 }
@@ -61,11 +61,15 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 
 	// do nothing if the node should have already triggered an update or
 	// if only one of the label and the unschedulability criteria are met.
-	if nodePrev.Spec.Unschedulable && !util.MapContains(nodePrev.Labels, c.opConfig.NodeReadinessLabel) ||
-		!nodeCur.Spec.Unschedulable || util.MapContains(nodeCur.Labels, c.opConfig.NodeReadinessLabel) {
+	if !c.nodeIsReady(nodePrev) || c.nodeIsReady(nodeCur) {
 		return
 	}
 	c.movePodsOffNode(nodeCur)
+}
+
+func (c *Controller) nodeIsReady(node *v1.Node) bool {
+	return (!node.Spec.Unschedulable || util.MapContains(node.Labels, c.opConfig.NodeReadinessLabel) ||
+		util.MapContains(node.Labels, map[string]string{"master": "true"}))
 }
 
 func (c *Controller) movePodsOffNode(node *v1.Node) {
