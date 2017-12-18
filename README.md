@@ -28,7 +28,9 @@ it manages and updates them with the new docker images; afterwards, all pods fro
 
 ## Status
 
-This project is currently in active development. It is however already used internally by Zalando in order to run Postgres databases on Kubernetes in larger numbers for staging environments and a smaller number of production databases. In this environment the operator is deployed to multiple Kubernetes clusters, where users deploy manifests via our CI/CD infrastructure.
+This project is currently in active development. It is however already [used internally by Zalando](https://jobs.zalando.com/tech/blog/postgresql-in-a-time-of-kubernetes/) in order to run Postgres databases on Kubernetes in larger numbers for staging environments and a smaller number of production databases. In this environment the operator is deployed to multiple Kubernetes clusters, where users deploy manifests via our CI/CD infrastructure.
+
+There is a talk about this project delivered by Josh Berkus on KubeCon 2017: [Kube-native Postgres](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
 
 Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
 
