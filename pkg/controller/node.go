@@ -38,6 +38,10 @@ func (c *Controller) nodeAdd(obj interface{}) {
 	}
 
 	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
+	// check if the node became not ready while the operator was down (otherwise we would have caught it in nodeUpdate)
+	if node.Spec.Unschedulable && !util.MapContains(node.Labels, c.opConfig.NodeReadinessLabel) {
+		c.movePodsOffNode(node)
+	}
 }
 
 func (c *Controller) nodeUpdate(prev, cur interface{}) {
@@ -65,11 +69,9 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 }
 
 func (c *Controller) movePodsOffNode(node *v1.Node) {
-	nameFromMeta := util.NameFromMeta(node.ObjectMeta)
-	fromMeta := nameFromMeta
-	meta := fromMeta
+	nodeName := util.NameFromMeta(node.ObjectMeta)
 	c.logger.Infof("moving pods: node %q became unschedulable and does not have a ready label: %q",
-		meta, c.opConfig.NodeReadinessLabel)
+		nodeName, c.opConfig.NodeReadinessLabel)
 
 	opts := metav1.ListOptions{
 		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),
@@ -152,11 +154,11 @@ func (c *Controller) movePodsOffNode(node *v1.Node) {
 	totalPods := len(nodePods)
 
 	c.logger.Infof("%d/%d pods have been moved out from the %q node",
-		movedPods, totalPods, meta)
+		movedPods, totalPods, nodeName)
 
 	if leftPods := totalPods - movedPods; leftPods > 0 {
 		c.logger.Warnf("could not move %d/%d pods from the %q node",
-			leftPods, totalPods, meta)
+			leftPods, totalPods, nodeName)
 	}
 }
 
