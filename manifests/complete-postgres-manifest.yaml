@@ -43,6 +43,11 @@ spec:
     loop_wait: &loop_wait 10
     retry_timeout: 10
     maximum_lag_on_failover: 33554432
+  # uncomment to restore a Postgres DB with point-in-time-recovery using the latest backup
+  # optional timestamp: use the latest backup before the timestamp
+  # clone:
+  #  cluster: "acid-batman"
+  #  endTimestamp: "2017-12-19T12:40:33+01:00" # timezone required (offset relative to UTC, see RFC 3339 section 5.6)
   maintenanceWindows:
   - 01:00-06:00 #UTC
   - Sat:00:00-04:00
