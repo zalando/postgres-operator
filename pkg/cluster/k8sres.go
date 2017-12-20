@@ -453,6 +453,10 @@ func (c *Cluster) generatePodTemplate(
 						Name:  "SCALYR_SERVER_HOST",
 						Value: c.Name,
 					},
+					{
+						Name:  "SCALYR_SERVER_URL",
+						Value: c.OpConfig.ScalyrServerURL,
+					},
 				},
 			},
 		)
