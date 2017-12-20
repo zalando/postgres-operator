@@ -435,7 +435,7 @@ func (c *Cluster) generatePodTemplate(
 		Tolerations:                   c.tolerations(tolerationsSpec),
 	}
 
-	if c.OpConfig.ScalyrAPIKey != "" {
+	if c.OpConfig.ScalyrAPIKey != "" && c.OpConfig.ScalyrImage != "" {
 		podSpec.Containers = append(
 			podSpec.Containers,
 			v1.Container{

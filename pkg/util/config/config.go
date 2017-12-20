@@ -53,7 +53,7 @@ type Auth struct {
 // Scalyr holds the configuration for the Scalyr Agent sidecar for log shipping:
 type Scalyr struct {
 	ScalyrAPIKey        string `name:"scalyr_api_key" default:""`
-	ScalyrImage         string `name:"scalyr_image" default:"registry.opensource.zalan.do/acid/spilo-sidecar-scalyr:cpr-1-18"`
+	ScalyrImage         string `name:"scalyr_image" default:""`
 	ScalyrCPURequest    string `name:"scalyr_cpu_request" default:"100m"`
 	ScalyrMemoryRequest string `name:"scalyr_memory_request" default:"50Mi"`
 	ScalyrCPULimit      string `name:"scalyr_cpu_limit" default:"1"`
