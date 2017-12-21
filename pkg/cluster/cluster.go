@@ -245,6 +245,9 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
+	if c.Statefulset != nil {
+		return fmt.Errorf("statefulset already exists in the cluster")
+	}
 	ss, err = c.createStatefulSet()
 	if err != nil {
 		return fmt.Errorf("could not create statefulset: %v", err)

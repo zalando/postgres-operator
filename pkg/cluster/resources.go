@@ -61,9 +61,6 @@ func (c *Cluster) listResources() error {
 
 func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	c.setProcessName("creating statefulset")
-	if c.Statefulset != nil {
-		return nil, fmt.Errorf("statefulset already exists in the cluster")
-	}
 	statefulSetSpec, err := c.generateStatefulSet(&c.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate statefulset: %v", err)
