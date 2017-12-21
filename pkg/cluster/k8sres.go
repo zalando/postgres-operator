@@ -476,12 +476,7 @@ func (c *Cluster) generatePodTemplate(
 	return &template
 }
 
-func makeResources(
-	cpuRequest string,
-	memoryRequest string,
-	cpuLimit string,
-	memoryLimit string,
-) spec.Resources {
+func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) spec.Resources {
 	return spec.Resources{
 		ResourceRequest: spec.ResourceDescription{
 			CPU:    cpuRequest,
