@@ -32,6 +32,20 @@ func (c *Controller) ClusterStatus(team, cluster string) (*spec.ClusterStatus, e
 	return status, nil
 }
 
+// GetClusterDatabasesMap returns for each cluster the list of databases running there
+func (c *Controller) GetClusterDatabasesMap() map[string][]string {
+
+	m := make(map[string][]string)
+
+	for _, cluster := range c.clusters {
+		for database := range cluster.Postgresql.Spec.Databases {
+			m[cluster.Name] = append(m[cluster.Name], database)
+		}
+	}
+
+	return m
+}
+
 // TeamClusterList returns team-clusters map
 func (c *Controller) TeamClusterList() map[string][]spec.NamespacedName {
 	return c.teamClusters
