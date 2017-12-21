@@ -307,6 +307,30 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
+	} else {
+		for index, container1 := range c.Statefulset.Spec.Template.Spec.Containers {
+			container2 := statefulSet.Spec.Template.Spec.Containers[index]
+			if container1.Image != container2.Image {
+				needsRollUpdate = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d image doesn't match the current one", index))
+			}
+			if !reflect.DeepEqual(container1.Ports, container2.Ports) {
+				needsRollUpdate = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d ports don't match the current one", index))
+			}
+			if !compareResources(&container1.Resources, &container2.Resources) {
+				needsRollUpdate = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d resources don't match the current ones", index))
+			}
+			if !reflect.DeepEqual(container1.Env, container2.Env) {
+				needsRollUpdate = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d environment doesn't match the current one", index))
+			}
+			if !reflect.DeepEqual(container1.EnvFrom, container2.EnvFrom) {
+				needsRollUpdate = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d environment sources don't match the current one", index))
+			}
+		}
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
@@ -365,31 +389,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 			needsReplace = true
 			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q doesn't match the current one", name))
 		}
-	}
-
-	container1 := c.Statefulset.Spec.Template.Spec.Containers[0]
-	container2 := statefulSet.Spec.Template.Spec.Containers[0]
-	if container1.Image != container2.Image {
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's container image doesn't match the current one")
-	}
-
-	if !reflect.DeepEqual(container1.Ports, container2.Ports) {
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's container ports don't match the current one")
-	}
-
-	if !compareResources(&container1.Resources, &container2.Resources) {
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's container resources don't match the current ones")
-	}
-	if !reflect.DeepEqual(container1.Env, container2.Env) {
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's container environment doesn't match the current one")
-	}
-	if !reflect.DeepEqual(container1.EnvFrom, container2.EnvFrom) {
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's container environment sources don't match the current one")
 	}
 
 	if needsRollUpdate || needsReplace {

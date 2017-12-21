@@ -50,11 +50,23 @@ type Auth struct {
 	ReplicationUsername           string              `name:"replication_username" default:"standby"`
 }
 
+// Scalyr holds the configuration for the Scalyr Agent sidecar for log shipping:
+type Scalyr struct {
+	ScalyrAPIKey        string `name:"scalyr_api_key" default:""`
+	ScalyrImage         string `name:"scalyr_image" default:""`
+	ScalyrServerURL     string `name:"scalyr_server_url" default:"https://upload.eu.scalyr.com"`
+	ScalyrCPURequest    string `name:"scalyr_cpu_request" default:"100m"`
+	ScalyrMemoryRequest string `name:"scalyr_memory_request" default:"50Mi"`
+	ScalyrCPULimit      string `name:"scalyr_cpu_limit" default:"1"`
+	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
+}
+
 // Config describes operator config
 type Config struct {
 	CRD
 	Resources
 	Auth
+	Scalyr
 	Namespace                string            `name:"namespace"`
 	EtcdHost                 string            `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
 	DockerImage              string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`

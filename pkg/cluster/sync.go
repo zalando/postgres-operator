@@ -320,7 +320,7 @@ func (c *Cluster) syncSecrets() error {
 			if err2 != nil {
 				return fmt.Errorf("could not get current secret: %v", err2)
 			}
-			c.logger.Debugf("secret %q already exists, fetching it's password", util.NameFromMeta(curSecret.ObjectMeta))
+			c.logger.Debugf("secret %q already exists, fetching its password", util.NameFromMeta(curSecret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
 				userMap = c.systemUsers

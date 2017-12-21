@@ -276,13 +276,16 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 	}
 }
 
-func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequirements,
+func (c *Cluster) generatePodTemplate(
+	resourceRequirements *v1.ResourceRequirements,
+	resourceRequirementsScalyrSidecar *v1.ResourceRequirements,
 	tolerationsSpec *[]v1.Toleration,
 	pgParameters *spec.PostgresqlParam,
 	patroniParameters *spec.Patroni,
 	cloneDescription *spec.CloneDescription,
 	dockerImage *string,
-	customPodEnvVars map[string]string) *v1.PodTemplateSpec {
+	customPodEnvVars map[string]string,
+) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -391,6 +394,12 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	if dockerImage != nil && *dockerImage != "" {
 		containerImage = *dockerImage
 	}
+	volumeMounts := []v1.VolumeMount{
+		{
+			Name:      constants.DataVolumeName,
+			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
+		},
+	}
 	container := v1.Container{
 		Name:            c.containerName(),
 		Image:           containerImage,
@@ -410,13 +419,8 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
-		VolumeMounts: []v1.VolumeMount{
-			{
-				Name:      constants.DataVolumeName,
-				MountPath: constants.PostgresDataMount, //TODO: fetch from manifesto
-			},
-		},
-		Env: envVars,
+		VolumeMounts: volumeMounts,
+		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
 			Privileged: &privilegedMode,
 		},
@@ -429,6 +433,33 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 		Containers:                    []v1.Container{container},
 		Affinity:                      c.nodeAffinity(),
 		Tolerations:                   c.tolerations(tolerationsSpec),
+	}
+
+	if c.OpConfig.ScalyrAPIKey != "" && c.OpConfig.ScalyrImage != "" {
+		podSpec.Containers = append(
+			podSpec.Containers,
+			v1.Container{
+				Name:            "scalyr-sidecar",
+				Image:           c.OpConfig.ScalyrImage,
+				ImagePullPolicy: v1.PullIfNotPresent,
+				Resources:       *resourceRequirementsScalyrSidecar,
+				VolumeMounts:    volumeMounts,
+				Env: []v1.EnvVar{
+					{
+						Name:  "SCALYR_API_KEY",
+						Value: c.OpConfig.ScalyrAPIKey,
+					},
+					{
+						Name:  "SCALYR_SERVER_HOST",
+						Value: c.Name,
+					},
+					{
+						Name:  "SCALYR_SERVER_URL",
+						Value: c.OpConfig.ScalyrServerURL,
+					},
+				},
+			},
+		)
 	}
 
 	template := v1.PodTemplateSpec{
@@ -445,10 +476,34 @@ func (c *Cluster) generatePodTemplate(resourceRequirements *v1.ResourceRequireme
 	return &template
 }
 
+func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) spec.Resources {
+	return spec.Resources{
+		ResourceRequest: spec.ResourceDescription{
+			CPU:    cpuRequest,
+			Memory: memoryRequest,
+		},
+		ResourceLimits: spec.ResourceDescription{
+			CPU:    cpuLimit,
+			Memory: memoryLimit,
+		},
+	}
+}
+
 func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
 	resourceRequirements, err := c.resourceRequirements(spec.Resources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+	resourceRequirementsScalyrSidecar, err := c.resourceRequirements(
+		makeResources(
+			c.OpConfig.ScalyrCPURequest,
+			c.OpConfig.ScalyrMemoryRequest,
+			c.OpConfig.ScalyrCPULimit,
+			c.OpConfig.ScalyrMemoryLimit,
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate Scalyr sidecar resource requirements: %v", err)
 	}
 	var customPodEnvVars map[string]string
 	if c.OpConfig.PodEnvironmentConfigMap != "" {
@@ -458,7 +513,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			customPodEnvVars = cm.Data
 		}
 	}
-	podTemplate := c.generatePodTemplate(resourceRequirements, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
+	podTemplate := c.generatePodTemplate(resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
