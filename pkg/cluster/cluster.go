@@ -318,9 +318,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 				needsRollUpdate = true
 				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d environment sources don't match the current one", index))
 			}
-			if needsRollUpdate || needsReplace {
-				match = false
-			}
 		}
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
@@ -380,6 +377,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 			needsReplace = true
 			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q doesn't match the current one", name))
 		}
+	}
+
+	if needsRollUpdate || needsReplace {
+		match = false
 	}
 
 	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
