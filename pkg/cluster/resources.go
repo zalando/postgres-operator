@@ -61,9 +61,6 @@ func (c *Cluster) listResources() error {
 
 func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
 	c.setProcessName("creating statefulset")
-	if c.Statefulset != nil {
-		return nil, fmt.Errorf("statefulset already exists in the cluster")
-	}
 	statefulSetSpec, err := c.generateStatefulSet(&c.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate statefulset: %v", err)
@@ -236,11 +233,7 @@ func (c *Cluster) deleteStatefulSet() error {
 func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 	c.setProcessName("creating %v service", role)
 
-	if c.Services[role] != nil {
-		return nil, fmt.Errorf("service already exists in the cluster")
-	}
 	serviceSpec := c.generateService(role, &c.Spec)
-
 	service, err := c.KubeClient.Services(serviceSpec.Namespace).Create(serviceSpec)
 	if err != nil {
 		return nil, err
@@ -349,9 +342,6 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 
 func (c *Cluster) createEndpoint(role PostgresRole) (*v1.Endpoints, error) {
 	c.setProcessName("creating endpoint")
-	if c.Endpoints[role] != nil {
-		return nil, fmt.Errorf("%s endpoint already exists in the cluster", role)
-	}
 	subsets := make([]v1.EndpointSubset, 0)
 	if role == Master {
 		//TODO: set subsets to the master
@@ -369,9 +359,6 @@ func (c *Cluster) createEndpoint(role PostgresRole) (*v1.Endpoints, error) {
 }
 
 func (c *Cluster) createPodDisruptionBudget() (*policybeta1.PodDisruptionBudget, error) {
-	if c.PodDisruptionBudget != nil {
-		return nil, fmt.Errorf("pod disruption budget already exists in the cluster")
-	}
 	podDisruptionBudgetSpec := c.generatePodDisruptionBudget()
 	podDisruptionBudget, err := c.KubeClient.
 		PodDisruptionBudgets(podDisruptionBudgetSpec.Namespace).

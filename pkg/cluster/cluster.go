@@ -216,12 +216,18 @@ func (c *Cluster) Create() error {
 		if role == Replica && !c.Spec.ReplicaLoadBalancer {
 			continue
 		}
+		if c.Endpoints[role] != nil {
+			return fmt.Errorf("%s endpoint already exists in the cluster", role)
+		}
 		ep, err = c.createEndpoint(role)
 		if err != nil {
 			return fmt.Errorf("could not create %s endpoint: %v", role, err)
 		}
 		c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
+		if c.Services[role] != nil {
+			return fmt.Errorf("service already exists in the cluster")
+		}
 		service, err = c.createService(role)
 		if err != nil {
 			return fmt.Errorf("could not create %s service: %v", role, err)
@@ -239,12 +245,18 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("secrets have been successfully created")
 
+	if c.PodDisruptionBudget != nil {
+		return fmt.Errorf("pod disruption budget already exists in the cluster")
+	}
 	pdb, err := c.createPodDisruptionBudget()
 	if err != nil {
 		return fmt.Errorf("could not create pod disruption budget: %v", err)
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
+	if c.Statefulset != nil {
+		return fmt.Errorf("statefulset already exists in the cluster")
+	}
 	ss, err = c.createStatefulSet()
 	if err != nil {
 		return fmt.Errorf("could not create statefulset: %v", err)

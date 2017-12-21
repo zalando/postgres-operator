@@ -245,6 +245,7 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not get statefulset: %v", err)
 		}
 		// statefulset does not exist, try to re-create it
+		c.Statefulset = nil
 		c.logger.Infof("could not find the cluster's statefulset")
 		pods, err := c.listPods()
 		if err != nil {
