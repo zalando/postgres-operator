@@ -446,6 +446,15 @@ func (c *Cluster) generatePodTemplate(
 				VolumeMounts:    volumeMounts,
 				Env: []v1.EnvVar{
 					{
+						Name: "POD_NAME",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.name",
+							},
+						},
+					},
+					{
 						Name:  "SCALYR_API_KEY",
 						Value: c.OpConfig.ScalyrAPIKey,
 					},
