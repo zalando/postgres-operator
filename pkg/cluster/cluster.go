@@ -75,7 +75,8 @@ type Cluster struct {
 	oauthTokenGetter OAuthTokenGetter
 	KubeClient       k8sutil.KubernetesClient //TODO: move clients to the better place?
 	currentProcess   spec.Process
-	processMu        sync.RWMutex
+	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
+	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
 }
 
 type compareStatefulsetResult struct {
@@ -437,7 +438,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 	defer c.mu.Unlock()
 
 	c.setStatus(spec.ClusterStatusUpdating)
-	c.Postgresql = *newSpec
+	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {

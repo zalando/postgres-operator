@@ -1,9 +1,12 @@
 package cluster
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,7 +21,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
-	"sort"
 )
 
 // OAuthTokenGetter provides the method for fetching OAuth tokens
@@ -385,4 +387,33 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 
 func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
 	return replicas[rand.Intn(len(replicas))]
+}
+
+func cloneSpec(from *spec.Postgresql) (*spec.Postgresql, error) {
+	var (
+		buf    bytes.Buffer
+		result *spec.Postgresql
+		err    error
+	)
+	enc := gob.NewEncoder(&buf)
+	if err = enc.Encode(*from); err != nil {
+		return nil, fmt.Errorf("could not encode the spec: %v", err)
+	}
+	dec := gob.NewDecoder(&buf)
+	if err = dec.Decode(&result); err != nil {
+		return nil, fmt.Errorf("could not decode the spec: %v", err)
+	}
+	return result, nil
+}
+
+func (c *Cluster) setSpec(newSpec *spec.Postgresql) {
+	c.specMu.Lock()
+	c.Postgresql = *newSpec
+	c.specMu.Unlock()
+}
+
+func (c *Cluster) GetSpec() (*spec.Postgresql, error) {
+	c.specMu.RLock()
+	defer c.specMu.RUnlock()
+	return cloneSpec(&c.Postgresql)
 }

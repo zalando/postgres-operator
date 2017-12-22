@@ -20,7 +20,7 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.Postgresql = *newSpec
+	c.setSpec(newSpec)
 
 	defer func() {
 		if err != nil {

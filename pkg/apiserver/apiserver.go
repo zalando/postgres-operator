@@ -33,11 +33,11 @@ type controllerInformer interface {
 	ClusterStatus(team, cluster string) (*spec.ClusterStatus, error)
 	ClusterLogs(team, cluster string) ([]*spec.LogEntry, error)
 	ClusterHistory(team, cluster string) ([]*spec.Diff, error)
+	ClusterDatabasesMap() map[string][]string
 	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
 	ListQueue(workerID uint32) (*spec.QueueDump, error)
 	GetWorkersCnt() uint32
 	WorkerStatus(workerID uint32) (*spec.WorkerStatus, error)
-	GetClusterDatabasesMap() map[string][]string
 }
 
 // Server describes HTTP API server
@@ -226,7 +226,7 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 
 func (s *Server) databases(w http.ResponseWriter, req *http.Request) {
 
-	databaseNamesPerCluster := s.controller.GetClusterDatabasesMap()
+	databaseNamesPerCluster := s.controller.ClusterDatabasesMap()
 	s.respond(databaseNamesPerCluster, nil, w)
 	return
 

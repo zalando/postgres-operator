@@ -33,13 +33,21 @@ func (c *Controller) ClusterStatus(team, cluster string) (*spec.ClusterStatus, e
 }
 
 // GetClusterDatabasesMap returns for each cluster the list of databases running there
-func (c *Controller) GetClusterDatabasesMap() map[string][]string {
+func (c *Controller) ClusterDatabasesMap() map[string][]string {
 
 	m := make(map[string][]string)
 
+	// avoid modifying the cluster list while we are fetching each one of them.
+	c.clustersMu.RLock()
+	defer c.clustersMu.RUnlock()
 	for _, cluster := range c.clusters {
-		for database := range cluster.Postgresql.Spec.Databases {
-			m[cluster.Name] = append(m[cluster.Name], database)
+		// GetSpec holds the specMu lock of a cluster
+		if spec, err := cluster.GetSpec(); err == nil {
+			for database := range spec.Spec.Databases {
+				m[cluster.Name] = append(m[cluster.Name], database)
+			}
+		} else {
+			c.logger.Warningf("could not get the list of databases for cluster %q: %v", cluster.Name, err)
 		}
 	}
 
