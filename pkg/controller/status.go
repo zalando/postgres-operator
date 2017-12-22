@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"sort"
 	"sync/atomic"
 
 	"github.com/Sirupsen/logrus"
@@ -46,6 +47,7 @@ func (c *Controller) ClusterDatabasesMap() map[string][]string {
 			for database := range spec.Spec.Databases {
 				m[cluster.Name] = append(m[cluster.Name], database)
 			}
+			sort.Strings(m[cluster.Name])
 		} else {
 			c.logger.Warningf("could not get the list of databases for cluster %q: %v", cluster.Name, err)
 		}
