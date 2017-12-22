@@ -32,7 +32,7 @@ func (c *Controller) ClusterStatus(team, cluster string) (*spec.ClusterStatus, e
 	return status, nil
 }
 
-// GetClusterDatabasesMap returns for each cluster the list of databases running there
+// ClusterDatabasesMap returns for each cluster the list of databases running there
 func (c *Controller) ClusterDatabasesMap() map[string][]string {
 
 	m := make(map[string][]string)
