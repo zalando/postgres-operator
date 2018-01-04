@@ -38,6 +38,10 @@ func (c *Controller) nodeAdd(obj interface{}) {
 	}
 
 	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
+	// check if the node became not ready while the operator was down (otherwise we would have caught it in nodeUpdate)
+	if !c.nodeIsReady(node) {
+		c.movePodsOffNode(node)
+	}
 }
 
 func (c *Controller) nodeUpdate(prev, cur interface{}) {
@@ -55,13 +59,23 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		return
 	}
 
-	if nodePrev.Spec.Unschedulable && util.MapContains(nodePrev.Labels, c.opConfig.NodeEOLLabel) ||
-		!nodeCur.Spec.Unschedulable || !util.MapContains(nodeCur.Labels, c.opConfig.NodeEOLLabel) {
+	// do nothing if the node should have already triggered an update or
+	// if only one of the label and the unschedulability criteria are met.
+	if !c.nodeIsReady(nodePrev) || c.nodeIsReady(nodeCur) {
 		return
 	}
+	c.movePodsOffNode(nodeCur)
+}
 
-	c.logger.Infof("node %q became unschedulable and has EOL labels: %q", util.NameFromMeta(nodeCur.ObjectMeta),
-		c.opConfig.NodeEOLLabel)
+func (c *Controller) nodeIsReady(node *v1.Node) bool {
+	return (!node.Spec.Unschedulable || util.MapContains(node.Labels, c.opConfig.NodeReadinessLabel) ||
+		util.MapContains(node.Labels, map[string]string{"master": "true"}))
+}
+
+func (c *Controller) movePodsOffNode(node *v1.Node) {
+	nodeName := util.NameFromMeta(node.ObjectMeta)
+	c.logger.Infof("moving pods: node %q became unschedulable and does not have a ready label: %q",
+		nodeName, c.opConfig.NodeReadinessLabel)
 
 	opts := metav1.ListOptions{
 		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),
@@ -74,7 +88,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 
 	nodePods := make([]*v1.Pod, 0)
 	for i, pod := range podList.Items {
-		if pod.Spec.NodeName == nodeCur.Name {
+		if pod.Spec.NodeName == node.Name {
 			nodePods = append(nodePods, &podList.Items[i])
 		}
 	}
@@ -131,7 +145,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	for pod, cl := range replicaPods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
-		if err := cl.MigrateReplicaPod(podName, nodeCur.Name); err != nil {
+		if err := cl.MigrateReplicaPod(podName, node.Name); err != nil {
 			c.logger.Errorf("could not move replica pod %q: %v", podName, err)
 			movedPods--
 		}
@@ -144,11 +158,11 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	totalPods := len(nodePods)
 
 	c.logger.Infof("%d/%d pods have been moved out from the %q node",
-		movedPods, totalPods, util.NameFromMeta(nodeCur.ObjectMeta))
+		movedPods, totalPods, nodeName)
 
 	if leftPods := totalPods - movedPods; leftPods > 0 {
 		c.logger.Warnf("could not move %d/%d pods from the %q node",
-			leftPods, totalPods, util.NameFromMeta(nodeCur.ObjectMeta))
+			leftPods, totalPods, nodeName)
 	}
 }
 
