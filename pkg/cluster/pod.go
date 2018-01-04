@@ -24,7 +24,7 @@ func (c *Cluster) listPods() ([]v1.Pod, error) {
 	return pods.Items, nil
 }
 
-func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
+func (c *Cluster) getRolePods(role PostgresRole, emptyOk bool) ([]v1.Pod, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: c.roleLabelsSet(role).String(),
 	}
@@ -34,7 +34,7 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 		return nil, fmt.Errorf("could not get list of pods: %v", err)
 	}
 
-	if len(pods.Items) == 0 {
+	if len(pods.Items) == 0 && !emptyOk {
 		return nil, fmt.Errorf("no pods")
 	}
 
@@ -153,9 +153,14 @@ func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
 }
 
 func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
-	replicas, err := c.getRolePods(Replica)
+	replicas, err := c.getRolePods(Replica, true)
 	if err != nil {
 		return nil, fmt.Errorf("could not get replica pods: %v", err)
+	}
+
+	if len(replicas) == 0 {
+		c.logger.Warningf("single master pod for cluster %q, migration will cause disruption of the service")
+		return nil, nil
 	}
 
 	for i, pod := range replicas {
@@ -198,14 +203,16 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get new master candidate: %v", err)
 	}
 
-	pod, err := c.movePodFromEndOfLifeNode(masterCandidatePod)
-	if err != nil {
-		return fmt.Errorf("could not move pod: %v", err)
-	}
+	if masterCandidatePod != nil {
+		pod, err := c.movePodFromEndOfLifeNode(masterCandidatePod)
+		if err != nil {
+			return fmt.Errorf("could not move pod: %v", err)
+		}
 
-	masterCandidateName := util.NameFromMeta(pod.ObjectMeta)
-	if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
-		return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+		masterCandidateName := util.NameFromMeta(pod.ObjectMeta)
+		if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
+			return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+		}
 	}
 
 	_, err = c.movePodFromEndOfLifeNode(oldMaster)

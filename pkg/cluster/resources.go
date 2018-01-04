@@ -91,7 +91,7 @@ func getPodIndex(podName string) (int32, error) {
 }
 
 func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
-	masterPod, err := c.getRolePods(Master)
+	masterPod, err := c.getRolePods(Master, false)
 	if err != nil {
 		return fmt.Errorf("could not get master pod: %v", err)
 	}
