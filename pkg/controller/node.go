@@ -40,7 +40,7 @@ func (c *Controller) nodeAdd(obj interface{}) {
 	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
 	// check if the node became not ready while the operator was down (otherwise we would have caught it in nodeUpdate)
 	if !c.nodeIsReady(node) {
-		c.movePodsOffNode(node)
+		c.moveMasterPodsOffNode(node)
 	}
 }
 
@@ -64,7 +64,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	if !c.nodeIsReady(nodePrev) || c.nodeIsReady(nodeCur) {
 		return
 	}
-	c.movePodsOffNode(nodeCur)
+	c.moveMasterPodsOffNode(nodeCur)
 }
 
 func (c *Controller) nodeIsReady(node *v1.Node) bool {
@@ -72,7 +72,7 @@ func (c *Controller) nodeIsReady(node *v1.Node) bool {
 		util.MapContains(node.Labels, map[string]string{"master": "true"}))
 }
 
-func (c *Controller) movePodsOffNode(node *v1.Node) {
+func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 	nodeName := util.NameFromMeta(node.ObjectMeta)
 	c.logger.Infof("moving pods: node %q became unschedulable and does not have a ready label: %q",
 		nodeName, c.opConfig.NodeReadinessLabel)
@@ -95,14 +95,15 @@ func (c *Controller) movePodsOffNode(node *v1.Node) {
 
 	clusters := make(map[*cluster.Cluster]bool)
 	masterPods := make(map[*v1.Pod]*cluster.Cluster)
-	replicaPods := make(map[*v1.Pod]*cluster.Cluster)
 	movedPods := 0
 	for _, pod := range nodePods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
 		role, ok := pod.Labels[c.opConfig.PodRoleLabel]
-		if !ok {
-			c.logger.Warningf("could not move pod %q: pod has no role", podName)
+		if !ok || cluster.PostgresRole(role) != cluster.Master {
+			if !ok {
+				c.logger.Warningf("could not move pod %q: pod has no role", podName)
+			}
 			continue
 		}
 
@@ -116,17 +117,11 @@ func (c *Controller) movePodsOffNode(node *v1.Node) {
 			continue
 		}
 
-		movedPods++
-
 		if !clusters[cl] {
 			clusters[cl] = true
 		}
 
-		if cluster.PostgresRole(role) == cluster.Master {
-			masterPods[pod] = cl
-		} else {
-			replicaPods[pod] = cl
-		}
+		masterPods[pod] = cl
 	}
 
 	for cl := range clusters {
@@ -138,16 +133,8 @@ func (c *Controller) movePodsOffNode(node *v1.Node) {
 
 		if err := cl.MigrateMasterPod(podName); err != nil {
 			c.logger.Errorf("could not move master pod %q: %v", podName, err)
-			movedPods--
-		}
-	}
-
-	for pod, cl := range replicaPods {
-		podName := util.NameFromMeta(pod.ObjectMeta)
-
-		if err := cl.MigrateReplicaPod(podName, node.Name); err != nil {
-			c.logger.Errorf("could not move replica pod %q: %v", podName, err)
-			movedPods--
+		} else {
+			movedPods++
 		}
 	}
 
@@ -155,13 +142,13 @@ func (c *Controller) movePodsOffNode(node *v1.Node) {
 		cl.Unlock()
 	}
 
-	totalPods := len(nodePods)
+	totalPods := len(masterPods)
 
-	c.logger.Infof("%d/%d pods have been moved out from the %q node",
+	c.logger.Infof("%d/%d master pods have been moved out from the %q node",
 		movedPods, totalPods, nodeName)
 
 	if leftPods := totalPods - movedPods; leftPods > 0 {
-		c.logger.Warnf("could not move %d/%d pods from the %q node",
+		c.logger.Warnf("could not move master %d/%d pods from the %q node",
 			leftPods, totalPods, nodeName)
 	}
 }

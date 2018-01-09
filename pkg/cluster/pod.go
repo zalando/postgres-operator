@@ -34,10 +34,6 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 		return nil, fmt.Errorf("could not get list of pods: %v", err)
 	}
 
-	if len(pods.Items) == 0 {
-		return nil, fmt.Errorf("no pods")
-	}
-
 	if role == Master && len(pods.Items) > 1 {
 		return nil, fmt.Errorf("too many masters")
 	}
@@ -158,6 +154,11 @@ func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 		return nil, fmt.Errorf("could not get replica pods: %v", err)
 	}
 
+	if len(replicas) == 0 {
+		c.logger.Warningf("single master pod for cluster %q, migration will cause disruption of the service")
+		return nil, nil
+	}
+
 	for i, pod := range replicas {
 		// look for replicas running on live nodes. Ignore errors when querying the nodes.
 		if pod.Spec.NodeName != oldNodeName {
@@ -198,21 +199,25 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get new master candidate: %v", err)
 	}
 
-	pod, err := c.movePodFromEndOfLifeNode(masterCandidatePod)
-	if err != nil {
-		return fmt.Errorf("could not move pod: %v", err)
-	}
+	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
+	// - the cluster has some replicas - migrate one of those if necessary and failover to it
+	// - there are no replicas - just terminate the master and wait until it respawns
+	// in both cases the result is the new master up and running on a new node.
+	if masterCandidatePod != nil {
+		pod, err := c.movePodFromEndOfLifeNode(masterCandidatePod)
+		if err != nil {
+			return fmt.Errorf("could not move pod: %v", err)
+		}
 
-	masterCandidateName := util.NameFromMeta(pod.ObjectMeta)
-	if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
-		return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+		masterCandidateName := util.NameFromMeta(pod.ObjectMeta)
+		if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
+			return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+		}
+	} else {
+		if _, err = c.movePodFromEndOfLifeNode(oldMaster); err != nil {
+			return fmt.Errorf("could not move pod: %v", err)
+		}
 	}
-
-	_, err = c.movePodFromEndOfLifeNode(oldMaster)
-	if err != nil {
-		return fmt.Errorf("could not move pod: %v", err)
-	}
-
 	return nil
 }
 

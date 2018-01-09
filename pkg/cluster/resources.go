@@ -95,6 +95,9 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 	if err != nil {
 		return fmt.Errorf("could not get master pod: %v", err)
 	}
+	if len(masterPod) == 0 {
+		return fmt.Errorf("no master pod is running in the cluster")
+	}
 
 	podNum, err := getPodIndex(masterPod[0].Name)
 	if err != nil {
