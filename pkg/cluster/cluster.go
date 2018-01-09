@@ -127,6 +127,10 @@ func (c *Cluster) clusterName() spec.NamespacedName {
 	return util.NameFromMeta(c.ObjectMeta)
 }
 
+func (c *Cluster) clusterNamespace() string {
+	return c.ObjectMeta.Namespace
+}
+
 func (c *Cluster) teamName() string {
 	// TODO: check Teams API for the actual name (in case the user passes an integer Id).
 	return c.Spec.TeamID
