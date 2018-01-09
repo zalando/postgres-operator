@@ -33,6 +33,7 @@ type controllerInformer interface {
 	ClusterStatus(team, cluster string) (*spec.ClusterStatus, error)
 	ClusterLogs(team, cluster string) ([]*spec.LogEntry, error)
 	ClusterHistory(team, cluster string) ([]*spec.Diff, error)
+	ClusterDatabasesMap() map[string][]string
 	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
 	ListQueue(workerID uint32) (*spec.QueueDump, error)
 	GetWorkersCnt() uint32
@@ -78,6 +79,7 @@ func New(controller controllerInformer, port int, logger *logrus.Logger) *Server
 
 	mux.HandleFunc("/clusters/", s.clusters)
 	mux.HandleFunc("/workers/", s.workers)
+	mux.HandleFunc("/databases/", s.databases)
 
 	s.http = http.Server{
 		Addr:        fmt.Sprintf(":%d", port),
@@ -220,6 +222,14 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 	}
 
 	s.respond(resp, err, w)
+}
+
+func (s *Server) databases(w http.ResponseWriter, req *http.Request) {
+
+	databaseNamesPerCluster := s.controller.ClusterDatabasesMap()
+	s.respond(databaseNamesPerCluster, nil, w)
+	return
+
 }
 
 func (s *Server) allQueues(w http.ResponseWriter, r *http.Request) {

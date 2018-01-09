@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"sort"
 	"sync/atomic"
 
 	"github.com/Sirupsen/logrus"
@@ -30,6 +31,29 @@ func (c *Controller) ClusterStatus(team, cluster string) (*spec.ClusterStatus, e
 	status.Worker = c.clusterWorkerID(clusterName)
 
 	return status, nil
+}
+
+// ClusterDatabasesMap returns for each cluster the list of databases running there
+func (c *Controller) ClusterDatabasesMap() map[string][]string {
+
+	m := make(map[string][]string)
+
+	// avoid modifying the cluster list while we are fetching each one of them.
+	c.clustersMu.RLock()
+	defer c.clustersMu.RUnlock()
+	for _, cluster := range c.clusters {
+		// GetSpec holds the specMu lock of a cluster
+		if spec, err := cluster.GetSpec(); err == nil {
+			for database := range spec.Spec.Databases {
+				m[cluster.Name] = append(m[cluster.Name], database)
+			}
+			sort.Strings(m[cluster.Name])
+		} else {
+			c.logger.Warningf("could not get the list of databases for cluster %q: %v", cluster.Name, err)
+		}
+	}
+
+	return m
 }
 
 // TeamClusterList returns team-clusters map
