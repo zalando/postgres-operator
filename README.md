@@ -267,6 +267,7 @@ The inner 'query' gets the name of the postgres operator pod, and the outer enab
 
 The available endpoints are listed below. Note that the worker ID is an integer from 0 up to 'workers' - 1 (value configured in the operator configuration and defaults to 4)
 
+* /databases - all databases per cluster
 * /workers/all/queue - state of the workers queue (cluster events to process)
 * /workers/$id/queue - state of the queue for the worker $id
 * /workers/$id/logs - log of the operations performed by a given worker
