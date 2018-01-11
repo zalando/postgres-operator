@@ -32,7 +32,7 @@ This project is currently in active development. It is however already [used int
 
 There is a talk about this project delivered by Josh Berkus on KubeCon 2017: [Kube-native Postgres](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
 
-Please, report any issues discovered to htts://github.com/zalando-incubator/postgres-operator/issues.
+Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
 
 ## Running and testing the operator
 
