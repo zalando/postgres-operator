@@ -32,7 +32,7 @@ This project is currently in active development. It is however already [used int
 
 There is a talk about this project delivered by Josh Berkus on KubeCon 2017: [Kube-native Postgres](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
 
-Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
+Please, report any issues discovered to httnodeps://github.com/zalando-incubator/postgres-operator/issues.
 
 ## Running and testing the operator
 
@@ -147,6 +147,30 @@ spec:
 
 Please be aware that the taint and toleration only ensures that no other pod gets scheduled to a PostgreSQL node 
 but not that PostgreSQL pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
+
+### Using the operator to minimize the amount of failovers during the cluster upgrade
+
+To make sure there is only one failover per each PostgreSQL deployment when nodes of the cluster are decomissioned
+during the cluster upgrade, the operator relies on the `node_readiness_label` parameter. It is used in order to determine whether
+a given node is considered ready to run postgres pods. When a node is both `unschedulable` and doesn't have a readiness
+label the operator starts moving master pods out of it. In addition, the operator sets the `PodDisruptionBudget` for the
+postgres pods to make sure pods with the role `master` are not killed by the cluster scale out operations. Each postgres
+pod has a `nodeAffinity` set to avoid being scheduled on the nodes without the readiness label. Together, those measures
+give us the following guarantees:
+
+* no postgres pod runs on the node being not ready
+* no postgres master pod is killed during the scale event before the operator has a chance to move it off the node
+* when a postgres pod is killed by the operator because the node is decomissioned, it will not respawn on another node to-be-decomissioned.
+
+By default the `node_readiness_label` is set to an empty string, disabling this feature altogether. It can be set to a
+string containing one or more key:value parameters, i.e:
+```
+node_readiness_label: "lifecycle-status:ready,disagnostic-checks:ok"
+
+```
+
+when multiple labels are set the operator will require all of them to be present on a node (and set to the specified value) in order to consider
+the node as ready. 
 
 #### Custom Pod Environment Variables
 
