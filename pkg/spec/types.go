@@ -28,6 +28,15 @@ const (
 	EventSync   EventType = "SYNC"
 )
 
+type RoleOrigin int
+const (
+	RoleOriginSystem = iota
+	RoleOriginInfrastructure
+	RoleOriginManifest
+	RoleOriginTeamsAPI
+	RoleOriginUnknown
+)
+
 // ClusterEvent carries the payload of the Cluster TPR events.
 type ClusterEvent struct {
 	EventTime time.Time
@@ -58,6 +67,7 @@ type PodEvent struct {
 
 // PgUser contains information about a single user.
 type PgUser struct {
+	Origin 	   RoleOrigin
 	Name       string
 	Password   string
 	Flags      []string

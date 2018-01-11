@@ -629,10 +629,12 @@ func (c *Cluster) initSystemUsers() {
 	// secrets, therefore, setting flags like SUPERUSER or REPLICATION
 	// is not necessary here
 	c.systemUsers[constants.SuperuserKeyName] = spec.PgUser{
+		Origin:   spec.RoleOriginSystem,
 		Name:     c.OpConfig.SuperUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
 	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
+		Origin:   spec.RoleOriginSystem,
 		Name:     c.OpConfig.ReplicationUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
@@ -653,6 +655,7 @@ func (c *Cluster) initRobotUsers() error {
 		}
 		if _, present := c.pgUsers[username]; !present {
 			c.pgUsers[username] = spec.PgUser{
+				Origin:   spec.RoleOriginManifest,
 				Name:     username,
 				Password: util.RandomPassword(constants.PasswordLength),
 				Flags:    flags,
@@ -696,6 +699,7 @@ func (c *Cluster) initHumanUsers() error {
 		}
 
 		c.pgUsers[username] = spec.PgUser{
+			Origin:		spec.RoleOriginTeamsAPI,
 			Name:       username,
 			Flags:      flags,
 			MemberOf:   memberOf,
