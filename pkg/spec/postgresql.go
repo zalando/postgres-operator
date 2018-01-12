@@ -105,6 +105,7 @@ type PostgresSpec struct {
 	ClusterName         string               `json:"-"`
 	Databases           map[string]string    `json:"databases,omitempty"`
 	Tolerations         []v1.Toleration      `json:"tolerations,omitempty"`
+	NodeSelector        map[string]string    `json:"NodeSelector,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.
