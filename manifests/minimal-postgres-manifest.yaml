@@ -1,7 +1,7 @@
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
-  name: acid-minimal-cluster-recent
+  name: acid-minimal-cluster
 spec:
   teamId: "ACID"
   volume:
@@ -21,4 +21,3 @@ spec:
     foo: zalando
   postgresql:
     version: "10"
-  dockerImage: registry.opensource.zalan.do/acid/spilotest-10:improve-support-for-namespaces-v1
