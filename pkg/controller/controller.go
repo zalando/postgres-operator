@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -107,6 +108,11 @@ func (c *Controller) initOperatorConfig() {
 	}
 
 	c.opConfig = config.NewFromMap(configMapData)
+
+	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
+	if scalyrAPIKey != "" {
+		c.opConfig.ScalyrAPIKey = scalyrAPIKey
+	}
 }
 
 func (c *Controller) initController() {
