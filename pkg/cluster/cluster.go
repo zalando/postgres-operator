@@ -653,24 +653,23 @@ func (c *Cluster) initRobotUsers() error {
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
 		}
+		newRole := spec.PgUser{
+			Origin:   spec.RoleOriginManifest,
+			Name:     username,
+			Password: util.RandomPassword(constants.PasswordLength),
+			Flags:    flags,
+		}
 		if _, present := c.pgUsers[username]; !present {
-			c.pgUsers[username] = spec.PgUser{
-				Origin:   spec.RoleOriginManifest,
-				Name:     username,
-				Password: util.RandomPassword(constants.PasswordLength),
-				Flags:    flags,
-			}
+			c.pgUsers[username] = newRole
 		} else {
-			// avoid overwriting the password if the user is already there. The flags should be
-			// merged here, but since there is no mechanism to define them for non-robot roles
-			// they are assigned from the robot user.
-			c.logger.Debugf("merging manifest and infrastructure user %q data", username)
 			user := c.pgUsers[username]
-			user.Flags = flags
-			c.pgUsers[username] = user
+			if mergeRole, err := c.mergeRoleDefinitions(&user, &newRole); err != nil {
+				return err
+			} else {
+				c.pgUsers[username] = *mergeRole
+			}
 		}
 	}
-
 	return nil
 }
 
@@ -694,16 +693,23 @@ func (c *Cluster) initHumanUsers() error {
 			}
 		}
 
-		if _, present := c.pgUsers[username]; present {
-			c.logger.Warnf("overwriting existing user %q with the data from the teams API", username)
-		}
-
-		c.pgUsers[username] = spec.PgUser{
-			Origin:		spec.RoleOriginTeamsAPI,
+		newRole := spec.PgUser{
+			Origin:     spec.RoleOriginTeamsAPI,
 			Name:       username,
 			Flags:      flags,
 			MemberOf:   memberOf,
 			Parameters: c.OpConfig.TeamAPIRoleConfiguration,
+		}
+
+		if _, present := c.pgUsers[username]; present {
+			user := c.pgUsers[username]
+			if mergeRole, err := c.mergeRoleDefinitions(&user, &newRole); err != nil {
+				return err
+			} else {
+				c.pgUsers[username] = *mergeRole
+			}
+		} else {
+			c.pgUsers[username] = newRole
 		}
 	}
 
@@ -727,6 +733,31 @@ func (c *Cluster) initInfrastructureRoles() error {
 		c.pgUsers[username] = data
 	}
 	return nil
+}
+
+func (c *Cluster) mergeRoleDefinitions(roleA, roleB *spec.PgUser) (*spec.PgUser, error) {
+	// human roles always win
+	// infrastructure roles take precendence over the manifest roles
+	if roleA.Name != roleB.Name {
+		return nil, fmt.Errorf("could not merge role %#v with role %#v: role names don't match")
+	}
+	for _, origin := range []spec.RoleOrigin{spec.RoleOriginSystem, spec.RoleOriginTeamsAPI} {
+		if roleA.Origin == origin {
+			return roleA, nil
+		}
+		if roleB.Origin == origin {
+			return roleB, nil
+		}
+	}
+	// one of the roles originates from the manifest, another one from the infrastructure roles
+	if roleA.Origin == spec.RoleOriginInfrastructure {
+		roleA.Flags = roleB.Flags
+		return roleA, nil
+	} else if roleB.Origin == spec.RoleOriginInfrastructure {
+		roleB.Flags = roleA.Flags
+		return roleB, nil
+	}
+	return nil, fmt.Errorf("could not merge role %#v and role %#v: unexpected role types ", *roleA, *roleB)
 }
 
 func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) bool {

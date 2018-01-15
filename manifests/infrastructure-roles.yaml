@@ -11,7 +11,8 @@ data:
   # testuser
   user2: dGVzdHVzZXI=
   # foobar
-  password2: Zm9vYmFy
+  password2: c2VjcmV0
+  batman: anVzdGljZQ==
 kind: Secret
 metadata:
   name: postgresql-infrastructure-roles

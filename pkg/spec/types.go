@@ -29,6 +29,7 @@ const (
 )
 
 type RoleOrigin int
+
 const (
 	RoleOriginSystem = iota
 	RoleOriginInfrastructure
@@ -67,12 +68,12 @@ type PodEvent struct {
 
 // PgUser contains information about a single user.
 type PgUser struct {
-	Origin 	   RoleOrigin
-	Name       string
-	Password   string
-	Flags      []string
-	MemberOf   []string
-	Parameters map[string]string
+	Origin     RoleOrigin        `yaml:"-"`
+	Name       string            `yaml:"-"`
+	Password   string            `yaml:"-"`
+	Flags      []string          `yaml:"options"`
+	MemberOf   []string          `yaml:"inrole"`
+	Parameters map[string]string `yaml:"parameters"`
 }
 
 // PgUserMap maps user names to the definitions.
