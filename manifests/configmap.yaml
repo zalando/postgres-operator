@@ -39,5 +39,5 @@ data:
   pod_terminate_grace_period: 5m
   pdb_name_format: "postgres-{cluster}-pdb"
   node_eol_label: "lifecycle-status:pending-decommission"
-  node_readiness_label: "lifecycle-status:ready"
+  node_readiness_label: ""
   team_api_role_configuration: "log_statement:all"

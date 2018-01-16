@@ -150,27 +150,24 @@ but not that PostgreSQL pods are placed on such a node. This can be achieved by 
 
 ### Using the operator to minimize the amount of failovers during the cluster upgrade
 
-To make sure there is only one failover per each PostgreSQL deployment when nodes of the cluster are decomissioned
-during the cluster upgrade, the operator relies on the `node_readiness_label` parameter. It is used in order to determine whether
-a given node is considered ready to run postgres pods. When a node is both `unschedulable` and doesn't have a readiness
-label the operator starts moving master pods out of it. In addition, the operator sets the `PodDisruptionBudget` for the
-postgres pods to make sure pods with the role `master` are not killed by the cluster scale out operations. Each postgres
-pod has a `nodeAffinity` set to avoid being scheduled on the nodes without the readiness label. Together, those measures
-give us the following guarantees:
+Postgres operator moves master pods out of to be decommissioned Kubernetes nodes. The decommission status of the node is derived
+from the presence of the set of labels defined by the `node_readiness_label` parameter. The operator makes sure that the Postgres
+master pods are moved elsewhere from the node that is pending to be decommissioned , but not on another node that is also
+about to be shut down. It achieves that via a combination of several properties set on the postgres pods:
 
-* no postgres pod runs on the node being not ready
-* no postgres master pod is killed during the scale event before the operator has a chance to move it off the node
-* when a postgres pod is killed by the operator because the node is decomissioned, it will not respawn on another node to-be-decomissioned.
+* [nodeAffinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity-beta-feature) is configured to avoid scheduling the pod on nodes without all labels from the `node_readiness_label` set.
+* [PodDisruptionBudget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#how-disruption-budgets-work) is defined to keep the master pods running until they are moved out by the operator.
 
-By default the `node_readiness_label` is set to an empty string, disabling this feature altogether. It can be set to a
-string containing one or more key:value parameters, i.e:
+The operator starts moving master pods when the node is drained and doesn't have all labels from the `node_readiness_label` set.
+By default this parameter is set to an empty string, disabling this feature altogether. It can be set to a string containing one
+or more key:value parameters, i.e:
 ```
 node_readiness_label: "lifecycle-status:ready,disagnostic-checks:ok"
 
 ```
 
 when multiple labels are set the operator will require all of them to be present on a node (and set to the specified value) in order to consider
-the node as ready. 
+it ready. 
 
 #### Custom Pod Environment Variables
 
