@@ -148,6 +148,27 @@ spec:
 Please be aware that the taint and toleration only ensures that no other pod gets scheduled to a PostgreSQL node 
 but not that PostgreSQL pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
 
+### Using the operator to minimize the amount of failovers during the cluster upgrade
+
+Postgres operator moves master pods out of to be decommissioned Kubernetes nodes. The decommission status of the node is derived
+from the presence of the set of labels defined by the `node_readiness_label` parameter. The operator makes sure that the Postgres
+master pods are moved elsewhere from the node that is pending to be decommissioned , but not on another node that is also
+about to be shut down. It achieves that via a combination of several properties set on the postgres pods:
+
+* [nodeAffinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity-beta-feature) is configured to avoid scheduling the pod on nodes without all labels from the `node_readiness_label` set.
+* [PodDisruptionBudget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#how-disruption-budgets-work) is defined to keep the master pods running until they are moved out by the operator.
+
+The operator starts moving master pods when the node is drained and doesn't have all labels from the `node_readiness_label` set.
+By default this parameter is set to an empty string, disabling this feature altogether. It can be set to a string containing one
+or more key:value parameters, i.e:
+```
+node_readiness_label: "lifecycle-status:ready,disagnostic-checks:ok"
+
+```
+
+when multiple labels are set the operator will require all of them to be present on a node (and set to the specified value) in order to consider
+it ready. 
+
 #### Custom Pod Environment Variables
 
 It is possible to configure a config map which is used by the Postgres pods as an additional provider for environment variables.

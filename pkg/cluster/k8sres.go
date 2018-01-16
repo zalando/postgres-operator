@@ -238,6 +238,9 @@ PatroniInitDBParams:
 
 func (c *Cluster) nodeAffinity() *v1.Affinity {
 	matchExpressions := make([]v1.NodeSelectorRequirement, 0)
+	if len(c.OpConfig.NodeReadinessLabel) == 0 {
+		return nil
+	}
 	for k, v := range c.OpConfig.NodeReadinessLabel {
 		matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
 			Key:      k,
@@ -431,8 +434,11 @@ func (c *Cluster) generatePodTemplate(
 		ServiceAccountName:            c.OpConfig.ServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
-		Affinity:                      c.nodeAffinity(),
 		Tolerations:                   c.tolerations(tolerationsSpec),
+	}
+
+	if affinity := c.nodeAffinity(); affinity != nil {
+		podSpec.Affinity = affinity
 	}
 
 	if c.OpConfig.ScalyrAPIKey != "" && c.OpConfig.ScalyrImage != "" {
