@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
@@ -280,6 +281,7 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 }
 
 func (c *Cluster) generatePodTemplate(
+	uuid types.UID,
 	resourceRequirements *v1.ResourceRequirements,
 	resourceRequirementsScalyrSidecar *v1.ResourceRequirements,
 	tolerationsSpec *[]v1.Toleration,
@@ -358,6 +360,7 @@ func (c *Cluster) generatePodTemplate(
 	}
 	if c.OpConfig.WALES3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: fmt.Sprintf("-%s", uuid) })
 	}
 
 	if c.OpConfig.EtcdHost == "" {
@@ -537,7 +540,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			customPodEnvVars = cm.Data
 		}
 	}
-	podTemplate := c.generatePodTemplate(resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
+	podTemplate := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
