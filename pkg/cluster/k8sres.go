@@ -7,8 +7,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
@@ -281,7 +281,7 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 }
 
 func (c *Cluster) generatePodTemplate(
-	uuid types.UID,
+	uid types.UID,
 	resourceRequirements *v1.ResourceRequirements,
 	resourceRequirementsScalyrSidecar *v1.ResourceRequirements,
 	tolerationsSpec *[]v1.Toleration,
@@ -360,7 +360,7 @@ func (c *Cluster) generatePodTemplate(
 	}
 	if c.OpConfig.WALES3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: fmt.Sprintf("-%s", uuid) })
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getWALBucketScopeSuffix(string(uid))})
 	}
 
 	if c.OpConfig.EtcdHost == "" {
@@ -501,6 +501,13 @@ func (c *Cluster) generatePodTemplate(
 	}
 
 	return &template
+}
+
+func getWALBucketScopeSuffix(uid string) string {
+	if uid != "" {
+		return fmt.Sprintf("-%s", uid)
+	}
+	return ""
 }
 
 func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) spec.Resources {
@@ -760,6 +767,7 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getWALBucketScopeSuffix(description.Uid)})
 	}
 
 	return result
