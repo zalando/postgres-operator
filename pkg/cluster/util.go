@@ -223,7 +223,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRole) error {
+func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
@@ -232,13 +232,13 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRo
 
 			if role == nil {
 				if podRole == Master || podRole == Replica {
-					return nil
+					return podEvent.CurPod, nil
 				}
 			} else if *role == podRole {
-				return nil
+				return podEvent.CurPod, nil
 			}
 		case <-timeout:
-			return fmt.Errorf("pod label wait timeout")
+			return nil, fmt.Errorf("pod label wait timeout")
 		}
 	}
 }
