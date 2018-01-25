@@ -9,8 +9,7 @@ function retry(){ # timeouts after 1 minutes
     cmd="$1"
     retryMsg="$2"
     for i in {1..20}; do
-	eval "$cmd"
-	if [ $? -eq 0 ]; then
+	if  eval "$cmd"; then
             return 0
         fi
 	echo "$retryMsg"
@@ -21,17 +20,20 @@ function retry(){ # timeouts after 1 minutes
 }
 
 function build_operator_binary(){ 
-  make tools && make deps && make local
+    make tools > /dev/null 2>&1 &&
+	make deps  > /dev/null 2>&1 &&
+	make local > /dev/null 2>&1
 }
 
 # the fastest way to run your docker image locally is to reuse the docker from minikube. 
 function deploy_self_built_image() {
 
     echo "==== DEPLOY CUSTOM OPERATOR IMAGE ==== "
-    
+
+    echo "Build operator binary (stderr redirected to /dev/null)..."
     build_operator_binary
     
-    # set docker env vars so that it can talk to the Docker daemon inside the minikube VM
+    # set docker env vars so that docker can talk to the Docker daemon inside the minikube VM
     eval $(minikube docker-env)
 
     # image tag consists of a git tag or a unique commit prefix
@@ -39,16 +41,43 @@ function deploy_self_built_image() {
     export TAG=$(git describe --tags --always --dirty="-dev")
 
     # build the image
-    make docker
+    echo "Build the operator Docker image (stderr redirected to /dev/null)..."
+    make docker > /dev/null 2>&1
     
     # update the tag in the postgres operator conf
     # since the image with this tag is already present on the machine,
     # docker should not attempt to fetch it from the registry due to imagePullPolicy
-    file="manifests/local-postgres-operator.yaml"
-    sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml >> "$file"
+    file="/tmp/local-postgres-operator.yaml"
+    sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml > "$file"
     
-    retry "kubectl  create -f \"$file\"" "attempt to create $file resource"
- }
+    retry "kubectl create -f \"$file\"" "attempt to create $file resource"
+}
+
+function display_help(){
+    echo "Usage: ./run_locally.sh [ -r | --rebuild-operator ] [ -h | --help ]"    
+}
+
+# parse options
+should_build_operator=false
+while true
+do
+    case "${1:-''}" in # if 1st is usnet, use the mety string as a default value
+
+	-h | --help)
+	    display_help
+	    exit 0
+	    ;;
+	-r | --rebuild-operator)
+	    should_build_operator=true
+	    shift 2
+	    break
+	    ;;
+	--) shift
+	    break;;
+	*)	     break
+		     ;;
+    esac
+done
 
 
 echo "==== CLEAN UP PREVIOUS RUN ==== "
@@ -88,11 +117,11 @@ do
     retry "kubectl  create -f manifests/\"$file\"" "attempt to create $file resource"
 done
 
-should_build_operator=true
+
 if [ "$should_build_operator" = true ]; then
-   deploy_self_built_image
+    deploy_self_built_image
 else
-   retry "kubectl  create -f manifests/postgres-operator.yaml" "attempt to create $file resource" 
+    retry "kubectl  create -f manifests/postgres-operator.yaml" "attempt to create /postgres-operator.yaml resource" 
 fi
 
 msg="Wait for the postgresql custom resource definition to register..."
@@ -117,7 +146,11 @@ checkMsg="Wait for port forwarding to take effect"
 
 if  retry "$checkCmd" "$checkMsg" ; then
     echo "==== SUCCESS: OPERATOR IS RUNNING ==== "
+    echo "To stop it cleanly, run 'minikube delete'"
 else
     echo "==== FAILURE: OPERATOR DID NOT START OR PORT FORWARDING DID NOT WORK"
+    echo "This *might* have left the minikube VM image in inconsistent state."
+    echo "If you observe strange issues, try deleting .minikube dir and re-running the script"
     exit 1
 fi
+
