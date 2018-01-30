@@ -24,8 +24,8 @@ function retry(){
     # errexit may break "eval $cmd", so we disable it temporarily
     set +o errexit
     
-    local cmd="$1"
-    local retry_msg="$2"
+    local -r cmd="$1"
+    local -r retry_msg="$2"
 
     # times out after 1 minute
     for i in {1..20}; do
@@ -42,46 +42,10 @@ function retry(){
 }
 
 
-function build_operator_binary(){
-
-    # redirecting stderr greatly reduces non-informative output during normal builds
-    echo "Build operator binary (stderr redirected to /dev/null)..."
-    
-    make tools > /dev/null 2>&1 
-    make deps  > /dev/null 2>&1
-    make local > /dev/null 2>&1
-}
-
-
-function deploy_self_built_image() {
-
-    echo "==== DEPLOY CUSTOM OPERATOR IMAGE ==== "
-    
-    build_operator_binary
-    
-    # the fastest way to run your docker image locally is to reuse the docker from minikube.     
-    # set docker env vars so that docker can talk to the Docker daemon inside the minikube
-    eval $(minikube docker-env)
-
-    # image tag consists of a git tag or a unique commit prefix
-    # and the "-dev" suffix if there are uncommited changes in the working dir
-    TAG=$(git describe --tags --always --dirty="-dev")
-    export TAG
-    
-    # build the image
-    make docker > /dev/null 2>&1
-    
-    # update the tag in the postgres operator conf
-    # since the image with this tag already exists on the machine,
-    # docker should not attempt to fetch it from the registry due to imagePullPolicy
-    sed --expression "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml > "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
-    
-    retry "kubectl create -f \"$PATH_TO_LOCAL_OPERATOR_MANIFEST\"" "attempt to create $PATH_TO_LOCAL_OPERATOR_MANIFEST resource"
-}
-
 function display_help(){
     echo "Usage: ./run_locally.sh [ -r | --rebuild-operator ] [ -h | --help ]"    
 }
+
 
 function clean_up(){
     
@@ -116,6 +80,7 @@ function clean_up(){
     fi
 }
 
+
 function start_minikube(){
     
     echo "==== START MINIKUBE ==== "
@@ -128,6 +93,46 @@ function start_minikube(){
     minikube status
 
 }
+
+
+function build_operator_binary(){
+
+    # redirecting stderr greatly reduces non-informative output during normal builds
+    echo "Build operator binary (stderr redirected to /dev/null)..."
+    
+    make tools > /dev/null 2>&1 
+    make deps  > /dev/null 2>&1
+    make local > /dev/null 2>&1
+}
+
+
+function deploy_self_built_image() {
+
+    echo "==== DEPLOY CUSTOM OPERATOR IMAGE ==== "
+    
+    build_operator_binary
+    
+    # the fastest way to run a docker image locally is to reuse the docker from minikube     
+    # set docker env vars so that docker can talk to the Docker daemon inside the minikube
+    eval $(minikube docker-env)
+
+    # image tag consists of a git tag or a unique commit prefix
+    # and the "-dev" suffix if there are uncommited changes in the working dir
+    local -x TAG
+    TAG=$(git describe --tags --always --dirty="-dev")
+    readonly TAG
+    
+    # build the image
+    make docker > /dev/null 2>&1
+    
+    # update the tag in the postgres operator conf
+    # since the image with this tag already exists on the machine,
+    # docker should not attempt to fetch it from the registry due to imagePullPolicy
+    sed --expression "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml > "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
+    
+    retry "kubectl create -f \"$PATH_TO_LOCAL_OPERATOR_MANIFEST\"" "attempt to create $PATH_TO_LOCAL_OPERATOR_MANIFEST resource"
+}
+
 
 function start_operator(){
     
@@ -147,12 +152,13 @@ function start_operator(){
 	retry "kubectl  create -f manifests/postgres-operator.yaml" "attempt to create /postgres-operator.yaml resource" 
     fi
 
-    local msg="Wait for the postgresql custom resource definition to register..."
-    local cmd="kubectl get crd | grep --quiet 'postgresqls.acid.zalan.do'"
+    local -r msg="Wait for the postgresql custom resource definition to register..."
+    local -r cmd="kubectl get crd | grep --quiet 'postgresqls.acid.zalan.do'"
     retry "$cmd" "$msg "
 
     kubectl create -f manifests/complete-postgres-manifest.yaml
 }
+
 
 function forward_ports(){
     
@@ -172,9 +178,9 @@ function check_health(){
     
     echo "==== RUN HEALTH CHECK ==== "
     
-    local check_cmd="curl --location --silent http://127.0.0.1:$LOCAL_PORT/clusters &> /dev/null"
+    local -r check_cmd="curl --location --silent http://127.0.0.1:$LOCAL_PORT/clusters &> /dev/null"
+    local -r check_msg="Wait for port forwarding to take effect"
     echo "Command for checking: $check_cmd"
-    local check_msg="Wait for port forwarding to take effect"
 
     if  retry "$check_cmd" "$check_msg"; then
 	echo "==== SUCCESS: OPERATOR IS RUNNING ==== "
@@ -196,7 +202,6 @@ function main(){
     
     trap "echo 'If you observe issues with minikube VM not starting/not proceeding, consider deleting the .minikube dir and/or rebooting before re-running the script'" EXIT
 
-    
     local should_build_operator=false
     while true
     do
