@@ -11,7 +11,7 @@ set -o pipefail
 IFS=$'\n\t'
 
 
-readonly PATH_TO_LOCAL_OPERATOR_MANIFEST="/tmp/local-postgres-operator.yaml"
+readonly PATH_TO_LOCAL_OPERATOR_MANIFEST="/tmp/local-postgres-operator-manifest.yaml"
 readonly PATH_TO_PORT_FORWARED_KUBECTL_PID="/tmp/kubectl-port-forward.pid"
 readonly LOCAL_PORT="8080"
 readonly OPERATOR_PORT="8080"
@@ -21,16 +21,12 @@ readonly OPERATOR_PORT="8080"
 # so the script retries actions until all the resources become available
 function retry(){
 
-    # errexit may break "eval $retry_cmd", so we disable it temporarily
-    set +o errexit
-
     local -r retry_cmd="$1"
     local -r retry_msg="$2"
 
     # times out after 1 minute
     for i in {1..20}; do
         if  eval "$retry_cmd"; then
-            set -o errexit # enable again
             return 0
         fi
         echo "$retry_msg"
@@ -43,7 +39,7 @@ function retry(){
 
 
 function display_help(){
-    echo "Usage: ./run_locally.sh [ -r | --rebuild-operator ] [ -h | --help ]"
+    echo "Usage: $0 [ -r | --rebuild-operator ] [ -h | --help ]"
 }
 
 
@@ -68,14 +64,13 @@ function clean_up(){
     if [[ -e "$PATH_TO_PORT_FORWARED_KUBECTL_PID" ]]; then
 
         local pid
-        pid=$(cat "$PATH_TO_PORT_FORWARED_KUBECTL_PID")
+        pid=$( < "$PATH_TO_PORT_FORWARED_KUBECTL_PID")
 
         # the process dies if a minikube stops between two invocations of the script
-        if ps --pid "$pid" > /dev/null  2>&1; then
+        if kill "$pid" > /dev/null  2>&1; then
             echo "Kill the kubectl process responsible for port forwarding for minikube so that we can re-use the same ports for forwarding later..."
-            kill "$pid"
         fi
-        rm --verbose /tmp/kubectl-port-forward.pid
+        rm --verbose  "$PATH_TO_PORT_FORWARED_KUBECTL_PID"
 
     fi
 }
@@ -99,10 +94,8 @@ function build_operator_binary(){
 
     # redirecting stderr greatly reduces non-informative output during normal builds
     echo "Build operator binary (stderr redirected to /dev/null)..."
+    make tools deps local > /dev/null 2>&1
 
-    make tools > /dev/null 2>&1
-    make deps  > /dev/null 2>&1
-    make local > /dev/null 2>&1
 }
 
 
@@ -171,7 +164,7 @@ function forward_ports(){
     # stdout redirect removes the info message about forwarded ports; the message sometimes garbles the cli prompt
     kubectl port-forward "$operator_pod" "$LOCAL_PORT":"$OPERATOR_PORT" &> /dev/null &
 
-    pgrep --newest "kubectl" > "$PATH_TO_PORT_FORWARED_KUBECTL_PID"
+    echo $! > "$PATH_TO_PORT_FORWARED_KUBECTL_PID"
 }
 
 
@@ -179,7 +172,7 @@ function check_health(){
 
     echo "==== RUN HEALTH CHECK ==== "
 
-    local -r check_cmd="curl --location --silent http://127.0.0.1:$LOCAL_PORT/clusters &> /dev/null"
+    local -r check_cmd="curl --location --silent --output /dev/null http://127.0.0.1:$LOCAL_PORT/clusters"
     local -r check_msg="Wait for port forwarding to take effect"
     echo "Command for checking: $check_cmd"
 
