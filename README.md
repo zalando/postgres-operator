@@ -305,3 +305,46 @@ The operator also supports pprof endpoints listed at the [pprof package](https:/
 * /debug/pprof/profile
 * /debug/pprof/symbol
 * /debug/pprof/trace
+
+It's possible to attach a debugger to troubleshoot postgres-operator inside a
+docker container. It's possible with gdb and
+[delve](https://github.com/derekparker/delve). Since the latter one is a
+specialized debugger for golang, we will use it as an example. To use it you
+need:
+
+* Install delve locally
+
+```
+go get -u github.com/derekparker/delve/cmd/dlv
+```
+
+* Add following dependencies to the `Dockerfile`
+
+```
+RUN apk --no-cache add go git musl-dev
+RUN go get github.com/derekparker/delve/cmd/dlv
+```
+
+* Update the `Makefile` to build the project with debugging symbols
+
+```
+-gcflags "-N -l"
+```
+
+* Run `postgres-operator` under the delve
+
+```
+CMD ["/root/go/bin/dlv", "--listen=:DLV_PORT", "--headless=true", "--api-version=2", "exec", "/postgres-operator"]
+```
+
+* Forward the listening port
+
+```
+kubectl port-forward POD_NAME DLV_PORT:DLV_PORT
+```
+
+* Attach to it
+
+```
+$ dlv connect 127.0.0.1:DLV_PORT
+```
