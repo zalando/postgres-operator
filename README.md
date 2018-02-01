@@ -325,13 +325,15 @@ RUN apk --no-cache add go git musl-dev
 RUN go get github.com/derekparker/delve/cmd/dlv
 ```
 
-* Update the `Makefile` to build the project with debugging symbols
+* Update the `Makefile` to build the project with debugging symbols. For that
+  you need to add `gcflags` to a build target for corresponding OS (e.g. linux)
 
 ```
 -gcflags "-N -l"
 ```
 
-* Run `postgres-operator` under the delve
+* Run `postgres-operator` under the delve. For that you need to replace
+  `ENTRYPOINT` with the following `CMD`:
 
 ```
 CMD ["/root/go/bin/dlv", "--listen=:DLV_PORT", "--headless=true", "--api-version=2", "exec", "/postgres-operator"]
