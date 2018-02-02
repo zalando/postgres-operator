@@ -8,9 +8,19 @@ ifeq ($(RACE),1)
     CGO_ENABLED=1
 endif
 
+ifeq ($(DEBUG),1)
+	BUILD_FLAGS += -gcflags "-N -l"
+endif
+
 LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
 LDFLAGS ?= -X=main.version=$(VERSION)
-DOCKERFILE = docker/Dockerfile
+
+ifeq ($(DEBUG),1)
+	DOCKERFILE = docker/DebugDockerfile
+else
+	DOCKERFILE = docker/Dockerfile
+endif
+
 IMAGE ?= registry.opensource.zalan.do/acid/$(BINARY)
 TAG ?= $(VERSION)
 GITHEAD = $(shell git rev-parse --short HEAD)
@@ -43,7 +53,7 @@ docker-context: scm-source.json linux
 	cp build/linux/${BINARY} scm-source.json docker/build/
 
 docker: ${DOCKERFILE} docker-context
-	cd docker && docker build --rm -t "$(IMAGE):$(TAG)" .
+	docker build --rm -t "$(IMAGE):$(TAG)" -f "${DOCKERFILE}" .
 
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.8.1 bash -c "make linux"
