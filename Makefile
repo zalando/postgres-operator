@@ -10,7 +10,8 @@ endif
 
 LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
 LDFLAGS ?= -X=main.version=$(VERSION)
-DOCKERFILE = docker/Dockerfile
+DOCKERDIR = docker
+
 IMAGE ?= registry.opensource.zalan.do/acid/$(BINARY)
 TAG ?= $(VERSION)
 GITHEAD = $(shell git rev-parse --short HEAD)
@@ -20,6 +21,14 @@ SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
 DIRS := cmd pkg
 PKG := `go list ./... | grep -v /vendor/`
+
+ifeq ($(DEBUG),1)
+	DOCKERFILE = DebugDockerfile
+	DEBUG_POSTFIX := -debug
+	BUILD_FLAGS += -gcflags "-N -l"
+else
+	DOCKERFILE = Dockerfile
+endif
 
 PATH := $(GOPATH)/bin:$(PATH)
 SHELL := env PATH=$(PATH) $(SHELL)
@@ -42,8 +51,8 @@ docker-context: scm-source.json linux
 	mkdir -p docker/build/
 	cp build/linux/${BINARY} scm-source.json docker/build/
 
-docker: ${DOCKERFILE} docker-context
-	cd docker && docker build --rm -t "$(IMAGE):$(TAG)" .
+docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
+	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.8.1 bash -c "make linux"
