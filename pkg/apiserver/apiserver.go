@@ -30,9 +30,9 @@ type controllerInformer interface {
 	GetOperatorConfig() *config.Config
 	GetStatus() *spec.ControllerStatus
 	TeamClusterList() map[string][]spec.NamespacedName
-	ClusterStatus(team, cluster string) (*spec.ClusterStatus, error)
-	ClusterLogs(team, cluster string) ([]*spec.LogEntry, error)
-	ClusterHistory(team, cluster string) ([]*spec.Diff, error)
+	ClusterStatus(team, namespace, cluster string) (*spec.ClusterStatus, error)
+	ClusterLogs(team, namespace, cluster string) ([]*spec.LogEntry, error)
+	ClusterHistory(team, namespace, cluster string) ([]*spec.Diff, error)
 	ClusterDatabasesMap() map[string][]string
 	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
 	ListQueue(workerID uint32) (*spec.QueueDump, error)
@@ -48,9 +48,9 @@ type Server struct {
 }
 
 var (
-	clusterStatusURL     = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/?$`)
-	clusterLogsURL       = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/logs/?$`)
-	clusterHistoryURL    = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/history/?$`)
+	clusterStatusURL     = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)(/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*))?/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/?$`)
+	clusterLogsURL       = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)(/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*))?/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/logs/?$`)
+	clusterHistoryURL    = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)(/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*))?/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/history/?$`)
 	teamURL              = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$`)
 	workerLogsURL        = regexp.MustCompile(`^/workers/(?P<id>\d+)/logs/?$`)
 	workerEventsQueueURL = regexp.MustCompile(`^/workers/(?P<id>\d+)/queue/?$`)
@@ -149,7 +149,8 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 	)
 
 	if matches := util.FindNamedStringSubmatch(clusterStatusURL, req.URL.Path); matches != nil {
-		resp, err = s.controller.ClusterStatus(matches["team"], matches["cluster"])
+		namespace, _ := matches["namespace"]
+		resp, err = s.controller.ClusterStatus(matches["team"], namespace, matches["cluster"])
 	} else if matches := util.FindNamedStringSubmatch(teamURL, req.URL.Path); matches != nil {
 		teamClusters := s.controller.TeamClusterList()
 		clusters, found := teamClusters[matches["team"]]
@@ -166,9 +167,11 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		s.respond(clusterNames, nil, w)
 		return
 	} else if matches := util.FindNamedStringSubmatch(clusterLogsURL, req.URL.Path); matches != nil {
-		resp, err = s.controller.ClusterLogs(matches["team"], matches["cluster"])
+		namespace, _ := matches["namespace"]
+		resp, err = s.controller.ClusterLogs(matches["team"], namespace, matches["cluster"])
 	} else if matches := util.FindNamedStringSubmatch(clusterHistoryURL, req.URL.Path); matches != nil {
-		resp, err = s.controller.ClusterHistory(matches["team"], matches["cluster"])
+		namespace, _ := matches["namespace"]
+		resp, err = s.controller.ClusterHistory(matches["team"], namespace, matches["cluster"])
 	} else if req.URL.Path == clustersURL {
 		res := make(map[string][]string)
 		for team, clusters := range s.controller.TeamClusterList() {
