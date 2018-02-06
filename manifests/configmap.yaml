@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: postgres-operator
 data:
+  # assumes the ns exists before the operator starts
+  # watched_namespace: development
   service_account_name: operator
   cluster_labels: application:spilo
   cluster_name_label: version
