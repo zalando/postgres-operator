@@ -27,14 +27,9 @@ func init() {
 	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
 
-	config.Namespace = os.Getenv("WATCH_NAMESPACE")
-	if config.Namespace == "" {
-		config.Namespace = "default"
-	}
-
-	configMap := os.Getenv("CONFIG_MAP_NAME")
-	if configMap != "" {
-		err := config.ConfigMapName.Decode(configMap)
+	configMapRawName := os.Getenv("CONFIG_MAP_NAME")
+	if configMapRawName != "" {
+		err := config.ConfigMapName.Decode(configMapRawName)
 		if err != nil {
 			log.Fatalf("incorrect config map name")
 		}

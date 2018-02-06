@@ -97,9 +97,21 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	if configMapData["watched_namespace"] == "" { // Namespace in ConfigMap has priority over env var
-		configMapData["watched_namespace"] = c.config.Namespace
+	// env var takes priority over the same param from the operator ConfigMap
+	watchedNamespace := os.Getenv("WATCHED_NAMESPACE")
+	if watchedNamespace != "" {
+		c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNamespace)
+		configMapData["watched_namespace"] = watchedNamespace
 	}
+
+	if configMapData["watched_namespace"] == "" {
+		c.logger.Infoln("No namespace to watch specified. Fall back to watching the 'default' namespace.")
+		configMapData["watched_namespace"] = v1.NamespaceDefault
+	}
+
+	// display the actual namespace in case someone checks the value manually
+	os.Setenv("WATCHED_NAMESPACE", configMapData["watched_namespace"])
+
 	if c.config.NoDatabaseAccess {
 		configMapData["enable_database_access"] = "false"
 	}

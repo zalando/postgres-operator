@@ -4,6 +4,7 @@ metadata:
   name: postgres-operator
 data:
   # assumes the ns exists before the operator starts
+  # the env var with the same name may overwrite it in the operator pod
   # watched_namespace: development
   service_account_name: operator
   cluster_labels: application:spilo
