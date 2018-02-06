@@ -97,8 +97,8 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
-		configMapData["namespace"] = c.config.Namespace
+	if configMapData["watched_namespace"] == "" { // Namespace in ConfigMap has priority over env var
+		configMapData["watched_namespace"] = c.config.Namespace
 	}
 	if c.config.NoDatabaseAccess {
 		configMapData["enable_database_access"] = "false"

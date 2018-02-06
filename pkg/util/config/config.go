@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"fmt"
+
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
@@ -66,7 +67,7 @@ type Config struct {
 	Resources
 	Auth
 	Scalyr
-	Namespace                string            `name:"namespace"`
+	WatchedNamespace         string            `name:"watched_namespace"`
 	EtcdHost                 string            `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
 	DockerImage              string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
 	ServiceAccountName       string            `name:"service_account_name" default:"operator"`
