@@ -109,9 +109,6 @@ func (c *Controller) initOperatorConfig() {
 		configMapData["watched_namespace"] = v1.NamespaceDefault
 	}
 
-	// display the actual namespace in case someone checks the value manually
-	os.Setenv("WATCHED_NAMESPACE", configMapData["watched_namespace"])
-
 	if c.config.NoDatabaseAccess {
 		configMapData["enable_database_access"] = "false"
 	}
