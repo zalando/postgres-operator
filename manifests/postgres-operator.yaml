@@ -15,9 +15,10 @@ spec:
         image: registry.opensource.zalan.do/acid/postgres-operator:c17aabb
         imagePullPolicy: IfNotPresent
         env:
-        - name: WATCH_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+        # uncomment to overwrite a similar setting from operator configmap
+        # - name: WATCHED_NAMESPACE
+        #  valueFrom:
+        #    fieldRef:
+        #      fieldPath: metadata.namespace
         - name: CONFIG_MAP_NAME
           value: "postgres-operator"

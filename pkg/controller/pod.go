@@ -17,7 +17,7 @@ func (c *Controller) podListFunc(options metav1.ListOptions) (runtime.Object, er
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.Pods(c.opConfig.Namespace).List(opts)
+	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).List(opts)
 }
 
 func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
@@ -27,7 +27,7 @@ func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, 
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.Pods(c.opConfig.Namespace).Watch(opts)
+	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).Watch(opts)
 }
 
 func (c *Controller) dispatchPodEvent(clusterName spec.NamespacedName, event spec.PodEvent) {
