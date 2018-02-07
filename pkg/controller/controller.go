@@ -143,6 +143,16 @@ func (c *Controller) initOperatorConfig() {
 func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
+
+	// earliest point where we can check if the namespace to watch actually exists
+	if c.opConfig.WatchedNamespace != v1.NamespaceAll {
+		_, err := c.KubeClient.Namespaces().Get(c.opConfig.WatchedNamespace, metav1.GetOptions{})
+		if err != nil {
+			c.logger.Warnf("Operator was told to watch the %q namespace but was unable to confirm it existense via Kubernetes API. Falling back to watching all namespaces instead (done automatically by k8s)", c.opConfig.WatchedNamespace)
+		}
+
+	}
+
 	c.initSharedInformers()
 
 	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
