@@ -110,7 +110,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 	}
 
 	podName := fmt.Sprintf("%s-0", c.Statefulset.Name)
-	masterCandidatePod, err := c.KubeClient.Pods(c.OpConfig.WatchedNamespace).Get(podName, metav1.GetOptions{})
+	masterCandidatePod, err := c.KubeClient.Pods(c.clusterNamespace()).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("could not get master candidate pod: %v", err)
 	}

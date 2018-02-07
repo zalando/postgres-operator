@@ -14,9 +14,14 @@ import (
 )
 
 // ClusterStatus provides status of the cluster
-func (c *Controller) ClusterStatus(team, cluster string) (*spec.ClusterStatus, error) {
+func (c *Controller) ClusterStatus(team, namespace, cluster string) (*spec.ClusterStatus, error) {
+
+	if namespace == "" {
+		namespace = c.opConfig.WatchedNamespace
+	}
+
 	clusterName := spec.NamespacedName{
-		Namespace: c.opConfig.WatchedNamespace,
+		Namespace: namespace,
 		Name:      team + "-" + cluster,
 	}
 
@@ -90,9 +95,14 @@ func (c *Controller) GetStatus() *spec.ControllerStatus {
 }
 
 // ClusterLogs dumps cluster ring logs
-func (c *Controller) ClusterLogs(team, name string) ([]*spec.LogEntry, error) {
+func (c *Controller) ClusterLogs(team, namespace, name string) ([]*spec.LogEntry, error) {
+
+	if namespace == "" {
+		namespace = c.opConfig.WatchedNamespace
+	}
+
 	clusterName := spec.NamespacedName{
-		Namespace: c.opConfig.WatchedNamespace,
+		Namespace: namespace,
 		Name:      team + "-" + name,
 	}
 
@@ -212,9 +222,14 @@ func (c *Controller) WorkerStatus(workerID uint32) (*spec.WorkerStatus, error) {
 }
 
 // ClusterHistory dumps history of cluster changes
-func (c *Controller) ClusterHistory(team, name string) ([]*spec.Diff, error) {
+func (c *Controller) ClusterHistory(team, namespace, name string) ([]*spec.Diff, error) {
+
+	if namespace == "" {
+		namespace = c.opConfig.WatchedNamespace
+	}
+
 	clusterName := spec.NamespacedName{
-		Namespace: c.opConfig.WatchedNamespace,
+		Namespace: namespace,
 		Name:      team + "-" + name,
 	}
 
