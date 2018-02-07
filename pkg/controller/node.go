@@ -80,7 +80,7 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 	opts := metav1.ListOptions{
 		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),
 	}
-	podList, err := c.KubeClient.Pods("").List(opts)
+	podList, err := c.KubeClient.Pods(c.opConfig.WatchedNamespace).List(opts)
 	if err != nil {
 		c.logger.Errorf("could not fetch list of the pods: %v", err)
 		return

@@ -97,18 +97,34 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	// env var takes priority over the same param from the operator ConfigMap
-	watchedNamespace := os.Getenv("WATCHED_NAMESPACE")
-	if watchedNamespace != "" {
-		c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNamespace)
-		configMapData["watched_namespace"] = watchedNamespace
+	// by default, the operator listens to all namespaces
+	// by setting the env variable, one can restrict the operator to a single namespace
+	watchedNamespace, isPresentInEnv := os.LookupEnv("WATCHED_NAMESPACE")
+	if isPresentInEnv {
+		// special case: v1.NamespaceAll currently also evaluates to the empty string
+		// so when the env var is set to the empty string, use the default ns
+		// since the meaning of this env var is only one namespace
+		if watchedNamespace == "" {
+			c.logger.Infof("The WATCHED_NAMESPACE env var evaluates to the empty string, falling back to watching the 'default' namespace.\n", watchedNamespace)
+			configMapData["watched_namespace"] = v1.NamespaceDefault
+		} else {
+			c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNamespace)
+			configMapData["watched_namespace"] = watchedNamespace
+		}
+
+	} else {
+		c.logger.Infof("Watch all namespaces. Set the WATCHED_NAMESPACE env var  to restrict to a single namespace.\n", watchedNamespace)
+		configMapData["watched_namespace"] = v1.NamespaceAll
 	}
 
-	if configMapData["watched_namespace"] == "" {
-		c.logger.Infoln("No namespace to watch specified. Fall back to watching the 'default' namespace.")
-		configMapData["watched_namespace"] = v1.NamespaceDefault
-	}
+	/*
+		// env var takes priority over the same param from the operator ConfigMap
 
+			if configMapData["watched_namespace"] == "" {
+				c.logger.Infoln("No namespace to watch specified. Fall back to watching the 'default' namespace.")
+				configMapData["watched_namespace"] = v1.NamespaceDefault
+			}
+	*/
 	if c.config.NoDatabaseAccess {
 		configMapData["enable_database_access"] = "false"
 	}

@@ -46,7 +46,7 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 
 	req := c.KubeClient.CRDREST.
 		Get().
-		Namespace("").
+		Namespace(c.opConfig.WatchedNamespace).
 		Resource(constants.CRDResource).
 		VersionedParams(&options, metav1.ParameterCodec)
 
