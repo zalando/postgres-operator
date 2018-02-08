@@ -16,6 +16,7 @@ spec:
         imagePullPolicy: IfNotPresent
         env:
         # uncomment to overwrite a similar setting from operator configmap
+        # if set to the empty string, watch the 'default' namespace
         # - name: WATCHED_NAMESPACE
         #  valueFrom:
         #    fieldRef:
