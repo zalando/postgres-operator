@@ -18,9 +18,9 @@ func (t *mockTicker) Tick() {
 
 func TestRetryWorkerSuccess(t *testing.T) {
 	tick := &mockTicker{t, 0}
-	result := RetryWorker(10, 20, func() (bool, error) {
+	result := RetryWorker(10, 20, tick, func() (bool, error) {
 		return true, nil
-	}, tick)
+	})
 
 	if result != nil {
 		t.Errorf("Wrong result, expected: %#v, got: %#v", nil, result)
@@ -35,7 +35,7 @@ func TestRetryWorkerOneFalse(t *testing.T) {
 	var counter = 0
 
 	tick := &mockTicker{t, 0}
-	result := RetryWorker(1, 3, func() (bool, error) {
+	result := RetryWorker(1, 3, tick, func() (bool, error) {
 		counter += 1
 
 		if counter <= 1 {
@@ -43,7 +43,7 @@ func TestRetryWorkerOneFalse(t *testing.T) {
 		} else {
 			return true, nil
 		}
-	}, tick)
+	})
 
 	if result != nil {
 		t.Errorf("Wrong result, expected: %#v, got: %#v", nil, result)
@@ -58,9 +58,9 @@ func TestRetryWorkerError(t *testing.T) {
 	fail := errors.New("Error")
 
 	tick := &mockTicker{t, 0}
-	result := RetryWorker(1, 3, func() (bool, error) {
+	result := RetryWorker(1, 3, tick, func() (bool, error) {
 		return false, fail
-	}, tick)
+	})
 
 	if result != fail {
 		t.Errorf("Wrong result, expected: %#v, got: %#v", fail, result)

@@ -28,14 +28,14 @@ func Retry(interval time.Duration, timeout time.Duration, f func() (bool, error)
 		return fmt.Errorf("timout(%s) should be greater than interval(%v)", timeout, interval)
 	}
 	tick := &Ticker{time.NewTicker(interval)}
-	return RetryWorker(interval, timeout, f, tick)
+	return RetryWorker(interval, timeout, tick, f)
 }
 
 func RetryWorker(
 	interval time.Duration,
 	timeout time.Duration,
-	f func() (bool, error),
-	tick RetryTicker) error {
+	tick RetryTicker,
+	f func() (bool, error)) error {
 
 	maxRetries := int(timeout / interval)
 	defer tick.Stop()
