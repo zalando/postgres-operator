@@ -110,7 +110,7 @@ func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interfa
 	options.Watch = true
 	r, err := c.KubeClient.CRDREST.
 		Get().
-		Namespace("").
+		Namespace(c.opConfig.WatchedNamespace).
 		Resource(constants.CRDResource).
 		VersionedParams(&options, metav1.ParameterCodec).
 		FieldsSelectorParam(nil).
