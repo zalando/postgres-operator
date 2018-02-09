@@ -356,14 +356,14 @@ $ dlv connect 127.0.0.1:DLV_PORT
 To run all unit tests, you can simply do:
 
 ```
-go test ./...
+$ go test ./...
 ```
 
 For go 1.9 `vendor` directory would be excluded automatically. For previous
 versions you can exclude it manually:
 
 ```
-go test (glide novendor)
+$ go test (glide novendor)
 ```
 
 In case if you need to debug your unit test, it's possible to use delve:
