@@ -30,9 +30,13 @@ it manages and updates them with the new docker images; afterwards, all pods fro
 
 This project is currently in active development. It is however already [used internally by Zalando](https://jobs.zalando.com/tech/blog/postgresql-in-a-time-of-kubernetes/) in order to run Postgres databases on Kubernetes in larger numbers for staging environments and a smaller number of production databases. In this environment the operator is deployed to multiple Kubernetes clusters, where users deploy manifests via our CI/CD infrastructure.
 
-There is a talk about this project delivered by Josh Berkus on KubeCon 2017: [Kube-native Postgres](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
-
 Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
+
+## Talks
+
+1. "Blue elephant on-demand: Postgres + Kubernetes" talk by Oleksii Kliukin and Jan Mussler, FOSDEM 2018: [video](https://fosdem.org/2018/schedule/event/blue_elephant_on_demand_postgres_kubernetes/) | [slides (pdf)](https://www.postgresql.eu/events/fosdem2018/sessions/session/1735/slides/59/FOSDEM%202018_%20Blue_Elephant_On_Demand.pdf)
+
+2. "Kube-Native Postgres" talk by Josh Berkus, KubeCon 2017: [video](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
 
 ## Running and testing the operator
 
