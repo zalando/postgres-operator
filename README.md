@@ -363,7 +363,7 @@ For go 1.9 `vendor` directory would be excluded automatically. For previous
 versions you can exclude it manually:
 
 ```
-$ go test (glide novendor)
+$ go test $(glide novendor)
 ```
 
 In case if you need to debug your unit test, it's possible to use delve:
