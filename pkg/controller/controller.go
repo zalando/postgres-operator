@@ -97,20 +97,34 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	// by default, the operator listens to all namespaces
-	if configMapData["watched_namespace"] == "" {
-		c.logger.Infoln("The operator config map specifies no namespace to watch. Falling back to watching all namespaces.")
+	watchedNsConfigMapVar, isPresentInOperatorConfigMap := configMapData["watched_namespace"]
+	watchedNsEnvVar, isPresentInOperatorEnv := os.LookupEnv("WATCHED_NAMESPACE")
+
+	if (!isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
+		c.logger.Infoln("Neither the operator config map nor operator pod's environment define a namespace to watch. Default to watching all namespaces.")
 		configMapData["watched_namespace"] = v1.NamespaceAll
 	}
 
-	watchedNsEnvVar, isPresentInEnv := os.LookupEnv("WATCHED_NAMESPACE")
-	if isPresentInEnv {
-		c.logger.Infoln("The WATCHED_NAMESPACE env variable takes priority over the same param from the operator configMap\n")
+	if (isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
+
 		// special case: v1.NamespaceAll currently also evaluates to the empty string
-		// so when the env var is set to the empty string, use the default ns
-		// since the meaning of this env var is only one namespace
+		// so when the param evaluates to the empty string, we use the default ns
+		// since the meaning of the param is a single namespace and *not* all namespaces
+		if watchedNsConfigMapVar == "" {
+			c.logger.Infof("The watched namespace field in the operator config map evaluates to the empty string, falling back to watching the 'default' namespace.\n")
+			configMapData["watched_namespace"] = v1.NamespaceDefault
+		}
+	}
+
+	if isPresentInOperatorEnv {
+
+		if isPresentInOperatorConfigMap {
+			c.logger.Infof("Both WATCHED_NAMESPACE=%q env var and wacthed_namespace=%q field in operator config map are defined. The env variable takes priority over the configMap param\n", watchedNsEnvVar, watchedNsConfigMapVar)
+		}
+
+		// handle the empty string consistently
 		if watchedNsEnvVar == "" {
-			c.logger.Infof("The WATCHED_NAMESPACE env var evaluates to the empty string, falling back to watching the 'default' namespace.\n", watchedNsEnvVar)
+			c.logger.Infoln("The WATCHED_NAMESPACE env var evaluates to the empty string, falling back to watching the 'default' namespace")
 			configMapData["watched_namespace"] = v1.NamespaceDefault
 		} else {
 			c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNsEnvVar)
