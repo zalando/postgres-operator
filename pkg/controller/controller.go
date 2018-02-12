@@ -101,18 +101,18 @@ func (c *Controller) initOperatorConfig() {
 	watchedNsEnvVar, isPresentInOperatorEnv := os.LookupEnv("WATCHED_NAMESPACE")
 
 	if (!isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
-		c.logger.Infoln("Neither the operator config map nor operator pod's environment define a namespace to watch. Default to watching all namespaces.")
-		configMapData["watched_namespace"] = v1.NamespaceAll
+		c.logger.Infoln("Neither the operator config map nor operator pod's environment define a namespace to watch. Fall back to watching the 'default' namespace.")
+		configMapData["watched_namespace"] = v1.NamespaceDefault
 	}
 
 	if (isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
 
-		// special case: v1.NamespaceAll currently also evaluates to the empty string
-		// so when the param evaluates to the empty string, we use the default ns
-		// since the meaning of the param is a single namespace and *not* all namespaces
+		// explicitly specify the policy for handling the empty string
+		// v1.NamespaceAll currently also evaluates to the empty string
+		// so when the param is set to this value, we watch all ns
 		if watchedNsConfigMapVar == "" {
-			c.logger.Infof("The watched namespace field in the operator config map evaluates to the empty string, falling back to watching the 'default' namespace.\n")
-			configMapData["watched_namespace"] = v1.NamespaceDefault
+			c.logger.Infof("The watched namespace field in the operator config map evaluates to the empty string, falling back to watching all namespaces.\n")
+			configMapData["watched_namespace"] = v1.NamespaceAll
 		}
 	}
 
@@ -124,8 +124,8 @@ func (c *Controller) initOperatorConfig() {
 
 		// handle the empty string consistently
 		if watchedNsEnvVar == "" {
-			c.logger.Infoln("The WATCHED_NAMESPACE env var evaluates to the empty string, falling back to watching the 'default' namespace")
-			configMapData["watched_namespace"] = v1.NamespaceDefault
+			c.logger.Infoln("The WATCHED_NAMESPACE env var evaluates to the empty string, falling back to watching all namespaces")
+			configMapData["watched_namespace"] = v1.NamespaceAll
 		} else {
 			c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNsEnvVar)
 			configMapData["watched_namespace"] = watchedNsEnvVar
