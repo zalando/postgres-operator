@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -28,8 +28,7 @@ func init() {
 	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
 
-	cmd := exec.Command("cat", "/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	operatorNamespaceBytes, err := cmd.Output()
+	operatorNamespaceBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		log.Fatalf("Unable to detect operator namespace from within its pod  due to %v", err)
 	}
@@ -43,7 +42,7 @@ func init() {
 
 		err := config.ConfigMapName.Decode(namespacedConfigMapName)
 		if err != nil {
-			log.Fatalf("incorrect config map name")
+			log.Fatalf("incorrect config map name: %v", namespacedConfigMapName)
 		}
 
 	}
