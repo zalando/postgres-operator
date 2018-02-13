@@ -37,7 +37,10 @@ func init() {
 	if configMapRawName != "" {
 
 		operatorNamespace := string(operatorNamespaceBytes)
+		config.Namespace = operatorNamespace
+
 		namespacedConfigMapName := operatorNamespace + "/" + configMapRawName
+
 		log.Printf("Looking for the operator configmap at the same namespace the operator resides. Fully qualified configmap name: %v", namespacedConfigMapName)
 
 		err := config.ConfigMapName.Decode(namespacedConfigMapName)

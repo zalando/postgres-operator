@@ -105,8 +105,13 @@ func (c *Controller) initOperatorConfig() {
 	}
 
 	if configMapData["watched_namespace"] == "" {
-		c.logger.Infoln("No namespace to watch specified. Fall back to watching the 'default' namespace.")
-		configMapData["watched_namespace"] = v1.NamespaceDefault
+		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the  namespace it is deployed to: '%v' \n", c.config.Namespace)
+		configMapData["watched_namespace"] = c.config.Namespace
+	}
+
+	_, err := c.KubeClient.ServiceAccounts(configMapData["watched_namespace"]).Get("operator", metav1.GetOptions{})
+	if err != nil {
+		c.logger.Warnf("Cannot find the 'operator' service account in the watched namepsace %q. Pods will not be able to start. Error: %v", c.opConfig.WatchedNamespace, err)
 	}
 
 	if c.config.NoDatabaseAccess {
