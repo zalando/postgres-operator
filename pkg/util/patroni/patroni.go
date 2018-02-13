@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	failoverPath = "/failover"
-	apiPort      = 8008
-	timeout      = 30 * time.Second
+	failoverPath       = "/failover"
+	LeaderNotMatchText = "leader name does not match"
+	apiPort            = 8008
+	timeout            = 30 * time.Second
 )
 
 // Interface describe patroni methods
@@ -53,7 +54,7 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 	if err != nil {
 		return fmt.Errorf("could not encode json: %v", err)
 	}
-
+	// TODO: consider connecting to the candidate. not to the master, for the failover
 	request, err := http.NewRequest(http.MethodPost, apiURL(master)+failoverPath, buf)
 	if err != nil {
 		return fmt.Errorf("could not create request: %v", err)
@@ -73,7 +74,17 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 			return fmt.Errorf("could not read response: %v", err)
 		}
 
-		return fmt.Errorf("patroni returned '%s'", string(bodyBytes))
+		// if the master to fail from is not the leader of the cluster anymore - treat it
+		// as a success; our goal is to move the master off the master pod.
+		responseText := string(bodyBytes)
+
+		if resp.StatusCode == http.StatusPreconditionFailed &&
+			responseText == LeaderNotMatchText {
+			p.logger.Infof("Failover did not happen: %s", responseText)
+			return nil
+		}
+
+		return fmt.Errorf("patroni returned '%s'", responseText)
 	}
 
 	return nil

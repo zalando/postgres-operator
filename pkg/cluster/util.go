@@ -313,14 +313,11 @@ func (c *Cluster) waitPodLabelsReady() error {
 				return false, fmt.Errorf("too many masters")
 			}
 			if len(replicaPods.Items) == podsNumber {
-				c.masterLess = true
 				return true, nil
 			}
 
 			return len(masterPods.Items)+len(replicaPods.Items) == podsNumber, nil
 		})
-
-	//TODO: wait for master for a while and then set masterLess flag
 
 	return err
 }

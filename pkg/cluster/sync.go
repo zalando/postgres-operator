@@ -57,7 +57,8 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		}
 	}
 
-	if !(c.databaseAccessDisabled() || c.masterLess) {
+	// create database objects unless we are running without pods or disabled that feature explicitely
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0) {
 		c.logger.Debugf("syncing roles")
 		if err = c.syncRoles(); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)
@@ -67,10 +68,6 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		if err = c.syncDatabases(); err != nil {
 			err = fmt.Errorf("could not sync databases: %v", err)
 			return
-		}
-	} else {
-		if c.masterLess {
-			c.logger.Warnln("cluster is masterless")
 		}
 	}
 

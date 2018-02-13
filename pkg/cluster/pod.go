@@ -282,8 +282,7 @@ func (c *Cluster) recreatePods() error {
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
 
 	var (
-		masterPod *v1.Pod
-		newPod    *v1.Pod
+		masterPod, newMasterPod, newPod *v1.Pod
 	)
 	replicas := make([]spec.NamespacedName, 0)
 	for i, pod := range pods.Items {
@@ -300,28 +299,26 @@ func (c *Cluster) recreatePods() error {
 		}
 		if newRole := PostgresRole(newPod.Labels[c.OpConfig.PodRoleLabel]); newRole == Replica {
 			replicas = append(replicas, util.NameFromMeta(pod.ObjectMeta))
+		} else if newRole == Master {
+			newMasterPod = newPod
 		}
 	}
 
-	if masterPod == nil {
-		if len(replicas) == len(pods.Items) {
-			c.logger.Warningln("no master pod in the cluster")
-			c.masterLess = true
-		} else {
-			c.masterLess = false
-		}
-	} else {
-		if len(replicas) > 0 {
+	if masterPod != nil {
+		// failover if we have not observed a master pod when re-creating former replicas.
+		if newMasterPod == nil && len(replicas) > 0 {
+			//TODO: use switchover w/o specifying the canddidate. This, however, requires Patroni 1.4.
 			err := c.ManualFailover(masterPod, masterCandidate(replicas))
 			if err != nil {
-				return fmt.Errorf("could not perform manual failover: %v", err)
+				return fmt.Errorf("could not perform failover: %v", err)
 			}
+		} else if newMasterPod == nil && len(replicas) == 0 {
+			c.logger.Warningf("cannot switch master role before re-creating the pod: no replicas")
 		}
-		//TODO: specify master, leave new master empty
-		c.logger.Infof("recreating master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
+		c.logger.Infof("recreating old master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
 		if _, err := c.recreatePod(util.NameFromMeta(masterPod.ObjectMeta)); err != nil {
-			return fmt.Errorf("could not recreate master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
+			return fmt.Errorf("could not recreate old master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
 		}
 	}
 
