@@ -35,4 +35,5 @@ build_steps:
       cmd: |
         export PATH=$PATH:$HOME/go/bin
         export GOPATH=$HOME/go
+        cd $OPERATOR_TOP_DIR/postgres-operator
         go test ./...
