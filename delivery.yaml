@@ -1,6 +1,6 @@
 version: "2017-09-20"
 pipeline:
-    - id: "Build postgres operator"
+    - id: Build postgres operator
       type: script
       env:
         GOPATH: /root/go
