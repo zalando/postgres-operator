@@ -23,6 +23,7 @@ build_steps:
       cmd: |
         export PATH=$PATH:$HOME/go/bin
         export GOPATH=$HOME/go
+        make tools deps
         go test ./...
     - desc: 'Build & push docker image'
       cmd: |
