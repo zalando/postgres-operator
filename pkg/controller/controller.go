@@ -105,13 +105,8 @@ func (c *Controller) initOperatorConfig() {
 	}
 
 	if configMapData["watched_namespace"] == "" {
-		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the  namespace it is deployed to: '%v' \n", c.config.Namespace)
+		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the namespace it is deployed to: '%v' \n", c.config.Namespace)
 		configMapData["watched_namespace"] = c.config.Namespace
-	}
-
-	_, err := c.KubeClient.ServiceAccounts(configMapData["watched_namespace"]).Get("operator", metav1.GetOptions{})
-	if err != nil {
-		c.logger.Warnf("Cannot find the 'operator' service account in the watched namepsace %q. Pods will not be able to start. Error: %v", c.opConfig.WatchedNamespace, err)
 	}
 
 	if c.config.NoDatabaseAccess {
@@ -135,6 +130,11 @@ func (c *Controller) initController() {
 	c.initSharedInformers()
 
 	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
+
+	c.mustHaveOperatorServiceAccountInNamespace(c.config.Namespace)
+	if c.config.Namespace != c.opConfig.WatchedNamespace {
+		c.mustHaveOperatorServiceAccountInNamespace(c.opConfig.WatchedNamespace)
+	}
 
 	if c.opConfig.DebugLogging {
 		c.logger.Logger.Level = logrus.DebugLevel
@@ -260,4 +260,11 @@ func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGrou
 	defer wg.Done()
 
 	c.nodesInformer.Run(stopCh)
+}
+
+func (c *Controller) mustHaveOperatorServiceAccountInNamespace(namespace string) {
+	_, err := c.KubeClient.ServiceAccounts(namespace).Get(c.opConfig.ServiceAccountName, metav1.GetOptions{})
+	if err != nil {
+		c.logger.Warnf("Cannot find the '%v' service account in the namepsace %q. Pods will not be able to start. Error: %v", c.opConfig.ServiceAccountName, namespace, err)
+	}
 }

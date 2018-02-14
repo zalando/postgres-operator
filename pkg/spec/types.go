@@ -3,6 +3,8 @@ package spec
 import (
 	"database/sql"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"strings"
 	"time"
 
@@ -26,6 +28,8 @@ const (
 	EventUpdate EventType = "UPDATE"
 	EventDelete EventType = "DELETE"
 	EventSync   EventType = "SYNC"
+
+	fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 )
 
 // ClusterEvent carries the payload of the Cluster TPR events.
@@ -165,16 +169,28 @@ func (n *NamespacedName) Decode(value string) error {
 
 	if strings.Trim(value, string(types.Separator)) != "" && name == (types.NamespacedName{}) {
 		name.Name = value
-		name.Namespace = v1.NamespaceDefault
+		name.Namespace = GetOperatorNamespace()
 	} else if name.Namespace == "" {
-		name.Namespace = v1.NamespaceDefault
+		name.Namespace = GetOperatorNamespace()
 	}
 
 	if name.Name == "" {
-		return fmt.Errorf("incorrect namespaced name")
+		return fmt.Errorf("incorrect namespaced name: %v", value)
 	}
 
 	*n = NamespacedName(name)
 
 	return nil
+}
+
+// GetOperatorNamespace assumes serviceaccount secret is mounted by kubernetes
+// Placing this func here instead of pgk/util avoids circular import
+func GetOperatorNamespace() string {
+
+	operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
+	if err != nil {
+		log.Fatalf("Unable to detect operator namespace from within its pod due to: %v", err)
+	}
+
+	return string(operatorNamespaceBytes)
 }

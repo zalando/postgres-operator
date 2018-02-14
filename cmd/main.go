@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -12,11 +11,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-)
-
-const (
-	// assumes serviceaccount secret is mounted by kubernetes
-	fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 )
 
 var (
@@ -33,15 +27,10 @@ func init() {
 	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
 
-	operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
-	if err != nil {
-		log.Fatalf("Unable to detect operator namespace from within its pod  due to %v", err)
-	}
-
 	configMapRawName := os.Getenv("CONFIG_MAP_NAME")
 	if configMapRawName != "" {
 
-		operatorNamespace := string(operatorNamespaceBytes)
+		operatorNamespace := spec.GetOperatorNamespace()
 		config.Namespace = operatorNamespace
 
 		namespacedConfigMapName := operatorNamespace + "/" + configMapRawName
