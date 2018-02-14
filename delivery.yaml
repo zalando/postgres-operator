@@ -19,12 +19,6 @@ build_steps:
         export OPERATOR_TOP_DIR=$GOPATH/src/github.com/zalando-incubator
         mkdir -p $OPERATOR_TOP_DIR
         ln -s $(pwd) $OPERATOR_TOP_DIR/postgres-operator
-    - desc: 'Run unit tests'
-      cmd: |
-        export PATH=$PATH:$HOME/go/bin
-        export GOPATH=$HOME/go
-        make tools deps
-        go test ./...
     - desc: 'Build & push docker image'
       cmd: |
         export PATH=$PATH:$HOME/go/bin
@@ -37,3 +31,8 @@ build_steps:
         fi
         export IMAGE
         make tools deps docker push
+    - desc: 'Run unit tests'
+      cmd: |
+        export PATH=$PATH:$HOME/go/bin
+        export GOPATH=$HOME/go
+        go test ./...
