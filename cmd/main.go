@@ -14,6 +14,11 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
+const (
+	// assumes serviceaccount secret is mounted by kubernetes
+	fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+)
+
 var (
 	kubeConfigFile string
 	outOfCluster   bool
@@ -28,7 +33,7 @@ func init() {
 	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
 
-	operatorNamespaceBytes, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
 	if err != nil {
 		log.Fatalf("Unable to detect operator namespace from within its pod  due to %v", err)
 	}
