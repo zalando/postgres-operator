@@ -63,7 +63,7 @@ Note: if you use multiple Kubernetes clusters, you can switch to Minikube with `
 
 ### Select the namespace to deploy to
 
-The operator can run in a namespace other than `default`. For example, to deploy it to the `test` namespace, run the following:
+The operator can run in a namespace other than `default`. For example, to use the `test` namespace, run the following before deploying the operator's manifests:
 
     kubectl create namespace test
     kubectl config set-context minikube --namespace=test
@@ -74,7 +74,7 @@ All subsequent `kubectl` commands will work with the `test` namespace. The opera
 
 Watching a namespace for an operator means tracking requests to change Postgresql clusters in the namespace such as "increase the number of Postgresql replicas to 5" and reacting to the requests, in this example by actually scaling up. 
 
-By default, the operator watches the namespace it is deployed to. You can change this by altering the `WATCHED_NAMESPACE` env var in the operator deployment manifest or the `watched_namespace` field in the operator configmap. In the case both are set, the env var takes the preference.
+By default, the operator watches the namespace it is deployed to. You can change this by altering the `WATCHED_NAMESPACE` env var in the operator deployment manifest or the `watched_namespace` field in the operator configmap. In the case both are set, the env var takes the precedence.
 
 Note that for an operator to create pods in the watched namespace, one needs to create the `operator` service account in the namespace.
 
