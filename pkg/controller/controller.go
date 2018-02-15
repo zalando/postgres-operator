@@ -131,9 +131,9 @@ func (c *Controller) initController() {
 
 	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
 
-	c.mustHaveOperatorServiceAccountInNamespace(c.config.Namespace)
+	c.checkOperatorServiceAccount(c.config.Namespace)
 	if c.config.Namespace != c.opConfig.WatchedNamespace {
-		c.mustHaveOperatorServiceAccountInNamespace(c.opConfig.WatchedNamespace)
+		c.checkOperatorServiceAccount(c.opConfig.WatchedNamespace)
 	}
 
 	if c.opConfig.DebugLogging {
@@ -262,9 +262,10 @@ func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGrou
 	c.nodesInformer.Run(stopCh)
 }
 
-func (c *Controller) mustHaveOperatorServiceAccountInNamespace(namespace string) {
+// Check that a namespace has the service account that the operator needs
+func (c *Controller) checkOperatorServiceAccount(namespace string) {
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(c.opConfig.ServiceAccountName, metav1.GetOptions{})
 	if err != nil {
-		c.logger.Warnf("Cannot find the '%v' service account in the namepsace %q. Pods will not be able to start. Error: %v", c.opConfig.ServiceAccountName, namespace, err)
+		c.logger.Warnf("Cannot find the '%v' service account needed for operator in the namespace %q. Pods will not be able to start. Error: %v", c.opConfig.ServiceAccountName, namespace, err)
 	}
 }
