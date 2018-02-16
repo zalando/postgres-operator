@@ -109,11 +109,10 @@ func (c *Controller) initOperatorConfig() {
 
 	if (isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
 
-		// explicitly specify the policy for handling the empty string
-		// v1.NamespaceAll currently also evaluates to the empty string
-		// so when the param is set to this value, we watch all ns
-		if watchedNsConfigMapVar == "" {
-			c.logger.Infof("The watched namespace field in the operator config map evaluates to the empty string, falling back to watching all namespaces.\n")
+		// explicitly specify the policy for handling all namespaces
+		// note that '*' is not a valid namespace name
+		if watchedNsConfigMapVar == "*" {
+			c.logger.Infof("The watched namespace field in the operator config map evaluates to '*', meaning watching all namespaces.\n")
 			configMapData["watched_namespace"] = v1.NamespaceAll
 		}
 	}
@@ -124,9 +123,9 @@ func (c *Controller) initOperatorConfig() {
 			c.logger.Infof("Both WATCHED_NAMESPACE=%q env var and wacthed_namespace=%q field in operator config map are defined. The env variable takes priority over the configMap param\n", watchedNsEnvVar, watchedNsConfigMapVar)
 		}
 
-		// handle the empty string consistently
-		if watchedNsEnvVar == "" {
-			c.logger.Infoln("The WATCHED_NAMESPACE env var evaluates to the empty string, falling back to watching all namespaces")
+		// handle all namespaces consistently
+		if watchedNsEnvVar == "*" {
+			c.logger.Infof("The watched namespace field in the operator config map evaluates to '*', meaning watching all namespaces.\n")
 			configMapData["watched_namespace"] = v1.NamespaceAll
 		} else {
 			c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNsEnvVar)
