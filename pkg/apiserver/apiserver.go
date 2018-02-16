@@ -48,9 +48,9 @@ type Server struct {
 }
 
 var (
-	clusterStatusURL     = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)(/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*))?/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/?$`)
-	clusterLogsURL       = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)(/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*))?/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/logs/?$`)
-	clusterHistoryURL    = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)(/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*))?/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/history/?$`)
+	clusterStatusURL     = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/?$`)
+	clusterLogsURL       = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/logs/?$`)
+	clusterHistoryURL    = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<namespace>[a-zA-Z][a-zA-Z0-9-]*)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/history/?$`)
 	teamURL              = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$`)
 	workerLogsURL        = regexp.MustCompile(`^/workers/(?P<id>\d+)/logs/?$`)
 	workerEventsQueueURL = regexp.MustCompile(`^/workers/(?P<id>\d+)/queue/?$`)
