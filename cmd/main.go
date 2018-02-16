@@ -29,11 +29,21 @@ func init() {
 
 	configMapRawName := os.Getenv("CONFIG_MAP_NAME")
 	if configMapRawName != "" {
-		err := config.ConfigMapName.Decode(configMapRawName)
+
+		operatorNamespace := spec.GetOperatorNamespace()
+		config.Namespace = operatorNamespace
+
+		namespacedConfigMapName := operatorNamespace + "/" + configMapRawName
+
+		log.Printf("Looking for the operator configmap at the same namespace the operator resides. Fully qualified configmap name: %v", namespacedConfigMapName)
+
+		err := config.ConfigMapName.Decode(namespacedConfigMapName)
 		if err != nil {
-			log.Fatalf("incorrect config map name")
+			log.Fatalf("incorrect config map name: %v", namespacedConfigMapName)
 		}
+
 	}
+
 }
 
 func main() {

@@ -61,6 +61,23 @@ to test your that your setup is working.
 
 Note: if you use multiple Kubernetes clusters, you can switch to Minikube with `kubectl config use-context minikube`
 
+### Select the namespace to deploy to
+
+The operator can run in a namespace other than `default`. For example, to use the `test` namespace, run the following before deploying the operator's manifests:
+
+    kubectl create namespace test
+    kubectl config set-context minikube --namespace=test
+
+All subsequent `kubectl` commands will work with the `test` namespace. The operator  will run in this namespace and look up needed resources - such as its config map - there.
+
+### Specify the namespace to watch
+
+Watching a namespace for an operator means tracking requests to change Postgresql clusters in the namespace such as "increase the number of Postgresql replicas to 5" and reacting to the requests, in this example by actually scaling up. 
+
+By default, the operator watches the namespace it is deployed to. You can change this by altering the `WATCHED_NAMESPACE` env var in the operator deployment manifest or the `watched_namespace` field in the operator configmap. In the case both are set, the env var takes the precedence.
+
+Note that for an operator to manage pods in the watched namespace, the operator's service account (as specified in the operator deployment manifest) has to have appropriate privileges to access the watched namespace. The watched namespace also needs to have a (possibly different) service account in the case database pods need to talk to the Kubernetes API (e.g. when using Kubernetes-native configuration of Patroni).
+
 ### Create ConfigMap
 
 ConfigMap is used to store the configuration of the operator
