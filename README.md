@@ -30,9 +30,13 @@ it manages and updates them with the new docker images; afterwards, all pods fro
 
 This project is currently in active development. It is however already [used internally by Zalando](https://jobs.zalando.com/tech/blog/postgresql-in-a-time-of-kubernetes/) in order to run Postgres databases on Kubernetes in larger numbers for staging environments and a smaller number of production databases. In this environment the operator is deployed to multiple Kubernetes clusters, where users deploy manifests via our CI/CD infrastructure.
 
-There is a talk about this project delivered by Josh Berkus on KubeCon 2017: [Kube-native Postgres](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
-
 Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
+
+## Talks
+
+1. "Blue elephant on-demand: Postgres + Kubernetes" talk by Oleksii Kliukin and Jan Mussler, FOSDEM 2018: [video](https://fosdem.org/2018/schedule/event/blue_elephant_on_demand_postgres_kubernetes/) | [slides (pdf)](https://www.postgresql.eu/events/fosdem2018/sessions/session/1735/slides/59/FOSDEM%202018_%20Blue_Elephant_On_Demand.pdf)
+
+2. "Kube-Native Postgres" talk by Josh Berkus, KubeCon 2017: [video](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
 
 ## Running and testing the operator
 
@@ -56,6 +60,23 @@ Once you have it started successfully, use [the quickstart guide](https://github
 to test your that your setup is working.
 
 Note: if you use multiple Kubernetes clusters, you can switch to Minikube with `kubectl config use-context minikube`
+
+### Select the namespace to deploy to
+
+The operator can run in a namespace other than `default`. For example, to use the `test` namespace, run the following before deploying the operator's manifests:
+
+    kubectl create namespace test
+    kubectl config set-context minikube --namespace=test
+
+All subsequent `kubectl` commands will work with the `test` namespace. The operator  will run in this namespace and look up needed resources - such as its config map - there.
+
+### Specify the namespace to watch
+
+Watching a namespace for an operator means tracking requests to change Postgresql clusters in the namespace such as "increase the number of Postgresql replicas to 5" and reacting to the requests, in this example by actually scaling up. 
+
+By default, the operator watches the namespace it is deployed to. You can change this by altering the `WATCHED_NAMESPACE` env var in the operator deployment manifest or the `watched_namespace` field in the operator configmap. In the case both are set, the env var takes the precedence.
+
+Note that for an operator to manage pods in the watched namespace, the operator's service account (as specified in the operator deployment manifest) has to have appropriate privileges to access the watched namespace. The watched namespace also needs to have a (possibly different) service account in the case database pods need to talk to the Kubernetes API (e.g. when using Kubernetes-native configuration of Patroni).
 
 ### Create ConfigMap
 
@@ -349,4 +370,28 @@ kubectl port-forward POD_NAME DLV_PORT:DLV_PORT
 
 ```
 $ dlv connect 127.0.0.1:DLV_PORT
+```
+
+### Unit tests
+
+To run all unit tests, you can simply do:
+
+```
+$ go test ./...
+```
+
+For go 1.9 `vendor` directory would be excluded automatically. For previous
+versions you can exclude it manually:
+
+```
+$ go test $(glide novendor)
+```
+
+In case if you need to debug your unit test, it's possible to use delve:
+
+```
+$ dlv test ./pkg/util/retryutil/
+Type 'help' for list of commands.
+(dlv) c
+PASS
 ```

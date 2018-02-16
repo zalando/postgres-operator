@@ -33,6 +33,7 @@ type KubernetesClient struct {
 	v1core.ConfigMapsGetter
 	v1core.NodesGetter
 	v1core.NamespacesGetter
+	v1core.ServiceAccountsGetter
 	v1beta1.StatefulSetsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
@@ -73,6 +74,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.ServicesGetter = client.CoreV1()
 	kubeClient.EndpointsGetter = client.CoreV1()
 	kubeClient.SecretsGetter = client.CoreV1()
+	kubeClient.ServiceAccountsGetter = client.CoreV1()
 	kubeClient.ConfigMapsGetter = client.CoreV1()
 	kubeClient.PersistentVolumeClaimsGetter = client.CoreV1()
 	kubeClient.PersistentVolumesGetter = client.CoreV1()

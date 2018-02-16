@@ -101,8 +101,10 @@ func (c *Controller) initOperatorConfig() {
 	watchedNsEnvVar, isPresentInOperatorEnv := os.LookupEnv("WATCHED_NAMESPACE")
 
 	if (!isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
-		c.logger.Infoln("Neither the operator config map nor operator pod's environment define a namespace to watch. Fall back to watching the 'default' namespace.")
-		configMapData["watched_namespace"] = v1.NamespaceDefault
+
+		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the namespace it is deployed to: '%v' \n", spec.GetOperatorNamespace())
+		configMapData["watched_namespace"] = spec.GetOperatorNamespace()
+
 	}
 
 	if (isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
