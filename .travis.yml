@@ -1,5 +1,9 @@
 dist: trusty
 
+branches:
+  only:
+  - master
+
 language: go
 
 go:
