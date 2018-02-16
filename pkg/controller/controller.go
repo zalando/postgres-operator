@@ -105,8 +105,8 @@ func (c *Controller) initOperatorConfig() {
 	}
 
 	if configMapData["watched_namespace"] == "" {
-		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the namespace it is deployed to: '%v' \n", c.config.Namespace)
-		configMapData["watched_namespace"] = c.config.Namespace
+		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the namespace it is deployed to: '%v' \n", spec.GetOperatorNamespace())
+		configMapData["watched_namespace"] = spec.GetOperatorNamespace()
 	}
 
 	if c.config.NoDatabaseAccess {
