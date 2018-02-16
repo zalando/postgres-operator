@@ -165,13 +165,19 @@ func (n NamespacedName) MarshalJSON() ([]byte, error) {
 
 // Decode converts a (possibly unqualified) string into the namespaced name object.
 func (n *NamespacedName) Decode(value string) error {
+	return n.DecodeWorker(value, GetOperatorNamespace())
+}
+
+// DecodeWorker separates the decode logic to (unit) test
+// from obtaining the operator namespace that depends on k8s mounting files at runtime
+func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
 	name := types.NewNamespacedNameFromString(value)
 
 	if strings.Trim(value, string(types.Separator)) != "" && name == (types.NamespacedName{}) {
 		name.Name = value
-		name.Namespace = GetOperatorNamespace()
+		name.Namespace = operatorNamespace
 	} else if name.Namespace == "" {
-		name.Namespace = GetOperatorNamespace()
+		name.Namespace = operatorNamespace
 	}
 
 	if name.Name == "" {
