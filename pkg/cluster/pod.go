@@ -307,10 +307,8 @@ func (c *Cluster) recreatePods() error {
 	if masterPod != nil {
 		// failover if we have not observed a master pod when re-creating former replicas.
 		if newMasterPod == nil && len(replicas) > 0 {
-			//TODO: use switchover w/o specifying the canddidate. This, however, requires Patroni 1.4.
-			err := c.ManualFailover(masterPod, masterCandidate(replicas))
-			if err != nil {
-				return fmt.Errorf("could not perform failover: %v", err)
+			if err := c.ManualFailover(masterPod, masterCandidate(replicas)); err != nil {
+				c.logger.Warningf("could not perform failover: %v", err)
 			}
 		} else if newMasterPod == nil && len(replicas) == 0 {
 			c.logger.Warningf("cannot switch master role before re-creating the pod: no replicas")
