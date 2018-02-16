@@ -56,7 +56,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: operator
+  name: zalando-postgres-operator
 subjects:
 - kind: ServiceAccount
   name: zalando-postgres-operator
