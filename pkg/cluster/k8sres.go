@@ -285,6 +285,7 @@ func (c *Cluster) generatePodTemplate(
 	tolerationsSpec *[]v1.Toleration,
 	pgParameters *spec.PostgresqlParam,
 	patroniParameters *spec.Patroni,
+	nodeSelector *map[string]string,
 	cloneDescription *spec.CloneDescription,
 	dockerImage *string,
 	customPodEnvVars map[string]string,
@@ -435,6 +436,7 @@ func (c *Cluster) generatePodTemplate(
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
 		Tolerations:                   c.tolerations(tolerationsSpec),
+		NodeSelector:                  *nodeSelector,
 	}
 
 	if affinity := c.nodeAffinity(); affinity != nil {
@@ -537,7 +539,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			customPodEnvVars = cm.Data
 		}
 	}
-	podTemplate := c.generatePodTemplate(resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
+	podTemplate := c.generatePodTemplate(resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.NodeSelector, &spec.Clone, &spec.DockerImage, customPodEnvVars)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
