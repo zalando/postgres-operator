@@ -163,8 +163,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 			clusterNames = append(clusterNames, cluster.Name[len(matches["team"])+1:])
 		}
 
-		s.respond(clusterNames, nil, w)
-		return
+		resp, err = clusterNames, nil
 	} else if matches := util.FindNamedStringSubmatch(clusterLogsURL, req.URL.Path); matches != nil {
 		resp, err = s.controller.ClusterLogs(matches["team"], matches["cluster"])
 	} else if matches := util.FindNamedStringSubmatch(clusterHistoryURL, req.URL.Path); matches != nil {
@@ -176,11 +175,9 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 				res[team] = append(res[team], cluster.Name[len(team)+1:])
 			}
 		}
-
-		s.respond(res, nil, w)
-		return
+		err = nil
 	} else {
-		err = fmt.Errorf("page not found")
+		resp, err = nil, fmt.Errorf("page not found")
 	}
 
 	s.respond(resp, err, w)

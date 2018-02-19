@@ -274,9 +274,9 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 				Effect:   v1.TaintEffect(podToleration["effect"]),
 			},
 		}
-	} else {
-		return []v1.Toleration{}
 	}
+
+	return []v1.Toleration{}
 }
 
 func (c *Cluster) generatePodTemplate(
@@ -373,7 +373,7 @@ func (c *Cluster) generatePodTemplate(
 	var names []string
 	// handle environment variables from the PodEnvironmentConfigMap. We don't use envSource here as it is impossible
 	// to track any changes to the object envSource points to. In order to emulate the envSource behavior, however, we
-	// need to make sure that PodConfigMap variables doesn't override those we set explicitely from the configuration
+	// need to make sure that PodConfigMap variables doesn't override those we set explicitly from the configuration
 	// parameters
 	envVarsMap := make(map[string]string)
 	for _, envVar := range envVars {

@@ -28,7 +28,7 @@ type OAuthTokenGetter interface {
 	getOAuthToken() (string, error)
 }
 
-// OAuthTokenGetter enables fetching OAuth tokens by reading Kubernetes secrets
+// SecretOauthTokenGetter enables fetching OAuth tokens by reading Kubernetes secrets
 type SecretOauthTokenGetter struct {
 	kubeClient           *k8sutil.KubernetesClient
 	OAuthTokenSecretName spec.NamespacedName

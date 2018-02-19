@@ -29,7 +29,7 @@ type DefaultUserSyncStrategy struct {
 }
 
 // ProduceSyncRequests figures out the types of changes that need to happen with the given users.
-func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
+func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
 	newUsers spec.PgUserMap) (reqs []spec.PgSyncUserRequest) {
 
 	// No existing roles are deleted or stripped of role memebership/flags
@@ -70,19 +70,19 @@ func (s DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
 }
 
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
-func (s DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserRequest, db *sql.DB) error {
+func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserRequest, db *sql.DB) error {
 	for _, r := range reqs {
 		switch r.Kind {
 		case spec.PGSyncUserAdd:
-			if err := s.createPgUser(r.User, db); err != nil {
+			if err := strategy.createPgUser(r.User, db); err != nil {
 				return fmt.Errorf("could not create user %q: %v", r.User.Name, err)
 			}
 		case spec.PGsyncUserAlter:
-			if err := s.alterPgUser(r.User, db); err != nil {
+			if err := strategy.alterPgUser(r.User, db); err != nil {
 				return fmt.Errorf("could not alter user %q: %v", r.User.Name, err)
 			}
 		case spec.PGSyncAlterSet:
-			if err := s.alterPgUserSet(r.User, db); err != nil {
+			if err := strategy.alterPgUserSet(r.User, db); err != nil {
 				return fmt.Errorf("could not set custom user %q parameters: %v", r.User.Name, err)
 			}
 		default:
@@ -102,7 +102,7 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 	return
 }
 
-func (s DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err error) {
+func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err error) {
 	var userFlags []string
 	var userPassword string
 
@@ -129,7 +129,7 @@ func (s DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err
 	return
 }
 
-func (s DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err error) {
+func (strategy DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err error) {
 	var resultStmt []string
 
 	if user.Password != "" || len(user.Flags) > 0 {
@@ -206,9 +206,9 @@ func quoteParameterValue(name, val string) string {
 		// in the schema name would break the parsing code in the operator.)
 		if start == '\'' && end == '\'' {
 			return fmt.Sprintf("%s", val[1:len(val)-1])
-		} else {
-			return val
 		}
+
+		return val
 	}
 	if (start == '"' && end == '"') || (start == '\'' && end == '\'') {
 		return val
