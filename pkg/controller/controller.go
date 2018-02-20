@@ -14,6 +14,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
@@ -97,41 +98,7 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	watchedNsConfigMapVar, isPresentInOperatorConfigMap := configMapData["watched_namespace"]
-	watchedNsEnvVar, isPresentInOperatorEnv := os.LookupEnv("WATCHED_NAMESPACE")
-
-	if (!isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
-
-		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the namespace it is deployed to: '%v' \n", spec.GetOperatorNamespace())
-		configMapData["watched_namespace"] = spec.GetOperatorNamespace()
-
-	}
-
-	if (isPresentInOperatorConfigMap) && (!isPresentInOperatorEnv) {
-
-		// explicitly specify the policy for handling all namespaces
-		// note that '*' is not a valid namespace name
-		if watchedNsConfigMapVar == "*" {
-			c.logger.Infof("The watched namespace field in the operator config map evaluates to '*', meaning watching all namespaces.\n")
-			configMapData["watched_namespace"] = v1.NamespaceAll
-		}
-	}
-
-	if isPresentInOperatorEnv {
-
-		if isPresentInOperatorConfigMap {
-			c.logger.Infof("Both WATCHED_NAMESPACE=%q env var and wacthed_namespace=%q field in operator config map are defined. The env variable takes priority over the configMap param\n", watchedNsEnvVar, watchedNsConfigMapVar)
-		}
-
-		// handle all namespaces consistently
-		if watchedNsEnvVar == "*" {
-			c.logger.Infof("The watched namespace field in the operator config map evaluates to '*', meaning watching all namespaces.\n")
-			configMapData["watched_namespace"] = v1.NamespaceAll
-		} else {
-			c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNsEnvVar)
-			configMapData["watched_namespace"] = watchedNsEnvVar
-		}
-	}
+	configMapData["watched_namespace"] = c.getEffectiveNamespace(os.Getenv("WATCHED_NAMESPACE"), configMapData["watched_namespace"])
 
 	if c.config.NoDatabaseAccess {
 		configMapData["enable_database_access"] = "false"
@@ -151,15 +118,6 @@ func (c *Controller) initOperatorConfig() {
 func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
-
-	// earliest point where we can check if the namespace to watch actually exists
-	if c.opConfig.WatchedNamespace != v1.NamespaceAll {
-		_, err := c.KubeClient.Namespaces().Get(c.opConfig.WatchedNamespace, metav1.GetOptions{})
-		if err != nil {
-			c.logger.Fatalf("Operator was told to watch the %q namespace but was unable to find it via Kubernetes API.", c.opConfig.WatchedNamespace)
-		}
-
-	}
 
 	c.initSharedInformers()
 
@@ -289,4 +247,27 @@ func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGrou
 	defer wg.Done()
 
 	c.nodesInformer.Run(stopCh)
+}
+
+func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFromConfigMap string) string {
+
+	namespace := util.Coalesce(namespaceFromEnvironment, util.Coalesce(namespaceFromConfigMap, spec.GetOperatorNamespace()))
+
+	if namespace == "*" {
+
+		namespace = v1.NamespaceAll
+		c.logger.Infof("Listening to all namespaces")
+
+	} else {
+
+		if _, err := c.KubeClient.Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+			// the namespace may be created manually at runtime
+			c.logger.Warnf("Could not find the watched namespace %q", namespace)
+		} else {
+			c.logger.Infof("Listenting to the specific namespace %q", namespace)
+		}
+
+	}
+
+	return namespace
 }

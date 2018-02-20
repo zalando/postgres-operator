@@ -67,7 +67,7 @@ type Config struct {
 	Resources
 	Auth
 	Scalyr
-	WatchedNamespace         string            `name:"watched_namespace"` // may be v1.NamespaceAll, meaning watch all namespaces
+	WatchedNamespace         string            `name:"watched_namespace"` // may be "*", meaning watch all namespaces
 	EtcdHost                 string            `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
 	DockerImage              string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
 	ServiceAccountName       string            `name:"service_account_name" default:"operator"`

@@ -4,8 +4,8 @@ metadata:
   name: postgres-operator
 data:
   # the env var with the same name in the operator pod may overwrite this value
-  # if neither is set, listen to the 'default' namespace
-  # if set to the empty string "", listen to all namespaces
+  # if neither is set or evaluates to the empty string, listen to the operator's own namespace
+  # if set to the "*", listen to all namespaces
   # watched_namespace: development
   service_account_name: operator
   cluster_labels: application:spilo
