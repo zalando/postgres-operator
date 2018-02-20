@@ -583,6 +583,10 @@ func (c *Cluster) Delete() error {
 		}
 	}
 
+	if err := c.deletePatroniClusterObjects(); err != nil {
+		return fmt.Errorf("could not remove leftover patroni objects; %v", err)
+	}
+
 	return nil
 }
 
@@ -816,4 +820,21 @@ func (c *Cluster) Unlock() {
 func (c *Cluster) shouldDeleteSecret(secret *v1.Secret) (delete bool, userName string) {
 	secretUser := string(secret.Data["username"])
 	return (secretUser != c.OpConfig.ReplicationUsername && secretUser != c.OpConfig.SuperUsername), secretUser
+}
+
+func (c *Cluster) deletePatroniClusterObjects() error {
+	return c.deletePatroniClusterEndpoints()
+}
+func (c *Cluster) deletePatroniClusterEndpoints() error {
+	configEndpointName := fmt.Sprintf("%s-config", c.Name)
+
+	if ep, err := c.KubeClient.Endpoints(c.Namespace).Get(configEndpointName, metav1.GetOptions{}); err != nil {
+		if err = c.KubeClient.Endpoints(c.Namespace).Delete(configEndpointName, c.deleteOptions); err != nil {
+			return fmt.Errorf("could not delete cluster config endpoint %q: %v",
+				util.NameFromMeta(ep.ObjectMeta), err)
+		}
+	} else if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not fetch endpoint %q: %v", ep, err)
+	}
+	return nil
 }
