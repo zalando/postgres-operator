@@ -154,6 +154,9 @@ type ControllerConfig struct {
 	Namespace        string
 }
 
+// cached value for the GetOperatorNamespace
+var operatorNamespace string
+
 func (n NamespacedName) String() string {
 	return types.NamespacedName(n).String()
 }
@@ -192,11 +195,12 @@ func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
 // GetOperatorNamespace assumes serviceaccount secret is mounted by kubernetes
 // Placing this func here instead of pgk/util avoids circular import
 func GetOperatorNamespace() string {
-
-	operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
-	if err != nil {
-		log.Fatalf("Unable to detect operator namespace from within its pod due to: %v", err)
+	if operatorNamespace == "" {
+		operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
+		if err != nil {
+			log.Fatalf("Unable to detect operator namespace from within its pod due to: %v", err)
+		}
+		operatorNamespace = string(operatorNamespaceBytes)
 	}
-
-	return string(operatorNamespaceBytes)
+	return operatorNamespace
 }
