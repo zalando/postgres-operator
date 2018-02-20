@@ -261,8 +261,7 @@ func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFr
 	} else {
 
 		if _, err := c.KubeClient.Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
-			// the namespace may be created manually at runtime
-			c.logger.Warnf("Could not find the watched namespace %q", namespace)
+			c.logger.Fatalf("Could not find the watched namespace %q", namespace)
 		} else {
 			c.logger.Infof("Listenting to the specific namespace %q", namespace)
 		}
