@@ -3,8 +3,9 @@ kind: ConfigMap
 metadata:
   name: postgres-operator
 data:
-  # assumes the ns exists before the operator starts
-  # the env var with the same name may overwrite it in the operator pod
+  # the env var with the same name in the operator pod may overwrite this value
+  # if neither is set or evaluates to the empty string, listen to the operator's own namespace
+  # if set to the "*", listen to all namespaces
   # watched_namespace: development
   service_account_name: operator
   cluster_labels: application:spilo

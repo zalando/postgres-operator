@@ -24,6 +24,7 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 
 	defer func() {
 		if err != nil {
+			c.logger.Warningf("error while syncing cluster state: %v", err)
 			c.setStatus(spec.ClusterStatusSyncFailed)
 		} else if c.Status != spec.ClusterStatusRunning {
 			c.setStatus(spec.ClusterStatusRunning)
