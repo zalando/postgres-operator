@@ -505,7 +505,7 @@ func (c *Cluster) generatePodTemplate(
 
 func getWALBucketScopeSuffix(uid string) string {
 	if uid != "" {
-		return fmt.Sprintf("-%s", uid)
+		return fmt.Sprintf("/%s", uid)
 	}
 	return ""
 }
