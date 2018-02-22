@@ -30,8 +30,7 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-ticker.C:
-			_, err := c.clusterListFunc(metav1.ListOptions{ResourceVersion: "0"})
-			if err != nil {
+			if _, err := c.clusterListFunc(metav1.ListOptions{ResourceVersion: "0"}); err != nil {
 				c.logger.Errorf("could not list clusters: %v", err)
 			}
 		case <-stopCh:
@@ -52,9 +51,12 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 
 	b, err := req.DoRaw()
 	if err != nil {
+		c.logger.Errorf("could not get the list of postgresql CRD objects: %v", err)
 		return nil, err
 	}
-	err = json.Unmarshal(b, &list)
+	if err = json.Unmarshal(b, &list); err != nil {
+		c.logger.Warningf("could not unmarshal list of clusters: %v", err)
+	}
 
 	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
 		return &list, err
