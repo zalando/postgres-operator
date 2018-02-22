@@ -311,6 +311,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	} else {
 		for index, container1 := range c.Statefulset.Spec.Template.Spec.Containers {
 			container2 := statefulSet.Spec.Template.Spec.Containers[index]
+			if container1.Name != container2.Name {
+				needsRollUpdate = true
+				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d name doesn't match the current one", index))
+			}
 			if container1.Image != container2.Image {
 				needsRollUpdate = true
 				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d image doesn't match the current one", index))

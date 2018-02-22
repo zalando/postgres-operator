@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -96,9 +97,18 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
-		configMapData["namespace"] = c.config.Namespace
+	// env var takes priority over the same param from the operator ConfigMap
+	watchedNamespace := os.Getenv("WATCHED_NAMESPACE")
+	if watchedNamespace != "" {
+		c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNamespace)
+		configMapData["watched_namespace"] = watchedNamespace
 	}
+
+	if configMapData["watched_namespace"] == "" {
+		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the namespace it is deployed to: '%v' \n", spec.GetOperatorNamespace())
+		configMapData["watched_namespace"] = spec.GetOperatorNamespace()
+	}
+
 	if c.config.NoDatabaseAccess {
 		configMapData["enable_database_access"] = "false"
 	}
@@ -107,6 +117,11 @@ func (c *Controller) initOperatorConfig() {
 	}
 
 	c.opConfig = config.NewFromMap(configMapData)
+
+	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
+	if scalyrAPIKey != "" {
+		c.opConfig.ScalyrAPIKey = scalyrAPIKey
+	}
 }
 
 func (c *Controller) initController() {

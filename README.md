@@ -30,9 +30,13 @@ it manages and updates them with the new docker images; afterwards, all pods fro
 
 This project is currently in active development. It is however already [used internally by Zalando](https://jobs.zalando.com/tech/blog/postgresql-in-a-time-of-kubernetes/) in order to run Postgres databases on Kubernetes in larger numbers for staging environments and a smaller number of production databases. In this environment the operator is deployed to multiple Kubernetes clusters, where users deploy manifests via our CI/CD infrastructure.
 
-There is a talk about this project delivered by Josh Berkus on KubeCon 2017: [Kube-native Postgres](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
-
 Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
+
+## Talks
+
+1. "Blue elephant on-demand: Postgres + Kubernetes" talk by Oleksii Kliukin and Jan Mussler, FOSDEM 2018: [video](https://fosdem.org/2018/schedule/event/blue_elephant_on_demand_postgres_kubernetes/) | [slides (pdf)](https://www.postgresql.eu/events/fosdem2018/sessions/session/1735/slides/59/FOSDEM%202018_%20Blue_Elephant_On_Demand.pdf)
+
+2. "Kube-Native Postgres" talk by Josh Berkus, KubeCon 2017: [video](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
 
 ## Running and testing the operator
 
@@ -56,6 +60,23 @@ Once you have it started successfully, use [the quickstart guide](https://github
 to test your that your setup is working.
 
 Note: if you use multiple Kubernetes clusters, you can switch to Minikube with `kubectl config use-context minikube`
+
+### Select the namespace to deploy to
+
+The operator can run in a namespace other than `default`. For example, to use the `test` namespace, run the following before deploying the operator's manifests:
+
+    kubectl create namespace test
+    kubectl config set-context minikube --namespace=test
+
+All subsequent `kubectl` commands will work with the `test` namespace. The operator  will run in this namespace and look up needed resources - such as its config map - there.
+
+### Specify the namespace to watch
+
+Watching a namespace for an operator means tracking requests to change Postgresql clusters in the namespace such as "increase the number of Postgresql replicas to 5" and reacting to the requests, in this example by actually scaling up. 
+
+By default, the operator watches the namespace it is deployed to. You can change this by altering the `WATCHED_NAMESPACE` env var in the operator deployment manifest or the `watched_namespace` field in the operator configmap. In the case both are set, the env var takes the precedence.
+
+Note that for an operator to manage pods in the watched namespace, the operator's service account (as specified in the operator deployment manifest) has to have appropriate privileges to access the watched namespace. The watched namespace also needs to have a (possibly different) service account in the case database pods need to talk to the Kubernetes API (e.g. when using Kubernetes-native configuration of Patroni).
 
 ### Create ConfigMap
 
@@ -147,6 +168,27 @@ spec:
 
 Please be aware that the taint and toleration only ensures that no other pod gets scheduled to a PostgreSQL node 
 but not that PostgreSQL pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
+
+### Using the operator to minimize the amount of failovers during the cluster upgrade
+
+Postgres operator moves master pods out of to be decommissioned Kubernetes nodes. The decommission status of the node is derived
+from the presence of the set of labels defined by the `node_readiness_label` parameter. The operator makes sure that the Postgres
+master pods are moved elsewhere from the node that is pending to be decommissioned , but not on another node that is also
+about to be shut down. It achieves that via a combination of several properties set on the postgres pods:
+
+* [nodeAffinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity-beta-feature) is configured to avoid scheduling the pod on nodes without all labels from the `node_readiness_label` set.
+* [PodDisruptionBudget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#how-disruption-budgets-work) is defined to keep the master pods running until they are moved out by the operator.
+
+The operator starts moving master pods when the node is drained and doesn't have all labels from the `node_readiness_label` set.
+By default this parameter is set to an empty string, disabling this feature altogether. It can be set to a string containing one
+or more key:value parameters, i.e:
+```
+node_readiness_label: "lifecycle-status:ready,disagnostic-checks:ok"
+
+```
+
+when multiple labels are set the operator will require all of them to be present on a node (and set to the specified value) in order to consider
+it ready. 
 
 #### Custom Pod Environment Variables
 
@@ -267,6 +309,7 @@ The inner 'query' gets the name of the postgres operator pod, and the outer enab
 
 The available endpoints are listed below. Note that the worker ID is an integer from 0 up to 'workers' - 1 (value configured in the operator configuration and defaults to 4)
 
+* /databases - all databases per cluster
 * /workers/all/queue - state of the workers queue (cluster events to process)
 * /workers/$id/queue - state of the queue for the worker $id
 * /workers/$id/logs - log of the operations performed by a given worker
@@ -283,3 +326,72 @@ The operator also supports pprof endpoints listed at the [pprof package](https:/
 * /debug/pprof/profile
 * /debug/pprof/symbol
 * /debug/pprof/trace
+
+It's possible to attach a debugger to troubleshoot postgres-operator inside a
+docker container. It's possible with gdb and
+[delve](https://github.com/derekparker/delve). Since the latter one is a
+specialized debugger for golang, we will use it as an example. To use it you
+need:
+
+* Install delve locally
+
+```
+go get -u github.com/derekparker/delve/cmd/dlv
+```
+
+* Add following dependencies to the `Dockerfile`
+
+```
+RUN apk --no-cache add go git musl-dev
+RUN go get github.com/derekparker/delve/cmd/dlv
+```
+
+* Update the `Makefile` to build the project with debugging symbols. For that
+  you need to add `gcflags` to a build target for corresponding OS (e.g. linux)
+
+```
+-gcflags "-N -l"
+```
+
+* Run `postgres-operator` under the delve. For that you need to replace
+  `ENTRYPOINT` with the following `CMD`:
+
+```
+CMD ["/root/go/bin/dlv", "--listen=:DLV_PORT", "--headless=true", "--api-version=2", "exec", "/postgres-operator"]
+```
+
+* Forward the listening port
+
+```
+kubectl port-forward POD_NAME DLV_PORT:DLV_PORT
+```
+
+* Attach to it
+
+```
+$ dlv connect 127.0.0.1:DLV_PORT
+```
+
+### Unit tests
+
+To run all unit tests, you can simply do:
+
+```
+$ go test ./...
+```
+
+For go 1.9 `vendor` directory would be excluded automatically. For previous
+versions you can exclude it manually:
+
+```
+$ go test $(glide novendor)
+```
+
+In case if you need to debug your unit test, it's possible to use delve:
+
+```
+$ dlv test ./pkg/util/retryutil/
+Type 'help' for list of commands.
+(dlv) c
+PASS
+```

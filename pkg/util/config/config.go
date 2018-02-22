@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"fmt"
+
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
@@ -32,7 +33,7 @@ type Resources struct {
 	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
 	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
 	PodEnvironmentConfigMap string            `name:"pod_environment_configmap" default:""`
-	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:"lifecycle-status:ready"`
+	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
 	MinInstances            int32             `name:"min_instances" default:"-1"`
 }
@@ -66,7 +67,7 @@ type Config struct {
 	Resources
 	Auth
 	Scalyr
-	Namespace                string            `name:"namespace"`
+	WatchedNamespace         string            `name:"watched_namespace"`
 	EtcdHost                 string            `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
 	DockerImage              string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
 	ServiceAccountName       string            `name:"service_account_name" default:"operator"`

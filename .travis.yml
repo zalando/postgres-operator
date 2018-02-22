@@ -1,5 +1,9 @@
 dist: trusty
 
+branches:
+  only:
+  - master
+
 language: go
 
 go:
@@ -13,4 +17,4 @@ install:
   - make deps
 
 script:
-  - goveralls -service=travis-ci
+  - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -package ./cmd/... -v
