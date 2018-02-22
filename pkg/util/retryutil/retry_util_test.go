@@ -37,12 +37,7 @@ func TestRetryWorkerOneFalse(t *testing.T) {
 	tick := &mockTicker{t, 0}
 	result := RetryWorker(1, 3, tick, func() (bool, error) {
 		counter++
-
-		if counter <= 1 {
-			return false, nil
-		}
-
-		return true, nil
+		return counter > 1, nil
 	})
 
 	if result != nil {
