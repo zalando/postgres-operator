@@ -419,9 +419,8 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 			}
 			if k8sutil.ResourceNotFound(err2) {
 				return true, nil
-			} else {
-				return false, err2
 			}
+			return false, err2
 		})
 	if err != nil {
 		return fmt.Errorf("could not delete pod disruption budget: %v", err)

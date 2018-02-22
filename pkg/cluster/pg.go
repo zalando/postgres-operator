@@ -180,7 +180,7 @@ func (c *Cluster) getDatabases() (map[string]string, error) {
 		dbs[datname] = owner
 	}
 
-	return dbs, nil
+	return dbs, err
 }
 
 // executeCreateDatabase creates new database with the given owner.

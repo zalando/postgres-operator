@@ -164,8 +164,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 			clusterNames = append(clusterNames, cluster.Name[len(matches["team"])+1:])
 		}
 
-		s.respond(clusterNames, nil, w)
-		return
+		resp, err = clusterNames, nil
 	} else if matches := util.FindNamedStringSubmatch(clusterLogsURL, req.URL.Path); matches != nil {
 		namespace, _ := matches["namespace"]
 		resp, err = s.controller.ClusterLogs(matches["team"], namespace, matches["cluster"])
@@ -173,17 +172,15 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 		namespace, _ := matches["namespace"]
 		resp, err = s.controller.ClusterHistory(matches["team"], namespace, matches["cluster"])
 	} else if req.URL.Path == clustersURL {
-		res := make(map[string][]string)
+		clusterNamesPerTeam := make(map[string][]string)
 		for team, clusters := range s.controller.TeamClusterList() {
 			for _, cluster := range clusters {
-				res[team] = append(res[team], cluster.Name[len(team)+1:])
+				clusterNamesPerTeam[team] = append(clusterNamesPerTeam[team], cluster.Name[len(team)+1:])
 			}
 		}
-
-		s.respond(res, nil, w)
-		return
+		resp, err = clusterNamesPerTeam, nil
 	} else {
-		err = fmt.Errorf("page not found")
+		resp, err = nil, fmt.Errorf("page not found")
 	}
 
 	s.respond(resp, err, w)
