@@ -76,7 +76,7 @@ Watching a namespace for an operator means tracking requests to change Postgresq
 
 By default, the operator watches the namespace it is deployed to. You can change this by altering the `WATCHED_NAMESPACE` env var in the operator deployment manifest or the `watched_namespace` field in the operator configmap. In the case both are set, the env var takes the precedence. To make the operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
-Note that for an operator to manage pods in the watched namespace, the operator's service account (as specified in the operator deployment manifest) has to have appropriate privileges to access the watched namespace. The operator may not be able to function in the case it watches all namespaces but lacks access rights to some of them. The reason is that for multiple namespaces operations such as 'list pods' are done at the cluster scope.
+Note that for an operator to manage pods in the watched namespace, the operator's service account (as specified in the operator deployment manifest) has to have appropriate privileges to access the watched namespace. The operator may not be able to function in the case it watches all namespaces but lacks access rights to any of them (except Kubernetes system namespaces like `kube-system`). The reason is that for multiple namespaces operations such as 'list pods' execute at the cluster scope and fail at the first violation of access rights. 
 
 The watched namespace also needs to have a (possibly different) service account in the case database pods need to talk to the Kubernetes API (e.g. when using Kubernetes-native configuration of Patroni).
 
