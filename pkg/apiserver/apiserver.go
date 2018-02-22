@@ -169,13 +169,13 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 	} else if matches := util.FindNamedStringSubmatch(clusterHistoryURL, req.URL.Path); matches != nil {
 		resp, err = s.controller.ClusterHistory(matches["team"], matches["cluster"])
 	} else if req.URL.Path == clustersURL {
-		res := make(map[string][]string)
+		clusterNamesPerTeam := make(map[string][]string)
 		for team, clusters := range s.controller.TeamClusterList() {
 			for _, cluster := range clusters {
-				res[team] = append(res[team], cluster.Name[len(team)+1:])
+				clusterNamesPerTeam[team] = append(clusterNamesPerTeam[team], cluster.Name[len(team)+1:])
 			}
 		}
-		err = nil
+		resp, err = clusterNamesPerTeam, nil
 	} else {
 		resp, err = nil, fmt.Errorf("page not found")
 	}
