@@ -825,6 +825,10 @@ func (c *Cluster) shouldDeleteSecret(secret *v1.Secret) (delete bool, userName s
 
 type simpleActionWithResult func() error
 
+type ClusterObjectGet func(name string) (spec.NamespacedName, error)
+
+type ClusterObjectDelete func(name string) error
+
 func (c *Cluster) deletePatroniClusterObjects() error {
 	// TODO: figure out how to remove leftover patroni objects in other cases
 	if !c.patroniUsesKubernetes() {
@@ -839,40 +843,52 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 	return nil
 }
 
-// TODO: figure out the interface shenanigans to avoid code duplication below.
-func (c *Cluster) deletePatroniClusterEndpoints() error {
+func (c *Cluster) deleteClusterObject(
+	get ClusterObjectGet,
+	del ClusterObjectDelete,
+	objType string) error {
 	for _, suffix := range patroniObjectSuffixes {
-		configEndpointName := fmt.Sprintf("%s-%s", c.Name, suffix)
+		name := fmt.Sprintf("%s-%s", c.Name, suffix)
 
-		if ep, err := c.KubeClient.Endpoints(c.Namespace).Get(configEndpointName, metav1.GetOptions{}); err == nil {
-			c.logger.Debugf("deleting Patroni Endpoint %q", util.NameFromMeta(ep.ObjectMeta))
+		if namespacedName, err := get(name); err == nil {
+			c.logger.Debugf("deleting Patroni cluster object %q with name %q",
+				objType, namespacedName)
 
-			if err = c.KubeClient.Endpoints(c.Namespace).Delete(configEndpointName, c.deleteOptions); err != nil {
-				return fmt.Errorf("could not delete Patroni Endpoint %q: %v",
-					util.NameFromMeta(ep.ObjectMeta), err)
+			if err = del(name); err != nil {
+				return fmt.Errorf("could not Patroni delete cluster object %q with name %q: %v",
+					objType, namespacedName, err)
 			}
 
 		} else if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("could not fetch Patroni Endpoint %q: %v", util.NameFromMeta(ep.ObjectMeta), err)
+			return fmt.Errorf("could not fetch Patroni Endpoint %q: %v",
+				namespacedName, err)
 		}
 	}
 	return nil
 }
 
-func (c *Cluster) deletePatroniClusterConfigMaps() error {
-	for _, suffix := range patroniObjectSuffixes {
-		configMapName := fmt.Sprintf("%s-%s", c.Name, suffix)
-
-		if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(configMapName, metav1.GetOptions{}); err == nil {
-			c.logger.Debugf("deleting Patroni ConfigMap %q", util.NameFromMeta(cm.ObjectMeta))
-
-			if err = c.KubeClient.ConfigMaps(c.Namespace).Delete(configMapName, c.deleteOptions); err != nil {
-				return fmt.Errorf("could not delete Patroni ConfigMap %q: %v",
-					util.NameFromMeta(cm.ObjectMeta), err)
-			}
-		} else if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("could not fetch Patroni ConfigMap %q: %v", util.NameFromMeta(cm.ObjectMeta), err)
-		}
+func (c *Cluster) deletePatroniClusterEndpoints() error {
+	get := func(name string) (spec.NamespacedName, error) {
+		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(name, metav1.GetOptions{})
+		return util.NameFromMeta(ep.ObjectMeta), err
 	}
-	return nil
+
+	delete := func(name string) error {
+		return c.KubeClient.Endpoints(c.Namespace).Delete(name, c.deleteOptions)
+	}
+
+	return c.deleteClusterObject(get, delete, "endpoint")
+}
+
+func (c *Cluster) deletePatroniClusterConfigMaps() error {
+	get := func(name string) (spec.NamespacedName, error) {
+		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(name, metav1.GetOptions{})
+		return util.NameFromMeta(cm.ObjectMeta), err
+	}
+
+	delete := func(name string) error {
+		return c.KubeClient.ConfigMaps(c.Namespace).Delete(name, c.deleteOptions)
+	}
+
+	return c.deleteClusterObject(get, delete, "configmap")
 }
