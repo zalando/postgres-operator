@@ -66,7 +66,6 @@ type Cluster struct {
 	podSubscribersMu sync.RWMutex
 	pgDb             *sql.DB
 	mu               sync.Mutex
-	masterLess       bool
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    *metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
@@ -109,7 +108,6 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
@@ -276,7 +274,8 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pods are ready")
 
-	if !(c.masterLess || c.databaseAccessDisabled()) {
+	// create database objects unless we are running without pods or disabled that feature explicitely
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
@@ -286,10 +285,6 @@ func (c *Cluster) Create() error {
 			return fmt.Errorf("could not sync databases: %v", err)
 		}
 		c.logger.Infof("databases have been successfully created")
-	} else {
-		if c.masterLess {
-			c.logger.Warnln("cluster is masterless")
-		}
 	}
 
 	if err := c.listResources(); err != nil {
@@ -487,14 +482,6 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 			c.logger.Errorf("could not sync secrets: %v", err)
 			updateFailed = true
 		}
-
-		if !c.databaseAccessDisabled() {
-			c.logger.Debugf("syncing roles")
-			if err := c.syncRoles(); err != nil {
-				c.logger.Errorf("could not sync roles: %v", err)
-				updateFailed = true
-			}
-		}
 	}
 
 	// Volume
@@ -534,12 +521,19 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 		}
 	}()
 
-	// Databases
-	if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
-		c.logger.Infof("syncing databases")
-		if err := c.syncDatabases(); err != nil {
-			c.logger.Errorf("could not sync databases: %v", err)
+	// Roles and Databases
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
+		c.logger.Debugf("syncing roles")
+		if err := c.syncRoles(); err != nil {
+			c.logger.Errorf("could not sync roles: %v", err)
 			updateFailed = true
+		}
+		if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
+			c.logger.Infof("syncing databases")
+			if err := c.syncDatabases(); err != nil {
+				c.logger.Errorf("could not sync databases: %v", err)
+				updateFailed = true
+			}
 		}
 	}
 
@@ -786,9 +780,11 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 
 		role := Master
 
+		_, err := c.waitForPodLabel(ch, &role)
+
 		select {
 		case <-stopCh:
-		case podLabelErr <- c.waitForPodLabel(ch, &role):
+		case podLabelErr <- err:
 		}
 	}()
 
