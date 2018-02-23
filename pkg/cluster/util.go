@@ -343,6 +343,7 @@ func (c *Cluster) labelsSet() labels.Set {
 		lbls[k] = v
 	}
 	lbls[c.OpConfig.ClusterNameLabel] = c.Name
+	lbls["team"] = c.Postgresql.Spec.TeamID
 
 	return labels.Set(lbls)
 }
