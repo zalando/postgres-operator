@@ -377,9 +377,15 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
 }
 
+type ContainerCondition func(a, b v1.Container) bool
+
 type ContainerCheck struct {
-	condition func(a, b v1.Container) bool
+	condition ContainerCondition
 	reason    string
+}
+
+func NewCheck(msg string, cond ContainerCondition) ContainerCheck {
+	return ContainerCheck{reason: msg, condition: cond}
 }
 
 // compareContainers: compare containers from two stateful sets
@@ -389,39 +395,19 @@ type ContainerCheck struct {
 func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
 	reasons := make([]string, 0)
 	needsRollUpdate := false
-	checks := map[string]ContainerCheck{
-		"name": ContainerCheck{
-			condition: func(a, b v1.Container) bool { return a.Name != b.Name },
-			reason:    "new statefulset's container %d name doesn't match the current one",
-		},
-		"image": ContainerCheck{
-			condition: func(a, b v1.Container) bool { return a.Image != b.Image },
-			reason:    "new statefulset's container %d image doesn't match the current one",
-		},
-		"ports": ContainerCheck{
-			condition: func(a, b v1.Container) bool {
-				return !reflect.DeepEqual(a.Ports, b.Ports)
-			},
-			reason: "new statefulset's container %d ports don't match the current one",
-		},
-		"resourses": ContainerCheck{
-			condition: func(a, b v1.Container) bool {
-				return !compareResources(&a.Resources, &b.Resources)
-			},
-			reason: "new statefulset's container %d resources don't match the current ones",
-		},
-		"env": ContainerCheck{
-			condition: func(a, b v1.Container) bool {
-				return !reflect.DeepEqual(a.Env, b.Env)
-			},
-			reason: "new statefulset's container %d environment doesn't match the current one",
-		},
-		"env_from": ContainerCheck{
-			condition: func(a, b v1.Container) bool {
-				return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom)
-			},
-			reason: "new statefulset's container %d environment sources don't match the current one",
-		},
+	checks := []ContainerCheck{
+		NewCheck("new statefulset's container %d name doesn't match the current one",
+			func(a, b v1.Container) bool { return a.Name != b.Name }),
+		NewCheck("new statefulset's container %d image doesn't match the current one",
+			func(a, b v1.Container) bool { return a.Image != b.Image }),
+		NewCheck("new statefulset's container %d ports don't match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
+		NewCheck("new statefulset's container %d resources don't match the current ones",
+			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
+		NewCheck("new statefulset's container %d environment doesn't match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
+		NewCheck("new statefulset's container %d environment sources don't match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 	}
 
 	for index, containerA := range setA.Spec.Template.Spec.Containers {
