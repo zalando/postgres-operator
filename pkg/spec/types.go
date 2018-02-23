@@ -33,12 +33,13 @@ const (
 )
 
 type RoleOrigin int
+
 const (
-	RoleOriginSystem = iota
+	RoleOriginUnknown = iota
 	RoleOriginInfrastructure
 	RoleOriginManifest
 	RoleOriginTeamsAPI
-	RoleOriginUnknown
+	RoleOriginSystem
 )
 
 // ClusterEvent carries the payload of the Cluster TPR events.
@@ -71,7 +72,7 @@ type PodEvent struct {
 
 // PgUser contains information about a single user.
 type PgUser struct {
-	Origin 	   RoleOrigin
+	Origin     RoleOrigin
 	Name       string
 	Password   string
 	Flags      []string

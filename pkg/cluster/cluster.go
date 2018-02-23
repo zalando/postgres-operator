@@ -706,7 +706,7 @@ func (c *Cluster) initHumanUsers() error {
 		}
 
 		c.pgUsers[username] = spec.PgUser{
-			Origin:		spec.RoleOriginTeamsAPI,
+			Origin:     spec.RoleOriginTeamsAPI,
 			Name:       username,
 			Flags:      flags,
 			MemberOf:   memberOf,

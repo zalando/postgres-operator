@@ -33,9 +33,9 @@ func TestInitRobotUsers(t *testing.T) {
 	}{
 		{
 			manifestUsers: map[string]spec.UserFlags{"foo": {"superuser", "createdb"}},
-			infraRoles:    map[string]spec.PgUser{"foo": {Name: "foo", Password: "bar"}},
-			result: map[string]spec.PgUser{"foo": {Name: "foo", Password: "bar",
-				Flags: []string{"CREATEDB", "LOGIN", "SUPERUSER"}}},
+			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginManifest, Name: "foo", Password: "bar"}},
+			result: map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginManifest,
+				Name: "foo", Password: "bar", Flags: []string{"CREATEDB", "LOGIN", "SUPERUSER"}}},
 			err: nil,
 		},
 		{
@@ -119,10 +119,11 @@ func TestInitHumanUsers(t *testing.T) {
 		result        map[string]spec.PgUser
 	}{
 		{
-			existingRoles: map[string]spec.PgUser{"foo": {Name: "foo", Flags: []string{"NOLOGIN"}},
-				"bar": {Name: "bar", Flags: []string{"NOLOGIN"}}},
+			existingRoles: map[string]spec.PgUser{"foo": {Name: "foo", Origin: spec.RoleOriginTeamsAPI,
+				Flags: []string{"NOLOGIN"}}, "bar": {Name: "bar", Flags: []string{"NOLOGIN"}}},
 			teamRoles: []string{"foo"},
-			result: map[string]spec.PgUser{"foo": {Name: "foo", MemberOf: []string{cl.OpConfig.PamRoleName}, Flags: []string{"LOGIN", "SUPERUSER"}},
+			result: map[string]spec.PgUser{"foo": {Name: "foo", Origin: spec.RoleOriginTeamsAPI,
+				MemberOf: []string{cl.OpConfig.PamRoleName}, Flags: []string{"LOGIN", "SUPERUSER"}},
 				"bar": {Name: "bar", Flags: []string{"NOLOGIN"}}},
 		},
 		{
