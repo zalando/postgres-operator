@@ -116,7 +116,7 @@ Users:
 	// in worst case we would have one line per user
 	for i := 1; i <= len(data); i++ {
 		properties := []string{"user", "password", "inrole"}
-		t := spec.PgUser{}
+		t := spec.PgUser{Origin: spec.RoleOriginInfrastructure}
 		for _, p := range properties {
 			key := fmt.Sprintf("%s%d", p, i)
 			if val, present := data[key]; !present {

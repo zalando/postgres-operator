@@ -131,6 +131,7 @@ func TestGetInfrastructureRoles(t *testing.T) {
 			map[string]spec.PgUser{
 				"testrole": {
 					Name:     "testrole",
+					Origin:   spec.RoleOriginInfrastructure,
 					Password: "testpassword",
 					MemberOf: []string{"testinrole"},
 				},
