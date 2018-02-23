@@ -31,9 +31,10 @@ import (
 )
 
 var (
-	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
-	databaseNameRegexp = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
-	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
+	alphaNumericRegexp    = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
+	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
+	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
+	patroniObjectSuffixes = []string{"config", "failover", "sync"}
 )
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
@@ -581,6 +582,10 @@ func (c *Cluster) Delete() error {
 		}
 	}
 
+	if err := c.deletePatroniClusterObjects(); err != nil {
+		return fmt.Errorf("could not remove leftover patroni objects; %v", err)
+	}
+
 	return nil
 }
 
@@ -816,4 +821,74 @@ func (c *Cluster) Unlock() {
 func (c *Cluster) shouldDeleteSecret(secret *v1.Secret) (delete bool, userName string) {
 	secretUser := string(secret.Data["username"])
 	return (secretUser != c.OpConfig.ReplicationUsername && secretUser != c.OpConfig.SuperUsername), secretUser
+}
+
+type simpleActionWithResult func() error
+
+type ClusterObjectGet func(name string) (spec.NamespacedName, error)
+
+type ClusterObjectDelete func(name string) error
+
+func (c *Cluster) deletePatroniClusterObjects() error {
+	// TODO: figure out how to remove leftover patroni objects in other cases
+	if !c.patroniUsesKubernetes() {
+		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
+	}
+	c.logger.Debugf("removing leftover Patroni objects (endpoints or configmaps)")
+	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterConfigMaps} {
+		if err := deleter(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Cluster) deleteClusterObject(
+	get ClusterObjectGet,
+	del ClusterObjectDelete,
+	objType string) error {
+	for _, suffix := range patroniObjectSuffixes {
+		name := fmt.Sprintf("%s-%s", c.Name, suffix)
+
+		if namespacedName, err := get(name); err == nil {
+			c.logger.Debugf("deleting Patroni cluster object %q with name %q",
+				objType, namespacedName)
+
+			if err = del(name); err != nil {
+				return fmt.Errorf("could not Patroni delete cluster object %q with name %q: %v",
+					objType, namespacedName, err)
+			}
+
+		} else if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not fetch Patroni Endpoint %q: %v",
+				namespacedName, err)
+		}
+	}
+	return nil
+}
+
+func (c *Cluster) deletePatroniClusterEndpoints() error {
+	get := func(name string) (spec.NamespacedName, error) {
+		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(name, metav1.GetOptions{})
+		return util.NameFromMeta(ep.ObjectMeta), err
+	}
+
+	delete := func(name string) error {
+		return c.KubeClient.Endpoints(c.Namespace).Delete(name, c.deleteOptions)
+	}
+
+	return c.deleteClusterObject(get, delete, "endpoint")
+}
+
+func (c *Cluster) deletePatroniClusterConfigMaps() error {
+	get := func(name string) (spec.NamespacedName, error) {
+		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(name, metav1.GetOptions{})
+		return util.NameFromMeta(cm.ObjectMeta), err
+	}
+
+	delete := func(name string) error {
+		return c.KubeClient.ConfigMaps(c.Namespace).Delete(name, c.deleteOptions)
+	}
+
+	return c.deleteClusterObject(get, delete, "configmap")
 }
