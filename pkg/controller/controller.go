@@ -14,6 +14,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
@@ -97,17 +98,7 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	// env var takes priority over the same param from the operator ConfigMap
-	watchedNamespace := os.Getenv("WATCHED_NAMESPACE")
-	if watchedNamespace != "" {
-		c.logger.Infof("Watch the %q namespace specified in the env variable WATCHED_NAMESPACE\n", watchedNamespace)
-		configMapData["watched_namespace"] = watchedNamespace
-	}
-
-	if configMapData["watched_namespace"] == "" {
-		c.logger.Infof("No namespace to watch specified. By convention, the operator falls back to watching the namespace it is deployed to: '%v' \n", spec.GetOperatorNamespace())
-		configMapData["watched_namespace"] = spec.GetOperatorNamespace()
-	}
+	configMapData["watched_namespace"] = c.getEffectiveNamespace(os.Getenv("WATCHED_NAMESPACE"), configMapData["watched_namespace"])
 
 	if c.config.NoDatabaseAccess {
 		configMapData["enable_database_access"] = "false"
@@ -127,6 +118,7 @@ func (c *Controller) initOperatorConfig() {
 func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
+
 	c.initSharedInformers()
 
 	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
@@ -255,4 +247,26 @@ func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGrou
 	defer wg.Done()
 
 	c.nodesInformer.Run(stopCh)
+}
+
+func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFromConfigMap string) string {
+
+	namespace := util.Coalesce(namespaceFromEnvironment, util.Coalesce(namespaceFromConfigMap, spec.GetOperatorNamespace()))
+
+	if namespace == "*" {
+
+		namespace = v1.NamespaceAll
+		c.logger.Infof("Listening to all namespaces")
+
+	} else {
+
+		if _, err := c.KubeClient.Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+			c.logger.Fatalf("Could not find the watched namespace %q", namespace)
+		} else {
+			c.logger.Infof("Listenting to the specific namespace %q", namespace)
+		}
+
+	}
+
+	return namespace
 }

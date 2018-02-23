@@ -13,7 +13,7 @@ type mockTicker struct {
 func (t *mockTicker) Stop() {}
 
 func (t *mockTicker) Tick() {
-	t.counter += 1
+	t.counter++
 }
 
 func TestRetryWorkerSuccess(t *testing.T) {
@@ -36,13 +36,8 @@ func TestRetryWorkerOneFalse(t *testing.T) {
 
 	tick := &mockTicker{t, 0}
 	result := RetryWorker(1, 3, tick, func() (bool, error) {
-		counter += 1
-
-		if counter <= 1 {
-			return false, nil
-		} else {
-			return true, nil
-		}
+		counter++
+		return counter > 1, nil
 	})
 
 	if result != nil {

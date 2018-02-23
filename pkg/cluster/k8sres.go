@@ -275,9 +275,9 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 				Effect:   v1.TaintEffect(podToleration["effect"]),
 			},
 		}
-	} else {
-		return []v1.Toleration{}
 	}
+
+	return []v1.Toleration{}
 }
 
 func (c *Cluster) generatePodTemplate(
@@ -363,7 +363,7 @@ func (c *Cluster) generatePodTemplate(
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getWALBucketScopeSuffix(string(uid))})
 	}
 
-	if c.OpConfig.EtcdHost == "" {
+	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
 	} else {
 		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
@@ -376,7 +376,7 @@ func (c *Cluster) generatePodTemplate(
 	var names []string
 	// handle environment variables from the PodEnvironmentConfigMap. We don't use envSource here as it is impossible
 	// to track any changes to the object envSource points to. In order to emulate the envSource behavior, however, we
-	// need to make sure that PodConfigMap variables doesn't override those we set explicitely from the configuration
+	// need to make sure that PodConfigMap variables doesn't override those we set explicitly from the configuration
 	// parameters
 	envVarsMap := make(map[string]string)
 	for _, envVar := range envVars {

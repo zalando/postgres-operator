@@ -24,6 +24,7 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 
 	defer func() {
 		if err != nil {
+			c.logger.Warningf("error while syncing cluster state: %v", err)
 			c.setStatus(spec.ClusterStatusSyncFailed)
 		} else if c.Status != spec.ClusterStatusRunning {
 			c.setStatus(spec.ClusterStatusRunning)
@@ -57,7 +58,8 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		}
 	}
 
-	if !c.databaseAccessDisabled() {
+	// create database objects unless we are running without pods or disabled that feature explicitely
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0) {
 		c.logger.Debugf("syncing roles")
 		if err = c.syncRoles(); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)

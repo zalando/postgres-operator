@@ -119,3 +119,10 @@ func MapContains(haystack, needle map[string]string) bool {
 
 	return true
 }
+
+func Coalesce(val, defaultVal string) string {
+	if val == "" {
+		return defaultVal
+	}
+	return val
+}
