@@ -309,33 +309,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
 	} else {
-		for index, container1 := range c.Statefulset.Spec.Template.Spec.Containers {
-			container2 := statefulSet.Spec.Template.Spec.Containers[index]
-			if container1.Name != container2.Name {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d name doesn't match the current one", index))
-			}
-			if container1.Image != container2.Image {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d image doesn't match the current one", index))
-			}
-			if !reflect.DeepEqual(container1.Ports, container2.Ports) {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d ports don't match the current one", index))
-			}
-			if !compareResources(&container1.Resources, &container2.Resources) {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d resources don't match the current ones", index))
-			}
-			if !reflect.DeepEqual(container1.Env, container2.Env) {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d environment doesn't match the current one", index))
-			}
-			if !reflect.DeepEqual(container1.EnvFrom, container2.EnvFrom) {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d environment sources don't match the current one", index))
-			}
-		}
+		needsRollUpdate, reasons = c.compareContainers(c.Statefulset, statefulSet)
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
@@ -401,6 +375,66 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 
 	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
+}
+
+type ContainerCheck struct {
+	condition func(a, b v1.Container) bool
+	reason    string
+}
+
+// compareContainers: compare containers from two stateful sets
+// and return:
+// * whether or not roll update is needed
+// * a list of reasons in a human readable format
+func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
+	reasons := make([]string, 0)
+	needsRollUpdate := false
+	checks := map[string]ContainerCheck{
+		"name": ContainerCheck{
+			condition: func(a, b v1.Container) bool { return a.Name != b.Name },
+			reason:    "new statefulset's container %d name doesn't match the current one",
+		},
+		"image": ContainerCheck{
+			condition: func(a, b v1.Container) bool { return a.Image != b.Image },
+			reason:    "new statefulset's container %d image doesn't match the current one",
+		},
+		"ports": ContainerCheck{
+			condition: func(a, b v1.Container) bool {
+				return !reflect.DeepEqual(a.Ports, b.Ports)
+			},
+			reason: "new statefulset's container %d ports don't match the current one",
+		},
+		"resourses": ContainerCheck{
+			condition: func(a, b v1.Container) bool {
+				return !compareResources(&a.Resources, &b.Resources)
+			},
+			reason: "new statefulset's container %d resources don't match the current ones",
+		},
+		"env": ContainerCheck{
+			condition: func(a, b v1.Container) bool {
+				return !reflect.DeepEqual(a.Env, b.Env)
+			},
+			reason: "new statefulset's container %d environment doesn't match the current one",
+		},
+		"env_from": ContainerCheck{
+			condition: func(a, b v1.Container) bool {
+				return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom)
+			},
+			reason: "new statefulset's container %d environment sources don't match the current one",
+		},
+	}
+
+	for index, containerA := range setA.Spec.Template.Spec.Containers {
+		containerB := setB.Spec.Template.Spec.Containers[index]
+		for _, check := range checks {
+			if check.condition(containerA, containerB) {
+				needsRollUpdate = true
+				reasons = append(reasons, fmt.Sprintf(check.reason, index))
+			}
+		}
+	}
+
+	return needsRollUpdate, reasons
 }
 
 func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (equal bool) {
