@@ -12,7 +12,7 @@ spec:
       serviceAccountName: operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:c17aabb
+        image: registry.opensource.zalan.do/acid/postgres-operator:0f392c2
         imagePullPolicy: IfNotPresent
         env:
         # uncomment to overwrite a similar setting from operator configmap
