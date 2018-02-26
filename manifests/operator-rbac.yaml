@@ -33,9 +33,17 @@ rules:
   - ""
   resources:
   - endpoints
+  verbs:
+  - create
+  - delete
+  - get
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - create
+  - update
   - delete
   - get
 - apiGroups:
@@ -90,6 +98,12 @@ rules:
   - get
   - patch
 - apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
   - policy
   resources:
   - poddisruptionbudgets
@@ -109,5 +123,7 @@ roleRef:
   name: zalando-postgres-operator
 subjects:
 - kind: ServiceAccount
+# note: the cluster role binding needs to be defined
+# for every namespace the operator service account lives in.
   name: zalando-postgres-operator
   namespace: default
