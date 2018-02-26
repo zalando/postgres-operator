@@ -110,7 +110,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 	}
 
 	podName := fmt.Sprintf("%s-0", c.Statefulset.Name)
-	masterCandidatePod, err := c.KubeClient.Pods(c.OpConfig.WatchedNamespace).Get(podName, metav1.GetOptions{})
+	masterCandidatePod, err := c.KubeClient.Pods(c.clusterNamespace()).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("could not get master candidate pod: %v", err)
 	}
@@ -419,9 +419,8 @@ func (c *Cluster) deletePodDisruptionBudget() error {
 			}
 			if k8sutil.ResourceNotFound(err2) {
 				return true, nil
-			} else {
-				return false, err2
 			}
+			return false, err2
 		})
 	if err != nil {
 		return fmt.Errorf("could not delete pod disruption budget: %v", err)

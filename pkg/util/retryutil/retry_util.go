@@ -5,11 +5,14 @@ import (
 	"time"
 )
 
+// RetryTicker is a wrapper aroung time.Tick,
+// that allows to mock its implementation
 type RetryTicker interface {
 	Stop()
 	Tick()
 }
 
+// Ticker is a real implementation of RetryTicker interface
 type Ticker struct {
 	ticker *time.Ticker
 }
@@ -18,10 +21,7 @@ func (t *Ticker) Stop() { t.ticker.Stop() }
 
 func (t *Ticker) Tick() { <-t.ticker.C }
 
-// Retry calls ConditionFunc until either:
-// * it returns boolean true
-// * a timeout expires
-// * an error occurs
+// Retry is a wrapper around RetryWorker that provides a real RetryTicker
 func Retry(interval time.Duration, timeout time.Duration, f func() (bool, error)) error {
 	//TODO: make the retry exponential
 	if timeout < interval {
@@ -31,6 +31,10 @@ func Retry(interval time.Duration, timeout time.Duration, f func() (bool, error)
 	return RetryWorker(interval, timeout, tick, f)
 }
 
+// RetryWorker calls ConditionFunc until either:
+// * it returns boolean true
+// * a timeout expires
+// * an error occurs
 func RetryWorker(
 	interval time.Duration,
 	timeout time.Duration,

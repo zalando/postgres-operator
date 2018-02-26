@@ -55,6 +55,7 @@ type Patroni struct {
 // CloneDescription describes which cluster the new should clone and up to which point in time
 type CloneDescription struct {
 	ClusterName  string `json:"cluster,omitempty"`
+	Uid          string `json:"uid,omitempty"`
 	EndTimestamp string `json:"timestamp,omitempty"`
 }
 

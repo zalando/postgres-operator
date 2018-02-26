@@ -53,7 +53,6 @@ func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
 	if err != nil {
 		return fmt.Errorf("could not encode json: %v", err)
 	}
-
 	request, err := http.NewRequest(http.MethodPost, apiURL(master)+failoverPath, buf)
 	if err != nil {
 		return fmt.Errorf("could not create request: %v", err)

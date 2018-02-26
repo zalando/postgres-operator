@@ -24,6 +24,7 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 
 	defer func() {
 		if err != nil {
+			c.logger.Warningf("error while syncing cluster state: %v", err)
 			c.setStatus(spec.ClusterStatusSyncFailed)
 		} else if c.Status != spec.ClusterStatusRunning {
 			c.setStatus(spec.ClusterStatusRunning)
@@ -57,7 +58,8 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		}
 	}
 
-	if !c.databaseAccessDisabled() {
+	// create database objects unless we are running without pods or disabled that feature explicitely
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0) {
 		c.logger.Debugf("syncing roles")
 		if err = c.syncRoles(); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)
@@ -320,6 +322,10 @@ func (c *Cluster) syncSecrets() error {
 			if err2 != nil {
 				return fmt.Errorf("could not get current secret: %v", err2)
 			}
+			if secretUsername != string(curSecret.Data["username"]) {
+				c.logger.Warningf("secret %q does not contain the role %q", secretSpec.Name, secretUsername)
+				continue
+			}
 			c.logger.Debugf("secret %q already exists, fetching its password", util.NameFromMeta(curSecret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
@@ -331,8 +337,17 @@ func (c *Cluster) syncSecrets() error {
 				userMap = c.pgUsers
 			}
 			pwdUser := userMap[secretUsername]
-			pwdUser.Password = string(curSecret.Data["password"])
-			userMap[secretUsername] = pwdUser
+			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
+			if pwdUser.Password != string(curSecret.Data["password"]) && pwdUser.Origin == spec.RoleOriginInfrastructure {
+				c.logger.Debugf("updating the secret %q from the infrastructure roles", secretSpec.Name)
+				if _, err := c.KubeClient.Secrets(secretSpec.Namespace).Update(secretSpec); err != nil {
+					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
+				}
+			} else {
+				// for non-infrastructure role - update the role with the password from the secret
+				pwdUser.Password = string(curSecret.Data["password"])
+				userMap[secretUsername] = pwdUser
+			}
 
 			continue
 		} else {

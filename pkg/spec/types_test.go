@@ -5,22 +5,27 @@ import (
 	"testing"
 )
 
+const (
+	mockOperatorNamespace = "acid"
+)
+
 var nnTests = []struct {
 	s               string
 	expected        NamespacedName
 	expectedMarshal []byte
 }{
-	{`acid/cluster`, NamespacedName{Namespace: "acid", Name: "cluster"}, []byte(`"acid/cluster"`)},
-	{`/name`, NamespacedName{Namespace: "default", Name: "name"}, []byte(`"default/name"`)},
-	{`test`, NamespacedName{Namespace: "default", Name: "test"}, []byte(`"default/test"`)},
+	{`acid/cluster`, NamespacedName{Namespace: mockOperatorNamespace, Name: "cluster"}, []byte(`"acid/cluster"`)},
+	{`/name`, NamespacedName{Namespace: mockOperatorNamespace, Name: "name"}, []byte(`"acid/name"`)},
+	{`test`, NamespacedName{Namespace: mockOperatorNamespace, Name: "test"}, []byte(`"acid/test"`)},
 }
 
 var nnErr = []string{"test/", "/", "", "//"}
 
 func TestNamespacedNameDecode(t *testing.T) {
+
 	for _, tt := range nnTests {
 		var actual NamespacedName
-		err := actual.Decode(tt.s)
+		err := actual.DecodeWorker(tt.s, mockOperatorNamespace)
 		if err != nil {
 			t.Errorf("decode error: %v", err)
 		}
@@ -28,6 +33,7 @@ func TestNamespacedNameDecode(t *testing.T) {
 			t.Errorf("expected: %v, got %#v", tt.expected, actual)
 		}
 	}
+
 }
 
 func TestNamespacedNameMarshal(t *testing.T) {
@@ -47,7 +53,7 @@ func TestNamespacedNameMarshal(t *testing.T) {
 func TestNamespacedNameError(t *testing.T) {
 	for _, tt := range nnErr {
 		var actual NamespacedName
-		err := actual.Decode(tt)
+		err := actual.DecodeWorker(tt, mockOperatorNamespace)
 		if err == nil {
 			t.Errorf("error expected for %q, got: %#v", tt, actual)
 		}

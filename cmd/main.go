@@ -29,10 +29,14 @@ func init() {
 
 	configMapRawName := os.Getenv("CONFIG_MAP_NAME")
 	if configMapRawName != "" {
+
 		err := config.ConfigMapName.Decode(configMapRawName)
 		if err != nil {
-			log.Fatalf("incorrect config map name")
+			log.Fatalf("incorrect config map name: %v", configMapRawName)
 		}
+
+		log.Printf("Fully qualified configmap name: %v", config.ConfigMapName)
+
 	}
 }
 
