@@ -491,7 +491,7 @@ func (c *Cluster) generatePodTemplate(
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    c.labelsSet(),
+			Labels:    c.labelsSet(true),
 			Namespace: c.Namespace,
 		},
 		Spec: podSpec,
@@ -559,7 +559,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.statefulSetName(),
 			Namespace: c.Namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.labelsSet(true),
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -658,7 +658,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.credentialSecretName(username),
 			Namespace: namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.labelsSet(true),
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -785,7 +785,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.podDisruptionBudgetName(),
 			Namespace: c.Namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.labelsSet(true),
 		},
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,

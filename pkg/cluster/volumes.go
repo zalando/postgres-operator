@@ -19,7 +19,7 @@ import (
 func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, error) {
 	ns := c.Namespace
 	listOptions := metav1.ListOptions{
-		LabelSelector: c.labelsSet().String(),
+		LabelSelector: c.labelsSet(false).String(),
 	}
 
 	pvcs, err := c.KubeClient.PersistentVolumeClaims(ns).List(listOptions)
