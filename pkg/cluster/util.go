@@ -261,7 +261,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
 			listOptions := metav1.ListOptions{
-				LabelSelector: c.labelsSet().String(),
+				LabelSelector: c.labelsSet(false).String(),
 			}
 			ss, err := c.KubeClient.StatefulSets(c.Namespace).List(listOptions)
 			if err != nil {
@@ -277,7 +277,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 }
 
 func (c *Cluster) waitPodLabelsReady() error {
-	ls := c.labelsSet()
+	ls := c.labelsSet(false)
 	namespace := c.Namespace
 
 	listOptions := metav1.ListOptions{
@@ -337,19 +337,26 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 	return nil
 }
 
-func (c *Cluster) labelsSet() labels.Set {
+// Returns labels used to create or list k8s objects such as pods
+// For backward compatability, shouldAddExtraLabels must be false
+// when listing k8s objects. See operator PR #252
+func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 	lbls := make(map[string]string)
 	for k, v := range c.OpConfig.ClusterLabels {
 		lbls[k] = v
 	}
 	lbls[c.OpConfig.ClusterNameLabel] = c.Name
-	lbls["team"] = c.Postgresql.Spec.TeamID
+
+	if shouldAddExtraLabels {
+		// enables filtering resources owned by a team
+		lbls["team"] = c.Postgresql.Spec.TeamID
+	}
 
 	return labels.Set(lbls)
 }
 
 func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
-	lbls := c.labelsSet()
+	lbls := c.labelsSet(false)
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
 	return lbls
 }

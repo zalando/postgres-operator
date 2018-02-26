@@ -13,7 +13,7 @@ import (
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
 	listOptions := metav1.ListOptions{
-		LabelSelector: c.labelsSet().String(),
+		LabelSelector: c.labelsSet(false).String(),
 	}
 
 	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)
@@ -268,7 +268,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 
 func (c *Cluster) recreatePods() error {
 	c.setProcessName("recreating pods")
-	ls := c.labelsSet()
+	ls := c.labelsSet(false)
 	namespace := c.Namespace
 
 	listOptions := metav1.ListOptions{
