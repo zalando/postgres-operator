@@ -82,7 +82,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - service
+  - services
   verbs:
   - create
   - delete
