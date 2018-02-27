@@ -160,11 +160,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 
 	ep, err := c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
 	if err == nil {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			if err := c.deleteEndpoint(role); err != nil {
-				return fmt.Errorf("could not delete %s endpoint", role)
-			}
-		}
 
 		c.Endpoints[role] = ep
 		return nil
