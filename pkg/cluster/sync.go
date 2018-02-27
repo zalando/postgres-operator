@@ -128,11 +128,6 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	}
 	c.Services[role] = nil
 
-	// Service does not exist
-	if role == Replica && !c.Spec.ReplicaLoadBalancer {
-		return nil
-	}
-
 	c.logger.Infof("could not find the cluster's %s service", role)
 
 	if svc, err := c.createService(role); err != nil {
@@ -167,10 +162,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 		return fmt.Errorf("could not get %s endpoint: %v", role, err)
 	}
 	c.Endpoints[role] = nil
-
-	if role == Replica && !c.Spec.ReplicaLoadBalancer {
-		return nil
-	}
 
 	c.logger.Infof("could not find the cluster's %s endpoint", role)
 
