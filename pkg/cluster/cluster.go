@@ -217,9 +217,7 @@ func (c *Cluster) Create() error {
 	c.setStatus(spec.ClusterStatusCreating)
 
 	for _, role := range []PostgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			continue
-		}
+
 		if c.Endpoints[role] != nil {
 			return fmt.Errorf("%s endpoint already exists in the cluster", role)
 		}
@@ -589,9 +587,6 @@ func (c *Cluster) Delete() error {
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			continue
-		}
 
 		if err := c.deleteEndpoint(role); err != nil {
 			return fmt.Errorf("could not delete %s endpoint: %v", role, err)
