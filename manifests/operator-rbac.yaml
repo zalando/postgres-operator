@@ -89,7 +89,7 @@ rules:
   - get
   - patch
 - apiGroups:
-  - ""
+  - apps
   resources:
   - statefulsets
   verbs:
