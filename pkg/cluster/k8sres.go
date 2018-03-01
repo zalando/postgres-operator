@@ -773,7 +773,7 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getWALBucketScopeSuffix(description.Uid)})
-		result = append(result, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	return result
