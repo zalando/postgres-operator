@@ -98,8 +98,9 @@ type PostgresSpec struct {
 	DockerImage         string   `json:"dockerImage,omitempty"`
 	// EnableLoadBalancer  is a pointer, since it is important to know if that parameters is omitted from the Postgres manifest
 	// in that case UseLoadBalancer == nil and the value is taken from the operator config
-	UseLoadBalancer     *bool                `json:"useLoadBalancer,omitempty"`
-	ReplicaLoadBalancer bool                 `json:"replicaLoadBalancer,omitempty"`
+	UseLoadBalancer *bool `json:"useLoadBalancer,omitempty"`
+	// if ReplicaLoadBalancer == nil (is unset), value of UseLoadBalancer takes priority
+	ReplicaLoadBalancer *bool                `json:"replicaLoadBalancer,omitempty"`
 	NumberOfInstances   int32                `json:"numberOfInstances"`
 	Users               map[string]UserFlags `json:"users"`
 	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
