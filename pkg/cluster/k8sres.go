@@ -703,7 +703,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v
 
 	var annotations map[string]string
 
-	if c.shouldCreateLoadBalancerForService(role, spec) == true {
+	if c.shouldCreateLoadBalancerForService(role, spec) {
 
 		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
