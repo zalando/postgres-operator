@@ -669,6 +669,20 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
+func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *spec.PostgresSpec) bool {
+
+	// handle LB for the replica service separately if ReplicaLoadBalancer is set in the Postgres manifest
+	if role == Replica && spec.ReplicaLoadBalancer != nil {
+		return *spec.ReplicaLoadBalancer
+	}
+
+	// create a load balancer for the master service if either Postgres or operator manifests tell to do so
+	// if ReplicaLoadBalancer is unset and LB for master service is created, also create a balancer for replicas
+	return (spec.UseLoadBalancer != nil && *spec.UseLoadBalancer) ||
+		(spec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer)
+
+}
+
 func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v1.Service {
 	var dnsName string
 
@@ -689,12 +703,12 @@ func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v
 
 	var annotations map[string]string
 
-	// Examine the per-cluster load balancer setting, if it is not defined - check the operator configuration.
-	if (spec.UseLoadBalancer != nil && *spec.UseLoadBalancer) ||
-		(spec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
+	if c.shouldCreateLoadBalancerForService(role, spec) == true {
 
 		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
+
+		// source ranges are the same for balancers for master and replica services
 		allowedSourceRanges := spec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {
 			sourceRanges = allowedSourceRanges
