@@ -721,6 +721,10 @@ func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v
 			constants.ZalandoDNSNameAnnotation: dnsName,
 			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 		}
+	} else if role == Replica {
+		// before PR #258, the replica service was only created if allocated a LB
+		// now we always create the service but warn if the LB is absent
+		c.logger.Debugf("No load balancer created for the replica service")
 	}
 
 	service := &v1.Service{
