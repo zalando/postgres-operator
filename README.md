@@ -233,6 +233,10 @@ As a preventive measure, one can restrict the minimum and the maximum number of 
 If either `min_instances` or `max_instances` is set to a non-zero value, the operator may adjust the number of instances specified in the cluster manifest to match either the min or the max boundary.
 For instance, of a cluster manifest has 1 instance and the min_instances is set to 3, the cluster will be created with 3 instances. By default, both parameters are set to -1.
 
+### Load balancers 
+
+For any Postgresql/Spilo cluster an operator creates two separate k8s services: one for the master pod and one for replica pods. To expose these services to an outer network, one can attach load balancers to them by setting `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the cluster manifest. In the case any of these variables is omitted from the manifest, the operator configmap's settings `enable_master_load_balancer` and `enable_replica_load_balancer` apply. Note that the operator settings affect all Postgresql services running in a namespace watched by the operator.
+
 # Setup development environment
 
 The following steps guide you through the setup to work on the operator itself.
