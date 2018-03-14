@@ -96,18 +96,18 @@ type PostgresSpec struct {
 	TeamID              string   `json:"teamId"`
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 	DockerImage         string   `json:"dockerImage,omitempty"`
-	// EnableLoadBalancer  is a pointer, since it is important to know if that parameters is omitted from the Postgres manifest
-	// in that case UseLoadBalancer == nil and the value is taken from the operator config
-	UseLoadBalancer *bool `json:"useLoadBalancer,omitempty"`
-	// if ReplicaLoadBalancer == nil (is unset), value of UseLoadBalancer determines if a balancer for replicas is created
-	ReplicaLoadBalancer *bool                `json:"replicaLoadBalancer,omitempty"`
-	NumberOfInstances   int32                `json:"numberOfInstances"`
-	Users               map[string]UserFlags `json:"users"`
-	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone               CloneDescription     `json:"clone"`
-	ClusterName         string               `json:"-"`
-	Databases           map[string]string    `json:"databases,omitempty"`
-	Tolerations         []v1.Toleration      `json:"tolerations,omitempty"`
+	// EnableMasterLoadBalancer  is a pointer, since it is important to know if that parameters is omitted from the Postgres manifest
+	// in that case EnableMasterLoadBalancer == nil and the value is taken from the operator config
+	EnableMasterLoadBalancer *bool `json:"enableMasterLoadBalancer,omitempty"`
+	// if EnableReplicaLoadBalancer == nil (is unset), value of UseLoadBalancer determines if a balancer for replicas is created
+	EnableReplicaLoadBalancer *bool                `json:"enableReplicaLoadBalancer,omitempty"`
+	NumberOfInstances         int32                `json:"numberOfInstances"`
+	Users                     map[string]UserFlags `json:"users"`
+	MaintenanceWindows        []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+	Clone                     CloneDescription     `json:"clone"`
+	ClusterName               string               `json:"-"`
+	Databases                 map[string]string    `json:"databases,omitempty"`
+	Tolerations               []v1.Toleration      `json:"tolerations,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.

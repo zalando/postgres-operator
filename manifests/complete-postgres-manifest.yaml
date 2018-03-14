@@ -12,8 +12,9 @@ spec:
     zalando:
     - superuser
     - createdb
-  useLoadBalancer: true
-  allowedSourceRanges: #Load balancer source ranges
+  enableMasterLoadBalancer: true
+  # enableReplicaLoadBalancer: true # uncomment to enable a LB for a replica k8s service
+  allowedSourceRanges: # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
     foo: zalando
