@@ -36,7 +36,8 @@ data:
   team_admin_role: "admin"
   teams_api_url: http://fake-teams-api.default.svc.cluster.local
   workers: "4"
-  enable_load_balancer: "true"
+  enable_master_load_balancer: "true"
+  # enable_replica_load_balancer: "true"
   api_port: "8080"
   ring_log_lines: "100"
   cluster_history_entries: "1000"

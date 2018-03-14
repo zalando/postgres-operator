@@ -679,7 +679,7 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *sp
 	// create a load balancer for the master service if either Postgres or operator manifests tell to do so
 	// if ReplicaLoadBalancer is unset and LB for master service is created, also create a balancer for replicas
 	return (spec.EnableMasterLoadBalancer != nil && *spec.EnableMasterLoadBalancer) ||
-		(spec.EnableMasterLoadBalancer == nil && c.OpConfig.EnableLoadBalancer)
+		(spec.EnableMasterLoadBalancer == nil && c.OpConfig.EnableMasterLoadBalancer)
 
 }
 
