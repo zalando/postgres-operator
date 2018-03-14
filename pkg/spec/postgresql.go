@@ -96,10 +96,9 @@ type PostgresSpec struct {
 	TeamID              string   `json:"teamId"`
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 	DockerImage         string   `json:"dockerImage,omitempty"`
-	// EnableMasterLoadBalancer  is a pointer, since it is important to know if that parameters is omitted from the Postgres manifest
-	// in that case EnableMasterLoadBalancer == nil and the value is taken from the operator config
-	EnableMasterLoadBalancer *bool `json:"enableMasterLoadBalancer,omitempty"`
-	// if EnableReplicaLoadBalancer == nil (is unset), value of UseLoadBalancer determines if a balancer for replicas is created
+	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
+	// in that case the var evaluates to nil and the value is taken from the operator config
+	EnableMasterLoadBalancer  *bool                `json:"enableMasterLoadBalancer,omitempty"`
 	EnableReplicaLoadBalancer *bool                `json:"enableReplicaLoadBalancer,omitempty"`
 	NumberOfInstances         int32                `json:"numberOfInstances"`
 	Users                     map[string]UserFlags `json:"users"`

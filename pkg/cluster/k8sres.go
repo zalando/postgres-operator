@@ -671,15 +671,27 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 
 func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *spec.PostgresSpec) bool {
 
-	// handle LB for the replica service separately if ReplicaLoadBalancer is set in the Postgres manifest
-	if role == Replica && spec.EnableReplicaLoadBalancer != nil {
-		return *spec.EnableReplicaLoadBalancer
-	}
+	switch role {
 
-	// create a load balancer for the master service if either Postgres or operator manifests tell to do so
-	// if ReplicaLoadBalancer is unset and LB for master service is created, also create a balancer for replicas
-	return (spec.EnableMasterLoadBalancer != nil && *spec.EnableMasterLoadBalancer) ||
-		(spec.EnableMasterLoadBalancer == nil && c.OpConfig.EnableMasterLoadBalancer)
+	case Replica:
+
+		// if the value is explicitly set in a Postgresql manifest, follow this setting
+		if spec.EnableReplicaLoadBalancer != nil {
+			return *spec.EnableReplicaLoadBalancer
+		}
+		// otherwise, follow the operator configuration
+		return c.OpConfig.EnableReplicaLoadBalancer
+
+	case Master:
+
+		if spec.EnableMasterLoadBalancer != nil {
+			return *spec.EnableMasterLoadBalancer
+		}
+		return c.OpConfig.EnableMasterLoadBalancer
+
+	default:
+		panic(fmt.Sprintf("Unknown role %v", role))
+	}
 
 }
 
