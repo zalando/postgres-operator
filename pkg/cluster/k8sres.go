@@ -7,6 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
@@ -238,6 +239,9 @@ PatroniInitDBParams:
 
 func (c *Cluster) nodeAffinity() *v1.Affinity {
 	matchExpressions := make([]v1.NodeSelectorRequirement, 0)
+	if len(c.OpConfig.NodeReadinessLabel) == 0 {
+		return nil
+	}
 	for k, v := range c.OpConfig.NodeReadinessLabel {
 		matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
 			Key:      k,
@@ -271,12 +275,13 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 				Effect:   v1.TaintEffect(podToleration["effect"]),
 			},
 		}
-	} else {
-		return []v1.Toleration{}
 	}
+
+	return []v1.Toleration{}
 }
 
 func (c *Cluster) generatePodTemplate(
+	uid types.UID,
 	resourceRequirements *v1.ResourceRequirements,
 	resourceRequirementsScalyrSidecar *v1.ResourceRequirements,
 	tolerationsSpec *[]v1.Toleration,
@@ -355,9 +360,10 @@ func (c *Cluster) generatePodTemplate(
 	}
 	if c.OpConfig.WALES3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getWALBucketScopeSuffix(string(uid))})
 	}
 
-	if c.OpConfig.EtcdHost == "" {
+	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
 	} else {
 		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
@@ -370,7 +376,7 @@ func (c *Cluster) generatePodTemplate(
 	var names []string
 	// handle environment variables from the PodEnvironmentConfigMap. We don't use envSource here as it is impossible
 	// to track any changes to the object envSource points to. In order to emulate the envSource behavior, however, we
-	// need to make sure that PodConfigMap variables doesn't override those we set explicitely from the configuration
+	// need to make sure that PodConfigMap variables doesn't override those we set explicitly from the configuration
 	// parameters
 	envVarsMap := make(map[string]string)
 	for _, envVar := range envVars {
@@ -431,8 +437,11 @@ func (c *Cluster) generatePodTemplate(
 		ServiceAccountName:            c.OpConfig.ServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
-		Affinity:                      c.nodeAffinity(),
 		Tolerations:                   c.tolerations(tolerationsSpec),
+	}
+
+	if affinity := c.nodeAffinity(); affinity != nil {
+		podSpec.Affinity = affinity
 	}
 
 	if c.OpConfig.ScalyrAPIKey != "" && c.OpConfig.ScalyrImage != "" {
@@ -482,7 +491,7 @@ func (c *Cluster) generatePodTemplate(
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    c.labelsSet(),
+			Labels:    c.labelsSet(true),
 			Namespace: c.Namespace,
 		},
 		Spec: podSpec,
@@ -492,6 +501,13 @@ func (c *Cluster) generatePodTemplate(
 	}
 
 	return &template
+}
+
+func getWALBucketScopeSuffix(uid string) string {
+	if uid != "" {
+		return fmt.Sprintf("/%s", uid)
+	}
+	return ""
 }
 
 func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) spec.Resources {
@@ -531,7 +547,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			customPodEnvVars = cm.Data
 		}
 	}
-	podTemplate := c.generatePodTemplate(resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
+	podTemplate := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
@@ -543,7 +559,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.statefulSetName(),
 			Namespace: c.Namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.labelsSet(true),
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -630,14 +646,19 @@ func (c *Cluster) generateUserSecrets() (secrets map[string]*v1.Secret) {
 func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {
 	//Skip users with no password i.e. human users (they'll be authenticated using pam)
 	if pgUser.Password == "" {
+		if pgUser.Origin != spec.RoleOriginTeamsAPI {
+			c.logger.Warningf("could not generate secret for a non-teamsAPI role %q: role has no password",
+				pgUser.Name)
+		}
 		return nil
 	}
+
 	username := pgUser.Name
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.credentialSecretName(username),
 			Namespace: namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.labelsSet(true),
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -751,6 +772,8 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getWALBucketScopeSuffix(description.Uid)})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	return result
@@ -763,7 +786,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.podDisruptionBudgetName(),
 			Namespace: c.Namespace,
-			Labels:    c.labelsSet(),
+			Labels:    c.labelsSet(true),
 		},
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -13,6 +14,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
@@ -96,9 +98,8 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	if configMapData["namespace"] == "" { // Namespace in ConfigMap has priority over env var
-		configMapData["namespace"] = c.config.Namespace
-	}
+	configMapData["watched_namespace"] = c.getEffectiveNamespace(os.Getenv("WATCHED_NAMESPACE"), configMapData["watched_namespace"])
+
 	if c.config.NoDatabaseAccess {
 		configMapData["enable_database_access"] = "false"
 	}
@@ -107,11 +108,17 @@ func (c *Controller) initOperatorConfig() {
 	}
 
 	c.opConfig = config.NewFromMap(configMapData)
+
+	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
+	if scalyrAPIKey != "" {
+		c.opConfig.ScalyrAPIKey = scalyrAPIKey
+	}
 }
 
 func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
+
 	c.initSharedInformers()
 
 	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
@@ -240,4 +247,26 @@ func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGrou
 	defer wg.Done()
 
 	c.nodesInformer.Run(stopCh)
+}
+
+func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFromConfigMap string) string {
+
+	namespace := util.Coalesce(namespaceFromEnvironment, util.Coalesce(namespaceFromConfigMap, spec.GetOperatorNamespace()))
+
+	if namespace == "*" {
+
+		namespace = v1.NamespaceAll
+		c.logger.Infof("Listening to all namespaces")
+
+	} else {
+
+		if _, err := c.KubeClient.Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+			c.logger.Fatalf("Could not find the watched namespace %q", namespace)
+		} else {
+			c.logger.Infof("Listenting to the specific namespace %q", namespace)
+		}
+
+	}
+
+	return namespace
 }

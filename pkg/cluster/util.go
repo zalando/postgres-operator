@@ -28,7 +28,7 @@ type OAuthTokenGetter interface {
 	getOAuthToken() (string, error)
 }
 
-// OAuthTokenGetter enables fetching OAuth tokens by reading Kubernetes secrets
+// SecretOauthTokenGetter enables fetching OAuth tokens by reading Kubernetes secrets
 type SecretOauthTokenGetter struct {
 	kubeClient           *k8sutil.KubernetesClient
 	OAuthTokenSecretName spec.NamespacedName
@@ -223,7 +223,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRole) error {
+func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
@@ -232,13 +232,13 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, role *PostgresRo
 
 			if role == nil {
 				if podRole == Master || podRole == Replica {
-					return nil
+					return podEvent.CurPod, nil
 				}
 			} else if *role == podRole {
-				return nil
+				return podEvent.CurPod, nil
 			}
 		case <-timeout:
-			return fmt.Errorf("pod label wait timeout")
+			return nil, fmt.Errorf("pod label wait timeout")
 		}
 	}
 }
@@ -261,7 +261,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 	return retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
 			listOptions := metav1.ListOptions{
-				LabelSelector: c.labelsSet().String(),
+				LabelSelector: c.labelsSet(false).String(),
 			}
 			ss, err := c.KubeClient.StatefulSets(c.Namespace).List(listOptions)
 			if err != nil {
@@ -277,7 +277,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 }
 
 func (c *Cluster) waitPodLabelsReady() error {
-	ls := c.labelsSet()
+	ls := c.labelsSet(false)
 	namespace := c.Namespace
 
 	listOptions := metav1.ListOptions{
@@ -313,14 +313,11 @@ func (c *Cluster) waitPodLabelsReady() error {
 				return false, fmt.Errorf("too many masters")
 			}
 			if len(replicaPods.Items) == podsNumber {
-				c.masterLess = true
 				return true, nil
 			}
 
 			return len(masterPods.Items)+len(replicaPods.Items) == podsNumber, nil
 		})
-
-	//TODO: wait for master for a while and then set masterLess flag
 
 	return err
 }
@@ -340,18 +337,26 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 	return nil
 }
 
-func (c *Cluster) labelsSet() labels.Set {
+// Returns labels used to create or list k8s objects such as pods
+// For backward compatability, shouldAddExtraLabels must be false
+// when listing k8s objects. See operator PR #252
+func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 	lbls := make(map[string]string)
 	for k, v := range c.OpConfig.ClusterLabels {
 		lbls[k] = v
 	}
 	lbls[c.OpConfig.ClusterNameLabel] = c.Name
 
+	if shouldAddExtraLabels {
+		// enables filtering resources owned by a team
+		lbls["team"] = c.Postgresql.Spec.TeamID
+	}
+
 	return labels.Set(lbls)
 }
 
 func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
-	lbls := c.labelsSet()
+	lbls := c.labelsSet(false)
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
 	return lbls
 }
@@ -416,4 +421,8 @@ func (c *Cluster) GetSpec() (*spec.Postgresql, error) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
 	return cloneSpec(&c.Postgresql)
+}
+
+func (c *Cluster) patroniUsesKubernetes() bool {
+	return c.OpConfig.EtcdHost == ""
 }

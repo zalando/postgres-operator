@@ -12,12 +12,15 @@ spec:
       serviceAccountName: operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:c17aabb
+        image: registry.opensource.zalan.do/acid/postgres-operator:0f392c2
         imagePullPolicy: IfNotPresent
         env:
-        - name: WATCH_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+        # uncomment to overwrite a similar setting from operator configmap
+        # if set to the empty string, watch the operator's own namespace
+        # if set to the "*", listen to all namespaces
+        # - name: WATCHED_NAMESPACE
+        #  valueFrom:
+        #    fieldRef:
+        #      fieldPath: metadata.namespace
         - name: CONFIG_MAP_NAME
           value: "postgres-operator"

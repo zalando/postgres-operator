@@ -1,33 +1,55 @@
-build_steps:
-    - desc: 'Install required build software'
-      cmd: |
-        apt-get install -y make git apt-transport-https ca-certificates curl
-    - desc: 'Install go'
-      cmd: |
-        cd /tmp
-        wget -q https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz -O go.tar.gz
-        tar -xf go.tar.gz
-        mv go /usr/local
-        ln -s /usr/local/go/bin/go /usr/bin/go
-        go version
-    - desc: 'Install Docker'
-      cmd: |
-        curl -sSL https://get.docker.com/ | sh
-    - desc: 'Symlink sources into the GOPATH'
-      cmd: |
-        export GOPATH=$HOME/go
-        export OPERATOR_TOP_DIR=$GOPATH/src/github.com/zalando-incubator
-        mkdir -p $OPERATOR_TOP_DIR
-        ln -s $(pwd) $OPERATOR_TOP_DIR/postgres-operator
-    - desc: 'Build & push docker image'
-      cmd: |
-        export PATH=$PATH:$HOME/go/bin
-        IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
-        if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
-        then
-          IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
-        else
-          IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
-        fi
-        export IMAGE
-        make tools deps docker push
+version: "2017-09-20"
+pipeline:
+    - id: build-postgres-operator
+      type: script
+      env:
+        GOPATH: /root/go
+        OPERATOR_TOP_DIR: /root/go/src/github.com/zalando-incubator
+      commands:
+        - desc: 'Install required build software'
+          cmd: |
+            apt-get install -y make git apt-transport-https ca-certificates curl
+        - desc: 'Install go'
+          cmd: |
+            cd /tmp
+            wget -q https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz -O go.tar.gz
+            tar -xf go.tar.gz
+            mv go /usr/local
+            ln -s /usr/local/go/bin/go /usr/bin/go
+            go version
+        - desc: 'Install Docker'
+          cmd: |
+            curl -sSL https://get.docker.com/ | sh
+        - desc: 'Symlink sources into the GOPATH'
+          cmd: |
+            mkdir -p $OPERATOR_TOP_DIR
+            ln -s $(pwd) $OPERATOR_TOP_DIR/postgres-operator
+        - desc: 'Build docker image'
+          cmd: |
+            export PATH=$PATH:$HOME/go/bin
+            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
+            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
+            then
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+            else
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
+            fi
+            export IMAGE
+            make tools deps docker
+        - desc: 'Run unit tests'
+          cmd: |
+            export PATH=$PATH:$HOME/go/bin
+            cd $OPERATOR_TOP_DIR/postgres-operator
+            go test ./...
+        - desc: 'Push docker image'
+          cmd: |
+            export PATH=$PATH:$HOME/go/bin
+            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
+            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
+            then
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+            else
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
+            fi
+            export IMAGE
+            make push

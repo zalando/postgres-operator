@@ -31,9 +31,10 @@ import (
 )
 
 var (
-	alphaNumericRegexp = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
-	databaseNameRegexp = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
-	userRegexp         = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
+	alphaNumericRegexp    = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
+	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
+	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
+	patroniObjectSuffixes = []string{"config", "failover", "sync"}
 )
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
@@ -66,7 +67,6 @@ type Cluster struct {
 	podSubscribersMu sync.RWMutex
 	pgDb             *sql.DB
 	mu               sync.Mutex
-	masterLess       bool
 	userSyncStrategy spec.UserSyncer
 	deleteOptions    *metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
@@ -109,7 +109,6 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		masterLess:       false,
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
@@ -125,6 +124,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 
 func (c *Cluster) clusterName() spec.NamespacedName {
 	return util.NameFromMeta(c.ObjectMeta)
+}
+
+func (c *Cluster) clusterNamespace() string {
+	return c.ObjectMeta.Namespace
 }
 
 func (c *Cluster) teamName() string {
@@ -272,7 +275,8 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pods are ready")
 
-	if !(c.masterLess || c.databaseAccessDisabled()) {
+	// create database objects unless we are running without pods or disabled that feature explicitely
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
@@ -282,10 +286,6 @@ func (c *Cluster) Create() error {
 			return fmt.Errorf("could not sync databases: %v", err)
 		}
 		c.logger.Infof("databases have been successfully created")
-	} else {
-		if c.masterLess {
-			c.logger.Warnln("cluster is masterless")
-		}
 	}
 
 	if err := c.listResources(); err != nil {
@@ -309,29 +309,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
 	} else {
-		for index, container1 := range c.Statefulset.Spec.Template.Spec.Containers {
-			container2 := statefulSet.Spec.Template.Spec.Containers[index]
-			if container1.Image != container2.Image {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d image doesn't match the current one", index))
-			}
-			if !reflect.DeepEqual(container1.Ports, container2.Ports) {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d ports don't match the current one", index))
-			}
-			if !compareResources(&container1.Resources, &container2.Resources) {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d resources don't match the current ones", index))
-			}
-			if !reflect.DeepEqual(container1.Env, container2.Env) {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d environment doesn't match the current one", index))
-			}
-			if !reflect.DeepEqual(container1.EnvFrom, container2.EnvFrom) {
-				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf("new statefulset's container %d environment sources don't match the current one", index))
-			}
-		}
+		needsRollUpdate, reasons = c.compareContainers(c.Statefulset, statefulSet)
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
@@ -397,6 +375,52 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 
 	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
+}
+
+type ContainerCondition func(a, b v1.Container) bool
+
+type ContainerCheck struct {
+	condition ContainerCondition
+	reason    string
+}
+
+func NewCheck(msg string, cond ContainerCondition) ContainerCheck {
+	return ContainerCheck{reason: msg, condition: cond}
+}
+
+// compareContainers: compare containers from two stateful sets
+// and return:
+// * whether or not roll update is needed
+// * a list of reasons in a human readable format
+func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
+	reasons := make([]string, 0)
+	needsRollUpdate := false
+	checks := []ContainerCheck{
+		NewCheck("new statefulset's container %d name doesn't match the current one",
+			func(a, b v1.Container) bool { return a.Name != b.Name }),
+		NewCheck("new statefulset's container %d image doesn't match the current one",
+			func(a, b v1.Container) bool { return a.Image != b.Image }),
+		NewCheck("new statefulset's container %d ports don't match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
+		NewCheck("new statefulset's container %d resources don't match the current ones",
+			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
+		NewCheck("new statefulset's container %d environment doesn't match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
+		NewCheck("new statefulset's container %d environment sources don't match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
+	}
+
+	for index, containerA := range setA.Spec.Template.Spec.Containers {
+		containerB := setB.Spec.Template.Spec.Containers[index]
+		for _, check := range checks {
+			if check.condition(containerA, containerB) {
+				needsRollUpdate = true
+				reasons = append(reasons, fmt.Sprintf(check.reason, index))
+			}
+		}
+	}
+
+	return needsRollUpdate, reasons
 }
 
 func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (equal bool) {
@@ -479,14 +503,6 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 			c.logger.Errorf("could not sync secrets: %v", err)
 			updateFailed = true
 		}
-
-		if !c.databaseAccessDisabled() {
-			c.logger.Debugf("syncing roles")
-			if err := c.syncRoles(); err != nil {
-				c.logger.Errorf("could not sync roles: %v", err)
-				updateFailed = true
-			}
-		}
 	}
 
 	// Volume
@@ -526,12 +542,19 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 		}
 	}()
 
-	// Databases
-	if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
-		c.logger.Infof("syncing databases")
-		if err := c.syncDatabases(); err != nil {
-			c.logger.Errorf("could not sync databases: %v", err)
+	// Roles and Databases
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
+		c.logger.Debugf("syncing roles")
+		if err := c.syncRoles(); err != nil {
+			c.logger.Errorf("could not sync roles: %v", err)
 			updateFailed = true
+		}
+		if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
+			c.logger.Infof("syncing databases")
+			if err := c.syncDatabases(); err != nil {
+				c.logger.Errorf("could not sync databases: %v", err)
+				updateFailed = true
+			}
 		}
 	}
 
@@ -577,6 +600,10 @@ func (c *Cluster) Delete() error {
 		if err := c.deleteService(role); err != nil {
 			return fmt.Errorf("could not delete %s service: %v", role, err)
 		}
+	}
+
+	if err := c.deletePatroniClusterObjects(); err != nil {
+		return fmt.Errorf("could not remove leftover patroni objects; %v", err)
 	}
 
 	return nil
@@ -813,9 +840,11 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 
 		role := Master
 
+		_, err := c.waitForPodLabel(ch, &role)
+
 		select {
 		case <-stopCh:
-		case podLabelErr <- c.waitForPodLabel(ch, &role):
+		case podLabelErr <- err:
 		}
 	}()
 
@@ -847,4 +876,74 @@ func (c *Cluster) Unlock() {
 func (c *Cluster) shouldDeleteSecret(secret *v1.Secret) (delete bool, userName string) {
 	secretUser := string(secret.Data["username"])
 	return (secretUser != c.OpConfig.ReplicationUsername && secretUser != c.OpConfig.SuperUsername), secretUser
+}
+
+type simpleActionWithResult func() error
+
+type ClusterObjectGet func(name string) (spec.NamespacedName, error)
+
+type ClusterObjectDelete func(name string) error
+
+func (c *Cluster) deletePatroniClusterObjects() error {
+	// TODO: figure out how to remove leftover patroni objects in other cases
+	if !c.patroniUsesKubernetes() {
+		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
+	}
+	c.logger.Debugf("removing leftover Patroni objects (endpoints or configmaps)")
+	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterConfigMaps} {
+		if err := deleter(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Cluster) deleteClusterObject(
+	get ClusterObjectGet,
+	del ClusterObjectDelete,
+	objType string) error {
+	for _, suffix := range patroniObjectSuffixes {
+		name := fmt.Sprintf("%s-%s", c.Name, suffix)
+
+		if namespacedName, err := get(name); err == nil {
+			c.logger.Debugf("deleting Patroni cluster object %q with name %q",
+				objType, namespacedName)
+
+			if err = del(name); err != nil {
+				return fmt.Errorf("could not Patroni delete cluster object %q with name %q: %v",
+					objType, namespacedName, err)
+			}
+
+		} else if !k8sutil.ResourceNotFound(err) {
+			return fmt.Errorf("could not fetch Patroni Endpoint %q: %v",
+				namespacedName, err)
+		}
+	}
+	return nil
+}
+
+func (c *Cluster) deletePatroniClusterEndpoints() error {
+	get := func(name string) (spec.NamespacedName, error) {
+		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(name, metav1.GetOptions{})
+		return util.NameFromMeta(ep.ObjectMeta), err
+	}
+
+	delete := func(name string) error {
+		return c.KubeClient.Endpoints(c.Namespace).Delete(name, c.deleteOptions)
+	}
+
+	return c.deleteClusterObject(get, delete, "endpoint")
+}
+
+func (c *Cluster) deletePatroniClusterConfigMaps() error {
+	get := func(name string) (spec.NamespacedName, error) {
+		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(name, metav1.GetOptions{})
+		return util.NameFromMeta(cm.ObjectMeta), err
+	}
+
+	delete := func(name string) error {
+		return c.KubeClient.ConfigMaps(c.Namespace).Delete(name, c.deleteOptions)
+	}
+
+	return c.deleteClusterObject(get, delete, "configmap")
 }
