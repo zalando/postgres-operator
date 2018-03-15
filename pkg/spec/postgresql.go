@@ -224,7 +224,6 @@ type postgresqlCopy Postgresql
 
 // UnmarshalJSON converts a JSON into the PostgreSQL object.
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
-	fmt.Printf("unmarshaling %s\n", string(data))
 	var tmp postgresqlCopy
 
 	err := json.Unmarshal(data, &tmp)

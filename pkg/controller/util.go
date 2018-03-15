@@ -143,7 +143,7 @@ Users:
 				case "inrole":
 					t.MemberOf = append(t.MemberOf, s)
 				default:
-					c.logger.Warningf("unkonwn key %q", p)
+					c.logger.Warningf("unknown key %q", p)
 				}
 			}
 			delete(secretData, key)
@@ -176,8 +176,11 @@ Users:
 			}
 		}
 		if len(secretData) > 0 {
-			c.logger.Warningf("%d unprocessed entries in the infrastructure roles' secret", len(secretData))
-			c.logger.Info(`infrastructure role entries should be in the {key}{id} format, where {key} can be either of "user", "password", "inrole" and the {id} a monotonically increasing integer starting with 1`)
+			c.logger.Warningf("%d unprocessed entries in the infrastructure roles secret,"+
+				" checking configmap %v", len(secretData), rolesSecret.Name)
+			c.logger.Info(`infrastructure role entries should be in the {key}{id} format,` +
+				` where {key} can be either of "user", "password", "inrole" and the {id}` +
+				` a monotonically increasing integer starting with 1`)
 			c.logger.Debugf("unprocessed entries: %#v", secretData)
 		}
 	}
