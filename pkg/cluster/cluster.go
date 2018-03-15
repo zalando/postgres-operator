@@ -762,18 +762,25 @@ func (c *Cluster) initInfrastructureRoles() error {
 	return nil
 }
 
+// mergeRoleDefinitions: figure out which role from two have priority, and
+// return it (possibly with some modifications), taking into account following
+// rules:
+// * Human roles always win
+// * Infrastructure roles take precendence over the manifest roles
+// * If both two roles have RoleOriginSystem or RoleOriginTeamsAPI,
+//	 the last one (roleB) wins. It's necessary to be able to e.g. extend roles
+//	 flags as shown in cluster_test.go:TestInitHumanUsers
 func (c *Cluster) mergeRoleDefinitions(roleA, roleB *spec.PgUser) (*spec.PgUser, error) {
-	// human roles always win
-	// infrastructure roles take precendence over the manifest roles
 	if roleA.Name != roleB.Name {
 		return nil, fmt.Errorf("could not merge role %#v with role %#v: role names don't match")
 	}
 	for _, origin := range []spec.RoleOrigin{spec.RoleOriginSystem, spec.RoleOriginTeamsAPI} {
-		if roleA.Origin == origin {
-			return roleA, nil
-		}
+		// latter wins in case of the same origins
 		if roleB.Origin == origin {
 			return roleB, nil
+		}
+		if roleA.Origin == origin {
+			return roleA, nil
 		}
 	}
 	// one of the roles originates from the manifest, another one from the infrastructure roles

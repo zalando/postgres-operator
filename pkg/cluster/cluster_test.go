@@ -33,8 +33,8 @@ func TestInitRobotUsers(t *testing.T) {
 	}{
 		{
 			manifestUsers: map[string]spec.UserFlags{"foo": {"superuser", "createdb"}},
-			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginManifest, Name: "foo", Password: "bar"}},
-			result: map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginManifest,
+			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Password: "bar"}},
+			result: map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure,
 				Name: "foo", Password: "bar", Flags: []string{"CREATEDB", "LOGIN", "SUPERUSER"}}},
 			err: nil,
 		},
