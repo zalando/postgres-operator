@@ -154,35 +154,42 @@ Users:
 		}
 	}
 
-	if len(secretData) != 0 {
-		c.logger.Debugf("Extra data in the infrastructure role, checking configmap %v", rolesSecret.Name)
-		// perhaps we have some map entries with usernames, passwords, let's check if we have those users in the configmap
-		if infraRolesMap, err := c.KubeClient.ConfigMaps(rolesSecret.Namespace).Get(rolesSecret.Name, metav1.GetOptions{}); err == nil {
-			// we have a configmap with username - json description, let's read and decode it
-			for role, s := range infraRolesMap.Data {
-				if roleDescr, err := readDecodedRole(s); err != nil {
-					// check if we have a a password in a configmap
-					return nil, fmt.Errorf("could not decode role description: %v", err)
-				} else {
-					c.logger.Debugf("found role description for role %q: %+v", role, roleDescr)
-					if passwd, ok := secretData[role]; ok {
-						roleDescr.Password = string(passwd)
-						delete(secretData, role)
-					}
-					roleDescr.Name = role
-					roleDescr.Origin = spec.RoleOriginInfrastructure
-					result[role] = *roleDescr
+	// If there is no extra data, we're done
+	if len(secretData) == 0 {
+		return result, nil
+	}
+
+	// perhaps we have some map entries with usernames, passwords, let's
+	// check if we have those users in the configmap
+	c.logger.Debugf("Extra data in the infrastructure role, checking configmap %v", rolesSecret.Name)
+	configmaps := c.KubeClient.ConfigMaps(rolesSecret.Namespace)
+	if infraRolesMap, err := configmaps.Get(rolesSecret.Name, metav1.GetOptions{}); err == nil {
+		// we have a configmap with username - json description, let's read
+		// and decode it
+		for role, s := range infraRolesMap.Data {
+			if roleDescr, err := readDecodedRole(s); err != nil {
+				return nil, fmt.Errorf("could not decode role description: %v", err)
+			} else {
+				// check if we have a a password in a configmap
+				c.logger.Debugf("found role description for role %q: %+v", role, roleDescr)
+				if passwd, ok := secretData[role]; ok {
+					roleDescr.Password = string(passwd)
+					delete(secretData, role)
 				}
+				roleDescr.Name = role
+				roleDescr.Origin = spec.RoleOriginInfrastructure
+				result[role] = *roleDescr
 			}
 		}
-		if len(secretData) > 0 {
-			c.logger.Warningf("%d unprocessed entries in the infrastructure roles secret,"+
-				" checking configmap %v", len(secretData), rolesSecret.Name)
-			c.logger.Info(`infrastructure role entries should be in the {key}{id} format,` +
-				` where {key} can be either of "user", "password", "inrole" and the {id}` +
-				` a monotonically increasing integer starting with 1`)
-			c.logger.Debugf("unprocessed entries: %#v", secretData)
-		}
+	}
+
+	if len(secretData) > 0 {
+		c.logger.Warningf("%d unprocessed entries in the infrastructure roles secret,"+
+			" checking configmap %v", len(secretData), rolesSecret.Name)
+		c.logger.Info(`infrastructure role entries should be in the {key}{id} format,` +
+			` where {key} can be either of "user", "password", "inrole" and the {id}` +
+			` a monotonically increasing integer starting with 1`)
+		c.logger.Debugf("unprocessed entries: %#v", secretData)
 	}
 
 	return result, nil
