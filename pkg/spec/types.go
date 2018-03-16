@@ -75,9 +75,9 @@ type PgUser struct {
 	Origin     RoleOrigin        `yaml:"-"`
 	Name       string            `yaml:"-"`
 	Password   string            `yaml:"-"`
-	Flags      []string          `yaml:"options"`
+	Flags      []string          `yaml:"user_flags"`
 	MemberOf   []string          `yaml:"inrole"`
-	Parameters map[string]string `yaml:"parameters"`
+	Parameters map[string]string `yaml:"db_parameters"`
 }
 
 // PgUserMap maps user names to the definitions.

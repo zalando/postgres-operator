@@ -6,11 +6,11 @@ data:
   batman: |
     name: batman
     inrole: [role1, role2]
-    options:
+    user_flags:
       - superuser
       - login
-    parameters:
-      log_statements: all
+    db_parameters:
+      log_statement: all
   robin: |
     name: robin
     inrole:
