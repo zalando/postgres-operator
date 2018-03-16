@@ -96,17 +96,24 @@ type PostgresSpec struct {
 	TeamID              string   `json:"teamId"`
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 	DockerImage         string   `json:"dockerImage,omitempty"`
+
 	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
 	// in that case the var evaluates to nil and the value is taken from the operator config
-	EnableMasterLoadBalancer  *bool                `json:"enableMasterLoadBalancer,omitempty"`
-	EnableReplicaLoadBalancer *bool                `json:"enableReplicaLoadBalancer,omitempty"`
-	NumberOfInstances         int32                `json:"numberOfInstances"`
-	Users                     map[string]UserFlags `json:"users"`
-	MaintenanceWindows        []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone                     CloneDescription     `json:"clone"`
-	ClusterName               string               `json:"-"`
-	Databases                 map[string]string    `json:"databases,omitempty"`
-	Tolerations               []v1.Toleration      `json:"tolerations,omitempty"`
+	EnableMasterLoadBalancer  *bool `json:"enableMasterLoadBalancer,omitempty"`
+	EnableReplicaLoadBalancer *bool `json:"enableReplicaLoadBalancer,omitempty"`
+
+	// deprecated load balancer settings mantained for backward compatibility
+	// see "Load balancers" operator docs (PR #258)
+	UseLoadBalancer     *bool `json:"useLoadBalancer,omitempty"`
+	ReplicaLoadBalancer *bool `json:"replicaLoadBalancer,omitempty"`
+
+	NumberOfInstances  int32                `json:"numberOfInstances"`
+	Users              map[string]UserFlags `json:"users"`
+	MaintenanceWindows []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+	Clone              CloneDescription     `json:"clone"`
+	ClusterName        string               `json:"-"`
+	Databases          map[string]string    `json:"databases,omitempty"`
+	Tolerations        []v1.Toleration      `json:"tolerations,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.

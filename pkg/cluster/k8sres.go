@@ -675,18 +675,31 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *sp
 
 	case Replica:
 
+		// deprecated option takes priority for backward compatibility
+		if spec.ReplicaLoadBalancer != nil {
+			c.logger.Debugf("The Postgres manifest for the cluster %v sets the deprecated `replicaLoadBalancer` param. Consider using the `enableReplicaLoadBalancer` instead.", c.Name)
+			return *spec.ReplicaLoadBalancer
+		}
+
 		// if the value is explicitly set in a Postgresql manifest, follow this setting
 		if spec.EnableReplicaLoadBalancer != nil {
 			return *spec.EnableReplicaLoadBalancer
 		}
+
 		// otherwise, follow the operator configuration
 		return c.OpConfig.EnableReplicaLoadBalancer
 
 	case Master:
 
+		if spec.UseLoadBalancer != nil {
+			c.logger.Debugf("The Postgres manifest for the cluster %v sets the deprecated `useLoadBalancer` param. Consider using the `enableMasterLoadBalancer` instead.", c.Name)
+			return *spec.UseLoadBalancer
+		}
+
 		if spec.EnableMasterLoadBalancer != nil {
 			return *spec.EnableMasterLoadBalancer
 		}
+
 		return c.OpConfig.EnableMasterLoadBalancer
 
 	default:
