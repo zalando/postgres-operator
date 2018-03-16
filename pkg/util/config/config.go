@@ -80,7 +80,7 @@ type Config struct {
 	EnableTeamsAPI            bool              `name:"enable_teams_api" default:"true"`
 	EnableTeamSuperuser       bool              `name:"enable_team_superuser" default:"false"`
 	TeamAdminRole             string            `name:"team_admin_role" default:"admin"`
-	EnableMasterLoadBalancer  bool              `name:"enable_master_load_balancer" default:"true"`
+	EnableMasterLoadBalancer  bool              `name:"enable_master_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer bool              `name:"enable_replica_load_balancer" default:"false"`
 	MasterDNSNameFormat       stringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat      stringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
