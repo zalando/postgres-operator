@@ -239,6 +239,8 @@ For any Postgresql/Spilo cluster an operator creates two separate k8s services: 
 
 For backward compatibility with already configured clusters we maintain in a cluster manifest older parameter names, namely `useLoadBalancer` for enabling the master service's load balancer and `replicaLoadBalancer` for the replica service. If set, these params take precedence over the newer `enableMasterLoadBalancer` and `enableReplicaLoadBalancer`. Note that in older versions of the operator (before PR #258) `replicaLoadBalancer` was responsible for both creating the replica service and attaching an LB to it; now the service is always created (since k8s service typically is free in the cloud setting), and this param only attaches an LB (that typically costs money).
 
+For the same reason of compatibility, we maintain the `enable_load_balancer` setting in the operator config map that was previously used to attach a LB to the master service. Its value is examined after the deprecated `useLoadBalancer` setting from the Postgresql manifest but before the recommended `enableMasterLoadBalancer`. There is no equivalent option for the replica service since the service used to be always created with a load balancer.
+
 # Setup development environment
 
 The following steps guide you through the setup to work on the operator itself.
