@@ -697,7 +697,7 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *sp
 		}
 
 		// `enable_load_balancer`` governs LB for a master service
-		// there is no equivalent operator configmap option for the replica LB
+		// there is no equivalent deprecated operator option for the replica LB
 		if c.OpConfig.EnableLoadBalancer != nil {
 			c.logger.Debugf("The operator configmap sets the deprecated `enable_load_balancer` param. Consider using the `enable_master_load_balancer` or `enable_replica_load_balancer` instead.", c.Name)
 			return *c.OpConfig.EnableLoadBalancer
@@ -736,7 +736,6 @@ func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v
 		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
 
-		// source ranges are the same for balancers for master and replica services
 		allowedSourceRanges := spec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {
 			sourceRanges = allowedSourceRanges
