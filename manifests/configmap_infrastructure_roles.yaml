@@ -5,11 +5,11 @@ metadata:
 data:
   batman: |
     name: batman
-    inrole: [role1, role2]
+    inrole: [role1, role2]  # following roles will be assigned to the new user
     user_flags:
       - superuser
       - login
-    db_parameters:
+    db_parameters:  # db parameters, applyed for this particular user
       log_statement: all
   robin: |
     name: robin
