@@ -772,7 +772,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 //	 flags as shown in cluster_test.go:TestInitHumanUsers
 func (c *Cluster) mergeRoleDefinitions(roleA, roleB *spec.PgUser) (*spec.PgUser, error) {
 	if roleA.Name != roleB.Name {
-		return nil, fmt.Errorf("could not merge role %#v with role %#v: role names don't match")
+		return nil, fmt.Errorf("could not merge role %#v with role %#v: role names don't match", *roleA, *roleB)
 	}
 	for _, origin := range []spec.RoleOrigin{spec.RoleOriginSystem, spec.RoleOriginTeamsAPI} {
 		// latter wins in case of the same origins
