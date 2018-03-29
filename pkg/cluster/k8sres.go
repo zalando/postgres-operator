@@ -669,6 +669,48 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
+func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *spec.PostgresSpec) bool {
+
+	switch role {
+
+	case Replica:
+
+		// deprecated option takes priority for backward compatibility
+		if spec.ReplicaLoadBalancer != nil {
+			c.logger.Debugf("The Postgres manifest for the cluster %v sets the deprecated `replicaLoadBalancer` param. Consider using the `enableReplicaLoadBalancer` instead.", c.Name)
+			return *spec.ReplicaLoadBalancer
+		}
+
+		// if the value is explicitly set in a Postgresql manifest, follow this setting
+		if spec.EnableReplicaLoadBalancer != nil {
+			return *spec.EnableReplicaLoadBalancer
+		}
+
+		// otherwise, follow the operator configuration
+		return c.OpConfig.EnableReplicaLoadBalancer
+
+	case Master:
+
+		if spec.UseLoadBalancer != nil {
+			c.logger.Debugf("The Postgres manifest for the cluster %v sets the deprecated `useLoadBalancer` param. Consider using the `enableMasterLoadBalancer` instead.", c.Name)
+			return *spec.UseLoadBalancer
+		}
+
+		// `enable_load_balancer`` governs LB for a master service
+		// there is no equivalent deprecated operator option for the replica LB
+		if c.OpConfig.EnableLoadBalancer != nil {
+			c.logger.Debugf("The operator configmap sets the deprecated `enable_load_balancer` param. Consider using the `enable_master_load_balancer` or `enable_replica_load_balancer` instead.", c.Name)
+			return *c.OpConfig.EnableLoadBalancer
+		}
+
+		return c.OpConfig.EnableMasterLoadBalancer
+
+	default:
+		panic(fmt.Sprintf("Unknown role %v", role))
+	}
+
+}
+
 func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v1.Service {
 	var dnsName string
 
@@ -689,12 +731,11 @@ func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v
 
 	var annotations map[string]string
 
-	// Examine the per-cluster load balancer setting, if it is not defined - check the operator configuration.
-	if (spec.UseLoadBalancer != nil && *spec.UseLoadBalancer) ||
-		(spec.UseLoadBalancer == nil && c.OpConfig.EnableLoadBalancer) {
+	if c.shouldCreateLoadBalancerForService(role, spec) {
 
 		// safe default value: lock load balancer to only local address unless overridden explicitly.
 		sourceRanges := []string{localHost}
+
 		allowedSourceRanges := spec.AllowedSourceRanges
 		if len(allowedSourceRanges) >= 0 {
 			sourceRanges = allowedSourceRanges
@@ -707,6 +748,10 @@ func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v
 			constants.ZalandoDNSNameAnnotation: dnsName,
 			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 		}
+	} else if role == Replica {
+		// before PR #258, the replica service was only created if allocated a LB
+		// now we always create the service but warn if the LB is absent
+		c.logger.Debugf("No load balancer created for the replica service")
 	}
 
 	service := &v1.Service{

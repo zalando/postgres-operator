@@ -6,6 +6,9 @@ pipeline:
         GOPATH: /root/go
         OPERATOR_TOP_DIR: /root/go/src/github.com/zalando-incubator
       commands:
+        - desc: 'Update'
+          cmd: |
+            apt-get update
         - desc: 'Install required build software'
           cmd: |
             apt-get install -y make git apt-transport-https ca-certificates curl

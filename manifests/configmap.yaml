@@ -37,7 +37,10 @@ data:
   team_admin_role: "admin"
   teams_api_url: http://fake-teams-api.default.svc.cluster.local
   workers: "4"
-  enable_load_balancer: "true"
+  # turn on/off load balancers for all Postgres clusters managed by the operator
+  # LB settings in cluster manifests take priority over these settings
+  enable_master_load_balancer: "true"
+  enable_replica_load_balancer: "false"
   api_port: "8080"
   ring_log_lines: "100"
   cluster_history_entries: "1000"

@@ -17,4 +17,4 @@ install:
   - make deps
 
 script:
-  - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -package ./cmd/... -v
+  - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -v
