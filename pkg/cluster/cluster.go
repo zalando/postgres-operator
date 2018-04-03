@@ -681,9 +681,10 @@ func (c *Cluster) initRobotUsers() error {
 			Flags:    flags,
 		}
 		if _, present := c.pgUsers[username]; present {
-			return c.resolveNameConflict(&newRole)
+			c.resolveNameConflict(&newRole)
+		} else {
+			c.pgUsers[username] = newRole
 		}
-		c.pgUsers[username] = newRole
 	}
 	return nil
 }
@@ -717,9 +718,10 @@ func (c *Cluster) initHumanUsers() error {
 		}
 
 		if _, present := c.pgUsers[username]; present {
-			return c.resolveNameConflict(&newRole)
+			c.resolveNameConflict(&newRole)
+		} else {
+			c.pgUsers[username] = newRole
 		}
-		c.pgUsers[username] = newRole
 	}
 
 	return nil
@@ -741,15 +743,16 @@ func (c *Cluster) initInfrastructureRoles() error {
 		newRole.Flags = flags
 
 		if _, present := c.pgUsers[username]; present {
-			return c.resolveNameConflict(&newRole)
+			c.resolveNameConflict(&newRole)
+		} else {
+			c.pgUsers[username] = newRole
 		}
-		c.pgUsers[username] = newRole
 	}
 	return nil
 }
 
 // resolves naming conflicts between existing and new roles by chosing either of them.
-func (c *Cluster) resolveNameConflict(newRole *spec.PgUser) error {
+func (c *Cluster) resolveNameConflict(newRole *spec.PgUser) {
 	username := newRole.Name
 	oldOrigin := c.pgUsers[username].Origin
 	if newRole.Origin > oldOrigin {
@@ -757,8 +760,6 @@ func (c *Cluster) resolveNameConflict(newRole *spec.PgUser) error {
 	}
 	c.logger.Debugf("resolved a conflict of role %q between %s and %s to %s",
 		username, newRole.Origin, oldOrigin, c.pgUsers[username].Origin)
-
-	return nil
 }
 
 func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) bool {
