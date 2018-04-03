@@ -32,12 +32,14 @@ const (
 	fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 )
 
+// RoleOrigin contains the code of the origin of a role
 type RoleOrigin int
 
+// The rolesOrigin constant values should be sorted by the role priority.
 const (
-	RoleOriginUnknown = iota
-	RoleOriginInfrastructure
+	RoleOriginUnknown RoleOrigin = iota
 	RoleOriginManifest
+	RoleOriginInfrastructure
 	RoleOriginTeamsAPI
 	RoleOriginSystem
 )
@@ -201,6 +203,20 @@ func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
 	*n = NamespacedName(name)
 
 	return nil
+}
+
+func (r RoleOrigin) String() string {
+	switch r {
+	case RoleOriginManifest:
+		return "manifest role"
+	case RoleOriginInfrastructure:
+		return "infrastructure role"
+	case RoleOriginTeamsAPI:
+		return "teams API role"
+	case RoleOriginSystem:
+		return "system role"
+	}
+	return "unknown"
 }
 
 // GetOperatorNamespace assumes serviceaccount secret is mounted by kubernetes

@@ -686,16 +686,10 @@ func (c *Cluster) initRobotUsers() error {
 			Password: util.RandomPassword(constants.PasswordLength),
 			Flags:    flags,
 		}
-		if _, present := c.pgUsers[username]; !present {
-			c.pgUsers[username] = newRole
-		} else {
-			user := c.pgUsers[username]
-			if mergeRole, err := c.mergeRoleDefinitions(&user, &newRole); err != nil {
-				return err
-			} else {
-				c.pgUsers[username] = *mergeRole
-			}
+		if _, present := c.pgUsers[username]; present {
+			return c.resolveNameConflict(&newRole)
 		}
+		c.pgUsers[username] = newRole
 	}
 	return nil
 }
@@ -729,69 +723,48 @@ func (c *Cluster) initHumanUsers() error {
 		}
 
 		if _, present := c.pgUsers[username]; present {
-			user := c.pgUsers[username]
-			if mergeRole, err := c.mergeRoleDefinitions(&user, &newRole); err != nil {
-				return err
-			} else {
-				c.pgUsers[username] = *mergeRole
-			}
-		} else {
-			c.pgUsers[username] = newRole
+			return c.resolveNameConflict(&newRole)
 		}
+		c.pgUsers[username] = newRole
 	}
 
 	return nil
 }
 
 func (c *Cluster) initInfrastructureRoles() error {
-	// add infrastucture roles from the operator's definition
-	for username, data := range c.InfrastructureRoles {
+	// add infrastructure roles from the operator's definition
+	for username, newRole := range c.InfrastructureRoles {
 		if !isValidUsername(username) {
 			return fmt.Errorf("invalid username: '%v'", username)
 		}
 		if c.shouldAvoidProtectedOrSystemRole(username, "infrastructure role") {
 			continue
 		}
-		flags, err := normalizeUserFlags(data.Flags)
+		flags, err := normalizeUserFlags(newRole.Flags)
 		if err != nil {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
-		data.Flags = flags
-		c.pgUsers[username] = data
+		newRole.Flags = flags
+
+		if _, present := c.pgUsers[username]; present {
+			return c.resolveNameConflict(&newRole)
+		}
+		c.pgUsers[username] = newRole
 	}
 	return nil
 }
 
-// mergeRoleDefinitions: figure out which role from two have priority, and
-// return it (possibly with some modifications), taking into account following
-// rules:
-// * Human roles always win
-// * Infrastructure roles take precendence over the manifest roles
-// * If both two roles have RoleOriginSystem or RoleOriginTeamsAPI,
-//	 the last one (roleB) wins. It's necessary to be able to e.g. extend roles
-//	 flags as shown in cluster_test.go:TestInitHumanUsers
-func (c *Cluster) mergeRoleDefinitions(roleA, roleB *spec.PgUser) (*spec.PgUser, error) {
-	if roleA.Name != roleB.Name {
-		return nil, fmt.Errorf("could not merge role %#v with role %#v: role names don't match", *roleA, *roleB)
+// resolves naming conflicts between existing and new roles by chosing either of them.
+func (c *Cluster) resolveNameConflict(newRole *spec.PgUser) error {
+	username := newRole.Name
+	oldOrigin := c.pgUsers[username].Origin
+	if newRole.Origin > oldOrigin {
+		c.pgUsers[username] = *newRole
 	}
-	for _, origin := range []spec.RoleOrigin{spec.RoleOriginSystem, spec.RoleOriginTeamsAPI} {
-		// latter wins in case of the same origins
-		if roleB.Origin == origin {
-			return roleB, nil
-		}
-		if roleA.Origin == origin {
-			return roleA, nil
-		}
-	}
-	// one of the roles originates from the manifest, another one from the infrastructure roles
-	if roleA.Origin == spec.RoleOriginInfrastructure {
-		roleA.Flags = roleB.Flags
-		return roleA, nil
-	} else if roleB.Origin == spec.RoleOriginInfrastructure {
-		roleB.Flags = roleA.Flags
-		return roleB, nil
-	}
-	return nil, fmt.Errorf("could not merge role %#v and role %#v: unexpected role types ", *roleA, *roleB)
+	c.logger.Debugf("resolved a conflict of role %q between %s and %s to %s",
+		username, newRole.Origin, oldOrigin, c.pgUsers[username].Origin)
+
+	return nil
 }
 
 func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) bool {

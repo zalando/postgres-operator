@@ -150,22 +150,17 @@ Users:
 		}
 
 		if t.Name != "" {
+			if t.Password == "" {
+				c.logger.Warningf("infrastructure role %q has no password defined and is ignored", t.Name)
+				continue
+			}
 			result[t.Name] = t
 		}
 	}
 
-	// If there is no extra data, we're done
-	if len(secretData) == 0 {
-		return result, nil
-	}
-
-	// perhaps we have some map entries with usernames, passwords, let's
-	// check if we have those users in the configmap
-	c.logger.Debugf("Extra data in the infrastructure role, checking configmap %v", rolesSecret.Name)
-	configmaps := c.KubeClient.ConfigMaps(rolesSecret.Namespace)
-	if infraRolesMap, err := configmaps.Get(rolesSecret.Name, metav1.GetOptions{}); err == nil {
-		// we have a configmap with username - json description, let's read
-		// and decode it
+	// perhaps we have some map entries with usernames, passwords, let's check if we have those users in the configmap
+	if infraRolesMap, err := c.KubeClient.ConfigMaps(rolesSecret.Namespace).Get(rolesSecret.Name, metav1.GetOptions{}); err == nil {
+		// we have a configmap with username - json description, let's read and decode it
 		for role, s := range infraRolesMap.Data {
 			if roleDescr, err := readDecodedRole(s); err != nil {
 				return nil, fmt.Errorf("could not decode role description: %v", err)
@@ -175,6 +170,9 @@ Users:
 				if passwd, ok := secretData[role]; ok {
 					roleDescr.Password = string(passwd)
 					delete(secretData, role)
+				} else {
+					c.logger.Warningf("infrastructure role %q has no password defined and is ignored", role)
+					continue
 				}
 				roleDescr.Name = role
 				roleDescr.Origin = spec.RoleOriginInfrastructure
