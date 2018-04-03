@@ -331,7 +331,15 @@ In the next sessions we will cover those use cases in more details
 Manifest roles are defined directly in the cluster manifest. See [minimal postgres manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml) for an example of `zalando` role, defined with `superuser` and `createdb` flags.
 
 Manifest roles are defined as a dictionary, with role name as a key and a list of role options. For a role without any options supply an empty list.
-You can find a list of possible  
+The following options are accepted by the operator:  `superuser`, `inherit`, `login`, `nologin`, `createrole`, `createdb`, `replication`, `bypassrls`
+
+By default manifest roles are login roles (aka users), unless `nologin` is specified explicitely.
+
+The operator automatically generates a password for each manifest role and places it in the secret named
+`{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do` in the same namespace as the cluster.
+This way, the application running in the Kubernetes cluster and working with the database can obtain the password right from the secret, without ever sharing it outside of the cluster.  
+
+At the moment it is not possible to specify other roles the particular manifest role is a member of.
 
 
 ### Debugging the operator itself
