@@ -331,6 +331,7 @@ In the next sessions we will cover those use cases in more details
 Manifest roles are defined directly in the cluster manifest. See [minimal postgres manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml) for an example of `zalando` role, defined with `superuser` and `createdb` flags.
 
 Manifest roles are defined as a dictionary, with role name as a key and a list of role options. For a role without any options supply an empty list.
+
 The following options are accepted by the operator:  `superuser`, `inherit`, `login`, `nologin`, `createrole`, `createdb`, `replication`, `bypassrls`
 
 By default manifest roles are login roles (aka users), unless `nologin` is specified explicitely.
