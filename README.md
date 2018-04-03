@@ -316,6 +316,24 @@ By default is set to *"log_statement:all"*. See [PostgreSQL documentation on ALT
 The default value is `admin`. Operator will also disallow superuser and replication roles to be redefined.
 
 
+### Defining database roles in the operator
+
+Postgres operator allows to define roles to be created in the resulting database cluster. It covers three use-cases:
+
+* create application roles specific to the cluster described in the manifest: `manifest roles`
+* create application roles that should be automatically created on every cluster managed by the operator: `infrastructure roles`
+* automatically create users for every member of the team owning the database cluster: `teams API roles`
+
+In the next sessions we will cover those use cases in more details
+
+#### Manifest roles
+
+Manifest roles are defined directly in the cluster manifest. See [minimal postgres manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml) for an example of `zalando` role, defined with `superuser` and `createdb` flags.
+
+Manifest roles are defined as a dictionary, with role name as a key and a list of role options. For a role without any options supply an empty list.
+You can find a list of possible  
+
+
 ### Debugging the operator itself
 
 There is a web interface in the operator to observe its internal state. The operator listens on port 8080. It is possible to expose it to the localhost:8080 by doing:

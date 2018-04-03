@@ -680,8 +680,8 @@ func (c *Cluster) initRobotUsers() error {
 			Password: util.RandomPassword(constants.PasswordLength),
 			Flags:    flags,
 		}
-		if _, present := c.pgUsers[username]; present {
-			c.resolveNameConflict(&newRole)
+		if currentRole, present := c.pgUsers[username]; present {
+			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
 		} else {
 			c.pgUsers[username] = newRole
 		}
@@ -717,8 +717,8 @@ func (c *Cluster) initHumanUsers() error {
 			Parameters: c.OpConfig.TeamAPIRoleConfiguration,
 		}
 
-		if _, present := c.pgUsers[username]; present {
-			c.resolveNameConflict(&newRole)
+		if currentRole, present := c.pgUsers[username]; present {
+			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
 		} else {
 			c.pgUsers[username] = newRole
 		}
@@ -742,8 +742,8 @@ func (c *Cluster) initInfrastructureRoles() error {
 		}
 		newRole.Flags = flags
 
-		if _, present := c.pgUsers[username]; present {
-			c.resolveNameConflict(&newRole)
+		if currentRole, present := c.pgUsers[username]; present {
+			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
 		} else {
 			c.pgUsers[username] = newRole
 		}
@@ -752,14 +752,15 @@ func (c *Cluster) initInfrastructureRoles() error {
 }
 
 // resolves naming conflicts between existing and new roles by chosing either of them.
-func (c *Cluster) resolveNameConflict(newRole *spec.PgUser) {
-	username := newRole.Name
-	oldOrigin := c.pgUsers[username].Origin
-	if newRole.Origin > oldOrigin {
-		c.pgUsers[username] = *newRole
+func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) (result spec.PgUser) {
+	if newRole.Origin > currentRole.Origin {
+		result = *newRole
+	} else {
+		result = *currentRole
 	}
 	c.logger.Debugf("resolved a conflict of role %q between %s and %s to %s",
-		username, newRole.Origin, oldOrigin, c.pgUsers[username].Origin)
+		newRole.Name, newRole.Origin, currentRole.Origin, result.Origin)
+	return
 }
 
 func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) bool {
