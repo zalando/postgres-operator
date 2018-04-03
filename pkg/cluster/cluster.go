@@ -217,9 +217,7 @@ func (c *Cluster) Create() error {
 	c.setStatus(spec.ClusterStatusCreating)
 
 	for _, role := range []PostgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			continue
-		}
+
 		if c.Endpoints[role] != nil {
 			return fmt.Errorf("%s endpoint already exists in the cluster", role)
 		}
@@ -480,8 +478,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 
 	// Service
 	if !reflect.DeepEqual(c.generateService(Master, &oldSpec.Spec), c.generateService(Master, &newSpec.Spec)) ||
-		!reflect.DeepEqual(c.generateService(Replica, &oldSpec.Spec), c.generateService(Replica, &newSpec.Spec)) ||
-		oldSpec.Spec.ReplicaLoadBalancer != newSpec.Spec.ReplicaLoadBalancer {
+		!reflect.DeepEqual(c.generateService(Replica, &oldSpec.Spec), c.generateService(Replica, &newSpec.Spec)) {
 		c.logger.Debugf("syncing services")
 		if err := c.syncServices(); err != nil {
 			c.logger.Errorf("could not sync services: %v", err)
@@ -589,9 +586,6 @@ func (c *Cluster) Delete() error {
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			continue
-		}
 
 		if err := c.deleteEndpoint(role); err != nil {
 			return fmt.Errorf("could not delete %s endpoint: %v", role, err)

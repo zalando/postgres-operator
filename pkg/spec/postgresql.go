@@ -93,19 +93,29 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	TeamID              string   `json:"teamId"`
+	TeamID      string `json:"teamId"`
+	DockerImage string `json:"dockerImage,omitempty"`
+
+	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
+	// in that case the var evaluates to nil and the value is taken from the operator config
+	EnableMasterLoadBalancer  *bool `json:"enableMasterLoadBalancer,omitempty"`
+	EnableReplicaLoadBalancer *bool `json:"enableReplicaLoadBalancer,omitempty"`
+
+	// deprecated load balancer settings mantained for backward compatibility
+	// see "Load balancers" operator docs
+	UseLoadBalancer     *bool `json:"useLoadBalancer,omitempty"`
+	ReplicaLoadBalancer *bool `json:"replicaLoadBalancer,omitempty"`
+
+	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
-	DockerImage         string   `json:"dockerImage,omitempty"`
-	// EnableLoadBalancer  is a pointer, since it is important to know if that parameters is omitted from the manifest
-	UseLoadBalancer     *bool                `json:"useLoadBalancer,omitempty"`
-	ReplicaLoadBalancer bool                 `json:"replicaLoadBalancer,omitempty"`
-	NumberOfInstances   int32                `json:"numberOfInstances"`
-	Users               map[string]UserFlags `json:"users"`
-	MaintenanceWindows  []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone               CloneDescription     `json:"clone"`
-	ClusterName         string               `json:"-"`
-	Databases           map[string]string    `json:"databases,omitempty"`
-	Tolerations         []v1.Toleration      `json:"tolerations,omitempty"`
+
+	NumberOfInstances  int32                `json:"numberOfInstances"`
+	Users              map[string]UserFlags `json:"users"`
+	MaintenanceWindows []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+	Clone              CloneDescription     `json:"clone"`
+	ClusterName        string               `json:"-"`
+	Databases          map[string]string    `json:"databases,omitempty"`
+	Tolerations        []v1.Toleration      `json:"tolerations,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.

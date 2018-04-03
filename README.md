@@ -6,7 +6,7 @@
 
 The Postgres operator manages PostgreSQL clusters on Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
 During the initial run it registers the [Custom Resource Definition (CRD)](https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions) for Postgres.
-The PostgreSQL CRD is essentially the schema that describes the contents of the manifests for deploying individual 
+The PostgreSQL CRD is essentially the schema that describes the contents of the manifests for deploying individual
 PostgreSQL clusters using StatefulSets and [Patroni](https://github.com/zalando/patroni).
 
 Once the operator is running, it performs the following actions:
@@ -14,21 +14,30 @@ Once the operator is running, it performs the following actions:
 * watches for new PostgreSQL cluster manifests and deploys corresponding clusters
 * watches for updates to existing manifests and changes corresponding properties of the running clusters
 * watches for deletes of the existing manifests and deletes corresponding clusters
-* acts on an update to the operator definition itself and changes the running clusters when necessary 
+* acts on an update to the operator definition itself and changes the running clusters when necessary
   (i.e. when the docker image inside the operator definition has been updated)
 * periodically checks running clusters against the manifests and acts on the differences found
 
-For instance, when the user creates a new custom object of type ``postgresql`` by submitting a new manifest with 
-``kubectl``, the operator fetches that object and creates the corresponding Kubernetes structures 
+For instance, when the user creates a new custom object of type ``postgresql`` by submitting a new manifest with
+``kubectl``, the operator fetches that object and creates the corresponding Kubernetes structures
 (StatefulSets, Services, Secrets) according to its definition.
 
 Another example is changing the docker image inside the operator. In this case, the operator first goes to all StatefulSets
 it manages and updates them with the new docker images; afterwards, all pods from each StatefulSet are killed one by one
 (rolling upgrade) and the replacements are spawned automatically by each StatefulSet with the new docker image.
 
+## Scope
+
+The scope of the postgres operator is on provisioning, modifying configuration and cleaning up Postgres clusters that use Patroni, basically to make it easy and convenient to run Patroni based clusters on Kubernetes.
+The provisioning and modifying includes Kubernetes resources on one side but also e.g. database and role provisioning once the cluster is up and running.
+We try to leave as much work as possible to Kubernetes and to Patroni where it fits, especially the cluster bootstrap and high availability.
+The operator is however involved in some overarching orchestration, like rolling upgrades to improve the user experience.
+
+Monitoring of clusters is not in scope, for this good tools already exist from ZMON to Prometheus and more Postgres specific options.
+
 ## Status
 
-This project is currently in active development. It is however already [used internally by Zalando](https://jobs.zalando.com/tech/blog/postgresql-in-a-time-of-kubernetes/) in order to run Postgres databases on Kubernetes in larger numbers for staging environments and a smaller number of production databases. In this environment the operator is deployed to multiple Kubernetes clusters, where users deploy manifests via our CI/CD infrastructure.
+This project is currently in active development. It is however already [used internally by Zalando](https://jobs.zalando.com/tech/blog/postgresql-in-a-time-of-kubernetes/) in order to run Postgres clusters on Kubernetes in larger numbers for staging environments and a growing number of production clusters. In this environment the operator is deployed to multiple Kubernetes clusters, where users deploy manifests via our CI/CD infrastructure or rely on a slim user interface to create manifests.
 
 Please, report any issues discovered to https://github.com/zalando-incubator/postgres-operator/issues.
 
@@ -40,7 +49,7 @@ Please, report any issues discovered to https://github.com/zalando-incubator/pos
 
 ## Running and testing the operator
 
-The best way to test the operator is to run it in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/). 
+The best way to test the operator is to run it in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/).
 Minikube is a tool to run Kubernetes cluster locally.
 
 ### Installing and starting minikube
@@ -72,11 +81,11 @@ All subsequent `kubectl` commands will work with the `test` namespace. The opera
 
 ### Specify the namespace to watch
 
-Watching a namespace for an operator means tracking requests to change Postgresql clusters in the namespace such as "increase the number of Postgresql replicas to 5" and reacting to the requests, in this example by actually scaling up. 
+Watching a namespace for an operator means tracking requests to change Postgresql clusters in the namespace such as "increase the number of Postgresql replicas to 5" and reacting to the requests, in this example by actually scaling up.
 
 By default, the operator watches the namespace it is deployed to. You can change this by altering the `WATCHED_NAMESPACE` env var in the operator deployment manifest or the `watched_namespace` field in the operator configmap. In the case both are set, the env var takes the precedence. To make the operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
-Note that for an operator to manage pods in the watched namespace, the operator's service account (as specified in the operator deployment manifest) has to have appropriate privileges to access the watched namespace. The operator may not be able to function in the case it watches all namespaces but lacks access rights to any of them (except Kubernetes system namespaces like `kube-system`). The reason is that for multiple namespaces operations such as 'list pods' execute at the cluster scope and fail at the first violation of access rights. 
+Note that for an operator to manage pods in the watched namespace, the operator's service account (as specified in the operator deployment manifest) has to have appropriate privileges to access the watched namespace. The operator may not be able to function in the case it watches all namespaces but lacks access rights to any of them (except Kubernetes system namespaces like `kube-system`). The reason is that for multiple namespaces operations such as 'list pods' execute at the cluster scope and fail at the first violation of access rights.
 
 The watched namespace also needs to have a (possibly different) service account in the case database pods need to talk to the Kubernetes API (e.g. when using Kubernetes-native configuration of Patroni).
 
@@ -131,8 +140,8 @@ The operator can be configured with the provided ConfigMap (`manifests/configmap
 
 #### Use taints and tolerations for dedicated PostgreSQL nodes
 
-To ensure Postgres pods are running on nodes without any other application pods, you can use 
-[taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) and configure the 
+To ensure Postgres pods are running on nodes without any other application pods, you can use
+[taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) and configure the
 required toleration in the operator ConfigMap.
 
 As an example you can set following node taint:
@@ -168,7 +177,7 @@ spec:
     effect: NoSchedule
 ```
 
-Please be aware that the taint and toleration only ensures that no other pod gets scheduled to a PostgreSQL node 
+Please be aware that the taint and toleration only ensures that no other pod gets scheduled to a PostgreSQL node
 but not that PostgreSQL pods are placed on such a node. This can be achieved by setting a node affinity rule in the ConfigMap.
 
 ### Using the operator to minimize the amount of failovers during the cluster upgrade
@@ -190,7 +199,7 @@ node_readiness_label: "lifecycle-status:ready,disagnostic-checks:ok"
 ```
 
 when multiple labels are set the operator will require all of them to be present on a node (and set to the specified value) in order to consider
-it ready. 
+it ready.
 
 #### Custom Pod Environment Variables
 
@@ -232,6 +241,14 @@ This ConfigMap is then added as a source of environment variables to the Postgre
 As a preventive measure, one can restrict the minimum and the maximum number of instances permitted by each Postgres cluster managed by the operator.
 If either `min_instances` or `max_instances` is set to a non-zero value, the operator may adjust the number of instances specified in the cluster manifest to match either the min or the max boundary.
 For instance, of a cluster manifest has 1 instance and the min_instances is set to 3, the cluster will be created with 3 instances. By default, both parameters are set to -1.
+
+### Load balancers 
+
+For any Postgresql/Spilo cluster an operator creates two separate k8s services: one for the master pod and one for replica pods. To expose these services to an outer network, one can attach load balancers to them by setting `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the cluster manifest. In the case any of these variables is omitted from the manifest, the operator configmap's settings `enable_master_load_balancer` and `enable_replica_load_balancer` apply. Note that the operator settings affect all Postgresql services running in a namespace watched by the operator.
+
+For backward compatibility with already configured clusters we maintain in a cluster manifest older parameter names, namely `useLoadBalancer` for enabling the master service's load balancer and `replicaLoadBalancer` for the replica service. If set, these params take precedence over the newer `enableMasterLoadBalancer` and `enableReplicaLoadBalancer`. Note that in older versions of the operator (before PR #258) `replicaLoadBalancer` was responsible for both creating the replica service and attaching an LB to it; now the service is always created (since k8s service typically is free in the cloud setting), and this param only attaches an LB (that typically costs money).
+
+For the same reason of compatibility, we maintain the `enable_load_balancer` setting in the operator config map that was previously used to attach a LB to the master service. Its value is examined after the deprecated `useLoadBalancer` setting from the Postgresql manifest but before the recommended `enableMasterLoadBalancer`. There is no equivalent option for the replica service since the service used to be always created with a load balancer.
 
 # Setup development environment
 

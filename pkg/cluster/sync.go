@@ -108,11 +108,6 @@ func (c *Cluster) syncService(role PostgresRole) error {
 
 	svc, err := c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{})
 	if err == nil {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			if err := c.deleteService(role); err != nil {
-				return fmt.Errorf("could not delete %s service", role)
-			}
-		}
 
 		desiredSvc := c.generateService(role, &c.Spec)
 		match, reason := k8sutil.SameService(svc, desiredSvc)
@@ -132,11 +127,6 @@ func (c *Cluster) syncService(role PostgresRole) error {
 		return fmt.Errorf("could not get %s service: %v", role, err)
 	}
 	c.Services[role] = nil
-
-	// Service does not exist
-	if role == Replica && !c.Spec.ReplicaLoadBalancer {
-		return nil
-	}
 
 	c.logger.Infof("could not find the cluster's %s service", role)
 
@@ -165,11 +155,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 
 	ep, err := c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
 	if err == nil {
-		if role == Replica && !c.Spec.ReplicaLoadBalancer {
-			if err := c.deleteEndpoint(role); err != nil {
-				return fmt.Errorf("could not delete %s endpoint", role)
-			}
-		}
 
 		c.Endpoints[role] = ep
 		return nil
@@ -177,10 +162,6 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 		return fmt.Errorf("could not get %s endpoint: %v", role, err)
 	}
 	c.Endpoints[role] = nil
-
-	if role == Replica && !c.Spec.ReplicaLoadBalancer {
-		return nil
-	}
 
 	c.logger.Infof("could not find the cluster's %s endpoint", role)
 
