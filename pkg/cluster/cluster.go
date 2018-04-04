@@ -753,7 +753,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 
 // resolves naming conflicts between existing and new roles by chosing either of them.
 func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) (result spec.PgUser) {
-	if newRole.Origin > currentRole.Origin {
+	if newRole.Origin >= currentRole.Origin {
 		result = *newRole
 	} else {
 		result = *currentRole
