@@ -32,12 +32,14 @@ const (
 	fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 )
 
+// RoleOrigin contains the code of the origin of a role
 type RoleOrigin int
 
+// The rolesOrigin constant values should be sorted by the role priority.
 const (
-	RoleOriginUnknown = iota
-	RoleOriginInfrastructure
+	RoleOriginUnknown RoleOrigin = iota
 	RoleOriginManifest
+	RoleOriginInfrastructure
 	RoleOriginTeamsAPI
 	RoleOriginSystem
 )
@@ -72,12 +74,12 @@ type PodEvent struct {
 
 // PgUser contains information about a single user.
 type PgUser struct {
-	Origin     RoleOrigin
-	Name       string
-	Password   string
-	Flags      []string
-	MemberOf   []string
-	Parameters map[string]string
+	Origin     RoleOrigin        `yaml:"-"`
+	Name       string            `yaml:"-"`
+	Password   string            `yaml:"-"`
+	Flags      []string          `yaml:"user_flags"`
+	MemberOf   []string          `yaml:"inrole"`
+	Parameters map[string]string `yaml:"db_parameters"`
 }
 
 // PgUserMap maps user names to the definitions.
@@ -201,6 +203,20 @@ func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
 	*n = NamespacedName(name)
 
 	return nil
+}
+
+func (r RoleOrigin) String() string {
+	switch r {
+	case RoleOriginManifest:
+		return "manifest role"
+	case RoleOriginInfrastructure:
+		return "infrastructure role"
+	case RoleOriginTeamsAPI:
+		return "teams API role"
+	case RoleOriginSystem:
+		return "system role"
+	}
+	return "unknown"
 }
 
 // GetOperatorNamespace assumes serviceaccount secret is mounted by kubernetes

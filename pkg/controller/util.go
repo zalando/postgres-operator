@@ -13,6 +13,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"gopkg.in/yaml.v2"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {
@@ -96,6 +97,14 @@ func (c *Controller) createCRD() error {
 	})
 }
 
+func readDecodedRole(s string) (*spec.PgUser, error) {
+	var result spec.PgUser
+	if err := yaml.Unmarshal([]byte(s), &result); err != nil {
+		return nil, fmt.Errorf("could not decode yaml role: %v", err)
+	}
+	return &result, nil
+}
+
 func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (result map[string]spec.PgUser, err error) {
 	if *rolesSecret == (spec.NamespacedName{}) {
 		// we don't have infrastructure roles defined, bail out
@@ -110,16 +119,16 @@ func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (r
 		return nil, fmt.Errorf("could not get infrastructure roles secret: %v", err)
 	}
 
-	data := infraRolesSecret.Data
+	secretData := infraRolesSecret.Data
 	result = make(map[string]spec.PgUser)
 Users:
 	// in worst case we would have one line per user
-	for i := 1; i <= len(data); i++ {
+	for i := 1; i <= len(secretData); i++ {
 		properties := []string{"user", "password", "inrole"}
 		t := spec.PgUser{Origin: spec.RoleOriginInfrastructure}
 		for _, p := range properties {
 			key := fmt.Sprintf("%s%d", p, i)
-			if val, present := data[key]; !present {
+			if val, present := secretData[key]; !present {
 				if p == "user" {
 					// exit when the user name with the next sequence id is absent
 					break Users
@@ -137,19 +146,48 @@ Users:
 					c.logger.Warningf("unknown key %q", p)
 				}
 			}
-
-			delete(data, key)
+			delete(secretData, key)
 		}
 
 		if t.Name != "" {
+			if t.Password == "" {
+				c.logger.Warningf("infrastructure role %q has no password defined and is ignored", t.Name)
+				continue
+			}
 			result[t.Name] = t
 		}
 	}
 
-	if len(data) != 0 {
-		c.logger.Warningf("%d unprocessed entries in the infrastructure roles' secret", len(data))
-		c.logger.Info(`infrastructure role entries should be in the {key}{id} format, where {key} can be either of "user", "password", "inrole" and the {id} a monotonically increasing integer starting with 1`)
-		c.logger.Debugf("unprocessed entries: %#v", data)
+	// perhaps we have some map entries with usernames, passwords, let's check if we have those users in the configmap
+	if infraRolesMap, err := c.KubeClient.ConfigMaps(rolesSecret.Namespace).Get(rolesSecret.Name, metav1.GetOptions{}); err == nil {
+		// we have a configmap with username - json description, let's read and decode it
+		for role, s := range infraRolesMap.Data {
+			if roleDescr, err := readDecodedRole(s); err != nil {
+				return nil, fmt.Errorf("could not decode role description: %v", err)
+			} else {
+				// check if we have a a password in a configmap
+				c.logger.Debugf("found role description for role %q: %+v", role, roleDescr)
+				if passwd, ok := secretData[role]; ok {
+					roleDescr.Password = string(passwd)
+					delete(secretData, role)
+				} else {
+					c.logger.Warningf("infrastructure role %q has no password defined and is ignored", role)
+					continue
+				}
+				roleDescr.Name = role
+				roleDescr.Origin = spec.RoleOriginInfrastructure
+				result[role] = *roleDescr
+			}
+		}
+	}
+
+	if len(secretData) > 0 {
+		c.logger.Warningf("%d unprocessed entries in the infrastructure roles secret,"+
+			" checking configmap %v", len(secretData), rolesSecret.Name)
+		c.logger.Info(`infrastructure role entries should be in the {key}{id} format,` +
+			` where {key} can be either of "user", "password", "inrole" and the {id}` +
+			` a monotonically increasing integer starting with 1`)
+		c.logger.Debugf("unprocessed entries: %#v", secretData)
 	}
 
 	return result, nil

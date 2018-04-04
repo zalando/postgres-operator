@@ -674,24 +674,18 @@ func (c *Cluster) initRobotUsers() error {
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
 		}
-		if _, present := c.pgUsers[username]; !present {
-			c.pgUsers[username] = spec.PgUser{
-				Origin:   spec.RoleOriginManifest,
-				Name:     username,
-				Password: util.RandomPassword(constants.PasswordLength),
-				Flags:    flags,
-			}
+		newRole := spec.PgUser{
+			Origin:   spec.RoleOriginManifest,
+			Name:     username,
+			Password: util.RandomPassword(constants.PasswordLength),
+			Flags:    flags,
+		}
+		if currentRole, present := c.pgUsers[username]; present {
+			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
 		} else {
-			// avoid overwriting the password if the user is already there. The flags should be
-			// merged here, but since there is no mechanism to define them for non-robot roles
-			// they are assigned from the robot user.
-			c.logger.Debugf("merging manifest and infrastructure user %q data", username)
-			user := c.pgUsers[username]
-			user.Flags = flags
-			c.pgUsers[username] = user
+			c.pgUsers[username] = newRole
 		}
 	}
-
 	return nil
 }
 
@@ -715,16 +709,18 @@ func (c *Cluster) initHumanUsers() error {
 			}
 		}
 
-		if _, present := c.pgUsers[username]; present {
-			c.logger.Warnf("overwriting existing user %q with the data from the teams API", username)
-		}
-
-		c.pgUsers[username] = spec.PgUser{
+		newRole := spec.PgUser{
 			Origin:     spec.RoleOriginTeamsAPI,
 			Name:       username,
 			Flags:      flags,
 			MemberOf:   memberOf,
 			Parameters: c.OpConfig.TeamAPIRoleConfiguration,
+		}
+
+		if currentRole, present := c.pgUsers[username]; present {
+			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
+		} else {
+			c.pgUsers[username] = newRole
 		}
 	}
 
@@ -732,22 +728,39 @@ func (c *Cluster) initHumanUsers() error {
 }
 
 func (c *Cluster) initInfrastructureRoles() error {
-	// add infrastucture roles from the operator's definition
-	for username, data := range c.InfrastructureRoles {
+	// add infrastructure roles from the operator's definition
+	for username, newRole := range c.InfrastructureRoles {
 		if !isValidUsername(username) {
 			return fmt.Errorf("invalid username: '%v'", username)
 		}
 		if c.shouldAvoidProtectedOrSystemRole(username, "infrastructure role") {
 			continue
 		}
-		flags, err := normalizeUserFlags(data.Flags)
+		flags, err := normalizeUserFlags(newRole.Flags)
 		if err != nil {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
-		data.Flags = flags
-		c.pgUsers[username] = data
+		newRole.Flags = flags
+
+		if currentRole, present := c.pgUsers[username]; present {
+			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
+		} else {
+			c.pgUsers[username] = newRole
+		}
 	}
 	return nil
+}
+
+// resolves naming conflicts between existing and new roles by chosing either of them.
+func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) (result spec.PgUser) {
+	if newRole.Origin >= currentRole.Origin {
+		result = *newRole
+	} else {
+		result = *currentRole
+	}
+	c.logger.Debugf("resolved a conflict of role %q between %s and %s to %s",
+		newRole.Name, newRole.Origin, currentRole.Origin, result.Origin)
+	return
 }
 
 func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) bool {

@@ -43,3 +43,4 @@ import:
   - tools/cache
   - tools/clientcmd
   - tools/remotecommand
+- package: gopkg.in/yaml.v2

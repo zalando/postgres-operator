@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	b64 "encoding/base64"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
@@ -21,6 +22,10 @@ type mockSecret struct {
 	v1core.SecretInterface
 }
 
+type mockConfigMap struct {
+	v1core.ConfigMapInterface
+}
+
 func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
 	if name != testInfrastructureRolesSecretName {
 		return nil, fmt.Errorf("NotFound")
@@ -31,20 +36,43 @@ func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, er
 		"user1":     []byte("testrole"),
 		"password1": []byte("testpassword"),
 		"inrole1":   []byte("testinrole"),
+		"foobar":    []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
 	}
 	return secret, nil
 
 }
 
+func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
+	if name != testInfrastructureRolesSecretName {
+		return nil, fmt.Errorf("NotFound")
+	}
+	configmap := &v1.ConfigMap{}
+	configmap.Name = mockController.opConfig.ClusterNameLabel
+	configmap.Data = map[string]string{
+		"foobar": "{}",
+	}
+	return configmap, nil
+}
+
 type MockSecretGetter struct {
+}
+
+type MockConfigMapsGetter struct {
 }
 
 func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
 	return &mockSecret{}
 }
 
+func (c *MockConfigMapsGetter) ConfigMaps(namespace string) v1core.ConfigMapInterface {
+	return &mockConfigMap{}
+}
+
 func newMockKubernetesClient() k8sutil.KubernetesClient {
-	return k8sutil.KubernetesClient{SecretsGetter: &MockSecretGetter{}}
+	return k8sutil.KubernetesClient{
+		SecretsGetter:    &MockSecretGetter{},
+		ConfigMapsGetter: &MockConfigMapsGetter{},
+	}
 }
 
 func newMockController() *Controller {
@@ -134,6 +162,12 @@ func TestGetInfrastructureRoles(t *testing.T) {
 					Origin:   spec.RoleOriginInfrastructure,
 					Password: "testpassword",
 					MemberOf: []string{"testinrole"},
+				},
+				"foobar": {
+					Name:     "foobar",
+					Origin:   spec.RoleOriginInfrastructure,
+					Password: b64.StdEncoding.EncodeToString([]byte("password")),
+					MemberOf: nil,
 				},
 			},
 			nil,

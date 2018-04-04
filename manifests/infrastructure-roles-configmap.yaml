@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-infrastructure-roles
+data:
+  batman: |
+    inrole: [admin]  # following roles will be assigned to the new user
+    user_flags:
+      - createdb
+    db_parameters:  # db parameters, applyed for this particular user
+      log_statement: all
