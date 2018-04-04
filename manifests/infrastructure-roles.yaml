@@ -12,6 +12,8 @@ data:
   user2: dGVzdHVzZXI=
   # foobar
   password2: c2VjcmV0
+  # user batman with the password justice
+  # looks for defails in the infrastructure roles configmap
   batman: anVzdGljZQ==
 kind: Secret
 metadata:

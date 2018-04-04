@@ -4,14 +4,8 @@ metadata:
   name: postgresql-infrastructure-roles
 data:
   batman: |
-    name: batman
-    inrole: [role1, role2]  # following roles will be assigned to the new user
+    inrole: [admin]  # following roles will be assigned to the new user
     user_flags:
-      - superuser
-      - login
+      - createdb
     db_parameters:  # db parameters, applyed for this particular user
       log_statement: all
-  robin: |
-    name: robin
-    inrole:
-      - postgres
