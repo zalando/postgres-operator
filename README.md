@@ -133,6 +133,29 @@ We can use the generated secret of the `postgres` robot user to connect to our `
     $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
     $ psql -U postgres
 
+### Role-based access control for the operator
+
+The `manifests/operator-rbac.yaml` defines cluster roles and bindings needed for the operator to function under access control restrictions. To deploy the operator with this RBAC policy use:
+
+```bash
+kubectl create -f manifests/configmap.yaml 
+kubectl create -f manifests/operator-rbac.yaml
+kubectl create -f manifests/postgres-operator.yaml 
+kubectl create -f manifests/minimal-postgres-manifest.yaml
+```
+
+Note that the service account in `operator-rbac.yaml` is named `zalando-postgres-operator` and not
+the `operator` default that is created in the `serviceaccount.yaml`. So you will have to change the `service_account_name` in the operator configmap and `serviceAccountName` in the postgres-operator deployment appropriately.
+
+This is done intentionally, as to avoid breaking those setups that
+already work with the default `operator` account. In the future the operator should ideally be run under the
+`zalando-postgres-operator` service account. 
+
+The service account defined in  `operator-rbac.yaml` acquires some privileges not really
+used by the operator (i.e. we only need list and watch on configmaps),
+this is also done intentionally to avoid breaking things if someone
+decides to configure the same service account in the operator's
+configmap to run postgres clusters.
 
 ### Configuration Options
 
