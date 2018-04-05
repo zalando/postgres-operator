@@ -126,7 +126,7 @@ We can use the generated secret of the `postgres` robot user to connect to our `
 
 ### Role-based access control for the operator
 
-The `manifests/operator-rbac.yaml` defines cluster roles and bindigns needed for the operator to function under access control restrictions. To deploy the operator with this RBAC policy use:
+The `manifests/operator-rbac.yaml` defines cluster roles and bindings needed for the operator to function under access control restrictions. To deploy the operator with this RBAC policy use:
 
 ```bash
 kubectl create -f manifests/configmap.yaml 
