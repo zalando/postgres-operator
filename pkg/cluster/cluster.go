@@ -348,10 +348,9 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 				c.logger.Warningf("new statefulset introduces extra labels in the label selector, cannot continue")
 				return &compareStatefulsetResult{}
 			}
+			needsReplace = true
+			reasons = append(reasons, "new statefulset's selector doesn't match the current one")
 		}
-		needsReplace = true
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's selector doesn't match the current one")
 	}
 
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
