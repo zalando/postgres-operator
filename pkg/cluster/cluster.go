@@ -340,6 +340,20 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's metadata labels doesn't match the current one")
 	}
+	if (c.Statefulset.Spec.Selector != nil) && (statefulSet.Spec.Selector != nil) {
+		if !reflect.DeepEqual(c.Statefulset.Spec.Selector.MatchLabels, statefulSet.Spec.Selector.MatchLabels) {
+			// forbid introducing new labels in the selector on the new statefulset, as it would cripple replacements
+			// due to the fact that the new statefulset won't be able to pick up old pods with non-matching labels.
+			if !util.MapContains(c.Statefulset.Spec.Selector.MatchLabels, statefulSet.Spec.Selector.MatchLabels) {
+				c.logger.Warningf("new statefulset introduces extra labels in the label selector, cannot continue")
+				return &compareStatefulsetResult{}
+			}
+		}
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's selector doesn't match the current one")
+	}
+
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
 		needsRollUpdate = true
 		needsReplace = true
