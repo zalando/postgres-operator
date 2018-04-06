@@ -564,6 +564,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
+			Selector:             c.labelsSelector(),
 			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
