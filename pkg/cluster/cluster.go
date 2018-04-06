@@ -293,6 +293,8 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
+// TODO: forbid changing the label selector on the statefulset, as it would cripple replacements
+// due to the fact that the new statefulset won't be able to pick up old pods with non-matching labels.
 func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
 	reasons := make([]string, 0)
 	var match, needsRollUpdate, needsReplace bool
