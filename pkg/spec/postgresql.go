@@ -3,6 +3,7 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -76,6 +77,11 @@ const (
 	ClusterStatusInvalid      PostgresStatus = "Invalid"
 )
 
+const (
+	serviceNameMaxLength = 63
+	clusterNameMaxLength = serviceNameMaxLength - len("-repl")
+)
+
 // Postgresql defines PostgreSQL Custom Resource Definition Object.
 type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -126,7 +132,10 @@ type PostgresqlList struct {
 	Items []Postgresql `json:"items"`
 }
 
-var weekdays = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
+var (
+	weekdays         = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
+	serviceNameRegex = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
+)
 
 func parseTime(s string) (time.Time, error) {
 	parts := strings.Split(s, ":")
@@ -225,8 +234,27 @@ func extractClusterName(clusterName string, teamName string) (string, error) {
 	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
 		return "", fmt.Errorf("name must match {TEAM}-{NAME} format")
 	}
+	if len(clusterName) > clusterNameMaxLength {
+		return "", fmt.Errorf("name cannot be longer than %d characters", clusterNameMaxLength)
+	}
+	if !serviceNameRegex.MatchString(clusterName) {
+		return "", fmt.Errorf("name must confirm to a valid service name (DNS-1035)")
+	}
 
 	return clusterName[teamNameLen+1:], nil
+}
+
+func validateCloneClusterDescription(clone *CloneDescription) error {
+	// when cloning from the basebackup (no end timestamp) check that the cluster name is a valid service name
+	if clone.ClusterName != "" && clone.EndTimestamp == "" {
+		if !serviceNameRegex.MatchString(clone.ClusterName) {
+			return fmt.Errorf("clone cluster name must confirm to a valid service name (DNS-1035)")
+		}
+		if len(clone.ClusterName) > serviceNameMaxLength {
+			return fmt.Errorf("clone cluster name must be no longer than %d characters", serviceNameMaxLength)
+		}
+	}
+	return nil
 }
 
 type postgresqlListCopy PostgresqlList
@@ -252,13 +280,16 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	}
 	tmp2 := Postgresql(tmp)
 
-	clusterName, err := extractClusterName(tmp2.ObjectMeta.Name, tmp2.Spec.TeamID)
-	if err == nil {
-		tmp2.Spec.ClusterName = clusterName
-	} else {
+	if clusterName, err := extractClusterName(tmp2.ObjectMeta.Name, tmp2.Spec.TeamID); err != nil {
 		tmp2.Error = err
 		tmp2.Status = ClusterStatusInvalid
+	} else if err := validateCloneClusterDescription(&tmp2.Spec.Clone); err != nil {
+		tmp2.Error = err
+		tmp2.Status = ClusterStatusInvalid
+	} else {
+		tmp2.Spec.ClusterName = clusterName
 	}
+
 	*p = tmp2
 
 	return nil
