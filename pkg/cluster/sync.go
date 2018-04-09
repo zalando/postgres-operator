@@ -249,10 +249,17 @@ func (c *Cluster) syncStatefulSet() error {
 			return nil
 		}
 		c.logger.Infof("found pods without the statefulset: trigger rolling update")
+		c.setPendingRollingUpgrade(true)
 
 	} else {
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
+		// resolve the pending rolling upgrade flags as soon as we read an actual statefulset from kubernetes.
+		// we must do it before updating statefulsets; after an update, the statfulset will receive a new
+		// updateRevision, different from the one the pods run with.
+		if err := c.resolvePendingRollingUpdate(sset); err != nil {
+			return fmt.Errorf("could not resolve the rolling upgrade status: %v", err)
+		}
 
 		desiredSS, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
@@ -260,33 +267,33 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 
 		cmp := c.compareStatefulSetWith(desiredSS)
-		if cmp.match {
-			return nil
-		}
-		c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
-
-		if !cmp.replace {
-			if err := c.updateStatefulSet(desiredSS); err != nil {
-				return fmt.Errorf("could not update statefulset: %v", err)
+		if !cmp.match {
+			if cmp.rollingUpdate {
+				c.setPendingRollingUpgrade(true)
 			}
-		} else {
-			if err := c.replaceStatefulSet(desiredSS); err != nil {
-				return fmt.Errorf("could not replace statefulset: %v", err)
-			}
-		}
+			c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
 
-		if !cmp.rollingUpdate {
-			c.logger.Debugln("no rolling update is needed")
-			return nil
+			if !cmp.replace {
+				if err := c.updateStatefulSet(desiredSS); err != nil {
+					return fmt.Errorf("could not update statefulset: %v", err)
+				}
+			} else {
+				if err := c.replaceStatefulSet(desiredSS); err != nil {
+					return fmt.Errorf("could not replace statefulset: %v", err)
+				}
+			}
 		}
 	}
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
-	c.logger.Debugln("performing rolling update")
-	if err := c.recreatePods(); err != nil {
-		return fmt.Errorf("could not recreate pods: %v", err)
+	if *c.pendingRollingUpdate {
+		c.logger.Debugln("performing rolling update")
+		if err := c.recreatePods(); err != nil {
+			return fmt.Errorf("could not recreate pods: %v", err)
+		}
+		c.setPendingRollingUpgrade(false)
+		c.logger.Infof("pods have been recreated")
 	}
-	c.logger.Infof("pods have been recreated")
 
 	return nil
 }

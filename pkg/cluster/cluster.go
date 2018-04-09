@@ -71,12 +71,13 @@ type Cluster struct {
 	deleteOptions    *metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
-	teamsAPIClient   teams.Interface
-	oauthTokenGetter OAuthTokenGetter
-	KubeClient       k8sutil.KubernetesClient //TODO: move clients to the better place?
-	currentProcess   spec.Process
-	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
-	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+	teamsAPIClient       teams.Interface
+	oauthTokenGetter     OAuthTokenGetter
+	KubeClient           k8sutil.KubernetesClient //TODO: move clients to the better place?
+	currentProcess       spec.Process
+	processMu            sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
+	specMu               sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+	pendingRollingUpdate *bool        // indicates the cluster needs a rolling update
 }
 
 type compareStatefulsetResult struct {
@@ -109,10 +110,11 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
-		podEventsQueue:   podEventsQueue,
-		KubeClient:       kubeClient,
+		userSyncStrategy:     users.DefaultUserSyncStrategy{},
+		deleteOptions:        &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
+		podEventsQueue:       podEventsQueue,
+		KubeClient:           kubeClient,
+		pendingRollingUpdate: nil,
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
@@ -215,6 +217,7 @@ func (c *Cluster) Create() error {
 	}()
 
 	c.setStatus(spec.ClusterStatusCreating)
+	c.setPendingRollingUpgrade(false)
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
