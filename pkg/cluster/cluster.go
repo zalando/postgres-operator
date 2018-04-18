@@ -256,6 +256,11 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
+	if err = c.syncPodServiceAccounts(); err != nil {
+		return fmt.Errorf("could not sync pod service accounts: %v", err)
+	}
+	c.logger.Infof("pod service accounts have been successfully synced")
+
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
 	}

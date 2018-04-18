@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"k8s.io/client-go/pkg/api/v1"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
@@ -67,21 +68,25 @@ type Config struct {
 	Resources
 	Auth
 	Scalyr
-	WatchedNamespace          string `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	EtcdHost                  string `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
-	DockerImage               string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
-	ServiceAccountName        string `name:"service_account_name" default:"operator"`
-	DbHostedZone              string `name:"db_hosted_zone" default:"db.example.com"`
-	EtcdScope                 string `name:"etcd_scope" default:"service"`
-	WALES3Bucket              string `name:"wal_s3_bucket"`
-	KubeIAMRole               string `name:"kube_iam_role"`
-	DebugLogging              bool   `name:"debug_logging" default:"true"`
-	EnableDBAccess            bool   `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI            bool   `name:"enable_teams_api" default:"true"`
-	EnableTeamSuperuser       bool   `name:"enable_team_superuser" default:"false"`
-	TeamAdminRole             string `name:"team_admin_role" default:"admin"`
-	EnableMasterLoadBalancer  bool   `name:"enable_master_load_balancer" default:"true"`
-	EnableReplicaLoadBalancer bool   `name:"enable_replica_load_balancer" default:"false"`
+	PodServiceAccount *v1.ServiceAccount
+	WatchedNamespace  string `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	EtcdHost          string `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
+	DockerImage       string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
+	// re-use one account for both Spilo pods and the operator; this grants extra privileges to pods
+	ServiceAccountName          string `name:"service_account_name" default:"operator"`
+	PodServiceAccountName       string `name:"pod_service_account_name" default:"operator"`
+	PodServiceAccountDefinition string `name:"pod_service_account_definition" default:"apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: operator\n"`
+	DbHostedZone                string `name:"db_hosted_zone" default:"db.example.com"`
+	EtcdScope                   string `name:"etcd_scope" default:"service"`
+	WALES3Bucket                string `name:"wal_s3_bucket"`
+	KubeIAMRole                 string `name:"kube_iam_role"`
+	DebugLogging                bool   `name:"debug_logging" default:"true"`
+	EnableDBAccess              bool   `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI              bool   `name:"enable_teams_api" default:"true"`
+	EnableTeamSuperuser         bool   `name:"enable_team_superuser" default:"false"`
+	TeamAdminRole               string `name:"team_admin_role" default:"admin"`
+	EnableMasterLoadBalancer    bool   `name:"enable_master_load_balancer" default:"true"`
+	EnableReplicaLoadBalancer   bool   `name:"enable_replica_load_balancer" default:"false"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer       *bool             `name:"enable_load_balancer" default:"true"`
 	MasterDNSNameFormat      stringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`

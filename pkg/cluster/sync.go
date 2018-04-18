@@ -44,6 +44,12 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		return
 	}
 
+	c.logger.Debugf("syncing service accounts")
+	if err = c.syncPodServiceAccounts(); err != nil {
+		err = fmt.Errorf("could not sync service accounts: %v", err)
+		return
+	}
+
 	c.logger.Debugf("syncing services")
 	if err = c.syncServices(); err != nil {
 		err = fmt.Errorf("could not sync services: %v", err)
@@ -101,6 +107,34 @@ func (c *Cluster) syncServices() error {
 	}
 
 	return nil
+}
+
+/*
+  Ensures the service account required by StatefulSets to create pods exists in all namespaces watched by the operator.
+*/
+func (c *Cluster) syncPodServiceAccounts() error {
+
+	podServiceAccount := c.Config.OpConfig.PodServiceAccountName
+	c.setProcessName("syncing pod service account in the watched namespaces")
+
+	_, err := c.KubeClient.ServiceAccounts(c.Namespace).Get(podServiceAccount, metav1.GetOptions{})
+
+	if err != nil {
+		c.logger.Warnf("the pod service account %q is absent from the namespace %q. Stateful sets in the namespace are unable to create pods.", podServiceAccount, c.Namespace)
+
+		c.OpConfig.PodServiceAccount.SetNamespace(c.Namespace)
+
+		_, err = c.KubeClient.ServiceAccounts(c.Namespace).Create(c.OpConfig.PodServiceAccount)
+		if err != nil {
+			c.logger.Warnf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccount, c.Namespace, err)
+		} else {
+			c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccount, c.Namespace)
+		}
+	} else {
+		c.logger.Infof("successfully found the service account %q used to create pods to the namespace %q", podServiceAccount, c.Namespace)
+	}
+
+	return err
 }
 
 func (c *Cluster) syncService(role PostgresRole) error {

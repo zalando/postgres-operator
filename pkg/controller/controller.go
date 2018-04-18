@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -113,11 +114,30 @@ func (c *Controller) initOperatorConfig() {
 	if scalyrAPIKey != "" {
 		c.opConfig.ScalyrAPIKey = scalyrAPIKey
 	}
+
+}
+
+func (c *Controller) initPodServiceAccount() {
+	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	obj, groupVersionKind, err := decode([]byte(c.opConfig.PodServiceAccountDefinition), nil, nil)
+
+	switch {
+	case err != nil:
+		panic(fmt.Errorf("Unable to parse pod service account definiton from the operator config map: %v", err))
+	case groupVersionKind.Kind != "ServiceAccount":
+		panic(fmt.Errorf("pod service account definiton in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+	default:
+		c.opConfig.PodServiceAccount = obj.(*v1.ServiceAccount)
+	}
+
+	// actual service accounts are deployed lazily at the time of cluster creation or sync
 }
 
 func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
+	c.initPodServiceAccount()
 
 	c.initSharedInformers()
 
