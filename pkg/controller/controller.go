@@ -131,7 +131,7 @@ func (c *Controller) initPodServiceAccount() {
 		c.opConfig.PodServiceAccount = obj.(*v1.ServiceAccount)
 	}
 
-	// actual service accounts are deployed lazily at the time of cluster creation or sync
+	// actual service accounts are deployed at the time of Postgres/Spilo cluster creation
 }
 
 func (c *Controller) initController() {

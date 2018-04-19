@@ -194,6 +194,36 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
+/*
+  Ensures the service account required by StatefulSets to create pods exists in a namespace before a PG cluster is created there so that a user does not have to deploy the account manually.
+
+  The operator does not sync these accounts.
+*/
+func (c *Cluster) createPodServiceAccounts() error {
+
+	podServiceAccount := c.Config.OpConfig.PodServiceAccountName
+	c.setProcessName("creating pod service account in the watched namespaces")
+
+	_, err := c.KubeClient.ServiceAccounts(c.Namespace).Get(podServiceAccount, metav1.GetOptions{})
+
+	if err != nil {
+		c.logger.Warnf("the pod service account %q is absent from the namespace %q. Stateful sets in the namespace are unable to create pods.", podServiceAccount, c.Namespace)
+
+		c.OpConfig.PodServiceAccount.SetNamespace(c.Namespace)
+
+		_, err = c.KubeClient.ServiceAccounts(c.Namespace).Create(c.OpConfig.PodServiceAccount)
+		if err != nil {
+			c.logger.Warnf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccount, c.Namespace, err)
+		} else {
+			c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccount, c.Namespace)
+		}
+	} else {
+		c.logger.Infof("successfully found the service account %q used to create pods to the namespace %q", podServiceAccount, c.Namespace)
+	}
+
+	return err
+}
+
 // Create creates the new kubernetes objects associated with the cluster.
 func (c *Cluster) Create() error {
 	c.mu.Lock()
@@ -256,7 +286,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
-	if err = c.syncPodServiceAccounts(); err != nil {
+	if err = c.createPodServiceAccounts(); err != nil {
 		return fmt.Errorf("could not sync pod service accounts: %v", err)
 	}
 	c.logger.Infof("pod service accounts have been successfully synced")
