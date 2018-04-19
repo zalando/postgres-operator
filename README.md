@@ -87,7 +87,7 @@ By default, the operator watches the namespace it is deployed to. You can change
 
 Note that for an operator to manage pods in the watched namespace, the operator's service account (as specified in the operator deployment manifest) has to have appropriate privileges to access the watched namespace. The operator may not be able to function in the case it watches all namespaces but lacks access rights to any of them (except Kubernetes system namespaces like `kube-system`). The reason is that for multiple namespaces operations such as 'list pods' execute at the cluster scope and fail at the first violation of access rights.
 
-The watched namespace also needs to have a (possibly different) service account in the case database pods need to talk to the Kubernetes API (e.g. when using Kubernetes-native configuration of Patroni).
+The watched namespace also needs to have a (possibly different) service account in the case database pods need to talk to the Kubernetes API (e.g. when using Kubernetes-native configuration of Patroni). The operator checks that the `pod_service_account_name` exists in the target namespace, and, if not, deploys there the `pod_service_account_definition`. In this definition, the operator overwrites the account's name to match `pod_service_account_name` and the namespace to match the target namespace. The operator  performs **no** further syncing of this account.
 
 ### Create ConfigMap
 
