@@ -129,6 +129,8 @@ func (c *Controller) initPodServiceAccount() {
 		panic(fmt.Errorf("pod service account definiton in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
 	default:
 		c.opConfig.PodServiceAccount = obj.(*v1.ServiceAccount)
+		// ensure consistent naming of the account
+		c.opConfig.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
 	}
 
 	// actual service accounts are deployed at the time of Postgres/Spilo cluster creation
