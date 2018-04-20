@@ -128,7 +128,7 @@ func (c *Controller) initPodServiceAccount() {
 	case groupVersionKind.Kind != "ServiceAccount":
 		panic(fmt.Errorf("pod service account definiton in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
 	default:
-		c.opConfig.PodServiceAccount = obj.(*v1.ServiceAccount)
+		c.opConfig.PodServiceAccount = *obj.(*v1.ServiceAccount)
 		// ensure consistent naming of the account
 		c.opConfig.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
 	}
