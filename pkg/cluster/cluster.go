@@ -202,12 +202,12 @@ func (c *Cluster) initUsers() error {
 func (c *Cluster) createPodServiceAccounts() error {
 
 	podServiceAccountName := c.Config.OpConfig.PodServiceAccountName
-	c.setProcessName("creating pod service account in the watched namespaces")
+	c.setProcessName(fmt.Sprintf("creating pod service account in the namespace %v", c.Namespace))
 
 	_, err := c.KubeClient.ServiceAccounts(c.Namespace).Get(podServiceAccountName, metav1.GetOptions{})
 
 	if err != nil {
-		c.logger.Warnf("the pod service account %q is absent from the namespace %q. Stateful sets in the namespace are unable to create pods.", podServiceAccountName, c.Namespace)
+		c.logger.Warnf("the pod service account %q cannot be retrieved in the namespace %q. Stateful sets in the namespace may be unable to create pods. Error: %v", podServiceAccountName, c.Namespace, err)
 
 		// when created, each Cluster struct gets a separate copy of OpConfig
 		// including the nested PodServiceAccount struct, so no race condition here
@@ -215,15 +215,16 @@ func (c *Cluster) createPodServiceAccounts() error {
 
 		_, err = c.KubeClient.ServiceAccounts(c.Namespace).Create(&c.OpConfig.PodServiceAccount)
 		if err != nil {
-			c.logger.Warnf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccountName, c.Namespace, err)
-		} else {
-			c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, c.Namespace)
+			return fmt.Errorf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccountName, c.Namespace, err)
 		}
+
+		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, c.Namespace)
+
 	} else {
 		c.logger.Infof("successfully found the service account %q used to create pods to the namespace %q", podServiceAccountName, c.Namespace)
 	}
 
-	return err
+	return nil
 }
 
 // Create creates the new kubernetes objects associated with the cluster.
@@ -289,7 +290,7 @@ func (c *Cluster) Create() error {
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
 	if err = c.createPodServiceAccounts(); err != nil {
-		return fmt.Errorf("could not sync pod service accounts: %v", err)
+		return fmt.Errorf("could not create pod service account %v : %v", c.OpConfig.PodServiceAccountName, err)
 	}
 	c.logger.Infof("pod service accounts have been successfully synced")
 
