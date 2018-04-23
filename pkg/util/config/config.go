@@ -73,7 +73,6 @@ type Config struct {
 	EtcdHost          string            `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
 	DockerImage       string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
 	// re-use one account for both Spilo pods and the operator; this grants extra privileges to pods
-	ServiceAccountName          string `name:"service_account_name" default:"operator"`
 	PodServiceAccountName       string `name:"pod_service_account_name" default:"operator"`
 	PodServiceAccountDefinition string `name:"pod_service_account_definition" default:"apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: operator\n"`
 	DbHostedZone                string `name:"db_hosted_zone" default:"db.example.com"`
