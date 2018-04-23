@@ -212,12 +212,14 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 
 	token, err := c.oauthTokenGetter.getOAuthToken()
 	if err != nil {
-		return []string{}, fmt.Errorf("could not get oauth token: %v", err)
+		c.logger.Warnf("could not get oauth token to authenticate to team service API, returning empty list of team members: %v", err)
+		return []string{}, nil
 	}
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(c.Spec.TeamID, token)
 	if err != nil {
-		return nil, fmt.Errorf("could not get team info: %v", err)
+		c.logger.Warnf("could not get team info, returning empty list of team members: %v", err)
+		return []string{}, nil
 	}
 
 	return teamInfo.Members, nil
