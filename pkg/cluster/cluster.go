@@ -42,6 +42,7 @@ type Config struct {
 	OpConfig            config.Config
 	RestConfig          *rest.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
+	PodServiceAccount   *v1.ServiceAccount
 }
 
 type kubeResources struct {
@@ -209,11 +210,12 @@ func (c *Cluster) createPodServiceAccounts() error {
 	if err != nil {
 		c.logger.Warnf("the pod service account %q cannot be retrieved in the namespace %q. Stateful sets in the namespace may be unable to create pods. Error: %v", podServiceAccountName, c.Namespace, err)
 
-		// when created, each Cluster struct gets a separate copy of OpConfig
-		// including the nested PodServiceAccount struct, so no race condition here
-		c.OpConfig.PodServiceAccount.SetNamespace(c.Namespace)
+		// get a separate copy of service account
+		// to prevent a race condition when setting a namespace for many clusters
+		sa := *c.PodServiceAccount
+		sa.SetNamespace(c.Namespace)
 
-		_, err = c.KubeClient.ServiceAccounts(c.Namespace).Create(&c.OpConfig.PodServiceAccount)
+		_, err = c.KubeClient.ServiceAccounts(c.Namespace).Create(&sa)
 		if err != nil {
 			return fmt.Errorf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccountName, c.Namespace, err)
 		}

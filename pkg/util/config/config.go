@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
@@ -68,10 +67,10 @@ type Config struct {
 	Resources
 	Auth
 	Scalyr
-	PodServiceAccount v1.ServiceAccount // has to be struct value, not a pointer
-	WatchedNamespace  string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	EtcdHost          string            `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
-	DockerImage       string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
+
+	WatchedNamespace string `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	EtcdHost         string `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
+	DockerImage      string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
 	// re-use one account for both Spilo pods and the operator; this grants extra privileges to pods
 	PodServiceAccountName       string `name:"pod_service_account_name" default:"operator"`
 	PodServiceAccountDefinition string `name:"pod_service_account_definition" default:"apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: operator\n"`

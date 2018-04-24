@@ -26,6 +26,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 		RestConfig:          c.config.RestConfig,
 		OpConfig:            config.Copy(c.opConfig),
 		InfrastructureRoles: infrastructureRoles,
+		PodServiceAccount:   c.PodServiceAccount,
 	}
 }
 
