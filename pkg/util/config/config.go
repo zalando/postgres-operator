@@ -72,8 +72,9 @@ type Config struct {
 	EtcdHost         string `name:"etcd_host" default:"etcd-client.default.svc.cluster.local:2379"`
 	DockerImage      string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
-	PodServiceAccountName       string `name:"pod_service_account_name" default:"operator"`
-	PodServiceAccountDefinition string `name:"pod_service_account_definition" default:"apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: operator\n"`
+	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
+	// value of this string must be valid JSON or YAML; see initPodServiceAccount
+	PodServiceAccountDefinition string `name:"pod_service_account_definition" default:""`
 	DbHostedZone                string `name:"db_hosted_zone" default:"db.example.com"`
 	EtcdScope                   string `name:"etcd_scope" default:"service"`
 	WALES3Bucket                string `name:"wal_s3_bucket"`

@@ -120,6 +120,17 @@ func (c *Controller) initOperatorConfig() {
 }
 
 func (c *Controller) initPodServiceAccount() {
+
+	if c.opConfig.PodServiceAccountDefinition == "" {
+		c.opConfig.PodServiceAccountDefinition = `
+		{ "apiVersion": "v1", 
+		  "kind": "ServiceAccount", 
+		  "metadata": { 
+				 "name": "operator" 
+		   }
+		}`
+	}
+
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, groupVersionKind, err := decode([]byte(c.opConfig.PodServiceAccountDefinition), nil, nil)
@@ -134,6 +145,7 @@ func (c *Controller) initPodServiceAccount() {
 		if c.PodServiceAccount.Name != c.opConfig.PodServiceAccountName {
 			c.logger.Warnf("in the operator config map, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
 			c.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
+			c.PodServiceAccount.Namespace = ""
 		}
 	}
 
