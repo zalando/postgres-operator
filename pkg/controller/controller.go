@@ -145,8 +145,8 @@ func (c *Controller) initPodServiceAccount() {
 		if c.PodServiceAccount.Name != c.opConfig.PodServiceAccountName {
 			c.logger.Warnf("in the operator config map, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
 			c.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
-			c.PodServiceAccount.Namespace = ""
 		}
+		c.PodServiceAccount.Namespace = ""
 	}
 
 	// actual service accounts are deployed at the time of Postgres/Spilo cluster creation
