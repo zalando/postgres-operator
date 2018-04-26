@@ -203,12 +203,13 @@ func (c *Cluster) initUsers() error {
 func (c *Cluster) createPodServiceAccounts() error {
 
 	podServiceAccountName := c.Config.OpConfig.PodServiceAccountName
-	c.setProcessName(fmt.Sprintf("creating pod service account in the namespace %v", c.Namespace))
-
 	_, err := c.KubeClient.ServiceAccounts(c.Namespace).Get(podServiceAccountName, metav1.GetOptions{})
 
 	if err != nil {
-		c.logger.Infof("the pod service account %q cannot be retrieved in the namespace %q; stateful sets in the namespace may be unable to create pods. Trying to deploy the account.", podServiceAccountName, c.Namespace)
+
+		c.setProcessName(fmt.Sprintf("creating pod service account in the namespace %v", c.Namespace))
+
+		c.logger.Infof("the pod service account %q cannot be retrieved in the namespace %q. Trying to deploy the account.", podServiceAccountName, c.Namespace)
 
 		// get a separate copy of service account
 		// to prevent a race condition when setting a namespace for many clusters
