@@ -435,7 +435,7 @@ func (c *Cluster) generatePodTemplate(
 	terminateGracePeriodSeconds := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
 
 	podSpec := v1.PodSpec{
-		ServiceAccountName:            c.OpConfig.ServiceAccountName,
+		ServiceAccountName:            c.OpConfig.PodServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    []v1.Container{container},
 		Tolerations:                   c.tolerations(tolerationsSpec),
