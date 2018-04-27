@@ -278,7 +278,10 @@ func (c *Cluster) waitStatefulsetReady() error {
 		})
 }
 
-func (c *Cluster) waitPodLabelsReady() error {
+func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
+	var (
+		podsNumber int
+	)
 	ls := c.labelsSet(false)
 	namespace := c.Namespace
 
@@ -295,33 +298,53 @@ func (c *Cluster) waitPodLabelsReady() error {
 			c.OpConfig.PodRoleLabel: string(Replica),
 		}).String(),
 	}
-	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
-	if err != nil {
-		return err
+	podsNumber = 1
+	if !anyReplica {
+		pods, err := c.KubeClient.Pods(namespace).List(listOptions)
+		if err != nil {
+			return err
+		}
+		podsNumber = len(pods.Items)
+		c.logger.Debugf("Waiting for %d pods to become ready", podsNumber)
+	} else {
+		c.logger.Debugf("Waiting for any replica pod to become ready")
 	}
-	podsNumber := len(pods.Items)
 
-	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+	err := retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
-			masterPods, err2 := c.KubeClient.Pods(namespace).List(masterListOption)
-			if err2 != nil {
-				return false, err2
+			masterCount := 0
+			if !anyReplica {
+				masterPods, err2 := c.KubeClient.Pods(namespace).List(masterListOption)
+				if err2 != nil {
+					return false, err2
+				}
+				if len(masterPods.Items) > 1 {
+					return false, fmt.Errorf("too many masters")
+				}
+				masterCount = len(masterPods.Items)
 			}
 			replicaPods, err2 := c.KubeClient.Pods(namespace).List(replicaListOption)
 			if err2 != nil {
 				return false, err2
 			}
-			if len(masterPods.Items) > 1 {
-				return false, fmt.Errorf("too many masters")
-			}
-			if len(replicaPods.Items) == podsNumber {
+			replicaCount := len(replicaPods.Items)
+			if anyReplica && replicaCount > 1 {
+				c.logger.Debugf("Found %d running replica pods", replicaCount)
 				return true, nil
 			}
 
-			return len(masterPods.Items)+len(replicaPods.Items) == podsNumber, nil
+			return masterCount+replicaCount >= podsNumber, nil
 		})
 
 	return err
+}
+
+func (c *Cluster) waitForAnyReplicaLabelReady() error {
+	return c._waitPodLabelsReady(true)
+}
+
+func (c *Cluster) waitForAllPodsLabelReady() error {
+	return c._waitPodLabelsReady(false)
 }
 
 func (c *Cluster) waitStatefulsetPodsReady() error {
@@ -332,7 +355,7 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 	}
 
 	// TODO: wait only for master
-	if err := c.waitPodLabelsReady(); err != nil {
+	if err := c.waitForAllPodsLabelReady(); err != nil {
 		return fmt.Errorf("pod labels error: %v", err)
 	}
 
