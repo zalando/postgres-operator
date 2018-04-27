@@ -155,7 +155,7 @@ func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 	}
 
 	if len(replicas) == 0 {
-		c.logger.Warningf("single master pod for cluster %q, migration will cause disruption of the service")
+		c.logger.Warningf("single master pod for cluster %q, migration will cause disruption of the service", c.Name)
 		return nil, nil
 	}
 

@@ -293,7 +293,7 @@ func (c *Cluster) Create() error {
 	if err = c.createPodServiceAccounts(); err != nil {
 		return fmt.Errorf("could not create pod service account %v : %v", c.OpConfig.PodServiceAccountName, err)
 	}
-	c.logger.Infof("pod service accounts have been successfully synced")
+	c.logger.Infof("pod service accounts have been successfully found/created")
 
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
