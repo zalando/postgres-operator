@@ -78,8 +78,9 @@ const (
 )
 
 const (
-	serviceNameMaxLength = 63
-	clusterNameMaxLength = serviceNameMaxLength - len("-repl")
+	serviceNameMaxLength   = 63
+	clusterNameMaxLength   = serviceNameMaxLength - len("-repl")
+	serviceNameRegexString = `^[a-z]([-a-z0-9]*[a-z0-9])?$`
 )
 
 // Postgresql defines PostgreSQL Custom Resource Definition Object.
@@ -134,7 +135,7 @@ type PostgresqlList struct {
 
 var (
 	weekdays         = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
-	serviceNameRegex = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
+	serviceNameRegex = regexp.MustCompile(serviceNameRegexString)
 )
 
 func parseTime(s string) (time.Time, error) {
@@ -238,7 +239,8 @@ func extractClusterName(clusterName string, teamName string) (string, error) {
 		return "", fmt.Errorf("name cannot be longer than %d characters", clusterNameMaxLength)
 	}
 	if !serviceNameRegex.MatchString(clusterName) {
-		return "", fmt.Errorf("name must confirm to a valid service name (DNS-1035)")
+		return "", fmt.Errorf("name must confirm to DNS-1035, regex used for validation is %q",
+			serviceNameRegexString)
 	}
 
 	return clusterName[teamNameLen+1:], nil
@@ -248,7 +250,8 @@ func validateCloneClusterDescription(clone *CloneDescription) error {
 	// when cloning from the basebackup (no end timestamp) check that the cluster name is a valid service name
 	if clone.ClusterName != "" && clone.EndTimestamp == "" {
 		if !serviceNameRegex.MatchString(clone.ClusterName) {
-			return fmt.Errorf("clone cluster name must confirm to a valid service name (DNS-1035)")
+			return fmt.Errorf("clone cluster name must confirm to DNS-1035, regex used for validation is %q",
+				serviceNameRegexString)
 		}
 		if len(clone.ClusterName) > serviceNameMaxLength {
 			return fmt.Errorf("clone cluster name must be no longer than %d characters", serviceNameMaxLength)
