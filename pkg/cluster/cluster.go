@@ -872,7 +872,7 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 		select {
 		case <-stopCh:
 		case podLabelErr <- func() error {
-			_, err := c.waitForPodLabel(ch, &role)
+			_, err := c.waitForPodLabel(ch, stopCh, &role)
 			return err
 		}():
 		}

@@ -263,6 +263,7 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
+	stopChan := make(chan struct{})
 
 	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, c.deleteOptions); err != nil {
 		return nil, fmt.Errorf("could not delete pod: %v", err)
@@ -271,7 +272,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	if err := c.waitForPodDeletion(ch); err != nil {
 		return nil, err
 	}
-	if pod, err := c.waitForPodLabel(ch, nil); err != nil {
+	if pod, err := c.waitForPodLabel(ch, stopChan, nil); err != nil {
 		return nil, err
 	} else {
 		c.logger.Infof("pod %q has been recreated", podName)
