@@ -360,8 +360,14 @@ func (c *Cluster) generatePodTemplate(
 	}
 	if c.OpConfig.WALES3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getWALBucketScopeSuffix(string(uid))})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+	}
+
+	if c.OpConfig.LogS3Bucket != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
+		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.patroniUsesKubernetes() {
@@ -504,7 +510,7 @@ func (c *Cluster) generatePodTemplate(
 	return &template
 }
 
-func getWALBucketScopeSuffix(uid string) string {
+func getBucketScopeSuffix(uid string) string {
 	if uid != "" {
 		return fmt.Sprintf("/%s", uid)
 	}
@@ -819,7 +825,7 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getWALBucketScopeSuffix(description.Uid)})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.Uid)})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
