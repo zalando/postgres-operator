@@ -364,10 +364,10 @@ func (c *Cluster) generatePodTemplate(
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
-	if c.OpConfig.PgDailyLogS3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "PG_DAILY_LOG_S3_BUCKET", Value: c.OpConfig.PgDailyLogS3Bucket})
-		envVars = append(envVars, v1.EnvVar{Name: "PG_DAILY_LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
-		envVars = append(envVars, v1.EnvVar{Name: "PG_DAILY_LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+	if c.OpConfig.LogS3Bucket != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
+		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
 	if c.patroniUsesKubernetes() {

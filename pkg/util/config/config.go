@@ -78,7 +78,7 @@ type Config struct {
 	DbHostedZone                string `name:"db_hosted_zone" default:"db.example.com"`
 	EtcdScope                   string `name:"etcd_scope" default:"service"`
 	WALES3Bucket                string `name:"wal_s3_bucket"`
-	PgDailyLogS3Bucket          string `name:"pg_daily_log_s3_bucket"`
+	LogS3Bucket                 string `name:"log_s3_bucket"`
 	KubeIAMRole                 string `name:"kube_iam_role"`
 	DebugLogging                bool   `name:"debug_logging" default:"true"`
 	EnableDBAccess              bool   `name:"enable_database_access" default:"true"`
