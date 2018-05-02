@@ -44,7 +44,7 @@ var clusterNames = []struct {
 	{"test-my-name", "test", "my-name", nil},
 	{"my-team-another-test", "my-team", "another-test", nil},
 	{"------strange-team-cluster", "-----", "strange-team-cluster",
-		errors.New("name must confirm to a valid service name (DNS-1035)")},
+		errors.New(`name must confirm to DNS-1035, regex used for validation is "^[a-z]([-a-z0-9]*[a-z0-9])?$"`)},
 	{"fooobar-fooobarfooobarfooobarfooobarfooobarfooobarfooobarfooobar", "fooobar", "",
 		errors.New("name cannot be longer than 58 characters")},
 	{"acid-test", "test", "", errors.New("name must match {TEAM}-{NAME} format")},
@@ -60,7 +60,7 @@ var cloneClusterDescriptions = []struct {
 }{
 	{&CloneDescription{"foo+bar", "", "NotEmpty"}, nil},
 	{&CloneDescription{"foo+bar", "", ""},
-		errors.New("clone cluster name must confirm to a valid service name (DNS-1035)")},
+		errors.New(`clone cluster name must confirm to DNS-1035, regex used for validation is "^[a-z]([-a-z0-9]*[a-z0-9])?$"`)},
 	{&CloneDescription{"foobar123456789012345678901234567890123456789012345678901234567890", "", ""},
 		errors.New("clone cluster name must be no longer than 63 characters")},
 	{&CloneDescription{"foobar", "", ""}, nil},
@@ -419,7 +419,7 @@ func TestCloneClusterDescription(t *testing.T) {
 	for _, tt := range cloneClusterDescriptions {
 		if err := validateCloneClusterDescription(tt.in); err != nil {
 			if tt.err == nil || err.Error() != tt.err.Error() {
-				t.Errorf("testCloneClusterDescription expected error: %v, got: %v")
+				t.Errorf("testCloneClusterDescription expected error: %v, got: %v", tt.err, err)
 			}
 		} else if tt.err != nil {
 			t.Errorf("Expected error: %v", tt.err)
