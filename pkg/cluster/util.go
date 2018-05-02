@@ -321,7 +321,8 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 					return false, err2
 				}
 				if len(masterPods.Items) > 1 {
-					return false, fmt.Errorf("too many masters")
+					return false, fmt.Errorf("too many masters (%d pods with the master label found)",
+						len(masterPods.Items))
 				}
 				masterCount = len(masterPods.Items)
 			}
@@ -330,7 +331,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 				return false, err2
 			}
 			replicaCount := len(replicaPods.Items)
-			if anyReplica && replicaCount > 1 {
+			if anyReplica && replicaCount > 0 {
 				c.logger.Debugf("Found %d running replica pods", replicaCount)
 				return true, nil
 			}
