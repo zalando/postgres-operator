@@ -72,13 +72,12 @@ type Cluster struct {
 	deleteOptions    *metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
-	teamsAPIClient       teams.Interface
-	oauthTokenGetter     OAuthTokenGetter
-	KubeClient           k8sutil.KubernetesClient //TODO: move clients to the better place?
-	currentProcess       spec.Process
-	processMu            sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
-	specMu               sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	pendingRollingUpdate *bool        // indicates the cluster needs a rolling update
+	teamsAPIClient   teams.Interface
+	oauthTokenGetter OAuthTokenGetter
+	KubeClient       k8sutil.KubernetesClient //TODO: move clients to the better place?
+	currentProcess   spec.Process
+	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
+	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
 }
 
 type compareStatefulsetResult struct {
@@ -111,11 +110,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy:     users.DefaultUserSyncStrategy{},
-		deleteOptions:        &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
-		podEventsQueue:       podEventsQueue,
-		KubeClient:           kubeClient,
-		pendingRollingUpdate: nil,
+		userSyncStrategy: users.DefaultUserSyncStrategy{},
+		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
+		podEventsQueue:   podEventsQueue,
+		KubeClient:       kubeClient,
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
@@ -251,7 +249,6 @@ func (c *Cluster) Create() error {
 	}()
 
 	c.setStatus(spec.ClusterStatusCreating)
-	c.setPendingRollingUpgrade(false)
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
@@ -301,7 +298,7 @@ func (c *Cluster) Create() error {
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
 	}
-	ss, err = c.createStatefulSet()
+	ss, err = c.createStatefulSet(false)
 	if err != nil {
 		return fmt.Errorf("could not create statefulset: %v", err)
 	}
@@ -344,6 +341,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
 		match = false
 		reasons = append(reasons, "new statefulset's number of replicas doesn't match the current one")
+	}
+	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
+		match = false
+		reasons = append(reasons, "new statefulset's annotations doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
 		needsRollUpdate = true
@@ -396,9 +397,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
-		needsRollUpdate = true
+		match = false
 		needsReplace = true
-		reasons = append(reasons, "new statefulset's metadata annotations doesn't match the current one")
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod template metadata annotations doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
 		needsReplace = true

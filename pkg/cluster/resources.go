@@ -17,6 +17,10 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
 
+const (
+	RollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update"
+)
+
 func (c *Cluster) listResources() error {
 	if c.PodDisruptionBudget != nil {
 		c.logger.Infof("found pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta), c.PodDisruptionBudget.UID)
@@ -59,9 +63,38 @@ func (c *Cluster) listResources() error {
 	return nil
 }
 
-func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
+func setRollingUpdateFlag(sset *v1beta1.StatefulSet, val bool) {
+	anno := sset.GetAnnotations()
+	fmt.Printf("rolling upgrade flag has been set to %t", val)
+	if anno == nil {
+		anno = make(map[string]string)
+	}
+	anno[RollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
+	sset.SetAnnotations(anno)
+}
+
+func getRollingUpdateFlag(sset *v1beta1.StatefulSet, defaultValue bool) (flag bool) {
+	anno := sset.GetAnnotations()
+	flag = defaultValue
+
+	stringFlag, exists := anno[RollingUpdateStatefulsetAnnotationKey]
+	if exists {
+		var err error
+		if flag, err = strconv.ParseBool(stringFlag); err != nil {
+			fmt.Printf("error when parsing %s annotation for the statefulset %s: expected boolean value, got %s\n",
+				RollingUpdateStatefulsetAnnotationKey,
+				types.NamespacedName{sset.Namespace, sset.Name},
+				stringFlag)
+			flag = defaultValue
+		}
+	}
+	return flag
+}
+
+func (c *Cluster) createStatefulSet(pendingRollingUpgrade bool) (*v1beta1.StatefulSet, error) {
 	c.setProcessName("creating statefulset")
 	statefulSetSpec, err := c.generateStatefulSet(&c.Spec)
+	setRollingUpdateFlag(statefulSetSpec, pendingRollingUpgrade)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate statefulset: %v", err)
 	}
@@ -128,7 +161,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 	return nil
 }
 
-func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet, includeAnnotations bool) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
@@ -153,8 +186,19 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 		types.MergePatchType,
 		patchData, "")
 	if err != nil {
-		return fmt.Errorf("could not patch statefulset %q: %v", statefulSetName, err)
+		return fmt.Errorf("could not patch statefulset spec %q: %v", statefulSetName, err)
 	}
+	if includeAnnotations && newStatefulSet.Annotations != nil {
+		patchData := metadataAnnotationsPatch(newStatefulSet.Annotations)
+		statefulSet, err = c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
+			c.Statefulset.Name,
+			types.StrategicMergePatchType,
+			[]byte(patchData), "")
+		if err != nil {
+			return fmt.Errorf("could not patch statefulset annotations %q: %v", patchData, err)
+		}
+	}
+
 	c.Statefulset = statefulSet
 
 	return nil

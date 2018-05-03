@@ -39,10 +39,6 @@ func NewSecretOauthTokenGetter(kubeClient *k8sutil.KubernetesClient,
 	return &SecretOauthTokenGetter{kubeClient, OAuthTokenSecretName}
 }
 
-const (
-	podControllerRevisionHashLabel = "controller-revision-hash"
-)
-
 func (g *SecretOauthTokenGetter) getOAuthToken() (string, error) {
 	//TODO: we can move this function to the Controller in case it will be needed there. As for now we use it only in the Cluster
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
@@ -461,57 +457,4 @@ func (c *Cluster) GetSpec() (*spec.Postgresql, error) {
 
 func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
-}
-
-func (c *Cluster) setPendingRollingUpgrade(val bool) {
-	if c.pendingRollingUpdate == nil {
-		c.pendingRollingUpdate = new(bool)
-	}
-	*c.pendingRollingUpdate = val
-	c.logger.Debugf("pending rolling upgrade was set to %b", val)
-}
-
-// resolvePendingRollingUpdate figures out if rolling upgrade is necessary
-// based on the states of the cluster statefulset and pods
-func (c *Cluster) resolvePendingRollingUpdate(sset *v1beta1.StatefulSet) error {
-	// XXX: it looks like we will always trigger a rolling update if the
-	// pods are on a different revision from a statefulset, even if the
-	// statefulset change that caused it didn't require a rolling update
-	// originally.
-	if c.pendingRollingUpdate != nil {
-		return nil
-	}
-	c.logger.Debugf("evaluating rolling upgrade requirement")
-	effectiveRevision := sset.Status.UpdateRevision
-	if effectiveRevision == "" {
-		if sset.Status.CurrentRevision == "" {
-			c.logger.Debugf("statefulset doesn't have a current revision, no rolling upgrade")
-			// the statefulset does not have a currentRevision, it must be new; hence, no rollingUpdate
-			c.setPendingRollingUpgrade(false)
-			return nil
-		}
-		effectiveRevision = sset.Status.CurrentRevision
-	}
-
-	// fetch all pods related to this cluster
-	pods, err := c.listPods()
-	if err != nil {
-		return err
-	}
-	// check their revisions
-	for _, pod := range pods {
-		podRevision, present := pod.Labels[podControllerRevisionHashLabel]
-		// empty or missing revision indicates a new pod - doesn't need a rolling upgrade
-		if !present || podRevision == "" {
-			continue
-		}
-		c.logger.Debugf("observing pod revision %q vs statefulset revision %q", podRevision, effectiveRevision)
-		if podRevision != effectiveRevision {
-			// pod is on a different revision - trigger the rolling upgrade
-			c.setPendingRollingUpgrade(true)
-			return nil
-		}
-	}
-	c.setPendingRollingUpgrade(false)
-	return nil
 }

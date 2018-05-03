@@ -220,7 +220,9 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 }
 
 func (c *Cluster) syncStatefulSet() error {
-
+	var (
+		cachedRollingUpdateFlag, podsRollingUpdateRequired bool
+	)
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
 	if err != nil {
 		if !k8sutil.ResourceNotFound(err) {
@@ -234,7 +236,8 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not list pods of the statefulset: %v", err)
 		}
 
-		sset, err = c.createStatefulSet()
+		podsRollingUpdateRequired := (len(pods) > 0)
+		sset, err = c.createStatefulSet(podsRollingUpdateRequired)
 		if err != nil {
 			return fmt.Errorf("could not create missing statefulset: %v", err)
 		}
@@ -244,36 +247,42 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
-		if len(pods) <= 0 {
-			return nil
-		}
-		c.logger.Infof("found pods without the statefulset: trigger rolling update")
-		c.setPendingRollingUpgrade(true)
 
 	} else {
+		if c.Statefulset != nil {
+			// if we reset the rolling update flag in the statefulset structure in memory but didn't manage to update
+			// the actual object in Kubernetes for some reason we want to avoid doing an unnecessary update by relying
+			// on the 'cached' in-memory flag.
+			cachedRollingUpdateFlag = getRollingUpdateFlag(c.Statefulset, true)
+			c.logger.Debugf("cached statefulset value exists, rollingUpdate flag is %t", cachedRollingUpdateFlag)
+		}
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
-		// resolve the pending rolling upgrade flags as soon as we read an actual statefulset from kubernetes.
-		// we must do it before updating statefulsets; after an update, the statfulset will receive a new
-		// updateRevision, different from the one the pods run with.
-		if err := c.resolvePendingRollingUpdate(sset); err != nil {
-			return fmt.Errorf("could not resolve the rolling upgrade status: %v", err)
+		if podsRollingUpdateRequired = getRollingUpdateFlag(c.Statefulset, false); podsRollingUpdateRequired {
+			if cachedRollingUpdateFlag {
+				c.logger.Infof("found a statefulset with an unfinished pods rolling update")
+			} else {
+				c.logger.Infof("clearing the rolling update flag based on the cached information")
+				podsRollingUpdateRequired = false
+			}
 		}
 
 		desiredSS, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
+		setRollingUpdateFlag(desiredSS, podsRollingUpdateRequired)
 
 		cmp := c.compareStatefulSetWith(desiredSS)
 		if !cmp.match {
-			if cmp.rollingUpdate {
-				c.setPendingRollingUpgrade(true)
+			if cmp.rollingUpdate && !podsRollingUpdateRequired {
+				podsRollingUpdateRequired = true
+				setRollingUpdateFlag(desiredSS, podsRollingUpdateRequired)
 			}
 			c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
 
 			if !cmp.replace {
-				if err := c.updateStatefulSet(desiredSS); err != nil {
+				if err := c.updateStatefulSet(desiredSS, true); err != nil {
 					return fmt.Errorf("could not update statefulset: %v", err)
 				}
 			} else {
@@ -285,15 +294,17 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
-	if *c.pendingRollingUpdate {
+	if podsRollingUpdateRequired {
 		c.logger.Debugln("performing rolling update")
 		if err := c.recreatePods(); err != nil {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
-		c.setPendingRollingUpgrade(false)
 		c.logger.Infof("pods have been recreated")
+		setRollingUpdateFlag(c.Statefulset, false)
+		if err := c.updateStatefulSet(c.Statefulset, true); err != nil {
+			c.logger.Warningf("could not clear rolling update for the statefulset")
+		}
 	}
-
 	return nil
 }
 
