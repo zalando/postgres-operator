@@ -42,6 +42,7 @@ type Config struct {
 	OpConfig            config.Config
 	RestConfig          *rest.Config
 	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
+	PodServiceAccount   *v1.ServiceAccount
 }
 
 type kubeResources struct {
@@ -196,6 +197,39 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
+/*
+  Ensures the service account required by StatefulSets to create pods exists in a namespace before a PG cluster is created there so that a user does not have to deploy the account manually.
+
+  The operator does not sync these accounts after creation.
+*/
+func (c *Cluster) createPodServiceAccounts() error {
+
+	podServiceAccountName := c.Config.OpConfig.PodServiceAccountName
+	_, err := c.KubeClient.ServiceAccounts(c.Namespace).Get(podServiceAccountName, metav1.GetOptions{})
+
+	if err != nil {
+
+		c.setProcessName(fmt.Sprintf("creating pod service account in the namespace %v", c.Namespace))
+
+		c.logger.Infof("the pod service account %q cannot be retrieved in the namespace %q. Trying to deploy the account.", podServiceAccountName, c.Namespace)
+
+		// get a separate copy of service account
+		// to prevent a race condition when setting a namespace for many clusters
+		sa := *c.PodServiceAccount
+		_, err = c.KubeClient.ServiceAccounts(c.Namespace).Create(&sa)
+		if err != nil {
+			return fmt.Errorf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccountName, c.Namespace, err)
+		}
+
+		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, c.Namespace)
+
+	} else {
+		c.logger.Infof("successfully found the service account %q used to create pods to the namespace %q", podServiceAccountName, c.Namespace)
+	}
+
+	return nil
+}
+
 // Create creates the new kubernetes objects associated with the cluster.
 func (c *Cluster) Create() error {
 	c.mu.Lock()
@@ -258,6 +292,11 @@ func (c *Cluster) Create() error {
 		return fmt.Errorf("could not create pod disruption budget: %v", err)
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
+
+	if err = c.createPodServiceAccounts(); err != nil {
+		return fmt.Errorf("could not create pod service account %v : %v", c.OpConfig.PodServiceAccountName, err)
+	}
+	c.logger.Infof("pod service accounts have been successfully synced")
 
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
@@ -822,6 +861,7 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 // ManualFailover does manual failover to a candidate pod
 func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
 	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
+
 	podLabelErr := make(chan error)
 	stopCh := make(chan struct{})
 	defer close(podLabelErr)
@@ -832,11 +872,12 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 
 		role := Master
 
-		_, err := c.waitForPodLabel(ch, &role)
-
 		select {
 		case <-stopCh:
-		case podLabelErr <- err:
+		case podLabelErr <- func() error {
+			_, err := c.waitForPodLabel(ch, stopCh, &role)
+			return err
+		}():
 		}
 	}()
 

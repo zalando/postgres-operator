@@ -108,11 +108,10 @@ func (c *Cluster) syncService(role PostgresRole) error {
 
 	svc, err := c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{})
 	if err == nil {
-
+		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
 		match, reason := k8sutil.SameService(svc, desiredSvc)
 		if match {
-			c.Services[role] = svc
 			return nil
 		}
 		c.logServiceChanges(role, svc, desiredSvc, false, reason)

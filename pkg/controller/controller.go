@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -50,6 +51,8 @@ type Controller struct {
 	lastClusterSyncTime int64
 
 	workerLogs map[uint32]ringlog.RingLogger
+
+	PodServiceAccount *v1.ServiceAccount
 }
 
 // NewController creates a new controller
@@ -113,11 +116,46 @@ func (c *Controller) initOperatorConfig() {
 	if scalyrAPIKey != "" {
 		c.opConfig.ScalyrAPIKey = scalyrAPIKey
 	}
+
+}
+
+func (c *Controller) initPodServiceAccount() {
+
+	if c.opConfig.PodServiceAccountDefinition == "" {
+		c.opConfig.PodServiceAccountDefinition = `
+		{ "apiVersion": "v1", 
+		  "kind": "ServiceAccount", 
+		  "metadata": { 
+				 "name": "operator" 
+		   }
+		}`
+	}
+
+	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	obj, groupVersionKind, err := decode([]byte(c.opConfig.PodServiceAccountDefinition), nil, nil)
+
+	switch {
+	case err != nil:
+		panic(fmt.Errorf("Unable to parse pod service account definiton from the operator config map: %v", err))
+	case groupVersionKind.Kind != "ServiceAccount":
+		panic(fmt.Errorf("pod service account definiton in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+	default:
+		c.PodServiceAccount = obj.(*v1.ServiceAccount)
+		if c.PodServiceAccount.Name != c.opConfig.PodServiceAccountName {
+			c.logger.Warnf("in the operator config map, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
+			c.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
+		}
+		c.PodServiceAccount.Namespace = ""
+	}
+
+	// actual service accounts are deployed at the time of Postgres/Spilo cluster creation
 }
 
 func (c *Controller) initController() {
 	c.initClients()
 	c.initOperatorConfig()
+	c.initPodServiceAccount()
 
 	c.initSharedInformers()
 
