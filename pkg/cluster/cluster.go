@@ -858,6 +858,7 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 // ManualFailover does manual failover to a candidate pod
 func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
 	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
+
 	podLabelErr := make(chan error)
 	stopCh := make(chan struct{})
 	defer close(podLabelErr)
@@ -868,11 +869,12 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 
 		role := Master
 
-		_, err := c.waitForPodLabel(ch, &role)
-
 		select {
 		case <-stopCh:
-		case podLabelErr <- err:
+		case podLabelErr <- func() error {
+			_, err := c.waitForPodLabel(ch, stopCh, &role)
+			return err
+		}():
 		}
 	}()
 

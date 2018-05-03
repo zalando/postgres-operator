@@ -149,13 +149,19 @@ func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
 }
 
 func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
+
+	// Wait until at least one replica pod will come up
+	if err := c.waitForAnyReplicaLabelReady(); err != nil {
+		c.logger.Warningf("could not find at least one ready replica: %v", err)
+	}
+
 	replicas, err := c.getRolePods(Replica)
 	if err != nil {
 		return nil, fmt.Errorf("could not get replica pods: %v", err)
 	}
 
 	if len(replicas) == 0 {
-		c.logger.Warningf("single master pod for cluster %q, migration will cause disruption of the service")
+		c.logger.Warningf("no available master candidates, migration will cause longer downtime of the master instance")
 		return nil, nil
 	}
 
@@ -168,12 +174,16 @@ func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 			}
 		}
 	}
-	c.logger.Debug("no available master candidates on live nodes")
+	c.logger.Warningf("no available master candidates on live nodes")
 	return &replicas[rand.Intn(len(replicas))], nil
 }
 
 // MigrateMasterPod migrates master pod via failover to a replica
 func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
+	var (
+		masterCandidatePod *v1.Pod
+	)
+
 	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
 
 	if err != nil {
@@ -193,10 +203,13 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		c.logger.Warningf("pod %q is not a master", podName)
 		return nil
 	}
-
-	masterCandidatePod, err := c.masterCandidate(oldMaster.Spec.NodeName)
-	if err != nil {
-		return fmt.Errorf("could not get new master candidate: %v", err)
+	if *c.Statefulset.Spec.Replicas == 1 {
+		c.logger.Warningf("single master pod for cluster %q, migration will cause longer downtime of the master instance", c.clusterName())
+	} else {
+		masterCandidatePod, err = c.masterCandidate(oldMaster.Spec.NodeName)
+		if err != nil {
+			return fmt.Errorf("could not get new master candidate: %v", err)
+		}
 	}
 
 	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
@@ -250,6 +263,7 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
+	stopChan := make(chan struct{})
 
 	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, c.deleteOptions); err != nil {
 		return nil, fmt.Errorf("could not delete pod: %v", err)
@@ -258,7 +272,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	if err := c.waitForPodDeletion(ch); err != nil {
 		return nil, err
 	}
-	if pod, err := c.waitForPodLabel(ch, nil); err != nil {
+	if pod, err := c.waitForPodLabel(ch, stopChan, nil); err != nil {
 		return nil, err
 	} else {
 		c.logger.Infof("pod %q has been recreated", podName)

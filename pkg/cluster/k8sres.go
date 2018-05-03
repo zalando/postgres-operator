@@ -707,7 +707,7 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *sp
 		// `enable_load_balancer`` governs LB for a master service
 		// there is no equivalent deprecated operator option for the replica LB
 		if c.OpConfig.EnableLoadBalancer != nil {
-			c.logger.Debugf("The operator configmap sets the deprecated `enable_load_balancer` param. Consider using the `enable_master_load_balancer` or `enable_replica_load_balancer` instead.", c.Name)
+			c.logger.Debugf("The operator configmap sets the deprecated `enable_load_balancer` param. Consider using the `enable_master_load_balancer` or `enable_replica_load_balancer` instead.")
 			return *c.OpConfig.EnableLoadBalancer
 		}
 
