@@ -43,12 +43,27 @@ var clusterNames = []struct {
 	{"acid-test", "acid", "test", nil},
 	{"test-my-name", "test", "my-name", nil},
 	{"my-team-another-test", "my-team", "another-test", nil},
-	{"------strange-team-cluster", "-----", "strange-team-cluster", nil},
+	{"------strange-team-cluster", "-----", "strange-team-cluster",
+		errors.New(`name must confirm to DNS-1035, regex used for validation is "^[a-z]([-a-z0-9]*[a-z0-9])?$"`)},
+	{"fooobar-fooobarfooobarfooobarfooobarfooobarfooobarfooobarfooobar", "fooobar", "",
+		errors.New("name cannot be longer than 58 characters")},
 	{"acid-test", "test", "", errors.New("name must match {TEAM}-{NAME} format")},
 	{"-test", "", "", errors.New("team name is empty")},
 	{"-test", "-", "", errors.New("name must match {TEAM}-{NAME} format")},
 	{"", "-", "", errors.New("name is too short")},
 	{"-", "-", "", errors.New("name is too short")},
+}
+
+var cloneClusterDescriptions = []struct {
+	in  *CloneDescription
+	err error
+}{
+	{&CloneDescription{"foo+bar", "", "NotEmpty"}, nil},
+	{&CloneDescription{"foo+bar", "", ""},
+		errors.New(`clone cluster name must confirm to DNS-1035, regex used for validation is "^[a-z]([-a-z0-9]*[a-z0-9])?$"`)},
+	{&CloneDescription{"foobar123456789012345678901234567890123456789012345678901234567890", "", ""},
+		errors.New("clone cluster name must be no longer than 63 characters")},
+	{&CloneDescription{"foobar", "", ""}, nil},
 }
 
 var maintenanceWindows = []struct {
@@ -279,14 +294,15 @@ var unmarshalCluster = []struct {
 				Name: "acid-testcluster1",
 			},
 			Spec: PostgresSpec{
-				TeamID:      "acid",
-				Clone:       CloneDescription{},
+				TeamID: "acid",
+				Clone: CloneDescription{
+					ClusterName: "team-batman",
+				},
 				ClusterName: "testcluster1",
 			},
-			Status: ClusterStatusInvalid,
-			Error:  errors.New("name must match {TEAM}-{NAME} format for the cluster to clone"),
+			Error: nil,
 		},
-		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":"Invalid"}`), err: nil},
+		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{"cluster":"team-batman"}}}`), err: nil},
 	{[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1"`),
 		Postgresql{},
 		[]byte{},
@@ -350,11 +366,12 @@ func TestParseTime(t *testing.T) {
 	for _, tt := range parseTimeTests {
 		aTime, err := parseTime(tt.in)
 		if err != nil {
-			if err.Error() != tt.err.Error() {
+			if tt.err == nil || err.Error() != tt.err.Error() {
 				t.Errorf("ParseTime expected error: %v, got: %v", tt.err, err)
 			}
-
 			continue
+		} else if tt.err != nil {
+			t.Errorf("Expected error: %v", tt.err)
 		}
 
 		if aTime != tt.out {
@@ -367,11 +384,12 @@ func TestWeekdayTime(t *testing.T) {
 	for _, tt := range parseWeekdayTests {
 		aTime, err := parseWeekday(tt.in)
 		if err != nil {
-			if err.Error() != tt.err.Error() {
+			if tt.err == nil || err.Error() != tt.err.Error() {
 				t.Errorf("ParseWeekday expected error: %v, got: %v", tt.err, err)
 			}
-
 			continue
+		} else if tt.err != nil {
+			t.Errorf("Expected error: %v", tt.err)
 		}
 
 		if aTime != tt.out {
@@ -383,12 +401,28 @@ func TestWeekdayTime(t *testing.T) {
 func TestClusterName(t *testing.T) {
 	for _, tt := range clusterNames {
 		name, err := extractClusterName(tt.in, tt.inTeam)
-		if err != nil && err.Error() != tt.err.Error() {
-			t.Errorf("extractClusterName expected error: %v, got: %v", tt.err, err)
+		if err != nil {
+			if tt.err == nil || err.Error() != tt.err.Error() {
+				t.Errorf("extractClusterName expected error: %v, got: %v", tt.err, err)
+			}
 			continue
+		} else if tt.err != nil {
+			t.Errorf("Expected error: %v", tt.err)
 		}
 		if name != tt.clusterName {
 			t.Errorf("Expected cluserName: %q, got: %q", tt.clusterName, name)
+		}
+	}
+}
+
+func TestCloneClusterDescription(t *testing.T) {
+	for _, tt := range cloneClusterDescriptions {
+		if err := validateCloneClusterDescription(tt.in); err != nil {
+			if tt.err == nil || err.Error() != tt.err.Error() {
+				t.Errorf("testCloneClusterDescription expected error: %v, got: %v", tt.err, err)
+			}
+		} else if tt.err != nil {
+			t.Errorf("Expected error: %v", tt.err)
 		}
 	}
 }
@@ -397,13 +431,13 @@ func TestUnmarshalMaintenanceWindow(t *testing.T) {
 	for _, tt := range maintenanceWindows {
 		var m MaintenanceWindow
 		err := m.UnmarshalJSON(tt.in)
-		if err != nil && err.Error() != tt.err.Error() {
-			t.Errorf("MaintenanceWindow unmarshal expected error: %v, got %v", tt.err, err)
+		if err != nil {
+			if tt.err == nil || err.Error() != tt.err.Error() {
+				t.Errorf("MaintenanceWindow unmarshal expected error: %v, got %v", tt.err, err)
+			}
 			continue
-		}
-		if tt.err != nil && err == nil {
-			t.Errorf("Expected error")
-			continue
+		} else if tt.err != nil {
+			t.Errorf("Expected error: %v", tt.err)
 		}
 
 		if !reflect.DeepEqual(m, tt.out) {
@@ -421,7 +455,6 @@ func TestMarshalMaintenanceWindow(t *testing.T) {
 		s, err := tt.out.MarshalJSON()
 		if err != nil {
 			t.Errorf("Marshal Error: %v", err)
-			continue
 		}
 
 		if !bytes.Equal(s, tt.in) {
@@ -435,11 +468,12 @@ func TestPostgresUnmarshal(t *testing.T) {
 		var cluster Postgresql
 		err := cluster.UnmarshalJSON(tt.in)
 		if err != nil {
-			if err.Error() != tt.err.Error() {
+			if tt.err == nil || err.Error() != tt.err.Error() {
 				t.Errorf("Unmarshal expected error: %v, got: %v", tt.err, err)
 			}
-
 			continue
+		} else if tt.err != nil {
+			t.Errorf("Expected error: %v", tt.err)
 		}
 
 		if !reflect.DeepEqual(cluster, tt.out) {
@@ -457,7 +491,6 @@ func TestMarshal(t *testing.T) {
 		m, err := json.Marshal(tt.out)
 		if err != nil {
 			t.Errorf("Marshal error: %v", err)
-			continue
 		}
 		if !bytes.Equal(m, tt.marshal) {
 			t.Errorf("Marshal Postgresql expected: %q, got: %q", string(tt.marshal), string(m))
@@ -481,10 +514,15 @@ func TestUnmarshalPostgresList(t *testing.T) {
 	for _, tt := range postgresqlList {
 		var list PostgresqlList
 		err := list.UnmarshalJSON(tt.in)
-		if err != nil && err.Error() != tt.err.Error() {
-			t.Errorf("PostgresqlList unmarshal expected error: %v, got: %v", tt.err, err)
-			return
+		if err != nil {
+			if tt.err == nil || err.Error() != tt.err.Error() {
+				t.Errorf("PostgresqlList unmarshal expected error: %v, got: %v", tt.err, err)
+			}
+			continue
+		} else if tt.err != nil {
+			t.Errorf("Expected error: %v", tt.err)
 		}
+
 		if !reflect.DeepEqual(list, tt.out) {
 			t.Errorf("Postgresql list unmarshall expected: %#v, got: %#v", tt.out, list)
 		}
