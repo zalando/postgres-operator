@@ -298,7 +298,7 @@ func (c *Cluster) Create() error {
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
 	}
-	ss, err = c.createStatefulSet(false)
+	ss, err = c.createStatefulSet()
 	if err != nil {
 		return fmt.Errorf("could not create statefulset: %v", err)
 	}

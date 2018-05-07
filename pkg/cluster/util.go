@@ -133,21 +133,23 @@ func normalizeUserFlags(userFlags []string) ([]string, error) {
 	return flags, nil
 }
 
+// specPatch produces a JSON of the Kubernetes object specification passed (typically service or
+// statefulset) to use it in a MergePatch.
 func specPatch(spec interface{}) ([]byte, error) {
 	return json.Marshal(struct {
 		Spec interface{} `json:"spec"`
 	}{spec})
 }
 
-func metadataAnnotationsPatch(annotations map[string]string) string {
-	annotationsList := make([]string, 0, len(annotations))
-
-	for name, value := range annotations {
-		annotationsList = append(annotationsList, fmt.Sprintf(`"%s":"%s"`, name, value))
-	}
-	annotationsString := strings.Join(annotationsList, ",")
-	// TODO: perhaps use patchStrategy:action json annotation instead of constructing the patch literally.
-	return fmt.Sprintf(constants.ServiceMetadataAnnotationReplaceFormat, annotationsString)
+// metaAnnotationsPatch produces a JSON of the object metadata that has only the annotation
+// field in order to use it in a MergePatch. Note that we don't patch the complete metadata, since
+// it contains the current revision of the object that could be outdated at the time we patch.
+func metaAnnotationsPatch(annotations map[string]string) ([]byte, error) {
+	var meta metav1.ObjectMeta
+	meta.Annotations = annotations
+	return json.Marshal(struct {
+		ObjMeta interface{} `json:"metadata"`
+	}{&meta})
 }
 
 func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpdate bool, reason string) {

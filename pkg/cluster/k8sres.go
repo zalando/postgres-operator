@@ -564,9 +564,10 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.statefulSetName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
+			Name:        c.statefulSetName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: map[string]string{RollingUpdateStatefulsetAnnotationKey: "false"},
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -702,6 +703,11 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *sp
 		if spec.UseLoadBalancer != nil {
 			c.logger.Debugf("The Postgres manifest for the cluster %v sets the deprecated `useLoadBalancer` param. Consider using the `enableMasterLoadBalancer` instead.", c.Name)
 			return *spec.UseLoadBalancer
+		}
+
+		// if the value is explicitly set in a Postgresql manifest, follow this setting
+		if spec.EnableMasterLoadBalancer != nil {
+			return *spec.EnableMasterLoadBalancer
 		}
 
 		// `enable_load_balancer`` governs LB for a master service
