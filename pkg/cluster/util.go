@@ -139,6 +139,12 @@ func specPatch(spec interface{}) ([]byte, error) {
 	}{spec})
 }
 
+func metaPatch(meta interface{}) ([]byte, error) {
+	return json.Marshal(struct {
+		ObjMeta interface{} `json:"metadata"`
+	}{meta})
+}
+
 func metadataAnnotationsPatch(annotations map[string]string) string {
 	annotationsList := make([]string, 0, len(annotations))
 

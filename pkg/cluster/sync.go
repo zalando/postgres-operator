@@ -221,7 +221,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 
 func (c *Cluster) syncStatefulSet() error {
 	var (
-		cachedRollingUpdateFlag, podsRollingUpdateRequired bool
+		cachedRollingUpdateFlag, cachedStatefulsetExists, podsRollingUpdateRequired bool
 	)
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
 	if err != nil {
@@ -253,17 +253,20 @@ func (c *Cluster) syncStatefulSet() error {
 			// if we reset the rolling update flag in the statefulset structure in memory but didn't manage to update
 			// the actual object in Kubernetes for some reason we want to avoid doing an unnecessary update by relying
 			// on the 'cached' in-memory flag.
+			cachedStatefulsetExists = true
 			cachedRollingUpdateFlag = getRollingUpdateFlag(c.Statefulset, true)
 			c.logger.Debugf("cached statefulset value exists, rollingUpdate flag is %t", cachedRollingUpdateFlag)
 		}
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 		if podsRollingUpdateRequired = getRollingUpdateFlag(c.Statefulset, false); podsRollingUpdateRequired {
-			if cachedRollingUpdateFlag {
-				c.logger.Infof("found a statefulset with an unfinished pods rolling update")
-			} else {
-				c.logger.Infof("clearing the rolling update flag based on the cached information")
-				podsRollingUpdateRequired = false
+			if cachedStatefulsetExists {
+				if cachedRollingUpdateFlag {
+					c.logger.Infof("found a statefulset with an unfinished pods rolling update")
+				} else {
+					c.logger.Infof("clearing the rolling update flag based on the cached information")
+					podsRollingUpdateRequired = false
+				}
 			}
 		}
 
@@ -302,7 +305,7 @@ func (c *Cluster) syncStatefulSet() error {
 		c.logger.Infof("pods have been recreated")
 		setRollingUpdateFlag(c.Statefulset, false)
 		if err := c.updateStatefulSet(c.Statefulset, true); err != nil {
-			c.logger.Warningf("could not clear rolling update for the statefulset")
+			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
 		}
 	}
 	return nil

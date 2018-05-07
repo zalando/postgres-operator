@@ -189,10 +189,13 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet, include
 		return fmt.Errorf("could not patch statefulset spec %q: %v", statefulSetName, err)
 	}
 	if includeAnnotations && newStatefulSet.Annotations != nil {
-		patchData := metadataAnnotationsPatch(newStatefulSet.Annotations)
+		c.logger.Debugf("updating statefulset annotations")
+		if patchData, err = metaPatch(newStatefulSet.ObjectMeta); err != nil {
+			return fmt.Errorf("could not form patch for the stetefulset metadata: %v", err)
+		}
 		statefulSet, err = c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
 			c.Statefulset.Name,
-			types.StrategicMergePatchType,
+			types.MergePatchType,
 			[]byte(patchData), "")
 		if err != nil {
 			return fmt.Errorf("could not patch statefulset annotations %q: %v", patchData, err)
