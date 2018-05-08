@@ -32,8 +32,6 @@ data:
   enable_replica_load_balancer: "false"
 
   pdb_name_format: "postgres-{cluster}-pdb"
-  node_eol_label: "lifecycle-status:pending-decommission"
-  node_readiness_label: ""
 
   api_port: "8080"
   ring_log_lines: "100"
