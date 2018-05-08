@@ -24,14 +24,14 @@ Example: When a user creates a new custom object of type ``postgresql`` by submi
 
 Update example: After changing the Docker image inside the operator's configuration, the operator first goes to all StatefulSets
 it manages and updates them with the new Docker image; afterwards, all pods from each StatefulSet are killed one by one
-and the replacements are spawned automatically by each StatefulSet with the new Docker image. This is called the rolling upgrade.
+and the replacements are spawned automatically by each StatefulSet with the new Docker image. This is called the Rolling update.
 
 ## Scope
 
 The scope of the postgres operator is on provisioning, modifying configuration and cleaning up Postgres clusters that use Patroni, basically to make it easy and convenient to run Patroni based clusters on Kubernetes.
 The provisioning and modifying includes Kubernetes resources on one side but also e.g. database and role provisioning once the cluster is up and running.
 We try to leave as much work as possible to Kubernetes and to Patroni where it fits, especially the cluster bootstrap and high availability.
-The operator is however involved in some overarching orchestration, like rolling upgrades to improve the user experience.
+The operator is however involved in some overarching orchestration, like rolling updates to improve the user experience.
 
 Monitoring of clusters is not in scope, for this good tools already exist from ZMON to Prometheus and more Postgres specific options.
 
