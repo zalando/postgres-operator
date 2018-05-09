@@ -285,8 +285,12 @@ namespace watched by the operator.
 
 ###### Deprecated parameters
 
-Parameters `useLoadBalancer` and `replicaLoadBalancer` in the PostgreSQL manifest, as well as `enable_load_balancer`
-are deprecated and take no effect, producing a warning when specified in the operator or cluster configuration.
+Parameters `useLoadBalancer` and `replicaLoadBalancer` in the PostgreSQL manifest are deprecated. To retain
+compatibility with the old manifests they take affect in the absense of new `enableMasterLoadBalancer` and
+`enableReplicaLoadBalancer` parameters (that is, if either of the new ones is present - all deprecated parameters are
+ignored). The operator configuration parameter `enable_load_balancer` is ignored in all cases.
+
+`
 
 # Setup development environment
 

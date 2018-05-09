@@ -166,6 +166,17 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 
 	defer c.curWorkerCluster.Store(event.WorkerID, nil)
 
+	if event.EventType == spec.EventAdd || event.EventType == spec.EventUpdate || event.EventType == spec.EventSync {
+		// handle deprecated parameters by possibly assigning their values to the new ones.
+		if event.OldSpec != nil {
+			c.mergeDeprecatedPostgreSQLSpecParameters(&event.OldSpec.Spec)
+		}
+		if event.NewSpec != nil {
+			c.mergeDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
+		}
+		c.warnOnDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
+	}
+
 	switch event.EventType {
 	case spec.EventAdd:
 		if clusterFound {
@@ -290,7 +301,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *spec.PostgresSpec) {
 
 	deprecate := func(deprecated, replacement string) {
-		c.logger.Warningf("Parameter %q is deprecated and takes no effect. Consider setting %q instead")
+		c.logger.Warningf("Parameter %q is deprecated. Consider setting %q instead")
 	}
 
 	noeffect := func(param string, explanation string) {
@@ -307,6 +318,24 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *spec.Postgre
 	if len(spec.MaintenanceWindows) > 0 {
 		noeffect("maintenanceWindows", "Not implemented.")
 	}
+}
+
+func (c *Controller) mergeDeprecatedPostgreSQLSpecParameters(spec *spec.PostgresSpec) *spec.PostgresSpec {
+	if spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil {
+		if spec.EnableReplicaLoadBalancer != nil || spec.EnableMasterLoadBalancer != nil {
+			c.logger.Warnf("Both old and new load balancer options are present, ignoring old ones")
+		} else {
+			if spec.UseLoadBalancer != nil {
+				spec.EnableMasterLoadBalancer = new(bool)
+				*spec.EnableMasterLoadBalancer = *spec.UseLoadBalancer
+			}
+			if spec.ReplicaLoadBalancer != nil {
+				spec.EnableReplicaLoadBalancer = new(bool)
+				*spec.EnableReplicaLoadBalancer = *spec.ReplicaLoadBalancer
+			}
+		}
+	}
+	return spec
 }
 
 func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
