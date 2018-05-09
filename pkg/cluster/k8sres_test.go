@@ -66,21 +66,21 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 			result:   false,
 		},
 		{
-			subtest:  "old format, load balancer is enabled for replica",
+			subtest:  "old format, load balancer is enabled for replica, but is ignored",
 			role:     Replica,
 			spec:     &spec.PostgresSpec{ReplicaLoadBalancer: True()},
 			opConfig: config.Config{},
-			result:   true,
+			result:   false,
 		},
 		{
-			subtest: "old format has priority",
+			subtest: "old format is ignored, new one is applied",
 			role:    Replica,
 			spec: &spec.PostgresSpec{
 				ReplicaLoadBalancer:       True(),
 				EnableReplicaLoadBalancer: False(),
 			},
 			opConfig: config.Config{},
-			result:   true,
+			result:   false,
 		},
 	}
 	for _, tt := range tests {

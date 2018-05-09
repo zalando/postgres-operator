@@ -287,6 +287,28 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}
 }
 
+func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *spec.PostgresSpec) {
+
+	deprecate := func(deprecated, replacement string) {
+		c.logger.Warningf("Parameter %q is deprecated and takes no effect. Consider setting %q instead")
+	}
+
+	noeffect := func(param string, explanation string) {
+		c.logger.Warningf("Parameter %q takes no effect. %s", param, explanation)
+	}
+
+	if spec.UseLoadBalancer != nil {
+		deprecate("useLoadBalancer", "enableMasterLoadBalancer")
+	}
+	if spec.ReplicaLoadBalancer != nil {
+		deprecate("replicaLoadBalancer", "enableReplicaLoadBalancer")
+	}
+
+	if len(spec.MaintenanceWindows) > 0 {
+		noeffect("maintenanceWindows", "Not implemented.")
+	}
+}
+
 func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
 	var (
 		uid          types.UID

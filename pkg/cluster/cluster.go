@@ -255,7 +255,7 @@ func (c *Cluster) Create() error {
 		if c.Endpoints[role] != nil {
 			return fmt.Errorf("%s endpoint already exists in the cluster", role)
 		}
-		ep, err = c.createEndpoint(role)
+		ep, err = c.createEndpoint(role, false)
 		if err != nil {
 			return fmt.Errorf("could not create %s endpoint: %v", role, err)
 		}
