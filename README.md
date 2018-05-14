@@ -6,32 +6,32 @@
 
 The Postgres operator manages PostgreSQL clusters on Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
 During the initial run it registers the [Custom Resource Definition (CRD)](https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions) for Postgres.
-The PostgreSQL CRD is essentially the schema that describes the contents of the manifests for deploying individual
-PostgreSQL clusters using StatefulSets and [Patroni](https://github.com/zalando/patroni).
+The `postgresql` CRD is essentially the schema that describes the contents of the manifests for deploying individual
+Postgres clusters using StatefulSets and [Patroni](https://github.com/zalando/patroni).
 
 Once the operator is running, it performs the following actions:
 
-* watches for new PostgreSQL cluster manifests and deploys corresponding clusters
+* watches for new `postgresql` manifests and deploys new clusters
 * watches for updates to existing manifests and changes corresponding properties of the running clusters
 * watches for deletes of the existing manifests and deletes corresponding clusters
-* acts on an update to the operator definition itself and changes the running clusters when necessary
-  (i.e. when the docker image inside the operator definition has been updated)
-* periodically checks running clusters against the manifests and acts on the differences found
+* acts on an update to the operator configuration itself and changes the running clusters when necessary
+  (i.e. the Docker image changes for a minor release update)
+* periodically checks running clusters against the manifests and syncs changes
 
-For instance, when the user creates a new custom object of type ``postgresql`` by submitting a new manifest with
-``kubectl``, the operator fetches that object and creates the corresponding Kubernetes structures
-(StatefulSets, Services, Secrets) according to its definition.
+Example: When a user creates a new custom object of type ``postgresql`` by submitting a new manifest with
+``kubectl``, the operator fetches that object and creates the required Kubernetes entities to spawn a new Postgres cluster
+(StatefulSets, Services, Secrets).
 
-Another example is changing the docker image inside the operator. In this case, the operator first goes to all StatefulSets
-it manages and updates them with the new docker images; afterwards, all pods from each StatefulSet are killed one by one
-(rolling upgrade) and the replacements are spawned automatically by each StatefulSet with the new docker image.
+Update example: After changing the Docker image inside the operator's configuration, the operator first goes to all StatefulSets
+it manages and updates them with the new Docker image; afterwards, all pods from each StatefulSet are killed one by one
+and the replacements are spawned automatically by each StatefulSet with the new Docker image. This is called the Rolling update.
 
 ## Scope
 
 The scope of the postgres operator is on provisioning, modifying configuration and cleaning up Postgres clusters that use Patroni, basically to make it easy and convenient to run Patroni based clusters on Kubernetes.
 The provisioning and modifying includes Kubernetes resources on one side but also e.g. database and role provisioning once the cluster is up and running.
 We try to leave as much work as possible to Kubernetes and to Patroni where it fits, especially the cluster bootstrap and high availability.
-The operator is however involved in some overarching orchestration, like rolling upgrades to improve the user experience.
+The operator is however involved in some overarching orchestration, like rolling updates to improve the user experience.
 
 Monitoring of clusters is not in scope, for this good tools already exist from ZMON to Prometheus and more Postgres specific options.
 
@@ -147,9 +147,9 @@ We can use the generated secret of the `postgres` robot user to connect to our `
 The `manifests/operator-rbac.yaml` defines cluster roles and bindings needed for the operator to function under access control restrictions. To deploy the operator with this RBAC policy use:
 
 ```bash
-kubectl create -f manifests/configmap.yaml 
+kubectl create -f manifests/configmap.yaml
 kubectl create -f manifests/operator-rbac.yaml
-kubectl create -f manifests/postgres-operator.yaml 
+kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
@@ -158,7 +158,7 @@ the `operator` default that is created in the `serviceaccount.yaml`. So you will
 
 This is done intentionally, as to avoid breaking those setups that
 already work with the default `operator` account. In the future the operator should ideally be run under the
-`zalando-postgres-operator` service account. 
+`zalando-postgres-operator` service account.
 
 The service account defined in  `operator-rbac.yaml` acquires some privileges not really
 used by the operator (i.e. we only need list and watch on configmaps),
@@ -274,7 +274,7 @@ As a preventive measure, one can restrict the minimum and the maximum number of 
 If either `min_instances` or `max_instances` is set to a non-zero value, the operator may adjust the number of instances specified in the cluster manifest to match either the min or the max boundary.
 For instance, of a cluster manifest has 1 instance and the min_instances is set to 3, the cluster will be created with 3 instances. By default, both parameters are set to -1.
 
-### Load balancers 
+### Load balancers
 
 For any Postgresql/Spilo cluster an operator creates two separate k8s services: one for the master pod and one for replica pods. To expose these services to an outer network, one can attach load balancers to them by setting `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the cluster manifest. In the case any of these variables is omitted from the manifest, the operator configmap's settings `enable_master_load_balancer` and `enable_replica_load_balancer` apply. Note that the operator settings affect all Postgresql services running in a namespace watched by the operator.
 
