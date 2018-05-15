@@ -564,9 +564,10 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.statefulSetName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
+			Name:        c.statefulSetName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: map[string]string{RollingUpdateStatefulsetAnnotationKey: "false"},
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,

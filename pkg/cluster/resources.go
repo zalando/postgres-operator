@@ -17,6 +17,10 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
 
+const (
+	RollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
+)
+
 func (c *Cluster) listResources() error {
 	if c.PodDisruptionBudget != nil {
 		c.logger.Infof("found pod disruption budget: %q (uid: %q)", util.NameFromMeta(c.PodDisruptionBudget.ObjectMeta), c.PodDisruptionBudget.UID)
@@ -128,6 +132,95 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 	return nil
 }
 
+// setRollingUpdateFlagForStatefulSet sets the indicator or the rolling upgrade requirement
+// in the StatefulSet annotation.
+func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *v1beta1.StatefulSet, val bool) {
+	anno := sset.GetAnnotations()
+	c.logger.Debugf("rolling upgrade flag has been set to %t", val)
+	if anno == nil {
+		anno = make(map[string]string)
+	}
+	anno[RollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
+	sset.SetAnnotations(anno)
+}
+
+// applyRollingUpdateFlagforStatefulSet sets the rolling update flag for the cluster's StatefulSet
+// and applies that setting to the actual running cluster.
+func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
+	c.setRollingUpdateFlagForStatefulSet(c.Statefulset, val)
+	sset, err := c.updateStatefulSetAnnotations(c.Statefulset.GetAnnotations())
+	if err != nil {
+		return err
+	}
+	c.Statefulset = sset
+	return nil
+}
+
+// getRollingUpdateFlagFromStatefulSet returns the value of the rollingUpdate flag from the passed
+// StatefulSet, reverting to the default value in case of errors
+func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet, defaultValue bool) (flag bool) {
+	anno := sset.GetAnnotations()
+	flag = defaultValue
+
+	stringFlag, exists := anno[RollingUpdateStatefulsetAnnotationKey]
+	if exists {
+		var err error
+		if flag, err = strconv.ParseBool(stringFlag); err != nil {
+			c.logger.Warnf("error when parsing %q annotation for the statefulset %q: expected boolean value, got %q\n",
+				RollingUpdateStatefulsetAnnotationKey,
+				types.NamespacedName{sset.Namespace, sset.Name},
+				stringFlag)
+			flag = defaultValue
+		}
+	}
+	return flag
+}
+
+// mergeRollingUpdateFlagUsingCache return the value of the rollingUpdate flag from the passed
+// statefulset, however, the value can be cleared if there is a cached flag in the cluster that
+// is set to false (the disrepancy could be a result of a failed StatefulSet update).s
+func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *v1beta1.StatefulSet) bool {
+	var (
+		cachedStatefulsetExists, clearRollingUpdateFromCache, podsRollingUpdateRequired bool
+	)
+
+	if c.Statefulset != nil {
+		// if we reset the rolling update flag in the statefulset structure in memory but didn't manage to update
+		// the actual object in Kubernetes for some reason we want to avoid doing an unnecessary update by relying
+		// on the 'cached' in-memory flag.
+		cachedStatefulsetExists = true
+		clearRollingUpdateFromCache = !c.getRollingUpdateFlagFromStatefulSet(c.Statefulset, true)
+		c.logger.Debugf("cached StatefulSet value exists, rollingUpdate flag is %t", clearRollingUpdateFromCache)
+	}
+
+	if podsRollingUpdateRequired = c.getRollingUpdateFlagFromStatefulSet(runningStatefulSet, false); podsRollingUpdateRequired {
+		if cachedStatefulsetExists && clearRollingUpdateFromCache {
+			c.logger.Infof("clearing the rolling update flag based on the cached information")
+			podsRollingUpdateRequired = false
+		} else {
+			c.logger.Infof("found a statefulset with an unfinished pods rolling update")
+
+		}
+	}
+	return podsRollingUpdateRequired
+}
+
+func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*v1beta1.StatefulSet, error) {
+	c.logger.Debugf("updating statefulset annotations")
+	patchData, err := metaAnnotationsPatch(annotations)
+	if err != nil {
+		return nil, fmt.Errorf("could not form patch for the statefulset metadata: %v", err)
+	}
+	result, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
+		c.Statefulset.Name,
+		types.MergePatchType,
+		[]byte(patchData), "")
+	if err != nil {
+		return nil, fmt.Errorf("could not patch statefulset annotations %q: %v", patchData, err)
+	}
+	return result, nil
+
+}
 func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
@@ -153,8 +246,16 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 		types.MergePatchType,
 		patchData, "")
 	if err != nil {
-		return fmt.Errorf("could not patch statefulset %q: %v", statefulSetName, err)
+		return fmt.Errorf("could not patch statefulset spec %q: %v", statefulSetName, err)
 	}
+
+	if newStatefulSet.Annotations != nil {
+		statefulSet, err = c.updateStatefulSetAnnotations(newStatefulSet.Annotations)
+		if err != nil {
+			return err
+		}
+	}
+
 	c.Statefulset = statefulSet
 
 	return nil
@@ -298,16 +399,19 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		return nil
 	}
 
+	// update the service annotation in order to propagate ELB notation.
 	if len(newService.ObjectMeta.Annotations) > 0 {
-		annotationsPatchData := metadataAnnotationsPatch(newService.ObjectMeta.Annotations)
+		if annotationsPatchData, err := metaAnnotationsPatch(newService.ObjectMeta.Annotations); err == nil {
+			_, err = c.KubeClient.Services(serviceName.Namespace).Patch(
+				serviceName.Name,
+				types.MergePatchType,
+				[]byte(annotationsPatchData), "")
 
-		_, err := c.KubeClient.Services(serviceName.Namespace).Patch(
-			serviceName.Name,
-			types.StrategicMergePatchType,
-			[]byte(annotationsPatchData), "")
-
-		if err != nil {
-			return fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
+			if err != nil {
+				return fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
+			}
+		} else {
+			return fmt.Errorf("could not form patch for the service metadata: %v", err)
 		}
 	}
 
@@ -316,6 +420,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
 	}
 
+	// update the service spec
 	svc, err := c.KubeClient.Services(serviceName.Namespace).Patch(
 		serviceName.Name,
 		types.MergePatchType,

@@ -350,6 +350,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		match = false
 		reasons = append(reasons, "new statefulset's number of replicas doesn't match the current one")
 	}
+	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
+		match = false
+		reasons = append(reasons, "new statefulset's annotations doesn't match the current one")
+	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
@@ -401,9 +405,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
-		needsRollUpdate = true
+		match = false
 		needsReplace = true
-		reasons = append(reasons, "new statefulset's metadata annotations doesn't match the current one")
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod template metadata annotations doesn't match the current one")
 	}
 	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
 		needsReplace = true

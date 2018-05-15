@@ -120,17 +120,24 @@ func SameService(cur, new *v1.Service) (match bool, reason string) {
 	newSourceRanges := new.Spec.LoadBalancerSourceRanges
 
 	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
-	if (len(oldSourceRanges) == 0) && (len(newSourceRanges) == 0) {
-		return true, ""
-	}
-	if !reflect.DeepEqual(oldSourceRanges, newSourceRanges) {
-		return false, "new service's LoadBalancerSourceRange doesn't match the current one"
+	if (len(oldSourceRanges) != 0) || (len(newSourceRanges) != 0) {
+		if !reflect.DeepEqual(oldSourceRanges, newSourceRanges) {
+			return false, "new service's LoadBalancerSourceRange doesn't match the current one"
+		}
 	}
 
 	oldDNSAnnotation := cur.Annotations[constants.ZalandoDNSNameAnnotation]
 	newDNSAnnotation := new.Annotations[constants.ZalandoDNSNameAnnotation]
+	oldELBAnnotation := cur.Annotations[constants.ElbTimeoutAnnotationName]
+	newELBAnnotation := new.Annotations[constants.ElbTimeoutAnnotationName]
+
 	if oldDNSAnnotation != newDNSAnnotation {
-		return false, fmt.Sprintf("new service's %q annotation doesn't match the current one", constants.ZalandoDNSNameAnnotation)
+		return false, fmt.Sprintf("new service's %q annotation value %q doesn't match the current one %q",
+			constants.ZalandoDNSNameAnnotation, newDNSAnnotation, oldDNSAnnotation)
+	}
+	if oldELBAnnotation != newELBAnnotation {
+		return false, fmt.Sprintf("new service's %q annotation value %q doesn't match the current one %q",
+			constants.ElbTimeoutAnnotationName, oldELBAnnotation, newELBAnnotation)
 	}
 
 	return true, ""
