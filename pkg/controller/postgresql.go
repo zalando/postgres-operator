@@ -301,7 +301,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *spec.PostgresSpec) {
 
 	deprecate := func(deprecated, replacement string) {
-		c.logger.Warningf("Parameter %q is deprecated. Consider setting %q instead")
+		c.logger.Warningf("Parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
 
 	noeffect := func(param string, explanation string) {
