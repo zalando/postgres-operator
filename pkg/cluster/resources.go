@@ -343,12 +343,12 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 	return nil
 }
 
-func (c *Cluster) createEndpoint(role PostgresRole, sync bool) (*v1.Endpoints, error) {
+func (c *Cluster) createEndpoint(role PostgresRole) (*v1.Endpoints, error) {
 	var (
 		subsets []v1.EndpointSubset
 	)
 	c.setProcessName("creating endpoint")
-	if sync {
+	if !c.isNewCluster() {
 		subsets = c.generateEndpointSubsets(role)
 	} else {
 		// Patroni will populate the master endpoint for the new cluster

@@ -164,7 +164,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 
 	c.logger.Infof("could not find the cluster's %s endpoint", role)
 
-	if ep, err := c.createEndpoint(role, true); err != nil {
+	if ep, err := c.createEndpoint(role); err != nil {
 		if k8sutil.ResourceAlreadyExists(err) {
 			c.logger.Infof("%s endpoint %q already exists", role, util.NameFromMeta(ep.ObjectMeta))
 			ep, err := c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
