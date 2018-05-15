@@ -131,8 +131,13 @@ func SameService(cur, new *v1.Service) (match bool, reason string) {
 	oldELBAnnotation := cur.Annotations[constants.ElbTimeoutAnnotationName]
 	newELBAnnotation := new.Annotations[constants.ElbTimeoutAnnotationName]
 
-	if oldDNSAnnotation != newDNSAnnotation || oldELBAnnotation != newELBAnnotation {
-		return false, fmt.Sprintf("new service's %q annotation doesn't match the current one", constants.ZalandoDNSNameAnnotation)
+	if oldDNSAnnotation != newDNSAnnotation {
+		return false, fmt.Sprintf("new service's %q annotation value %q doesn't match the current one %q",
+			constants.ZalandoDNSNameAnnotation, newDNSAnnotation, oldDNSAnnotation)
+	}
+	if oldELBAnnotation != newELBAnnotation {
+		return false, fmt.Sprintf("new service's %q annotation value %q doesn't match the current one %q",
+			constants.ElbTimeoutAnnotationName, oldELBAnnotation, newELBAnnotation)
 	}
 
 	return true, ""

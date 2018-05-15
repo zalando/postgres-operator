@@ -247,6 +247,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 		podsRollingUpdateRequired = (len(pods) > 0)
 		if podsRollingUpdateRequired {
+			c.logger.Warningf("found pods from the previous statefulset: trigger rolling update")
 			c.applyRollingUpdateFlagforStatefulSet(podsRollingUpdateRequired)
 		}
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))

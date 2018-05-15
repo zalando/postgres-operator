@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	RollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update"
+	RollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 )
 
 func (c *Cluster) listResources() error {

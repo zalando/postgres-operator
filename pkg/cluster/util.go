@@ -21,6 +21,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
+	"reflect"
 )
 
 // OAuthTokenGetter provides the method for fetching OAuth tokens
@@ -172,7 +173,10 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
+		c.logger.Debugf("metadata.annotation diff\n%s\n", util.PrettyDiff(old.Annotations, new.Annotations))
+	}
+	c.logger.Debugf("spec diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
