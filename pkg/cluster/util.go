@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -21,7 +22,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
-	"reflect"
 )
 
 // OAuthTokenGetter provides the method for fetching OAuth tokens
