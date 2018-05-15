@@ -684,12 +684,6 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *sp
 
 	case Replica:
 
-		// deprecated option takes priority for backward compatibility
-		if spec.ReplicaLoadBalancer != nil {
-			c.logger.Debugf("The Postgres manifest for the cluster %v sets the deprecated `replicaLoadBalancer` param. Consider using the `enableReplicaLoadBalancer` instead.", c.Name)
-			return *spec.ReplicaLoadBalancer
-		}
-
 		// if the value is explicitly set in a Postgresql manifest, follow this setting
 		if spec.EnableReplicaLoadBalancer != nil {
 			return *spec.EnableReplicaLoadBalancer
@@ -700,21 +694,8 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *sp
 
 	case Master:
 
-		if spec.UseLoadBalancer != nil {
-			c.logger.Debugf("The Postgres manifest for the cluster %v sets the deprecated `useLoadBalancer` param. Consider using the `enableMasterLoadBalancer` instead.", c.Name)
-			return *spec.UseLoadBalancer
-		}
-
-		// if the value is explicitly set in a Postgresql manifest, follow this setting
 		if spec.EnableMasterLoadBalancer != nil {
 			return *spec.EnableMasterLoadBalancer
-		}
-
-		// `enable_load_balancer`` governs LB for a master service
-		// there is no equivalent deprecated operator option for the replica LB
-		if c.OpConfig.EnableLoadBalancer != nil {
-			c.logger.Debugf("The operator configmap sets the deprecated `enable_load_balancer` param. Consider using the `enable_master_load_balancer` or `enable_replica_load_balancer` instead.")
-			return *c.OpConfig.EnableLoadBalancer
 		}
 
 		return c.OpConfig.EnableMasterLoadBalancer

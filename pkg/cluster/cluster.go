@@ -170,6 +170,10 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 	}
 }
 
+func (c *Cluster) isNewCluster() bool {
+	return c.Status == spec.ClusterStatusCreating
+}
+
 // initUsers populates c.systemUsers and c.pgUsers maps.
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
@@ -255,11 +259,15 @@ func (c *Cluster) Create() error {
 		if c.Endpoints[role] != nil {
 			return fmt.Errorf("%s endpoint already exists in the cluster", role)
 		}
-		ep, err = c.createEndpoint(role)
-		if err != nil {
-			return fmt.Errorf("could not create %s endpoint: %v", role, err)
+		if role == Master {
+			// replica endpoint will be created by the replica service. Master endpoint needs to be created by us,
+			// since the corresponding master service doesn't define any selectors.
+			ep, err = c.createEndpoint(role)
+			if err != nil {
+				return fmt.Errorf("could not create %s endpoint: %v", role, err)
+			}
+			c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 		}
-		c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 
 		if c.Services[role] != nil {
 			return fmt.Errorf("service already exists in the cluster")

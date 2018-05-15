@@ -88,7 +88,7 @@ type Config struct {
 	EnableMasterLoadBalancer    bool   `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer   bool   `name:"enable_replica_load_balancer" default:"false"`
 	// deprecated and kept for backward compatibility
-	EnableLoadBalancer       *bool             `name:"enable_load_balancer" default:"true"`
+	EnableLoadBalancer       *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat      stringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat     stringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat            stringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`

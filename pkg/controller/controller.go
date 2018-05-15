@@ -111,12 +111,21 @@ func (c *Controller) initOperatorConfig() {
 	}
 
 	c.opConfig = config.NewFromMap(configMapData)
+	c.warnOnDeprecatedOperatorParameters()
 
 	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
 	if scalyrAPIKey != "" {
 		c.opConfig.ScalyrAPIKey = scalyrAPIKey
 	}
 
+}
+
+// warningOnDeprecatedParameters emits warnings upon finding deprecated parmaters
+func (c *Controller) warnOnDeprecatedOperatorParameters() {
+	if c.opConfig.EnableLoadBalancer != nil {
+		c.logger.Warningf("Operator configuration parameter 'enable_load_balancer' is deprecated and takes no effect. " +
+			"Consider using the 'enable_master_load_balancer' or 'enable_replica_load_balancer' instead.")
+	}
 }
 
 func (c *Controller) initPodServiceAccount() {
