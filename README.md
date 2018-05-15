@@ -26,6 +26,36 @@ Update example: After changing the Docker image inside the operator's configurat
 it manages and updates them with the new Docker image; afterwards, all pods from each StatefulSet are killed one by one
 and the replacements are spawned automatically by each StatefulSet with the new Docker image. This is called the Rolling update.
 
+
+## Quickstart 
+
+Prerequisites: [minikube](https://github.com/kubernetes/minikube/releases) and [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-native-package-management)
+
+### Local execution
+
+```bash
+git clone https://github.com/zalando-incubator/postgres-operator.git
+cd postgres-operator
+
+minikube start
+kubectl config set-context minikube
+
+kubectl create -f manifests/configmap.yaml         # operator config
+kubectl create -f manifests/serviceaccount.yaml    # operator pod identity
+kubectl create -f manifests/postgres-operator.yaml # start the operator
+
+# startup may last a few seconds
+
+kubectl create -f manifests/minimal-postgres-manifest.yaml # submit a PG cluster
+minikube delete # tear down cleanly
+```
+
+We have automated these steps for you:
+```bash
+cd postgres-operator
+./run_operator_locally.sh
+```
+
 ## Scope
 
 The scope of the postgres operator is on provisioning, modifying configuration and cleaning up Postgres clusters that use Patroni, basically to make it easy and convenient to run Patroni based clusters on Kubernetes.
