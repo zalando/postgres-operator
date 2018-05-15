@@ -344,10 +344,16 @@ func (c *Cluster) deleteService(role PostgresRole) error {
 }
 
 func (c *Cluster) createEndpoint(role PostgresRole) (*v1.Endpoints, error) {
+	var (
+		subsets []v1.EndpointSubset
+	)
 	c.setProcessName("creating endpoint")
-	subsets := make([]v1.EndpointSubset, 0)
-	if role == Master {
-		//TODO: set subsets to the master
+	if !c.isNewCluster() {
+		subsets = c.generateEndpointSubsets(role)
+	} else {
+		// Patroni will populate the master endpoint for the new cluster
+		// The replica endpoint will be filled-in by the service selector.
+		subsets = make([]v1.EndpointSubset, 0)
 	}
 	endpointsSpec := c.generateEndpoint(role, subsets)
 
@@ -359,6 +365,34 @@ func (c *Cluster) createEndpoint(role PostgresRole) (*v1.Endpoints, error) {
 	c.Endpoints[role] = endpoints
 
 	return endpoints, nil
+}
+
+func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset {
+	result := make([]v1.EndpointSubset, 0)
+	pods, err := c.getRolePods(role)
+	if err != nil {
+		if role == Master {
+			c.logger.Warningf("could not obtain the address for %s pod: %v", role, err)
+		} else {
+			c.logger.Warningf("could not obtain the addresses for %s pods: %v", role, err)
+		}
+		return result
+	}
+
+	endPointAddresses := make([]v1.EndpointAddress, 0)
+	for _, pod := range pods {
+		endPointAddresses = append(endPointAddresses, v1.EndpointAddress{IP: pod.Status.PodIP})
+	}
+	if len(endPointAddresses) > 0 {
+		result = append(result, v1.EndpointSubset{
+			Addresses: endPointAddresses,
+			Ports:     []v1.EndpointPort{{"postgresql", 5432, "TCP"}},
+		})
+	} else if role == Master {
+		c.logger.Warningf("master is not running, generated master endpoint does not contain any addresses")
+	}
+
+	return result
 }
 
 func (c *Cluster) createPodDisruptionBudget() (*policybeta1.PodDisruptionBudget, error) {

@@ -276,11 +276,21 @@ For instance, of a cluster manifest has 1 instance and the min_instances is set 
 
 ### Load balancers
 
-For any Postgresql/Spilo cluster an operator creates two separate k8s services: one for the master pod and one for replica pods. To expose these services to an outer network, one can attach load balancers to them by setting `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the cluster manifest. In the case any of these variables is omitted from the manifest, the operator configmap's settings `enable_master_load_balancer` and `enable_replica_load_balancer` apply. Note that the operator settings affect all Postgresql services running in a namespace watched by the operator.
+For any Postgresql/Spilo cluster, the operator creates two separate k8s services: one for the master pod and one for
+replica pods. To expose these services to an outer network, one can attach load balancers to them by setting
+`enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the cluster manifest. In the case any of
+these variables are omitted from the manifest, the operator configmap's settings `enable_master_load_balancer` and
+`enable_replica_load_balancer` apply. Note that the operator settings affect all Postgresql services running in a
+namespace watched by the operator.
 
-For backward compatibility with already configured clusters we maintain in a cluster manifest older parameter names, namely `useLoadBalancer` for enabling the master service's load balancer and `replicaLoadBalancer` for the replica service. If set, these params take precedence over the newer `enableMasterLoadBalancer` and `enableReplicaLoadBalancer`. Note that in older versions of the operator (before PR #258) `replicaLoadBalancer` was responsible for both creating the replica service and attaching an LB to it; now the service is always created (since k8s service typically is free in the cloud setting), and this param only attaches an LB (that typically costs money).
+###### Deprecated parameters
 
-For the same reason of compatibility, we maintain the `enable_load_balancer` setting in the operator config map that was previously used to attach a LB to the master service. Its value is examined after the deprecated `useLoadBalancer` setting from the Postgresql manifest but before the recommended `enableMasterLoadBalancer`. There is no equivalent option for the replica service since the service used to be always created with a load balancer.
+Parameters `useLoadBalancer` and `replicaLoadBalancer` in the PostgreSQL manifest are deprecated. To retain
+compatibility with the old manifests they take affect in the absense of new `enableMasterLoadBalancer` and
+`enableReplicaLoadBalancer` parameters (that is, if either of the new ones is present - all deprecated parameters are
+ignored). The operator configuration parameter `enable_load_balancer` is ignored in all cases.
+
+`
 
 # Setup development environment
 
