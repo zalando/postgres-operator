@@ -47,15 +47,15 @@ kubectl create -f manifests/postgres-operator.yaml # create  postgres-operator d
 kubectl create -f manifests/minimal-postgres-manifest.yaml # submit a PG cluster
 ```
 
+Tear down cleanly:
+```bash
+minikube delete
+```
+
 We have automated these steps for you:
 ```bash
 cd postgres-operator
 ./run_operator_locally.sh
-```
-
-Tear down cleanly:
-```bash
-minikube delete
 ```
 
 ## Scope

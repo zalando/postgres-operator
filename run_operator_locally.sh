@@ -134,7 +134,7 @@ function start_operator(){
 
     # the order of resource initialization is significant
     local file
-    for file  in "configmap.yaml" "serviceaccount.yaml"
+    for file  in "configmap.yaml" "operator-rbac.yaml"
     do
         retry "kubectl  create -f manifests/\"$file\"" "attempt to create $file resource"
     done
