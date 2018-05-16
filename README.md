@@ -46,10 +46,8 @@ kubectl create -f manifests/postgres-operator.yaml # operator deployment
 
 # submit a Postgres cluster
 kubectl create -f manifests/minimal-postgres-manifest.yaml 
-```
 
-Tear down cleanly:
-```bash
+# tear down cleanly
 minikube delete
 ```
 
