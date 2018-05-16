@@ -39,12 +39,13 @@ cd postgres-operator
 
 minikube start
 
+# start the operator; may take a few seconds
 kubectl create -f manifests/configmap.yaml         # operator config
-kubectl create -f manifests/operator-rbac.yaml     # operator pod identity
-kubectl create -f manifests/postgres-operator.yaml # create  postgres-operator deployment
-# operator startup may last a few seconds
+kubectl create -f manifests/operator-rbac.yaml     # operator identity and persmissions
+kubectl create -f manifests/postgres-operator.yaml # operator deployment
 
-kubectl create -f manifests/minimal-postgres-manifest.yaml # submit a PG cluster
+# submit a Postgres cluster
+kubectl create -f manifests/minimal-postgres-manifest.yaml 
 ```
 
 Tear down cleanly:
