@@ -29,7 +29,7 @@ and the replacements are spawned automatically by each StatefulSet with the new 
 
 ## Quickstart 
 
-Prerequisites: [minikube](https://github.com/kubernetes/minikube/releases) and [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-native-package-management)
+Prerequisites: [minikube](https://github.com/kubernetes/minikube/releases) and [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl)
 
 ### Local execution
 
@@ -38,22 +38,24 @@ git clone https://github.com/zalando-incubator/postgres-operator.git
 cd postgres-operator
 
 minikube start
-kubectl config set-context minikube
 
 kubectl create -f manifests/configmap.yaml         # operator config
-kubectl create -f manifests/serviceaccount.yaml    # operator pod identity
-kubectl create -f manifests/postgres-operator.yaml # start the operator
-
-# startup may last a few seconds
+kubectl create -f manifests/operator-rbac.yaml     # operator pod identity
+kubectl create -f manifests/postgres-operator.yaml # create  postgres-operator deployment
+# operator startup may last a few seconds
 
 kubectl create -f manifests/minimal-postgres-manifest.yaml # submit a PG cluster
-minikube delete # tear down cleanly
 ```
 
 We have automated these steps for you:
 ```bash
 cd postgres-operator
 ./run_operator_locally.sh
+```
+
+Tear down cleanly:
+```bash
+minikube delete
 ```
 
 ## Scope
