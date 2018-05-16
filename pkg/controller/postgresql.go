@@ -172,9 +172,9 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			c.mergeDeprecatedPostgreSQLSpecParameters(&event.OldSpec.Spec)
 		}
 		if event.NewSpec != nil {
+			c.warnOnDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 			c.mergeDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 		}
-		c.warnOnDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 	}
 
 	switch event.EventType {
@@ -318,46 +318,55 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *spec.Postgre
 	if len(spec.MaintenanceWindows) > 0 {
 		noeffect("maintenanceWindows", "Not implemented.")
 	}
+
+	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
+		(spec.EnableReplicaLoadBalancer != nil || spec.EnableMasterLoadBalancer != nil) {
+		c.logger.Warnf("Both old and new load balancer parameters are present in the manifest, ignoring old ones")
+	}
 }
 
+// mergeDeprecatedPostgreSQLSpecParameters modifies the spec passed to the cluster by setting current parameter
+// values from the obsolete ones. Note: while the spec that is modified is a copy made in queueClusterEvent, it is
+// still a shallow copy, so be extra careful not to modify values pointer fields point to, but copy them instead.
 func (c *Controller) mergeDeprecatedPostgreSQLSpecParameters(spec *spec.PostgresSpec) *spec.PostgresSpec {
-	if spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil {
-		if spec.EnableReplicaLoadBalancer != nil || spec.EnableMasterLoadBalancer != nil {
-			c.logger.Warnf("Both old and new load balancer options are present, ignoring old ones")
-		} else {
-			if spec.UseLoadBalancer != nil {
-				spec.EnableMasterLoadBalancer = new(bool)
-				*spec.EnableMasterLoadBalancer = *spec.UseLoadBalancer
-			}
-			if spec.ReplicaLoadBalancer != nil {
-				spec.EnableReplicaLoadBalancer = new(bool)
-				*spec.EnableReplicaLoadBalancer = *spec.ReplicaLoadBalancer
-			}
+	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
+		(spec.EnableReplicaLoadBalancer == nil && spec.EnableMasterLoadBalancer == nil) {
+		if spec.UseLoadBalancer != nil {
+			spec.EnableMasterLoadBalancer = new(bool)
+			*spec.EnableMasterLoadBalancer = *spec.UseLoadBalancer
+		}
+		if spec.ReplicaLoadBalancer != nil {
+			spec.EnableReplicaLoadBalancer = new(bool)
+			*spec.EnableReplicaLoadBalancer = *spec.ReplicaLoadBalancer
 		}
 	}
+	spec.ReplicaLoadBalancer = nil
+	spec.UseLoadBalancer = nil
+
 	return spec
 }
 
-func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec.EventType) {
+func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *spec.Postgresql, eventType spec.EventType) {
 	var (
-		uid          types.UID
-		clusterName  spec.NamespacedName
-		clusterError error
+		uid              types.UID
+		clusterName      spec.NamespacedName
+		clusterError     error
+		oldSpec, newSpec *spec.Postgresql
 	)
 
-	if old != nil { //update, delete
-		uid = old.GetUID()
-		clusterName = util.NameFromMeta(old.ObjectMeta)
-		if eventType == spec.EventUpdate && new.Error == nil && old.Error != nil {
+	if informerOldSpec != nil { //update, delete
+		uid = informerOldSpec.GetUID()
+		clusterName = util.NameFromMeta(informerOldSpec.ObjectMeta)
+		if eventType == spec.EventUpdate && informerNewSpec.Error == nil && informerOldSpec.Error != nil {
 			eventType = spec.EventSync
-			clusterError = new.Error
+			clusterError = informerNewSpec.Error
 		} else {
-			clusterError = old.Error
+			clusterError = informerOldSpec.Error
 		}
 	} else { //add, sync
-		uid = new.GetUID()
-		clusterName = util.NameFromMeta(new.ObjectMeta)
-		clusterError = new.Error
+		uid = informerNewSpec.GetUID()
+		clusterName = util.NameFromMeta(informerNewSpec.ObjectMeta)
+		clusterError = informerNewSpec.Error
 	}
 
 	if clusterError != nil && eventType != spec.EventDelete {
@@ -367,13 +376,26 @@ func (c *Controller) queueClusterEvent(old, new *spec.Postgresql, eventType spec
 		return
 	}
 
+	// Don't pass the spec directly from the informer, since subsequent modifications of it would be reflected
+	// in the informer internal state, making it incohherent with the actual Kubernetes object (and, as a side
+	// effect, the modified state will be returned together with subsequent events).
+
+	if informerOldSpec != nil {
+		t := *informerOldSpec
+		oldSpec = &t
+	}
+	if informerNewSpec != nil {
+		t := *informerNewSpec
+		newSpec = &t
+	}
+
 	workerID := c.clusterWorkerID(clusterName)
 	clusterEvent := spec.ClusterEvent{
 		EventTime: time.Now(),
 		EventType: eventType,
 		UID:       uid,
-		OldSpec:   old,
-		NewSpec:   new,
+		OldSpec:   oldSpec,
+		NewSpec:   newSpec,
 		WorkerID:  workerID,
 	}
 

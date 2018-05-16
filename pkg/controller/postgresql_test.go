@@ -23,14 +23,14 @@ func TestMergeDeprecatedPostgreSQLSpecParameters(t *testing.T) {
 		{
 			"Check that old parameters propagate values to the new ones",
 			&spec.PostgresSpec{UseLoadBalancer: &True, ReplicaLoadBalancer: &True},
-			&spec.PostgresSpec{UseLoadBalancer: &True, ReplicaLoadBalancer: &True,
+			&spec.PostgresSpec{UseLoadBalancer: nil, ReplicaLoadBalancer: nil,
 				EnableMasterLoadBalancer: &True, EnableReplicaLoadBalancer: &True},
 			"New parameters should be set from the values of old ones",
 		},
 		{
 			"Check that new parameters are not set when both old and new ones are present",
-			&spec.PostgresSpec{UseLoadBalancer: &True, EnableReplicaLoadBalancer: &True},
-			&spec.PostgresSpec{UseLoadBalancer: &True, EnableReplicaLoadBalancer: &True},
+			&spec.PostgresSpec{UseLoadBalancer: &True, EnableMasterLoadBalancer: &False},
+			&spec.PostgresSpec{UseLoadBalancer: nil, EnableMasterLoadBalancer: &False},
 			"New parameters should remain unchanged when both old and new are present",
 		},
 	}
