@@ -4,27 +4,51 @@
 [![Coverage Status](https://coveralls.io/repos/github/zalando-incubator/postgres-operator/badge.svg)](https://coveralls.io/github/zalando-incubator/postgres-operator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zalando-incubator/postgres-operator)](https://goreportcard.com/report/github.com/zalando-incubator/postgres-operator)
 
-The Postgres operator manages PostgreSQL clusters on Kubernetes using the [operator pattern](https://coreos.com/blog/introducing-operators.html).
-During the initial run it registers the [Custom Resource Definition (CRD)](https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions) for Postgres.
-The `postgresql` CRD is essentially the schema that describes the contents of the manifests for deploying individual
-Postgres clusters using StatefulSets and [Patroni](https://github.com/zalando/patroni).
+## Introduction 
 
-Once the operator is running, it performs the following actions:
+The Postgres [operator](https://coreos.com/blog/introducing-operators.html) manages PostgreSQL clusters on Kubernetes:
 
-* watches for new `postgresql` manifests and deploys new clusters
-* watches for updates to existing manifests and changes corresponding properties of the running clusters
-* watches for deletes of the existing manifests and deletes corresponding clusters
-* acts on an update to the operator configuration itself and changes the running clusters when necessary
-  (i.e. the Docker image changes for a minor release update)
-* periodically checks running clusters against the manifests and syncs changes
+1. The operator watches additions, updates, and deletions of PostgreSQL cluster manifests and changes the running clusters accordingly.  
+For example, when a user submits a new manifest, the operator fetches that manifest and spawns a new Postgres cluster along with all necessary entities such as Kubernetes StatefulSets and Postgres roles.  
+See this [Postgres cluster manifest](manifests/complete-postgres-manifest.yaml) for settings that a manifest may contain.
 
-Example: When a user creates a new custom object of type ``postgresql`` by submitting a new manifest with
-``kubectl``, the operator fetches that object and creates the required Kubernetes entities to spawn a new Postgres cluster
-(StatefulSets, Services, Secrets).
+2. The operator also watches updates to [its own configuration](manifests/configmap.yaml) and alters running Postgres clusters if necessary.  
+For instance, if a pod docker image is changed, the operator carries out the rolling update.  
+That is, the operator re-spawns one-by-one pods of each StatefulSet it manages with the new Docker image.
 
-Update example: After changing the Docker image inside the operator's configuration, the operator first goes to all StatefulSets
-it manages and updates them with the new Docker image; afterwards, all pods from each StatefulSet are killed one by one
-and the replacements are spawned automatically by each StatefulSet with the new Docker image. This is called the Rolling update.
+3. Finally, the operator periodically synchronizes the actual state of each Postgres cluster with the desired state defined in the cluster's manifest. 
+
+
+## Quickstart 
+
+Prerequisites: [minikube](https://github.com/kubernetes/minikube/releases) and [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl)
+
+### Local execution
+
+```bash
+git clone https://github.com/zalando-incubator/postgres-operator.git
+cd postgres-operator
+
+minikube start
+
+# start the operator; may take a few seconds
+kubectl create -f manifests/configmap.yaml  # configuration
+kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
+kubectl create -f manifests/postgres-operator.yaml  # deployment
+
+# create a Postgres cluster
+kubectl create -f manifests/minimal-postgres-manifest.yaml 
+
+# tear down cleanly
+minikube delete
+```
+
+We have automated these steps for you:
+```bash
+cd postgres-operator
+./run_operator_locally.sh
+minikube delete
+```
 
 ## Scope
 
@@ -108,7 +132,7 @@ ConfigMap is used to store the configuration of the operator
 
 First you need to install the service account definition in your Minikube cluster.
 
-    $ kubectl --context minikube create -f manifests/serviceaccount.yaml
+    $ kubectl --context minikube create -f manifests/operator-service-account-rbac.yaml
 
 Next deploy the postgres-operator from the docker image Zalando is using:
 
@@ -153,8 +177,7 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-Note that the service account in `operator-rbac.yaml` is named `zalando-postgres-operator` and not
-the `operator` default that is created in the `serviceaccount.yaml`. So you will have to change the `service_account_name` in the operator configmap and `serviceAccountName` in the postgres-operator deployment appropriately.
+Note that the service account in `operator-rbac.yaml` is named `zalando-postgres-operator`. You may have to change the `service_account_name` in the operator configmap and `serviceAccountName` in the postgres-operator deployment appropriately.
 
 This is done intentionally, as to avoid breaking those setups that
 already work with the default `operator` account. In the future the operator should ideally be run under the
