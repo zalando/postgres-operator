@@ -128,7 +128,7 @@ ConfigMap is used to store the configuration of the operator
 
 First you need to install the service account definition in your Minikube cluster.
 
-    $ kubectl --context minikube create -f manifests/serviceaccount.yaml
+    $ kubectl --context minikube create -f manifests/operator-service-account-rbac.yaml
 
 Next deploy the postgres-operator from the docker image Zalando is using:
 
@@ -173,8 +173,7 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-Note that the service account in `operator-rbac.yaml` is named `zalando-postgres-operator` and not
-the `operator` default that is created in the `serviceaccount.yaml`. So you will have to change the `service_account_name` in the operator configmap and `serviceAccountName` in the postgres-operator deployment appropriately.
+Note that the service account in `operator-rbac.yaml` is named `zalando-postgres-operator`. You may have to change the `service_account_name` in the operator configmap and `serviceAccountName` in the postgres-operator deployment appropriately.
 
 This is done intentionally, as to avoid breaking those setups that
 already work with the default `operator` account. In the future the operator should ideally be run under the
