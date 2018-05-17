@@ -8,9 +8,9 @@
 
 The Postgres [operator](https://coreos.com/blog/introducing-operators.html) manages PostgreSQL clusters on Kubernetes:
 
-1. The operator watches additions, updates and deletions of Postgresql manifests (cluster descriptions) and changes the running clusters accordingly. For example, when a user submits a new manifest, the operator fetches that object and spawns a new Postgres cluster, including all necessary  entities such as Kubernetes StatefulSets and Postgres roles. The [`postgresql` Custom Resource Definition](https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions) defines settings that a cluster manifest may contain (see example).
+1. The operator watches additions, updates, and deletions of PostgreSQL cluster manifests (descriptions) and changes the running clusters accordingly. For example, when a user submits a new manifest, the operator fetches that object and spawns a new Postgres cluster along with all necessary entities such as Kubernetes StatefulSets and Postgres roles. See this [Postgres cluster manifest](manifests/complete-postgres-manifest.yaml) for settings that a manifest may contain.
 
-2. The operator also watches updates to its own configuration and alters running Postgres clusters if necessary. For instance, if a pods' Docker image is changed, the operator carries out the rolling update. That is, it re-spawns one-by-one pods from each StatefulSet it manages with the new Docker image. 
+2. The operator also watches updates to [its own configuration](manifests/configmap.yaml) and alters running Postgres clusters if necessary. For instance, if a pods' Docker image is changed, the operator carries out the rolling update. That is, the operator re-spawns one-by-one pods of each StatefulSet it manages with the new Docker image.
 
 3. Finally, the operator periodically synchronizes the actual state of each Postgres cluster with the desired state defined in the cluster's manifest. 
 
@@ -29,7 +29,7 @@ minikube start
 
 # start the operator; may take a few seconds
 kubectl create -f manifests/configmap.yaml         # operator config
-kubectl create -f manifests/operator-rbac.yaml     # operator identity and persmissions
+kubectl create -f manifests/operator-rbac.yaml     # operator identity and permissions
 kubectl create -f manifests/postgres-operator.yaml # operator deployment
 
 # submit a Postgres cluster
