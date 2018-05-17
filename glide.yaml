@@ -44,3 +44,4 @@ import:
   - tools/clientcmd
   - tools/remotecommand
 - package: gopkg.in/yaml.v2
+- package: github.com/mohae/deepcopy
