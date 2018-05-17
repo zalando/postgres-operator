@@ -348,10 +348,9 @@ func (c *Controller) mergeDeprecatedPostgreSQLSpecParameters(spec *spec.Postgres
 
 func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *spec.Postgresql, eventType spec.EventType) {
 	var (
-		uid              types.UID
-		clusterName      spec.NamespacedName
-		clusterError     error
-		oldSpec, newSpec *spec.Postgresql
+		uid          types.UID
+		clusterName  spec.NamespacedName
+		clusterError error
 	)
 
 	if informerOldSpec != nil { //update, delete
@@ -380,22 +379,13 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *spec.Po
 	// in the informer internal state, making it incohherent with the actual Kubernetes object (and, as a side
 	// effect, the modified state will be returned together with subsequent events).
 
-	if informerOldSpec != nil {
-		t := *informerOldSpec
-		oldSpec = &t
-	}
-	if informerNewSpec != nil {
-		t := *informerNewSpec
-		newSpec = &t
-	}
-
 	workerID := c.clusterWorkerID(clusterName)
 	clusterEvent := spec.ClusterEvent{
 		EventTime: time.Now(),
 		EventType: eventType,
 		UID:       uid,
-		OldSpec:   oldSpec,
-		NewSpec:   newSpec,
+		OldSpec:   informerOldSpec.Clone(),
+		NewSpec:   informerNewSpec.Clone(),
 		WorkerID:  workerID,
 	}
 

@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
 	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var parseTimeTests = []struct {
@@ -544,5 +543,17 @@ func TestPostgresListMeta(t *testing.T) {
 		}
 
 		return
+	}
+}
+
+func TestPostgresqlClone(t *testing.T) {
+	for _, tt := range unmarshalCluster {
+		cp := &tt.out
+		cp.Error = nil
+		clone := cp.Clone()
+		if !reflect.DeepEqual(clone, cp) {
+			t.Errorf("TestPostgresqlClone expected: \n%#v\n, got \n%#v", cp, clone)
+		}
+
 	}
 }

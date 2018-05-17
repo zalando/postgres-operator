@@ -3,6 +3,7 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mohae/deepcopy"
 	"regexp"
 	"strings"
 	"time"
@@ -137,6 +138,19 @@ var (
 	weekdays         = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
 	serviceNameRegex = regexp.MustCompile(serviceNameRegexString)
 )
+
+// Clone makes a deepcopy of the Postgresql structure. The Error field is nulled-out,
+// as there is no guaratee that the actual implementation of the error interface
+// will not contain any private fields not-reachable to deepcopy. This should be ok,
+// since Error is never read from a Kubernetes object.
+func (p *Postgresql) Clone() *Postgresql {
+	if p == nil {
+		return nil
+	}
+	c := deepcopy.Copy(p).(*Postgresql)
+	c.Error = nil
+	return c
+}
 
 func parseTime(s string) (time.Time, error) {
 	parts := strings.Split(s, ":")

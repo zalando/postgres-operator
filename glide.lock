@@ -1,8 +1,8 @@
-hash: aa008e00a8cf34fa59a081dd67644319f9d5d077bf4de81aa4a25a2d5b8781a1
-updated: 2018-01-15T15:00:53.231516+01:00
+hash: 688e15147f1217da635b83ee33f20a3741a400a493787d79992d1650f6e4c514
+updated: 2018-05-17T10:46:49.090929+02:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: 0cebc639926eb91b0192dae4b28bc808417e764c
+  version: ee7b4b1162937cba700de23bd90acb742982e626
   subpackages:
   - aws
   - aws/awserr
@@ -20,6 +20,8 @@ imports:
   - aws/request
   - aws/session
   - aws/signer/v4
+  - internal/sdkio
+  - internal/sdkrand
   - internal/shareddefaults
   - private/protocol
   - private/protocol/ec2query
@@ -97,6 +99,8 @@ imports:
   - buffer
   - jlexer
   - jwriter
+- name: github.com/mohae/deepcopy
+  version: c48cc78d482608239f6c4c92a4abd87eb8761c90
 - name: github.com/motomux/pretty
   version: b2aad2c9a95d14eb978f29baa6e3a5c3c20eef30
 - name: github.com/PuerkitoBio/purell
@@ -104,7 +108,7 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/Sirupsen/logrus
-  version: d682213848ed68c0a260ca37d6dd5ace8423f5ba
+  version: c155da19408a8799da419ed3eeb0cb5db0ad5dbc
 - name: github.com/spf13/pflag
   version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: github.com/ugorji/go
@@ -153,7 +157,7 @@ imports:
   - pkg/client/clientset/clientset/scheme
   - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 - name: k8s.io/apimachinery
-  version: 8ab5f3d8a330c2e9baaf84e39042db8d49034ae2
+  version: 1cb2cdd78d38df243e686d1b572b76e190469842
   subpackages:
   - pkg/api/equality
   - pkg/api/errors
