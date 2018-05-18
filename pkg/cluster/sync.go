@@ -50,6 +50,18 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 		return
 	}
 
+	// potentially enlarge volumes before changing the statefulset. By doing that
+	// in this order we make sure the operator is not stuck waiting for a pod that
+	// cannot start because it ran out of disk space.
+	// TODO: handle the case of the cluster that is downsized and enlarged again
+	// (there will be a volume from the old pod for which we can't act before the
+	//  the statefulset modification is concluded)
+	c.logger.Debugf("syncing persistent volumes")
+	if err = c.syncVolumes(); err != nil {
+		err = fmt.Errorf("could not sync persistent volumes: %v", err)
+		return
+	}
+
 	c.logger.Debugf("syncing statefulsets")
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
@@ -70,12 +82,6 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 			err = fmt.Errorf("could not sync databases: %v", err)
 			return
 		}
-	}
-
-	c.logger.Debugf("syncing persistent volumes")
-	if err = c.syncVolumes(); err != nil {
-		err = fmt.Errorf("could not sync persistent volumes: %v", err)
-		return
 	}
 
 	c.logger.Debug("syncing pod disruption budgets")
