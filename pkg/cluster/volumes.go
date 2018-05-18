@@ -57,7 +57,14 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not list cluster's PersistentVolumeClaims: %v", err)
 	}
-	lastPodIndex := *c.Statefulset.Spec.Replicas - 1
+
+	pods, err := c.listPods()
+	if err != nil {
+		return nil, fmt.Errorf("could not get list of running pods for resizing persistent volumes: %v", err)
+	}
+
+	lastPodIndex := len(pods) - 1
+
 	for _, pvc := range pvcs {
 		lastDash := strings.LastIndex(pvc.Name, "-")
 		if lastDash > 0 && lastDash < len(pvc.Name)-1 {
@@ -65,7 +72,7 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not convert last part of the persistent volume claim name %q to a number", pvc.Name)
 			}
-			if int32(pvcNumber) > lastPodIndex {
+			if pvcNumber > lastPodIndex {
 				c.logger.Debugf("skipping persistent volume %q corresponding to a non-running pods", pvc.Name)
 				continue
 			}
@@ -93,6 +100,7 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
+
 	for _, pv := range pvs {
 		volumeSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
 		if volumeSize > newSize {
