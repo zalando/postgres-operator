@@ -628,44 +628,42 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 // DCS, reuses the master's endpoint to store the leader related metadata. If we remove the endpoint
 // before the pods, it will be re-created by the current master pod and will remain, obstructing the
 // creation of the new cluster with the same name. Therefore, the endpoints should be deleted last.
-func (c *Cluster) Delete() error {
+func (c *Cluster) Delete() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if err := c.deleteStatefulSet(); err != nil {
-		return fmt.Errorf("could not delete statefulset: %v", err)
+		c.logger.Warningf("could not delete statefulset: %v", err)
 	}
 
 	for _, obj := range c.Secrets {
 		if delete, user := c.shouldDeleteSecret(obj); !delete {
-			c.logger.Infof("not removing secret %q for the system user %q", obj.GetName(), user)
+			c.logger.Warningf("not removing secret %q for the system user %q", obj.GetName(), user)
 			continue
 		}
 		if err := c.deleteSecret(obj); err != nil {
-			return fmt.Errorf("could not delete secret: %v", err)
+			c.logger.Warningf("could not delete secret: %v", err)
 		}
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
-		return fmt.Errorf("could not delete pod disruption budget: %v", err)
+		c.logger.Warningf("could not delete pod disruption budget: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
 		if err := c.deleteEndpoint(role); err != nil {
-			return fmt.Errorf("could not delete %s endpoint: %v", role, err)
+			c.logger.Warningf("could not delete %s endpoint: %v", role, err)
 		}
 
 		if err := c.deleteService(role); err != nil {
-			return fmt.Errorf("could not delete %s service: %v", role, err)
+			c.logger.Warningf("could not delete %s service: %v", role, err)
 		}
 	}
 
 	if err := c.deletePatroniClusterObjects(); err != nil {
-		return fmt.Errorf("could not remove leftover patroni objects; %v", err)
+		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
 	}
-
-	return nil
 }
 
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.

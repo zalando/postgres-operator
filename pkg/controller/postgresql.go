@@ -230,9 +230,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		teamName := strings.ToLower(cl.Spec.TeamID)
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
-		if err := cl.Delete(); err != nil {
-			lg.Errorf("could not delete cluster: %v", err)
-		}
+		cl.Delete()
 
 		func() {
 			defer c.clustersMu.Unlock()
