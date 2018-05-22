@@ -30,10 +30,11 @@ type pgUser struct {
 }
 
 type patroniDCS struct {
-	TTL                  uint32  `json:"ttl,omitempty"`
-	LoopWait             uint32  `json:"loop_wait,omitempty"`
-	RetryTimeout         uint32  `json:"retry_timeout,omitempty"`
-	MaximumLagOnFailover float32 `json:"maximum_lag_on_failover,omitempty"`
+	TTL                      uint32                 `json:"ttl,omitempty"`
+	LoopWait                 uint32                 `json:"loop_wait,omitempty"`
+	RetryTimeout             uint32                 `json:"retry_timeout,omitempty"`
+	MaximumLagOnFailover     float32                `json:"maximum_lag_on_failover,omitempty"`
+	PGBootstrapConfiguration map[string]interface{} `json:"postgresql,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -221,7 +222,22 @@ PatroniInitDBParams:
 	config.PgLocalConfiguration = make(map[string]interface{})
 	config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
 	if len(pg.Parameters) > 0 {
-		config.PgLocalConfiguration[patroniPGParametersParameterName] = pg.Parameters
+		localParameters := make(map[string]string)
+		bootstrapParameters := make(map[string]string)
+		for param, val := range pg.Parameters {
+			if !isBootstrapOnlyParameter(param) {
+				localParameters[param] = val
+			} else {
+				bootstrapParameters[param] = val
+			}
+		}
+		if len(localParameters) > 0 {
+			config.PgLocalConfiguration[patroniPGParametersParameterName] = localParameters
+		}
+		if len(bootstrapParameters) > 0 {
+			config.Bootstrap.DCS.PGBootstrapConfiguration = make(map[string]interface{})
+			config.Bootstrap.DCS.PGBootstrapConfiguration[patroniPGParametersParameterName] = bootstrapParameters
+		}
 	}
 	config.Bootstrap.Users = map[string]pgUser{
 		c.OpConfig.PamRoleName: {
@@ -278,6 +294,16 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 	}
 
 	return []v1.Toleration{}
+}
+
+func isBootstrapOnlyParameter(param string) bool {
+	return param == "max_connections" ||
+		param == "max_locks_per_transaction" ||
+		param == "max_worker_processes" ||
+		param == "max_prepared_transactions" ||
+		param == "wal_level" ||
+		param == "wal_log_hints" ||
+		param == "track_commit_timestamp"
 }
 
 func (c *Cluster) generatePodTemplate(
