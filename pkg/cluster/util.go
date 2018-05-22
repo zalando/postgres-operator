@@ -464,3 +464,14 @@ func (c *Cluster) GetSpec() (*spec.Postgresql, error) {
 func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
 }
+
+// Checks if the repair scan should act on this cluster.
+func (c *Cluster) NeedRepair() bool {
+	c.specMu.RLock()
+	defer c.specMu.RUnlock()
+	status := c.Status
+
+	return status == spec.ClusterStatusUpdateFailed ||
+		status == spec.ClusterStatusAddFailed ||
+		status == spec.ClusterStatusSyncFailed
+}

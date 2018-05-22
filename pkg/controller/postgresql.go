@@ -41,7 +41,6 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
 	var list spec.PostgresqlList
-	var activeClustersCnt, failedClustersCnt int
 
 	req := c.KubeClient.CRDREST.
 		Get().
@@ -61,7 +60,14 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
 		return &list, err
 	}
+	c.queueSyncEvents(&list)
 
+	return &list, err
+}
+
+// queueSyncEvents adds a sync event for every cluster with the valid manifest to the queue.
+func (c *Controller) queueSyncEvents(list *spec.PostgresqlList) {
+	var activeClustersCnt, failedClustersCnt int
 	for i, pg := range list.Items {
 		if pg.Error != nil {
 			failedClustersCnt++
@@ -81,10 +87,13 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	} else {
 		c.logger.Infof("no clusters running")
 	}
-
 	atomic.StoreInt64(&c.lastClusterSyncTime, time.Now().Unix())
+}
 
-	return &list, err
+// queueRepairEvents adds a repair event for every cluster that has a failing status.
+// The failing statuses are ClusterStatusAddFailed, ClusterStatusUpdateFailed or ClusterStatusSyncFailed
+func (c *Controller) queueRepairEvent(list *spec.PostgresqlList) {
+
 }
 
 type crdDecoder struct {
