@@ -225,10 +225,10 @@ PatroniInitDBParams:
 		localParameters := make(map[string]string)
 		bootstrapParameters := make(map[string]string)
 		for param, val := range pg.Parameters {
-			if !isBootstrapOnlyParameter(param) {
-				localParameters[param] = val
-			} else {
+			if isBootstrapOnlyParameter(param) {
 				bootstrapParameters[param] = val
+			} else {
+				localParameters[param] = val
 			}
 		}
 		if len(localParameters) > 0 {
@@ -296,6 +296,9 @@ func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration 
 	return []v1.Toleration{}
 }
 
+// isBootstrapOnlyParameter checks asgainst special Patroni bootstrap parameters.
+// Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
+// See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
 func isBootstrapOnlyParameter(param string) bool {
 	return param == "max_connections" ||
 		param == "max_locks_per_transaction" ||
