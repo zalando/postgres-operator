@@ -460,7 +460,3 @@ func (c *Cluster) GetSpec() (*spec.Postgresql, error) {
 	defer c.specMu.RUnlock()
 	return cloneSpec(&c.Postgresql)
 }
-
-func (c *Cluster) patroniUsesKubernetes() bool {
-	return c.OpConfig.EtcdHost == ""
-}
