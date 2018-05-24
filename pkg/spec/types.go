@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
+	"os"
 )
 
 // EventType contains type of the events for the TPRs and Pods received from Kubernetes
@@ -223,6 +224,9 @@ func (r RoleOrigin) String() string {
 // Placing this func here instead of pgk/util avoids circular import
 func GetOperatorNamespace() string {
 	if operatorNamespace == "" {
+		if namespaceFromEnvironment := os.Getenv("OPERATOR_NAMESPACE"); namespaceFromEnvironment != "" {
+			return namespaceFromEnvironment
+		}
 		operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
 		if err != nil {
 			log.Fatalf("Unable to detect operator namespace from within its pod due to: %v", err)
