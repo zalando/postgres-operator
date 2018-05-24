@@ -69,7 +69,7 @@ type Config struct {
 	Scalyr
 
 	WatchedNamespace string `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	EtcdHost         string `name:"etcd_host" default:""` // empty string forces Patroni use k8s as a DCS
+	EtcdHost         string `name:"etcd_host" default:""` // forces Patroni use k8s as a DCS
 	DockerImage      string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spiloprivate-9.6:1.2-p4"`
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
 	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
