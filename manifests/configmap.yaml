@@ -29,7 +29,7 @@ data:
   db_hosted_zone: db.example.com
   master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
   replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
-  enable_master_load_balancer: "false"
+  enable_master_load_balancer: "true"
   enable_replica_load_balancer: "false"
 
   pdb_name_format: "postgres-{cluster}-pdb"
