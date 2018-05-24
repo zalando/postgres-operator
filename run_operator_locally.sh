@@ -149,7 +149,7 @@ function start_operator(){
     local -r cmd="kubectl get crd | grep --quiet 'postgresqls.acid.zalan.do'"
     retry "$cmd" "$msg "
 
-    kubectl create -f manifests/complete-postgres-manifest.yaml
+    kubectl create -f manifests/minimal-postgres-manifest.yaml
 }
 
 
