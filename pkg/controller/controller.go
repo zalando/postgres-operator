@@ -112,6 +112,7 @@ func (c *Controller) initOperatorConfig() {
 
 	c.opConfig = config.NewFromMap(configMapData)
 	c.warnOnDeprecatedOperatorParameters()
+	c.processDeprecatedOperatorParameters()
 
 	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
 	if scalyrAPIKey != "" {
@@ -125,6 +126,20 @@ func (c *Controller) warnOnDeprecatedOperatorParameters() {
 	if c.opConfig.EnableLoadBalancer != nil {
 		c.logger.Warningf("Operator configuration parameter 'enable_load_balancer' is deprecated and takes no effect. " +
 			"Consider using the 'enable_master_load_balancer' or 'enable_replica_load_balancer' instead.")
+	}
+	if c.opConfig.EtcdHost == "" && !c.opConfig.PatroniUseKubernetes {
+		c.logger.Warningf("Set 'patroni_use_kubernetes' instead of setting 'etcd_host' set to an empty string to enable " +
+			"support for Kubernetes API in Patroni.")
+	}
+	if c.opConfig.EtcdHost != "" && c.opConfig.PatroniUseKubernetes {
+		c.logger.Warningf("both 'patroni_use_kubernetes' is enabled and 'etcd_host' is set to a non-empty value, " +
+			"'patroni_use_kubernetes' is ignored.")
+	}
+}
+
+func (c *Controller) processDeprecatedOperatorParameters() {
+	if c.opConfig.EtcdHost == "" && !c.opConfig.PatroniUseKubernetes {
+		c.opConfig.PatroniUseKubernetes = true
 	}
 }
 

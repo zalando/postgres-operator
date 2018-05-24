@@ -927,7 +927,7 @@ type ClusterObjectDelete func(name string) error
 
 func (c *Cluster) deletePatroniClusterObjects() error {
 	// TODO: figure out how to remove leftover patroni objects in other cases
-	if !c.patroniUsesKubernetes() {
+	if !c.OpConfig.PatroniUseKubernetes {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
 	c.logger.Debugf("removing leftover Patroni objects (endpoints or configmaps)")

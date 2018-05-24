@@ -399,7 +399,7 @@ func (c *Cluster) generatePodTemplate(
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
-	if c.patroniUsesKubernetes() {
+	if c.OpConfig.PatroniUseKubernetes {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
 	} else {
 		envVars = append(envVars, v1.EnvVar{Name: "ETCD_HOST", Value: c.OpConfig.EtcdHost})
