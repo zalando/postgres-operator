@@ -203,6 +203,15 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		c.logger.Warningf("pod %q is not a master", podName)
 		return nil
 	}
+	// we must have a statefulset in the cluster for the migration to work
+	if c.Statefulset == nil {
+		sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("could not retrieve cluster statefulset: %v", err)
+		}
+		c.Statefulset = sset
+	}
+	// We may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case.
 	if *c.Statefulset.Spec.Replicas == 1 {
 		c.logger.Warningf("single master pod for cluster %q, migration will cause longer downtime of the master instance", c.clusterName())
 	} else {
