@@ -326,19 +326,24 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 	}
 
 	if len(optionsToSet) > 0 {
-		// TODO: eliminate unnecessary calls to listPods during sync
 		pods, err := c.listPods()
 		if err != nil {
 			return err
 		}
 		if len(pods) == 0 {
-			return fmt.Errorf("could not call patroni API: cluster has no pods")
+			return fmt.Errorf("could not call Patroni API: cluster has no pods")
 		}
-		// TODO: try to call all pods until success
-		c.logger.Debugf("calling Patroni API to set the following Postgres options: %v", optionsToSet)
-		if err := c.patroni.SetPostgresParameters(&pods[0], optionsToSet); err != nil {
-			return err
+		for _, pod := range pods {
+			podName := util.NameFromMeta(pod.ObjectMeta)
+			c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %v",
+				podName, optionsToSet)
+			if err := c.patroni.SetPostgresParameters(&pod, optionsToSet); err == nil {
+				return nil
+			} else {
+				c.logger.Warningf("could not patch postgres parameters with a pod %s: %v", podName, err)
+			}
 		}
+		return fmt.Errorf("could not call Patroni API to set Postgres options: failed on %d pods", len(pods))
 	}
 	return nil
 }
