@@ -103,10 +103,10 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 
 	for _, pv := range pvs {
 		volumeSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
-		if volumeSize > newSize {
-			return fmt.Errorf("cannot shrink persistent volume")
-		}
-		if volumeSize == newSize {
+		if volumeSize >= newSize {
+			if volumeSize > newSize {
+				c.logger.Warningf("cannot shrink persistent volume")
+			}
 			continue
 		}
 		for _, resizer := range resizers {
