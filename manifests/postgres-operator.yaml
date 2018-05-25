@@ -12,7 +12,7 @@ spec:
       serviceAccountName: zalando-postgres-operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:1352c4a5e2f5
+        image: registry.opensource.zalan.do/acid/postgres-operator:1352c4a
         imagePullPolicy: IfNotPresent
         env:
         # provided additional ENV vars can overwrite individual config map entries  
