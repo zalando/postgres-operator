@@ -325,3 +325,9 @@ func (pl *PostgresqlList) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+func (status PostgresStatus) Success() bool {
+	return status != ClusterStatusAddFailed &&
+		status != ClusterStatusUpdateFailed &&
+		status != ClusterStatusSyncFailed
+}
