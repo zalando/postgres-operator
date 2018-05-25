@@ -11,9 +11,9 @@ data:
 
   debug_logging: "true"
   workers: "4"
-  docker_image: registry.opensource.zalan.do/acid/demospilo-10:1.3-p3
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p8
+  pod_service_account_name: "zalando-postgres-operator"
   secret_name_template: '{username}.{cluster}.credentials'
-  # etcd_host: ""
   super_username: postgres
   enable_teams_api: "false"
   # enable_team_superuser: "false"
@@ -28,7 +28,7 @@ data:
   db_hosted_zone: db.example.com
   master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
   replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
-  enable_master_load_balancer: "false"
+  enable_master_load_balancer: "true"
   enable_replica_load_balancer: "false"
 
   pdb_name_format: "postgres-{cluster}-pdb"
