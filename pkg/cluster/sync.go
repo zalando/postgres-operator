@@ -229,7 +229,7 @@ func (c *Cluster) syncStatefulSet() error {
 	var (
 		podsRollingUpdateRequired bool
 	)
-	// the following code should not return before the end of this function in a non-error case
+	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
 	if err != nil {
 		if !k8sutil.ResourceNotFound(err) {
@@ -343,7 +343,8 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 				c.logger.Warningf("could not patch postgres parameters with a pod %s: %v", podName, err)
 			}
 		}
-		return fmt.Errorf("could not call Patroni API to set Postgres options: failed on %d pods", len(pods))
+		return fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
+			len(pods))
 	}
 	return nil
 }

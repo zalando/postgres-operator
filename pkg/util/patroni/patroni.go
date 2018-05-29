@@ -21,7 +21,7 @@ const (
 
 // Interface describe patroni methods
 type Interface interface {
-	Failover(master *v1.Pod, candidate string) error
+	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 }
 
@@ -72,8 +72,8 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 	return nil
 }
 
-// Failover does manual failover via Patroni POST API call
-func (p *Patroni) Failover(master *v1.Pod, candidate string) error {
+// Switchover by calling Patroni REST API
+func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(map[string]string{"leader": master.Name, "member": candidate})
 	if err != nil {
