@@ -39,15 +39,22 @@ kubectl create -f manifests/postgres-operator.yaml  # deployment
 # create a Postgres cluster
 kubectl create -f manifests/minimal-postgres-manifest.yaml 
 
+# connect to the Postgres master via psql
+# operator creates the relevant k8s secret
+export HOST_PORT=$(minikube service acid-minimal-cluster --url | sed 's,.*/,,')
+export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
+export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
+export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+psql -U postgres
+
 # tear down cleanly
 minikube delete
 ```
 
-We have automated these steps for you:
+We have automated starting the operator and submitting the `acid-minimal-cluster` for you:
 ```bash
 cd postgres-operator
 ./run_operator_locally.sh
-minikube delete
 ```
 
 ## Scope
