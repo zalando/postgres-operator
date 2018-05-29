@@ -232,7 +232,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		}
 
 		masterCandidateName := util.NameFromMeta(pod.ObjectMeta)
-		if err := c.ManualFailover(oldMaster, masterCandidateName); err != nil {
+		if err := c.Switchover(oldMaster, masterCandidateName); err != nil {
 			return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
 		}
 	} else {
@@ -330,7 +330,7 @@ func (c *Cluster) recreatePods() error {
 	if masterPod != nil {
 		// failover if we have not observed a master pod when re-creating former replicas.
 		if newMasterPod == nil && len(replicas) > 0 {
-			if err := c.ManualFailover(masterPod, masterCandidate(replicas)); err != nil {
+			if err := c.Switchover(masterPod, masterCandidate(replicas)); err != nil {
 				c.logger.Warningf("could not perform failover: %v", err)
 			}
 		} else if newMasterPod == nil && len(replicas) == 0 {

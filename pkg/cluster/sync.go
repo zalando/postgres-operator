@@ -229,6 +229,7 @@ func (c *Cluster) syncStatefulSet() error {
 	var (
 		podsRollingUpdateRequired bool
 	)
+	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
 	if err != nil {
 		if !k8sutil.ResourceNotFound(err) {
@@ -288,6 +289,14 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 		}
 	}
+
+	// Apply special PostgreSQL parameters that can only be set via the Patroni API.
+	// it is important to do it after the statefulset pods are there, but before the rolling update
+	// since those parameters require PostgreSQL restart.
+	if err := c.checkAndSetGlobalPostgreSQLConfiguration(); err != nil {
+		return fmt.Errorf("could not set cluster-wide PostgreSQL configuration options: %v", err)
+	}
+
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if podsRollingUpdateRequired {
@@ -299,6 +308,43 @@ func (c *Cluster) syncStatefulSet() error {
 		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
 			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
 		}
+	}
+	return nil
+}
+
+// checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
+// (like max_connections) has changed and if necessary sets it via the Patroni API
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
+	// we need to extract those options from the cluster manifest.
+	optionsToSet := make(map[string]string)
+	pgOptions := c.Spec.Parameters
+
+	for k, v := range pgOptions {
+		if isBootstrapOnlyParameter(k) {
+			optionsToSet[k] = v
+		}
+	}
+
+	if len(optionsToSet) > 0 {
+		pods, err := c.listPods()
+		if err != nil {
+			return err
+		}
+		if len(pods) == 0 {
+			return fmt.Errorf("could not call Patroni API: cluster has no pods")
+		}
+		for _, pod := range pods {
+			podName := util.NameFromMeta(pod.ObjectMeta)
+			c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %v",
+				podName, optionsToSet)
+			if err := c.patroni.SetPostgresParameters(&pod, optionsToSet); err == nil {
+				return nil
+			} else {
+				c.logger.Warningf("could not patch postgres parameters with a pod %s: %v", podName, err)
+			}
+		}
+		return fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
+			len(pods))
 	}
 	return nil
 }

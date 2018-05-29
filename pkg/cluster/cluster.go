@@ -866,8 +866,8 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 	}
 }
 
-// ManualFailover does manual failover to a candidate pod
-func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
+// Switchover does a switchover (via Patroni) to a candidate pod
+func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
 	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
 
 	podLabelErr := make(chan error)
@@ -889,7 +889,7 @@ func (c *Cluster) ManualFailover(curMaster *v1.Pod, candidate spec.NamespacedNam
 		}
 	}()
 
-	if err := c.patroni.Failover(curMaster, candidate.Name); err != nil {
+	if err := c.patroni.Switchover(curMaster, candidate.Name); err != nil {
 		close(stopCh)
 		return fmt.Errorf("could not failover: %v", err)
 	}
