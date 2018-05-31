@@ -17,11 +17,11 @@ manages PostgreSQL clusters on Kubernetes:
    [Postgres cluster manifest](manifests/complete-postgres-manifest.yaml)
    for settings that a manifest may contain.
 
-2. The operator also watches updates to [its own
-   configuration](manifests/configmap.yaml) and alters running Postgres
-   clusters if necessary.  For instance, if a pod docker image is changed, the
-   operator carries out the rolling update.  That is, the operator re-spawns
-   one-by-one pods of each StatefulSet it manages with the new Docker image.
+2. The operator also watches updates to [its own configuration](manifests/configmap.yaml)
+   and alters running Postgres clusters if necessary.  For instance, if a pod
+   docker image is changed, the operator carries out the rolling update.  That
+   is, the operator re-spawns one-by-one pods of each StatefulSet it manages
+   with the new Docker image.
 
 3. Finally, the operator periodically synchronizes the actual state of each
    Postgres cluster with the desired state defined in the cluster's manifest.
@@ -70,4 +70,9 @@ Minikube is a tool to run Kubernetes cluster locally.
 
 The operator can be configured with the provided ConfigMap (`manifests/configmap.yaml`).
 
+## Table of contents
 
+* [concepts](docs/concepts.md)
+* [tutorials](docs/tutorials.md)
+* [howtos](docs/howtos.md)
+* [reference](docs/reference.md)
