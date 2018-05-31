@@ -39,6 +39,8 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	}
 }
 
+// TODO: make a separate function to be called from InitSharedInformers
+// clusterListFunc obtains a list of all PostgreSQL clusters and runs sync when necessary
 func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
 	var list spec.PostgresqlList
 	var activeClustersCnt, failedClustersCnt int
@@ -58,7 +60,9 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 		c.logger.Warningf("could not unmarshal list of clusters: %v", err)
 	}
 
-	if time.Now().Unix()-atomic.LoadInt64(&c.lastClusterSyncTime) <= int64(c.opConfig.ResyncPeriod.Seconds()) {
+	timeFromPreviousSync := time.Now().Unix() - atomic.LoadInt64(&c.lastClusterSyncTime)
+	if timeFromPreviousSync < int64(c.opConfig.ResyncPeriod.Seconds()) {
+		c.logger.Infof("not running SYNC, previous sync happened %d seconds ago", timeFromPreviousSync)
 		return &list, err
 	}
 
