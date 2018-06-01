@@ -14,9 +14,50 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
 
+var syncChannel chan Action
+
+func (c *Cluster) SyncActions(newSpec *spec.Postgresql) (err error) {
+	syncSecrets = Action{
+		SyncSecrets,
+		SyncSecretsData{
+			c.generateUserSecrets(),
+		},
+	}
+
+	syncServiceMaster = Action{
+		SyncService,
+		SyncServiceData{
+			Master,
+		},
+	}
+
+	syncServiceReplica = Action{
+		SyncService,
+		SyncServiceData{
+			Replica,
+		},
+	}
+
+	syncVolumes = Action{
+		SyncVolumes,
+		SyncVolumesData{
+			c.Spec.Volume,
+		},
+	}
+
+	return []Action{
+		syncSecrets,
+		syncServiceMaster,
+		syncServiceReplica,
+		syncVolumes,
+	}
+}
+
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
 // Unlike the update, sync does not error out if some objects do not exist and takes care of creating them.
 func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
+	syncChannel = make(chan Action)
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -109,7 +150,7 @@ func (c *Cluster) syncServices() error {
 	return nil
 }
 
-func (c *Cluster) syncService(role PostgresRole) error {
+func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	c.setProcessName("syncing %s service", role)
 
 	svc, err := c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{})
@@ -118,18 +159,16 @@ func (c *Cluster) syncService(role PostgresRole) error {
 		desiredSvc := c.generateService(role, &c.Spec)
 		match, reason := k8sutil.SameService(svc, desiredSvc)
 		if match {
-			return nil
+			return NoActions, nil
 		}
-		c.logServiceChanges(role, svc, desiredSvc, false, reason)
 
-		if err := c.updateService(role, desiredSvc); err != nil {
-			return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
+		if actions, err := c.updateService(role, desiredSvc); err != nil {
+			return NoActions, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
-		c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
 
-		return nil
+		return actions, nil
 	} else if !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get %s service: %v", role, err)
+		return NoActions, fmt.Errorf("could not get %s service: %v", role, err)
 	}
 	c.Services[role] = nil
 

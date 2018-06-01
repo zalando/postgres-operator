@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
+	"github.com/zalando-incubator/postgres-operator/pkg/events"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -263,6 +264,12 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
+		actions := cl.SyncActions(event.NewSpec)
+
+		for i, processor := range c.changeProcessors {
+			processor(changes)
+		}
+
 		if err := cl.Sync(event.NewSpec); err != nil {
 			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
 			lg.Error(cl.Error)
