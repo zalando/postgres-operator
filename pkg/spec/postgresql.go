@@ -65,7 +65,7 @@ type CloneDescription struct {
 type Sidecar struct {
 	Resources   `json:"resources,omitempty"`
 	Name        string             `json:"name,omitempty"`
-	DockerImage string             `json:"dockerImage,omitempty"`
+	DockerImage string             `json:"image,omitempty"`
 	Ports       []v1.ContainerPort `json:"ports,omitempty"`
 	Env         []v1.EnvVar        `json:"env,omitempty"`
 }
