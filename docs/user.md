@@ -195,13 +195,26 @@ metadata:
   name: acid-test-cluster
 spec:
   clone:
+    uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-batman"
     timestamp: "2017-12-19T12:40:33+01:00"
 ```
 
 Here `cluster` is a name of a target cluster that is going to be cloned. If
-`timestamp` is not empty, then a new cluster will be cloned from an S3 bucket
-using the latest backup before the `timestamp`. If `timestamp` is empty or
-absent, a new cluster will be cloned from an existing alive cluster using
-pg_basebackup. Note that timezone required for `timestamp` (offset relative to
-UTC, see RFC 3339 section 5.6)
+`timestamp` is not empty, then a new cluster will be cloned from an S3 bucket,
+that was created by operator,
+using the latest backup before the `timestamp`. In this case `uid` field is
+also mandatory - operator will use it to find an S3 bucket. You can find this
+field from metadata of a target cluster:
+
+```yaml
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: acid-test-cluster
+  uid: efd12e58-5786-11e8-b5a7-06148230260c
+```
+
+If `timestamp` is empty or absent, a new cluster will be cloned from an
+existing alive cluster using pg_basebackup. Note that timezone required for
+`timestamp` (offset relative to UTC, see RFC 3339 section 5.6)
