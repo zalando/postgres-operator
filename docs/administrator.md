@@ -1,4 +1,39 @@
-# How To
+# How to deploy PostgreSQL operator
+
+## Create ConfigMap
+
+ConfigMap is used to store the configuration of the operator
+
+```bash
+    $ kubectl create -f manifests/configmap.yaml
+```
+
+## Deploying the operator
+
+First you need to install the service account definition in your Minikube cluster.
+
+```bash
+    $ kubectl create -f manifests/operator-service-account-rbac.yaml
+```
+
+Next deploy the postgres-operator from the docker image Zalando is using:
+
+```bash
+    $ kubectl create -f manifests/postgres-operator.yaml
+```
+
+If you prefer to build the image yourself follow up down below.
+
+## Check if CustomResourceDefinition has been registered
+
+```bash
+    $ kubectl get crd
+
+	NAME                          KIND
+	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
+```
+
+# How to configure PostgreSQL operator
 
 ## Select the namespace to deploy to
 
@@ -6,8 +41,10 @@ The operator can run in a namespace other than `default`. For example, to use
 the `test` namespace, run the following before deploying the operator's
 manifests:
 
-    kubectl create namespace test kubectl config set-context minikube
-    --namespace=test
+```bash
+    $ kubectl create namespace test
+    $ kubectl config set-context --namespace=test
+```
 
 All subsequent `kubectl` commands will work with the `test` namespace. The
 operator  will run in this namespace and look up needed resources - such as its
@@ -60,10 +97,10 @@ for the operator to function under access control restrictions. To deploy the
 operator with this RBAC policy use:
 
 ```bash
-kubectl create -f manifests/configmap.yaml
-kubectl create -f manifests/operator-rbac.yaml
-kubectl create -f manifests/postgres-operator.yaml
-kubectl create -f manifests/minimal-postgres-manifest.yaml
+    $ kubectl create -f manifests/configmap.yaml
+    $ kubectl create -f manifests/operator-rbac.yaml
+    $ kubectl create -f manifests/postgres-operator.yaml
+    $ kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
 Note that the service account in `operator-rbac.yaml` is named
@@ -81,7 +118,7 @@ configmaps), this is also done intentionally to avoid breaking things if
 someone decides to configure the same service account in the operator's
 configmap to run postgres clusters.
 
-#### Use taints and tolerations for dedicated PostgreSQL nodes
+### Use taints and tolerations for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application
 pods, you can use
@@ -90,14 +127,14 @@ and configure the required toleration in the operator ConfigMap.
 
 As an example you can set following node taint:
 
-```
-$ kubectl taint nodes <nodeName> postgres=:NoSchedule
+```bash
+    $ kubectl taint nodes <nodeName> postgres=:NoSchedule
 ```
 
 And configure the toleration for the PostgreSQL pods by adding following line
 to the ConfigMap:
 
-```
+```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -107,59 +144,7 @@ data:
   ...
 ```
 
-Or you can specify and/or overwrite the tolerations for each PostgreSQL
-instance in the manifest:
-
-```
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-metadata:
-  name: acid-minimal-cluster
-spec:
-  teamId: "ACID"
-  tolerations:
-  - key: postgres
-    operator: Exists
-    effect: NoSchedule
-```
-
-Please be aware that the taint and toleration only ensures that no other pod
-gets scheduled to a PostgreSQL node but not that PostgreSQL pods are placed on
-such a node. This can be achieved by setting a node affinity rule in the
-ConfigMap.
-
-### Using the operator to minimize the amount of failovers during the cluster upgrade
-
-Postgres operator moves master pods out of to be decommissioned Kubernetes
-nodes. The decommission status of the node is derived from the presence of the
-set of labels defined by the `node_readiness_label` parameter. The operator
-makes sure that the Postgres master pods are moved elsewhere from the node that
-is pending to be decommissioned , but not on another node that is also about to
-be shut down. It achieves that via a combination of several properties set on
-the postgres pods:
-
-* [nodeAffinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity-beta-feature)
-  is configured to avoid scheduling the pod on nodes without all labels from
-  the `node_readiness_label` set.
-* [PodDisruptionBudget](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/#how-disruption-budgets-work)
-  is defined to keep the master pods running until they are moved out by the
-  operator.
-
-The operator starts moving master pods when the node is drained and doesn't
-have all labels from the `node_readiness_label` set. By default this parameter
-is set to an empty string, disabling this feature altogether. It can be set to
-a string containing one or more key:value parameters, i.e:
-
-```
-node_readiness_label: "lifecycle-status:ready,disagnostic-checks:ok"
-
-```
-
-when multiple labels are set the operator will require all of them to be
-present on a node (and set to the specified value) in order to consider it
-ready.
-
-#### Custom Pod Environment Variables
+## Custom Pod Environment Variables
 
 It is possible to configure a config map which is used by the Postgres pods as
 an additional provider for environment variables.
@@ -170,7 +155,7 @@ operator's main config map:
 
 **postgres-operator ConfigMap**
 
-```
+```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -183,7 +168,7 @@ data:
 
 **referenced ConfigMap `postgres-pod-config`**
 
-```
+```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -196,12 +181,7 @@ data:
 This ConfigMap is then added as a source of environment variables to the
 Postgres StatefulSet/pods.
 
-:exclamation: Note that there are environment variables defined by the operator
-itself in order to pass parameters to the Spilo image. The values from the
-operator for those variables will take precedence over those defined in the
-`pod_environment_configmap`.
-
-### Limiting the number of instances in clusters with `min_instances` and `max_instances`
+## Limiting the number of instances in clusters with `min_instances` and `max_instances`
 
 As a preventive measure, one can restrict the minimum and the maximum number of
 instances permitted by each Postgres cluster managed by the operator. If either
@@ -211,7 +191,7 @@ either the min or the max boundary. For instance, of a cluster manifest has 1
 instance and the min_instances is set to 3, the cluster will be created with 3
 instances. By default, both parameters are set to -1.
 
-### Load balancers
+## Load balancers
 
 For any Postgresql/Spilo cluster, the operator creates two separate k8s
 services: one for the master pod and one for replica pods. To expose these

@@ -73,6 +73,7 @@ The operator can be configured with the provided ConfigMap (`manifests/configmap
 ## Table of contents
 
 * [concepts](docs/concepts.md)
-* [tutorials](docs/tutorials.md)
-* [howtos](docs/howtos.md)
+* [user documentation](docs/user.md)
+* [administrator documentation](docs/administrator.md)
+* [developer documentation](docs/developer.md)
 * [reference](docs/reference.md)
