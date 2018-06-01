@@ -162,7 +162,7 @@ definitions will be ignored with a prior warning.
 See [infrastructure roles secret](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
 and [infrastructure roles configmap](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml) for the examples.
 
-#### Use taints and tolerations for dedicated PostgreSQL nodes
+## Use taints and tolerations for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application
 pods, you can use
@@ -181,3 +181,27 @@ spec:
     operator: Exists
     effect: NoSchedule
 ```
+
+## How to clone an existing PostgreSQL cluster
+
+To spin up a new cluster as a clone of the existing one, you need to provide a
+clone section in the spec:
+
+```
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  clone:
+    cluster: "acid-batman"
+    timestamp: "2017-12-19T12:40:33+01:00"
+```
+
+Here `cluster` is a name of a target cluster that is going to be cloned. If
+`timestamp` is not empty, then a new cluster will be cloned from an S3 bucket
+using the latest backup before the `timestamp`. If `timestamp` is empty or
+absent, a new cluster will be cloned from an existing alive cluster using
+pg_basebackup. Note that timezone required for `timestamp` (offset relative to
+UTC, see RFC 3339 section 5.6)
