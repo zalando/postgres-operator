@@ -15,6 +15,7 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 )
 
 const (
@@ -319,6 +320,7 @@ func (c *Cluster) generatePodTemplate(
 	cloneDescription *spec.CloneDescription,
 	dockerImage *string,
 	customPodEnvVars map[string]string,
+	customPodSecrets map[string][]byte,
 ) *v1.PodTemplateSpec {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
@@ -426,9 +428,41 @@ func (c *Cluster) generatePodTemplate(
 				name, c.OpConfig.PodEnvironmentConfigMap)
 		}
 	}
+
 	sort.Strings(names)
 	for _, name := range names {
 		envVars = append(envVars, v1.EnvVar{Name: name, Value: customPodEnvVars[name]})
+	}
+
+	//TODO: move the variable comparing and sorting code to a sepatate function
+	var secretVarNames []string
+	// include references to the secrets provided in the operator configuration.
+	// TODO: what happens with the secrets located in a different namespace?
+	if c.OpConfig.PodEnvironmentSecret != "" {
+		for secretVarName := range customPodSecrets {
+			// environment variable names have scricter rules than secrets
+			if !k8sutil.EnvironmentVariableNameIsValid(secretVarName) {
+				c.logger.Warningf("Secret key %s cannot be a name of an environment variable")
+				continue
+			}
+			if _, ok := envVarsMap[secretVarName]; !ok {
+				secretVarNames = append(secretVarNames, secretVarName)
+			} else {
+				c.logger.Warningf("variable %q value from %q is ignored: conflict with the definition from the operator",
+					secretVarNames, c.OpConfig.PodEnvironmentConfigMap)
+			}
+		}
+		sort.Strings(secretVarNames)
+		for _, name := range secretVarNames {
+			envVars = append(envVars, v1.EnvVar{Name: name, ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.OpConfig.PodEnvironmentSecret,
+					},
+					Key: name,
+				},
+			}})
+		}
 	}
 
 	privilegedMode := true
@@ -575,7 +609,11 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Scalyr sidecar resource requirements: %v", err)
 	}
-	var customPodEnvVars map[string]string
+	var (
+		customPodEnvVars map[string]string
+		customPodSecrets map[string][]byte
+	)
+	// TODO: pod environment configmaps are read from the cluster namespace
 	if c.OpConfig.PodEnvironmentConfigMap != "" {
 		if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{}); err != nil {
 			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
@@ -583,7 +621,24 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			customPodEnvVars = cm.Data
 		}
 	}
-	podTemplate := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
+	// TODO: pod environment secrets are read from the cluster namespace
+	if c.OpConfig.PodEnvironmentSecret != "" {
+		if secret, err := c.KubeClient.Secrets(c.Namespace).Get(c.OpConfig.PodEnvironmentSecret, metav1.GetOptions{}); err != nil {
+			return nil, fmt.Errorf("could not read PodEnvironmentSecret secrets", err)
+		} else {
+			customPodSecrets = secret.Data
+		}
+	}
+	podTemplate := c.generatePodTemplate(c.Postgresql.GetUID(),
+		resourceRequirements,
+		resourceRequirementsScalyrSidecar,
+		&spec.Tolerations,
+		&spec.PostgresqlParam,
+		&spec.Patroni,
+		&spec.Clone,
+		&spec.DockerImage,
+		customPodEnvVars,
+		customPodSecrets)
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)

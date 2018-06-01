@@ -3,6 +3,7 @@ package k8sutil
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
@@ -20,6 +21,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+)
+
+const (
+	EnvironmentNameRegexpString = "[-._a-zA-Z][-._a-zA-Z0-9]*"
+)
+
+var (
+	environmentNameRegexp = regexp.MustCompile(EnvironmentNameRegexpString)
 )
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -152,4 +161,8 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	}
 
 	return
+}
+
+func EnvironmentVariableNameIsValid(name string) bool {
+	return environmentNameRegexp.MatchString(name)
 }

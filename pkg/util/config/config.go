@@ -33,6 +33,7 @@ type Resources struct {
 	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
 	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
 	PodEnvironmentConfigMap string            `name:"pod_environment_configmap" default:""`
+	PodEnvironmentSecret    string            `name:"pod_environment_secret" default:""`
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
 	MinInstances            int32             `name:"min_instances" default:"-1"`
