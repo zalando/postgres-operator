@@ -34,13 +34,13 @@ spec:
 ## Create a new Spilo cluster
 
 ```bash
-    $ kubectl create -f manifests/minimal-postgres-manifest.yaml
+$ kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
 ## Watch pods being created
 
 ```bash
-    $ kubectl get pods -w --show-labels
+$ kubectl get pods -w --show-labels
 ```
 
 ## Connect to PostgreSQL
@@ -48,10 +48,10 @@ spec:
 We can use the generated secret of the `postgres` robot user to connect to our `acid-minimal-cluster` master running in Minikube:
 
 ```bash
-    $ export PGHOST=db_host
-    $ export PGPORT=db_port
-    $ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
-    $ psql -U postgres
+$ export PGHOST=db_host
+$ export PGPORT=db_port
+$ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+$ psql -U postgres
 ```
 
 # Defining database roles in the operator
@@ -169,7 +169,7 @@ pods, you can use
 [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
 and configure the required toleration in the manifest.
 
-```
+```yaml
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
@@ -187,7 +187,7 @@ spec:
 To spin up a new cluster as a clone of the existing one, you need to provide a
 clone section in the spec:
 
-```
+```yaml
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 
