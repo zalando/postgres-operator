@@ -1,6 +1,6 @@
-# How to create a new db cluster
+# How to create a new PostgreSQL cluster
 
-## Create a manifest for a new db cluster
+## Create a manifest for a new PostgreSQL cluster
 
 As an example you can take this
 [minimal example](manifests/minimal-postgres-manifest.yaml):
