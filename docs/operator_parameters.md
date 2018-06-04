@@ -36,7 +36,10 @@ Available Configuration Parameters
   cluster equal to the value of this parameter. When -1 is specified, no limits
   are applied. Default is -1.
 
-### Users
+* **resync_period**
+  period between consecutive sync requests. Default is '*5m*'. 
+
+### Postgres users
 * **super_username**
   postgres superuser name created by *initdb*. Default is '*postgres*'.
 
@@ -101,6 +104,55 @@ Available Configuration Parameters
   *ready* nodes. Default is "" (empty).
 
 * **toleration**
+  a dictionary that should contain '*key*', '*operator*', '*value*' and
+  '*effect*' keys. In that case, the operator will define a pod toleration
+  according to the values of those keys. See [kubernetes
+  documentation](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
+  for details on taints and tolerations. Default is an empty value.
+
+### Kubernetes resource requests
+* **default_cpu_request**
+  CPU request value for the Postgres containers, unless overridden by
+  cluster-specific settings. Default is '*100m*'.
+
+* **default_memory_request**
+  memory request value for the Postgres containers, unless overridden by
+  cluster-specific settings. Default is '*100Mi*'.
+
+* **default_cpu_limit**
+  CPU limits for the Postgres containers, unless overridden by cluster-specific
+  settings. Default is '*3*'.
+
+* **default_memory_limit**
+  memory limits for the Postgres containers, unless overridden by cluster-specific
+  settings. Default is '*1Gi*'.
+
+### Operator timeouts
+* **resource_check_interval**
+  interval to wait between consecutive attempts to check for the presence of
+  some Kubernetes resource (i.e. StatefulSet or PodDisruptionBudget). Default
+  is '*3s*'.
+
+* **resource_check_timeout**
+  timeout when waiting for the presence of a certain Kubernetes resource (i.e.
+  StatefulSet or PodDisruptionBudget) before declaring the operation
+  unsuccessful. Default is "*10m*".
+
+* **pod_label_wait_timeout**
+  timeout when waiting for the pod role and cluster labels. Bigger value gives
+  Patroni more time to start the instance, smaller makes the operator detect
+  possible issues faster. Default is '*10m*'.
+
+* **pod_deletion_wait_timeout**
+  timeout when waiting for the pods to be deleted when removing the cluster or
+  recreating pods. Default is '*10m*'.
+
+* **ready_wait_interval**
+  the interval between consecutive attempts waiting for the Postgres CRD to be
+  created. Default is '*5s*'.
+
+* **ready_wait_timeout**
+  the timeout for the complete Postgres CRD creation. Default is '*30s*'.
 
 ### Load balancer related options
 * **db_hosted_zone**
@@ -194,6 +246,10 @@ Available Configuration Parameters
   "*https://info.example.com/oauth2/tokeninfo?access_token= uid
   realm=/employees*"
 
+* **protected_roles**
+  List of roles that cannot be overwritten by an application, team or
+  infrastructure role. Default is '*admin*'.
+
 ### Logging and REST API
 * **api_port**
   REST API listener listens to this port. Default is *8080*.
@@ -203,4 +259,28 @@ Available Configuration Parameters
 
 * **cluster_history_entries**
   number of entries in the cluster history ring buffer. Default is *1000*
+
+## Scalyr options
+* **scalyr_api_key**
+  API key for the Scalyr sidecar. Default is empty.
+
+* **scalyr_image**
+  Docker image for the Scalyr sidecar. Default is empty.
+
+* **scalyr_server_url**
+  server URL for the Scalyr sidecar. Default is "*https://upload.eu.scalyr.com*".
+
+* **scalyr_cpu_request**
+  CPU request value for the Scalyr sidecar. Default is '*100m*'.
+
+* **scalyr_memory_request**
+  Memory request value for the Scalyr sidecar.Default is '50Mi'.
+
+* **scalyr_cpu_limit**
+  CPU limit value for the Scalyr sidecar. Default is '*1*'.
+
+* **scalyr_memory_limit**
+  Memory limit value for the Scalyr sidecar.Default is '1Gi'.
+
+
 
