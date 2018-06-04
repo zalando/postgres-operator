@@ -26,8 +26,17 @@ Available Configuration Parameters
   forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
   after this timeout. Default is '*5m*'
 
-### Users
+* **max_instances**
+  operator will cap the number of instances in any given Postgres cluster
+  managed by it to the value of this parameter. When -1 is specified, no limits
+  are applied. Default is -1.
 
+* **min_instances**
+  operator will run at least the number of instances for any given Postgres
+  cluster equal to the value of this parameter. When -1 is specified, no limits
+  are applied. Default is -1.
+
+### Users
 * **super_username**
   postgres superuser name created by *initdb*. Default is '*postgres*'.
 
@@ -70,6 +79,28 @@ Available Configuration Parameters
 
 * **infrastructure_roles_secret_name**
   name of the secret containing infrastructure roles names and passwords.
+
+* **pod_role_label**
+  name of the label assigned to the Postgres pods (and services/endpoints) by
+  the operator. Default is '*spilo-role*'.
+
+* **cluster_labels**
+  list of name:value pairs for additional labels assigned to the cluster objects. Default is '*application:spilo*'.
+
+* **cluster_name_label**
+  name of the label assigned to Kubernetes objects created by the operator that
+  indicates which cluster a given object belongs to. Default is
+  '*cluster-name'*.
+
+* **node_readiness_label**
+  a set of labels that a running and active node should possess to be
+  considered *ready.* The operator uses values for those labels to detect the
+  start of the Kubernetes cluster upgrade procedure and move master pods off
+  the nodes to be decommissioned. When the set is not empty, the operator also
+  assigns an Affinity clause to the Postgres pods to be scheduled only on
+  *ready* nodes. Default is "" (empty).
+
+* **toleration**
 
 ### Load balancer related options
 * **db_hosted_zone**
