@@ -34,13 +34,13 @@ spec:
 ## Create a new Spilo cluster
 
 ```bash
-    $ kubectl create -f manifests/minimal-postgres-manifest.yaml
+$ kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
 ## Watch pods being created
 
 ```bash
-    $ kubectl get pods -w --show-labels
+$ kubectl get pods -w --show-labels
 ```
 
 ## Connect to PostgreSQL
@@ -48,10 +48,10 @@ spec:
 We can use the generated secret of the `postgres` robot user to connect to our `acid-minimal-cluster` master running in Minikube:
 
 ```bash
-    $ export PGHOST=db_host
-    $ export PGPORT=db_port
-    $ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
-    $ psql -U postgres
+$ export PGHOST=db_host
+$ export PGPORT=db_port
+$ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+$ psql -U postgres
 ```
 
 # Defining database roles in the operator
@@ -162,14 +162,14 @@ definitions will be ignored with a prior warning.
 See [infrastructure roles secret](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
 and [infrastructure roles configmap](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml) for the examples.
 
-#### Use taints and tolerations for dedicated PostgreSQL nodes
+## Use taints and tolerations for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application
 pods, you can use
 [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
 and configure the required toleration in the manifest.
 
-```
+```yaml
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
@@ -181,3 +181,64 @@ spec:
     operator: Exists
     effect: NoSchedule
 ```
+
+## How to clone an existing PostgreSQL cluster
+
+You can spin up a new cluster as a clone of the existing one, using a clone
+section in the spec. There are two options here:
+
+* Clone directly from a source cluster using `pg_basebackup`
+
+* Clone from an S3 bucket
+
+### Clone directly
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  clone:
+    cluster: "acid-batman"
+```
+
+Here `cluster` is a name of a source cluster that is going to be cloned. The
+cluster to clone is assumed to be running and the clone procedure invokes
+`pg_basebackup` from it. The operator will connect to the service by name (if
+the cluster is called test, then the connection string will look like host=test
+port=5432), which means that you can clone only from clusters running in the
+default namespace.
+
+### Clone from S3
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  clone:
+    uid: "efd12e58-5786-11e8-b5a7-06148230260c"
+    cluster: "acid-batman"
+    timestamp: "2017-12-19T12:40:33+01:00"
+```
+
+Here `cluster` is a name of a source cluster that is going to be cloned. A new
+cluster will be cloned from S3, using the latest backup before the
+`timestamp`. In this case, `uid` field is also mandatory - operator will use it
+to find a correct key inside an S3 bucket. You can find this field from
+metadata of a source cluster:
+
+```yaml
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: acid-test-cluster
+  uid: efd12e58-5786-11e8-b5a7-06148230260c
+```
+
+Note that timezone required for `timestamp` (offset relative to UTC, see RFC
+3339 section 5.6)
