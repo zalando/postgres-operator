@@ -189,7 +189,7 @@ section in the spec. There are two options here:
 
 * Clone directly from a source cluster using `pg_basebackup`
 
-* Clone from S3 bucket
+* Clone from an S3 bucket
 
 ### Clone directly
 
