@@ -189,7 +189,7 @@ section in the spec. There are two options here:
 
 * Clone directly from a source cluster using `pg_basebackup`
 
-* Clone from an S3 bucket
+* Clone from S3 bucket
 
 ### Clone directly
 
@@ -206,7 +206,10 @@ spec:
 
 Here `cluster` is a name of a source cluster that is going to be cloned. The
 cluster to clone is assumed to be running and the clone procedure invokes
-`pg_basebackup` from it.
+`pg_basebackup` from it. The operator will connect to the service by name (if
+the cluster is called test, then the connection string will look like host=test
+port=5432), which means that you can clone only from clusters running in the
+default namespace.
 
 ### Clone from S3
 
@@ -224,7 +227,7 @@ spec:
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
-cluster will be cloned from an S3, using the latest backup before the
+cluster will be cloned from S3, using the latest backup before the
 `timestamp`. In this case, `uid` field is also mandatory - operator will use it
 to find a correct key inside an S3 bucket. You can find this field from
 metadata of a source cluster:
