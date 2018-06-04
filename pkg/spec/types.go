@@ -15,7 +15,6 @@ import (
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
-
 )
 
 // EventType contains type of the events for the TPRs and Pods received from Kubernetes
