@@ -611,7 +611,7 @@ func (c *Cluster) getSidecarContainer(sidecar spec.Sidecar, index int, volumeMou
 		Resources:       *resources,
 		VolumeMounts:    volumeMounts,
 		Env:             env,
-		Posts:           sidecar.Ports,
+		Ports:           sidecar.Ports,
 	}, nil
 }
 
