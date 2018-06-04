@@ -184,8 +184,31 @@ spec:
 
 ## How to clone an existing PostgreSQL cluster
 
-To spin up a new cluster as a clone of the existing one, you need to provide a
-clone section in the spec:
+You can spin up a new cluster as a clone of the existing one, using a clone
+section in the spec. There are two options here:
+
+* Clone directly from a source cluster using `pg_basebackup`
+
+* Clone from an S3 bucket
+
+### Clone directly
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  clone:
+    cluster: "acid-batman"
+```
+
+Here `cluster` is a name of a source cluster that is going to be cloned. The
+cluster to clone is assumed to be running and the clone procedure invokes
+`pg_basebackup` from it.
+
+### Clone from S3
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -200,12 +223,11 @@ spec:
     timestamp: "2017-12-19T12:40:33+01:00"
 ```
 
-Here `cluster` is a name of a target cluster that is going to be cloned. If
-`timestamp` is not empty, then a new cluster will be cloned from an S3 bucket,
-that was created by operator,
-using the latest backup before the `timestamp`. In this case `uid` field is
-also mandatory - operator will use it to find an S3 bucket. You can find this
-field from metadata of a target cluster:
+Here `cluster` is a name of a source cluster that is going to be cloned. A new
+cluster will be cloned from an S3, using the latest backup before the
+`timestamp`. In this case, `uid` field is also mandatory - operator will use it
+to find a correct key inside an S3 bucket. You can find this field from
+metadata of a source cluster:
 
 ```yaml
 apiVersion: acid.zalan.do/v1
@@ -215,6 +237,5 @@ metadata:
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
 
-If `timestamp` is empty or absent, a new cluster will be cloned from an
-existing alive cluster using pg_basebackup. Note that timezone required for
-`timestamp` (offset relative to UTC, see RFC 3339 section 5.6)
+Note that timezone required for `timestamp` (offset relative to UTC, see RFC
+3339 section 5.6)
