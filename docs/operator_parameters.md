@@ -8,7 +8,7 @@ words.
 Available Configuration Parameters
 ----------------------------------
 
-## General
+### General
 * **etcd_host**
   Etcd *host:port* for Patroni. Not required when Patroni native Kubernetes
   support is used. The default is empty (use Kubernetes-native DCS).
