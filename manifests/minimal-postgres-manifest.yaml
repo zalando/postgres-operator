@@ -21,14 +21,3 @@ spec:
     foo: zalando
   postgresql:
     version: "10"
-
-  sideCars:
-    - name: "pghero"
-      dockerImage: "ankane/pghero"
-      resources:
-        requests:
-          cpu: 10m
-          memory: 100Mi
-        limits:
-          cpu: 300m
-          memory: 3000Mi
