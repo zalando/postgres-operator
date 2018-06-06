@@ -411,59 +411,7 @@ func (c *Cluster) generatePodTemplate(
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 
-	var names []string
-	// handle environment variables from the PodEnvironmentConfigMap. We don't use envSource here as it is impossible
-	// to track any changes to the object envSource points to. In order to emulate the envSource behavior, however, we
-	// need to make sure that PodConfigMap variables doesn't override those we set explicitly from the configuration
-	// parameters
-	envVarsMap := make(map[string]string)
-	for _, envVar := range envVars {
-		envVarsMap[envVar.Name] = envVar.Value
-	}
-	for name := range customPodEnvVars {
-		if _, ok := envVarsMap[name]; !ok {
-			names = append(names, name)
-		} else {
-			c.logger.Warningf("variable %q value from %q is ignored: conflict with the definition from the operator",
-				name, c.OpConfig.PodEnvironmentConfigMap)
-		}
-	}
-
-	sort.Strings(names)
-	for _, name := range names {
-		envVars = append(envVars, v1.EnvVar{Name: name, Value: customPodEnvVars[name]})
-	}
-
-	//TODO: move the variable comparing and sorting code to a sepatate function
-	var secretVarNames []string
-	// include references to the secrets provided in the operator configuration.
-	// TODO: what happens with the secrets located in a different namespace?
-	if c.OpConfig.PodEnvironmentSecret != "" {
-		for secretVarName := range customPodSecrets {
-			// environment variable names have scricter rules than secrets
-			if !k8sutil.EnvironmentVariableNameIsValid(secretVarName) {
-				c.logger.Warningf("Secret key %s cannot be a name of an environment variable")
-				continue
-			}
-			if _, ok := envVarsMap[secretVarName]; !ok {
-				secretVarNames = append(secretVarNames, secretVarName)
-			} else {
-				c.logger.Warningf("variable %q value from %q is ignored: conflict with the definition from the operator",
-					secretVarNames, c.OpConfig.PodEnvironmentConfigMap)
-			}
-		}
-		sort.Strings(secretVarNames)
-		for _, name := range secretVarNames {
-			envVars = append(envVars, v1.EnvVar{Name: name, ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: c.OpConfig.PodEnvironmentSecret,
-					},
-					Key: name,
-				},
-			}})
-		}
-	}
+	envVars = c.injectPodEnvironment(customPodSecrets, customPodEnvVars, envVars)
 
 	privilegedMode := true
 	containerImage := c.OpConfig.DockerImage
@@ -523,38 +471,7 @@ func (c *Cluster) generatePodTemplate(
 				ImagePullPolicy: v1.PullIfNotPresent,
 				Resources:       *resourceRequirementsScalyrSidecar,
 				VolumeMounts:    volumeMounts,
-				Env: []v1.EnvVar{
-					{
-						Name: "POD_NAME",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1",
-								FieldPath:  "metadata.name",
-							},
-						},
-					},
-					{
-						Name: "POD_NAMESPACE",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1",
-								FieldPath:  "metadata.namespace",
-							},
-						},
-					},
-					{
-						Name:  "SCALYR_API_KEY",
-						Value: c.OpConfig.ScalyrAPIKey,
-					},
-					{
-						Name:  "SCALYR_SERVER_HOST",
-						Value: c.Name,
-					},
-					{
-						Name:  "SCALYR_SERVER_URL",
-						Value: c.OpConfig.ScalyrServerURL,
-					},
-				},
+				Env:             c.produceScalyrSidecarEnvironment(customPodSecrets, customPodEnvVars),
 			},
 		)
 	}
@@ -571,6 +488,105 @@ func (c *Cluster) generatePodTemplate(
 	}
 
 	return &template
+}
+
+// injectPodEnvironment adds variables from podEnvironmentConfigMap and PodEnvironmentSecret
+func (c *Cluster) injectPodEnvironment(customPodSecrets map[string][]byte, customPodEnvVars map[string]string, envVars []v1.EnvVar) []v1.EnvVar {
+	var (
+		variablesToInject []string
+	)
+	// handle environment variables from the PodEnvironmentConfigMap. We don't use envSource here as it is impossible
+	// to track any changes to the object envSource points to. In order to emulate the envSource behavior, however, we
+	// need to make sure that PodConfigMap variables doesn't override those we set explicitly from the configuration
+	// parameters
+	envVarsMap := make(map[string]string)
+	for _, envVar := range envVars {
+		envVarsMap[envVar.Name] = envVar.Value
+	}
+
+	for secretKey := range customPodSecrets {
+		// environment variable names have stricter rules than secrets
+		if !k8sutil.EnvironmentVariableNameIsValid(secretKey) {
+			c.logger.Warningf("Secret key %s cannot be a name of an environment variable")
+			continue
+		}
+		if _, ok := envVarsMap[secretKey]; !ok {
+			variablesToInject = append(variablesToInject, secretKey)
+		} else {
+			c.logger.Warningf("variable %q value from %q is ignored: conflict with the definition from the operator",
+				secretKey, c.OpConfig.PodEnvironmentSecret)
+		}
+	}
+
+	for podEnvironmentVariable := range customPodEnvVars {
+		if _, ok := envVarsMap[podEnvironmentVariable]; !ok {
+			if _, ok = customPodSecrets[podEnvironmentVariable]; !ok {
+				variablesToInject = append(variablesToInject, podEnvironmentVariable)
+			} else {
+				c.logger.Warningf("variable %q value from %q is ignored: conflict with the pod_environment_secret",
+					podEnvironmentVariable, c.OpConfig.PodEnvironmentConfigMap)
+			}
+		} else {
+			c.logger.Warningf("variable %q value from %q is ignored: conflict with the definition from the operator",
+				podEnvironmentVariable, c.OpConfig.PodEnvironmentConfigMap)
+		}
+	}
+
+	sort.Strings(variablesToInject)
+	for _, name := range variablesToInject {
+		if _, ok := customPodSecrets[name]; ok {
+			envVars = append(envVars, v1.EnvVar{Name: name, ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.OpConfig.PodEnvironmentSecret,
+					},
+					Key: name,
+				},
+			}})
+		} else if val, ok := customPodEnvVars[name]; ok {
+			envVars = append(envVars, v1.EnvVar{Name: name, Value: val})
+		} else {
+			c.logger.Warningf("could not determine the source of the variable %q definition", name)
+		}
+	}
+
+	return envVars
+}
+
+func (c *Cluster) produceScalyrSidecarEnvironment(customPodSecrets map[string][]byte, customPodEnvVars map[string]string) []v1.EnvVar {
+	podEnv := []v1.EnvVar{
+		{
+			Name: "POD_NAME",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "SCALYR_API_KEY",
+			Value: c.OpConfig.ScalyrAPIKey,
+		},
+		{
+			Name:  "SCALYR_SERVER_HOST",
+			Value: c.Name,
+		},
+		{
+			Name:  "SCALYR_SERVER_URL",
+			Value: c.OpConfig.ScalyrServerURL,
+		},
+	}
+	return c.injectPodEnvironment(customPodSecrets, customPodEnvVars, podEnv)
 }
 
 func getBucketScopeSuffix(uid string) string {
