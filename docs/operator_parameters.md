@@ -22,11 +22,6 @@ Available Configuration Parameters
   number of working routines the operator spawns to process requests to
   create/update/delete/sync clusters concurrently. The default is *4*.
 
-* **pod_terminate_grace_period**
-  Patroni pods are [terminated
-  forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
-  after this timeout. The default is '*5m*'.
-
 * **max_instances**
   operator will cap the number of instances in any managed Postgres cluster up
   to the value of this parameter. When *-1* is specified, no limits are applied.
@@ -61,6 +56,11 @@ Available Configuration Parameters
   doesn't define such an account using the YAML definition provided by this
   option. If not defined, a simple definition that contains only the name will
   be used. The default is empty.
+
+* **pod_terminate_grace_period**
+  Patroni pods are [terminated
+  forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
+  after this timeout. The default is '*5m*'.
 
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not
