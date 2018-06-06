@@ -14,50 +14,9 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
 )
 
-var syncChannel chan Action
-
-func (c *Cluster) SyncActions(newSpec *spec.Postgresql) (err error) {
-	syncSecrets = Action{
-		SyncSecrets,
-		SyncSecretsData{
-			c.generateUserSecrets(),
-		},
-	}
-
-	syncServiceMaster = Action{
-		SyncService,
-		SyncServiceData{
-			Master,
-		},
-	}
-
-	syncServiceReplica = Action{
-		SyncService,
-		SyncServiceData{
-			Replica,
-		},
-	}
-
-	syncVolumes = Action{
-		SyncVolumes,
-		SyncVolumesData{
-			c.Spec.Volume,
-		},
-	}
-
-	return []Action{
-		syncSecrets,
-		syncServiceMaster,
-		syncServiceReplica,
-		syncVolumes,
-	}
-}
-
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
 // Unlike the update, sync does not error out if some objects do not exist and takes care of creating them.
 func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
-	syncChannel = make(chan Action)
-
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -86,8 +45,13 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	}
 
 	c.logger.Debugf("syncing services")
-	if err = c.syncServices(); err != nil {
-		err = fmt.Errorf("could not sync services: %v", err)
+	if actions, err = c.syncServices(); err != nil {
+		err = fmt.Errorf("could not resolve actions to sync services: %v", err)
+		return
+	}
+
+	if err = c.applyActions(actions); err != nil {
+		err = fmt.Errorf("could not apply actions to sync services: %v", err)
 		return
 	}
 
@@ -150,6 +114,23 @@ func (c *Cluster) syncServices() error {
 	return nil
 }
 
+func (c *Cluster) applyActions(actions []Action) (err error) {
+	uniqueActions = []Actions{}
+	hashMap = map[ActionHash]bool{}
+	for idx, action := range actions {
+		if _, present := uniqueActions[action.hash()]; !present {
+			uniqueActions[action.hash()] = true
+			append(uniqueActions, action)
+		}
+	}
+
+	for action := range uniqueActions {
+		if dontStop, err := action.process(); err != nil && !dontStop {
+			c.logger.Errorf("Can't apply action %s: %v", action.name(), err)
+		}
+	}
+}
+
 func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	c.setProcessName("syncing %s service", role)
 
@@ -170,28 +151,16 @@ func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	} else if !k8sutil.ResourceNotFound(err) {
 		return NoActions, fmt.Errorf("could not get %s service: %v", role, err)
 	}
-	c.Services[role] = nil
-
 	c.logger.Infof("could not find the cluster's %s service", role)
 
-	if svc, err := c.createService(role); err != nil {
-		if k8sutil.ResourceAlreadyExists(err) {
-			c.logger.Infof("%s service %q already exists", role, util.NameFromMeta(svc.ObjectMeta))
-			svc, err := c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{})
-			if err == nil {
-				c.Services[role] = svc
-			} else {
-				c.logger.Infof("could not fetch existing %s service: %v", role, err)
-			}
-		} else {
-			return fmt.Errorf("could not create missing %s service: %v", role, err)
-		}
-	} else {
-		c.logger.Infof("created missing %s service %q", role, util.NameFromMeta(svc.ObjectMeta))
-		c.Services[role] = svc
-	}
-
-	return nil
+	return []CreateService{
+		ActionData{
+			namespace: serviceName.Namespace,
+		},
+		ServiceData{
+			role: role,
+		},
+	}, nil
 }
 
 func (c *Cluster) syncEndpoint(role PostgresRole) error {

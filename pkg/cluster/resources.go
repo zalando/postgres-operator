@@ -339,13 +339,12 @@ func (c *Cluster) createService(role PostgresRole) ([]Action, error) {
 	c.setProcessName("creating %v service", role)
 
 	serviceSpec := c.generateService(role, &c.Spec)
-	return []Action{
-		Action{
-			CreateService,
-			serviceName.Namespace,
-			ServiceData{
-				spec: serviceSpec,
-			},
+	return []CreateService{
+		ActionData{
+			namespace: serviceName.Namespace,
+		},
+		ServiceData{
+			spec: serviceSpec,
 		},
 	}, nil
 }
@@ -362,14 +361,14 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) ([]Ac
 	if newService.Spec.Type != c.Services[role].Spec.Type {
 		// service type has changed, need to replace the service completely.
 		// we cannot use just pach the current service, since it may contain attributes incompatible with the new type.
-		return []Action{
-			Action{
-				RecreateService,
-				ServiceData{
-					name: serviceName.Name,
-					role: role,
-					spec: newService,
-				},
+		return []RecreateService{
+			ActionData{
+				namespace: serviceName.Namespace,
+			},
+			ServiceData{
+				name: serviceName.Name,
+				role: role,
+				spec: newService,
 			},
 		}, nil
 	}
@@ -380,14 +379,13 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) ([]Ac
 		return NoActions, fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
 	}
 
-	return []Action{
-		Action{
-			CreateService,
-			serviceName.Namespace,
-			ServiceData{
-				name: serviceName.Name,
-				spec: newService,
-			},
+	return []CreateService{
+		ActionData{
+			namespace: serviceName.Namespace,
+		},
+		ServiceData{
+			name: serviceName.Name,
+			spec: newService,
 		},
 	}, nil
 }
@@ -395,13 +393,12 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) ([]Ac
 func (c *Cluster) deleteService(role PostgresRole) error {
 	service := c.Services[role]
 
-	return []Action{
-		Action{
-			DeleteService,
-			serviceName.Namespace,
-			ServiceData{
-				name: service.Name,
-			},
+	return []DeleteService{
+		ActionData{
+			namespace: serviceName.Namespace,
+		},
+		ServiceData{
+			name: service.Name,
 		},
 	}, nil
 }
