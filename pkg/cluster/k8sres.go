@@ -318,8 +318,9 @@ func (c *Cluster) generatePodTemplate(
 	patroniParameters *spec.Patroni,
 	cloneDescription *spec.CloneDescription,
 	dockerImage *string,
+	sidecars *[]spec.Sidecar,
 	customPodEnvVars map[string]string,
-) *v1.PodTemplateSpec {
+) (*v1.PodTemplateSpec, error) {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
 	envVars := []v1.EnvVar{
@@ -525,6 +526,16 @@ func (c *Cluster) generatePodTemplate(
 		)
 	}
 
+	if sidecars != nil && len(*sidecars) > 0 {
+		for index, sidecar := range *sidecars {
+			sc, err := c.getSidecarContainer(sidecar, index, volumeMounts)
+			if err != nil {
+				return nil, err
+			}
+			podSpec.Containers = append(podSpec.Containers, *sc)
+		}
+	}
+
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    c.labelsSet(true),
@@ -536,7 +547,72 @@ func (c *Cluster) generatePodTemplate(
 		template.Annotations = map[string]string{constants.KubeIAmAnnotation: c.OpConfig.KubeIAMRole}
 	}
 
-	return &template
+	return &template, nil
+}
+
+func (c *Cluster) getSidecarContainer(sidecar spec.Sidecar, index int, volumeMounts []v1.VolumeMount) (*v1.Container, error) {
+	name := sidecar.Name
+	if name == "" {
+		name = fmt.Sprintf("sidecar-%d", index)
+	}
+	resources, err := c.resourceRequirements(
+		makeResources(
+			sidecar.Resources.ResourceRequest.CPU,
+			sidecar.Resources.ResourceRequest.Memory,
+			sidecar.Resources.ResourceLimits.CPU,
+			sidecar.Resources.ResourceLimits.Memory,
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+	env := []v1.EnvVar{
+		{
+			Name: "POD_NAME",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "POSTGRES_USER",
+			Value: c.OpConfig.SuperUsername,
+		},
+		{
+			Name: "POSTGRES_PASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.credentialSecretName(c.OpConfig.SuperUsername),
+					},
+					Key: "password",
+				},
+			},
+		},
+	}
+	if len(sidecar.Env) > 0 {
+		env = append(env, sidecar.Env...)
+	}
+	return &v1.Container{
+		Name:            name,
+		Image:           sidecar.DockerImage,
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Resources:       *resources,
+		VolumeMounts:    volumeMounts,
+		Env:             env,
+		Ports:           sidecar.Ports,
+	}, nil
 }
 
 func getBucketScopeSuffix(uid string) string {
@@ -583,7 +659,10 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			customPodEnvVars = cm.Data
 		}
 	}
-	podTemplate := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
+	podTemplate, err := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, &spec.Sidecars, customPodEnvVars)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate pod template: %v", err)
+	}
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
