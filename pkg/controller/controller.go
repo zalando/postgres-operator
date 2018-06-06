@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
+	rbac "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
@@ -52,7 +53,8 @@ type Controller struct {
 
 	workerLogs map[uint32]ringlog.RingLogger
 
-	PodServiceAccount *v1.ServiceAccount
+	PodServiceAccount            *v1.ServiceAccount
+	PodServiceAccountRoleBinding *rbac.RoleBinding
 }
 
 // NewController creates a new controller
@@ -158,7 +160,49 @@ func (c *Controller) initPodServiceAccount() {
 		c.PodServiceAccount.Namespace = ""
 	}
 
-	// actual service accounts are deployed at the time of Postgres/Spilo cluster creation
+	// service account on its own lacks any rights starting with k8s v1.8
+	// operator binds it to the cluster role with sufficient priviliges
+	// we assume the role is created by the k8s administrator
+	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
+		c.opConfig.PodServiceAccountRoleBindingDefinition = `
+		{ 
+			"apiVersion": "rbac.authorization.k8s.io/v1beta1",
+			"kind": "RoleBinding", 
+			"metadata": { 
+				   "name": "zalando-postgres-operator"
+			},
+			"roleRef": {
+				"apiGroup": "rbac.authorization.k8s.io",
+				"kind": "ClusterRole",
+				"name": "zalando-postgres-operator"
+			},
+			"subjects": [
+				{
+					"kind": "ServiceAccount",
+					"name": "operator"
+				}
+			]	
+		}`
+	}
+	c.logger.Info("Parse role bindings")
+	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
+	obj, groupVersionKind, err = decode([]byte(c.opConfig.PodServiceAccountRoleBindingDefinition), nil, nil)
+
+	switch {
+	case err != nil:
+		panic(fmt.Errorf("Unable to parse the definiton of the role binding  for the pod service account definiton from the operator config map: %v", err))
+	case groupVersionKind.Kind != "RoleBinding":
+		panic(fmt.Errorf("role binding definiton in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+	default:
+		c.PodServiceAccountRoleBinding = obj.(*rbac.RoleBinding)
+		c.PodServiceAccountRoleBinding.Namespace = ""
+		c.PodServiceAccountRoleBinding.Subjects[0].Name = c.PodServiceAccount.Name
+		c.logger.Info("successfully parsed")
+
+	}
+
+	// actual service accounts and roles bindings are deployed at the time of Postgres/Spilo cluster creation
+
 }
 
 func (c *Controller) initController() {
