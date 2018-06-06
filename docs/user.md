@@ -246,8 +246,8 @@ Note that timezone required for `timestamp` (offset relative to UTC, see RFC
 ## Increase volume size
 
 PostgreSQL operator supports statefulset volume resize if you're using the
-operator on top of AWS. For that you need to apply manifest with a new size,
-and the operator will find out that a volume size needs to be changed:
+operator on top of AWS. For that you need to change the size field of the
+volume description in the cluster manifest and apply it:
 
 ```
 apiVersion: "acid.zalan.do/v1"
@@ -260,16 +260,22 @@ spec:
     size: 5Gi # new volume size
 ```
 
-You can only increase a volume size in this way, if a new requested size is
-smaller than the previous one nothing will be done. After this update all the
-new pods in a statefulset will be created with a new volume size. To increase a
-volume size on already existing pods in a statefulset, the operator will
-perform the following steps:
+The operator compares the new value of the size field with the previous one and
+acts on differences.
 
-* modify EBS volume size
+You can only enlarge the volume with the process described above, shrinking is
+not supported and will emit a warning. After this update all the new volumes in
+a statefulset are allocated according to the new size. To enlarge persistent
+volumes attached to the running pods, the operator performs the following
+actions:
 
-* resize an actuall filesystem use `resize2fs`
+* call AWS API to change the volume size
 
-Note that if before a volume size was increased a statefulset was scaled down
-and (after the change was applied) scaled back, those pods that were down will
-have an old volume size, since a statefulset doesn't delete volumes.
+* connect to the pod using `kubectl exec` and resize the filesystem with
+  `resize2fs`.
+
+Fist step has a limitation, AWS rate-limits this operation to no more than once
+every 6 hours.
+Note that if the statefulset is scaled down before resizing the size changes
+are only applied to the volumes attached to the running pods. The size of the
+volumes that correspond to the previously running pods is not changed.
