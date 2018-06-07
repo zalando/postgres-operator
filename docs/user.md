@@ -247,7 +247,7 @@ Note that timezone required for `timestamp` (offset relative to UTC, see RFC
 
 PostgreSQL operator supports statefulset volume resize if you're using the
 operator on top of AWS. For that you need to change the size field of the
-volume description in the cluster manifest and apply it:
+volume description in the cluster manifest and apply the change:
 
 ```
 apiVersion: "acid.zalan.do/v1"
@@ -265,7 +265,7 @@ acts on differences.
 
 You can only enlarge the volume with the process described above, shrinking is
 not supported and will emit a warning. After this update all the new volumes in
-a statefulset are allocated according to the new size. To enlarge persistent
+the statefulset are allocated according to the new size. To enlarge persistent
 volumes attached to the running pods, the operator performs the following
 actions:
 
