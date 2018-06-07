@@ -290,11 +290,11 @@ Available Configuration Parameters
   CPU request value for the Scalyr sidecar. The default is '*100m*'.
 
 * **scalyr_memory_request**
-  Memory request value for the Scalyr sidecar.Default is '50Mi'.
+  Memory request value for the Scalyr sidecar. The default is '50Mi'.
 
 * **scalyr_cpu_limit**
   CPU limit value for the Scalyr sidecar. The default is '*1*'.
 
 * **scalyr_memory_limit**
-  Memory limit value for the Scalyr sidecar.Default is '1Gi'.
+  Memory limit value for the Scalyr sidecar. The default is '1Gi'.
 
