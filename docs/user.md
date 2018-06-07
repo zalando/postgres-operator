@@ -242,3 +242,40 @@ metadata:
 
 Note that timezone required for `timestamp` (offset relative to UTC, see RFC
 3339 section 5.6)
+
+## Increase volume size
+
+PostgreSQL operator supports statefulset volume resize if you're using the
+operator on top of AWS. For that you need to change the size field of the
+volume description in the cluster manifest and apply the change:
+
+```
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  volume:
+    size: 5Gi # new volume size
+```
+
+The operator compares the new value of the size field with the previous one and
+acts on differences.
+
+You can only enlarge the volume with the process described above, shrinking is
+not supported and will emit a warning. After this update all the new volumes in
+the statefulset are allocated according to the new size. To enlarge persistent
+volumes attached to the running pods, the operator performs the following
+actions:
+
+* call AWS API to change the volume size
+
+* connect to the pod using `kubectl exec` and resize the filesystem with
+  `resize2fs`.
+
+Fist step has a limitation, AWS rate-limits this operation to no more than once
+every 6 hours.
+Note that if the statefulset is scaled down before resizing the size changes
+are only applied to the volumes attached to the running pods. The size of the
+volumes that correspond to the previously running pods is not changed.
