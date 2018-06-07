@@ -16,7 +16,7 @@ Available Configuration Parameters
 * **docker_image**
   Spilo docker image for Postgres instances. For production, don't rely on
   defaults, as it might be too old. Instead, build your own Spilo image from
-  the [github repository](github.com/zalando/spilo).
+  the [github repository](https://github.com/zalando/spilo).
 
 * **workers**
   number of working routines the operator spawns to process requests to
