@@ -10,8 +10,9 @@ Available Configuration Parameters
 
 ### General
 * **etcd_host**
-  Etcd *host:port* for Patroni. Not required when Patroni native Kubernetes
-  support is used. The default is empty (use Kubernetes-native DCS).
+  Etcd connection string for Patroni defined as *host:port*. Not required when
+  Patroni native Kubernetes support is used. The default is empty (use
+  Kubernetes-native DCS).
 
 * **docker_image**
   Spilo docker image for Postgres instances. For production, don't rely on
