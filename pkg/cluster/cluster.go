@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	rbac "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
@@ -39,10 +40,11 @@ var (
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
-	OpConfig            config.Config
-	RestConfig          *rest.Config
-	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
-	PodServiceAccount   *v1.ServiceAccount
+	OpConfig                     config.Config
+	RestConfig                   *rest.Config
+	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
+	PodServiceAccount            *v1.ServiceAccount
+	PodServiceAccountRoleBinding *rbac.RoleBinding
 }
 
 type kubeResources struct {
@@ -200,7 +202,7 @@ func (c *Cluster) initUsers() error {
 }
 
 /*
-  Ensures the service account required by StatefulSets to create pods exists in a namespace before a PG cluster is created there so that a user does not have to deploy the account manually.
+  Ensures the service account required by StatefulSets to create pods exists in a namespace and has correct access rights before a PG cluster is created there so that a user does not have to deploy and configure the account manually.
 
   The operator does not sync these accounts after creation.
 */
@@ -229,7 +231,31 @@ func (c *Cluster) createPodServiceAccounts() error {
 		c.logger.Infof("successfully found the service account %q used to create pods to the namespace %q", podServiceAccountName, c.Namespace)
 	}
 
+	podServiceAccountRoleBindingName := c.Config.PodServiceAccountRoleBinding.Name
+	_, err = c.KubeClient.RoleBindings(c.Namespace).Get(podServiceAccountRoleBindingName, metav1.GetOptions{})
+
+	if err != nil {
+
+		c.setProcessName(fmt.Sprintf("binding the pod service account in the namespace %v to the cluster role", c.Namespace))
+
+		c.logger.Infof("the role binding %q for the pod service account %q cannot be retrieved in the namespace %q. Trying to deploy the role binding.", podServiceAccountRoleBindingName, podServiceAccountName, c.Namespace)
+
+		// get a separate copy of role binding
+		// to prevent a race condition when setting a namespace for many clusters
+		rb := *c.PodServiceAccountRoleBinding
+		_, err = c.KubeClient.RoleBindings(c.Namespace).Create(&rb)
+		if err != nil {
+			return fmt.Errorf("cannot bind the pod service account %q defined in the config map to the cluster role in the %q namespace: %v", podServiceAccountName, c.Namespace, err)
+		}
+
+		c.logger.Infof("successfully deployed the role binding for the pod service account %q to the %q namespace", podServiceAccountName, c.Namespace)
+
+	} else {
+		c.logger.Infof("successfully found the role binding %q for the service account %q used to create pods to the namespace %q", podServiceAccountRoleBindingName, podServiceAccountName, c.Namespace)
+	}
+
 	return nil
+
 }
 
 // Create creates the new kubernetes objects associated with the cluster.
