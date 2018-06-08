@@ -1,137 +1,154 @@
 Postgres Cluster Manifest
 =========================
 
-Individual Postgres clusters are described by the Kubernetes object called
-cluster manifest that has the structure defined by the Postgres CRD (custom
-resource definition). The following section describes the structure of the
-manifest and the purpose of individual fields. You can take a look at the
-examples of the
+Individual postgres clusters are described by the Kubernetes *cluster manifest*
+that has the structure defined by the `postgres CRD` (custom resource
+definition). The following section describes the structure of the manifest and
+the purpose of individual keys. You can take a look at the examples of the
 [minimal](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
 and the
 [complete](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml)
 cluster manifests.
 
+When Kubernetes resources, such as memory, CPU or volumes, are configured,
+their amount is usually described as a string together with the units of
+measurements. Please, refer to the [Kubernetes
+documentation](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
+for the possible values of those.
+
 Manifest structure
 ------------------
 
-Postgres manifest is a YAML document. At the root both individual parameters and parameter groups can be defined that describe the Postgres cluster to be deployed. Parameter names are written in camelCase.
+A postgres manifest is a `YAML` document. On the top level both individual
+parameters and parameter groups can be defined  Parameter names are written
+in camelCase.
 
 ### Cluster metadata
 
-Those parameters are grouped under the `metadata` root key.
+Those parameters are grouped under the `metadata` top-level key.
 
 * **name**
-  the name of the cluster. Should start with the `teamId` following by a dash.
+  the name of the cluster. Should start with the `teamId` followed by a dash.
   Changing it after the cluster creation is not supported. Required field.
 
 * **namespace**
-  the namespace for cluster Kubernetes objects (i.e. pods, services, secrets).
-  The operator should listen to that namespace in order to pick up the cluster
-  object. Changing it after the cluster creation will result in deploying or
-  updating a completely separate cluster in the target namespace. 
+  the namespace where the operator creates its Kubernetes objects (i.e. pods,
+  services, secrets) for the cluster. Changing it after the cluster creation
+  results in deploying or updating a completely separate cluster in the target
+  namespace. Optional (if present, should match the namespace where the
+  manifest is applied). 
 
-### Root parameters
+### Top-level parameters
 
 * **teamId**
-  text name of the team the cluster belongs to. The operator requires the
-  cluster name to start with the team name and may reference to the team name
-  in the DNS name template defined by the operator configuration. The team name
-  is also used to populate initial users to te cluster when the
-  `enable_teams_api` operator parameter is set. Changing it after the cluster
+  name of the team the cluster belongs to. Changing it after the cluster
   creation is not supported. Required field.
 
 * **dockerImage**
   optional custom docker image that overrides the **docker_image** operator
-  parameter.
+  parameter. Optional.
 
 * **enableMasterReplicaLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_master_load_balancer` parameter) to define whether to enable the load
-  balancer pointing to the Postgres primary. Optional.
+  balancer pointing to the postgres primary. Optional.
 
 * **enableReplicaLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_replica_load_balancer` parameter) to define whether to enable the
-  load balancer pointing to the Postgres standby instances. Optional.
+  load balancer pointing to the postgres standby instances. Optional.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
   defines the comma-separated range of networks (in CIDR-notation). The
-  corresponding load balancer will be accessible only to the networks defined
-  by this parameter. Optional, when empty the corresponding load balancer
-  service becomes inaccessible from outside of the Kubernetes cluster.
+  corresponding load balancer is accessible only to the networks defined by
+  this parameter. Optional, when empty the load balancer service becomes
+  inaccessible from outside of the Kubernetes cluster.
 
 * **numberOfInstances**
-  total number of  instances for a given cluster. The number here may be
-  adjusted by the operator parameters `max_instances` and `min_instances`.
-  Required field.
+  total number of  instances for a given cluster. The operator parameters
+  `max_instances` and `min_instances` may also adjust this number.  Required
+  field.
 
 * **users**
-  a dictionary of user names to user flags for the users that should be created
-  in the cluster by the operator. User flags is itself a list, allowed flags
-  are `SUPERUSER` `REPLICATION` `INHERIT`, `LOGIN`, `NOLOGIN`, `CREATEROLE`,
-  `CREATEDB`, `REPLICATION`, `BYPASSURL`. A login user is created by default,
+  a map of usernames to user flags for the users that should be created in the
+  cluster by the operator. User flags are a list, allowed elements are
+  `SUPERUSER` `REPLICATION` `INHERIT`, `LOGIN`, `NOLOGIN`, `CREATEROLE`,
+  `CREATEDB`, `REPLICATION`, `BYPASSURL`. A login user is created by default
   unless NOLOGIN is specified, in which case the operator creates a role. One
   can specify empty flags by providing a JSON empty array '*[]*'. Optional.
 
 * **databases**
-  a dictionary of database names to database owners for the databases that
-  should be created by the operator. The owner users should already exist on
-  the cluster (a role from the `user` dictionary would work). Optional.
+  a map of database names to database owners for the databases that should be
+  created by the operator. The owner users should already exist on the cluster
+  (i.e. mentioned in the `user` parameter). Optional.
+
+* **tolerations**
+  a list of tolerations that apply to the cluster pods. Each element of that
+  list is a dictionary with the following fields: `key`, `operator`, `value`,
+  `effect` and `tolerationSeconds`. Each field is optional. See [Kubernetes
+  examples](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
+  for details on tolerations and possible values of those keys. When set, this
+  value overrides the `pod_toleration` setting from the operator. Optional.
 
 ### Postgres parameters
 
-Those parameters are grouped under the `postgresql` root key.
+Those parameters are grouped under the `postgresql` top-level key.
 
 * **version**
-  postgres major version the cluster should run. Looks at the [Spilo
+  the postgres major version of the cluster. Looks at the [Spilo
   project](https://github.com/zalando/spilo) for the list of supported
   versions. Changing the cluster version once the cluster has been bootstrapped
   is not supported. Required field.
 
 * **parameters**
   a dictionary of postgres parameter names and values to apply to the resulting
-  cluster. Optional (reasonable defaults for parameters like work_mem or
-  max_connections are automatically set by Spilo).
+  cluster. Optional (Spilo automatically sets reasonable defaults for
+  parameters like work_mem or max_connections).
 
 ### Patroni parameters
 
-Those parameters are grouped under the `patroni` root key. See the [patroni
+Those parameters are grouped under the `patroni` top-level key. See the [patroni
 documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html) for the
 explanation of `ttl` and `loop_wait` parameters.
 
 * **initdb**
   a map of key-value pairs describing initdb parameters. For `data-checksum`,
   `debug`, `no-locale`, `noclean`, `nosync` and `sync-only` parameters use
-  `true` as the value if you want to set them. Changes to this option have no
-  effect once the cluster is initialized. Optional. 
+  `true` as the value if you want to set them. Changes to this option do not
+  affect the already initialized clusters. Optional. 
 
 * **pg_hba**
   list of custom `pg_hba` lines to replace default ones. Note that the default
-  ones include `hostsll all +pamrole all pam`, where pamrole is the name of the
-  pamrole; any custom lines should include the pam line to avoid breaking pam
-  authentication. Optional.
+  ones include
+
+  ```
+  hostsll all +pamrole all pam
+  ```
+  , where pamrole is the name of the role for the pam authentication; any
+    custom `pg_hba` should include the pam line to avoid breaking pam
+    authentication. Optional.
 
 * **ttl**
   patroni `ttl` parameter value, optional. The default is set by the Spilo
-  docker image.
+  docker image. Optional.
 
 * **loop_wait**
   patroni `loop_wait` parameter value, optional. The default is set by the
-  Spilo docker image.
+  Spilo docker image. Optional.
 
 * **retry_timeout**
   patroni `retry_timeout` parameter value, optional. The default is set by the
-  Spilo docker image.
+  Spilo docker image. Optional.
 
 * **maximum_lag_on_failover**
   patroni `maximum_lag_on_failover` parameter value, optional. The default is
-  set by the Spilo docker image.
+  set by the Spilo docker image. Optional.
 
 ### Postgres container resources
 
 Those parameters define CPU and memory requests and limits for the postgres
-container. They are grouped under the `resources` root key. There are two
+container. They are grouped under the `resources` top-level key. There are two
 subgroups, `requests` and `limits`.
 
 #### Requests
@@ -139,38 +156,60 @@ subgroups, `requests` and `limits`.
 CPU and memory requests for the postgres container.
 
 * **cpu**
-  CPU requests for the Postgres container. Optional, overrides the `default_cpu_requests` operator configuration parameter.
+  CPU requests for the postgres container. Optional, overrides the
+  `default_cpu_requests` operator configuration parameter. Optional.
 
 * **memory**
-  memory requests for the Postgres container. Optional, overrides the `default_memory_request` operator configuration parameter.
+  memory requests for the postgres container. Optional, overrides the
+  `default_memory_request` operator configuration parameter. Optional.
 
 #### Limits
 
 CPU and memory limits for the postgres container.
 
 * **cpu**
-  CPU limits for the Postgres container. Optional, overrides the `default_cpu_limits` operator configuration parameter.
+  CPU limits for the postgres container. Optional, overrides the
+  `default_cpu_limits` operator configuration parameter. Optional.
 
 * **memory**
-  memory limits for the Postgres container. Optional, overrides the `default_memory_limits` operator configuration parameter.
+  memory limits for the postgres container. Optional, overrides the
+  `default_memory_limits` operator configuration parameter. Optional.
 
-### Cluster cloning
+### Parameters defining how to clone the cluster from another one
 
-Those parameters define the source clone to clone the current one from. They
-have no effect once the cluster is already up and running.They are grouped
-under the `clone` root key.
+Those parameters are applied when the cluster should be a clone of another one
+that is either already running or has a basebackup on S3. They are grouped
+under the `clone` top-level key and do not affect the already running cluster.
 
 * **cluster**
-  name of the cluster to clone from. Translated to either the service name or the key inside the S3 bucket containing base backups.
+  name of the cluster to clone from. Translated to either the service name or
+  the key inside the S3 bucket containing base backups. Required when the
+  `clone` section is present.
 
 * **uid**
-  Kubernetes UID of the cluster to clone from. Since name is not a unique
-  identifier of the cluster, we use UID in the S3 bucket name in order to
-  guarantee uniqness. Has no effect when cloning from the running cluster
+  Kubernetes UID of the cluster to clone from. Since cluster name is not a
+  unique identifier of the cluster (as identically named clusters may exist in
+  different namespaces) , the operator uses UID in the S3 bucket name in order
+  to guarantee uniqueness. Has no effect when cloning from the running
+  clusters. Optional.
   
 * **timestamp**
-  timestamp to stop replaying changes of the original cluster for the
-  point-in-time recovery. The operator always configures non-inclusive recovery
-  target, stopping right before the given timestamp. When the timestamp is
-  included the operator will not consider cloning from the live cluster, even
-  if it is running, and instead goes to S3. 
+  the timestamp up to which the recovery should proceed. The operator always
+  configures non-inclusive recovery target, stopping right before the given
+  timestamp. When this parameter is set the operator will not consider cloning
+  from the live cluster, even if it is running, and instead goes to S3. Optional.
+
+### EBS volume resizing
+
+Those parameters are grouped under the `volume` top-level key and define the
+properties of the persistent storage that stores postgres data.
+
+* **size**
+  the size of the target EBS volume. Usual Kubernetes size modifiers, i.e. `Gi`
+  or `Mi`, apply. Required.
+
+* **storageClass**
+  the name of the Kubernetes storage class to draw the persistent volume from.
+  See [Kubernetes
+  documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
+  for the details on storage classes. Optional. 
