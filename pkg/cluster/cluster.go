@@ -155,7 +155,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 
 	_, err = c.KubeClient.CRDREST.Patch(types.MergePatchType).
 		Namespace(c.Namespace).
-		Resource(constants.CRDResource).
+		Resource(constants.PostgresCRDResource).
 		Name(c.Name).
 		Body(request).
 		DoRaw()

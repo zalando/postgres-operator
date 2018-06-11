@@ -48,7 +48,7 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	req := c.KubeClient.CRDREST.
 		Get().
 		Namespace(c.opConfig.WatchedNamespace).
-		Resource(constants.CRDResource).
+		Resource(constants.PostgresCRDResource).
 		VersionedParams(&options, metav1.ParameterCodec)
 
 	b, err := req.DoRaw()
@@ -117,7 +117,7 @@ func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interfa
 	r, err := c.KubeClient.CRDREST.
 		Get().
 		Namespace(c.opConfig.WatchedNamespace).
-		Resource(constants.CRDResource).
+		Resource(constants.PostgresCRDResource).
 		VersionedParams(&options, metav1.ParameterCodec).
 		FieldsSelectorParam(nil).
 		Stream()
