@@ -174,8 +174,21 @@ func (c *Controller) initController() {
 		c.logger.Logger.Level = logrus.DebugLevel
 	}
 
-	if err := c.createCRD(); err != nil {
-		c.logger.Fatalf("could not register CustomResourceDefinition: %v", err)
+
+	if err := c.createPostgresCRD(); err != nil {
+		c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
+	}
+
+	if err := c.createOperatorCRD(); err != nil {
+		c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
+	}
+
+	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
+		if config, err := c.readOperatorConfigurationFromCRD(configObjectName); err != nil {
+			c.logger.Fatalf("unable to read operator configuration: %v", err)
+		} else {
+			c.logger.Info("operator configuration: %#v", config)
+		}
 	}
 
 	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
