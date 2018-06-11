@@ -125,8 +125,12 @@ func (c *Cluster) applyActions(actions []Action) (err error) {
 	}
 
 	for action := range uniqueActions {
-		if dontStop, err := action.process(); err != nil && !dontStop {
+		if critical, err := action.process(); err != nil {
 			c.logger.Errorf("Can't apply action %s: %v", action.name(), err)
+		}
+
+		if critical == true {
+			return err
 		}
 	}
 }
