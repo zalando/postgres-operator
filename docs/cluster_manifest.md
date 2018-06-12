@@ -28,7 +28,7 @@ in camelCase.
 Those parameters are grouped under the `metadata` top-level key.
 
 * **name**
-  the name of the cluster. Should start with the `teamId` followed by a dash.
+  the name of the cluster. Must start with the `teamId` followed by a dash.
   Changing it after the cluster creation is not supported. Required field.
 
 * **namespace**
