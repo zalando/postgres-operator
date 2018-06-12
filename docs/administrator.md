@@ -1,5 +1,3 @@
-# How to deploy PostgreSQL operator
-
 ## Create ConfigMap
 
 ConfigMap is used to store the configuration of the operator

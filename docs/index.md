@@ -8,10 +8,10 @@ manages PostgreSQL clusters on Kubernetes:
    user submits a new manifest, the operator fetches that manifest and spawns a
    new Postgres cluster along with all necessary entities such as Kubernetes
    StatefulSets and Postgres roles.  See this
-   [Postgres cluster manifest](manifests/complete-postgres-manifest.yaml)
+   [Postgres cluster manifest](https://github.com/zalando-incubator/postgres-operator/manifests/complete-postgres-manifest.yaml)
    for settings that a manifest may contain.
 
-2. The operator also watches updates to [its own configuration](manifests/configmap.yaml)
+2. The operator also watches updates to [its own configuration](https://github.com/zalando-incubator/postgres-operator/manifests/configmap.yaml)
    and alters running Postgres clusters if necessary.  For instance, if a pod
    docker image is changed, the operator carries out the rolling update.  That
    is, the operator re-spawns one-by-one pods of each StatefulSet it manages

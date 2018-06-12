@@ -1,6 +1,6 @@
-## Quickstart
+## Prerequisites:
 
-Prerequisites:
+In order to run the Postgres operator locally in minikube you need to install the following tools:
 
 * [minikube](https://github.com/kubernetes/minikube/releases)
 * [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl)
@@ -10,7 +10,7 @@ for Mac to follow the steps of this tutorial. You would have to replace
 `minikube start` and `minikube delete` with your launch actionsfor the Docker
 built-in Kubernetes support.
 
-### Local execution
+## Local execution
 
 ```bash
 git clone https://github.com/zalando-incubator/postgres-operator.git

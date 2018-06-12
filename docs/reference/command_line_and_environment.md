@@ -1,6 +1,3 @@
-Command line options and environment variables
-==============================================
-
 ## Command-line options
 
 The following command-line options are supported for the operator:

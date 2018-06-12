@@ -1,5 +1,3 @@
-# Installing and starting minikube
-
 ## Intro
 
 See [minikube installation guide](https://github.com/kubernetes/minikube/releases)
