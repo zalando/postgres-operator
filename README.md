@@ -1,4 +1,4 @@
-e Postgres Operator
+# Postgres Operator
 
 [![Build Status](https://travis-ci.org/zalando-incubator/postgres-operator.svg?branch=master)](https://travis-ci.org/zalando-incubator/postgres-operator)
 [![Coverage Status](https://coveralls.io/repos/github/zalando-incubator/postgres-operator/badge.svg)](https://coveralls.io/github/zalando-incubator/postgres-operator)
@@ -28,7 +28,7 @@ manages PostgreSQL clusters on Kubernetes:
 
 ## Table of contents
 
-* [concepts](docs/concepts.md)
+* [concepts](docs/index.md)
 * [user documentation](docs/user.md)
 * [administrator documentation](docs/administrator.md)
 * [developer documentation](docs/developer.md)
