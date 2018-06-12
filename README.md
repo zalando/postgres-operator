@@ -26,6 +26,17 @@ manages PostgreSQL clusters on Kubernetes:
 3. Finally, the operator periodically synchronizes the actual state of each
    Postgres cluster with the desired state defined in the cluster's manifest.
 
+## Table of contents
+
+* [concepts](docs/concepts.md)
+* [user documentation](docs/user.md)
+* [administrator documentation](docs/administrator.md)
+* [developer documentation](docs/developer.md)
+* [operator configuration reference](docs/operator_parameters.md)
+* [cluster manifest reference](docs/cluster_manifest.md)
+* [command-line options and environment variables](docs/command_line_and_environment.md)
+
+the rest of the document is a tutorial to get you up and running with the operator on Minikube.
 
 ## Quickstart
 
@@ -33,6 +44,11 @@ Prerequisites:
 
 * [minikube](https://github.com/kubernetes/minikube/releases)
 * [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl)
+
+Note that you can also use built-in Kubernetes support in the Docker Desktop
+for Mac to follow the steps of this tutorial. You would have to replace
+`minikube start` and `minikube delete` with your launch actionsfor the Docker
+built-in Kubernetes support.
 
 ### Local execution
 
@@ -77,10 +93,4 @@ Minikube is a tool to run Kubernetes cluster locally.
 
 The operator can be configured with the provided ConfigMap (`manifests/configmap.yaml`).
 
-## Table of contents
 
-* [concepts](docs/concepts.md)
-* [user documentation](docs/user.md)
-* [administrator documentation](docs/administrator.md)
-* [developer documentation](docs/developer.md)
-* [reference](docs/reference.md)
