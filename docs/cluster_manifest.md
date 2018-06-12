@@ -20,7 +20,7 @@ Manifest structure
 ------------------
 
 A postgres manifest is a `YAML` document. On the top level both individual
-parameters and parameter groups can be defined  Parameter names are written
+parameters and parameter groups can be defined. Parameter names are written
 in camelCase.
 
 ### Cluster metadata
@@ -32,7 +32,7 @@ Those parameters are grouped under the `metadata` top-level key.
   Changing it after the cluster creation is not supported. Required field.
 
 * **namespace**
-  the namespace where the operator creates its Kubernetes objects (i.e. pods,
+  the namespace where the operator creates Kubernetes objects (i.e. pods,
   services, secrets) for the cluster. Changing it after the cluster creation
   results in deploying or updating a completely separate cluster in the target
   namespace. Optional (if present, should match the namespace where the
@@ -40,15 +40,17 @@ Those parameters are grouped under the `metadata` top-level key.
 
 ### Top-level parameters
 
+Those are parameters grouped directly under  the `spec` key in the manifest.
+
 * **teamId**
   name of the team the cluster belongs to. Changing it after the cluster
   creation is not supported. Required field.
 
 * **dockerImage**
-  optional custom docker image that overrides the **docker_image** operator
-  parameter. Optional.
+  custom docker image that overrides the **docker_image** operator parameter.
+  It should be a [Spilo](https://github.com/zalando/spilo) image.  Optional.
 
-* **enableMasterReplicaLoadBalancer**
+* **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_master_load_balancer` parameter) to define whether to enable the load
   balancer pointing to the postgres primary. Optional.
@@ -60,7 +62,7 @@ Those parameters are grouped under the `metadata` top-level key.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
-  defines the comma-separated range of networks (in CIDR-notation). The
+  defines the comma-separated range of IP networks (in CIDR-notation). The
   corresponding load balancer is accessible only to the networks defined by
   this parameter. Optional, when empty the load balancer service becomes
   inaccessible from outside of the Kubernetes cluster.
@@ -74,9 +76,9 @@ Those parameters are grouped under the `metadata` top-level key.
   a map of usernames to user flags for the users that should be created in the
   cluster by the operator. User flags are a list, allowed elements are
   `SUPERUSER` `REPLICATION` `INHERIT`, `LOGIN`, `NOLOGIN`, `CREATEROLE`,
-  `CREATEDB`, `REPLICATION`, `BYPASSURL`. A login user is created by default
-  unless NOLOGIN is specified, in which case the operator creates a role. One
-  can specify empty flags by providing a JSON empty array '*[]*'. Optional.
+  `CREATEDB`, `BYPASSURL`. A login user is created by default unless NOLOGIN is
+  specified, in which case the operator creates a role. One can specify empty
+  flags by providing a JSON empty array '*[]*'. Optional.
 
 * **databases**
   a map of database names to database owners for the databases that should be
@@ -97,7 +99,7 @@ Those parameters are grouped under the `postgresql` top-level key.
 
 * **version**
   the postgres major version of the cluster. Looks at the [Spilo
-  project](https://github.com/zalando/spilo) for the list of supported
+  project](https://github.com/zalando/spilo/releases) for the list of supported
   versions. Changing the cluster version once the cluster has been bootstrapped
   is not supported. Required field.
 
@@ -147,9 +149,10 @@ explanation of `ttl` and `loop_wait` parameters.
 
 ### Postgres container resources
 
-Those parameters define CPU and memory requests and limits for the postgres
-container. They are grouped under the `resources` top-level key. There are two
-subgroups, `requests` and `limits`.
+Those parameters define [CPU and memory requests and
+limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
+for the postgres container. They are grouped under the `resources` top-level
+key. There are two subgroups, `requests` and `limits`.
 
 #### Requests
 
