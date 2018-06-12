@@ -1,5 +1,3 @@
-Postgres Cluster Manifest
-=========================
 
 Individual postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgres CRD` (custom resource
@@ -16,14 +14,13 @@ measurements. Please, refer to the [Kubernetes
 documentation](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the possible values of those.
 
-Manifest structure
-------------------
+## Manifest structure
 
 A postgres manifest is a `YAML` document. On the top level both individual
 parameters and parameter groups can be defined. Parameter names are written
 in camelCase.
 
-### Cluster metadata
+## Cluster metadata
 
 Those parameters are grouped under the `metadata` top-level key.
 
@@ -38,7 +35,7 @@ Those parameters are grouped under the `metadata` top-level key.
   namespace. Optional (if present, should match the namespace where the
   manifest is applied). 
 
-### Top-level parameters
+## Top-level parameters
 
 Those are parameters grouped directly under  the `spec` key in the manifest.
 
@@ -93,7 +90,7 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
   for details on tolerations and possible values of those keys. When set, this
   value overrides the `pod_toleration` setting from the operator. Optional.
 
-### Postgres parameters
+## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key.
 
@@ -108,7 +105,7 @@ Those parameters are grouped under the `postgresql` top-level key.
   cluster. Optional (Spilo automatically sets reasonable defaults for
   parameters like work_mem or max_connections).
 
-### Patroni parameters
+## Patroni parameters
 
 Those parameters are grouped under the `patroni` top-level key. See the [patroni
 documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html) for the
@@ -147,14 +144,14 @@ explanation of `ttl` and `loop_wait` parameters.
   patroni `maximum_lag_on_failover` parameter value, optional. The default is
   set by the Spilo docker image. Optional.
 
-### Postgres container resources
+## Postgres container resources
 
 Those parameters define [CPU and memory requests and
 limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the postgres container. They are grouped under the `resources` top-level
 key. There are two subgroups, `requests` and `limits`.
 
-#### Requests
+### Requests
 
 CPU and memory requests for the postgres container.
 
@@ -178,7 +175,7 @@ CPU and memory limits for the postgres container.
   memory limits for the postgres container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
 
-### Parameters defining how to clone the cluster from another one
+## Parameters defining how to clone the cluster from another one
 
 Those parameters are applied when the cluster should be a clone of another one
 that is either already running or has a basebackup on S3. They are grouped

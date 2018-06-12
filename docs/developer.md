@@ -1,5 +1,3 @@
-# Installing and starting minikube
-
 ## Intro
 
 See [minikube installation guide](https://github.com/kubernetes/minikube/releases)
@@ -12,9 +10,7 @@ After the installation, issue
     $ minikube start
 ```
 
-Note: if you are running on a Mac, make sure to use the [xhyve
-driver](https://github.com/kubernetes/minikube/blob/master/docs/drivers.md#xhyve-driver)
-instead of the default docker-machine one for performance reasons.
+Note: if you are running on a Mac, you may also use Docker for Mac Kubernetes instead of a docker-machine.
 
 Once you have it started successfully, use [the quickstart
 guide](https://github.com/kubernetes/minikube#quickstart) in order to test your

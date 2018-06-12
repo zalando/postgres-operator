@@ -1,9 +1,7 @@
-# How to create a new PostgreSQL cluster
-
 ## Create a manifest for a new PostgreSQL cluster
 
 As an example you can take this
-[minimal example](manifests/minimal-postgres-manifest.yaml):
+[minimal example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -206,10 +204,10 @@ spec:
 
 Here `cluster` is a name of a source cluster that is going to be cloned. The
 cluster to clone is assumed to be running and the clone procedure invokes
-`pg_basebackup` from it. The operator will connect to the service by name (if
-the cluster is called test, then the connection string will look like host=test
-port=5432), which means that you can clone only from clusters running in the
-default namespace.
+`pg_basebackup` from it. The operator will setup the cluster to be cloned to
+connect to the service of the source cluster by name (if the cluster is called
+test, then the connection string will look like host=test port=5432), which
+means that you can clone only from clusters within the same namespace.
 
 ### Clone from S3
 
