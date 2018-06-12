@@ -24,6 +24,8 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
 )
 
+type Annotations = map[string]string
+
 // OAuthTokenGetter provides the method for fetching OAuth tokens
 type OAuthTokenGetter interface {
 	getOAuthToken() (string, error)
@@ -132,6 +134,17 @@ func normalizeUserFlags(userFlags []string) ([]string, error) {
 	}
 	sort.Strings(flags)
 	return flags, nil
+}
+
+func servicePatchData(spec interface{}, annotations Annotations) ([]byte, error) {
+	var meta metav1.ObjectMeta = metav1.ObjectMeta{
+		Annotations: annotations,
+	}
+
+	return json.Marshal(struct {
+		SpecField    interface{} `json:"spec"`
+		ObjMetaField interface{} `json:"metadata"`
+	}{spec, &meta})
 }
 
 // specPatch produces a JSON of the Kubernetes object specification passed (typically service or

@@ -19,6 +19,7 @@ import (
 func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	var actions []Action = NoActions
 
 	c.setSpec(newSpec)
 
@@ -98,41 +99,40 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	return
 }
 
-func (c *Cluster) syncServices() error {
+func (c *Cluster) syncServices() (actions []Action, err error) {
 	for _, role := range []PostgresRole{Master, Replica} {
 		c.logger.Debugf("syncing %s service", role)
 
-		if err := c.syncEndpoint(role); err != nil {
-			return fmt.Errorf("could not sync %s endpont: %v", role, err)
+		if err = c.syncEndpoint(role); err != nil {
+			return NoActions, fmt.Errorf("could not sync %s endpont: %v", role, err)
 		}
 
-		if err := c.syncService(role); err != nil {
-			return fmt.Errorf("could not sync %s service: %v", role, err)
+		if actions, err = c.syncService(role); err != nil {
+			return NoActions, fmt.Errorf("could not sync %s service: %v", role, err)
+		}
+	}
+
+	return actions, nil
+}
+
+func (c *Cluster) applyActions(actions []Action) (err error) {
+	uniqueActions := NoActions
+	hashMap := map[ActionHash]bool{}
+	for _, action := range actions {
+		if _, present := hashMap[action.Hash()]; !present {
+			hashMap[action.Hash()] = true
+			action.SetCluster(c)
+			uniqueActions = append(uniqueActions, action)
+		}
+	}
+
+	for _, action := range uniqueActions {
+		if err := action.Process(); err != nil {
+			c.logger.Errorf("Can't apply action %s: %v", action.Name(), err)
 		}
 	}
 
 	return nil
-}
-
-func (c *Cluster) applyActions(actions []Action) (err error) {
-	uniqueActions = []Actions{}
-	hashMap = map[ActionHash]bool{}
-	for idx, action := range actions {
-		if _, present := uniqueActions[action.hash()]; !present {
-			uniqueActions[action.hash()] = true
-			append(uniqueActions, action)
-		}
-	}
-
-	for action := range uniqueActions {
-		if critical, err := action.process(); err != nil {
-			c.logger.Errorf("Can't apply action %s: %v", action.name(), err)
-		}
-
-		if critical == true {
-			return err
-		}
-	}
 }
 
 func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
@@ -142,12 +142,13 @@ func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	if err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		match, reason := k8sutil.SameService(svc, desiredSvc)
+		match, _ := k8sutil.SameService(svc, desiredSvc)
 		if match {
 			return NoActions, nil
 		}
 
-		if actions, err := c.updateService(role, desiredSvc); err != nil {
+		actions, err := c.updateService(role, desiredSvc)
+		if err != nil {
 			return NoActions, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
 		}
 
@@ -157,14 +158,14 @@ func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	}
 	c.logger.Infof("could not find the cluster's %s service", role)
 
-	return []CreateService{
-		ActionData{
-			namespace: serviceName.Namespace,
-		},
-		ServiceData{
-			role: role,
-		},
-	}, nil
+	actions, err := c.createService(role)
+	if err != nil {
+		return NoActions, fmt.Errorf(
+			"could not calculate actions to create %s service: %v",
+			role, err)
+	}
+
+	return actions, nil
 }
 
 func (c *Cluster) syncEndpoint(role PostgresRole) error {

@@ -11,7 +11,6 @@ import (
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster/sync"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
@@ -339,12 +338,14 @@ func (c *Cluster) createService(role PostgresRole) ([]Action, error) {
 	c.setProcessName("creating %v service", role)
 
 	serviceSpec := c.generateService(role, &c.Spec)
-	return []CreateService{
-		ActionData{
-			namespace: serviceName.Namespace,
-		},
-		ServiceData{
-			spec: serviceSpec,
+	return []Action{
+		CreateService{
+			ActionData{
+				namespace: serviceSpec.Namespace,
+			},
+			ServiceData{
+				service: serviceSpec,
+			},
 		},
 	}, nil
 }
@@ -355,50 +356,60 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) ([]Ac
 	}
 
 	serviceName := util.NameFromMeta(c.Services[role].ObjectMeta)
-	endpointName := util.NameFromMeta(c.Endpoints[role].ObjectMeta)
 
 	// TODO: check if it possible to change the service type with a patch in future versions of Kubernetes
 	if newService.Spec.Type != c.Services[role].Spec.Type {
 		// service type has changed, need to replace the service completely.
 		// we cannot use just pach the current service, since it may contain attributes incompatible with the new type.
-		return []RecreateService{
-			ActionData{
-				namespace: serviceName.Namespace,
+		return []Action{
+			DeleteService{
+				ActionData{
+					namespace: serviceName.Namespace,
+				},
+				ServiceData{
+					name:    serviceName.Name,
+					role:    role,
+					service: newService,
+				},
 			},
-			ServiceData{
-				name: serviceName.Name,
-				role: role,
-				spec: newService,
+			CreateService{
+				ActionData{
+					namespace: serviceName.Namespace,
+				},
+				ServiceData{
+					name:    serviceName.Name,
+					role:    role,
+					service: newService,
+				},
 			},
 		}, nil
 	}
 
 	// update the service annotation in order to propagate ELB notation.
-	patchData, err := specPatch(newService.Spec)
-	if err != nil {
-		return NoActions, fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
-	}
-
-	return []CreateService{
-		ActionData{
-			namespace: serviceName.Namespace,
-		},
-		ServiceData{
-			name: serviceName.Name,
-			spec: newService,
+	return []Action{
+		CreateService{
+			ActionData{
+				namespace: serviceName.Namespace,
+			},
+			ServiceData{
+				name:    serviceName.Name,
+				service: newService,
+			},
 		},
 	}, nil
 }
 
-func (c *Cluster) deleteService(role PostgresRole) error {
+func (c *Cluster) deleteService(role PostgresRole) ([]Action, error) {
 	service := c.Services[role]
 
-	return []DeleteService{
-		ActionData{
-			namespace: serviceName.Namespace,
-		},
-		ServiceData{
-			name: service.Name,
+	return []Action{
+		DeleteService{
+			ActionData{
+				namespace: service.Namespace,
+			},
+			ServiceData{
+				name: service.Name,
+			},
 		},
 	}, nil
 }

@@ -239,9 +239,9 @@ func (c *Cluster) Create() error {
 	var (
 		err error
 
-		service *v1.Service
-		ep      *v1.Endpoints
-		ss      *v1beta1.StatefulSet
+		//service *v1.Service
+		ep *v1.Endpoints
+		ss *v1beta1.StatefulSet
 	)
 
 	defer func() {
@@ -272,11 +272,12 @@ func (c *Cluster) Create() error {
 		if c.Services[role] != nil {
 			return fmt.Errorf("service already exists in the cluster")
 		}
-		service, err = c.createService(role)
+		_, err = c.createService(role)
 		if err != nil {
-			return fmt.Errorf("could not create %s service: %v", role, err)
+			return fmt.Errorf("could not calculate actions to create %s service: %v",
+				role, err)
 		}
-		c.logger.Infof("%s service %q has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
+		//c.logger.Infof("%s service %q has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
 	}
 
 	if err = c.initUsers(); err != nil {
@@ -545,7 +546,7 @@ func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
 	if !reflect.DeepEqual(c.generateService(Master, &oldSpec.Spec), c.generateService(Master, &newSpec.Spec)) ||
 		!reflect.DeepEqual(c.generateService(Replica, &oldSpec.Spec), c.generateService(Replica, &newSpec.Spec)) {
 		c.logger.Debugf("syncing services")
-		if err := c.syncServices(); err != nil {
+		if _, err := c.syncServices(); err != nil {
 			c.logger.Errorf("could not sync services: %v", err)
 			updateFailed = true
 		}
@@ -656,7 +657,7 @@ func (c *Cluster) Delete() {
 			c.logger.Warningf("could not delete %s endpoint: %v", role, err)
 		}
 
-		if err := c.deleteService(role); err != nil {
+		if _, err := c.deleteService(role); err != nil {
 			c.logger.Warningf("could not delete %s service: %v", role, err)
 		}
 	}
