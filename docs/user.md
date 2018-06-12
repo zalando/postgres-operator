@@ -1,7 +1,7 @@
 ## Create a manifest for a new PostgreSQL cluster
 
 As an example you can take this
-[minimal example](https://github.com/zalando-incubator/postgres-operator/manifests/minimal-postgres-manifest.yaml):
+[minimal example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
