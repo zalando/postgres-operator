@@ -1,4 +1,4 @@
-# Postgres Operator
+e Postgres Operator
 
 [![Build Status](https://travis-ci.org/zalando-incubator/postgres-operator.svg?branch=master)](https://travis-ci.org/zalando-incubator/postgres-operator)
 [![Coverage Status](https://coveralls.io/repos/github/zalando-incubator/postgres-operator/badge.svg)](https://coveralls.io/github/zalando-incubator/postgres-operator)
@@ -32,9 +32,9 @@ manages PostgreSQL clusters on Kubernetes:
 * [user documentation](docs/user.md)
 * [administrator documentation](docs/administrator.md)
 * [developer documentation](docs/developer.md)
-* [operator configuration reference](docs/operator_parameters.md)
-* [cluster manifest reference](docs/cluster_manifest.md)
-* [command-line options and environment variables](docs/command_line_and_environment.md)
+* [operator configuration reference](docs/reference/operator_parameters.md)
+* [cluster manifest reference](docs/reference/cluster_manifest.md)
+* [command-line options and environment variables](docs/reference/command_line_and_environment.md)
 
 the rest of the document is a tutorial to get you up and running with the operator on Minikube.
 
