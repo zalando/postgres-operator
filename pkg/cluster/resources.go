@@ -385,9 +385,8 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) ([]Ac
 		}, nil
 	}
 
-	// update the service annotation in order to propagate ELB notation.
 	return []Action{
-		CreateService{
+		UpdateService{
 			ActionData{
 				namespace: serviceName.Namespace,
 			},
