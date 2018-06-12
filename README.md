@@ -26,6 +26,9 @@ manages PostgreSQL clusters on Kubernetes:
 3. Finally, the operator periodically synchronizes the actual state of each
    Postgres cluster with the desired state defined in the cluster's manifest.
 
+There is a browser-friendly version of this documentation at
+[postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
+
 ## Table of contents
 
 * [concepts](docs/index.md)
