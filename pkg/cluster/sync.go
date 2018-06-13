@@ -128,6 +128,14 @@ func (c *Cluster) applyActions(actions []Action) (err error) {
 	}
 
 	for _, action := range uniqueActions {
+		c.logger.Infof("Applying action %s", action.Name())
+	}
+
+	if c.dryRunMode {
+		return nil
+	}
+
+	for _, action := range uniqueActions {
 		if err := action.Process(); err != nil {
 			c.logger.Errorf("Can't apply action %s: %v", action.Name(), err)
 		}

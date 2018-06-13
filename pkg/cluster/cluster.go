@@ -78,6 +78,7 @@ type Cluster struct {
 	currentProcess   spec.Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+	dryRunMode       bool
 }
 
 type compareStatefulsetResult struct {
@@ -114,6 +115,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
+		dryRunMode:       false,
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
