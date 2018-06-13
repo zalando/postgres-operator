@@ -2,6 +2,7 @@ package spec
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,7 +16,6 @@ import (
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
-	"encoding/json"
 )
 
 // EventType contains type of the events for the TPRs and Pods received from Kubernetes
@@ -190,7 +190,11 @@ func (n *NamespacedName) Decode(value string) error {
 
 func (n *NamespacedName) UnmarshalJSON(data []byte) error {
 	result := NamespacedName{}
-	if err := result.Decode(string(data)); err != nil {
+	var tmp string
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	if err := result.Decode(tmp); err != nil {
 		return err
 	}
 	*n = result
@@ -252,7 +256,7 @@ type Duration time.Duration
 
 func (d *Duration) UnmarshalJSON(b []byte) error {
 	var (
-		v interface{}
+		v   interface{}
 		err error
 	)
 	if err = json.Unmarshal(b, &v); err != nil {
@@ -260,7 +264,7 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	}
 	switch val := v.(type) {
 	case string:
-		t, err := time.ParseDuration(val);
+		t, err := time.ParseDuration(val)
 		if err != nil {
 			return err
 		}
