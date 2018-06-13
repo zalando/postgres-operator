@@ -162,10 +162,12 @@ type ControllerConfig struct {
 	RestConfig          *rest.Config `json:"-"`
 	InfrastructureRoles map[string]PgUser
 
-	NoDatabaseAccess bool
-	NoTeamsAPI       bool
-	ConfigMapName    NamespacedName
-	Namespace        string
+	NoDatabaseAccess     bool
+	NoTeamsAPI           bool
+	CRDReadyWaitInterval time.Duration
+	CRDReadyWaitTimeout  time.Duration
+	ConfigMapName        NamespacedName
+	Namespace            string
 }
 
 // cached value for the GetOperatorNamespace

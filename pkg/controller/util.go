@@ -75,7 +75,7 @@ func (c *Controller) createZalandoCRD(plural, singular, short string) error {
 		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)
 	}
 
-	return wait.Poll(c.opConfig.CRD.ReadyWaitInterval, c.opConfig.CRD.ReadyWaitTimeout, func() (bool, error) {
+	return wait.Poll(c.config.CRDReadyWaitInterval, c.config.CRDReadyWaitTimeout, func() (bool, error) {
 		c, err := c.KubeClient.CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
