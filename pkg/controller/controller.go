@@ -169,7 +169,7 @@ func (c *Controller) initController() {
 		if err := c.createOperatorCRD(); err != nil {
 			c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
 		}
-		if cfg, err := c.readOperatorConfigurationFromCRD(configObjectName); err != nil {
+		if cfg, err := c.readOperatorConfigurationFromCRD(spec.GetOperatorNamespace(), configObjectName); err != nil {
 			c.logger.Fatalf("unable to read operator configuration: %v", err)
 		} else {
 			c.opConfig = c.importConfigurationFromCRD(&cfg.Configuration)

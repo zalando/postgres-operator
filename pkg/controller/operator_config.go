@@ -9,14 +9,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *Controller) readOperatorConfigurationFromCRD(configObjectName string) (*config.OperatorConfiguration, error) {
+func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, configObjectName string) (*config.OperatorConfiguration, error) {
 	var (
 		config config.OperatorConfiguration
 	)
 
 	req := c.KubeClient.CRDREST.Get().
 		Name(configObjectName).
-		Namespace(c.opConfig.WatchedNamespace).
+		Namespace(configObjectNamespace).
 		Resource(constants.OperatorConfigCRDResource).
 		VersionedParams(&metav1.ListOptions{ResourceVersion: "0"}, metav1.ParameterCodec)
 

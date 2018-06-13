@@ -15,8 +15,8 @@ configuration:
   kubernetes:
     pod_service_account_name: operator
     pod_terminate_grace_period: 5m
-    pdb_name_format: postgres-{cluster}-pdb
-    secret_name_template: {username}.{cluster}.credentials.{tprkind}.{tprgroup}
+    pdb_name_format: "postgres-{cluster}-pdb"
+    secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     oauth_token_secret_name: postgresql-operator
     pod_role_label: spilo-role
     cluster_labels:
@@ -30,7 +30,7 @@ configuration:
   postgres_pod_resources:
     default_cpu_request: 100m
     default_memory_request: 100Mi
-    default_cpu_limit: 3
+    default_cpu_limit: "3"
     default_memory_limit: 1Gi
   timeouts:
     resource_check_interval: 3s
@@ -42,8 +42,8 @@ configuration:
   load_balancer:
     enable_master_load_balancer: false
     enable_replica_load_balancer: false
-    master_dns_name_format: {cluster}.{team}.{hostedzone}
-    replica_dns_name_format: {cluster}-repl.{team}.{hostedzone}
+    master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+    replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
   aws_or_gcp:
     # db_hosted_zone: ""
     # wal_s3_bucket: "" 
