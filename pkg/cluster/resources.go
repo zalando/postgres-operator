@@ -356,11 +356,38 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) ([]Ac
 	}
 
 	serviceName := util.NameFromMeta(c.Services[role].ObjectMeta)
+	endpointName := util.NameFromMeta(c.Endpoints[role].ObjectMeta)
 
 	// TODO: check if it possible to change the service type with a patch in future versions of Kubernetes
 	if newService.Spec.Type != c.Services[role].Spec.Type {
 		// service type has changed, need to replace the service completely.
 		// we cannot use just pach the current service, since it may contain attributes incompatible with the new type.
+		var (
+			currentEndpoint *v1.Endpoints
+			err             error
+		)
+
+		if role == Master {
+			// for the master service we need to re-create the endpoint as well. Get the up-to-date version of
+			// the addresses stored in it before the service is deleted (deletion of the service removes the endpooint)
+			currentEndpoint, err = c.KubeClient.
+				Endpoints(c.Namespace).
+				Get(c.endpointName(role), metav1.GetOptions{})
+
+			if err != nil {
+				return NoActions, fmt.Errorf("could not get current cluster %s endpoints: %v", role, err)
+			}
+
+			// create the new endpoint using the addresses obtained from the previous one
+			endpointSpec := c.generateEndpoint(role, currentEndpoint.Subsets)
+			ep, err := c.KubeClient.Endpoints(endpointSpec.Namespace).Create(endpointSpec)
+			if err != nil {
+				return NoActions, fmt.Errorf("could not create endpoint %q: %v", endpointName, err)
+			}
+
+			c.Endpoints[role] = ep
+		}
+
 		return []Action{
 			DeleteService{
 				ActionData{

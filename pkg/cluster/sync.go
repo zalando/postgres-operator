@@ -108,7 +108,8 @@ func (c *Cluster) syncServices() (actions []Action, err error) {
 		}
 
 		if actions, err = c.syncService(role); err != nil {
-			return NoActions, fmt.Errorf("could not sync %s service: %v", role, err)
+			msg := "could prepare actions to sync %s service: %v"
+			return NoActions, fmt.Errorf(msg, role, err)
 		}
 	}
 
@@ -142,10 +143,11 @@ func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	if err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		match, _ := k8sutil.SameService(svc, desiredSvc)
+		match, reason := k8sutil.SameService(svc, desiredSvc)
 		if match {
 			return NoActions, nil
 		}
+		c.logServiceChanges(role, svc, desiredSvc, false, reason)
 
 		actions, err := c.updateService(role, desiredSvc)
 		if err != nil {
@@ -156,6 +158,8 @@ func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	} else if !k8sutil.ResourceNotFound(err) {
 		return NoActions, fmt.Errorf("could not get %s service: %v", role, err)
 	}
+	c.Services[role] = nil
+
 	c.logger.Infof("could not find the cluster's %s service", role)
 
 	actions, err := c.createService(role)
