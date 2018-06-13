@@ -7,6 +7,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
 )
 
 func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, configObjectName string) (*config.OperatorConfiguration, error) {
@@ -40,14 +41,14 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *config.OperatorConfigur
 	result.Workers = fromCRD.Workers
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
-	result.ResyncPeriod = fromCRD.ResyncPeriod
+	result.ResyncPeriod = time.Duration(fromCRD.ResyncPeriod)
 
 	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername
 	result.ReplicationUsername = fromCRD.PostgresUsersConfiguration.ReplicationUsername
 
 	result.PodServiceAccountName = fromCRD.Kubernetes.PodServiceAccountName
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
-	result.PodTerminateGracePeriod = fromCRD.Kubernetes.PodTerminateGracePeriod
+	result.PodTerminateGracePeriod = time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod)
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
@@ -63,12 +64,12 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *config.OperatorConfigur
 	result.DefaultCPULimit = fromCRD.PostgresPodResources.DefaultCPULimit
 	result.DefaultMemoryLimit = fromCRD.PostgresPodResources.DefaultMemoryLimit
 
-	result.ResourceCheckInterval = fromCRD.Timeouts.ResourceCheckInterval
-	result.ResourceCheckTimeout = fromCRD.Timeouts.ResourceCheckTimeout
-	result.PodLabelWaitTimeout = fromCRD.Timeouts.PodLabelWaitTimeout
-	result.PodDeletionWaitTimeout = fromCRD.Timeouts.PodDeletionWaitTimeout
-	result.ReadyWaitInterval = fromCRD.Timeouts.ReadyWaitInterval
-	result.ReadyWaitTimeout = fromCRD.Timeouts.ReadyWaitTimeout
+	result.ResourceCheckInterval = time.Duration(fromCRD.Timeouts.ResourceCheckInterval)
+	result.ResourceCheckTimeout = time.Duration(fromCRD.Timeouts.ResourceCheckTimeout)
+	result.PodLabelWaitTimeout = time.Duration(fromCRD.Timeouts.PodLabelWaitTimeout)
+	result.PodDeletionWaitTimeout = time.Duration(fromCRD.Timeouts.PodDeletionWaitTimeout)
+	result.ReadyWaitInterval = time.Duration(fromCRD.Timeouts.ReadyWaitInterval)
+	result.ReadyWaitTimeout = time.Duration(fromCRD.Timeouts.ReadyWaitTimeout)
 
 	result.DbHostedZone = fromCRD.LoadBalancer.DbHostedZone
 	result.EnableMasterLoadBalancer = fromCRD.LoadBalancer.EnableMasterLoadBalancer

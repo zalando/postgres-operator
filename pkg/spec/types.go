@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/pkg/apis/apps/v1beta1"
 	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
+	"encoding/json"
 )
 
 // EventType contains type of the events for the TPRs and Pods received from Kubernetes
@@ -187,6 +188,15 @@ func (n *NamespacedName) Decode(value string) error {
 	return n.DecodeWorker(value, GetOperatorNamespace())
 }
 
+func (n *NamespacedName) UnmarshalJSON(data []byte) error {
+	result := NamespacedName{}
+	if err := result.Decode(string(data)); err != nil {
+		return err
+	}
+	*n = result
+	return nil
+}
+
 // DecodeWorker separates the decode logic to (unit) test
 // from obtaining the operator namespace that depends on k8s mounting files at runtime
 func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
@@ -236,4 +246,32 @@ func GetOperatorNamespace() string {
 		operatorNamespace = string(operatorNamespaceBytes)
 	}
 	return operatorNamespace
+}
+
+type Duration time.Duration
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var (
+		v interface{}
+		err error
+	)
+	if err = json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	switch val := v.(type) {
+	case string:
+		t, err := time.ParseDuration(val);
+		if err != nil {
+			return err
+		}
+		*d = Duration(t)
+		return nil
+	case float64:
+		t := time.Duration(val)
+		*d = Duration(t)
+		return nil
+	default:
+		return fmt.Errorf("could not recognize type %T as a valid type to unmarshal to Duration", val)
+	}
+	return nil
 }

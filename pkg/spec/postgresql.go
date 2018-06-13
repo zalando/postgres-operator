@@ -190,7 +190,7 @@ func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
 		m.EndTime.Format("15:04"))), nil
 }
 
-// UnmarshalJSON convets a JSON to the maintenance window definition.
+// UnmarshalJSON converts a JSON to the maintenance window definition.
 func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	var (
 		got MaintenanceWindow

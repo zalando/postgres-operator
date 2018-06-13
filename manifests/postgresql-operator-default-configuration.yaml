@@ -70,7 +70,7 @@ configuration:
   scalyr:
     scalyr_cpu_request: 100m
     scalyr_memory_request: 50Mi
-    scalyr_cpu_limit: 1
+    scalyr_cpu_limit: "1"
     scalyr_memory_limit: 1Gi
     # scalyr_api_key: ""
     # scalyr_image: ""

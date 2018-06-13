@@ -2,8 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -33,7 +31,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
 	PodServiceAccountDefinition   string              `json:"pod_service_account_definition,omitempty"`
-	PodTerminateGracePeriod       time.Duration       `json:"pod_terminate_grace_period,omitempty"`
+	PodTerminateGracePeriod       spec.Duration       `json:"pod_terminate_grace_period,omitempty"`
 	WatchedNamespace              string              `json:"watched_namespace,omitempty"`
 	PDBNameFormat                 StringTemplate      `json:"pdb_name_format,omitempty"`
 	SecretNameTemplate            StringTemplate      `json:"secret_name_template,omitempty"`
@@ -57,12 +55,12 @@ type PostgresPodResourcesDefaults struct {
 }
 
 type OperatorTimeouts struct {
-	ResourceCheckInterval  time.Duration `json:"resource_check_interval,omitempty"`
-	ResourceCheckTimeout   time.Duration `json:"resource_check_timeout,omitempty"`
-	PodLabelWaitTimeout    time.Duration `json:"pod_label_wait_timeout,omitempty"`
-	PodDeletionWaitTimeout time.Duration `json:"pod_deletion_wait_timeout,omitempty"`
-	ReadyWaitInterval      time.Duration `json:"ready_wait_interval,omitempty"`
-	ReadyWaitTimeout       time.Duration `json:"ready_wait_timeout,omitempty"`
+	ResourceCheckInterval  spec.Duration `json:"resource_check_interval,omitempty"`
+	ResourceCheckTimeout   spec.Duration `json:"resource_check_timeout,omitempty"`
+	PodLabelWaitTimeout    spec.Duration `json:"pod_label_wait_timeout,omitempty"`
+	PodDeletionWaitTimeout spec.Duration `json:"pod_deletion_wait_timeout,omitempty"`
+	ReadyWaitInterval      spec.Duration `json:"ready_wait_interval,omitempty"`
+	ReadyWaitTimeout       spec.Duration `json:"ready_wait_timeout,omitempty"`
 }
 
 type LoadBalancerConfiguration struct {
@@ -117,7 +115,7 @@ type OperatorConfigurationData struct {
 	Workers                    uint32                       `json:"workers,omitempty"`
 	MinInstances               int32                        `json:"min_instances,omitempty"`
 	MaxInstances               int32                        `json:"max_instances,omitempty"`
-	ResyncPeriod               time.Duration                `json:"resync_period,omitempty"`
+	ResyncPeriod               spec.Duration                `json:"resync_period,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration   `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration  `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults `json:"postgres_pod_resources"`
