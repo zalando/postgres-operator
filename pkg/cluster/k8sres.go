@@ -318,7 +318,7 @@ func (c *Cluster) generatePodTemplate(
 	patroniParameters *spec.Patroni,
 	cloneDescription *spec.CloneDescription,
 	dockerImage *string,
-	sidecars *[]spec.Sidecar,
+	sidecars []spec.Sidecar,
 	customPodEnvVars map[string]string,
 ) (*v1.PodTemplateSpec, error) {
 	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
@@ -526,8 +526,8 @@ func (c *Cluster) generatePodTemplate(
 		)
 	}
 
-	if sidecars != nil && len(*sidecars) > 0 {
-		for index, sidecar := range *sidecars {
+	if sidecars != nil && len(sidecars) > 0 {
+		for index, sidecar := range sidecars {
 			sc, err := c.getSidecarContainer(sidecar, index, volumeMounts)
 			if err != nil {
 				return nil, err
@@ -659,7 +659,10 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			customPodEnvVars = cm.Data
 		}
 	}
-	podTemplate, err := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, &spec.Sidecars, customPodEnvVars)
+
+	mergedSidecars := c.mergeSidecars(spec.Sidecars)
+
+	podTemplate, err := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, mergedSidecars, customPodEnvVars)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
@@ -687,6 +690,31 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	}
 
 	return statefulSet, nil
+}
+
+// mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
+func (c *Cluster) mergeSidecars(sidecars []spec.Sidecar) []spec.Sidecar {
+	globalSidecarsToSkip := map[string]bool{}
+	result := make([]spec.Sidecar, 0)
+
+	for i, sidecar := range sidecars {
+		dockerImage, ok := c.OpConfig.Sidecars[sidecar.Name]
+		if ok {
+			if dockerImage != sidecar.DockerImage {
+				c.logger.Warningf("merging definitions for sidecar %q: "+
+					"ignoring %q in the global scope in favor of %q defined in the cluster",
+					sidecar.Name, dockerImage, sidecar.DockerImage)
+			}
+			globalSidecarsToSkip[sidecar.Name] = true
+		}
+		result = append(result, sidecars[i])
+	}
+	for name, dockerImage := range c.OpConfig.Sidecars {
+		if !globalSidecarsToSkip[name] {
+			result = append(result, spec.Sidecar{Name: name, DockerImage: dockerImage})
+		}
+	}
+	return result
 }
 
 func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) (newcur int32) {
