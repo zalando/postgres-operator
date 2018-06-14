@@ -1,9 +1,7 @@
-# How to create a new PostgreSQL cluster
-
 ## Create a manifest for a new PostgreSQL cluster
 
 As an example you can take this
-[minimal example](manifests/minimal-postgres-manifest.yaml):
+[minimal example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -206,10 +204,10 @@ spec:
 
 Here `cluster` is a name of a source cluster that is going to be cloned. The
 cluster to clone is assumed to be running and the clone procedure invokes
-`pg_basebackup` from it. The operator will connect to the service by name (if
-the cluster is called test, then the connection string will look like host=test
-port=5432), which means that you can clone only from clusters running in the
-default namespace.
+`pg_basebackup` from it. The operator will setup the cluster to be cloned to
+connect to the service of the source cluster by name (if the cluster is called
+test, then the connection string will look like host=test port=5432), which
+means that you can clone only from clusters within the same namespace.
 
 ### Clone from S3
 
@@ -272,5 +270,42 @@ are always passed to sidecars:
   - `POD_NAMESPACE` - field reference to `metadata.namespace`
   - `POSTGRES_USER` - the superuser that can be used to connect to the database
   - `POSTGRES_PASSWORD` - the password for the superuser
-   
+
 The PostgreSQL volume is shared with sidecars and is mounted at `/home/postgres/pgdata`.
+
+## Increase volume size
+
+PostgreSQL operator supports statefulset volume resize if you're using the
+operator on top of AWS. For that you need to change the size field of the
+volume description in the cluster manifest and apply the change:
+
+```
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  volume:
+    size: 5Gi # new volume size
+```
+
+The operator compares the new value of the size field with the previous one and
+acts on differences.
+
+You can only enlarge the volume with the process described above, shrinking is
+not supported and will emit a warning. After this update all the new volumes in
+the statefulset are allocated according to the new size. To enlarge persistent
+volumes attached to the running pods, the operator performs the following
+actions:
+
+* call AWS API to change the volume size
+
+* connect to the pod using `kubectl exec` and resize the filesystem with
+  `resize2fs`.
+
+Fist step has a limitation, AWS rate-limits this operation to no more than once
+every 6 hours.
+Note that if the statefulset is scaled down before resizing the size changes
+are only applied to the volumes attached to the running pods. The size of the
+volumes that correspond to the previously running pods is not changed.
