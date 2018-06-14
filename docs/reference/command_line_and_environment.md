@@ -48,3 +48,11 @@ The following environment variables are accepted by the operator:
 * **SCALYR_API_KEY**
   the value of the Scalyr API key to supply to the pods. Overrides the
   `scalyr_api_key` operator parameter.
+
+* **CRD_READY_WAIT_TIMEOUT**
+  defines the timeout for the complete postgres CRD creation. When not set
+  default is 30s.
+
+* **CRD_READY_WAIT_INTERVAL**
+  defines the  interval between consecutive attempts waiting for the postgres
+  CRD to be created. The default is 5s.

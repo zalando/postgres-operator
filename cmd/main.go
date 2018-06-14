@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/controller"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -19,6 +20,14 @@ var (
 	version        string
 	config         spec.ControllerConfig
 )
+
+func mustParseDuration(d string) time.Duration {
+	duration, err := time.ParseDuration(d)
+	if err != nil {
+		panic(err)
+	}
+	return duration
+}
 
 func init() {
 	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to kubeconfig file with authorization and master location information.")
@@ -37,6 +46,17 @@ func init() {
 
 		log.Printf("Fully qualified configmap name: %v", config.ConfigMapName)
 
+	}
+	if crd_interval := os.Getenv("CRD_READY_WAIT_INTERVAL"); crd_interval != "" {
+		config.CRDReadyWaitInterval = mustParseDuration(crd_interval)
+	} else {
+		config.CRDReadyWaitInterval = 4 * time.Second
+	}
+
+	if crd_timeout := os.Getenv("CRD_READY_WAIT_TIMEOUT"); crd_timeout != "" {
+		config.CRDReadyWaitTimeout = mustParseDuration(crd_timeout)
+	} else {
+		config.CRDReadyWaitTimeout = 30 * time.Second
 	}
 }
 
