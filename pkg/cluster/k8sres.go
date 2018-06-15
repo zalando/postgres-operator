@@ -310,19 +310,84 @@ func isBootstrapOnlyParameter(param string) bool {
 }
 
 func (c *Cluster) generatePodTemplate(
-	uid types.UID,
 	resourceRequirements *v1.ResourceRequirements,
-	resourceRequirementsScalyrSidecar *v1.ResourceRequirements,
+	envVars []v1.EnvVar,
 	tolerationsSpec *[]v1.Toleration,
-	pgParameters *spec.PostgresqlParam,
-	patroniParameters *spec.Patroni,
-	cloneDescription *spec.CloneDescription,
 	dockerImage *string,
 	sidecars []spec.Sidecar,
-	customPodEnvVars map[string]string,
 ) (*v1.PodTemplateSpec, error) {
-	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
 
+	privilegedMode := true
+	volumeMounts := []v1.VolumeMount{
+		{
+			Name:      constants.DataVolumeName,
+			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
+		},
+	}
+	container := v1.Container{
+		Name:            c.containerName(),
+		Image:           *dockerImage,
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Resources:       *resourceRequirements,
+		Ports: []v1.ContainerPort{
+			{
+				ContainerPort: 8008,
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				ContainerPort: 5432,
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				ContainerPort: 8080,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+		VolumeMounts: volumeMounts,
+		Env:          envVars,
+		SecurityContext: &v1.SecurityContext{
+			Privileged: &privilegedMode,
+		},
+	}
+	terminateGracePeriodSeconds := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
+
+	podSpec := v1.PodSpec{
+		ServiceAccountName:            c.OpConfig.PodServiceAccountName,
+		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
+		Containers:                    []v1.Container{container},
+		Tolerations:                   c.tolerations(tolerationsSpec),
+	}
+
+	if affinity := c.nodeAffinity(); affinity != nil {
+		podSpec.Affinity = affinity
+	}
+
+	if sidecars != nil && len(sidecars) > 0 {
+		for index, sidecar := range sidecars {
+			sc, err := c.getSidecarContainer(sidecar, index, volumeMounts)
+			if err != nil {
+				return nil, err
+			}
+			podSpec.Containers = append(podSpec.Containers, *sc)
+		}
+	}
+
+	template := v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    c.labelsSet(true),
+			Namespace: c.Namespace,
+		},
+		Spec: podSpec,
+	}
+	if c.OpConfig.KubeIAMRole != "" {
+		template.Annotations = map[string]string{constants.KubeIAmAnnotation: c.OpConfig.KubeIAMRole}
+	}
+
+	return &template, nil
+}
+
+// generatePodEnvVars generates environment variables for the Spilo Pod
+func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *spec.CloneDescription, customPodEnvVars map[string]string) []v1.EnvVar {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -431,123 +496,7 @@ func (c *Cluster) generatePodTemplate(
 	for _, name := range names {
 		envVars = append(envVars, v1.EnvVar{Name: name, Value: customPodEnvVars[name]})
 	}
-
-	privilegedMode := true
-	containerImage := c.OpConfig.DockerImage
-	if dockerImage != nil && *dockerImage != "" {
-		containerImage = *dockerImage
-	}
-	volumeMounts := []v1.VolumeMount{
-		{
-			Name:      constants.DataVolumeName,
-			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
-		},
-	}
-	container := v1.Container{
-		Name:            c.containerName(),
-		Image:           containerImage,
-		ImagePullPolicy: v1.PullIfNotPresent,
-		Resources:       *resourceRequirements,
-		Ports: []v1.ContainerPort{
-			{
-				ContainerPort: 8008,
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				ContainerPort: 5432,
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				ContainerPort: 8080,
-				Protocol:      v1.ProtocolTCP,
-			},
-		},
-		VolumeMounts: volumeMounts,
-		Env:          envVars,
-		SecurityContext: &v1.SecurityContext{
-			Privileged: &privilegedMode,
-		},
-	}
-	terminateGracePeriodSeconds := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
-
-	podSpec := v1.PodSpec{
-		ServiceAccountName:            c.OpConfig.PodServiceAccountName,
-		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
-		Containers:                    []v1.Container{container},
-		Tolerations:                   c.tolerations(tolerationsSpec),
-	}
-
-	if affinity := c.nodeAffinity(); affinity != nil {
-		podSpec.Affinity = affinity
-	}
-
-	if c.OpConfig.ScalyrAPIKey != "" && c.OpConfig.ScalyrImage != "" {
-		podSpec.Containers = append(
-			podSpec.Containers,
-			v1.Container{
-				Name:            "scalyr-sidecar",
-				Image:           c.OpConfig.ScalyrImage,
-				ImagePullPolicy: v1.PullIfNotPresent,
-				Resources:       *resourceRequirementsScalyrSidecar,
-				VolumeMounts:    volumeMounts,
-				Env: []v1.EnvVar{
-					{
-						Name: "POD_NAME",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1",
-								FieldPath:  "metadata.name",
-							},
-						},
-					},
-					{
-						Name: "POD_NAMESPACE",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1",
-								FieldPath:  "metadata.namespace",
-							},
-						},
-					},
-					{
-						Name:  "SCALYR_API_KEY",
-						Value: c.OpConfig.ScalyrAPIKey,
-					},
-					{
-						Name:  "SCALYR_SERVER_HOST",
-						Value: c.Name,
-					},
-					{
-						Name:  "SCALYR_SERVER_URL",
-						Value: c.OpConfig.ScalyrServerURL,
-					},
-				},
-			},
-		)
-	}
-
-	if sidecars != nil && len(sidecars) > 0 {
-		for index, sidecar := range sidecars {
-			sc, err := c.getSidecarContainer(sidecar, index, volumeMounts)
-			if err != nil {
-				return nil, err
-			}
-			podSpec.Containers = append(podSpec.Containers, *sc)
-		}
-	}
-
-	template := v1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:    c.labelsSet(true),
-			Namespace: c.Namespace,
-		},
-		Spec: podSpec,
-	}
-	if c.OpConfig.KubeIAMRole != "" {
-		template.Annotations = map[string]string{constants.KubeIAmAnnotation: c.OpConfig.KubeIAMRole}
-	}
-
-	return &template, nil
+	return envVars
 }
 
 func (c *Cluster) getSidecarContainer(sidecar spec.Sidecar, index int, volumeMounts []v1.VolumeMount) (*v1.Container, error) {
@@ -640,13 +589,11 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
-	resourceRequirementsScalyrSidecar, err := c.resourceRequirements(
-		makeResources(
-			c.OpConfig.ScalyrCPURequest,
-			c.OpConfig.ScalyrMemoryRequest,
-			c.OpConfig.ScalyrCPULimit,
-			c.OpConfig.ScalyrMemoryLimit,
-		),
+	resourceRequirementsScalyrSidecar := makeResources(
+		c.OpConfig.ScalyrCPURequest,
+		c.OpConfig.ScalyrMemoryRequest,
+		c.OpConfig.ScalyrCPULimit,
+		c.OpConfig.ScalyrMemoryLimit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Scalyr sidecar resource requirements: %v", err)
@@ -660,9 +607,27 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		}
 	}
 
-	mergedSidecars := c.mergeSidecars(spec.Sidecars)
+	spiloConfiguration := c.generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni)
+	envVars := c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone, customPodEnvVars)
 
-	podTemplate, err := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, mergedSidecars, customPodEnvVars)
+	sideCars := c.mergeSidecars(spec.Sidecars)
+	if scalarSidecar, present :=
+		generateScalarSidecarSpec(c.Name,
+			c.OpConfig.ScalyrAPIKey,
+			c.OpConfig.ScalyrServerURL,
+			c.OpConfig.ScalyrImage,
+			&resourceRequirementsScalyrSidecar); present {
+		sideCars = append(sideCars, *scalarSidecar)
+	}
+	effectiveDockerImage := getEffectiveDockerImage(c.OpConfig.DockerImage, spec.DockerImage)
+
+	podTemplate, err := c.generatePodTemplate(
+		resourceRequirements,
+		envVars,
+		&spec.Tolerations,
+		&effectiveDockerImage,
+		sideCars)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
@@ -690,6 +655,56 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	}
 
 	return statefulSet, nil
+}
+
+func getEffectiveDockerImage(globalDockerImage, clusterDockerImage string) string {
+	if clusterDockerImage == "" {
+		return globalDockerImage
+	}
+	return clusterDockerImage
+}
+
+func generateScalarSidecarSpec(clusterName, APIKey, serverURL, dockerImage string, containerResources *spec.Resources) (sidecar *spec.Sidecar, present bool) {
+	if APIKey == "" || serverURL == "" || dockerImage == "" {
+		return nil, false
+	}
+	return &spec.Sidecar{
+		Name:        "scalyr-sidecar",
+		DockerImage: dockerImage,
+		Env: []v1.EnvVar{
+			{
+				Name: "POD_NAME",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.name",
+					},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.namespace",
+					},
+				},
+			},
+			{
+				Name:  "SCALYR_API_KEY",
+				Value: APIKey,
+			},
+			{
+				Name:  "SCALYR_SERVER_HOST",
+				Value: clusterName,
+			},
+			{
+				Name:  "SCALYR_SERVER_URL",
+				Value: serverURL,
+			},
+		},
+		Resources: *containerResources,
+	}, true
 }
 
 // mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
