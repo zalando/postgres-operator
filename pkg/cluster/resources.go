@@ -340,10 +340,10 @@ func (c *Cluster) createService(role PostgresRole) ([]Action, error) {
 	serviceSpec := c.generateService(role, &c.Spec)
 	return []Action{
 		CreateService{
-			ActionData{
-				namespace: serviceSpec.Namespace,
-			},
-			ServiceData{
+			ActionService{
+				meta: MetaData{
+					namespace: serviceSpec.Namespace,
+				},
 				service: serviceSpec,
 			},
 		},
@@ -390,20 +390,20 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) ([]Ac
 
 		return []Action{
 			DeleteService{
-				ActionData{
-					namespace: serviceName.Namespace,
-				},
-				ServiceData{
+				ActionService{
+					meta: MetaData{
+						namespace: serviceName.Namespace,
+					},
 					name:    serviceName.Name,
 					role:    role,
 					service: newService,
 				},
 			},
 			CreateService{
-				ActionData{
-					namespace: serviceName.Namespace,
-				},
-				ServiceData{
+				ActionService{
+					meta: MetaData{
+						namespace: serviceName.Namespace,
+					},
 					name:    serviceName.Name,
 					role:    role,
 					service: newService,
@@ -414,10 +414,10 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) ([]Ac
 
 	return []Action{
 		UpdateService{
-			ActionData{
-				namespace: serviceName.Namespace,
-			},
-			ServiceData{
+			ActionService{
+				meta: MetaData{
+					namespace: serviceName.Namespace,
+				},
 				name:    serviceName.Name,
 				service: newService,
 			},
@@ -430,10 +430,10 @@ func (c *Cluster) deleteService(role PostgresRole) ([]Action, error) {
 
 	return []Action{
 		DeleteService{
-			ActionData{
-				namespace: service.Namespace,
-			},
-			ServiceData{
+			ActionService{
+				meta: MetaData{
+					namespace: service.Namespace,
+				},
 				name: service.Name,
 			},
 		},

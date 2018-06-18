@@ -117,17 +117,7 @@ func (c *Cluster) syncServices() (actions []Action, err error) {
 }
 
 func (c *Cluster) applyActions(actions []Action) (err error) {
-	uniqueActions := NoActions
-	hashMap := map[ActionHash]bool{}
 	for _, action := range actions {
-		if _, present := hashMap[action.Hash()]; !present {
-			hashMap[action.Hash()] = true
-			action.SetCluster(c)
-			uniqueActions = append(uniqueActions, action)
-		}
-	}
-
-	for _, action := range uniqueActions {
 		c.logger.Infof("Applying action %s", action.Name())
 	}
 
@@ -135,7 +125,7 @@ func (c *Cluster) applyActions(actions []Action) (err error) {
 		return nil
 	}
 
-	for _, action := range uniqueActions {
+	for _, action := range actions {
 		if err := action.Process(); err != nil {
 			c.logger.Errorf("Can't apply action %s: %v", action.Name(), err)
 		}

@@ -1,18 +1,15 @@
 package cluster
 
 import (
-	"crypto/md5"
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/pkg/api/v1"
-
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
 var NoActions []Action = []Action{}
 
-type ActionHash = [16]byte
+type ActionHash [16]byte
 
 var orphanDependents bool = true
 
@@ -20,50 +17,39 @@ var deleteOptions *metav1.DeleteOptions = &metav1.DeleteOptions{
 	OrphanDependents: &orphanDependents,
 }
 
-type SyncSecretsData struct {
-	secrets map[string]*v1.Secret
+type CreateService struct {
+	ActionService
 }
 
-type ServiceData struct {
+type UpdateService struct {
+	ActionService
+}
+
+type DeleteService struct {
+	ActionService
+}
+
+type MetaData struct {
+	cluster   *Cluster
+	namespace string
+}
+
+type ActionService struct {
+	meta    MetaData
 	name    string
 	role    PostgresRole
 	service *v1.Service
 }
 
-type SyncVolumesData struct {
-	volumeSpec spec.Volume
-}
-
-type ActionData struct {
-	cluster   *Cluster
-	namespace string
-}
-
-type CreateService struct {
-	common  ActionData
-	service ServiceData
-}
-
-type UpdateService struct {
-	common  ActionData
-	service ServiceData
-}
-
-type DeleteService struct {
-	common  ActionData
-	service ServiceData
-}
-
 type Action interface {
 	Process() error
 	Name() string
-	Hash() ActionHash
-	GetCommon() ActionData
+	GetMeta() MetaData
 	SetCluster(*Cluster)
 }
 
 func CheckAction(action Action) error {
-	if action.GetCommon().cluster == nil {
+	if action.GetMeta().cluster == nil {
 		return fmt.Errorf("no valid cluster for %v", action)
 	}
 
@@ -79,34 +65,30 @@ func (action UpdateService) Process() error {
 	if err := CheckAction(action); err != nil {
 		return err
 	}
-	common := action.GetCommon()
-	service := action.service.service
+	meta := action.GetMeta()
+	service := action.service
 
 	if len(service.ObjectMeta.Annotations) > 0 {
 		patchData, err = servicePatchData(service.Spec, service.ObjectMeta.Annotations)
 		if err != nil {
 			msg := "could not prepare patch data with annotations for service %q: %v"
-			return fmt.Errorf(msg, action.service.name, err)
+			return fmt.Errorf(msg, action.name, err)
 		}
 	} else {
 		patchData, err = specPatch(service.Spec)
 		if err != nil {
 			msg := "could not prepare patch data for service %q: %v"
-			return fmt.Errorf(msg, action.service.name, err)
+			return fmt.Errorf(msg, action.name, err)
 		}
 	}
 
-	if updatedService, err = common.cluster.KubeClient.
-		Services(common.namespace).
-		Patch(
-			action.service.name,
-			types.MergePatchType,
-			patchData,
-			""); err != nil {
+	if updatedService, err = meta.cluster.KubeClient.
+		Services(meta.namespace).
+		Patch(action.name, types.MergePatchType, patchData, ""); err != nil {
 		return err
 	}
 
-	common.cluster.Services[action.service.role] = updatedService
+	meta.cluster.Services[action.role] = updatedService
 	return nil
 }
 
@@ -119,15 +101,15 @@ func (action CreateService) Process() error {
 	if err := CheckAction(action); err != nil {
 		return err
 	}
-	common := action.GetCommon()
+	meta := action.GetMeta()
 
-	if newService, err = common.cluster.KubeClient.
-		Services(common.namespace).
-		Create(action.service.service); err != nil {
+	if newService, err = meta.cluster.KubeClient.
+		Services(meta.namespace).
+		Create(action.service); err != nil {
 		return err
 	}
 
-	common.cluster.Services[action.service.role] = newService
+	meta.cluster.Services[action.role] = newService
 	return nil
 }
 
@@ -135,56 +117,28 @@ func (action DeleteService) Process() error {
 	if err := CheckAction(action); err != nil {
 		return err
 	}
-	common := action.GetCommon()
+	meta := action.GetMeta()
 
-	if err := common.cluster.KubeClient.
-		Services(common.namespace).
-		Delete(action.service.name, deleteOptions); err != nil {
+	if err := meta.cluster.KubeClient.
+		Services(meta.namespace).
+		Delete(action.name, deleteOptions); err != nil {
 		return err
 	}
 
-	common.cluster.Services[action.service.role] = nil
+	meta.cluster.Services[action.role] = nil
 	return nil
 }
 
-func (action UpdateService) SetCluster(client *Cluster) {
-	action.common.cluster = client
+func (action ActionService) SetCluster(client *Cluster) {
+	action.meta.cluster = client
 }
 
-func (action CreateService) SetCluster(client *Cluster) {
-	action.common.cluster = client
-}
-
-func (action DeleteService) SetCluster(client *Cluster) {
-	action.common.cluster = client
-}
-
-func (action UpdateService) GetCommon() ActionData {
-	return action.common
-}
-
-func (action CreateService) GetCommon() ActionData {
-	return action.common
-}
-
-func (action DeleteService) GetCommon() ActionData {
-	return action.common
-}
-
-func (action UpdateService) Hash() ActionHash {
-	return md5.Sum([]byte("update" + action.service.name))
-}
-
-func (action CreateService) Hash() ActionHash {
-	return md5.Sum([]byte("create" + action.service.name))
-}
-
-func (action DeleteService) Hash() ActionHash {
-	return md5.Sum([]byte("delete" + action.service.name))
+func (action ActionService) GetMeta() MetaData {
+	return action.meta
 }
 
 func (action UpdateService) Name() string {
-	return fmt.Sprintf("Update service %s", action.service.name)
+	return fmt.Sprintf("Update service %s", action.name)
 }
 
 func (action CreateService) Name() string {
@@ -192,5 +146,5 @@ func (action CreateService) Name() string {
 }
 
 func (action DeleteService) Name() string {
-	return fmt.Sprintf("Delete service %s", action.service.name)
+	return fmt.Sprintf("Delete service %s", action.name)
 }
