@@ -361,7 +361,8 @@ func generateSpiloContainer(
 }
 
 func generateSidecarContainers(sidecars []spec.Sidecar,
-	volumeMounts []v1.VolumeMount, defaultResources spec.Resources, superUserName string, credentialsSecretName string) ([]v1.Container, error) {
+	volumeMounts []v1.VolumeMount, defaultResources spec.Resources,
+	superUserName string, credentialsSecretName string, logger *logrus.Entry) ([]v1.Container, error) {
 
 	if sidecars != nil && len(sidecars) > 0 {
 		result := make([]v1.Container, 0)
@@ -380,7 +381,7 @@ func generateSidecarContainers(sidecars []spec.Sidecar,
 				return nil, err
 			}
 
-			sc := getSidecarContainer(sidecar, index, volumeMounts, resources, superUserName, credentialsSecretName)
+			sc := getSidecarContainer(sidecar, index, volumeMounts, resources, superUserName, credentialsSecretName, logger)
 			result = append(result, *sc)
 		}
 		return result, nil
@@ -393,7 +394,6 @@ func generatePodTemplate(
 	labels labels.Set,
 	spiloContainer *v1.Container,
 	sidecarContainers []v1.Container,
-	volumeMounts []v1.VolumeMount,
 	tolerationsSpec *[]v1.Toleration,
 	nodeAffinity *v1.Affinity,
 	terminateGracePeriod int64,
@@ -548,7 +548,8 @@ func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.
 	return result
 }
 
-func getSidecarContainer(sidecar spec.Sidecar, index int, volumeMounts []v1.VolumeMount, resources *v1.ResourceRequirements, superUserName string, credentialsSecretName string) *v1.Container {
+func getSidecarContainer(sidecar spec.Sidecar, index int, volumeMounts []v1.VolumeMount,
+	resources *v1.ResourceRequirements, superUserName string, credentialsSecretName string, logger *logrus.Entry) *v1.Container {
 	name := sidecar.Name
 	if name == "" {
 		name = fmt.Sprintf("sidecar-%d", index)
@@ -598,7 +599,7 @@ func getSidecarContainer(sidecar spec.Sidecar, index int, volumeMounts []v1.Volu
 		ImagePullPolicy: v1.PullIfNotPresent,
 		Resources:       *resources,
 		VolumeMounts:    volumeMounts,
-		Env:             env,
+		Env:             deduplicateEnvVars(env, name, logger),
 		Ports:           sidecar.Ports,
 	}
 }
@@ -674,8 +675,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		c.OpConfig.ScalyrMemoryLimit,
 	)
 
-	// generate scalyr sidecar container
-	// TODO: avoid hardcoding scalyr container and use the sidecar mechansim
+	// generate scalyr sidecar containers
 	if scalarSidecar, present :=
 		generateScalarSidecarSpec(c.Name,
 			c.OpConfig.ScalyrAPIKey,
@@ -687,7 +687,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 
 	// generate sidecar containers
 	sidecarContainers, err := generateSidecarContainers(sideCars, volumeMounts, defaultResources,
-		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername))
+		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 	}
@@ -700,7 +700,6 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		c.labelsSet(true),
 		spiloContainer,
 		sidecarContainers,
-		volumeMounts,
 		&tolerationSpec,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
