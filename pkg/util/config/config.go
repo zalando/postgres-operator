@@ -76,6 +76,7 @@ type Config struct {
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition string `name:"pod_service_account_definition" default:""`
 	DbHostedZone                string `name:"db_hosted_zone" default:"db.example.com"`
+	AWSRegion                   string `name:"aws_region" default:"eu-central-1"`
 	WALES3Bucket                string `name:"wal_s3_bucket"`
 	LogS3Bucket                 string `name:"log_s3_bucket"`
 	KubeIAMRole                 string `name:"kube_iam_role"`
