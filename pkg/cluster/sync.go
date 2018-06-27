@@ -447,7 +447,7 @@ func (c *Cluster) syncVolumes() error {
 	if !act {
 		return nil
 	}
-	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
+	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{AWSRegion: c.OpConfig.AWSRegion}}); err != nil {
 		return fmt.Errorf("could not sync volumes: %v", err)
 	}
 

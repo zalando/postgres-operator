@@ -212,6 +212,9 @@ words.
   pods. Only used when combined with
   [kube2iam](https://github.com/jtblin/kube2iam) project on AWS. The default is empty.
 
+* **aws_region**
+  AWS region used to store ESB volumes.
+
 ## Debugging the operator
 * **debug_logging**
   boolean parameter that toggles verbose debug logs from the operator. The

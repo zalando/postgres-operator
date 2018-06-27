@@ -25,6 +25,7 @@ data:
   # pam_role_name: zalandos
   # pam_configuration: |
   #  https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
+  aws_region: eu-central-1
   db_hosted_zone: db.example.com
   master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
   replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
