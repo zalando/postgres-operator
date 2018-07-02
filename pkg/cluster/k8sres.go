@@ -676,19 +676,13 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	)
 
 	// generate scalyr sidecar container
-	// TODO: avoid hardcoding scalyr container and use the sidecar mechansim
-	if scalyrSidecar, defined :=
+	if scalyrSidecar :=
 		generateScalyrSidecarSpec(c.Name,
 			c.OpConfig.ScalyrAPIKey,
 			c.OpConfig.ScalyrServerURL,
 			c.OpConfig.ScalyrImage,
-			&resourceRequirementsScalyrSidecar); defined {
-		if scalyrSidecar != nil {
-			sideCars = append(sideCars, *scalyrSidecar)
-		} else {
-			c.logger.Warningf("Incomplete configuration for the Scalyr sidecar: " +
-				"all of SCALYR_API_KEY, SCALYR_SERVER_HOST and SCALYR_SERVER_URL must be defined")
-		}
+			&resourceRequirementsScalyrSidecar, c.logger); scalyrSidecar != nil {
+		sideCars = append(sideCars, *scalyrSidecar)
 	}
 
 	// generate sidecar containers
@@ -748,9 +742,14 @@ func getEffectiveDockerImage(globalDockerImage, clusterDockerImage string) strin
 	return clusterDockerImage
 }
 
-func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string, containerResources *spec.Resources) (sidecar *spec.Sidecar, defined bool) {
+func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
+	containerResources *spec.Resources, logger *logrus.Entry) *spec.Sidecar {
 	if APIKey == "" || serverURL == "" || dockerImage == "" {
-		return nil, (APIKey != "" || serverURL != "" || dockerImage != "")
+		if APIKey != "" || serverURL != "" || dockerImage != "" {
+			logger.Warningf("Incomplete configuration for the Scalyr sidecar: " +
+				"all of SCALYR_API_KEY, SCALYR_SERVER_HOST and SCALYR_SERVER_URL must be defined")
+		}
+		return nil
 	}
 	return &spec.Sidecar{
 		Name:        "scalyr-sidecar",
@@ -788,7 +787,7 @@ func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage strin
 			},
 		},
 		Resources: *containerResources,
-	}, true
+	}
 }
 
 // mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
