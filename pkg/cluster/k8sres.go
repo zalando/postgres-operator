@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/Sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
@@ -79,25 +81,30 @@ func (c *Cluster) podDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
 
-func (c *Cluster) resourceRequirements(resources spec.Resources) (*v1.ResourceRequirements, error) {
-	var err error
-
-	specRequests := resources.ResourceRequest
-	specLimits := resources.ResourceLimits
+func (c *Cluster) makeDefaultResources() spec.Resources {
 
 	config := c.OpConfig
 
 	defaultRequests := spec.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
 	defaultLimits := spec.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
 
+	return spec.Resources{defaultRequests, defaultLimits}
+}
+
+func generateResourceRequirements(resources spec.Resources, defaultResources spec.Resources) (*v1.ResourceRequirements, error) {
+	var err error
+
+	specRequests := resources.ResourceRequest
+	specLimits := resources.ResourceLimits
+
 	result := v1.ResourceRequirements{}
 
-	result.Requests, err = fillResourceList(specRequests, defaultRequests)
+	result.Requests, err = fillResourceList(specRequests, defaultResources.ResourceRequest)
 	if err != nil {
 		return nil, fmt.Errorf("could not fill resource requests: %v", err)
 	}
 
-	result.Limits, err = fillResourceList(specLimits, defaultLimits)
+	result.Limits, err = fillResourceList(specLimits, defaultResources.ResourceLimits)
 	if err != nil {
 		return nil, fmt.Errorf("could not fill resource limits: %v", err)
 	}
@@ -135,7 +142,7 @@ func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescr
 	return requests, nil
 }
 
-func (c *Cluster) generateSpiloJSONConfiguration(pg *spec.PostgresqlParam, patroni *spec.Patroni) string {
+func generateSpiloJSONConfiguration(pg *spec.PostgresqlParam, patroni *spec.Patroni, pamRoleName string, logger *logrus.Entry) string {
 	config := spiloConfiguration{}
 
 	config.Bootstrap = pgBootstrap{}
@@ -178,7 +185,7 @@ PatroniInitDBParams:
 					}
 				}
 			default:
-				c.logger.Warningf("unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
+				logger.Warningf("unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
 				continue PatroniInitDBParams
 			}
 		}
@@ -201,7 +208,7 @@ PatroniInitDBParams:
 	} else {
 		config.Bootstrap.PgHBA = []string{
 			"hostnossl all all all reject",
-			fmt.Sprintf("hostssl   all +%s all pam", c.OpConfig.PamRoleName),
+			fmt.Sprintf("hostssl   all +%s all pam", pamRoleName),
 			"hostssl   all all all md5",
 		}
 	}
@@ -240,25 +247,25 @@ PatroniInitDBParams:
 		}
 	}
 	config.Bootstrap.Users = map[string]pgUser{
-		c.OpConfig.PamRoleName: {
+		pamRoleName: {
 			Password: "",
 			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
 		},
 	}
 	result, err := json.Marshal(config)
 	if err != nil {
-		c.logger.Errorf("cannot convert spilo configuration into JSON: %v", err)
+		logger.Errorf("cannot convert spilo configuration into JSON: %v", err)
 		return ""
 	}
 	return string(result)
 }
 
-func (c *Cluster) nodeAffinity() *v1.Affinity {
+func nodeAffinity(nodeReadinessLabel map[string]string) *v1.Affinity {
 	matchExpressions := make([]v1.NodeSelectorRequirement, 0)
-	if len(c.OpConfig.NodeReadinessLabel) == 0 {
+	if len(nodeReadinessLabel) == 0 {
 		return nil
 	}
-	for k, v := range c.OpConfig.NodeReadinessLabel {
+	for k, v := range nodeReadinessLabel {
 		matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
 			Key:      k,
 			Operator: v1.NodeSelectorOpIn,
@@ -275,13 +282,12 @@ func (c *Cluster) nodeAffinity() *v1.Affinity {
 	}
 }
 
-func (c *Cluster) tolerations(tolerationsSpec *[]v1.Toleration) []v1.Toleration {
+func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
 	// allow to override tolerations by postgresql manifest
 	if len(*tolerationsSpec) > 0 {
 		return *tolerationsSpec
 	}
 
-	podToleration := c.Config.OpConfig.PodToleration
 	if len(podToleration["key"]) > 0 || len(podToleration["operator"]) > 0 || len(podToleration["value"]) > 0 || len(podToleration["effect"]) > 0 {
 		return []v1.Toleration{
 			{
@@ -309,19 +315,123 @@ func isBootstrapOnlyParameter(param string) bool {
 		param == "track_commit_timestamp"
 }
 
-func (c *Cluster) generatePodTemplate(
-	uid types.UID,
-	resourceRequirements *v1.ResourceRequirements,
-	resourceRequirementsScalyrSidecar *v1.ResourceRequirements,
-	tolerationsSpec *[]v1.Toleration,
-	pgParameters *spec.PostgresqlParam,
-	patroniParameters *spec.Patroni,
-	cloneDescription *spec.CloneDescription,
-	dockerImage *string,
-	customPodEnvVars map[string]string,
-) *v1.PodTemplateSpec {
-	spiloConfiguration := c.generateSpiloJSONConfiguration(pgParameters, patroniParameters)
+func generateVolumeMounts() []v1.VolumeMount {
+	return []v1.VolumeMount{
+		{
+			Name:      constants.DataVolumeName,
+			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
+		},
+	}
+}
 
+func generateSpiloContainer(
+	name string,
+	dockerImage *string,
+	resourceRequirements *v1.ResourceRequirements,
+	envVars []v1.EnvVar,
+	volumeMounts []v1.VolumeMount,
+) *v1.Container {
+
+	privilegedMode := true
+	return &v1.Container{
+		Name:            name,
+		Image:           *dockerImage,
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Resources:       *resourceRequirements,
+		Ports: []v1.ContainerPort{
+			{
+				ContainerPort: 8008,
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				ContainerPort: 5432,
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				ContainerPort: 8080,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+		VolumeMounts: volumeMounts,
+		Env:          envVars,
+		SecurityContext: &v1.SecurityContext{
+			Privileged: &privilegedMode,
+		},
+	}
+}
+
+func generateSidecarContainers(sidecars []spec.Sidecar,
+	volumeMounts []v1.VolumeMount, defaultResources spec.Resources,
+	superUserName string, credentialsSecretName string, logger *logrus.Entry) ([]v1.Container, error) {
+
+	if sidecars != nil && len(sidecars) > 0 {
+		result := make([]v1.Container, 0)
+		for index, sidecar := range sidecars {
+
+			resources, err := generateResourceRequirements(
+				makeResources(
+					sidecar.Resources.ResourceRequest.CPU,
+					sidecar.Resources.ResourceRequest.Memory,
+					sidecar.Resources.ResourceLimits.CPU,
+					sidecar.Resources.ResourceLimits.Memory,
+				),
+				defaultResources,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			sc := getSidecarContainer(sidecar, index, volumeMounts, resources, superUserName, credentialsSecretName, logger)
+			result = append(result, *sc)
+		}
+		return result, nil
+	}
+	return nil, nil
+}
+
+func generatePodTemplate(
+	namespace string,
+	labels labels.Set,
+	spiloContainer *v1.Container,
+	sidecarContainers []v1.Container,
+	tolerationsSpec *[]v1.Toleration,
+	nodeAffinity *v1.Affinity,
+	terminateGracePeriod int64,
+	podServiceAccountName string,
+	kubeIAMRole string,
+) (*v1.PodTemplateSpec, error) {
+
+	terminateGracePeriodSeconds := terminateGracePeriod
+	containers := []v1.Container{*spiloContainer}
+	containers = append(containers, sidecarContainers...)
+
+	podSpec := v1.PodSpec{
+		ServiceAccountName:            podServiceAccountName,
+		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
+		Containers:                    containers,
+		Tolerations:                   *tolerationsSpec,
+	}
+
+	if nodeAffinity != nil {
+		podSpec.Affinity = nodeAffinity
+	}
+
+	template := v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    labels,
+			Namespace: namespace,
+		},
+		Spec: podSpec,
+	}
+	if kubeIAMRole != "" {
+		template.Annotations = map[string]string{constants.KubeIAmAnnotation: kubeIAMRole}
+	}
+
+	return &template, nil
+}
+
+// generatePodEnvVars generates environment variables for the Spilo Pod
+func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *spec.CloneDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -409,134 +519,89 @@ func (c *Cluster) generatePodTemplate(
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 
-	var names []string
-	// handle environment variables from the PodEnvironmentConfigMap. We don't use envSource here as it is impossible
-	// to track any changes to the object envSource points to. In order to emulate the envSource behavior, however, we
-	// need to make sure that PodConfigMap variables doesn't override those we set explicitly from the configuration
-	// parameters
-	envVarsMap := make(map[string]string)
-	for _, envVar := range envVars {
-		envVarsMap[envVar.Name] = envVar.Value
+	if len(customPodEnvVarsList) > 0 {
+		envVars = append(envVars, customPodEnvVarsList...)
 	}
-	for name := range customPodEnvVars {
-		if _, ok := envVarsMap[name]; !ok {
-			names = append(names, name)
-		} else {
-			c.logger.Warningf("variable %q value from %q is ignored: conflict with the definition from the operator",
-				name, c.OpConfig.PodEnvironmentConfigMap)
+
+	return envVars
+}
+
+// deduplicateEnvVars makes sure there are no duplicate in the target envVar array. While Kubernetes already
+// deduplicates variables defined in a container, it leaves the last definition in the list and this behavior is not
+// well-documented, which means that the behavior can be reversed at some point (it may also start producing an error).
+// Therefore, the merge is done by the operator, the entries that are ahead in the passed list take priority over those
+// that are behind, and only the name is considered in order to eliminate duplicates.
+func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.Entry) []v1.EnvVar {
+	result := make([]v1.EnvVar, 0)
+	names := make(map[string]int)
+
+	for i, va := range input {
+		if names[va.Name] == 0 {
+			names[va.Name] += 1
+			result = append(result, input[i])
+		} else if names[va.Name] == 1 {
+			names[va.Name] += 1
+			logger.Warningf("variable %q is defined in %q more than once, the subsequent definitions are ignored",
+				va.Name, containerName)
 		}
 	}
-	sort.Strings(names)
-	for _, name := range names {
-		envVars = append(envVars, v1.EnvVar{Name: name, Value: customPodEnvVars[name]})
+	return result
+}
+
+func getSidecarContainer(sidecar spec.Sidecar, index int, volumeMounts []v1.VolumeMount,
+	resources *v1.ResourceRequirements, superUserName string, credentialsSecretName string, logger *logrus.Entry) *v1.Container {
+	name := sidecar.Name
+	if name == "" {
+		name = fmt.Sprintf("sidecar-%d", index)
 	}
 
-	privilegedMode := true
-	containerImage := c.OpConfig.DockerImage
-	if dockerImage != nil && *dockerImage != "" {
-		containerImage = *dockerImage
-	}
-	volumeMounts := []v1.VolumeMount{
+	env := []v1.EnvVar{
 		{
-			Name:      constants.DataVolumeName,
-			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
-		},
-	}
-	container := v1.Container{
-		Name:            c.containerName(),
-		Image:           containerImage,
-		ImagePullPolicy: v1.PullIfNotPresent,
-		Resources:       *resourceRequirements,
-		Ports: []v1.ContainerPort{
-			{
-				ContainerPort: 8008,
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				ContainerPort: 5432,
-				Protocol:      v1.ProtocolTCP,
-			},
-			{
-				ContainerPort: 8080,
-				Protocol:      v1.ProtocolTCP,
-			},
-		},
-		VolumeMounts: volumeMounts,
-		Env:          envVars,
-		SecurityContext: &v1.SecurityContext{
-			Privileged: &privilegedMode,
-		},
-	}
-	terminateGracePeriodSeconds := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
-
-	podSpec := v1.PodSpec{
-		ServiceAccountName:            c.OpConfig.PodServiceAccountName,
-		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
-		Containers:                    []v1.Container{container},
-		Tolerations:                   c.tolerations(tolerationsSpec),
-	}
-
-	if affinity := c.nodeAffinity(); affinity != nil {
-		podSpec.Affinity = affinity
-	}
-
-	if c.OpConfig.ScalyrAPIKey != "" && c.OpConfig.ScalyrImage != "" {
-		podSpec.Containers = append(
-			podSpec.Containers,
-			v1.Container{
-				Name:            "scalyr-sidecar",
-				Image:           c.OpConfig.ScalyrImage,
-				ImagePullPolicy: v1.PullIfNotPresent,
-				Resources:       *resourceRequirementsScalyrSidecar,
-				VolumeMounts:    volumeMounts,
-				Env: []v1.EnvVar{
-					{
-						Name: "POD_NAME",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1",
-								FieldPath:  "metadata.name",
-							},
-						},
-					},
-					{
-						Name: "POD_NAMESPACE",
-						ValueFrom: &v1.EnvVarSource{
-							FieldRef: &v1.ObjectFieldSelector{
-								APIVersion: "v1",
-								FieldPath:  "metadata.namespace",
-							},
-						},
-					},
-					{
-						Name:  "SCALYR_API_KEY",
-						Value: c.OpConfig.ScalyrAPIKey,
-					},
-					{
-						Name:  "SCALYR_SERVER_HOST",
-						Value: c.Name,
-					},
-					{
-						Name:  "SCALYR_SERVER_URL",
-						Value: c.OpConfig.ScalyrServerURL,
-					},
+			Name: "POD_NAME",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
 				},
 			},
-		)
-	}
-
-	template := v1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:    c.labelsSet(true),
-			Namespace: c.Namespace,
 		},
-		Spec: podSpec,
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "POSTGRES_USER",
+			Value: superUserName,
+		},
+		{
+			Name: "POSTGRES_PASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: credentialsSecretName,
+					},
+					Key: "password",
+				},
+			},
+		},
 	}
-	if c.OpConfig.KubeIAMRole != "" {
-		template.Annotations = map[string]string{constants.KubeIAmAnnotation: c.OpConfig.KubeIAMRole}
+	if len(sidecar.Env) > 0 {
+		env = append(env, sidecar.Env...)
 	}
-
-	return &template
+	return &v1.Container{
+		Name:            name,
+		Image:           sidecar.DockerImage,
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Resources:       *resources,
+		VolumeMounts:    volumeMounts,
+		Env:             deduplicateEnvVars(env, name, logger),
+		Ports:           sidecar.Ports,
+	}
 }
 
 func getBucketScopeSuffix(uid string) string {
@@ -560,30 +625,90 @@ func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) spec
 }
 
 func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
-	resourceRequirements, err := c.resourceRequirements(spec.Resources)
+
+	defaultResources := c.makeDefaultResources()
+
+	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
-	resourceRequirementsScalyrSidecar, err := c.resourceRequirements(
-		makeResources(
-			c.OpConfig.ScalyrCPURequest,
-			c.OpConfig.ScalyrMemoryRequest,
-			c.OpConfig.ScalyrCPULimit,
-			c.OpConfig.ScalyrMemoryLimit,
-		),
-	)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Scalyr sidecar resource requirements: %v", err)
 	}
-	var customPodEnvVars map[string]string
+	customPodEnvVarsList := make([]v1.EnvVar, 0)
+
 	if c.OpConfig.PodEnvironmentConfigMap != "" {
 		if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{}); err != nil {
 			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
 		} else {
-			customPodEnvVars = cm.Data
+			for k, v := range cm.Data {
+				customPodEnvVarsList = append(customPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
+			}
+			sort.Slice(customPodEnvVarsList,
+				func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 		}
 	}
-	podTemplate := c.generatePodTemplate(c.Postgresql.GetUID(), resourceRequirements, resourceRequirementsScalyrSidecar, &spec.Tolerations, &spec.PostgresqlParam, &spec.Patroni, &spec.Clone, &spec.DockerImage, customPodEnvVars)
+
+	spiloConfiguration := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
+
+	// generate environment variables for the spilo container
+	spiloEnvVars := deduplicateEnvVars(
+		c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone, customPodEnvVarsList),
+		c.containerName(), c.logger)
+
+	// pickup the docker image for the spilo container
+	effectiveDockerImage := getEffectiveDockerImage(c.OpConfig.DockerImage, spec.DockerImage)
+
+	volumeMounts := generateVolumeMounts()
+
+	// generate the spilo container
+	spiloContainer := generateSpiloContainer(c.containerName(), &effectiveDockerImage, resourceRequirements, spiloEnvVars, volumeMounts)
+
+	// resolve conflicts between operator-global and per-cluster sidecards
+	sideCars := c.mergeSidecars(spec.Sidecars)
+
+	resourceRequirementsScalyrSidecar := makeResources(
+		c.OpConfig.ScalyrCPURequest,
+		c.OpConfig.ScalyrMemoryRequest,
+		c.OpConfig.ScalyrCPULimit,
+		c.OpConfig.ScalyrMemoryLimit,
+	)
+
+	// generate scalyr sidecar container
+	if scalyrSidecar :=
+		generateScalyrSidecarSpec(c.Name,
+			c.OpConfig.ScalyrAPIKey,
+			c.OpConfig.ScalyrServerURL,
+			c.OpConfig.ScalyrImage,
+			&resourceRequirementsScalyrSidecar, c.logger); scalyrSidecar != nil {
+		sideCars = append(sideCars, *scalyrSidecar)
+	}
+
+	// generate sidecar containers
+	sidecarContainers, err := generateSidecarContainers(sideCars, volumeMounts, defaultResources,
+		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+	}
+
+	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+
+	// generate pod template for the statefulset, based on the spilo container and sidecards
+	podTemplate, err := generatePodTemplate(
+		c.Namespace,
+		c.labelsSet(true),
+		spiloContainer,
+		sidecarContainers,
+		&tolerationSpec,
+		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		c.OpConfig.PodServiceAccountName,
+		c.OpConfig.KubeIAMRole)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not generate pod template: %v", err)
+	}
 	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
@@ -608,6 +733,86 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	}
 
 	return statefulSet, nil
+}
+
+func getEffectiveDockerImage(globalDockerImage, clusterDockerImage string) string {
+	if clusterDockerImage == "" {
+		return globalDockerImage
+	}
+	return clusterDockerImage
+}
+
+func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
+	containerResources *spec.Resources, logger *logrus.Entry) *spec.Sidecar {
+	if APIKey == "" || serverURL == "" || dockerImage == "" {
+		if APIKey != "" || serverURL != "" || dockerImage != "" {
+			logger.Warningf("Incomplete configuration for the Scalyr sidecar: " +
+				"all of SCALYR_API_KEY, SCALYR_SERVER_HOST and SCALYR_SERVER_URL must be defined")
+		}
+		return nil
+	}
+	return &spec.Sidecar{
+		Name:        "scalyr-sidecar",
+		DockerImage: dockerImage,
+		Env: []v1.EnvVar{
+			{
+				Name: "POD_NAME",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.name",
+					},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.namespace",
+					},
+				},
+			},
+			{
+				Name:  "SCALYR_API_KEY",
+				Value: APIKey,
+			},
+			{
+				Name:  "SCALYR_SERVER_HOST",
+				Value: clusterName,
+			},
+			{
+				Name:  "SCALYR_SERVER_URL",
+				Value: serverURL,
+			},
+		},
+		Resources: *containerResources,
+	}
+}
+
+// mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
+func (c *Cluster) mergeSidecars(sidecars []spec.Sidecar) []spec.Sidecar {
+	globalSidecarsToSkip := map[string]bool{}
+	result := make([]spec.Sidecar, 0)
+
+	for i, sidecar := range sidecars {
+		dockerImage, ok := c.OpConfig.Sidecars[sidecar.Name]
+		if ok {
+			if dockerImage != sidecar.DockerImage {
+				c.logger.Warningf("merging definitions for sidecar %q: "+
+					"ignoring %q in the global scope in favor of %q defined in the cluster",
+					sidecar.Name, dockerImage, sidecar.DockerImage)
+			}
+			globalSidecarsToSkip[sidecar.Name] = true
+		}
+		result = append(result, sidecars[i])
+	}
+	for name, dockerImage := range c.OpConfig.Sidecars {
+		if !globalSidecarsToSkip[name] {
+			result = append(result, spec.Sidecar{Name: name, DockerImage: dockerImage})
+		}
+	}
+	return result
 }
 
 func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) (newcur int32) {

@@ -213,3 +213,21 @@ properties of the persistent storage that stores postgres data.
   See [Kubernetes
   documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
   for the details on storage classes. Optional. 
+
+### Sidecar definitions
+
+Those parameters are defined under the `sidecars` key. They consist of a list
+of dictionaries, each defining one sidecar (an extra container running
+along the main postgres container on the same pod). The following keys can be
+defined in the sidecar dictionary:
+
+* **name**
+  name of the sidecar. Required.
+
+* **image**
+  docker image of the sidecar. Required.
+
+* **env**
+  a dictionary of environment variables. Use usual Kubernetes definition
+  (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
+  for environment variables. Optional.

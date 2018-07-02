@@ -15,6 +15,11 @@ words.
   your own Spilo image from the [github
   repository](https://github.com/zalando/spilo).
 
+* **sidecar_docker_images**
+  a map of sidecar names to docker images for the containers to run alongside
+  Spilo. In case of the name conflict with the definition in the cluster
+  manifest the cluster-specific one is preferred.
+
 * **workers**
   number of working routines the operator spawns to process requests to
   create/update/delete/sync clusters concurrently. The default is `4`.
