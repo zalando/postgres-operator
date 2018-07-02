@@ -20,7 +20,7 @@ configuration:
     oauth_token_secret_name: postgresql-operator
     pod_role_label: spilo-role
     cluster_labels:
-        application: splio
+        application: spilo
     cluster_name_label: cluster-name
     # watched_namespace:"" 
     # node_readiness_label: ""
