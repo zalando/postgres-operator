@@ -526,11 +526,11 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 	return envVars
 }
 
-// deduplicateEnvVars makes sure there are no duplicate in the target envVar array. While Kubernetes already does, it
-// leaves the last definition in the list and is not documented, which means that the behavior can be reversed at some
-// point (it may also start producing an error). Therefore, the merge is done by the operator, the entries that are ahead
-// in the passed list take priority over those that are behind, and only the name is considered in order to eliminate
-// duplicates.
+// deduplicateEnvVars makes sure there are no duplicate in the target envVar array. While Kubernetes already
+// deduplicates variables defined in a container, it leaves the last definition in the list and this behavior is not
+// well-documented, which means that the behavior can be reversed at some point (it may also start producing an error).
+// Therefore, the merge is done by the operator, the entries that are ahead in the passed list take priority over those
+// that are behind, and only the name is considered in order to eliminate duplicates.
 func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.Entry) []v1.EnvVar {
 	result := make([]v1.EnvVar, 0)
 	names := make(map[string]int)
@@ -675,14 +675,20 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		c.OpConfig.ScalyrMemoryLimit,
 	)
 
-	// generate scalyr sidecar containers
-	if scalarSidecar, present :=
-		generateScalarSidecarSpec(c.Name,
+	// generate scalyr sidecar container
+	// TODO: avoid hardcoding scalyr container and use the sidecar mechansim
+	if scalyrSidecar, defined :=
+		generateScalyrSidecarSpec(c.Name,
 			c.OpConfig.ScalyrAPIKey,
 			c.OpConfig.ScalyrServerURL,
 			c.OpConfig.ScalyrImage,
-			&resourceRequirementsScalyrSidecar); present {
-		sideCars = append(sideCars, *scalarSidecar)
+			&resourceRequirementsScalyrSidecar); defined {
+		if scalyrSidecar != nil {
+			sideCars = append(sideCars, *scalyrSidecar)
+		} else {
+			c.logger.Warningf("Incomplete configuration for the Scalyr sidecar: " +
+				"all of SCALYR_API_KEY, SCALYR_SERVER_HOST and SCALYR_SERVER_URL must be defined")
+		}
 	}
 
 	// generate sidecar containers
@@ -742,9 +748,9 @@ func getEffectiveDockerImage(globalDockerImage, clusterDockerImage string) strin
 	return clusterDockerImage
 }
 
-func generateScalarSidecarSpec(clusterName, APIKey, serverURL, dockerImage string, containerResources *spec.Resources) (sidecar *spec.Sidecar, present bool) {
+func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string, containerResources *spec.Resources) (sidecar *spec.Sidecar, defined bool) {
 	if APIKey == "" || serverURL == "" || dockerImage == "" {
-		return nil, false
+		return nil, (APIKey != "" || serverURL != "" || dockerImage != "")
 	}
 	return &spec.Sidecar{
 		Name:        "scalyr-sidecar",
