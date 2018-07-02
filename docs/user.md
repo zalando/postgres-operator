@@ -241,6 +241,38 @@ metadata:
 Note that timezone required for `timestamp` (offset relative to UTC, see RFC
 3339 section 5.6)
 
+
+## Sidecar Support
+
+Each cluster can specify arbitrary sidecars to run. These containers could be used for
+log aggregation, monitoring, backups or other tasks. A sidecar can be specified like this:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-minimal-cluster
+spec:
+  ...
+  sidecars:
+    - name: "container-name"
+      image: "company/image:tag"
+      env:
+        - name: "ENV_VAR_NAME"
+          value: "any-k8s-env-things"
+```
+
+In addition to any environment variables you specify, the following environment variables
+are always passed to sidecars:
+
+  - `POD_NAME` - field reference to `metadata.name`
+  - `POD_NAMESPACE` - field reference to `metadata.namespace`
+  - `POSTGRES_USER` - the superuser that can be used to connect to the database
+  - `POSTGRES_PASSWORD` - the password for the superuser
+
+The PostgreSQL volume is shared with sidecars and is mounted at `/home/postgres/pgdata`.
+
 ## Increase volume size
 
 PostgreSQL operator supports statefulset volume resize if you're using the
