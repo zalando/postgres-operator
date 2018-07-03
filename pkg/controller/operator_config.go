@@ -12,7 +12,7 @@ import (
 
 func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, configObjectName string) (*config.OperatorConfiguration, error) {
 	var (
-		config config.OperatorConfiguration
+		opConfig config.OperatorConfiguration
 	)
 
 	req := c.KubeClient.CRDREST.Get().
@@ -25,11 +25,11 @@ func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, con
 	if err != nil {
 		return nil, fmt.Errorf("could not get operator configuration object %s: %v", configObjectName, err)
 	}
-	if err = json.Unmarshal(data, &config); err != nil {
+	if err = json.Unmarshal(data, &opConfig); err != nil {
 		return nil, fmt.Errorf("could not unmarshal operator configuration object %s, %v", configObjectName, err)
 	}
 
-	return &config, nil
+	return &opConfig, nil
 }
 
 // importConfigurationFromCRD is a transitional function that converts CRD configuration to the one based on the configmap
@@ -78,6 +78,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *config.OperatorConfigur
 	result.ReplicaDNSNameFormat = fromCRD.LoadBalancer.ReplicaDNSNameFormat
 
 	result.WALES3Bucket = fromCRD.AWSGCP.WALES3Bucket
+	result.AWSRegion = fromCRD.AWSGCP.AWSRegion
 	result.LogS3Bucket = fromCRD.AWSGCP.LogS3Bucket
 	result.KubeIAMRole = fromCRD.AWSGCP.KubeIAMRole
 

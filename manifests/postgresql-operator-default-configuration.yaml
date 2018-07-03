@@ -49,6 +49,7 @@ configuration:
     # wal_s3_bucket: "" 
     # log_s3_bucket: ""
     # kube_iam_role: ""
+    aws_region: eu-central-1
   debug:
     debug_logging: true
     enable_database_access: true

@@ -294,7 +294,7 @@ either. In the CRD-based configuration those options are grouped under the
   [kube2iam](https://github.com/jtblin/kube2iam) project on AWS. The default is empty.
 
 * **aws_region**
-  AWS region used to store ESB volumes.
+  AWS region used to store ESB volumes. The default is `eu-central-1`.
 
 ## Debugging the operator
 
