@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -117,6 +118,7 @@ type OperatorConfigurationData struct {
 	MinInstances               int32                        `json:"min_instances,omitempty"`
 	MaxInstances               int32                        `json:"max_instances,omitempty"`
 	ResyncPeriod               spec.Duration                `json:"resync_period,omitempty"`
+	Sidecars                   map[string]string            `json:"sidecar_docker_images,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration   `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration  `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults `json:"postgres_pod_resources"`
