@@ -835,14 +835,19 @@ func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) (newcur int32) {
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
+
+	var storageClassName *string
+
 	metadata := metav1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
 	if volumeStorageClass != "" {
-		// TODO: check if storage class exists
+		// TODO: remove the old annotation, switching completely to the StorageClassName field.
 		metadata.Annotations = map[string]string{"volume.beta.kubernetes.io/storage-class": volumeStorageClass}
+		storageClassName = &volumeStorageClass
 	} else {
 		metadata.Annotations = map[string]string{"volume.alpha.kubernetes.io/storage-class": "default"}
+		storageClassName = nil
 	}
 
 	quantity, err := resource.ParseQuantity(volumeSize)
@@ -859,6 +864,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 					v1.ResourceStorage: quantity,
 				},
 			},
+			StorageClassName: storageClassName,
 		},
 	}
 
