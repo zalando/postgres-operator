@@ -286,7 +286,7 @@ func (c *Cluster) syncStatefulSet() error {
 		c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired)
 
 		cmp := c.compareStatefulSetWith(desiredSS)
-		if !cmp.match {
+		if cmp.update {
 			if cmp.rollingUpdate && !podsRollingUpdateRequired {
 				podsRollingUpdateRequired = true
 				c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired)

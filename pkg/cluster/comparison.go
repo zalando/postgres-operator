@@ -25,7 +25,7 @@ func True() *bool {
 }
 
 type Result struct {
-	differs         *bool
+	needUpdate      *bool
 	needsRollUpdate *bool
 	needsReplace    *bool
 }
@@ -60,11 +60,11 @@ func (c *Cluster) getStatefulSetChecks() []ResourceCheck {
 	return []ResourceCheck{
 		c.NewCheck("new statefulset's number of replicas doesn't match the current one",
 			func(a, b *v1beta1.StatefulSet) bool { return a.Spec.Replicas != b.Spec.Replicas },
-			Result{differs: True()}),
+			Result{needUpdate: True()}),
 
 		c.NewCheck("new statefulset's annotations doesn't match the current one",
 			func(a, b *v1beta1.StatefulSet) bool { return !reflect.DeepEqual(a.Annotations, b.Annotations) },
-			Result{differs: True()}),
+			Result{needUpdate: True()}),
 
 		c.NewCheck("new statefulset's serviceAccountName service asccount name doesn't match the current one",
 			func(a, b *v1beta1.StatefulSet) bool {
@@ -99,7 +99,7 @@ func (c *Cluster) getStatefulSetChecks() []ResourceCheck {
 		c.NewCheck("new statefulset's pod template metadata annotations doesn't match the current one",
 			func(a, b *v1beta1.StatefulSet) bool {
 				return !reflect.DeepEqual(a.Spec.Template.Annotations, b.Spec.Template.Annotations)
-			}, Result{differs: True(), needsRollUpdate: True(), needsReplace: True()}),
+			}, Result{needUpdate: True(), needsRollUpdate: True(), needsReplace: True()}),
 
 		c.NewCheck("new statefulset's volumeClaimTemplates contains different number of volumes to the old one",
 			func(a, b *v1beta1.StatefulSet) bool {

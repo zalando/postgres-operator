@@ -82,7 +82,7 @@ type Cluster struct {
 }
 
 type compareStatefulsetResult struct {
-	match         bool
+	update        bool
 	replace       bool
 	rollingUpdate bool
 	reasons       []string
@@ -346,7 +346,7 @@ func (c *Cluster) Create() error {
 
 func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
 	reasons := make([]string, 0)
-	match, needsRollUpdate, needsReplace := true, false, false
+	update, needsRollUpdate, needsReplace := false, false, false
 
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
@@ -370,14 +370,14 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		}
 
 		if check.statefulSetCondition(c.Statefulset, statefulSet) {
-			if check.result.differs != nil {
-				match = !*check.result.differs
+			if util.IsTrue(check.result.needUpdate) {
+				update = true
 			}
-			if check.result.needsRollUpdate != nil {
-				needsRollUpdate = *check.result.needsRollUpdate
+			if util.IsTrue(check.result.needsRollUpdate) {
+				needsRollUpdate = true
 			}
-			if check.result.needsReplace != nil {
-				needsReplace = *check.result.needsReplace
+			if util.IsTrue(check.result.needsReplace) {
+				needsReplace = true
 			}
 
 			reasons = append(reasons, check.reason)
@@ -394,10 +394,15 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	// the template and the diff
 
 	if needsRollUpdate || needsReplace {
-		match = false
+		update = true
 	}
 
-	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
+	return &compareStatefulsetResult{
+		update:        update,
+		reasons:       reasons,
+		rollingUpdate: needsRollUpdate,
+		replace:       needsReplace,
+	}
 }
 
 func (c *Cluster) compareVolumeClaimTemplates(setA, setB *v1beta1.StatefulSet) (bool, []string) {
@@ -412,7 +417,11 @@ func (c *Cluster) compareVolumeClaimTemplates(setA, setB *v1beta1.StatefulSet) (
 				continue
 			}
 
-			if check.volumeClaimCondition(&claimA, &claimB) {
+			if !check.volumeClaimCondition(&claimA, &claimB) {
+				continue
+			}
+
+			if util.IsTrue(check.result.needsReplace) {
 				needsReplace = true
 				reasons = append(reasons, fmt.Sprintf(check.reason, index))
 			}
@@ -438,7 +447,11 @@ func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []st
 				continue
 			}
 
-			if check.containerCondition(&containerA, &containerB) {
+			if !check.containerCondition(&containerA, &containerB) {
+				continue
+			}
+
+			if util.IsTrue(check.result.needsRollUpdate) {
 				needsRollUpdate = true
 				reasons = append(reasons, fmt.Sprintf(check.reason, index))
 			}
