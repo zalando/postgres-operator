@@ -127,6 +127,16 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
+func True() *bool {
+	b := true
+	return &b
+}
+
+func False() *bool {
+	b := false
+	return &b
+}
+
 func IsTrue(value *bool) bool {
 	return value != nil && *value
 }
