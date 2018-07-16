@@ -61,6 +61,15 @@ type CloneDescription struct {
 	EndTimestamp string `json:"timestamp,omitempty"`
 }
 
+// Sidecar defines a container to be run in the same pod as the Postgres container.
+type Sidecar struct {
+	Resources   `json:"resources,omitempty"`
+	Name        string             `json:"name,omitempty"`
+	DockerImage string             `json:"image,omitempty"`
+	Ports       []v1.ContainerPort `json:"ports,omitempty"`
+	Env         []v1.EnvVar        `json:"env,omitempty"`
+}
+
 type UserFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
@@ -124,6 +133,7 @@ type PostgresSpec struct {
 	ClusterName        string               `json:"-"`
 	Databases          map[string]string    `json:"databases,omitempty"`
 	Tolerations        []v1.Toleration      `json:"tolerations,omitempty"`
+	Sidecars           []Sidecar            `json:"sidecars,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.

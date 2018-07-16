@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -224,6 +225,9 @@ func (r RoleOrigin) String() string {
 // Placing this func here instead of pgk/util avoids circular import
 func GetOperatorNamespace() string {
 	if operatorNamespace == "" {
+		if namespaceFromEnvironment := os.Getenv("OPERATOR_NAMESPACE"); namespaceFromEnvironment != "" {
+			return namespaceFromEnvironment
+		}
 		operatorNamespaceBytes, err := ioutil.ReadFile(fileWithNamespace)
 		if err != nil {
 			log.Fatalf("Unable to detect operator namespace from within its pod due to: %v", err)
