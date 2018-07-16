@@ -41,7 +41,7 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 // NB: as this function is called directly by the informer, it needs to avoid acquiring locks
 // on individual cluster structures. Therefore, it acts on the maifests obtained from Kubernetes
-// and not on the internal state of the clustes.
+// and not on the internal state of the clusters.
 func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
 	var (
 		list  spec.PostgresqlList
