@@ -8,7 +8,9 @@ configuration:
   workers: 4
   min_instances: -1
   max_instances: -1
-  resync_period: 5m
+  resync_period: 30m
+  repair_period: 5m
+
   #sidecar_docker_images:
   # example: "exampleimage:exampletag"
   users:
