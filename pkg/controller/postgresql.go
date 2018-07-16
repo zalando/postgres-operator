@@ -179,6 +179,11 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			c.warnOnDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 			c.mergeDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 		}
+
+		// submit the account necessary to start pods
+		if err := c.createPodServiceAccounts(event); err != nil {
+			c.logger.Warnf("could not create pod service account %v : %v", c.opConfig.PodServiceAccountName, err)
+		}
 	}
 
 	switch event.EventType {
@@ -456,4 +461,38 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 	}
 
 	c.queueClusterEvent(pg, nil, spec.EventDelete)
+}
+
+/*
+  Ensures the service account required by StatefulSets to create pods exists in a namespace before a PG cluster is created there so that a user does not have to deploy the account manually.
+
+  The operator does not sync these accounts after creation.
+*/
+func (c *Controller) createPodServiceAccounts(event spec.ClusterEvent) error {
+
+	namespace := event.NewSpec.GetNamespace()
+	podServiceAccountName := c.opConfig.PodServiceAccountName
+	_, err := c.KubeClient.ServiceAccounts(namespace).Get(podServiceAccountName, metav1.GetOptions{})
+
+	if err != nil {
+
+		c.logger.Infof(fmt.Sprintf("creating pod service account in the namespace %v", namespace))
+
+		c.logger.Infof("the pod service account %q cannot be retrieved in the namespace %q. Trying to deploy the account.", podServiceAccountName, namespace)
+
+		// get a separate copy of service account
+		// to prevent a race condition when setting a namespace for many clusters
+		sa := *c.PodServiceAccount
+		_, err = c.KubeClient.ServiceAccounts(namespace).Create(&sa)
+		if err != nil {
+			return fmt.Errorf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccountName, namespace, err)
+		}
+
+		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, namespace)
+
+	} else {
+		c.logger.Infof("successfully found the service account %q used to create pods to the namespace %q", podServiceAccountName, namespace)
+	}
+
+	return nil
 }
