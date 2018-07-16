@@ -166,7 +166,7 @@ func (c *Controller) initController() {
 	c.initClients()
 
 	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
-		if err := c.createOperatorCRD(); err != nil {
+		if err := c.createConfigurationCRD(); err != nil {
 			c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
 		}
 		if cfg, err := c.readOperatorConfigurationFromCRD(spec.GetOperatorNamespace(), configObjectName); err != nil {

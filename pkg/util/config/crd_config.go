@@ -34,8 +34,8 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountDefinition   string              `json:"pod_service_account_definition,omitempty"`
 	PodTerminateGracePeriod       spec.Duration       `json:"pod_terminate_grace_period,omitempty"`
 	WatchedNamespace              string              `json:"watched_namespace,omitempty"`
-	PDBNameFormat                 StringTemplate      `json:"pdb_name_format,omitempty"`
-	SecretNameTemplate            StringTemplate      `json:"secret_name_template,omitempty"`
+	PDBNameFormat                 stringTemplate      `json:"pdb_name_format,omitempty"`
+	SecretNameTemplate            stringTemplate      `json:"secret_name_template,omitempty"`
 	OAuthTokenSecretName          spec.NamespacedName `json:"oauth_token_secret_name,omitempty"`
 	InfrastructureRolesSecretName spec.NamespacedName `json:"infrastructure_roles_secret_name,omitempty"`
 	PodRoleLabel                  string              `json:"pod_role_label,omitempty"`
@@ -68,8 +68,8 @@ type LoadBalancerConfiguration struct {
 	DbHostedZone              string         `json:"db_hosted_zone,omitempty"`
 	EnableMasterLoadBalancer  bool           `json:"enable_master_load_balancer,omitempty"`
 	EnableReplicaLoadBalancer bool           `json:"enable_replica_load_balancer,omitempty"`
-	MasterDNSNameFormat       StringTemplate `json:"master_dns_name_format,omitempty"`
-	ReplicaDNSNameFormat      StringTemplate `json:"replica_dns_name_format,omitempty"`
+	MasterDNSNameFormat       stringTemplate `json:"master_dns_name_format,omitempty"`
+	ReplicaDNSNameFormat      stringTemplate `json:"replica_dns_name_format,omitempty"`
 }
 
 type AWSGCPConfiguration struct {

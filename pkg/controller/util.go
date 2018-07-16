@@ -47,7 +47,7 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 	return c.clusterWorkers[clusterName]
 }
 
-func (c *Controller) createZalandoCRD(plural, singular, short string) error {
+func (c *Controller) createOperatorCRD(plural, singular, short string) error {
 	crd := &apiextv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: plural + "." + constants.CRDGroup,
@@ -99,11 +99,11 @@ func (c *Controller) createZalandoCRD(plural, singular, short string) error {
 }
 
 func (c *Controller) createPostgresCRD() error {
-	return c.createZalandoCRD(constants.PostgresCRDResource, constants.PostgresCRDKind, constants.PostgresCRDShort)
+	return c.createOperatorCRD(constants.PostgresCRDResource, constants.PostgresCRDKind, constants.PostgresCRDShort)
 }
 
-func (c *Controller) createOperatorCRD() error {
-	return c.createZalandoCRD(constants.OperatorConfigCRDResource, constants.OperatorConfigCRDKind, constants.OperatorConfigCRDShort)
+func (c *Controller) createConfigurationCRD() error {
+	return c.createOperatorCRD(constants.OperatorConfigCRDResource, constants.OperatorConfigCRDKind, constants.OperatorConfigCRDShort)
 }
 
 func readDecodedRole(s string) (*spec.PgUser, error) {

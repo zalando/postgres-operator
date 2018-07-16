@@ -19,7 +19,7 @@ type fieldInfo struct {
 	Field   reflect.Value
 }
 
-type StringTemplate string
+type stringTemplate string
 
 func decoderFrom(field reflect.Value) (d decoder) {
 	// it may be impossible for a struct field to fail this check
@@ -222,13 +222,13 @@ func getMapPairsFromString(value string) (pairs []string, err error) {
 	return
 }
 
-func (f *StringTemplate) Decode(value string) error {
-	*f = StringTemplate(value)
+func (f *stringTemplate) Decode(value string) error {
+	*f = stringTemplate(value)
 
 	return nil
 }
 
-func (f *StringTemplate) Format(a ...string) string {
+func (f *stringTemplate) Format(a ...string) string {
 	res := string(*f)
 
 	for i := 0; i < len(a); i += 2 {
@@ -238,6 +238,6 @@ func (f *StringTemplate) Format(a ...string) string {
 	return res
 }
 
-func (f StringTemplate) MarshalJSON() ([]byte, error) {
+func (f stringTemplate) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(f))
 }
