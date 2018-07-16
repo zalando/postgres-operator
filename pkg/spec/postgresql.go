@@ -331,3 +331,7 @@ func (status PostgresStatus) Success() bool {
 		status != ClusterStatusUpdateFailed &&
 		status != ClusterStatusSyncFailed
 }
+
+func (status PostgresStatus) String() string {
+	return string(status)
+}

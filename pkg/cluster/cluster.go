@@ -666,10 +666,10 @@ func (c *Cluster) Delete() {
 	}
 }
 
-func (c *Cluster) NeedsRepair() bool {
+func (c *Cluster) NeedsRepair() (bool, spec.PostgresStatus) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
-	return !c.Status.Success()
+	return !c.Status.Success(), c.Status
 
 }
 

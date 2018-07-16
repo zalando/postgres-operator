@@ -196,11 +196,12 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 	defer c.curWorkerCluster.Store(event.WorkerID, nil)
 
 	if event.EventType == spec.EventRepair {
-		if !cl.NeedsRepair() {
-			lg.Debugf("Skip repair event")
+		runRepair, lastOperationStatus := cl.NeedsRepair()
+		if !runRepair {
+			lg.Debugf("Observed cluster status %s, repair is not required", lastOperationStatus)
 			return
 		}
-		lg.Debugf("Cluster repair is necessary, running sync")
+		lg.Debugf("Observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
 		event.EventType = spec.EventSync
 	}
 
