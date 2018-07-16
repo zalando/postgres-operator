@@ -867,14 +867,19 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 }
 
 // Switchover does a switchover (via Patroni) to a candidate pod
-func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
+func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) (err error) {
+
 	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
+
+	var wg sync.WaitGroup
 
 	podLabelErr := make(chan error)
 	stopCh := make(chan struct{})
-	defer close(podLabelErr)
+
+	wg.Add(1)
 
 	go func() {
+		defer wg.Done()
 		ch := c.registerPodSubscriber(candidate)
 		defer c.unregisterPodSubscriber(candidate)
 
@@ -882,26 +887,32 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 
 		select {
 		case <-stopCh:
-		case podLabelErr <- func() error {
-			_, err := c.waitForPodLabel(ch, stopCh, &role)
-			return err
+		case podLabelErr <- func() (err error) {
+			_, err = c.waitForPodLabel(ch, stopCh, &role)
+			return
 		}():
 		}
 	}()
 
-	if err := c.patroni.Switchover(curMaster, candidate.Name); err != nil {
-		close(stopCh)
-		return fmt.Errorf("could not failover: %v", err)
-	}
-	c.logger.Debugf("successfully failed over from %q to %q", curMaster.Name, candidate)
-
-	defer close(stopCh)
-
-	if err := <-podLabelErr; err != nil {
-		return fmt.Errorf("could not get master pod label: %v", err)
+	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
+		c.logger.Debugf("successfully failed over from %q to %q", curMaster.Name, candidate)
+		if err = <-podLabelErr; err != nil {
+			err = fmt.Errorf("could not get master pod label: %v", err)
+		}
+	} else {
+		err = fmt.Errorf("could not failover: %v", err)
 	}
 
-	return nil
+	// signal the role label waiting goroutine to close the shop and go home
+	close(stopCh)
+	// wait until the goroutine terminates, since unregisterPodSubscriber
+	// must be called before the outer return; otherwsise we risk subscribing to the same pod twice.
+	wg.Wait()
+	// close the label waiting channel no sooner than the waiting goroutine terminates.
+	close(podLabelErr)
+
+	return
+
 }
 
 // Lock locks the cluster
