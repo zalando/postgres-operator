@@ -879,17 +879,17 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) (
 	wg.Add(1)
 
 	go func() {
-		ch := c.registerPodSubscriber(candidate)
 		defer wg.Done()
+		ch := c.registerPodSubscriber(candidate)
 		defer c.unregisterPodSubscriber(candidate)
 
 		role := Master
 
 		select {
 		case <-stopCh:
-		case podLabelErr <- func() error {
-			_, err2 := c.waitForPodLabel(ch, stopCh, &role)
-			return err2
+		case podLabelErr <- func() (err error) {
+			_, err = c.waitForPodLabel(ch, stopCh, &role)
+			return
 		}():
 		}
 	}()
