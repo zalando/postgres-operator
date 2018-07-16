@@ -101,23 +101,24 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	configMapData["watched_namespace"] = c.getEffectiveNamespace(os.Getenv("WATCHED_NAMESPACE"), configMapData["watched_namespace"])
-
-	if c.config.NoDatabaseAccess {
-		configMapData["enable_database_access"] = "false"
-	}
-	if c.config.NoTeamsAPI {
-		configMapData["enable_teams_api"] = "false"
-	}
-
 	c.opConfig = config.NewFromMap(configMapData)
 	c.warnOnDeprecatedOperatorParameters()
 
+}
+
+func (c *Controller) modifyConfigFromEnvironment() {
+	c.opConfig.WatchedNamespace = c.getEffectiveNamespace(os.Getenv("WATCHED_NAMESPACE"), c.opConfig.WatchedNamespace)
+
+	if c.config.NoDatabaseAccess {
+		c.opConfig.EnableDBAccess = c.config.NoDatabaseAccess
+	}
+	if c.config.NoTeamsAPI {
+		c.opConfig.EnableTeamsAPI = c.config.NoTeamsAPI
+	}
 	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
 	if scalyrAPIKey != "" {
 		c.opConfig.ScalyrAPIKey = scalyrAPIKey
 	}
-
 }
 
 // warningOnDeprecatedParameters emits warnings upon finding deprecated parmaters
@@ -163,20 +164,34 @@ func (c *Controller) initPodServiceAccount() {
 
 func (c *Controller) initController() {
 	c.initClients()
-	c.initOperatorConfig()
+
+	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
+		if err := c.createConfigurationCRD(); err != nil {
+			c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
+		}
+		if cfg, err := c.readOperatorConfigurationFromCRD(spec.GetOperatorNamespace(), configObjectName); err != nil {
+			c.logger.Fatalf("unable to read operator configuration: %v", err)
+		} else {
+			c.opConfig = c.importConfigurationFromCRD(&cfg.Configuration)
+		}
+	} else {
+		c.initOperatorConfig()
+	}
+
+	c.modifyConfigFromEnvironment()
+
+	if err := c.createPostgresCRD(); err != nil {
+		c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
+	}
+
 	c.initPodServiceAccount()
-
 	c.initSharedInformers()
-
-	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
 
 	if c.opConfig.DebugLogging {
 		c.logger.Logger.Level = logrus.DebugLevel
 	}
 
-	if err := c.createCRD(); err != nil {
-		c.logger.Fatalf("could not register CustomResourceDefinition: %v", err)
-	}
+	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
 
 	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
