@@ -23,6 +23,10 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
 )
 
+var (
+	namespacesWithPodServiceAccount = new(sync.Map)
+)
+
 func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	ticker := time.NewTicker(c.opConfig.ResyncPeriod)
@@ -472,12 +476,17 @@ func (c *Controller) createPodServiceAccounts(event spec.ClusterEvent) error {
 
 	namespace := event.NewSpec.GetNamespace()
 	podServiceAccountName := c.opConfig.PodServiceAccountName
+
+	if _, ok := namespacesWithPodServiceAccount.Load(namespace); ok {
+		c.logger.Infof(fmt.Sprintf("The required pod service account %v already exists in the namespace %v", podServiceAccountName, namespace))
+		return nil
+	}
+
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(podServiceAccountName, metav1.GetOptions{})
 
 	if err != nil {
 
 		c.logger.Infof(fmt.Sprintf("creating pod service account in the namespace %v", namespace))
-
 		c.logger.Infof("the pod service account %q cannot be retrieved in the namespace %q. Trying to deploy the account.", podServiceAccountName, namespace)
 
 		// get a separate copy of service account
@@ -488,10 +497,8 @@ func (c *Controller) createPodServiceAccounts(event spec.ClusterEvent) error {
 			return fmt.Errorf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccountName, namespace, err)
 		}
 
+		namespacesWithPodServiceAccount.Store(namespace, podServiceAccountName)
 		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, namespace)
-
-	} else {
-		c.logger.Infof("successfully found the service account %q used to create pods to the namespace %q", podServiceAccountName, namespace)
 	}
 
 	return nil
