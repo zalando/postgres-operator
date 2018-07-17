@@ -28,6 +28,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/patroni"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
+	rbacv1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 )
 
 var (
@@ -39,10 +40,11 @@ var (
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
-	OpConfig            config.Config
-	RestConfig          *rest.Config
-	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
-	PodServiceAccount   *v1.ServiceAccount
+	OpConfig                     config.Config
+	RestConfig                   *rest.Config
+	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
+	PodServiceAccount            *v1.ServiceAccount
+	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
 }
 
 type kubeResources struct {

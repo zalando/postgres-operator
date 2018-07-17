@@ -501,5 +501,26 @@ func (c *Controller) createPodServiceAccounts(event spec.ClusterEvent) error {
 		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, namespace)
 	}
 
+	podServiceAccountRoleBindingName := c.PodServiceAccountRoleBinding.Name
+	_, err = c.KubeClient.RoleBindings(namespace).Get(podServiceAccountRoleBindingName, metav1.GetOptions{})
+
+	if err != nil {
+
+		c.logger.Infof("the role binding %q for the pod service account %q cannot be retrieved in the namespace %q. Trying to deploy the role binding.", podServiceAccountRoleBindingName, podServiceAccountName, namespace)
+
+		// get a separate copy of role binding
+		// to prevent a race condition when setting a namespace for many clusters
+		rb := *c.PodServiceAccountRoleBinding
+		_, err = c.KubeClient.RoleBindings(namespace).Create(&rb)
+		if err != nil {
+			return fmt.Errorf("cannot bind the pod service account %q defined in the config map to the cluster role in the %q namespace: %v", podServiceAccountName, namespace, err)
+		}
+
+		c.logger.Infof("successfully deployed the role binding for the pod service account %q to the %q namespace", podServiceAccountName, namespace)
+
+	} else {
+		c.logger.Infof("successfully found the role binding %q for the service account %q used to create pods to the namespace %q", podServiceAccountRoleBindingName, podServiceAccountName, namespace)
+	}
+
 	return nil
 }

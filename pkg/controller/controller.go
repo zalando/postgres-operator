@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
+	rbacv1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
@@ -52,7 +53,8 @@ type Controller struct {
 
 	workerLogs map[uint32]ringlog.RingLogger
 
-	PodServiceAccount *v1.ServiceAccount
+	PodServiceAccount            *v1.ServiceAccount
+	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
 }
 
 // NewController creates a new controller
