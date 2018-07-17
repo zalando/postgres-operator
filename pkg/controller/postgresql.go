@@ -505,11 +505,9 @@ func (c *Controller) createPodServiceAccount(namespace string) error {
 		}
 
 		c.logger.Infof("successfully deployed the pod service account %v to the %v namespace", podServiceAccountName, namespace)
-	} else {
-		return err
 	}
 
-	return nil
+	return err
 }
 
 func (c *Controller) createRoleBindings(namespace string) error {
@@ -532,9 +530,7 @@ func (c *Controller) createRoleBindings(namespace string) error {
 
 		c.logger.Infof("successfully deployed the role binding for the pod service account %q to the %q namespace", podServiceAccountName, namespace)
 
-	} else {
-		return err
 	}
 
-	return nil
+	return err
 }
