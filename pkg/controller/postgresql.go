@@ -20,11 +20,8 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
-)
-
-var (
-	namespacesWithDefinedRBAC = new(sync.Map)
 )
 
 func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
@@ -476,8 +473,7 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 func (c *Controller) submitRBACCredentials(event spec.ClusterEvent) error {
 
 	namespace := event.NewSpec.GetNamespace()
-	if _, ok := namespacesWithDefinedRBAC.Load(namespace); ok {
-		c.logger.Infof(fmt.Sprintf("The required pod service account and role bindings exist in the namespace %v", namespace))
+	if _, ok := c.namespacesWithDefinedRBAC.Load(namespace); ok {
 		return nil
 	}
 
@@ -489,14 +485,15 @@ func (c *Controller) submitRBACCredentials(event spec.ClusterEvent) error {
 		return fmt.Errorf("could not create role binding %v : %v", c.PodServiceAccountRoleBinding.Name, err)
 	}
 
-	namespacesWithDefinedRBAC.Store(namespace, true)
+	c.namespacesWithDefinedRBAC.Store(namespace, true)
 	return nil
 }
 
 func (c *Controller) createPodServiceAccount(namespace string) error {
 
 	podServiceAccountName := c.opConfig.PodServiceAccountName
-	if _, err := c.KubeClient.ServiceAccounts(namespace).Get(podServiceAccountName, metav1.GetOptions{}); err != nil {
+	_, err := c.KubeClient.ServiceAccounts(namespace).Get(podServiceAccountName, metav1.GetOptions{})
+	if k8sutil.ResourceNotFound(err) {
 
 		c.logger.Infof(fmt.Sprintf("creating pod service account in the namespace %v", namespace))
 
@@ -508,6 +505,8 @@ func (c *Controller) createPodServiceAccount(namespace string) error {
 		}
 
 		c.logger.Infof("successfully deployed the pod service account %v to the %v namespace", podServiceAccountName, namespace)
+	} else {
+		return err
 	}
 
 	return nil
@@ -519,7 +518,7 @@ func (c *Controller) createRoleBindings(namespace string) error {
 	podServiceAccountRoleBindingName := c.PodServiceAccountRoleBinding.Name
 
 	_, err := c.KubeClient.RoleBindings(namespace).Get(podServiceAccountRoleBindingName, metav1.GetOptions{})
-	if err != nil {
+	if k8sutil.ResourceNotFound(err) {
 
 		c.logger.Infof("Creating the role binding %v in the namespace %v", podServiceAccountRoleBindingName, namespace)
 
@@ -533,6 +532,8 @@ func (c *Controller) createRoleBindings(namespace string) error {
 
 		c.logger.Infof("successfully deployed the role binding for the pod service account %q to the %q namespace", podServiceAccountName, namespace)
 
+	} else {
+		return err
 	}
 
 	return nil

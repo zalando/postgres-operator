@@ -55,6 +55,7 @@ type Controller struct {
 
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
+	namespacesWithDefinedRBAC    sync.Map
 }
 
 // NewController creates a new controller
