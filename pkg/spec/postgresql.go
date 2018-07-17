@@ -150,7 +150,7 @@ var (
 )
 
 // Clone makes a deepcopy of the Postgresql structure. The Error field is nulled-out,
-// as there is no guaratee that the actual implementation of the error interface
+// as there is no guarantee that the actual implementation of the error interface
 // will not contain any private fields not-reachable to deepcopy. This should be ok,
 // since Error is never read from a Kubernetes object.
 func (p *Postgresql) Clone() *Postgresql {
@@ -200,7 +200,7 @@ func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
 		m.EndTime.Format("15:04"))), nil
 }
 
-// UnmarshalJSON convets a JSON to the maintenance window definition.
+// UnmarshalJSON converts a JSON to the maintenance window definition.
 func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	var (
 		got MaintenanceWindow

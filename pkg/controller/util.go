@@ -47,20 +47,20 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 	return c.clusterWorkers[clusterName]
 }
 
-func (c *Controller) createCRD() error {
+func (c *Controller) createOperatorCRD(plural, singular, short string) error {
 	crd := &apiextv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: constants.CRDResource + "." + constants.CRDGroup,
+			Name: plural + "." + constants.CRDGroup,
 		},
 		Spec: apiextv1beta1.CustomResourceDefinitionSpec{
 			Group:   constants.CRDGroup,
 			Version: constants.CRDApiVersion,
 			Names: apiextv1beta1.CustomResourceDefinitionNames{
-				Plural:     constants.CRDResource,
-				Singular:   constants.CRDKind,
-				ShortNames: []string{constants.CRDShort},
-				Kind:       constants.CRDKind,
-				ListKind:   constants.CRDKind + "List",
+				Plural:     plural,
+				Singular:   singular,
+				ShortNames: []string{short},
+				Kind:       singular,
+				ListKind:   singular + "List",
 			},
 			Scope: apiextv1beta1.NamespaceScoped,
 		},
@@ -75,7 +75,7 @@ func (c *Controller) createCRD() error {
 		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)
 	}
 
-	return wait.Poll(c.opConfig.CRD.ReadyWaitInterval, c.opConfig.CRD.ReadyWaitTimeout, func() (bool, error) {
+	return wait.Poll(c.config.CRDReadyWaitInterval, c.config.CRDReadyWaitTimeout, func() (bool, error) {
 		c, err := c.KubeClient.CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -96,6 +96,14 @@ func (c *Controller) createCRD() error {
 
 		return false, err
 	})
+}
+
+func (c *Controller) createPostgresCRD() error {
+	return c.createOperatorCRD(constants.PostgresCRDResource, constants.PostgresCRDKind, constants.PostgresCRDShort)
+}
+
+func (c *Controller) createConfigurationCRD() error {
+	return c.createOperatorCRD(constants.OperatorConfigCRDResource, constants.OperatorConfigCRDKind, constants.OperatorConfigCRDShort)
 }
 
 func readDecodedRole(s string) (*spec.PgUser, error) {

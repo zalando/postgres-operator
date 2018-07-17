@@ -2,6 +2,7 @@ package spec
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -162,10 +163,12 @@ type ControllerConfig struct {
 	RestConfig          *rest.Config `json:"-"`
 	InfrastructureRoles map[string]PgUser
 
-	NoDatabaseAccess bool
-	NoTeamsAPI       bool
-	ConfigMapName    NamespacedName
-	Namespace        string
+	NoDatabaseAccess     bool
+	NoTeamsAPI           bool
+	CRDReadyWaitInterval time.Duration
+	CRDReadyWaitTimeout  time.Duration
+	ConfigMapName        NamespacedName
+	Namespace            string
 }
 
 // cached value for the GetOperatorNamespace
@@ -183,6 +186,19 @@ func (n NamespacedName) MarshalJSON() ([]byte, error) {
 // Decode converts a (possibly unqualified) string into the namespaced name object.
 func (n *NamespacedName) Decode(value string) error {
 	return n.DecodeWorker(value, GetOperatorNamespace())
+}
+
+func (n *NamespacedName) UnmarshalJSON(data []byte) error {
+	result := NamespacedName{}
+	var tmp string
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	if err := result.Decode(tmp); err != nil {
+		return err
+	}
+	*n = result
+	return nil
 }
 
 // DecodeWorker separates the decode logic to (unit) test
@@ -234,4 +250,32 @@ func GetOperatorNamespace() string {
 		operatorNamespace = string(operatorNamespaceBytes)
 	}
 	return operatorNamespace
+}
+
+type Duration time.Duration
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var (
+		v   interface{}
+		err error
+	)
+	if err = json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	switch val := v.(type) {
+	case string:
+		t, err := time.ParseDuration(val)
+		if err != nil {
+			return err
+		}
+		*d = Duration(t)
+		return nil
+	case float64:
+		t := time.Duration(val)
+		*d = Duration(t)
+		return nil
+	default:
+		return fmt.Errorf("could not recognize type %T as a valid type to unmarshal to Duration", val)
+	}
+	return nil
 }
