@@ -90,13 +90,13 @@ namespace. The operator  performs **no** further syncing of this account.
 
 ## Role-based access control for the operator
 
-The `manifests/operator-rbac.yaml` defines cluster roles and bindings needed
+The `manifests/operator-service-account-rbac.yaml` defines cluster roles and bindings needed
 for the operator to function under access control restrictions. To deploy the
 operator with this RBAC policy use:
 
 ```bash
     $ kubectl create -f manifests/configmap.yaml
-    $ kubectl create -f manifests/operator-rbac.yaml
+    $ kubectl create -f manifests/operator-service-account-rbac.yaml
     $ kubectl create -f manifests/postgres-operator.yaml
     $ kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```

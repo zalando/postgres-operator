@@ -110,8 +110,10 @@ configuration they are grouped under the `kubernetes` key.
 * **pod_service_account_definition**
   The operator tries to create the pod Service Account in the namespace that
   doesn't define such an account using the YAML definition provided by this
-  option. If not defined, a simple definition that contains only the name will
-  be used. The default is empty.
+  option. If not defined, a simple definition that contains only the name will be used. The default is empty.
+
+* **pod_service_account_role_binding_definition**
+  This definition must bind pod service account to a role with permission sufficient for the pods to start and for Patroni to access k8s endpoints; service account on its own lacks any such rights starting with k8s v1.8. If not excplicitly defined by the user, a simple definition that binds the account to the operator's own 'zalando-postgres-operator' cluster role will be used. The default is empty.
 
 * **pod_terminate_grace_period**
   Patroni pods are [terminated

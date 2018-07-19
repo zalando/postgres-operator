@@ -20,6 +20,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
 )
 
@@ -179,6 +180,11 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 			c.warnOnDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 			c.mergeDeprecatedPostgreSQLSpecParameters(&event.NewSpec.Spec)
 		}
+
+		if err := c.submitRBACCredentials(event); err != nil {
+			c.logger.Warnf("Pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
+		}
+
 	}
 
 	switch event.EventType {
@@ -456,4 +462,79 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 	}
 
 	c.queueClusterEvent(pg, nil, spec.EventDelete)
+}
+
+/*
+  Ensures the pod service account and role bindings exists in a namespace before a PG cluster is created there so that a user does not have to deploy these credentials manually.
+  StatefulSets require the service account to create pods; Patroni requires relevant RBAC bindings to access endpoints.
+
+  The operator does not sync accounts/role bindings after creation.
+*/
+func (c *Controller) submitRBACCredentials(event spec.ClusterEvent) error {
+
+	namespace := event.NewSpec.GetNamespace()
+	if _, ok := c.namespacesWithDefinedRBAC.Load(namespace); ok {
+		return nil
+	}
+
+	if err := c.createPodServiceAccount(namespace); err != nil {
+		return fmt.Errorf("could not create pod service account %v : %v", c.opConfig.PodServiceAccountName, err)
+	}
+
+	if err := c.createRoleBindings(namespace); err != nil {
+		return fmt.Errorf("could not create role binding %v : %v", c.PodServiceAccountRoleBinding.Name, err)
+	}
+
+	c.namespacesWithDefinedRBAC.Store(namespace, true)
+	return nil
+}
+
+func (c *Controller) createPodServiceAccount(namespace string) error {
+
+	podServiceAccountName := c.opConfig.PodServiceAccountName
+	_, err := c.KubeClient.ServiceAccounts(namespace).Get(podServiceAccountName, metav1.GetOptions{})
+	if k8sutil.ResourceNotFound(err) {
+
+		c.logger.Infof(fmt.Sprintf("creating pod service account in the namespace %v", namespace))
+
+		// get a separate copy of service account
+		// to prevent a race condition when setting a namespace for many clusters
+		sa := *c.PodServiceAccount
+		if _, err = c.KubeClient.ServiceAccounts(namespace).Create(&sa); err != nil {
+			return fmt.Errorf("cannot deploy the pod service account %v defined in the config map to the %v namespace: %v", podServiceAccountName, namespace, err)
+		}
+
+		c.logger.Infof("successfully deployed the pod service account %v to the %v namespace", podServiceAccountName, namespace)
+	} else if k8sutil.ResourceAlreadyExists(err) {
+		return nil
+	}
+
+	return err
+}
+
+func (c *Controller) createRoleBindings(namespace string) error {
+
+	podServiceAccountName := c.opConfig.PodServiceAccountName
+	podServiceAccountRoleBindingName := c.PodServiceAccountRoleBinding.Name
+
+	_, err := c.KubeClient.RoleBindings(namespace).Get(podServiceAccountRoleBindingName, metav1.GetOptions{})
+	if k8sutil.ResourceNotFound(err) {
+
+		c.logger.Infof("Creating the role binding %v in the namespace %v", podServiceAccountRoleBindingName, namespace)
+
+		// get a separate copy of role binding
+		// to prevent a race condition when setting a namespace for many clusters
+		rb := *c.PodServiceAccountRoleBinding
+		_, err = c.KubeClient.RoleBindings(namespace).Create(&rb)
+		if err != nil {
+			return fmt.Errorf("cannot bind the pod service account %q defined in the config map to the cluster role in the %q namespace: %v", podServiceAccountName, namespace, err)
+		}
+
+		c.logger.Infof("successfully deployed the role binding for the pod service account %q to the %q namespace", podServiceAccountName, namespace)
+
+	} else if k8sutil.ResourceAlreadyExists(err) {
+		return nil
+	}
+
+	return err
 }

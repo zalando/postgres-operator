@@ -75,19 +75,20 @@ type Config struct {
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
 	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
-	PodServiceAccountDefinition string `name:"pod_service_account_definition" default:""`
-	DbHostedZone                string `name:"db_hosted_zone" default:"db.example.com"`
-	AWSRegion                   string `name:"aws_region" default:"eu-central-1"`
-	WALES3Bucket                string `name:"wal_s3_bucket"`
-	LogS3Bucket                 string `name:"log_s3_bucket"`
-	KubeIAMRole                 string `name:"kube_iam_role"`
-	DebugLogging                bool   `name:"debug_logging" default:"true"`
-	EnableDBAccess              bool   `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI              bool   `name:"enable_teams_api" default:"true"`
-	EnableTeamSuperuser         bool   `name:"enable_team_superuser" default:"false"`
-	TeamAdminRole               string `name:"team_admin_role" default:"admin"`
-	EnableMasterLoadBalancer    bool   `name:"enable_master_load_balancer" default:"true"`
-	EnableReplicaLoadBalancer   bool   `name:"enable_replica_load_balancer" default:"false"`
+	PodServiceAccountDefinition            string `name:"pod_service_account_definition" default:""`
+	PodServiceAccountRoleBindingDefinition string `name:"pod_service_account_role_binding_definition" default:""`
+	DbHostedZone                           string `name:"db_hosted_zone" default:"db.example.com"`
+	AWSRegion                              string `name:"aws_region" default:"eu-central-1"`
+	WALES3Bucket                           string `name:"wal_s3_bucket"`
+	LogS3Bucket                            string `name:"log_s3_bucket"`
+	KubeIAMRole                            string `name:"kube_iam_role"`
+	DebugLogging                           bool   `name:"debug_logging" default:"true"`
+	EnableDBAccess                         bool   `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI                         bool   `name:"enable_teams_api" default:"true"`
+	EnableTeamSuperuser                    bool   `name:"enable_team_superuser" default:"false"`
+	TeamAdminRole                          string `name:"team_admin_role" default:"admin"`
+	EnableMasterLoadBalancer               bool   `name:"enable_master_load_balancer" default:"true"`
+	EnableReplicaLoadBalancer              bool   `name:"enable_replica_load_balancer" default:"false"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer       *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat      stringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`

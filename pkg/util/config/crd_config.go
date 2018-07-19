@@ -31,17 +31,18 @@ type PostgresUsersConfiguration struct {
 type KubernetesMetaConfiguration struct {
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
-	PodServiceAccountDefinition   string              `json:"pod_service_account_definition,omitempty"`
-	PodTerminateGracePeriod       spec.Duration       `json:"pod_terminate_grace_period,omitempty"`
-	WatchedNamespace              string              `json:"watched_namespace,omitempty"`
-	PDBNameFormat                 stringTemplate      `json:"pdb_name_format,omitempty"`
-	SecretNameTemplate            stringTemplate      `json:"secret_name_template,omitempty"`
-	OAuthTokenSecretName          spec.NamespacedName `json:"oauth_token_secret_name,omitempty"`
-	InfrastructureRolesSecretName spec.NamespacedName `json:"infrastructure_roles_secret_name,omitempty"`
-	PodRoleLabel                  string              `json:"pod_role_label,omitempty"`
-	ClusterLabels                 map[string]string   `json:"cluster_labels,omitempty"`
-	ClusterNameLabel              string              `json:"cluster_name_label,omitempty"`
-	NodeReadinessLabel            map[string]string   `json:"node_readiness_label,omitempty"`
+	PodServiceAccountDefinition            string              `json:"pod_service_account_definition,omitempty"`
+	PodServiceAccountRoleBindingDefinition string              `json:"pod_service_account_role_binding_definition,omitempty"`
+	PodTerminateGracePeriod                spec.Duration       `json:"pod_terminate_grace_period,omitempty"`
+	WatchedNamespace                       string              `json:"watched_namespace,omitempty"`
+	PDBNameFormat                          stringTemplate      `json:"pdb_name_format,omitempty"`
+	SecretNameTemplate                     stringTemplate      `json:"secret_name_template,omitempty"`
+	OAuthTokenSecretName                   spec.NamespacedName `json:"oauth_token_secret_name,omitempty"`
+	InfrastructureRolesSecretName          spec.NamespacedName `json:"infrastructure_roles_secret_name,omitempty"`
+	PodRoleLabel                           string              `json:"pod_role_label,omitempty"`
+	ClusterLabels                          map[string]string   `json:"cluster_labels,omitempty"`
+	ClusterNameLabel                       string              `json:"cluster_name_label,omitempty"`
+	NodeReadinessLabel                     map[string]string   `json:"node_readiness_label,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
