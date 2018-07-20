@@ -91,7 +91,8 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.VolumeResizer) error {
 	c.setProcessName("resizing volumes")
 
-	totalCompatible := 0
+	var totalIncompatible int
+
 	newQuantity, err := resource.ParseQuantity(newVolume.Size)
 	if err != nil {
 		return fmt.Errorf("could not parse volume size: %v", err)
@@ -100,7 +101,6 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
-
 	for _, pv := range pvs {
 		volumeSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
 		if volumeSize >= newSize {
@@ -109,11 +109,12 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 			}
 			continue
 		}
+		compatible := false
 		for _, resizer := range resizers {
 			if !resizer.VolumeBelongsToProvider(pv) {
 				continue
 			}
-			totalCompatible++
+			compatible = true
 			if !resizer.IsConnectedToProvider() {
 				err := resizer.ConnectToProvider()
 				if err != nil {
@@ -146,9 +147,13 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 			}
 			c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
 		}
+		if !compatible {
+			c.logger.Warningf("volume %q is incompatible with all available resizing providers", pv.Name)
+			totalIncompatible++
+		}
 	}
-	if len(pvs) > 0 && totalCompatible == 0 {
-		return fmt.Errorf("could not resize EBS volumes: persistent volumes are not compatible with existing resizing providers")
+	if totalIncompatible > 0 {
+		return fmt.Errorf("could not resize EBS volumes: some persistent volumes are not compatible with existing resizing providers")
 	}
 	return nil
 }
