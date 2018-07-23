@@ -19,10 +19,6 @@ manages PostgreSQL clusters on Kubernetes:
 
 3. Finally, the operator periodically synchronizes the actual state of each
    Postgres cluster with the desired state defined in the cluster's manifest.
-   This is triggered by either the `sync scan`, running every `resync_period`
-   seconds for every cluster, or by the `repair scan`, coming every
-   `repair_period` only for those clusters that didn't report success as a
-   result of the last operation running on them.
 
 ## Concepts
 

@@ -199,3 +199,12 @@ cluster manifest. In the case any of these variables are omitted from the
 manifest, the operator configmap's settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in a namespace watched by the operator.
+
+## Running periodic 'autorepair' scans of Kubernetes objects
+
+The Postgres operator periodically scans all Kubernetes objects belonging to
+each cluster and repairs all discrepancies between them and the definitions
+generated from the current cluster manifest. There are two types of scans: a
+`sync scan`, running every `resync_period` seconds for every cluster, and the
+`repair scan`, coming every `repair_period` only for those clusters that didn't
+report success as a result of the last operation applied to them.

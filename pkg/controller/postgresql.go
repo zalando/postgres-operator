@@ -42,7 +42,7 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 // TODO: make a separate function to be called from InitSharedInformers
 // clusterListFunc obtains a list of all PostgreSQL clusters and runs sync when necessary
 // NB: as this function is called directly by the informer, it needs to avoid acquiring locks
-// on individual cluster structures. Therefore, it acts on the maifests obtained from Kubernetes
+// on individual cluster structures. Therefore, it acts on the manifests obtained from Kubernetes
 // and not on the internal state of the clusters.
 func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
 	var (
@@ -76,7 +76,8 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	if event != "" {
 		c.queueEvents(&list, event)
 	} else {
-		c.logger.Infof("not enough passed since the last sync (%s seconds) or repair (%s seconds)", timeFromPreviousSync, timeFromPreviousRepair)
+		c.logger.Infof("not enough time passed since the last sync (%s seconds) or repair (%s seconds)",
+			timeFromPreviousSync, timeFromPreviousRepair)
 	}
 	return &list, err
 }
