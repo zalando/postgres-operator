@@ -746,11 +746,11 @@ func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage strin
 	containerResources *spec.Resources, logger *logrus.Entry) *spec.Sidecar {
 	if APIKey == "" || dockerImage == "" {
 		if APIKey == "" && dockerImage != "" {
-			logger.Warningf("Not running Scalyr sidecar: SCALYR_API_KEY must be defined")
+			logger.Warning("Not running Scalyr sidecar: SCALYR_API_KEY must be defined")
 		}
 		return nil
 	}
-	spec := &spec.Sidecar{
+	scalarSpec := &spec.Sidecar{
 		Name:        "scalyr-sidecar",
 		DockerImage: dockerImage,
 		Env: []v1.EnvVar{
@@ -766,9 +766,9 @@ func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage strin
 		Resources: *containerResources,
 	}
 	if serverURL != "" {
-		spec.Env = append(spec.Env, v1.EnvVar{Name: "SCALYR_SERVER_URL", Value: serverURL})
+		scalarSpec.Env = append(scalarSpec.Env, v1.EnvVar{Name: "SCALYR_SERVER_URL", Value: serverURL})
 	}
-	return spec
+	return scalarSpec
 }
 
 // mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
