@@ -744,35 +744,16 @@ func getEffectiveDockerImage(globalDockerImage, clusterDockerImage string) strin
 
 func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
 	containerResources *spec.Resources, logger *logrus.Entry) *spec.Sidecar {
-	if APIKey == "" || serverURL == "" || dockerImage == "" {
-		if APIKey != "" || serverURL != "" || dockerImage != "" {
-			logger.Warningf("Incomplete configuration for the Scalyr sidecar: " +
-				"all of SCALYR_API_KEY, SCALYR_SERVER_HOST and SCALYR_SERVER_URL must be defined")
+	if APIKey == "" || dockerImage == "" {
+		if APIKey == "" && dockerImage != "" {
+			logger.Warning("Not running Scalyr sidecar: SCALYR_API_KEY must be defined")
 		}
 		return nil
 	}
-	return &spec.Sidecar{
+	scalarSpec := &spec.Sidecar{
 		Name:        "scalyr-sidecar",
 		DockerImage: dockerImage,
 		Env: []v1.EnvVar{
-			{
-				Name: "POD_NAME",
-				ValueFrom: &v1.EnvVarSource{
-					FieldRef: &v1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.name",
-					},
-				},
-			},
-			{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &v1.EnvVarSource{
-					FieldRef: &v1.ObjectFieldSelector{
-						APIVersion: "v1",
-						FieldPath:  "metadata.namespace",
-					},
-				},
-			},
 			{
 				Name:  "SCALYR_API_KEY",
 				Value: APIKey,
@@ -781,13 +762,13 @@ func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage strin
 				Name:  "SCALYR_SERVER_HOST",
 				Value: clusterName,
 			},
-			{
-				Name:  "SCALYR_SERVER_URL",
-				Value: serverURL,
-			},
 		},
 		Resources: *containerResources,
 	}
+	if serverURL != "" {
+		scalarSpec.Env = append(scalarSpec.Env, v1.EnvVar{Name: "SCALYR_SERVER_URL", Value: serverURL})
+	}
+	return scalarSpec
 }
 
 // mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
