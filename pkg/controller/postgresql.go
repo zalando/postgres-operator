@@ -82,7 +82,7 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 	return &list, err
 }
 
-// queueSyncEvents adds a sync event for every cluster with the valid manifest to the queue.
+// queueEvents queues a sync or repair event for every cluster with a valid manifest
 func (c *Controller) queueEvents(list *spec.PostgresqlList, event spec.EventType) {
 	var activeClustersCnt, failedClustersCnt, clustersToRepair int
 	for i, pg := range list.Items {
