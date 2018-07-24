@@ -8,7 +8,7 @@ import (
 	b64 "encoding/base64"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.

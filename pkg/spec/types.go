@@ -12,9 +12,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	"k8s.io/api/core/v1"
+	"k8s.io/api/apps/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/client-go/rest"
 )
 
