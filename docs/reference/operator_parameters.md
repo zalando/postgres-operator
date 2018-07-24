@@ -80,7 +80,10 @@ Those are top-level keys, containing both leaf keys and groups.
   are applied. The default is `-1`.
 
 * **resync_period**
-  period between consecutive sync requests. The default is `5m`.
+  period between consecutive sync requests. The default is `30m`.
+
+* **repair_period**
+  period between consecutive repair requests. The default is `5m`.
 
 ## Postgres users
 

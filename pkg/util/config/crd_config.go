@@ -119,6 +119,7 @@ type OperatorConfigurationData struct {
 	MinInstances               int32                        `json:"min_instances,omitempty"`
 	MaxInstances               int32                        `json:"max_instances,omitempty"`
 	ResyncPeriod               spec.Duration                `json:"resync_period,omitempty"`
+	RepairPeriod               spec.Duration                `json:"repair_period,omitempty"`
 	Sidecars                   map[string]string            `json:"sidecar_docker_images,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration   `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration  `json:"kubernetes"`

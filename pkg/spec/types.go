@@ -30,6 +30,7 @@ const (
 	EventUpdate EventType = "UPDATE"
 	EventDelete EventType = "DELETE"
 	EventSync   EventType = "SYNC"
+	EventRepair EventType = "REPAIR"
 
 	fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 )

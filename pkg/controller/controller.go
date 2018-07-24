@@ -48,8 +48,9 @@ type Controller struct {
 	nodesInformer      cache.SharedIndexInformer
 	podCh              chan spec.PodEvent
 
-	clusterEventQueues  []*cache.FIFO // [workerID]Queue
-	lastClusterSyncTime int64
+	clusterEventQueues    []*cache.FIFO // [workerID]Queue
+	lastClusterSyncTime   int64
+	lastClusterRepairTime int64
 
 	workerLogs map[uint32]ringlog.RingLogger
 

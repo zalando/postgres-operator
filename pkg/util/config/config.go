@@ -14,7 +14,8 @@ import (
 type CRD struct {
 	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
 	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod      time.Duration `name:"resync_period" default:"5m"`
+	ResyncPeriod      time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod      time.Duration `name:"repair_period" default:"5m"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters

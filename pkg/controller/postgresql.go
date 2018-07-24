@@ -42,9 +42,14 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 // TODO: make a separate function to be called from InitSharedInformers
 // clusterListFunc obtains a list of all PostgreSQL clusters and runs sync when necessary
+// NB: as this function is called directly by the informer, it needs to avoid acquiring locks
+// on individual cluster structures. Therefore, it acts on the manifests obtained from Kubernetes
+// and not on the internal state of the clusters.
 func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
-	var list spec.PostgresqlList
-	var activeClustersCnt, failedClustersCnt int
+	var (
+		list  spec.PostgresqlList
+		event spec.EventType
+	)
 
 	req := c.KubeClient.CRDREST.
 		Get().
@@ -61,19 +66,41 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 		c.logger.Warningf("could not unmarshal list of clusters: %v", err)
 	}
 
-	timeFromPreviousSync := time.Now().Unix() - atomic.LoadInt64(&c.lastClusterSyncTime)
-	if timeFromPreviousSync < int64(c.opConfig.ResyncPeriod.Seconds()) {
-		c.logger.Infof("not running SYNC, previous sync happened %d seconds ago", timeFromPreviousSync)
-		return &list, err
+	currentTime := time.Now().Unix()
+	timeFromPreviousSync := currentTime - atomic.LoadInt64(&c.lastClusterSyncTime)
+	timeFromPreviousRepair := currentTime - atomic.LoadInt64(&c.lastClusterRepairTime)
+	if timeFromPreviousSync >= int64(c.opConfig.ResyncPeriod.Seconds()) {
+		event = spec.EventSync
+	} else if timeFromPreviousRepair >= int64(c.opConfig.RepairPeriod.Seconds()) {
+		event = spec.EventRepair
 	}
+	if event != "" {
+		c.queueEvents(&list, event)
+	} else {
+		c.logger.Infof("not enough time passed since the last sync (%s seconds) or repair (%s seconds)",
+			timeFromPreviousSync, timeFromPreviousRepair)
+	}
+	return &list, err
+}
 
+// queueEvents queues a sync or repair event for every cluster with a valid manifest
+func (c *Controller) queueEvents(list *spec.PostgresqlList, event spec.EventType) {
+	var activeClustersCnt, failedClustersCnt, clustersToRepair int
 	for i, pg := range list.Items {
 		if pg.Error != nil {
 			failedClustersCnt++
 			continue
 		}
-		c.queueClusterEvent(nil, &list.Items[i], spec.EventSync)
 		activeClustersCnt++
+		// check if that cluster needs repair
+		if event == spec.EventRepair {
+			if pg.Status.Success() {
+				continue
+			} else {
+				clustersToRepair++
+			}
+		}
+		c.queueClusterEvent(nil, &list.Items[i], event)
 	}
 	if len(list.Items) > 0 {
 		if failedClustersCnt > 0 && activeClustersCnt == 0 {
@@ -83,13 +110,18 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 		} else {
 			c.logger.Infof("there are %d clusters running and %d are in the failed state", activeClustersCnt, failedClustersCnt)
 		}
+		if clustersToRepair > 0 {
+			c.logger.Infof("%d clusters are scheduled for a repair scan", clustersToRepair)
+		}
 	} else {
 		c.logger.Infof("no clusters running")
 	}
-
-	atomic.StoreInt64(&c.lastClusterSyncTime, time.Now().Unix())
-
-	return &list, err
+	if event == spec.EventRepair || event == spec.EventSync {
+		atomic.StoreInt64(&c.lastClusterRepairTime, time.Now().Unix())
+		if event == spec.EventSync {
+			atomic.StoreInt64(&c.lastClusterSyncTime, time.Now().Unix())
+		}
+	}
 }
 
 type crdDecoder struct {
@@ -155,7 +187,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 
 	lg := c.logger.WithField("worker", event.WorkerID)
 
-	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync {
+	if event.EventType == spec.EventAdd || event.EventType == spec.EventSync || event.EventType == spec.EventRepair {
 		clusterName = util.NameFromMeta(event.NewSpec.ObjectMeta)
 	} else {
 		clusterName = util.NameFromMeta(event.OldSpec.ObjectMeta)
@@ -170,6 +202,16 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 	c.clustersMu.RUnlock()
 
 	defer c.curWorkerCluster.Store(event.WorkerID, nil)
+
+	if event.EventType == spec.EventRepair {
+		runRepair, lastOperationStatus := cl.NeedsRepair()
+		if !runRepair {
+			lg.Debugf("Observed cluster status %s, repair is not required", lastOperationStatus)
+			return
+		}
+		lg.Debugf("Observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
+		event.EventType = spec.EventSync
+	}
 
 	if event.EventType == spec.EventAdd || event.EventType == spec.EventUpdate || event.EventType == spec.EventSync {
 		// handle deprecated parameters by possibly assigning their values to the new ones.
@@ -406,8 +448,8 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *spec.Po
 	if eventType != spec.EventDelete {
 		return
 	}
-
-	for _, evType := range []spec.EventType{spec.EventAdd, spec.EventSync, spec.EventUpdate} {
+	// A delete event discards all prior requests for that cluster.
+	for _, evType := range []spec.EventType{spec.EventAdd, spec.EventSync, spec.EventUpdate, spec.EventRepair} {
 		obj, exists, err := c.clusterEventQueues[workerID].GetByKey(queueClusterKey(evType, uid))
 		if err != nil {
 			lg.Warningf("could not get event from the queue: %v", err)

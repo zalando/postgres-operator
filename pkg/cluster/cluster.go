@@ -630,6 +630,13 @@ func (c *Cluster) Delete() {
 	}
 }
 
+func (c *Cluster) NeedsRepair() (bool, spec.PostgresStatus) {
+	c.specMu.RLock()
+	defer c.specMu.RUnlock()
+	return !c.Status.Success(), c.Status
+
+}
+
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
 func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
 	if err := c.podEventsQueue.Add(event); err != nil {

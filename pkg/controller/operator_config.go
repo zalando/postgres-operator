@@ -43,6 +43,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *config.OperatorConfigur
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
 	result.ResyncPeriod = time.Duration(fromCRD.ResyncPeriod)
+	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
 	result.Sidecars = fromCRD.Sidecars
 
 	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername
