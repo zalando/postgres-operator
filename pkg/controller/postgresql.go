@@ -147,12 +147,12 @@ func (d *crdDecoder) Decode() (action watch.EventType, object runtime.Object, er
 
 func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
 	options.Watch = true
+	// MIGRATION: FieldsSelectorParam(nil)
 	r, err := c.KubeClient.CRDREST.
 		Get().
 		Namespace(c.opConfig.WatchedNamespace).
 		Resource(constants.PostgresCRDResource).
 		VersionedParams(&options, metav1.ParameterCodec).
-		FieldsSelectorParam(nil).
 		Stream()
 
 	if err != nil {
