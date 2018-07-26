@@ -114,10 +114,10 @@ func (c *Controller) modifyConfigFromEnvironment() {
 	c.opConfig.WatchedNamespace = c.getEffectiveNamespace(os.Getenv("WATCHED_NAMESPACE"), c.opConfig.WatchedNamespace)
 
 	if c.config.NoDatabaseAccess {
-		c.opConfig.EnableDBAccess = c.config.NoDatabaseAccess
+		c.opConfig.EnableDBAccess = false
 	}
 	if c.config.NoTeamsAPI {
-		c.opConfig.EnableTeamsAPI = c.config.NoTeamsAPI
+		c.opConfig.EnableTeamsAPI = false
 	}
 	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
 	if scalyrAPIKey != "" {
