@@ -25,6 +25,7 @@ type Resources struct {
 	PodLabelWaitTimeout     time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
 	PodDeletionWaitTimeout  time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
 	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	PodPriorityClassName    string            `name:"pod_priority_class_name"`
 	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
 	ClusterNameLabel        string            `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel            string            `name:"pod_role_label" default:"spilo-role"`

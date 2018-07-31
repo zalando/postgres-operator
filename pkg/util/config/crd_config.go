@@ -5,8 +5,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/mohae/deepcopy"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -49,6 +49,7 @@ type KubernetesMetaConfiguration struct {
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
 	PodEnvironmentConfigMap string `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName    string `json:"pod_priority_class_name,omitempty"`
 }
 
 type PostgresPodResourcesDefaults struct {
@@ -171,7 +172,9 @@ func (in *OperatorConfiguration) DeepCopyInto(out *OperatorConfiguration) {
 }
 
 func (in *OperatorConfiguration) DeepCopy() *OperatorConfiguration {
-	if in == nil { return nil }
+	if in == nil {
+		return nil
+	}
 	out := new(OperatorConfiguration)
 	in.DeepCopyInto(out)
 	return out
@@ -192,7 +195,9 @@ func (in *OperatorConfigurationList) DeepCopyInto(out *OperatorConfigurationList
 }
 
 func (in *OperatorConfigurationList) DeepCopy() *OperatorConfigurationList {
-	if in == nil { return nil }
+	if in == nil {
+		return nil
+	}
 	out := new(OperatorConfigurationList)
 	in.DeepCopyInto(out)
 	return out
@@ -204,4 +209,3 @@ func (in *OperatorConfigurationList) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
-

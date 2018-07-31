@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -59,9 +59,9 @@ func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (
 	}
 
 	err = exec.Stream(remotecommand.StreamOptions{
-		Stdout:             &execOut,
-		Stderr:             &execErr,
-		Tty:                false,
+		Stdout: &execOut,
+		Stderr: &execErr,
+		Tty:    false,
 	})
 
 	if err != nil {
