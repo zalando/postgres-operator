@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -127,14 +127,15 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	NumberOfInstances  int32                `json:"numberOfInstances"`
-	Users              map[string]UserFlags `json:"users"`
-	MaintenanceWindows []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone              CloneDescription     `json:"clone"`
-	ClusterName        string               `json:"-"`
-	Databases          map[string]string    `json:"databases,omitempty"`
-	Tolerations        []v1.Toleration      `json:"tolerations,omitempty"`
-	Sidecars           []Sidecar            `json:"sidecars,omitempty"`
+	NumberOfInstances    int32                `json:"numberOfInstances"`
+	Users                map[string]UserFlags `json:"users"`
+	MaintenanceWindows   []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+	Clone                CloneDescription     `json:"clone"`
+	ClusterName          string               `json:"-"`
+	Databases            map[string]string    `json:"databases,omitempty"`
+	Tolerations          []v1.Toleration      `json:"tolerations,omitempty"`
+	Sidecars             []Sidecar            `json:"sidecars,omitempty"`
+	PodPriorityClassName string               `json:"pod_priority_class_name,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.
@@ -155,7 +156,9 @@ var (
 // will not contain any private fields not-reachable to deepcopy. This should be ok,
 // since Error is never read from a Kubernetes object.
 func (p *Postgresql) Clone() *Postgresql {
-	if p == nil {return nil}
+	if p == nil {
+		return nil
+	}
 	c := deepcopy.Copy(p).(*Postgresql)
 	c.Error = nil
 	return c
@@ -169,7 +172,9 @@ func (in *Postgresql) DeepCopyInto(out *Postgresql) {
 }
 
 func (in *Postgresql) DeepCopy() *Postgresql {
-	if in == nil { return nil }
+	if in == nil {
+		return nil
+	}
 	out := new(Postgresql)
 	in.DeepCopyInto(out)
 	return out
@@ -181,7 +186,6 @@ func (in *Postgresql) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
-
 
 func parseTime(s string) (time.Time, error) {
 	parts := strings.Split(s, ":")
@@ -308,9 +312,10 @@ func validateCloneClusterDescription(clone *CloneDescription) error {
 type postgresqlListCopy PostgresqlList
 type postgresqlCopy Postgresql
 
-
 func (in *PostgresqlList) DeepCopy() *PostgresqlList {
-	if in == nil { return nil }
+	if in == nil {
+		return nil
+	}
 	out := new(PostgresqlList)
 	in.DeepCopyInto(out)
 	return out
@@ -329,7 +334,6 @@ func (in *PostgresqlList) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
-
 
 // UnmarshalJSON converts a JSON into the PostgreSQL object.
 func (p *Postgresql) UnmarshalJSON(data []byte) error {

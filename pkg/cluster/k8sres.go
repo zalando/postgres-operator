@@ -6,15 +6,16 @@ import (
 	"sort"
 
 	"github.com/Sirupsen/logrus"
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/api/core/v1"
-	"k8s.io/api/apps/v1beta1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -399,6 +400,7 @@ func generatePodTemplate(
 	terminateGracePeriod int64,
 	podServiceAccountName string,
 	kubeIAMRole string,
+	priorityClassName string,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -414,6 +416,10 @@ func generatePodTemplate(
 
 	if nodeAffinity != nil {
 		podSpec.Affinity = nodeAffinity
+	}
+
+	if priorityClassName != "" {
+		podSpec.PriorityClassName = priorityClassName
 	}
 
 	template := v1.PodTemplateSpec{
@@ -658,7 +664,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		c.containerName(), c.logger)
 
 	// pickup the docker image for the spilo container
-	effectiveDockerImage := getEffectiveDockerImage(c.OpConfig.DockerImage, spec.DockerImage)
+	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
 
 	volumeMounts := generateVolumeMounts()
 
@@ -693,6 +699,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecards
 	podTemplate, err := generatePodTemplate(
@@ -704,7 +711,8 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
-		c.OpConfig.KubeIAMRole)
+		c.OpConfig.KubeIAMRole,
+		effectivePodPriorityClassName)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
@@ -733,13 +741,6 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	}
 
 	return statefulSet, nil
-}
-
-func getEffectiveDockerImage(globalDockerImage, clusterDockerImage string) string {
-	if clusterDockerImage == "" {
-		return globalDockerImage
-	}
-	return clusterDockerImage
 }
 
 func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
