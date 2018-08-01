@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
-	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -93,7 +93,8 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 		Version: constants.CRDApiVersion,
 	}
 	cfg2.APIPath = constants.K8sAPIPath
-	cfg2.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
+	// MIGRATION: api.codecs -> scheme.Codecs?
+	cfg2.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	crd, err := rest.RESTClientFor(&cfg2)
 	if err != nil {

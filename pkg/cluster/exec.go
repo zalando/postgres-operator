@@ -6,9 +6,8 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -54,15 +53,15 @@ func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (
 		Stderr:    true,
 	}, scheme.ParameterCodec)
 
-	exec, err := remotecommand.NewExecutor(c.RestConfig, "POST", req.URL())
+	exec, err := remotecommand.NewSPDYExecutor(c.RestConfig, "POST", req.URL())
 	if err != nil {
 		return "", fmt.Errorf("failed to init executor: %v", err)
 	}
 
 	err = exec.Stream(remotecommand.StreamOptions{
-		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
 		Stdout:             &execOut,
 		Stderr:             &execErr,
+		Tty:                false,
 	})
 
 	if err != nil {

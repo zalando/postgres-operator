@@ -9,7 +9,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.
@@ -154,13 +155,33 @@ var (
 // will not contain any private fields not-reachable to deepcopy. This should be ok,
 // since Error is never read from a Kubernetes object.
 func (p *Postgresql) Clone() *Postgresql {
-	if p == nil {
-		return nil
-	}
+	if p == nil {return nil}
 	c := deepcopy.Copy(p).(*Postgresql)
 	c.Error = nil
 	return c
 }
+
+func (in *Postgresql) DeepCopyInto(out *Postgresql) {
+	if in != nil {
+		out = deepcopy.Copy(in).(*Postgresql)
+	}
+	return
+}
+
+func (in *Postgresql) DeepCopy() *Postgresql {
+	if in == nil { return nil }
+	out := new(Postgresql)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *Postgresql) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
 
 func parseTime(s string) (time.Time, error) {
 	parts := strings.Split(s, ":")
@@ -286,6 +307,29 @@ func validateCloneClusterDescription(clone *CloneDescription) error {
 
 type postgresqlListCopy PostgresqlList
 type postgresqlCopy Postgresql
+
+
+func (in *PostgresqlList) DeepCopy() *PostgresqlList {
+	if in == nil { return nil }
+	out := new(PostgresqlList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *PostgresqlList) DeepCopyInto(out *PostgresqlList) {
+	if in != nil {
+		out = deepcopy.Copy(in).(*PostgresqlList)
+	}
+	return
+}
+
+func (in *PostgresqlList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
 
 // UnmarshalJSON converts a JSON into the PostgreSQL object.
 func (p *Postgresql) UnmarshalJSON(data []byte) error {

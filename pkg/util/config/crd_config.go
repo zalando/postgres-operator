@@ -6,6 +6,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/mohae/deepcopy"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type OperatorConfiguration struct {
@@ -160,3 +162,46 @@ func (opcl *OperatorConfigurationList) UnmarshalJSON(data []byte) error {
 	*opcl = OperatorConfigurationList(ref)
 	return nil
 }
+
+func (in *OperatorConfiguration) DeepCopyInto(out *OperatorConfiguration) {
+	if in != nil {
+		out = deepcopy.Copy(in).(*OperatorConfiguration)
+	}
+	return
+}
+
+func (in *OperatorConfiguration) DeepCopy() *OperatorConfiguration {
+	if in == nil { return nil }
+	out := new(OperatorConfiguration)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *OperatorConfiguration) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+func (in *OperatorConfigurationList) DeepCopyInto(out *OperatorConfigurationList) {
+	if in != nil {
+		out = deepcopy.Copy(in).(*OperatorConfigurationList)
+	}
+	return
+}
+
+func (in *OperatorConfigurationList) DeepCopy() *OperatorConfigurationList {
+	if in == nil { return nil }
+	out := new(OperatorConfigurationList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *OperatorConfigurationList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
