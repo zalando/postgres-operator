@@ -154,6 +154,27 @@ func (opc *OperatorConfiguration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (opc *OperatorConfiguration) DeepCopyInto(out *OperatorConfiguration) {
+	if opc != nil {
+		*out = deepcopy.Copy(*opc).(OperatorConfiguration)
+	}
+	return
+}
+
+func (opc *OperatorConfiguration) DeepCopy() *OperatorConfiguration {
+	if opc == nil { return nil }
+	out := new(OperatorConfiguration)
+	opc.DeepCopyInto(out)
+	return out
+}
+
+func (opc *OperatorConfiguration) DeepCopyObject() runtime.Object {
+	if c := opc.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
 func (opcl *OperatorConfigurationList) UnmarshalJSON(data []byte) error {
 	var ref OperatorConfigurationListCopy
 	if err := json.Unmarshal(data, &ref); err != nil {
@@ -163,43 +184,22 @@ func (opcl *OperatorConfigurationList) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (in *OperatorConfiguration) DeepCopyInto(out *OperatorConfiguration) {
-	if in != nil {
-		out = deepcopy.Copy(in).(*OperatorConfiguration)
+func (opcl *OperatorConfigurationList) DeepCopyInto(out *OperatorConfigurationList) {
+	if opcl != nil {
+		*out = deepcopy.Copy(*opcl).(OperatorConfigurationList)
 	}
 	return
 }
 
-func (in *OperatorConfiguration) DeepCopy() *OperatorConfiguration {
-	if in == nil { return nil }
-	out := new(OperatorConfiguration)
-	in.DeepCopyInto(out)
-	return out
-}
-
-func (in *OperatorConfiguration) DeepCopyObject() runtime.Object {
-	if c := in.DeepCopy(); c != nil {
-		return c
-	}
-	return nil
-}
-
-func (in *OperatorConfigurationList) DeepCopyInto(out *OperatorConfigurationList) {
-	if in != nil {
-		out = deepcopy.Copy(in).(*OperatorConfigurationList)
-	}
-	return
-}
-
-func (in *OperatorConfigurationList) DeepCopy() *OperatorConfigurationList {
-	if in == nil { return nil }
+func (opcl *OperatorConfigurationList) DeepCopy() *OperatorConfigurationList {
+	if opcl == nil { return nil }
 	out := new(OperatorConfigurationList)
-	in.DeepCopyInto(out)
+	opcl.DeepCopyInto(out)
 	return out
 }
 
-func (in *OperatorConfigurationList) DeepCopyObject() runtime.Object {
-	if c := in.DeepCopy(); c != nil {
+func (opcl *OperatorConfigurationList) DeepCopyObject() runtime.Object {
+	if c := opcl.DeepCopy(); c != nil {
 		return c
 	}
 	return nil

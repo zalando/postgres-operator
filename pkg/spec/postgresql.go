@@ -58,7 +58,7 @@ type Patroni struct {
 // CloneDescription describes which cluster the new should clone and up to which point in time
 type CloneDescription struct {
 	ClusterName  string `json:"cluster,omitempty"`
-	Uid          string `json:"uid,omitempty"`
+	UID          string `json:"uid,omitempty"`
 	EndTimestamp string `json:"timestamp,omitempty"`
 }
 
@@ -119,7 +119,7 @@ type PostgresSpec struct {
 	EnableMasterLoadBalancer  *bool `json:"enableMasterLoadBalancer,omitempty"`
 	EnableReplicaLoadBalancer *bool `json:"enableReplicaLoadBalancer,omitempty"`
 
-	// deprecated load balancer settings mantained for backward compatibility
+	// deprecated load balancer settings maintained for backward compatibility
 	// see "Load balancers" operator docs
 	UseLoadBalancer     *bool `json:"useLoadBalancer,omitempty"`
 	ReplicaLoadBalancer *bool `json:"replicaLoadBalancer,omitempty"`
@@ -161,22 +161,22 @@ func (p *Postgresql) Clone() *Postgresql {
 	return c
 }
 
-func (in *Postgresql) DeepCopyInto(out *Postgresql) {
-	if in != nil {
-		out = deepcopy.Copy(in).(*Postgresql)
+func (p *Postgresql) DeepCopyInto(out *Postgresql) {
+	if p != nil {
+		*out = deepcopy.Copy(*p).(Postgresql)
 	}
 	return
 }
 
-func (in *Postgresql) DeepCopy() *Postgresql {
-	if in == nil { return nil }
+func (p *Postgresql) DeepCopy() *Postgresql {
+	if p == nil { return nil }
 	out := new(Postgresql)
-	in.DeepCopyInto(out)
+	p.DeepCopyInto(out)
 	return out
 }
 
-func (in *Postgresql) DeepCopyObject() runtime.Object {
-	if c := in.DeepCopy(); c != nil {
+func (p *Postgresql) DeepCopyObject() runtime.Object {
+	if c := p.DeepCopy(); c != nil {
 		return c
 	}
 	return nil
@@ -309,28 +309,6 @@ type postgresqlListCopy PostgresqlList
 type postgresqlCopy Postgresql
 
 
-func (in *PostgresqlList) DeepCopy() *PostgresqlList {
-	if in == nil { return nil }
-	out := new(PostgresqlList)
-	in.DeepCopyInto(out)
-	return out
-}
-
-func (in *PostgresqlList) DeepCopyInto(out *PostgresqlList) {
-	if in != nil {
-		out = deepcopy.Copy(in).(*PostgresqlList)
-	}
-	return
-}
-
-func (in *PostgresqlList) DeepCopyObject() runtime.Object {
-	if c := in.DeepCopy(); c != nil {
-		return c
-	}
-	return nil
-}
-
-
 // UnmarshalJSON converts a JSON into the PostgreSQL object.
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	var tmp postgresqlCopy
@@ -379,6 +357,28 @@ func (pl *PostgresqlList) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+func (pl *PostgresqlList) DeepCopy() *PostgresqlList {
+	if pl == nil { return nil }
+	out := new(PostgresqlList)
+	pl.DeepCopyInto(out)
+	return out
+}
+
+func (pl *PostgresqlList) DeepCopyInto(out *PostgresqlList) {
+	if pl != nil {
+		*out = deepcopy.Copy(*pl).(PostgresqlList)
+	}
+	return
+}
+
+func (pl *PostgresqlList) DeepCopyObject() runtime.Object {
+	if c := pl.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
 
 func (status PostgresStatus) Success() bool {
 	return status != ClusterStatusAddFailed &&
