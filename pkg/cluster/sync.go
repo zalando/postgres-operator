@@ -6,7 +6,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
-	"k8s.io/api/policy/v1beta1"
 	"k8s.io/api/core/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -188,7 +187,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 
 func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	var (
-		pdb   *v1beta1.PodDisruptionBudget
+		pdb   *policybeta1.PodDisruptionBudget
 		err   error
 	)
 	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {

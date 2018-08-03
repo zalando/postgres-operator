@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -127,14 +127,15 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	NumberOfInstances  int32                `json:"numberOfInstances"`
-	Users              map[string]UserFlags `json:"users"`
-	MaintenanceWindows []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone              CloneDescription     `json:"clone"`
-	ClusterName        string               `json:"-"`
-	Databases          map[string]string    `json:"databases,omitempty"`
-	Tolerations        []v1.Toleration      `json:"tolerations,omitempty"`
-	Sidecars           []Sidecar            `json:"sidecars,omitempty"`
+	NumberOfInstances    int32                `json:"numberOfInstances"`
+	Users                map[string]UserFlags `json:"users"`
+	MaintenanceWindows   []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+	Clone                CloneDescription     `json:"clone"`
+	ClusterName          string               `json:"-"`
+	Databases            map[string]string    `json:"databases,omitempty"`
+	Tolerations          []v1.Toleration      `json:"tolerations,omitempty"`
+	Sidecars             []Sidecar            `json:"sidecars,omitempty"`
+	PodPriorityClassName string               `json:"pod_priority_class_name,omitempty"`
 }
 
 // PostgresqlList defines a list of PostgreSQL clusters.
@@ -181,7 +182,6 @@ func (p *Postgresql) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
-
 
 func parseTime(s string) (time.Time, error) {
 	parts := strings.Split(s, ":")

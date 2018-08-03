@@ -49,6 +49,7 @@ type KubernetesMetaConfiguration struct {
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
 	PodEnvironmentConfigMap string `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName    string `json:"pod_priority_class_name,omitempty"`
 }
 
 type PostgresPodResourcesDefaults struct {

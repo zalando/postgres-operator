@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/api/core/v1"
-	"k8s.io/api/apps/v1beta1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -272,10 +272,10 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	c.logger.Debugf("replacing statefulset")
 
 	// Delete the current statefulset without deleting the pods
-	orphanDepencies := true
+	deletePropagationPolicy := metav1.DeletePropagationOrphan
 	oldStatefulset := c.Statefulset
 
-	options := metav1.DeleteOptions{OrphanDependents: &orphanDepencies}
+	options := metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy}
 	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
 		return fmt.Errorf("could not delete statefulset %q: %v", statefulSetName, err)
 	}

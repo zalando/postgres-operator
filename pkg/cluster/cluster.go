@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/api/core/v1"
-	"k8s.io/api/apps/v1beta1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
@@ -91,7 +91,7 @@ type compareStatefulsetResult struct {
 
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
-	orphanDependents := true
+	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
 		e, ok := obj.(spec.PodEvent)
@@ -113,7 +113,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
+		deleteOptions:    &metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
 	}
@@ -601,7 +601,7 @@ func (c *Cluster) Delete() {
 	}
 
 	for _, obj := range c.Secrets {
-		if delete, user := c.shouldDeleteSecret(obj); !delete {
+		if doDelete, user := c.shouldDeleteSecret(obj); !doDelete {
 			c.logger.Warningf("not removing secret %q for the system user %q", obj.GetName(), user)
 			continue
 		}
@@ -951,11 +951,11 @@ func (c *Cluster) deletePatroniClusterEndpoints() error {
 		return util.NameFromMeta(ep.ObjectMeta), err
 	}
 
-	delete := func(name string) error {
+	deleteEndpointFn := func(name string) error {
 		return c.KubeClient.Endpoints(c.Namespace).Delete(name, c.deleteOptions)
 	}
 
-	return c.deleteClusterObject(get, delete, "endpoint")
+	return c.deleteClusterObject(get, deleteEndpointFn, "endpoint")
 }
 
 func (c *Cluster) deletePatroniClusterConfigMaps() error {
@@ -964,9 +964,9 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 		return util.NameFromMeta(cm.ObjectMeta), err
 	}
 
-	delete := func(name string) error {
+	deleteConfigMapFn := func(name string) error {
 		return c.KubeClient.ConfigMaps(c.Namespace).Delete(name, c.deleteOptions)
 	}
 
-	return c.deleteClusterObject(get, delete, "configmap")
+	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
 }
