@@ -114,7 +114,7 @@ func readDecodedRole(s string) (*spec.PgUser, error) {
 	return &result, nil
 }
 
-func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (result map[string]spec.PgUser, err error) {
+func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (map[string]spec.PgUser, error) {
 	if *rolesSecret == (spec.NamespacedName{}) {
 		// we don't have infrastructure roles defined, bail out
 		return nil, nil
@@ -129,7 +129,7 @@ func (c *Controller) getInfrastructureRoles(rolesSecret *spec.NamespacedName) (r
 	}
 
 	secretData := infraRolesSecret.Data
-	result = make(map[string]spec.PgUser)
+	result := make(map[string]spec.PgUser)
 Users:
 	// in worst case we would have one line per user
 	for i := 1; i <= len(secretData); i++ {
@@ -171,22 +171,22 @@ Users:
 	if infraRolesMap, err := c.KubeClient.ConfigMaps(rolesSecret.Namespace).Get(rolesSecret.Name, metav1.GetOptions{}); err == nil {
 		// we have a configmap with username - json description, let's read and decode it
 		for role, s := range infraRolesMap.Data {
-			if roleDescr, err := readDecodedRole(s); err != nil {
+			roleDescr, err := readDecodedRole(s)
+			if err != nil {
 				return nil, fmt.Errorf("could not decode role description: %v", err)
-			} else {
-				// check if we have a a password in a configmap
-				c.logger.Debugf("found role description for role %q: %+v", role, roleDescr)
-				if passwd, ok := secretData[role]; ok {
-					roleDescr.Password = string(passwd)
-					delete(secretData, role)
-				} else {
-					c.logger.Warningf("infrastructure role %q has no password defined and is ignored", role)
-					continue
-				}
-				roleDescr.Name = role
-				roleDescr.Origin = spec.RoleOriginInfrastructure
-				result[role] = *roleDescr
 			}
+			// check if we have a a password in a configmap
+			c.logger.Debugf("found role description for role %q: %+v", role, roleDescr)
+			if passwd, ok := secretData[role]; ok {
+				roleDescr.Password = string(passwd)
+				delete(secretData, role)
+			} else {
+				c.logger.Warningf("infrastructure role %q has no password defined and is ignored", role)
+				continue
+			}
+			roleDescr.Name = role
+			roleDescr.Origin = spec.RoleOriginInfrastructure
+			result[role] = *roleDescr
 		}
 	}
 

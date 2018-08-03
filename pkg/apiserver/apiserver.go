@@ -92,12 +92,14 @@ func New(controller controllerInformer, port int, logger *logrus.Logger) *Server
 
 // Run starts the HTTP server
 func (s *Server) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+
+	var err error
+
 	defer wg.Done()
 
 	go func() {
-		err := s.http.ListenAndServe()
-		if err != http.ErrServerClosed {
-			s.logger.Fatalf("Could not start http server: %v", err)
+		if err2 := s.http.ListenAndServe(); err2 != http.ErrServerClosed {
+			s.logger.Fatalf("Could not start http server: %v", err2)
 		}
 	}()
 	s.logger.Infof("listening on %s", s.http.Addr)
@@ -106,21 +108,27 @@ func (s *Server) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	err := s.http.Shutdown(ctx)
+	if err = s.http.Shutdown(ctx); err == nil {
+		s.logger.Infoln("Http server shut down")
+		return
+	}
 	if err == context.DeadlineExceeded {
 		s.logger.Warningf("Shutdown timeout exceeded. closing http server")
-		s.http.Close()
-	} else if err != nil {
-		s.logger.Errorf("Could not shutdown http server: %v", err)
+		if err = s.http.Close(); err != nil {
+			s.logger.Errorf("could not close http connection: %v", err)
+		}
+		return
 	}
-	s.logger.Infoln("Http server shut down")
+	s.logger.Errorf("Could not shutdown http server: %v", err)
 }
 
 func (s *Server) respond(obj interface{}, err error, w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error()})
+		if err2 := json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error()}); err2 != nil {
+			s.logger.Errorf("could not encode error response %q: %v", err, err2)
+		}
 		return
 	}
 
@@ -186,6 +194,14 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 	s.respond(resp, err, w)
 }
 
+func mustConvertToUint32(s string) uint32{
+	result, err := strconv.Atoi(s);
+	if err != nil {
+		panic(fmt.Errorf("mustConvertToUint32 called for %s: %v", s, err))
+	}
+	return uint32(result)
+}
+
 func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 	var (
 		resp interface{}
@@ -195,30 +211,30 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 	if workerAllQueue.MatchString(req.URL.Path) {
 		s.allQueues(w, req)
 		return
-	} else if matches := util.FindNamedStringSubmatch(workerLogsURL, req.URL.Path); matches != nil {
-		workerID, _ := strconv.Atoi(matches["id"])
+	}
+	if workerAllStatus.MatchString(req.URL.Path) {
+		s.allWorkers(w, req)
+		return
+	}
 
-		resp, err = s.controller.WorkerLogs(uint32(workerID))
+	err = fmt.Errorf("page not found")
+
+	if matches := util.FindNamedStringSubmatch(workerLogsURL, req.URL.Path); matches != nil {
+		workerID := mustConvertToUint32(matches["id"])
+		resp, err = s.controller.WorkerLogs(workerID)
+
 	} else if matches := util.FindNamedStringSubmatch(workerEventsQueueURL, req.URL.Path); matches != nil {
-		workerID, _ := strconv.Atoi(matches["id"])
+		workerID := mustConvertToUint32(matches["id"])
+		resp, err = s.controller.ListQueue(workerID)
 
-		resp, err = s.controller.ListQueue(uint32(workerID))
 	} else if matches := util.FindNamedStringSubmatch(workerStatusURL, req.URL.Path); matches != nil {
 		var workerStatus *spec.WorkerStatus
 
-		workerID, _ := strconv.Atoi(matches["id"])
-		workerStatus, err = s.controller.WorkerStatus(uint32(workerID))
-		if workerStatus == nil {
-			resp = "idle"
-		} else {
+		workerID := mustConvertToUint32(matches["id"])
+		resp = "idle"
+		if workerStatus, err = s.controller.WorkerStatus(workerID); workerStatus != nil {
 			resp = workerStatus
 		}
-	} else if workerAllStatus.MatchString(req.URL.Path) {
-		s.allWorkers(w, req)
-		return
-	} else {
-		s.respond(nil, fmt.Errorf("page not found"), w)
-		return
 	}
 
 	s.respond(resp, err, w)

@@ -151,9 +151,9 @@ func (c *Controller) initPodServiceAccount() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse pod service account definiton from the operator config map: %v", err))
+		panic(fmt.Errorf("Unable to parse pod service account definition from the operator config map: %v", err))
 	case groupVersionKind.Kind != "ServiceAccount":
-		panic(fmt.Errorf("pod service account definiton in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+		panic(fmt.Errorf("pod service account definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
 	default:
 		c.PodServiceAccount = obj.(*v1.ServiceAccount)
 		if c.PodServiceAccount.Name != c.opConfig.PodServiceAccountName {

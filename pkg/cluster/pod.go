@@ -9,6 +9,7 @@ import (
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"k8s.io/api/apps/v1beta1"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
@@ -182,6 +183,8 @@ func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	var (
 		masterCandidatePod *v1.Pod
+		err error
+		eol bool
 	)
 
 	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
@@ -192,9 +195,10 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 
 	c.logger.Infof("migrating master pod %q", podName)
 
-	if eol, err := c.podIsEndOfLife(oldMaster); err != nil {
+	if eol, err = c.podIsEndOfLife(oldMaster); err != nil {
 		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
-	} else if !eol {
+	}
+	if !eol {
 		c.logger.Debugf("pod is already on a live node")
 		return nil
 	}
@@ -205,41 +209,44 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 	// we must have a statefulset in the cluster for the migration to work
 	if c.Statefulset == nil {
-		sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("could not retrieve cluster statefulset: %v", err)
+		var sset *v1beta1.StatefulSet
+		if sset, err = c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(),
+			metav1.GetOptions{}); err != nil {
+				return fmt.Errorf("could not retrieve cluster statefulset: %v", err)
 		}
 		c.Statefulset = sset
 	}
 	// We may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case.
-	if *c.Statefulset.Spec.Replicas == 1 {
-		c.logger.Warningf("single master pod for cluster %q, migration will cause longer downtime of the master instance", c.clusterName())
-	} else {
-		masterCandidatePod, err = c.masterCandidate(oldMaster.Spec.NodeName)
-		if err != nil {
+	if *c.Statefulset.Spec.Replicas > 1 {
+		if masterCandidatePod, err = c.masterCandidate(oldMaster.Spec.NodeName); err != nil {
 			return fmt.Errorf("could not get new master candidate: %v", err)
 		}
+	} else {
+		c.logger.Warningf("single master pod for cluster %q, migration will cause longer downtime of the master instance", c.clusterName())
 	}
+
 
 	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
 	// - the cluster has some replicas - migrate one of those if necessary and failover to it
 	// - there are no replicas - just terminate the master and wait until it respawns
 	// in both cases the result is the new master up and running on a new node.
-	if masterCandidatePod != nil {
-		pod, err := c.movePodFromEndOfLifeNode(masterCandidatePod)
-		if err != nil {
-			return fmt.Errorf("could not move pod: %v", err)
-		}
 
-		masterCandidateName := util.NameFromMeta(pod.ObjectMeta)
-		if err := c.Switchover(oldMaster, masterCandidateName); err != nil {
-			return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
-		}
-	} else {
+	if masterCandidatePod == nil {
 		if _, err = c.movePodFromEndOfLifeNode(oldMaster); err != nil {
 			return fmt.Errorf("could not move pod: %v", err)
 		}
+		return nil
 	}
+
+	if masterCandidatePod, err = c.movePodFromEndOfLifeNode(masterCandidatePod); err != nil {
+		return fmt.Errorf("could not move pod: %v", err)
+	}
+
+	masterCandidateName := util.NameFromMeta(masterCandidatePod.ObjectMeta)
+	if err := c.Switchover(oldMaster, masterCandidateName); err != nil {
+		return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+	}
+
 	return nil
 }
 
@@ -281,12 +288,12 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	if err := c.waitForPodDeletion(ch); err != nil {
 		return nil, err
 	}
-	if pod, err := c.waitForPodLabel(ch, stopChan, nil); err != nil {
+	pod, err := c.waitForPodLabel(ch, stopChan, nil)
+	if err != nil {
 		return nil, err
-	} else {
-		c.logger.Infof("pod %q has been recreated", podName)
-		return pod, nil
 	}
+	c.logger.Infof("pod %q has been recreated", podName)
+	return pod, nil
 }
 
 func (c *Cluster) recreatePods() error {

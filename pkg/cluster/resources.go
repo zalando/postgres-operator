@@ -168,7 +168,7 @@ func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet,
 		if flag, err = strconv.ParseBool(stringFlag); err != nil {
 			c.logger.Warnf("error when parsing %q annotation for the statefulset %q: expected boolean value, got %q\n",
 				RollingUpdateStatefulsetAnnotationKey,
-				types.NamespacedName{sset.Namespace, sset.Name},
+				types.NamespacedName{Namespace: sset.Namespace, Name: sset.Name},
 				stringFlag)
 			flag = defaultValue
 		}
@@ -491,7 +491,7 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	if len(endPointAddresses) > 0 {
 		result = append(result, v1.EndpointSubset{
 			Addresses: endPointAddresses,
-			Ports:     []v1.EndpointPort{{"postgresql", 5432, "TCP"}},
+			Ports:     []v1.EndpointPort{{Name: "postgresql", Port: 5432, Protocol: "TCP"}},
 		})
 	} else if role == Master {
 		c.logger.Warningf("master is not running, generated master endpoint does not contain any addresses")

@@ -284,7 +284,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pods are ready")
 
-	// create database objects unless we are running without pods or disabled that feature explicitely
+	// create database objects unless we are running without pods or disabled that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)

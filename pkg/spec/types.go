@@ -278,5 +278,4 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	default:
 		return fmt.Errorf("could not recognize type %T as a valid type to unmarshal to Duration", val)
 	}
-	return nil
 }

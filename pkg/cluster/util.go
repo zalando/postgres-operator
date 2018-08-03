@@ -372,7 +372,7 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 }
 
 // Returns labels used to create or list k8s objects such as pods
-// For backward compatability, shouldAddExtraLabels must be false
+// For backward compatibility, shouldAddExtraLabels must be false
 // when listing k8s objects. See operator PR #252
 func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 	lbls := make(map[string]string)
@@ -390,7 +390,7 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 }
 
 func (c *Cluster) labelsSelector() *metav1.LabelSelector {
-	return &metav1.LabelSelector{c.labelsSet(false), nil}
+	return &metav1.LabelSelector{MatchLabels: c.labelsSet(false), MatchExpressions: nil}
 }
 
 func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {

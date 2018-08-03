@@ -22,7 +22,7 @@ configuration.
   There are no default values built-in in the operator, each parameter that is
   not supplied in the configuration receives an empty value.  In order to
   create your own configuration just copy the [default
-  one](https://github.com/zalando-incubator/postgres-operator/blob/wip/operator_configuration_via_crd/manifests/postgresql-operator-default-configuration.yaml)
+  one](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
   and change it.
 
 CRD-based configuration is more natural and powerful then the one based on
