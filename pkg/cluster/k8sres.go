@@ -88,7 +88,7 @@ func (c *Cluster) makeDefaultResources() spec.Resources {
 	defaultRequests := spec.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
 	defaultLimits := spec.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
 
-	return spec.Resources{defaultRequests, defaultLimits}
+	return spec.Resources{ResourceRequest:defaultRequests, ResourceLimits:defaultLimits}
 }
 
 func generateResourceRequirements(resources spec.Resources, defaultResources spec.Resources) (*v1.ResourceRequirements, error) {
@@ -537,10 +537,10 @@ func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.
 
 	for i, va := range input {
 		if names[va.Name] == 0 {
-			names[va.Name] += 1
+			names[va.Name]++
 			result = append(result, input[i])
 		} else if names[va.Name] == 1 {
-			names[va.Name] += 1
+			names[va.Name]++
 			logger.Warningf("variable %q is defined in %q more than once, the subsequent definitions are ignored",
 				va.Name, containerName)
 		}
@@ -626,6 +626,12 @@ func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) spec
 
 func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
 
+	var (
+		err                 error
+		sidecarContainers   []v1.Container
+		podTemplate         *v1.PodTemplateSpec
+		volumeClaimTemplate *v1.PersistentVolumeClaim
+	)
 	defaultResources := c.makeDefaultResources()
 
 	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
@@ -633,21 +639,19 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("could not generate Scalyr sidecar resource requirements: %v", err)
-	}
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
 
 	if c.OpConfig.PodEnvironmentConfigMap != "" {
-		if cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{}); err != nil {
+		var cm *v1.ConfigMap
+		cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{})
+		if err != nil {
 			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
-		} else {
-			for k, v := range cm.Data {
-				customPodEnvVarsList = append(customPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
-			}
-			sort.Slice(customPodEnvVarsList,
-				func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 		}
+		for k, v := range cm.Data {
+			customPodEnvVarsList = append(customPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
+		}
+		sort.Slice(customPodEnvVarsList,
+			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 	}
 
 	spiloConfiguration := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
@@ -686,16 +690,15 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	}
 
 	// generate sidecar containers
-	sidecarContainers, err := generateSidecarContainers(sideCars, volumeMounts, defaultResources,
-		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+	if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
+		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
+			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecards
-	podTemplate, err := generatePodTemplate(
+	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
 		spiloContainer,
@@ -704,14 +707,13 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
-		c.OpConfig.KubeIAMRole)
-
-	if err != nil {
-		return nil, fmt.Errorf("could not generate pod template: %v", err)
+		c.OpConfig.KubeIAMRole); err != nil {
+			return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
-	volumeClaimTemplate, err := generatePersistentVolumeClaimTemplate(spec.Volume.Size, spec.Volume.StorageClass)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
+
+	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
+		spec.Volume.StorageClass); err != nil {
+			return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
 	numberOfInstances := c.getNumberOfInstances(spec)
@@ -1033,7 +1035,7 @@ func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) [
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.Uid)})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.UID)})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 

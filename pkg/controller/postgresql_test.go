@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	True  bool = true
-	False bool = false
+	True  = true
+	False = false
 )
 
 func TestMergeDeprecatedPostgreSQLSpecParameters(t *testing.T) {

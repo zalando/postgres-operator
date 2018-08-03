@@ -80,12 +80,10 @@ func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 		return fmt.Errorf("could not encode json: %v", err)
 	}
 	return p.httpPostOrPatch(http.MethodPost, apiURL(master)+failoverPath, buf)
-
-	return nil
 }
 
 //TODO: add an option call /patroni to check if it is necessary to restart the server
-// SetPostgresParameters sets Postgres options via Patroni patch API call.
+//SetPostgresParameters sets Postgres options via Patroni patch API call.
 func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]string) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(map[string]map[string]interface{}{"postgresql": {"parameters": parameters}})
