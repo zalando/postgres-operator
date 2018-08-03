@@ -95,7 +95,7 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
    class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
    that should be assigned to the cluster pods. When not specified, the value
    is taken from the `pod_priority_class_name` operator parameter, if not set
-   then the default priority class is taken.
+   then the default priority class is taken. The priority class itself must be defined in advance.
    
 ## Postgres parameters
 

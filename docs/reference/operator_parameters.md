@@ -193,8 +193,8 @@ configuration they are grouped under the `kubernetes` key.
 * **pod_priority_class_name**
   a name of the [priority
   class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
-  that should be assigned to the Postgres pods. Default is empty (use the
-  default one).
+  that should be assigned to the Postgres pods. The priority class itself must be defined in advance.
+  Default is empty (use the default priority class).
   
 
 ## Kubernetes resource requests

@@ -606,7 +606,7 @@ func (c *Cluster) Delete() {
 			continue
 		}
 		if err := c.deleteSecret(obj); err != nil {
-			c.logger.Warningf("could not doDelete secret: %v", err)
+			c.logger.Warningf("could not delete secret: %v", err)
 		}
 	}
 
