@@ -7,13 +7,13 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/api/core/v1"
-	"k8s.io/api/apps/v1beta1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -90,7 +90,7 @@ func (c *Cluster) makeDefaultResources() spec.Resources {
 	defaultRequests := spec.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
 	defaultLimits := spec.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
 
-	return spec.Resources{ResourceRequest:defaultRequests, ResourceLimits:defaultLimits}
+	return spec.Resources{ResourceRequest: defaultRequests, ResourceLimits: defaultLimits}
 }
 
 func generateResourceRequirements(resources spec.Resources, defaultResources spec.Resources) (*v1.ResourceRequirements, error) {
@@ -366,7 +366,7 @@ func generateSidecarContainers(sidecars []spec.Sidecar,
 	volumeMounts []v1.VolumeMount, defaultResources spec.Resources,
 	superUserName string, credentialsSecretName string, logger *logrus.Entry) ([]v1.Container, error) {
 
-	if sidecars != nil && len(sidecars) > 0 {
+	if len(sidecars) > 0 {
 		result := make([]v1.Container, 0)
 		for index, sidecar := range sidecars {
 
@@ -699,7 +699,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 	// generate sidecar containers
 	if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
 		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
-			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
@@ -716,7 +716,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
-		effectivePodPriorityClassName); err != nil{
+		effectivePodPriorityClassName); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
@@ -726,7 +726,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 
 	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
 		spec.Volume.StorageClass); err != nil {
-			return nil, fmt.Errorf("could not generate volume claim template: %v", err)
+		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
 	numberOfInstances := c.getNumberOfInstances(spec)
@@ -804,11 +804,11 @@ func (c *Cluster) mergeSidecars(sidecars []spec.Sidecar) []spec.Sidecar {
 	return result
 }
 
-func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) (newcur int32) {
+func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) int32 {
 	min := c.OpConfig.MinInstances
 	max := c.OpConfig.MaxInstances
 	cur := spec.NumberOfInstances
-	newcur = cur
+	newcur := cur
 
 	if max >= 0 && newcur > max {
 		newcur = max
@@ -820,7 +820,7 @@ func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) (newcur int32) {
 		c.logger.Infof("adjusted number of instances from %d to %d (min: %d, max: %d)", cur, newcur, min, max)
 	}
 
-	return
+	return newcur
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
@@ -860,8 +860,8 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 	return volumeClaim, nil
 }
 
-func (c *Cluster) generateUserSecrets() (secrets map[string]*v1.Secret) {
-	secrets = make(map[string]*v1.Secret, len(c.pgUsers))
+func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
+	secrets := make(map[string]*v1.Secret, len(c.pgUsers))
 	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
@@ -878,7 +878,7 @@ func (c *Cluster) generateUserSecrets() (secrets map[string]*v1.Secret) {
 		}
 	}
 
-	return
+	return secrets
 }
 
 func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser) *v1.Secret {

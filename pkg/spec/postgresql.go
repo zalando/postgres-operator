@@ -156,7 +156,9 @@ var (
 // will not contain any private fields not-reachable to deepcopy. This should be ok,
 // since Error is never read from a Kubernetes object.
 func (p *Postgresql) Clone() *Postgresql {
-	if p == nil {return nil}
+	if p == nil {
+		return nil
+	}
 	c := deepcopy.Copy(p).(*Postgresql)
 	c.Error = nil
 	return c
@@ -166,11 +168,12 @@ func (p *Postgresql) DeepCopyInto(out *Postgresql) {
 	if p != nil {
 		*out = deepcopy.Copy(*p).(Postgresql)
 	}
-	return
 }
 
 func (p *Postgresql) DeepCopy() *Postgresql {
-	if p == nil { return nil }
+	if p == nil {
+		return nil
+	}
 	out := new(Postgresql)
 	p.DeepCopyInto(out)
 	return out
@@ -308,7 +311,6 @@ func validateCloneClusterDescription(clone *CloneDescription) error {
 type postgresqlListCopy PostgresqlList
 type postgresqlCopy Postgresql
 
-
 // UnmarshalJSON converts a JSON into the PostgreSQL object.
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	var tmp postgresqlCopy
@@ -359,7 +361,9 @@ func (pl *PostgresqlList) UnmarshalJSON(data []byte) error {
 }
 
 func (pl *PostgresqlList) DeepCopy() *PostgresqlList {
-	if pl == nil { return nil }
+	if pl == nil {
+		return nil
+	}
 	out := new(PostgresqlList)
 	pl.DeepCopyInto(out)
 	return out
@@ -369,7 +373,6 @@ func (pl *PostgresqlList) DeepCopyInto(out *PostgresqlList) {
 	if pl != nil {
 		*out = deepcopy.Copy(*pl).(PostgresqlList)
 	}
-	return
 }
 
 func (pl *PostgresqlList) DeepCopyObject() runtime.Object {
@@ -378,7 +381,6 @@ func (pl *PostgresqlList) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
-
 
 func (status PostgresStatus) Success() bool {
 	return status != ClusterStatusAddFailed &&

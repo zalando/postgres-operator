@@ -183,8 +183,8 @@ func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	var (
 		masterCandidatePod *v1.Pod
-		err error
-		eol bool
+		err                error
+		eol                bool
 	)
 
 	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
@@ -212,7 +212,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		var sset *v1beta1.StatefulSet
 		if sset, err = c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(),
 			metav1.GetOptions{}); err != nil {
-				return fmt.Errorf("could not retrieve cluster statefulset: %v", err)
+			return fmt.Errorf("could not retrieve cluster statefulset: %v", err)
 		}
 		c.Statefulset = sset
 	}
@@ -224,7 +224,6 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	} else {
 		c.logger.Warningf("single master pod for cluster %q, migration will cause longer downtime of the master instance", c.clusterName())
 	}
-
 
 	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
 	// - the cluster has some replicas - migrate one of those if necessary and failover to it

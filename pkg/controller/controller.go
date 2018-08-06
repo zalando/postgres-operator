@@ -169,7 +169,7 @@ func (c *Controller) initPodServiceAccount() {
 func (c *Controller) initRoleBinding() {
 
 	// service account on its own lacks any rights starting with k8s v1.8
-	// operator binds it to the cluster role with sufficient priviliges
+	// operator binds it to the cluster role with sufficient privileges
 	// we assume the role is created by the k8s administrator
 	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
 		c.opConfig.PodServiceAccountRoleBindingDefinition = `
@@ -199,9 +199,9 @@ func (c *Controller) initRoleBinding() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse the definiton of the role binding  for the pod service account definiton from the operator config map: %v", err))
+		panic(fmt.Errorf("Unable to parse the definition of the role binding for the pod service account definition from the operator config map: %v", err))
 	case groupVersionKind.Kind != "RoleBinding":
-		panic(fmt.Errorf("role binding definiton in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+		panic(fmt.Errorf("role binding definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
 	default:
 		c.PodServiceAccountRoleBinding = obj.(*rbacv1beta1.RoleBinding)
 		c.PodServiceAccountRoleBinding.Namespace = ""

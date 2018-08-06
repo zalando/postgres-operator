@@ -30,8 +30,9 @@ type DefaultUserSyncStrategy struct {
 
 // ProduceSyncRequests figures out the types of changes that need to happen with the given users.
 func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserMap,
-	newUsers spec.PgUserMap) (reqs []spec.PgSyncUserRequest) {
+	newUsers spec.PgUserMap) []spec.PgSyncUserRequest {
 
+	var reqs []spec.PgSyncUserRequest
 	// No existing roles are deleted or stripped of role memebership/flags
 	for name, newUser := range newUsers {
 		dbUser, exists := dbUsers[name]
@@ -66,7 +67,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 		}
 	}
 
-	return
+	return reqs
 }
 
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
@@ -102,7 +103,7 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 	return
 }
 
-func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) (err error) {
+func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) error {
 	var userFlags []string
 	var userPassword string
 
@@ -120,16 +121,14 @@ func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.D
 	}
 	query := fmt.Sprintf(createUserSQL, user.Name, strings.Join(userFlags, " "), userPassword)
 
-	_, err = db.Exec(query) // TODO: Try several times
-	if err != nil {
-		err = fmt.Errorf("dB error: %v, query: %s", err, query)
-		return
+	if _, err := db.Exec(query); err != nil { // TODO: Try several times
+		return fmt.Errorf("dB error: %v, query: %s", err, query)
 	}
 
-	return
+	return nil
 }
 
-func (strategy DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) (err error) {
+func (strategy DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB) error {
 	var resultStmt []string
 
 	if user.Password != "" || len(user.Flags) > 0 {
@@ -140,19 +139,16 @@ func (strategy DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB
 		grantStmt := produceGrantStmt(user)
 		resultStmt = append(resultStmt, grantStmt)
 	}
-	if len(resultStmt) == 0 {
-		return nil
+
+	if len(resultStmt) > 0 {
+		query := fmt.Sprintf(doBlockStmt, strings.Join(resultStmt, ";"))
+
+		if _, err := db.Exec(query); err != nil { // TODO: Try several times
+			return fmt.Errorf("dB error: %v query %s", err, query)
+		}
 	}
 
-	query := fmt.Sprintf(doBlockStmt, strings.Join(resultStmt, ";"))
-
-	_, err = db.Exec(query) // TODO: Try several times
-	if err != nil {
-		err = fmt.Errorf("dB error: %v query %s", err, query)
-		return
-	}
-
-	return
+	return nil
 }
 
 func produceAlterStmt(user spec.PgUser) string {
@@ -205,7 +201,7 @@ func quoteParameterValue(name, val string) string {
 		// containing spaces (but something more complex, like double quotes inside double quotes or spaces
 		// in the schema name would break the parsing code in the operator.)
 		if start == '\'' && end == '\'' {
-			return fmt.Sprintf("%s", val[1:len(val)-1])
+			return val[1 : len(val)-1]
 		}
 
 		return val
