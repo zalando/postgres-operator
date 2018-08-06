@@ -76,17 +76,15 @@ func (t *API) TeamInfo(teamID, token string) (tm *Team, err error) {
 	t.logger.Debugf("request url: %s", url)
 	req, err = http.NewRequest("GET", url, nil)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+token)
-	resp, err = t.httpClient.Do(req)
-	if err != nil {
-		return
+	if resp, err = t.httpClient.Do(req); err != nil {
+		return nil, err
 	}
 	defer func() {
-		closeErr := resp.Body.Close()
-		if closeErr != nil {
+		if closeErr := resp.Body.Close(); closeErr != nil {
 			err = fmt.Errorf("error when closing response: %v", closeErr)
 		}
 	}()
@@ -95,27 +93,20 @@ func (t *API) TeamInfo(teamID, token string) (tm *Team, err error) {
 		d := json.NewDecoder(resp.Body)
 		err = d.Decode(&raw)
 		if err != nil {
-			err = fmt.Errorf("team API query failed with status code %d and malformed response: %v", resp.StatusCode, err)
-			return
+			return nil, fmt.Errorf("team API query failed with status code %d and malformed response: %v", resp.StatusCode, err)
 		}
 
 		if errMessage, ok := raw["error"]; ok {
-			err = fmt.Errorf("team API query failed with status code %d and message: '%v'", resp.StatusCode, string(errMessage))
-			return
+			return nil, fmt.Errorf("team API query failed with status code %d and message: '%v'", resp.StatusCode, string(errMessage))
 		}
-		err = fmt.Errorf("team API query failed with status code %d", resp.StatusCode)
-
-		return
+		return nil, fmt.Errorf("team API query failed with status code %d", resp.StatusCode)
 	}
 
 	tm = &Team{}
 	d := json.NewDecoder(resp.Body)
-	err = d.Decode(tm)
-	if err != nil {
-		err = fmt.Errorf("could not parse team API response: %v", err)
-		tm = nil
-		return
+	if err = d.Decode(tm); err != nil {
+		return nil, fmt.Errorf("could not parse team API response: %v", err)
 	}
 
-	return
+	return tm, nil
 }

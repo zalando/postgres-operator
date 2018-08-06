@@ -157,7 +157,7 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 	)
 
 	if matches := util.FindNamedStringSubmatch(clusterStatusURL, req.URL.Path); matches != nil {
-		namespace, _ := matches["namespace"]
+		namespace := matches["namespace"]
 		resp, err = s.controller.ClusterStatus(matches["team"], namespace, matches["cluster"])
 	} else if matches := util.FindNamedStringSubmatch(teamURL, req.URL.Path); matches != nil {
 		teamClusters := s.controller.TeamClusterList()
@@ -174,10 +174,10 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 
 		resp, err = clusterNames, nil
 	} else if matches := util.FindNamedStringSubmatch(clusterLogsURL, req.URL.Path); matches != nil {
-		namespace, _ := matches["namespace"]
+		namespace := matches["namespace"]
 		resp, err = s.controller.ClusterLogs(matches["team"], namespace, matches["cluster"])
 	} else if matches := util.FindNamedStringSubmatch(clusterHistoryURL, req.URL.Path); matches != nil {
-		namespace, _ := matches["namespace"]
+		namespace := matches["namespace"]
 		resp, err = s.controller.ClusterHistory(matches["team"], namespace, matches["cluster"])
 	} else if req.URL.Path == clustersURL {
 		clusterNamesPerTeam := make(map[string][]string)
@@ -194,8 +194,8 @@ func (s *Server) clusters(w http.ResponseWriter, req *http.Request) {
 	s.respond(resp, err, w)
 }
 
-func mustConvertToUint32(s string) uint32{
-	result, err := strconv.Atoi(s);
+func mustConvertToUint32(s string) uint32 {
+	result, err := strconv.Atoi(s)
 	if err != nil {
 		panic(fmt.Errorf("mustConvertToUint32 called for %s: %v", s, err))
 	}
@@ -244,8 +244,6 @@ func (s *Server) databases(w http.ResponseWriter, req *http.Request) {
 
 	databaseNamesPerCluster := s.controller.ClusterDatabasesMap()
 	s.respond(databaseNamesPerCluster, nil, w)
-	return
-
 }
 
 func (s *Server) allQueues(w http.ResponseWriter, r *http.Request) {

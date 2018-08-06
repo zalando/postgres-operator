@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -130,7 +131,9 @@ type crdDecoder struct {
 }
 
 func (d *crdDecoder) Close() {
-	d.close()
+	if err := d.close(); err != nil {
+		fmt.Printf("error when closing CRDDecorer: %v\n", err)
+	}
 }
 
 func (d *crdDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {
@@ -526,7 +529,6 @@ func (c *Controller) submitRBACCredentials(event spec.ClusterEvent) error {
 	if err := c.createRoleBindings(namespace); err != nil {
 		return fmt.Errorf("could not create role binding %v : %v", c.PodServiceAccountRoleBinding.Name, err)
 	}
-
 	c.namespacesWithDefinedRBAC.Store(namespace, true)
 	return nil
 }

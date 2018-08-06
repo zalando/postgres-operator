@@ -183,32 +183,30 @@ func (c *Cluster) getDatabases() (dbs map[string]string, err error) {
 		dbs[datname] = owner
 	}
 
-	return
+	return dbs, err
 }
 
 // executeCreateDatabase creates new database with the given owner.
 // The caller is responsible for openinging and closing the database connection.
 func (c *Cluster) executeCreateDatabase(datname, owner string) error {
-	if !c.databaseNameOwnerValid(datname, owner) {
-		return nil
-	}
-	c.logger.Infof("creating database %q with owner %q", datname, owner)
-
-	if _, err := c.pgDb.Exec(fmt.Sprintf(createDatabaseSQL, datname, owner)); err != nil {
-		return fmt.Errorf("could not execute create database: %v", err)
-	}
-	return nil
+	return c.execCreateOrAlterDatabase(datname, owner, createDatabaseSQL,
+		"creating database", "create database")
 }
 
 // executeCreateDatabase changes the owner of the given database.
 // The caller is responsible for openinging and closing the database connection.
 func (c *Cluster) executeAlterDatabaseOwner(datname string, owner string) error {
+	return c.execCreateOrAlterDatabase(datname, owner, alterDatabaseOwnerSQL,
+		"changing owner for database", "alter database owner")
+}
+
+func (c *Cluster) execCreateOrAlterDatabase(datname, owner, statement, doing, operation string) error {
 	if !c.databaseNameOwnerValid(datname, owner) {
 		return nil
 	}
-	c.logger.Infof("changing database %q owner to %q", datname, owner)
-	if _, err := c.pgDb.Exec(fmt.Sprintf(alterDatabaseOwnerSQL, datname, owner)); err != nil {
-		return fmt.Errorf("could not execute alter database owner: %v", err)
+	c.logger.Infof("%s %q owner %q", doing, datname, owner)
+	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, datname, owner)); err != nil {
+		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
 	return nil
 }

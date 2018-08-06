@@ -450,8 +450,8 @@ func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []st
 	return needsRollUpdate, reasons
 }
 
-func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (equal bool) {
-	equal = true
+func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
+	equal := true
 	if a != nil {
 		equal = compareResoucesAssumeFirstNotNil(a, b)
 	}
@@ -459,7 +459,7 @@ func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (e
 		equal = compareResoucesAssumeFirstNotNil(b, a)
 	}
 
-	return
+	return equal
 }
 
 func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
@@ -786,7 +786,8 @@ func (c *Cluster) initInfrastructureRoles() error {
 }
 
 // resolves naming conflicts between existing and new roles by chosing either of them.
-func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) (result spec.PgUser) {
+func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) spec.PgUser {
+	var result spec.PgUser
 	if newRole.Origin >= currentRole.Origin {
 		result = *newRole
 	} else {
@@ -794,7 +795,7 @@ func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) (result
 	}
 	c.logger.Debugf("resolved a conflict of role %q between %s and %s to %s",
 		newRole.Name, newRole.Origin, currentRole.Origin, result.Origin)
-	return
+	return result
 }
 
 func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) bool {
@@ -838,8 +839,9 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 }
 
 // Switchover does a switchover (via Patroni) to a candidate pod
-func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) (err error) {
+func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
 
+	var err error
 	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
 
 	var wg sync.WaitGroup
@@ -858,8 +860,8 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) (
 
 		select {
 		case <-stopCh:
-		case podLabelErr <- func() (err error) {
-			_, err = c.waitForPodLabel(ch, stopCh, &role)
+		case podLabelErr <- func() (err2 error) {
+			_, err2 = c.waitForPodLabel(ch, stopCh, &role)
 			return
 		}():
 		}
@@ -882,7 +884,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) (
 	// close the label waiting channel no sooner than the waiting goroutine terminates.
 	close(podLabelErr)
 
-	return
+	return err
 
 }
 

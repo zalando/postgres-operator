@@ -40,19 +40,9 @@ func (c *Controller) dispatchPodEvent(clusterName spec.NamespacedName, event spe
 }
 
 func (c *Controller) podAdd(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return
+	if pod, ok := obj.(*v1.Pod); ok {
+		c.preparePodEventForDispatch(pod, nil, spec.EventAdd)
 	}
-
-	podEvent := spec.PodEvent{
-		PodName:         util.NameFromMeta(pod.ObjectMeta),
-		CurPod:          pod,
-		EventType:       spec.EventAdd,
-		ResourceVersion: pod.ResourceVersion,
-	}
-
-	c.dispatchPodEvent(c.podClusterName(pod), podEvent)
 }
 
 func (c *Controller) podUpdate(prev, cur interface{}) {
@@ -66,29 +56,24 @@ func (c *Controller) podUpdate(prev, cur interface{}) {
 		return
 	}
 
+	c.preparePodEventForDispatch(curPod, prevPod, spec.EventUpdate)
+}
+
+func (c *Controller) podDelete(obj interface{}) {
+
+	if pod, ok := obj.(*v1.Pod); ok {
+		c.preparePodEventForDispatch(pod, nil, spec.EventDelete)
+	}
+}
+
+func (c *Controller) preparePodEventForDispatch(curPod, prevPod *v1.Pod, event spec.EventType) {
 	podEvent := spec.PodEvent{
 		PodName:         util.NameFromMeta(curPod.ObjectMeta),
-		PrevPod:         prevPod,
 		CurPod:          curPod,
-		EventType:       spec.EventUpdate,
+		PrevPod:         prevPod,
+		EventType:       event,
 		ResourceVersion: curPod.ResourceVersion,
 	}
 
 	c.dispatchPodEvent(c.podClusterName(curPod), podEvent)
-}
-
-func (c *Controller) podDelete(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return
-	}
-
-	podEvent := spec.PodEvent{
-		PodName:         util.NameFromMeta(pod.ObjectMeta),
-		CurPod:          pod,
-		EventType:       spec.EventDelete,
-		ResourceVersion: pod.ResourceVersion,
-	}
-
-	c.dispatchPodEvent(c.podClusterName(pod), podEvent)
 }

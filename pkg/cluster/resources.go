@@ -633,27 +633,3 @@ func (c *Cluster) GetStatefulSet() *v1beta1.StatefulSet {
 func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
 }
-
-func (c *Cluster) createDatabases() error {
-	c.setProcessName("creating databases")
-
-	if len(c.Spec.Databases) == 0 {
-		return nil
-	}
-
-	if err := c.initDbConn(); err != nil {
-		return fmt.Errorf("could not init database connection")
-	}
-	defer func() {
-		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection: %v", err)
-		}
-	}()
-
-	for datname, owner := range c.Spec.Databases {
-		if err := c.executeCreateDatabase(datname, owner); err != nil {
-			return err
-		}
-	}
-	return nil
-}

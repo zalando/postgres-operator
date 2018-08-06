@@ -3,11 +3,11 @@ package config
 import (
 	"encoding/json"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/mohae/deepcopy"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/mohae/deepcopy"
 )
 
 type OperatorConfiguration struct {
@@ -159,11 +159,12 @@ func (opc *OperatorConfiguration) DeepCopyInto(out *OperatorConfiguration) {
 	if opc != nil {
 		*out = deepcopy.Copy(*opc).(OperatorConfiguration)
 	}
-	return
 }
 
 func (opc *OperatorConfiguration) DeepCopy() *OperatorConfiguration {
-	if opc == nil { return nil }
+	if opc == nil {
+		return nil
+	}
 	out := new(OperatorConfiguration)
 	opc.DeepCopyInto(out)
 	return out
@@ -189,11 +190,12 @@ func (opcl *OperatorConfigurationList) DeepCopyInto(out *OperatorConfigurationLi
 	if opcl != nil {
 		*out = deepcopy.Copy(*opcl).(OperatorConfigurationList)
 	}
-	return
 }
 
 func (opcl *OperatorConfigurationList) DeepCopy() *OperatorConfigurationList {
-	if opcl == nil { return nil }
+	if opcl == nil {
+		return nil
+	}
 	out := new(OperatorConfigurationList)
 	opcl.DeepCopyInto(out)
 	return out
@@ -205,4 +207,3 @@ func (opcl *OperatorConfigurationList) DeepCopyObject() runtime.Object {
 	}
 	return nil
 }
-
