@@ -62,6 +62,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *config.OperatorConfigur
 	result.ClusterLabels = fromCRD.Kubernetes.ClusterLabels
 	result.ClusterNameLabel = fromCRD.Kubernetes.ClusterNameLabel
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
+	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 
 	result.DefaultCPURequest = fromCRD.PostgresPodResources.DefaultCPURequest
 	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest

@@ -3,10 +3,10 @@ package controller
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/api/core/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
