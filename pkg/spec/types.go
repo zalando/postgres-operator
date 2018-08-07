@@ -205,17 +205,22 @@ func (n *NamespacedName) UnmarshalJSON(data []byte) error {
 // DecodeWorker separates the decode logic to (unit) test
 // from obtaining the operator namespace that depends on k8s mounting files at runtime
 func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
-	name := types.NewNamespacedNameFromString(value)
+	var (
+		name types.NamespacedName
+	)
 
-	if strings.Trim(value, string(types.Separator)) != "" && name == (types.NamespacedName{}) {
-		name.Name = value
-		name.Namespace = operatorNamespace
-	} else if name.Namespace == "" {
-		name.Namespace = operatorNamespace
+	result := strings.SplitN(value, string(types.Separator), 2)
+	if len(result) < 2 {
+		name.Name = result[0]
+	} else {
+		name.Name = strings.TrimLeft(result[1], string(types.Separator))
+		name.Namespace = result[0]
 	}
-
 	if name.Name == "" {
 		return fmt.Errorf("incorrect namespaced name: %v", value)
+	}
+	if name.Namespace == "" {
+		name.Namespace = operatorNamespace
 	}
 
 	*n = NamespacedName(name)
@@ -225,6 +230,8 @@ func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
 
 func (r RoleOrigin) String() string {
 	switch r {
+	case RoleOriginUnknown:
+		return "unknown"
 	case RoleOriginManifest:
 		return "manifest role"
 	case RoleOriginInfrastructure:
@@ -233,8 +240,9 @@ func (r RoleOrigin) String() string {
 		return "teams API role"
 	case RoleOriginSystem:
 		return "system role"
+	default:
+		panic(fmt.Sprintf("bogus role origin value %d", r))
 	}
-	return "unknown"
 }
 
 // GetOperatorNamespace assumes serviceaccount secret is mounted by kubernetes

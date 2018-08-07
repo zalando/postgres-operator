@@ -11,13 +11,13 @@ import:
 - package: github.com/lib/pq
 - package: github.com/motomux/pretty
 - package: k8s.io/apimachinery
-  version: kubernetes-1.9.9
+  version: kubernetes-1.11.1
 - package: k8s.io/apiextensions-apiserver
-  version: kubernetes-1.9.9
+  version: kubernetes-1.11.1
 - package: k8s.io/client-go
-  version: ^6.0.0
+  version: ^8.0.0
 - package: k8s.io/code-generator
-  version: kubernetes-1.9.9
+  version: kubernetes-1.11.1
 - package: k8s.io/gengo
 - package: gopkg.in/yaml.v2
 - package: github.com/mohae/deepcopy
