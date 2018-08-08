@@ -78,7 +78,8 @@ func (c *Cluster) isSystemUsername(username string) bool {
 
 func isValidFlag(flag string) bool {
 	for _, validFlag := range []string{constants.RoleFlagSuperuser, constants.RoleFlagLogin, constants.RoleFlagCreateDB,
-		constants.RoleFlagInherit, constants.RoleFlagReplication, constants.RoleFlagByPassRLS} {
+		constants.RoleFlagInherit, constants.RoleFlagReplication, constants.RoleFlagByPassRLS,
+		constants.RoleFlagCreateRole} {
 		if flag == validFlag || flag == "NO"+validFlag {
 			return true
 		}
