@@ -119,7 +119,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
-	cluster.oauthTokenGetter = NewSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
+	cluster.oauthTokenGetter = newSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
 	cluster.patroni = patroni.New(cluster.logger)
 
 	return cluster
@@ -404,15 +404,15 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
 }
 
-type ContainerCondition func(a, b v1.Container) bool
+type containerCondition func(a, b v1.Container) bool
 
-type ContainerCheck struct {
-	condition ContainerCondition
+type containerCheck struct {
+	condition containerCondition
 	reason    string
 }
 
-func NewCheck(msg string, cond ContainerCondition) ContainerCheck {
-	return ContainerCheck{reason: msg, condition: cond}
+func newCheck(msg string, cond containerCondition) containerCheck {
+	return containerCheck{reason: msg, condition: cond}
 }
 
 // compareContainers: compare containers from two stateful sets
@@ -422,18 +422,18 @@ func NewCheck(msg string, cond ContainerCondition) ContainerCheck {
 func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
 	reasons := make([]string, 0)
 	needsRollUpdate := false
-	checks := []ContainerCheck{
-		NewCheck("new statefulset's container %d name doesn't match the current one",
+	checks := []containerCheck{
+		newCheck("new statefulset's container %d name doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
-		NewCheck("new statefulset's container %d image doesn't match the current one",
+		newCheck("new statefulset's container %d image doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Image != b.Image }),
-		NewCheck("new statefulset's container %d ports don't match the current one",
+		newCheck("new statefulset's container %d ports don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
-		NewCheck("new statefulset's container %d resources don't match the current ones",
+		newCheck("new statefulset's container %d resources don't match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
-		NewCheck("new statefulset's container %d environment doesn't match the current one",
+		newCheck("new statefulset's container %d environment doesn't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
-		NewCheck("new statefulset's container %d environment sources don't match the current one",
+		newCheck("new statefulset's container %d environment sources don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 	}
 
@@ -630,6 +630,7 @@ func (c *Cluster) Delete() {
 	}
 }
 
+//NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
 func (c *Cluster) NeedsRepair() (bool, spec.PostgresStatus) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
@@ -905,9 +906,9 @@ func (c *Cluster) shouldDeleteSecret(secret *v1.Secret) (delete bool, userName s
 
 type simpleActionWithResult func() error
 
-type ClusterObjectGet func(name string) (spec.NamespacedName, error)
+type clusterObjectGet func(name string) (spec.NamespacedName, error)
 
-type ClusterObjectDelete func(name string) error
+type clusterObjectDelete func(name string) error
 
 func (c *Cluster) deletePatroniClusterObjects() error {
 	// TODO: figure out how to remove leftover patroni objects in other cases
@@ -924,8 +925,8 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 }
 
 func (c *Cluster) deleteClusterObject(
-	get ClusterObjectGet,
-	del ClusterObjectDelete,
+	get clusterObjectGet,
+	del clusterObjectDelete,
 	objType string) error {
 	for _, suffix := range patroniObjectSuffixes {
 		name := fmt.Sprintf("%s-%s", c.Name, suffix)

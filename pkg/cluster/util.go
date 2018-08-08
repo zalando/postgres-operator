@@ -35,7 +35,7 @@ type SecretOauthTokenGetter struct {
 	OAuthTokenSecretName spec.NamespacedName
 }
 
-func NewSecretOauthTokenGetter(kubeClient *k8sutil.KubernetesClient,
+func newSecretOauthTokenGetter(kubeClient *k8sutil.KubernetesClient,
 	OAuthTokenSecretName spec.NamespacedName) *SecretOauthTokenGetter {
 	return &SecretOauthTokenGetter{kubeClient, OAuthTokenSecretName}
 }

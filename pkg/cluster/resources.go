@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	RollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
+	rollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 )
 
 func (c *Cluster) listResources() error {
@@ -140,7 +140,7 @@ func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *v1beta1.StatefulSet, 
 	if anno == nil {
 		anno = make(map[string]string)
 	}
-	anno[RollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
+	anno[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
 	sset.SetAnnotations(anno)
 }
 
@@ -162,12 +162,12 @@ func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet,
 	anno := sset.GetAnnotations()
 	flag = defaultValue
 
-	stringFlag, exists := anno[RollingUpdateStatefulsetAnnotationKey]
+	stringFlag, exists := anno[rollingUpdateStatefulsetAnnotationKey]
 	if exists {
 		var err error
 		if flag, err = strconv.ParseBool(stringFlag); err != nil {
 			c.logger.Warnf("error when parsing %q annotation for the statefulset %q: expected boolean value, got %q\n",
-				RollingUpdateStatefulsetAnnotationKey,
+				rollingUpdateStatefulsetAnnotationKey,
 				types.NamespacedName{Namespace: sset.Namespace, Name: sset.Name},
 				stringFlag)
 			flag = defaultValue

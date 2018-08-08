@@ -71,6 +71,7 @@ type Sidecar struct {
 	Env         []v1.EnvVar        `json:"env,omitempty"`
 }
 
+// UserFlags defines flags (such as superuser, nologin) that could be assigned to individual users
 type UserFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)

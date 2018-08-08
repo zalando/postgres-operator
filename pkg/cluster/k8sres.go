@@ -25,6 +25,7 @@ const (
 	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
 	patroniPGBinariesParameterName   = "bin_dir"
 	patroniPGParametersParameterName = "parameters"
+	patroniPGHBAConfParameterName    = "pg_hba"
 	localHost                        = "127.0.0.1/32"
 )
 
@@ -44,7 +45,6 @@ type patroniDCS struct {
 type pgBootstrap struct {
 	Initdb []interface{}     `json:"initdb"`
 	Users  map[string]pgUser `json:"users"`
-	PgHBA  []string          `json:"pg_hba"`
 	DCS    patroniDCS        `json:"dcs,omitempty"`
 }
 
@@ -202,19 +202,6 @@ PatroniInitDBParams:
 		config.Bootstrap.Initdb = append(config.Bootstrap.Initdb, map[string]string{k: v})
 	}
 
-	// pg_hba parameters in the manifest replace the default ones. We cannot
-	// reasonably merge them automatically, because pg_hba parsing stops on
-	// a first successfully matched rule.
-	if len(patroni.PgHba) > 0 {
-		config.Bootstrap.PgHBA = patroni.PgHba
-	} else {
-		config.Bootstrap.PgHBA = []string{
-			"hostnossl all all all reject",
-			fmt.Sprintf("hostssl   all +%s all pam", pamRoleName),
-			"hostssl   all all all md5",
-		}
-	}
-
 	if patroni.MaximumLagOnFailover >= 0 {
 		config.Bootstrap.DCS.MaximumLagOnFailover = patroni.MaximumLagOnFailover
 	}
@@ -231,23 +218,23 @@ PatroniInitDBParams:
 	config.PgLocalConfiguration = make(map[string]interface{})
 	config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
 	if len(pg.Parameters) > 0 {
-		localParameters := make(map[string]string)
-		bootstrapParameters := make(map[string]string)
-		for param, val := range pg.Parameters {
-			if isBootstrapOnlyParameter(param) {
-				bootstrapParameters[param] = val
-			} else {
-				localParameters[param] = val
-			}
+		local, bootstrap := getLocalAndBoostrapPostgreSQLParameters(pg.Parameters)
+
+		if len(local) > 0 {
+			config.PgLocalConfiguration[patroniPGParametersParameterName] = local
 		}
-		if len(localParameters) > 0 {
-			config.PgLocalConfiguration[patroniPGParametersParameterName] = localParameters
-		}
-		if len(bootstrapParameters) > 0 {
+		if len(bootstrap) > 0 {
 			config.Bootstrap.DCS.PGBootstrapConfiguration = make(map[string]interface{})
-			config.Bootstrap.DCS.PGBootstrapConfiguration[patroniPGParametersParameterName] = bootstrapParameters
+			config.Bootstrap.DCS.PGBootstrapConfiguration[patroniPGParametersParameterName] = bootstrap
 		}
 	}
+	// Patroni gives us a choice of writing pg_hba.conf to either the bootstrap section or to the local postgresql one.
+	// We choose the local one, because we need Patroni to change pg_hba.conf in PostgreSQL after the user changes the
+	// relevant section in the manifest.
+	if len(patroni.PgHba) > 0 {
+		config.PgLocalConfiguration[patroniPGHBAConfParameterName] = patroni.PgHba
+	}
+
 	config.Bootstrap.Users = map[string]pgUser{
 		pamRoleName: {
 			Password: "",
@@ -260,6 +247,19 @@ PatroniInitDBParams:
 		return ""
 	}
 	return string(result)
+}
+
+func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (local, bootstrap map[string]string) {
+	local = make(map[string]string)
+	bootstrap = make(map[string]string)
+	for param, val := range parameters {
+		if isBootstrapOnlyParameter(param) {
+			bootstrap[param] = val
+		} else {
+			local[param] = val
+		}
+	}
+	return
 }
 
 func nodeAffinity(nodeReadinessLabel map[string]string) *v1.Affinity {
@@ -736,7 +736,7 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: map[string]string{RollingUpdateStatefulsetAnnotationKey: "false"},
+			Annotations: map[string]string{rollingUpdateStatefulsetAnnotationKey: "false"},
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
