@@ -16,6 +16,8 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
 
 // EventType contains type of the events for the TPRs and Pods received from Kubernetes
@@ -49,11 +51,11 @@ const (
 
 // ClusterEvent carries the payload of the Cluster TPR events.
 type ClusterEvent struct {
-	EventTime time.Time
+	EventTime metav1.Time
 	UID       types.UID
 	EventType EventType
-	OldSpec   *Postgresql
-	NewSpec   *Postgresql
+	OldSpec   *acidv1.Postgresql
+	NewSpec   *acidv1.Postgresql
 	WorkerID  uint32
 }
 
@@ -128,8 +130,8 @@ type ClusterStatus struct {
 
 	CurrentProcess Process
 	Worker         uint32
-	Status         PostgresStatus
-	Spec           PostgresSpec
+	Status         acidv1.PostgresStatus
+	Spec           acidv1.PostgresSpec
 	Error          error
 }
 

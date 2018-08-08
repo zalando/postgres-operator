@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -60,7 +61,7 @@ type kubeResources struct {
 // Cluster describes postgresql cluster
 type Cluster struct {
 	kubeResources
-	spec.Postgresql
+	acidv1.Postgresql
 	Config
 	logger           *logrus.Entry
 	patroni          patroni.Interface
@@ -90,7 +91,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -147,7 +148,7 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
-func (c *Cluster) setStatus(status spec.PostgresStatus) {
+func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
 	c.Status = status
 	b, err := json.Marshal(status)
 	if err != nil {
@@ -173,7 +174,7 @@ func (c *Cluster) setStatus(status spec.PostgresStatus) {
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status == spec.ClusterStatusCreating
+	return c.Status == acidv1.ClusterStatusCreating
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
@@ -215,13 +216,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.setStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
+			c.setStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.setStatus(spec.ClusterStatusAddFailed)
+			c.setStatus(acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.setStatus(spec.ClusterStatusCreating)
+	c.setStatus(acidv1.ClusterStatusCreating)
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
@@ -482,20 +483,20 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
 // (i.e. service) is treated as an error.
-func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
+func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setStatus(spec.ClusterStatusUpdating)
+	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.setStatus(spec.ClusterStatusUpdateFailed)
-		} else if c.Status != spec.ClusterStatusRunning {
-			c.setStatus(spec.ClusterStatusRunning)
+			c.setStatus(acidv1.ClusterStatusUpdateFailed)
+		} else if c.Status != acidv1.ClusterStatusRunning {
+			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 
@@ -631,7 +632,7 @@ func (c *Cluster) Delete() {
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
-func (c *Cluster) NeedsRepair() (bool, spec.PostgresStatus) {
+func (c *Cluster) NeedsRepair() (bool, acidv1.PostgresStatus) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
 	return !c.Status.Success(), c.Status
@@ -835,7 +836,7 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 		PodDisruptionBudget: c.GetPodDisruptionBudget(),
 		CurrentProcess:      c.GetCurrentProcess(),
 
-		Error: c.Error,
+		Error: fmt.Errorf("error: %s", c.Error),
 	}
 }
 

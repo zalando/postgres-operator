@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -275,7 +276,7 @@ func (c *Controller) initSharedInformers() {
 			ListFunc:  c.clusterListFunc,
 			WatchFunc: c.clusterWatchFunc,
 		},
-		&spec.Postgresql{},
+		&acidv1.Postgresql{},
 		constants.QueueResyncPeriodTPR,
 		cache.Indexers{})
 

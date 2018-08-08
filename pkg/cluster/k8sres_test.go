@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"testing"
@@ -27,41 +27,41 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, spec.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
 
 	testName := "TestCreateLoadBalancerLogic"
 	tests := []struct {
 		subtest  string
 		role     PostgresRole
-		spec     *spec.PostgresSpec
+		spec     *acidv1.PostgresSpec
 		opConfig config.Config
 		result   bool
 	}{
 		{
 			subtest:  "new format, load balancer is enabled for replica",
 			role:     Replica,
-			spec:     &spec.PostgresSpec{EnableReplicaLoadBalancer: True()},
+			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: True()},
 			opConfig: config.Config{},
 			result:   true,
 		},
 		{
 			subtest:  "new format, load balancer is disabled for replica",
 			role:     Replica,
-			spec:     &spec.PostgresSpec{EnableReplicaLoadBalancer: False()},
+			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: False()},
 			opConfig: config.Config{},
 			result:   false,
 		},
 		{
 			subtest:  "new format, load balancer isn't specified for replica",
 			role:     Replica,
-			spec:     &spec.PostgresSpec{EnableReplicaLoadBalancer: nil},
+			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: nil},
 			opConfig: config.Config{EnableReplicaLoadBalancer: true},
 			result:   true,
 		},
 		{
 			subtest:  "new format, load balancer isn't specified for replica",
 			role:     Replica,
-			spec:     &spec.PostgresSpec{EnableReplicaLoadBalancer: nil},
+			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: nil},
 			opConfig: config.Config{EnableReplicaLoadBalancer: false},
 			result:   false,
 		},

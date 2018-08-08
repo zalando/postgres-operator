@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -203,7 +204,7 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 	}
 }
 
-func (c *Cluster) logVolumeChanges(old, new spec.Volume) {
+func (c *Cluster) logVolumeChanges(old, new acidv1.Volume) {
 	c.logger.Infof("volume specification has been changed")
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
 }
@@ -433,10 +434,10 @@ func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
 	return replicas[rand.Intn(len(replicas))]
 }
 
-func cloneSpec(from *spec.Postgresql) (*spec.Postgresql, error) {
+func cloneSpec(from *acidv1.Postgresql) (*acidv1.Postgresql, error) {
 	var (
 		buf    bytes.Buffer
-		result *spec.Postgresql
+		result *acidv1.Postgresql
 		err    error
 	)
 	enc := gob.NewEncoder(&buf)
@@ -450,13 +451,13 @@ func cloneSpec(from *spec.Postgresql) (*spec.Postgresql, error) {
 	return result, nil
 }
 
-func (c *Cluster) setSpec(newSpec *spec.Postgresql) {
+func (c *Cluster) setSpec(newSpec *acidv1.Postgresql) {
 	c.specMu.Lock()
 	c.Postgresql = *newSpec
 	c.specMu.Unlock()
 }
 
-func (c *Cluster) GetSpec() (*spec.Postgresql, error) {
+func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
 	return cloneSpec(&c.Postgresql)

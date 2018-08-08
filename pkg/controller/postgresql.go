@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -42,9 +43,9 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 }
 
 // clusterListFunc obtains a list of all PostgreSQL clusters
-func (c *Controller) listClusters(options metav1.ListOptions) (*spec.PostgresqlList, error) {
+func (c *Controller) listClusters(options metav1.ListOptions) (*acidv1.PostgresqlList, error) {
 	var (
-		list spec.PostgresqlList
+		list acidv1.PostgresqlList
 	)
 
 	req := c.KubeClient.CRDREST.
@@ -88,7 +89,7 @@ func (c *Controller) clusterListAndSync() error {
 		event = spec.EventRepair
 	}
 	if event != "" {
-		var list *spec.PostgresqlList
+		var list *acidv1.PostgresqlList
 		if list, err = c.listClusters(metav1.ListOptions{ResourceVersion: "0"}); err != nil {
 			return err
 		}
@@ -101,10 +102,11 @@ func (c *Controller) clusterListAndSync() error {
 }
 
 // queueEvents queues a sync or repair event for every cluster with a valid manifest
-func (c *Controller) queueEvents(list *spec.PostgresqlList, event spec.EventType) {
+func (c *Controller) queueEvents(list *acidv1.PostgresqlList, event spec.EventType) {
 	var activeClustersCnt, failedClustersCnt, clustersToRepair int
 	for i, pg := range list.Items {
-		if pg.Error != nil {
+		// XXX: check the cluster status field instead
+		if pg.Error != "" {
 			failedClustersCnt++
 			continue
 		}
@@ -143,7 +145,7 @@ func (c *Controller) queueEvents(list *spec.PostgresqlList, event spec.EventType
 
 func (c *Controller) acquireInitialListOfClusters() error {
 	var (
-		list        *spec.PostgresqlList
+		list        *acidv1.PostgresqlList
 		err         error
 		clusterName spec.NamespacedName
 	)
@@ -153,7 +155,8 @@ func (c *Controller) acquireInitialListOfClusters() error {
 	}
 	c.logger.Debugf("acquiring initial list of clusters")
 	for _, pg := range list.Items {
-		if pg.Error != nil {
+		// XXX: check the cluster status field instead
+		if pg.Error != "" {
 			continue
 		}
 		clusterName = util.NameFromMeta(pg.ObjectMeta)
@@ -179,7 +182,7 @@ func (d *crdDecoder) Close() {
 func (d *crdDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {
 	var e struct {
 		Type   watch.EventType
-		Object spec.Postgresql
+		Object acidv1.Postgresql
 	}
 	if err := d.dec.Decode(&e); err != nil {
 		return watch.Error, nil, err
@@ -208,7 +211,7 @@ func (c *Controller) clusterWatchFunc(options metav1.ListOptions) (watch.Interfa
 	}), nil
 }
 
-func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *spec.Postgresql) *cluster.Cluster {
+func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) *cluster.Cluster {
 	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg)
 	cl.Run(c.stopCh)
 	teamName := strings.ToLower(cl.Spec.TeamID)
@@ -286,7 +289,7 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
 		if err := cl.Create(); err != nil {
-			cl.Error = fmt.Errorf("could not create cluster: %v", err)
+			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
 			lg.Error(cl.Error)
 
 			return
@@ -302,12 +305,12 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 		}
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 		if err := cl.Update(event.OldSpec, event.NewSpec); err != nil {
-			cl.Error = fmt.Errorf("could not update cluster: %v", err)
+			cl.Error = fmt.Sprintf("could not update cluster: %v", err)
 			lg.Error(cl.Error)
 
 			return
 		}
-		cl.Error = nil
+		cl.Error = ""
 		lg.Infoln("cluster has been updated")
 
 		clHistory.Insert(&spec.Diff{
@@ -355,11 +358,11 @@ func (c *Controller) processEvent(event spec.ClusterEvent) {
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 		if err := cl.Sync(event.NewSpec); err != nil {
-			cl.Error = fmt.Errorf("could not sync cluster: %v", err)
+			cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
 			lg.Error(cl.Error)
 			return
 		}
-		cl.Error = nil
+		cl.Error = ""
 
 		lg.Infof("cluster has been synced")
 	}
@@ -391,7 +394,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	}
 }
 
-func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *spec.PostgresSpec) {
+func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.PostgresSpec) {
 
 	deprecate := func(deprecated, replacement string) {
 		c.logger.Warningf("Parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
@@ -421,7 +424,7 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *spec.Postgre
 // mergeDeprecatedPostgreSQLSpecParameters modifies the spec passed to the cluster by setting current parameter
 // values from the obsolete ones. Note: while the spec that is modified is a copy made in queueClusterEvent, it is
 // still a shallow copy, so be extra careful not to modify values pointer fields point to, but copy them instead.
-func (c *Controller) mergeDeprecatedPostgreSQLSpecParameters(spec *spec.PostgresSpec) *spec.PostgresSpec {
+func (c *Controller) mergeDeprecatedPostgreSQLSpecParameters(spec *acidv1.PostgresSpec) *acidv1.PostgresSpec {
 	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
 		(spec.EnableReplicaLoadBalancer == nil && spec.EnableMasterLoadBalancer == nil) {
 		if spec.UseLoadBalancer != nil {
@@ -439,17 +442,17 @@ func (c *Controller) mergeDeprecatedPostgreSQLSpecParameters(spec *spec.Postgres
 	return spec
 }
 
-func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *spec.Postgresql, eventType spec.EventType) {
+func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.Postgresql, eventType spec.EventType) {
 	var (
 		uid          types.UID
 		clusterName  spec.NamespacedName
-		clusterError error
+		clusterError string
 	)
 
 	if informerOldSpec != nil { //update, delete
 		uid = informerOldSpec.GetUID()
 		clusterName = util.NameFromMeta(informerOldSpec.ObjectMeta)
-		if eventType == spec.EventUpdate && informerNewSpec.Error == nil && informerOldSpec.Error != nil {
+		if eventType == spec.EventUpdate && informerNewSpec.Error == "" && informerOldSpec.Error != "" {
 			eventType = spec.EventSync
 			clusterError = informerNewSpec.Error
 		} else {
@@ -461,10 +464,10 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *spec.Po
 		clusterError = informerNewSpec.Error
 	}
 
-	if clusterError != nil && eventType != spec.EventDelete {
+	if clusterError != "" && eventType != spec.EventDelete {
 		c.logger.
 			WithField("cluster-name", clusterName).
-			Debugf("skipping %q event for the invalid cluster: %v", eventType, clusterError)
+			Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
 		return
 	}
 
@@ -513,7 +516,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *spec.Po
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
-	pg, ok := obj.(*spec.Postgresql)
+	pg, ok := obj.(*acidv1.Postgresql)
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
 		return
@@ -524,11 +527,11 @@ func (c *Controller) postgresqlAdd(obj interface{}) {
 }
 
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
-	pgOld, ok := prev.(*spec.Postgresql)
+	pgOld, ok := prev.(*acidv1.Postgresql)
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
 	}
-	pgNew, ok := cur.(*spec.Postgresql)
+	pgNew, ok := cur.(*acidv1.Postgresql)
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
 	}
@@ -540,7 +543,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {
-	pg, ok := obj.(*spec.Postgresql)
+	pg, ok := obj.(*acidv1.Postgresql)
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
 		return
