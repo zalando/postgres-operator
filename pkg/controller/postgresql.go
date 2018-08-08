@@ -32,7 +32,7 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-ticker.C:
-			if _, err := c.clusterListFunc(metav1.ListOptions{ResourceVersion: "0"}); err != nil {
+			if err := c.clusterListAndSync(); err != nil {
 				c.logger.Errorf("could not list clusters: %v", err)
 			}
 		case <-stopCh:
@@ -41,15 +41,10 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	}
 }
 
-// TODO: make a separate function to be called from InitSharedInformers
-// clusterListFunc obtains a list of all PostgreSQL clusters and runs sync when necessary
-// NB: as this function is called directly by the informer, it needs to avoid acquiring locks
-// on individual cluster structures. Therefore, it acts on the manifests obtained from Kubernetes
-// and not on the internal state of the clusters.
-func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
+// clusterListFunc obtains a list of all PostgreSQL clusters
+func (c *Controller) listClusters(options metav1.ListOptions) (*spec.PostgresqlList, error) {
 	var (
-		list  spec.PostgresqlList
-		event spec.EventType
+		list spec.PostgresqlList
 	)
 
 	req := c.KubeClient.CRDREST.
@@ -67,21 +62,42 @@ func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object
 		c.logger.Warningf("could not unmarshal list of clusters: %v", err)
 	}
 
+	return &list, err
+
+}
+
+// A separate function to be called from InitSharedInformers
+func (c *Controller) clusterListFunc(options metav1.ListOptions) (runtime.Object, error) {
+	return c.listClusters(options)
+}
+
+// clusterListAndSync lists all manifests and decides whether to run the sync or repair.
+func (c *Controller) clusterListAndSync() error {
+	var (
+		err   error
+		event spec.EventType
+	)
+
 	currentTime := time.Now().Unix()
 	timeFromPreviousSync := currentTime - atomic.LoadInt64(&c.lastClusterSyncTime)
 	timeFromPreviousRepair := currentTime - atomic.LoadInt64(&c.lastClusterRepairTime)
+
 	if timeFromPreviousSync >= int64(c.opConfig.ResyncPeriod.Seconds()) {
 		event = spec.EventSync
 	} else if timeFromPreviousRepair >= int64(c.opConfig.RepairPeriod.Seconds()) {
 		event = spec.EventRepair
 	}
 	if event != "" {
-		c.queueEvents(&list, event)
+		var list *spec.PostgresqlList
+		if list, err = c.listClusters(metav1.ListOptions{ResourceVersion: "0"}); err != nil {
+			return err
+		}
+		c.queueEvents(list, event)
 	} else {
 		c.logger.Infof("not enough time passed since the last sync (%s seconds) or repair (%s seconds)",
 			timeFromPreviousSync, timeFromPreviousRepair)
 	}
-	return &list, err
+	return nil
 }
 
 // queueEvents queues a sync or repair event for every cluster with a valid manifest
@@ -123,6 +139,30 @@ func (c *Controller) queueEvents(list *spec.PostgresqlList, event spec.EventType
 			atomic.StoreInt64(&c.lastClusterSyncTime, time.Now().Unix())
 		}
 	}
+}
+
+func (c *Controller) acquireInitialListOfClusters() error {
+	var (
+		list        *spec.PostgresqlList
+		err         error
+		clusterName spec.NamespacedName
+	)
+
+	if list, err = c.listClusters(metav1.ListOptions{ResourceVersion: "0"}); err != nil {
+		return err
+	}
+	c.logger.Debugf("acquiring initial list of clusters")
+	for _, pg := range list.Items {
+		if pg.Error != nil {
+			continue
+		}
+		clusterName = util.NameFromMeta(pg.ObjectMeta)
+		c.addCluster(c.logger, clusterName, &pg)
+		c.logger.Debugf("added new cluster: %q", clusterName)
+	}
+	// initiate initial sync of all clusters.
+	c.queueEvents(list, spec.EventSync)
+	return nil
 }
 
 type crdDecoder struct {

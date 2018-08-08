@@ -326,6 +326,18 @@ func (c *Controller) initSharedInformers() {
 func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	c.initController()
 
+	// start workers reading from the events queue to prevent the initial sync from blocking on it.
+	for i := range c.clusterEventQueues {
+		wg.Add(1)
+		c.workerLogs[uint32(i)] = ringlog.New(c.opConfig.RingLogLines)
+		go c.processClusterEventsQueue(i, stopCh, wg)
+	}
+
+	// populate clusters before starting nodeInformer that relies on it and run the initial sync
+	if err := c.acquireInitialListOfClusters(); err != nil {
+		panic("could not acquire initial list of clusters")
+	}
+
 	wg.Add(5)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
@@ -333,11 +345,6 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	go c.apiserver.Run(stopCh, wg)
 	go c.kubeNodesInformer(stopCh, wg)
 
-	for i := range c.clusterEventQueues {
-		wg.Add(1)
-		c.workerLogs[uint32(i)] = ringlog.New(c.opConfig.RingLogLines)
-		go c.processClusterEventsQueue(i, stopCh, wg)
-	}
 
 	c.logger.Info("started working in background")
 }

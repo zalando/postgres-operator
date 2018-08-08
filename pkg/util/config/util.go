@@ -172,10 +172,9 @@ func processField(value string, field reflect.Value) error {
 type parserState int
 
 const (
-	Plain parserState = iota
-	DoubleQuoted
-	SingleQuoted
-	Escape
+	plain        parserState = iota
+	doubleQuoted
+	singleQuoted
 )
 
 // Split the pair candidates by commas not located inside open quotes
@@ -183,7 +182,7 @@ const (
 // expect to find them inside the map values for our use cases
 func getMapPairsFromString(value string) (pairs []string, err error) {
 	pairs = make([]string, 0)
-	state := Plain
+	state := plain
 	var start, quote int
 
 	for i, ch := range strings.Split(value, "") {
@@ -191,29 +190,29 @@ func getMapPairsFromString(value string) (pairs []string, err error) {
 			fmt.Printf("Parser warning: ecape character '\\' have no effect on quotes inside the configuration value %s\n", value)
 		}
 		if ch == `"` {
-			if state == Plain {
-				state = DoubleQuoted
+			if state == plain {
+				state = doubleQuoted
 				quote = i
-			} else if state == DoubleQuoted {
-				state = Plain
+			} else if state == doubleQuoted {
+				state = plain
 				quote = 0
 			}
 		}
 		if ch == "'" {
-			if state == Plain {
-				state = SingleQuoted
+			if state == plain {
+				state = singleQuoted
 				quote = i
-			} else if state == SingleQuoted {
-				state = Plain
+			} else if state == singleQuoted {
+				state = plain
 				quote = 0
 			}
 		}
-		if ch == "," && state == Plain {
+		if ch == "," && state == plain {
 			pairs = append(pairs, strings.Trim(value[start:i], " \t"))
 			start = i + 1
 		}
 	}
-	if state != Plain {
+	if state != plain {
 		err = fmt.Errorf("unmatched quote starting at position %d", quote+1)
 		pairs = nil
 	} else {
