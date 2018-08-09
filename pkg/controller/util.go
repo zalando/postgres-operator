@@ -11,9 +11,9 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"gopkg.in/yaml.v2"
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
 
 func (c *Controller) makeClusterConfig() cluster.Config {
@@ -47,20 +47,18 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 	return c.clusterWorkers[clusterName]
 }
 
-func (c *Controller) createOperatorCRD(plural, singular, short string) error {
+func (c *Controller) createOperatorCRD(name, kind, plural, short string) error {
 	crd := &apiextv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: plural + "." + constants.CRDGroup,
+			Name: name,
 		},
 		Spec: apiextv1beta1.CustomResourceDefinitionSpec{
-			Group:   constants.CRDGroup,
-			Version: constants.CRDApiVersion,
+			Group:   acidv1.SchemeGroupVersion.Group,
+			Version: acidv1.SchemeGroupVersion.Version,
 			Names: apiextv1beta1.CustomResourceDefinitionNames{
 				Plural:     plural,
-				Singular:   singular,
 				ShortNames: []string{short},
-				Kind:       singular,
-				ListKind:   singular + "List",
+				Kind:       kind,
 			},
 			Scope: apiextv1beta1.NamespaceScoped,
 		},
@@ -99,11 +97,17 @@ func (c *Controller) createOperatorCRD(plural, singular, short string) error {
 }
 
 func (c *Controller) createPostgresCRD() error {
-	return c.createOperatorCRD(constants.PostgresCRDResource, constants.PostgresCRDKind, constants.PostgresCRDShort)
+	return c.createOperatorCRD(acidv1.PostgresCRDResouceName,
+		acidv1.PostgresCRDResourceKind,
+		acidv1.PostgresCRDResourcePlural,
+		acidv1.PostgresCRDResourceShort)
 }
 
 func (c *Controller) createConfigurationCRD() error {
-	return c.createOperatorCRD(constants.OperatorConfigCRDResource, constants.OperatorConfigCRDKind, constants.OperatorConfigCRDShort)
+	return c.createOperatorCRD(acidv1.OperatorConfigCRDResourceName,
+		acidv1.OperatorConfigCRDResouceKind,
+		acidv1.OperatorConfigCRDResourcePlural,
+		acidv1.OperatorConfigCRDResourceShort)
 }
 
 func readDecodedRole(s string) (*spec.PgUser, error) {

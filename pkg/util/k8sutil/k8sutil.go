@@ -3,7 +3,6 @@ package k8sutil
 import (
 	"fmt"
 	"reflect"
-
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -19,8 +18,9 @@ import (
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+
+	acidv1client "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
 )
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -42,6 +42,7 @@ type KubernetesClient struct {
 
 	RESTClient rest.Interface
 	CRDREST    rest.Interface
+	AcidV1ClientSet *acidv1client.Clientset
 }
 
 // RestConfig creates REST config
@@ -108,6 +109,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	}
 
 	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1beta1()
+	kubeClient.AcidV1ClientSet = acidv1client.NewForConfigOrDie(cfg)
 
 	return kubeClient, nil
 }

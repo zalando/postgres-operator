@@ -51,7 +51,7 @@ const (
 
 // ClusterEvent carries the payload of the Cluster TPR events.
 type ClusterEvent struct {
-	EventTime metav1.Time
+	EventTime time.Time
 	UID       types.UID
 	EventType EventType
 	OldSpec   *acidv1.Postgresql

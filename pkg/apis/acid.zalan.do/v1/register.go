@@ -5,22 +5,30 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	acidzalando "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
+	"github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
 )
 
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: acidzalando.GroupName, Version: "v1"}
 
-// Resource takes an unqualified resource and returns a Group qualified GroupResource
-func Resource(resource string) schema.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
-}
+const (
+	PostgresCRDResourceKind   = "postgresql"
+	PostgresCRDResourcePlural = "postgresqls"
+	PostgresCRDResouceName    = PostgresCRDResourcePlural + "." + acidzalando.GroupName
+	PostgresCRDResourceShort  = "pg"
+
+	OperatorConfigCRDResouceKind    = "postgresql-operator-configuration"
+	OperatorConfigCRDResourcePlural = "postgresql-operator-configurations"
+	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
+	OperatorConfigCRDResourceShort  = "pgopconfig"
+
+	ApiVersion = "v1"
+)
 
 var (
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
 	SchemeBuilder      runtime.SchemeBuilder
 	localSchemeBuilder = &SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
+	SchemeGroupVersion = schema.GroupVersion{Group: acidzalando.GroupName, Version: ApiVersion}
 )
 
 func init() {
@@ -30,12 +38,18 @@ func init() {
 	localSchemeBuilder.Register(addKnownTypes)
 }
 
+// Resource takes an unqualified resource and returns a Group qualified GroupResource
+func Resource(resource string) schema.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
+}
+
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Postgresql{},
-		&PostgresqlList{},
-	)
+	// AddKnownType assumes derives the type kind from the type name, which is always uppercase.
+	// For our CRDs we use lowercase names historically, therefore we have to supply the name separately.
+	// TODO: User uppercase CRDResourceKind of our types in the next major API version
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresql"), &Postgresql{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresqlList"), &PostgresqlList{})
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

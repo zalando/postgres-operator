@@ -26,7 +26,7 @@ package v1
 
 import (
 	v1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	scheme "github.com/zalando-incubator/postgres-operator/pkg/client/clientset/versioned/scheme"
+	scheme "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"

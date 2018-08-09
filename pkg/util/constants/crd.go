@@ -2,12 +2,12 @@ package constants
 
 // Different properties of the PostgreSQL Custom Resource Definition
 const (
-	PostgresCRDKind           = "postgresql"
+	CRDGroup                  = "acid.zalan.do"
+	PostgresCRDKind           = "Postgresql"
 	PostgresCRDResource       = "postgresqls"
 	PostgresCRDShort          = "pg"
-	CRDGroup                  = "acid.zalan.do"
 	CRDApiVersion             = "v1"
-	OperatorConfigCRDKind     = "postgresql-operator-configuration"
+	OperatorConfigCRDKind     = "Postgresql-operator-configuration"
 	OperatorConfigCRDResource = "postgresql-operator-configurations"
 	OperatorConfigCRDShort    = "pgopconfig"
 )

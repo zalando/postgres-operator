@@ -28,9 +28,9 @@ import (
 	time "time"
 
 	acidzalandov1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	versioned "github.com/zalando-incubator/postgres-operator/pkg/client/clientset/versioned"
-	internalinterfaces "github.com/zalando-incubator/postgres-operator/pkg/client/informers/externalversions/internalinterfaces"
-	v1 "github.com/zalando-incubator/postgres-operator/pkg/client/listers/acid.zalan.do/v1"
+	versioned "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
+	internalinterfaces "github.com/zalando-incubator/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/zalando-incubator/postgres-operator/pkg/generated/listers/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
