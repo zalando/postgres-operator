@@ -12,7 +12,7 @@ configuration.
 
 * CRD-based configuration.  The configuration is stored in the custom YAML
   manifest, an instance of the custom resource definition (CRD) called
-  `postgresql-operator-configuration`.  This CRD is registered by the operator
+  `OperatorConfiguration`.  This CRD is registered by the operator
   during the start when `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` variable is
   set to a non-empty value. The CRD-based configuration is a regular YAML
   document; non-scalar keys are simply represented in the usual YAML way. The

@@ -48,7 +48,7 @@ type Controller struct {
 	postgresqlInformer cache.SharedIndexInformer
 	podInformer        cache.SharedIndexInformer
 	nodesInformer      cache.SharedIndexInformer
-	podCh              chan spec.PodEvent
+	podCh              chan cluster.PodEvent
 
 	clusterEventQueues    []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime   int64
@@ -76,7 +76,7 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 		clusterHistory:   make(map[spec.NamespacedName]ringlog.RingLogger),
 		teamClusters:     make(map[string][]spec.NamespacedName),
 		stopCh:           make(chan struct{}),
-		podCh:            make(chan spec.PodEvent),
+		podCh:            make(chan cluster.PodEvent),
 	}
 	logger.Hooks.Add(c)
 
@@ -229,9 +229,9 @@ func (c *Controller) initController() {
 		}
 	} else {
 		c.initOperatorConfig()
-		c.initPodServiceAccount()
-		c.initRoleBinding()
 	}
+	c.initPodServiceAccount()
+	c.initRoleBinding()
 
 	c.modifyConfigFromEnvironment()
 
@@ -258,7 +258,7 @@ func (c *Controller) initController() {
 	c.workerLogs = make(map[uint32]ringlog.RingLogger, c.opConfig.Workers)
 	for i := range c.clusterEventQueues {
 		c.clusterEventQueues[i] = cache.NewFIFO(func(obj interface{}) (string, error) {
-			e, ok := obj.(spec.ClusterEvent)
+			e, ok := obj.(ClusterEvent)
 			if !ok {
 				return "", fmt.Errorf("could not cast to ClusterEvent")
 			}
@@ -359,7 +359,7 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 	c.postgresqlInformer.Run(stopCh)
 }
 
-func queueClusterKey(eventType spec.EventType, uid types.UID) string {
+func queueClusterKey(eventType EventType, uid types.UID) string {
 	return fmt.Sprintf("%s-%s", eventType, uid)
 }
 

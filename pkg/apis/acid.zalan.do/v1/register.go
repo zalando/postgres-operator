@@ -15,10 +15,10 @@ const (
 	PostgresCRDResouceName    = PostgresCRDResourcePlural + "." + acidzalando.GroupName
 	PostgresCRDResourceShort  = "pg"
 
-	OperatorConfigCRDResouceKind    = "postgresql-operator-configuration"
-	OperatorConfigCRDResourcePlural = "postgresql-operator-configurations"
+	OperatorConfigCRDResouceKind    = "OperatorConfiguration"
+	OperatorConfigCRDResourcePlural = "operatorconfigurations"
 	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
-	OperatorConfigCRDResourceShort  = "pgopconfig"
+	OperatorConfigCRDResourceShort  = "opconfig"
 
 	ApiVersion = "v1"
 )
@@ -50,6 +50,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO: User uppercase CRDResourceKind of our types in the next major API version
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresql"), &Postgresql{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresqlList"), &PostgresqlList{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("OperatorConfiguration"),
+		&OperatorConfiguration{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("OperatorConfigurationList"),
+		&OperatorConfigurationList{})
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

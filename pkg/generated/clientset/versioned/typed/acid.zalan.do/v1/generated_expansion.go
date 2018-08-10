@@ -24,4 +24,6 @@ SOFTWARE.
 
 package v1
 
+type OperatorConfigurationExpansion interface{}
+
 type PostgresqlExpansion interface{}

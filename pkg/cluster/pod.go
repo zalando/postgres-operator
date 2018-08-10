@@ -97,12 +97,12 @@ func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {
 	delete(c.podSubscribers, podName)
 }
 
-func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan spec.PodEvent {
+func (c *Cluster) registerPodSubscriber(podName spec.NamespacedName) chan PodEvent {
 	c.logger.Debugf("subscribing to pod %q", podName)
 	c.podSubscribersMu.Lock()
 	defer c.podSubscribersMu.Unlock()
 
-	ch := make(chan spec.PodEvent)
+	ch := make(chan PodEvent)
 	if _, ok := c.podSubscribers[podName]; ok {
 		panic("pod '" + podName.String() + "' is already subscribed")
 	}

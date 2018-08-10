@@ -33,12 +33,17 @@ import (
 
 type AcidV1Interface interface {
 	RESTClient() rest.Interface
+	OperatorConfigurationsGetter
 	PostgresqlsGetter
 }
 
 // AcidV1Client is used to interact with features provided by the acid.zalan.do group.
 type AcidV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AcidV1Client) OperatorConfigurations(namespace string) OperatorConfigurationInterface {
+	return newOperatorConfigurations(c, namespace)
 }
 
 func (c *AcidV1Client) Postgresqls(namespace string) PostgresqlInterface {

@@ -21,6 +21,8 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 
 	acidv1client "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
 )
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -88,10 +90,11 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
 
+	// XXX: get rid of that code once we use use the generated client to update status
 	cfg2 := *cfg
 	cfg2.GroupVersion = &schema.GroupVersion{
-		Group:   constants.CRDGroup,
-		Version: constants.CRDApiVersion,
+		Group:   acidzalando.GroupName,
+		Version: acidv1.ApiVersion,
 	}
 	cfg2.APIPath = constants.K8sAPIPath
 	// MIGRATION: api.codecs -> scheme.Codecs?

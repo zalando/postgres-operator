@@ -34,6 +34,10 @@ type FakeAcidV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAcidV1) OperatorConfigurations(namespace string) v1.OperatorConfigurationInterface {
+	return &FakeOperatorConfigurations{c, namespace}
+}
+
 func (c *FakeAcidV1) Postgresqls(namespace string) v1.PostgresqlInterface {
 	return &FakePostgresqls{c, namespace}
 }

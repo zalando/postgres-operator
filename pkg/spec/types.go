@@ -11,31 +11,15 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
 
-// EventType contains type of the events for the TPRs and Pods received from Kubernetes
-type EventType string
 
 // NamespacedName describes the namespace/name pairs used in Kubernetes names.
 type NamespacedName types.NamespacedName
 
-// Possible values for the EventType
-const (
-	EventAdd    EventType = "ADD"
-	EventUpdate EventType = "UPDATE"
-	EventDelete EventType = "DELETE"
-	EventSync   EventType = "SYNC"
-	EventRepair EventType = "REPAIR"
-
-	fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-)
+const fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
 // RoleOrigin contains the code of the origin of a role
 type RoleOrigin int
@@ -49,16 +33,6 @@ const (
 	RoleOriginSystem
 )
 
-// ClusterEvent carries the payload of the Cluster TPR events.
-type ClusterEvent struct {
-	EventTime time.Time
-	UID       types.UID
-	EventType EventType
-	OldSpec   *acidv1.Postgresql
-	NewSpec   *acidv1.Postgresql
-	WorkerID  uint32
-}
-
 type syncUserOperation int
 
 // Possible values for the sync user operation (removal of users is not supported yet)
@@ -67,15 +41,6 @@ const (
 	PGsyncUserAlter
 	PGSyncAlterSet // handle ALTER ROLE SET parameter = value
 )
-
-// PodEvent describes the event for a single Pod
-type PodEvent struct {
-	ResourceVersion string
-	PodName         NamespacedName
-	PrevPod         *v1.Pod
-	CurPod          *v1.Pod
-	EventType       EventType
-}
 
 // PgUser contains information about a single user.
 type PgUser struct {
@@ -111,35 +76,6 @@ type LogEntry struct {
 	Message     string
 }
 
-// Process describes process of the cluster
-type Process struct {
-	Name      string
-	StartTime time.Time
-}
-
-// ClusterStatus describes status of the cluster
-type ClusterStatus struct {
-	Team                string
-	Cluster             string
-	MasterService       *v1.Service
-	ReplicaService      *v1.Service
-	MasterEndpoint      *v1.Endpoints
-	ReplicaEndpoint     *v1.Endpoints
-	StatefulSet         *v1beta1.StatefulSet
-	PodDisruptionBudget *policyv1beta1.PodDisruptionBudget
-
-	CurrentProcess Process
-	Worker         uint32
-	Status         acidv1.PostgresStatus
-	Spec           acidv1.PostgresSpec
-	Error          error
-}
-
-// WorkerStatus describes status of the worker
-type WorkerStatus struct {
-	CurrentCluster NamespacedName
-	CurrentProcess Process
-}
 
 // Diff describes diff
 type Diff struct {
@@ -261,31 +197,4 @@ func GetOperatorNamespace() string {
 		operatorNamespace = string(operatorNamespaceBytes)
 	}
 	return operatorNamespace
-}
-
-type Duration time.Duration
-
-func (d *Duration) UnmarshalJSON(b []byte) error {
-	var (
-		v   interface{}
-		err error
-	)
-	if err = json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-	switch val := v.(type) {
-	case string:
-		t, err := time.ParseDuration(val)
-		if err != nil {
-			return err
-		}
-		*d = Duration(t)
-		return nil
-	case float64:
-		t := time.Duration(val)
-		*d = Duration(t)
-		return nil
-	default:
-		return fmt.Errorf("could not recognize type %T as a valid type to unmarshal to Duration", val)
-	}
 }

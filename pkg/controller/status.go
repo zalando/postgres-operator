@@ -11,10 +11,11 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ClusterStatus provides status of the cluster
-func (c *Controller) ClusterStatus(team, namespace, cluster string) (*spec.ClusterStatus, error) {
+func (c *Controller) ClusterStatus(team, namespace, cluster string) (*cluster.ClusterStatus, error) {
 
 	clusterName := spec.NamespacedName{
 		Namespace: namespace,
@@ -196,7 +197,7 @@ func (c *Controller) GetWorkersCnt() uint32 {
 }
 
 //WorkerStatus provides status of the worker
-func (c *Controller) WorkerStatus(workerID uint32) (*spec.WorkerStatus, error) {
+func (c *Controller) WorkerStatus(workerID uint32) (*cluster.WorkerStatus, error) {
 	obj, ok := c.curWorkerCluster.Load(workerID)
 	if !ok || obj == nil {
 		return nil, nil
@@ -207,8 +208,8 @@ func (c *Controller) WorkerStatus(workerID uint32) (*spec.WorkerStatus, error) {
 		return nil, fmt.Errorf("could not cast to Cluster struct")
 	}
 
-	return &spec.WorkerStatus{
-		CurrentCluster: util.NameFromMeta(cl.ObjectMeta),
+	return &cluster.WorkerStatus{
+		CurrentCluster: types.NamespacedName(util.NameFromMeta(cl.ObjectMeta)),
 		CurrentProcess: cl.GetCurrentProcess(),
 	}, nil
 }

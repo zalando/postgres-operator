@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidzalando "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -233,7 +234,7 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
+func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
@@ -255,12 +256,12 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, stopChan chan st
 	}
 }
 
-func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
+func (c *Cluster) waitForPodDeletion(podEvents chan PodEvent) error {
 	timeout := time.After(c.OpConfig.PodDeletionWaitTimeout)
 	for {
 		select {
 		case podEvent := <-podEvents:
-			if podEvent.EventType == spec.EventDelete {
+			if podEvent.EventType == PodEventDelete {
 				return nil
 			}
 		case <-timeout:
@@ -426,8 +427,8 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 	return c.OpConfig.SecretNameTemplate.Format(
 		"username", strings.Replace(username, "_", "-", -1),
 		"cluster", clusterName,
-		"tprkind", constants.PostgresCRDKind,
-		"tprgroup", constants.CRDGroup)
+		"tprkind", acidv1.PostgresCRDResourceKind,
+		"tprgroup", acidzalando.GroupName)
 }
 
 func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
