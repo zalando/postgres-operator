@@ -45,6 +45,8 @@ They will be deprecated and removed in the future.
 
 Variable names are underscore-separated words.
 
+**Important:** the default parameter values mentioned below are values hardcoded into the operator codebase. They are likely be overwritten in your local operator installation via either operator configmap or CRD. 
+
 ## General
 
 Those are top-level keys, containing both leaf keys and groups.
