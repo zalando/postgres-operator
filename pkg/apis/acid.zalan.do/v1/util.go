@@ -87,11 +87,11 @@ func validateCloneClusterDescription(clone *CloneDescription) error {
 }
 
 func (status PostgresStatus) Success() bool {
-	return status != ClusterStatusAddFailed &&
-		status != ClusterStatusUpdateFailed &&
-		status != ClusterStatusSyncFailed
+	return status.State != ClusterStatusAddFailed &&
+		status.State!= ClusterStatusUpdateFailed &&
+		status.State!= ClusterStatusSyncFailed
 }
 
 func (status PostgresStatus) String() string {
-	return string(status)
+	return string(status.State)
 }

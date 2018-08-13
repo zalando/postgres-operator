@@ -48,6 +48,7 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 }
 
 func (c *Controller) createOperatorCRD(name, kind, plural, short string) error {
+	subResourceStatus := apiextv1beta1.CustomResourceSubresourceStatus{}
 	crd := &apiextv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -61,6 +62,9 @@ func (c *Controller) createOperatorCRD(name, kind, plural, short string) error {
 				Kind:       kind,
 			},
 			Scope: apiextv1beta1.NamespaceScoped,
+			Subresources: &apiextv1beta1.CustomResourceSubresources{
+				Status: &subResourceStatus,
+			},
 		},
 	}
 

@@ -81,7 +81,7 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 		}
 
 		tmp.Error = err.Error()
-		tmp.Status = ClusterStatusInvalid
+		tmp.Status = PostgresStatus{State: ClusterStatusInvalid}
 
 		*p = Postgresql(tmp)
 
@@ -91,10 +91,10 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 
 	if clusterName, err := extractClusterName(tmp2.ObjectMeta.Name, tmp2.Spec.TeamID); err != nil {
 		tmp2.Error = err.Error()
-		tmp2.Status = ClusterStatusInvalid
+		tmp2.Status = PostgresStatus{ClusterStatusInvalid}
 	} else if err := validateCloneClusterDescription(&tmp2.Spec.Clone); err != nil {
 		tmp2.Error = err.Error()
-		tmp2.Status = ClusterStatusInvalid
+		tmp2.Status = PostgresStatus{ClusterStatusInvalid}
 	} else {
 		tmp2.Spec.ClusterName = clusterName
 	}

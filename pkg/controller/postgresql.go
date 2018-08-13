@@ -468,6 +468,7 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
 	}
+	// Avoid the inifinite recursion for status updates
 	if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
 		return
 	}

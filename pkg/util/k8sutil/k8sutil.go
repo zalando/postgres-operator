@@ -8,10 +8,7 @@ import (
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
@@ -21,8 +18,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 
 	acidv1client "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
 )
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -43,7 +38,6 @@ type KubernetesClient struct {
 	apiextbeta1.CustomResourceDefinitionsGetter
 
 	RESTClient rest.Interface
-	CRDREST    rest.Interface
 	AcidV1ClientSet *acidv1client.Clientset
 }
 
@@ -90,21 +84,6 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
 
-	// XXX: get rid of that code once we use use the generated client to update status
-	cfg2 := *cfg
-	cfg2.GroupVersion = &schema.GroupVersion{
-		Group:   acidzalando.GroupName,
-		Version: acidv1.ApiVersion,
-	}
-	cfg2.APIPath = constants.K8sAPIPath
-	// MIGRATION: api.codecs -> scheme.Codecs?
-	cfg2.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
-
-	crd, err := rest.RESTClientFor(&cfg2)
-	if err != nil {
-		return kubeClient, fmt.Errorf("could not get rest client: %v", err)
-	}
-	kubeClient.CRDREST = crd
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {
