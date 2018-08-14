@@ -29,6 +29,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	"encoding/json"
 )
 
 var (
@@ -147,10 +148,19 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
-func (c *Cluster) setStatus(status acidv1.ClusterStateType) {
-	c.Status = acidv1.PostgresStatus{status}
+func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
 	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.OpConfig.WatchedNamespace).Update(&c.Postgresql)
+	var (
+		err error
+		b []byte
+	)
+	b, err = json.Marshal(status)
+
+	patch := []byte(fmt.Sprintf(`{"status": %s}`, string(b)))
+	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
+	// we should take advantage of it.
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.OpConfig.WatchedNamespace).Patch(c.Name, types.MergePatchType, patch)
 	if err != nil {
 		c.logger.Fatalf("could not update status: %v", err)
 	}
@@ -159,7 +169,7 @@ func (c *Cluster) setStatus(status acidv1.ClusterStateType) {
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status.State == acidv1.ClusterStatusCreating
+	return c.Status == acidv1.ClusterStatusCreating
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
@@ -480,7 +490,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	defer func() {
 		if updateFailed {
 			c.setStatus(acidv1.ClusterStatusUpdateFailed)
-		} else if c.Status.State != acidv1.ClusterStatusRunning {
+		} else if c.Status != acidv1.ClusterStatusRunning {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
