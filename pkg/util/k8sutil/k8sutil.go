@@ -2,7 +2,7 @@ package k8sutil
 
 import (
 	"fmt"
-	"reflect"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -15,7 +15,7 @@ import (
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"reflect"
 
 	acidv1client "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
 )
@@ -37,7 +37,7 @@ type KubernetesClient struct {
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
 
-	RESTClient rest.Interface
+	RESTClient      rest.Interface
 	AcidV1ClientSet *acidv1client.Clientset
 }
 
@@ -83,7 +83,6 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
-
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {

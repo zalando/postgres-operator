@@ -1,12 +1,12 @@
 package cluster
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/api/apps/v1beta1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"time"
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
+	"time"
 )
 
 // PostgresRole describes role of the node
@@ -44,13 +44,11 @@ type Process struct {
 	StartTime time.Time
 }
 
-
 // WorkerStatus describes status of the worker
 type WorkerStatus struct {
 	CurrentCluster types.NamespacedName
 	CurrentProcess Process
 }
-
 
 // ClusterStatus describes status of the cluster
 type ClusterStatus struct {

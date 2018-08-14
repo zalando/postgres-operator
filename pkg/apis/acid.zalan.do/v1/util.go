@@ -1,13 +1,12 @@
 package v1
 
 import (
-	"strings"
 	"fmt"
-	"time"
-	"regexp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"regexp"
+	"strings"
+	"time"
 )
-
 
 var (
 	weekdays         = map[string]int{"Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6}
@@ -21,7 +20,6 @@ func (p *Postgresql) Clone() *Postgresql {
 	return p.DeepCopy()
 }
 
-
 func parseTime(s string) (metav1.Time, error) {
 	parts := strings.Split(s, ":")
 	if len(parts) != 2 {
@@ -34,7 +32,7 @@ func parseTime(s string) (metav1.Time, error) {
 		return metav1.Time{}, err
 	}
 
-	return metav1.Time{tp.UTC()}, nil
+	return metav1.Time{Time: tp.UTC()}, nil
 }
 
 func parseWeekday(s string) (time.Weekday, error) {
@@ -45,8 +43,6 @@ func parseWeekday(s string) (time.Weekday, error) {
 
 	return time.Weekday(weekday), nil
 }
-
-
 
 func extractClusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)

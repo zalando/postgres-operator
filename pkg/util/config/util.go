@@ -172,7 +172,7 @@ func processField(value string, field reflect.Value) error {
 type parserState int
 
 const (
-	plain        parserState = iota
+	plain parserState = iota
 	doubleQuoted
 	singleQuoted
 )

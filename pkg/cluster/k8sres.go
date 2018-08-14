@@ -16,10 +16,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"k8s.io/apimachinery/pkg/labels"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 )
 
 const (

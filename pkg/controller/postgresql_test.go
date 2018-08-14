@@ -1,6 +1,7 @@
 package controller
 
 import (
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"reflect"
 	"testing"

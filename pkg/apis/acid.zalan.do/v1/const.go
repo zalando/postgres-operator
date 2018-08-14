@@ -13,6 +13,4 @@ const (
 	ClusterStatusAddFailed    PostgresStatus = "CreateFailed"
 	ClusterStatusRunning      PostgresStatus = "Running"
 	ClusterStatusInvalid      PostgresStatus = "Invalid"
-
 )
-

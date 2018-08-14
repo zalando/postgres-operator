@@ -9,14 +9,14 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// Postgresql defines PostgreSQL Custom Resource Definition Object.
+//Postgresql defines PostgreSQL Custom Resource Definition Object.
 type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   PostgresSpec   `json:"spec"`
 	Status PostgresStatus `json:"status,omitempty"`
-	Error  string          `json:"-"`
+	Error  string         `json:"-"`
 }
 
 // PostgresSpec defines the specification for the PostgreSQL TPR.
@@ -125,9 +125,3 @@ type UserFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus string
-
-
-
-
-
-

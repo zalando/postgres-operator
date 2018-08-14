@@ -8,7 +8,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
 )
 
-
 const (
 	PostgresCRDResourceKind   = "postgresql"
 	PostgresCRDResourcePlural = "postgresqls"
@@ -20,7 +19,7 @@ const (
 	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
 	OperatorConfigCRDResourceShort  = "opconfig"
 
-	ApiVersion = "v1"
+	APIVersion = "v1"
 )
 
 var (
@@ -28,7 +27,7 @@ var (
 	SchemeBuilder      runtime.SchemeBuilder
 	localSchemeBuilder = &SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
-	SchemeGroupVersion = schema.GroupVersion{Group: acidzalando.GroupName, Version: ApiVersion}
+	SchemeGroupVersion = schema.GroupVersion{Group: acidzalando.GroupName, Version: APIVersion}
 )
 
 func init() {
@@ -57,4 +56,3 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
-

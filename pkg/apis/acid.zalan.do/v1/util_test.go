@@ -1,6 +1,5 @@
 package v1
 
-
 import (
 	"bytes"
 	"encoding/json"
@@ -359,7 +358,7 @@ func mustParseTime(s string) metav1.Time {
 		panic(err)
 	}
 
-	return metav1.Time{v.UTC()}
+	return metav1.Time{Time: v.UTC()}
 }
 
 func TestParseTime(t *testing.T) {
@@ -539,4 +538,3 @@ func TestPostgresqlClone(t *testing.T) {
 
 	}
 }
-

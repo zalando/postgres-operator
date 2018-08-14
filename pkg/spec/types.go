@@ -15,7 +15,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-
 // NamespacedName describes the namespace/name pairs used in Kubernetes names.
 type NamespacedName types.NamespacedName
 
@@ -75,7 +74,6 @@ type LogEntry struct {
 	Worker      *uint32         `json:",omitempty"`
 	Message     string
 }
-
 
 // Diff describes diff
 type Diff struct {

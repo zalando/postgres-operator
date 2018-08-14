@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"time"
 	"k8s.io/apimachinery/pkg/types"
+	"time"
 
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
@@ -19,7 +19,6 @@ const (
 	EventRepair EventType = "REPAIR"
 )
 
-
 // ClusterEvent carries the payload of the Cluster TPR events.
 type ClusterEvent struct {
 	EventTime time.Time
@@ -29,4 +28,3 @@ type ClusterEvent struct {
 	NewSpec   *acidv1.Postgresql
 	WorkerID  uint32
 }
-

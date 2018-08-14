@@ -3,8 +3,8 @@ package v1
 import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 )
 
@@ -33,18 +33,18 @@ type PostgresUsersConfiguration struct {
 type KubernetesMetaConfiguration struct {
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
-	PodServiceAccountDefinition            string              `json:"pod_service_account_definition,omitempty"`
-	PodServiceAccountRoleBindingDefinition string              `json:"pod_service_account_role_binding_definition,omitempty"`
-	PodTerminateGracePeriod                Duration       `json:"pod_terminate_grace_period,omitempty"`
-	WatchedNamespace                       string              `json:"watched_namespace,omitempty"`
-	PDBNameFormat                          config.StringTemplate      `json:"pdb_name_format,omitempty"`
-	SecretNameTemplate                     config.StringTemplate      `json:"secret_name_template,omitempty"`
-	OAuthTokenSecretName                   spec.NamespacedName `json:"oauth_token_secret_name,omitempty"`
-	InfrastructureRolesSecretName          spec.NamespacedName `json:"infrastructure_roles_secret_name,omitempty"`
-	PodRoleLabel                           string              `json:"pod_role_label,omitempty"`
-	ClusterLabels                          map[string]string   `json:"cluster_labels,omitempty"`
-	ClusterNameLabel                       string              `json:"cluster_name_label,omitempty"`
-	NodeReadinessLabel                     map[string]string   `json:"node_readiness_label,omitempty"`
+	PodServiceAccountDefinition            string                `json:"pod_service_account_definition,omitempty"`
+	PodServiceAccountRoleBindingDefinition string                `json:"pod_service_account_role_binding_definition,omitempty"`
+	PodTerminateGracePeriod                Duration              `json:"pod_terminate_grace_period,omitempty"`
+	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
+	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
+	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
+	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
+	InfrastructureRolesSecretName          spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
+	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
+	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
+	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
+	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
@@ -69,9 +69,9 @@ type OperatorTimeouts struct {
 }
 
 type LoadBalancerConfiguration struct {
-	DbHostedZone              string         `json:"db_hosted_zone,omitempty"`
-	EnableMasterLoadBalancer  bool           `json:"enable_master_load_balancer,omitempty"`
-	EnableReplicaLoadBalancer bool           `json:"enable_replica_load_balancer,omitempty"`
+	DbHostedZone              string                `json:"db_hosted_zone,omitempty"`
+	EnableMasterLoadBalancer  bool                  `json:"enable_master_load_balancer,omitempty"`
+	EnableReplicaLoadBalancer bool                  `json:"enable_replica_load_balancer,omitempty"`
 	MasterDNSNameFormat       config.StringTemplate `json:"master_dns_name_format,omitempty"`
 	ReplicaDNSNameFormat      config.StringTemplate `json:"replica_dns_name_format,omitempty"`
 }
@@ -121,8 +121,8 @@ type OperatorConfigurationData struct {
 	Workers                    uint32                       `json:"workers,omitempty"`
 	MinInstances               int32                        `json:"min_instances,omitempty"`
 	MaxInstances               int32                        `json:"max_instances,omitempty"`
-	ResyncPeriod               Duration                `json:"resync_period,omitempty"`
-	RepairPeriod               Duration                `json:"repair_period,omitempty"`
+	ResyncPeriod               Duration                     `json:"resync_period,omitempty"`
+	RepairPeriod               Duration                     `json:"repair_period,omitempty"`
 	Sidecars                   map[string]string            `json:"sidecar_docker_images,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration   `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration  `json:"kubernetes"`

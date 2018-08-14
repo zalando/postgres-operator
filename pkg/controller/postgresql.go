@@ -41,7 +41,7 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 // clusterListFunc obtains a list of all PostgreSQL clusters
 func (c *Controller) listClusters(options metav1.ListOptions) (*acidv1.PostgresqlList, error) {
 	// TODO: use the SharedInformer cache instead of quering Kubernetes API directly.
-	list, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.opConfig.WatchedNamespace).List(options);
+	list, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.opConfig.WatchedNamespace).List(options)
 	if err != nil {
 		c.logger.Errorf("could not list postgresql objects: %v", err)
 	}
