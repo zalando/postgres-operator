@@ -6,6 +6,7 @@ import (
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -15,7 +16,7 @@ import (
 
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
 // Unlike the update, sync does not error out if some objects do not exist and takes care of creating them.
-func (c *Cluster) Sync(newSpec *spec.Postgresql) error {
+func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	var err error
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -25,9 +26,9 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) error {
 	defer func() {
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			c.setStatus(spec.ClusterStatusSyncFailed)
-		} else if c.Status != spec.ClusterStatusRunning {
-			c.setStatus(spec.ClusterStatusRunning)
+			c.setStatus(acidv1.ClusterStatusSyncFailed)
+		} else if c.Status != acidv1.ClusterStatusRunning {
+			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 

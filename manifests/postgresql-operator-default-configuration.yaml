@@ -1,5 +1,5 @@
 apiVersion: "acid.zalan.do/v1"
-kind: postgresql-operator-configuration
+kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:

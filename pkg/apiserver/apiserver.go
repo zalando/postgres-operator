@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -30,14 +31,14 @@ type controllerInformer interface {
 	GetOperatorConfig() *config.Config
 	GetStatus() *spec.ControllerStatus
 	TeamClusterList() map[string][]spec.NamespacedName
-	ClusterStatus(team, namespace, cluster string) (*spec.ClusterStatus, error)
+	ClusterStatus(team, namespace, cluster string) (*cluster.ClusterStatus, error)
 	ClusterLogs(team, namespace, cluster string) ([]*spec.LogEntry, error)
 	ClusterHistory(team, namespace, cluster string) ([]*spec.Diff, error)
 	ClusterDatabasesMap() map[string][]string
 	WorkerLogs(workerID uint32) ([]*spec.LogEntry, error)
 	ListQueue(workerID uint32) (*spec.QueueDump, error)
 	GetWorkersCnt() uint32
-	WorkerStatus(workerID uint32) (*spec.WorkerStatus, error)
+	WorkerStatus(workerID uint32) (*cluster.WorkerStatus, error)
 }
 
 // Server describes HTTP API server
@@ -228,7 +229,7 @@ func (s *Server) workers(w http.ResponseWriter, req *http.Request) {
 		resp, err = s.controller.ListQueue(workerID)
 
 	} else if matches := util.FindNamedStringSubmatch(workerStatusURL, req.URL.Path); matches != nil {
-		var workerStatus *spec.WorkerStatus
+		var workerStatus *cluster.WorkerStatus
 
 		workerID := mustConvertToUint32(matches["id"])
 		resp = "idle"

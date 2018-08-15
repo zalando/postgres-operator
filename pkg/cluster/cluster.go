@@ -4,7 +4,6 @@ package cluster
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -20,6 +19,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	"encoding/json"
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -60,13 +61,13 @@ type kubeResources struct {
 // Cluster describes postgresql cluster
 type Cluster struct {
 	kubeResources
-	spec.Postgresql
+	acidv1.Postgresql
 	Config
 	logger           *logrus.Entry
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
-	podSubscribers   map[spec.NamespacedName]chan spec.PodEvent
+	podSubscribers   map[spec.NamespacedName]chan PodEvent
 	podSubscribersMu sync.RWMutex
 	pgDb             *sql.DB
 	mu               sync.Mutex
@@ -77,7 +78,7 @@ type Cluster struct {
 	teamsAPIClient   teams.Interface
 	oauthTokenGetter OAuthTokenGetter
 	KubeClient       k8sutil.KubernetesClient //TODO: move clients to the better place?
-	currentProcess   spec.Process
+	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
 }
@@ -90,11 +91,11 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
-		e, ok := obj.(spec.PodEvent)
+		e, ok := obj.(PodEvent)
 		if !ok {
 			return "", fmt.Errorf("could not cast to PodEvent")
 		}
@@ -107,7 +108,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		Postgresql:     pgSpec,
 		pgUsers:        make(map[string]spec.PgUser),
 		systemUsers:    make(map[string]spec.PgUser),
-		podSubscribers: make(map[spec.NamespacedName]chan spec.PodEvent),
+		podSubscribers: make(map[spec.NamespacedName]chan PodEvent),
 		kubeResources: kubeResources{
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
@@ -141,39 +142,36 @@ func (c *Cluster) teamName() string {
 func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	c.processMu.Lock()
 	defer c.processMu.Unlock()
-	c.currentProcess = spec.Process{
+	c.currentProcess = Process{
 		Name:      fmt.Sprintf(procName, args...),
 		StartTime: time.Now(),
 	}
 }
 
-func (c *Cluster) setStatus(status spec.PostgresStatus) {
-	c.Status = status
-	b, err := json.Marshal(status)
+func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
+	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
+	var (
+		err error
+		b   []byte
+	)
+	if b, err = json.Marshal(status); err != nil {
+		c.logger.Errorf("could not marshal status: %v", err)
+	}
+
+	patch := []byte(fmt.Sprintf(`{"status": %s}`, string(b)))
+	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
+	// we should take advantage of it.
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.OpConfig.WatchedNamespace).Patch(c.Name, types.MergePatchType, patch)
 	if err != nil {
-		c.logger.Fatalf("could not marshal status: %v", err)
+		c.logger.Errorf("could not update status: %v", err)
 	}
-	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
-
-	_, err = c.KubeClient.CRDREST.Patch(types.MergePatchType).
-		Namespace(c.Namespace).
-		Resource(constants.PostgresCRDResource).
-		Name(c.Name).
-		Body(request).
-		DoRaw()
-
-	if k8sutil.ResourceNotFound(err) {
-		c.logger.Warningf("could not set %q status for the non-existing cluster", status)
-		return
-	}
-
-	if err != nil {
-		c.logger.Warningf("could not set %q status for the cluster: %v", status, err)
-	}
+	// update the spec, maintaining the new resourceVersion.
+	c.setSpec(newspec)
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status == spec.ClusterStatusCreating
+	return c.Status == acidv1.ClusterStatusCreating
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
@@ -215,13 +213,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.setStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
+			c.setStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.setStatus(spec.ClusterStatusAddFailed)
+			c.setStatus(acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.setStatus(spec.ClusterStatusCreating)
+	c.setStatus(acidv1.ClusterStatusCreating)
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
@@ -482,20 +480,20 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
 // (i.e. service) is treated as an error.
-func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
+func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setStatus(spec.ClusterStatusUpdating)
+	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.setStatus(spec.ClusterStatusUpdateFailed)
-		} else if c.Status != spec.ClusterStatusRunning {
-			c.setStatus(spec.ClusterStatusRunning)
+			c.setStatus(acidv1.ClusterStatusUpdateFailed)
+		} else if c.Status != acidv1.ClusterStatusRunning {
+			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 
@@ -631,7 +629,7 @@ func (c *Cluster) Delete() {
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
-func (c *Cluster) NeedsRepair() (bool, spec.PostgresStatus) {
+func (c *Cluster) NeedsRepair() (bool, acidv1.PostgresStatus) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
 	return !c.Status.Success(), c.Status
@@ -639,20 +637,20 @@ func (c *Cluster) NeedsRepair() (bool, spec.PostgresStatus) {
 }
 
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
-func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
+func (c *Cluster) ReceivePodEvent(event PodEvent) {
 	if err := c.podEventsQueue.Add(event); err != nil {
 		c.logger.Errorf("error when receiving pod events: %v", err)
 	}
 }
 
 func (c *Cluster) processPodEvent(obj interface{}) error {
-	event, ok := obj.(spec.PodEvent)
+	event, ok := obj.(PodEvent)
 	if !ok {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
 
 	c.podSubscribersMu.RLock()
-	subscriber, ok := c.podSubscribers[event.PodName]
+	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
 	c.podSubscribersMu.RUnlock()
 	if ok {
 		subscriber <- event
@@ -812,7 +810,7 @@ func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) boo
 }
 
 // GetCurrentProcess provides name of the last process of the cluster
-func (c *Cluster) GetCurrentProcess() spec.Process {
+func (c *Cluster) GetCurrentProcess() Process {
 	c.processMu.RLock()
 	defer c.processMu.RUnlock()
 
@@ -820,8 +818,8 @@ func (c *Cluster) GetCurrentProcess() spec.Process {
 }
 
 // GetStatus provides status of the cluster
-func (c *Cluster) GetStatus() *spec.ClusterStatus {
-	return &spec.ClusterStatus{
+func (c *Cluster) GetStatus() *ClusterStatus {
+	return &ClusterStatus{
 		Cluster: c.Spec.ClusterName,
 		Team:    c.Spec.TeamID,
 		Status:  c.Status,
@@ -835,7 +833,7 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 		PodDisruptionBudget: c.GetPodDisruptionBudget(),
 		CurrentProcess:      c.GetCurrentProcess(),
 
-		Error: c.Error,
+		Error: fmt.Errorf("error: %s", c.Error),
 	}
 }
 

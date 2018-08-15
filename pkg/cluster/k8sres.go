@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -83,17 +84,17 @@ func (c *Cluster) podDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
 
-func (c *Cluster) makeDefaultResources() spec.Resources {
+func (c *Cluster) makeDefaultResources() acidv1.Resources {
 
 	config := c.OpConfig
 
-	defaultRequests := spec.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
-	defaultLimits := spec.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
+	defaultRequests := acidv1.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
+	defaultLimits := acidv1.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
 
-	return spec.Resources{ResourceRequest: defaultRequests, ResourceLimits: defaultLimits}
+	return acidv1.Resources{ResourceRequest: defaultRequests, ResourceLimits: defaultLimits}
 }
 
-func generateResourceRequirements(resources spec.Resources, defaultResources spec.Resources) (*v1.ResourceRequirements, error) {
+func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
 	var err error
 
 	specRequests := resources.ResourceRequest
@@ -114,7 +115,7 @@ func generateResourceRequirements(resources spec.Resources, defaultResources spe
 	return &result, nil
 }
 
-func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescription) (v1.ResourceList, error) {
+func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
 	var err error
 	requests := v1.ResourceList{}
 
@@ -144,7 +145,7 @@ func fillResourceList(spec spec.ResourceDescription, defaults spec.ResourceDescr
 	return requests, nil
 }
 
-func generateSpiloJSONConfiguration(pg *spec.PostgresqlParam, patroni *spec.Patroni, pamRoleName string, logger *logrus.Entry) string {
+func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, logger *logrus.Entry) string {
 	config := spiloConfiguration{}
 
 	config.Bootstrap = pgBootstrap{}
@@ -362,8 +363,8 @@ func generateSpiloContainer(
 	}
 }
 
-func generateSidecarContainers(sidecars []spec.Sidecar,
-	volumeMounts []v1.VolumeMount, defaultResources spec.Resources,
+func generateSidecarContainers(sidecars []acidv1.Sidecar,
+	volumeMounts []v1.VolumeMount, defaultResources acidv1.Resources,
 	superUserName string, credentialsSecretName string, logger *logrus.Entry) ([]v1.Container, error) {
 
 	if len(sidecars) > 0 {
@@ -438,7 +439,7 @@ func generatePodTemplate(
 }
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
-func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *spec.CloneDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -555,7 +556,7 @@ func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.
 	return result
 }
 
-func getSidecarContainer(sidecar spec.Sidecar, index int, volumeMounts []v1.VolumeMount,
+func getSidecarContainer(sidecar acidv1.Sidecar, index int, volumeMounts []v1.VolumeMount,
 	resources *v1.ResourceRequirements, superUserName string, credentialsSecretName string, logger *logrus.Entry) *v1.Container {
 	name := sidecar.Name
 	if name == "" {
@@ -618,20 +619,20 @@ func getBucketScopeSuffix(uid string) string {
 	return ""
 }
 
-func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) spec.Resources {
-	return spec.Resources{
-		ResourceRequest: spec.ResourceDescription{
+func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) acidv1.Resources {
+	return acidv1.Resources{
+		ResourceRequest: acidv1.ResourceDescription{
 			CPU:    cpuRequest,
 			Memory: memoryRequest,
 		},
-		ResourceLimits: spec.ResourceDescription{
+		ResourceLimits: acidv1.ResourceDescription{
 			CPU:    cpuLimit,
 			Memory: memoryLimit,
 		},
 	}
 }
 
-func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.StatefulSet, error) {
+func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.StatefulSet, error) {
 
 	var (
 		err                 error
@@ -751,14 +752,14 @@ func (c *Cluster) generateStatefulSet(spec *spec.PostgresSpec) (*v1beta1.Statefu
 }
 
 func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
-	containerResources *spec.Resources, logger *logrus.Entry) *spec.Sidecar {
+	containerResources *acidv1.Resources, logger *logrus.Entry) *acidv1.Sidecar {
 	if APIKey == "" || dockerImage == "" {
 		if APIKey == "" && dockerImage != "" {
 			logger.Warning("Not running Scalyr sidecar: SCALYR_API_KEY must be defined")
 		}
 		return nil
 	}
-	scalarSpec := &spec.Sidecar{
+	scalarSpec := &acidv1.Sidecar{
 		Name:        "scalyr-sidecar",
 		DockerImage: dockerImage,
 		Env: []v1.EnvVar{
@@ -780,9 +781,9 @@ func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage strin
 }
 
 // mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
-func (c *Cluster) mergeSidecars(sidecars []spec.Sidecar) []spec.Sidecar {
+func (c *Cluster) mergeSidecars(sidecars []acidv1.Sidecar) []acidv1.Sidecar {
 	globalSidecarsToSkip := map[string]bool{}
-	result := make([]spec.Sidecar, 0)
+	result := make([]acidv1.Sidecar, 0)
 
 	for i, sidecar := range sidecars {
 		dockerImage, ok := c.OpConfig.Sidecars[sidecar.Name]
@@ -798,13 +799,13 @@ func (c *Cluster) mergeSidecars(sidecars []spec.Sidecar) []spec.Sidecar {
 	}
 	for name, dockerImage := range c.OpConfig.Sidecars {
 		if !globalSidecarsToSkip[name] {
-			result = append(result, spec.Sidecar{Name: name, DockerImage: dockerImage})
+			result = append(result, acidv1.Sidecar{Name: name, DockerImage: dockerImage})
 		}
 	}
 	return result
 }
 
-func (c *Cluster) getNumberOfInstances(spec *spec.PostgresSpec) int32 {
+func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	min := c.OpConfig.MinInstances
 	max := c.OpConfig.MaxInstances
 	cur := spec.NumberOfInstances
@@ -907,7 +908,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
-func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *spec.PostgresSpec) bool {
+func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *acidv1.PostgresSpec) bool {
 
 	switch role {
 
@@ -935,7 +936,7 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *sp
 
 }
 
-func (c *Cluster) generateService(role PostgresRole, spec *spec.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {
 	var dnsName string
 
 	if role == Master {
@@ -1006,7 +1007,7 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 	return endpoints
 }
 
-func (c *Cluster) generateCloneEnvironment(description *spec.CloneDescription) []v1.EnvVar {
+func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription) []v1.EnvVar {
 	result := make([]v1.EnvVar, 0)
 
 	if description.ClusterName == "" {

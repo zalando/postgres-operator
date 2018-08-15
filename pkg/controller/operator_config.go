@@ -1,40 +1,27 @@
 package controller
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"time"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, configObjectName string) (*config.OperatorConfiguration, error) {
-	var (
-		opConfig config.OperatorConfiguration
-	)
+func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, configObjectName string) (*acidv1.OperatorConfiguration, error) {
 
-	req := c.KubeClient.CRDREST.Get().
-		Name(configObjectName).
-		Namespace(configObjectNamespace).
-		Resource(constants.OperatorConfigCRDResource).
-		VersionedParams(&metav1.ListOptions{ResourceVersion: "0"}, metav1.ParameterCodec)
-
-	data, err := req.DoRaw()
+	config, err := c.KubeClient.AcidV1ClientSet.AcidV1().OperatorConfigurations(configObjectNamespace).Get(configObjectName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("could not get operator configuration object %s: %v", configObjectName, err)
-	}
-	if err = json.Unmarshal(data, &opConfig); err != nil {
-		return nil, fmt.Errorf("could not unmarshal operator configuration object %s, %v", configObjectName, err)
+		return nil, fmt.Errorf("could not get operator configuration object %q: %v", configObjectName, err)
 	}
 
-	return &opConfig, nil
+	return config, nil
 }
 
 // importConfigurationFromCRD is a transitional function that converts CRD configuration to the one based on the configmap
-func (c *Controller) importConfigurationFromCRD(fromCRD *config.OperatorConfigurationData) *config.Config {
+func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigurationData) *config.Config {
 	result := &config.Config{}
 
 	result.EtcdHost = fromCRD.EtcdHost

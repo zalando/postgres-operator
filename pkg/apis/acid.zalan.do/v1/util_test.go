@@ -1,4 +1,4 @@
-package spec
+package v1
 
 import (
 	"bytes"
@@ -12,15 +12,15 @@ import (
 
 var parseTimeTests = []struct {
 	in  string
-	out time.Time
+	out metav1.Time
 	err error
 }{
 	{"16:08", mustParseTime("16:08"), nil},
 	{"11:00", mustParseTime("11:00"), nil},
 	{"23:59", mustParseTime("23:59"), nil},
 
-	{"26:09", time.Now(), errors.New(`parsing time "26:09": hour out of range`)},
-	{"23:69", time.Now(), errors.New(`parsing time "23:69": minute out of range`)},
+	{"26:09", metav1.Now(), errors.New(`parsing time "26:09": hour out of range`)},
+	{"23:69", metav1.Now(), errors.New(`parsing time "23:69": minute out of range`)},
 }
 
 var parseWeekdayTests = []struct {
@@ -125,13 +125,13 @@ var unmarshalCluster = []struct {
 			Name: "acid-testcluster1",
 		},
 		Status: ClusterStatusInvalid,
-		Error: &json.UnmarshalTypeError{
+		Error: (&json.UnmarshalTypeError{
 			Value:  "number",
 			Type:   reflect.TypeOf(""),
 			Offset: 126,
 			Struct: "PostgresSpec",
 			Field:  "teamId",
-		},
+		}).Error(),
 	},
 	[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":"Invalid"}`), nil},
 	{[]byte(`{
@@ -264,7 +264,7 @@ var unmarshalCluster = []struct {
 				},
 				ClusterName: "testcluster1",
 			},
-			Error: nil,
+			Error: "",
 		},
 		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"volume":{"size":"5Gi","storageClass":"SSD"},"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"ACID","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00","05:00-05:15"],"clone":{"cluster":"acid-batman"}}}`), nil},
 	{
@@ -279,7 +279,7 @@ var unmarshalCluster = []struct {
 			},
 			Spec:   PostgresSpec{TeamID: "acid"},
 			Status: ClusterStatusInvalid,
-			Error:  errors.New("name must match {TEAM}-{NAME} format"),
+			Error:  errors.New("name must match {TEAM}-{NAME} format").Error(),
 		},
 		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"teapot-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":"Invalid"}`), nil},
 	{
@@ -299,7 +299,7 @@ var unmarshalCluster = []struct {
 				},
 				ClusterName: "testcluster1",
 			},
-			Error: nil,
+			Error: "",
 		},
 		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{"cluster":"team-batman"}}}`), err: nil},
 	{[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1"`),
@@ -344,7 +344,7 @@ var postgresqlList = []struct {
 					NumberOfInstances:   1,
 				},
 				Status: ClusterStatusRunning,
-				Error:  nil,
+				Error:  "",
 			}},
 		},
 		nil},
@@ -352,13 +352,13 @@ var postgresqlList = []struct {
 		PostgresqlList{},
 		errors.New("unexpected end of JSON input")}}
 
-func mustParseTime(s string) time.Time {
+func mustParseTime(s string) metav1.Time {
 	v, err := time.Parse("15:04", s)
 	if err != nil {
 		panic(err)
 	}
 
-	return v.UTC()
+	return metav1.Time{Time: v.UTC()}
 }
 
 func TestParseTime(t *testing.T) {
@@ -509,25 +509,6 @@ func TestPostgresMeta(t *testing.T) {
 	}
 }
 
-func TestUnmarshalPostgresList(t *testing.T) {
-	for _, tt := range postgresqlList {
-		var list PostgresqlList
-		err := list.UnmarshalJSON(tt.in)
-		if err != nil {
-			if tt.err == nil || err.Error() != tt.err.Error() {
-				t.Errorf("PostgresqlList unmarshal expected error: %v, got: %v", tt.err, err)
-			}
-			continue
-		} else if tt.err != nil {
-			t.Errorf("Expected error: %v", tt.err)
-		}
-
-		if !reflect.DeepEqual(list, tt.out) {
-			t.Errorf("Postgresql list unmarshall expected: %#v, got: %#v", tt.out, list)
-		}
-	}
-}
-
 func TestPostgresListMeta(t *testing.T) {
 	for _, tt := range postgresqlList {
 		if tt.err != nil {
@@ -549,7 +530,7 @@ func TestPostgresListMeta(t *testing.T) {
 func TestPostgresqlClone(t *testing.T) {
 	for _, tt := range unmarshalCluster {
 		cp := &tt.out
-		cp.Error = nil
+		cp.Error = ""
 		clone := cp.Clone()
 		if !reflect.DeepEqual(clone, cp) {
 			t.Errorf("TestPostgresqlClone expected: \n%#v\n, got \n%#v", cp, clone)

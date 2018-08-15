@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
@@ -21,43 +22,43 @@ var logger = logrus.New().WithField("test", "cluster")
 var cl = New(Config{OpConfig: config.Config{ProtectedRoles: []string{"admin"},
 	Auth: config.Auth{SuperUsername: superUserName,
 		ReplicationUsername: replicationUserName}}},
-	k8sutil.KubernetesClient{}, spec.Postgresql{}, logger)
+	k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
 
 func TestInitRobotUsers(t *testing.T) {
 	testName := "TestInitRobotUsers"
 	tests := []struct {
-		manifestUsers map[string]spec.UserFlags
+		manifestUsers map[string]acidv1.UserFlags
 		infraRoles    map[string]spec.PgUser
 		result        map[string]spec.PgUser
 		err           error
 	}{
 		{
-			manifestUsers: map[string]spec.UserFlags{"foo": {"superuser", "createdb"}},
+			manifestUsers: map[string]acidv1.UserFlags{"foo": {"superuser", "createdb"}},
 			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Password: "bar"}},
 			result:        map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Password: "bar"}},
 			err:           nil,
 		},
 		{
-			manifestUsers: map[string]spec.UserFlags{"!fooBar": {"superuser", "createdb"}},
+			manifestUsers: map[string]acidv1.UserFlags{"!fooBar": {"superuser", "createdb"}},
 			err:           fmt.Errorf(`invalid username: "!fooBar"`),
 		},
 		{
-			manifestUsers: map[string]spec.UserFlags{"foobar": {"!superuser", "createdb"}},
+			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"!superuser", "createdb"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`user flag "!superuser" is not alphanumeric`),
 		},
 		{
-			manifestUsers: map[string]spec.UserFlags{"foobar": {"superuser1", "createdb"}},
+			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"superuser1", "createdb"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`user flag "SUPERUSER1" is not valid`),
 		},
 		{
-			manifestUsers: map[string]spec.UserFlags{"foobar": {"inherit", "noinherit"}},
+			manifestUsers: map[string]acidv1.UserFlags{"foobar": {"inherit", "noinherit"}},
 			err: fmt.Errorf(`invalid flags for user "foobar": ` +
 				`conflicting user flags: "NOINHERIT" and "INHERIT"`),
 		},
 		{
-			manifestUsers: map[string]spec.UserFlags{"admin": {"superuser"}, superUserName: {"createdb"}},
+			manifestUsers: map[string]acidv1.UserFlags{"admin": {"superuser"}, superUserName: {"createdb"}},
 			infraRoles:    map[string]spec.PgUser{},
 			result:        map[string]spec.PgUser{},
 			err:           nil,

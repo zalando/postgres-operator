@@ -1,8 +1,8 @@
-hash: ff2f80192f85899fb70880aabc4851672673f8ac3be257c6d9ff46ad33db94ca
-updated: 2018-08-06T15:28:34.096941+02:00
+hash: bd5394acf101795aac9da20c104a57344a6c4fd71080bf1b16845367e6360578
+updated: 2018-08-14T15:18:08.144086+02:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: f70339bb6af843c8ab1974381b3f4fcaee2b1a41
+  version: f831d5a0822a1ad72420ab18c6269bca1ddaf490
   subpackages:
   - aws
   - aws/awserr
@@ -103,7 +103,7 @@ imports:
 - name: github.com/Sirupsen/logrus
   version: 3e01752db0189b9157070a0e1668a620f9a85da2
 - name: github.com/spf13/pflag
-  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+  version: 583c0c0531f06d5278b7d917446061adc344b5cd
 - name: golang.org/x/crypto
   version: c126467f60eb25f8f27e5a981f32a87e3965053f
   subpackages:
@@ -124,17 +124,10 @@ imports:
 - name: golang.org/x/text
   version: b19bf474d317b857955b12035d2c5acb57ce8b01
   subpackages:
-  - cases
-  - internal
-  - internal/tag
-  - language
-  - runes
   - secure/bidirule
-  - secure/precis
   - transform
   - unicode/bidi
   - unicode/norm
-  - width
 - name: golang.org/x/time
   version: f51c12702a4d776e4c1fa9b0fabab841babae631
   subpackages:
@@ -144,7 +137,7 @@ imports:
 - name: gopkg.in/yaml.v2
   version: 5420a8b6744d3b0345ab293f6fcba19c978f1183
 - name: k8s.io/api
-  version: 072894a440bdee3a891dea811fe42902311cd2a3
+  version: 2d6f90ab1293a1fb871cf149423ebb72aa7423aa
   subpackages:
   - admissionregistration/v1alpha1
   - admissionregistration/v1beta1
@@ -164,6 +157,7 @@ imports:
   - core/v1
   - events/v1beta1
   - extensions/v1beta1
+  - imagepolicy/v1alpha1
   - networking/v1
   - policy/v1beta1
   - rbac/v1
@@ -176,7 +170,7 @@ imports:
   - storage/v1alpha1
   - storage/v1beta1
 - name: k8s.io/apiextensions-apiserver
-  version: 06dfdaae5c2bd89e1243151ff65b9bf8ee050f28
+  version: cc9cd5d998df84cc405d398e9030d29c95acff18
   subpackages:
   - pkg/apis/apiextensions
   - pkg/apis/apiextensions/v1beta1
@@ -216,22 +210,26 @@ imports:
   - pkg/util/httpstream/spdy
   - pkg/util/intstr
   - pkg/util/json
+  - pkg/util/mergepatch
   - pkg/util/net
   - pkg/util/remotecommand
   - pkg/util/runtime
   - pkg/util/sets
+  - pkg/util/strategicpatch
   - pkg/util/validation
   - pkg/util/validation/field
   - pkg/util/wait
   - pkg/util/yaml
   - pkg/version
   - pkg/watch
+  - third_party/forked/golang/json
   - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
-  version: 7d04d0e2a0a1a4d4a1cd6baa432a2301492e4e65
+  version: 1f13a808da65775f22cbf47862c4e5898d8f4ca1
   subpackages:
   - discovery
+  - discovery/fake
   - kubernetes
   - kubernetes/scheme
   - kubernetes/typed/admissionregistration/v1alpha1
@@ -270,6 +268,7 @@ imports:
   - plugin/pkg/client/auth/exec
   - rest
   - rest/watch
+  - testing
   - tools/auth
   - tools/cache
   - tools/clientcmd
@@ -294,4 +293,8 @@ imports:
   version: 6702109cc68eb6fe6350b83e14407c8d7309fd1a
 - name: k8s.io/gengo
   version: 906d99f89cd644eecf75ab547b29bf9f876f0b59
+- name: k8s.io/kube-openapi
+  version: 91cfa479c814065e420cee7ed227db0f63a5854e
+  subpackages:
+  - pkg/util/proto
 testImports: []

@@ -1,23 +1,25 @@
-package config
+package v1
 
 import (
-	"encoding/json"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/mohae/deepcopy"
+	"time"
 )
 
+// +genclient
+// +genclient:onlyVerbs=get
+// +genclient:noStatus
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type OperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
 	Configuration OperatorConfigurationData `json:"configuration"`
-	Error         error                     `json:"-"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type OperatorConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
@@ -33,18 +35,18 @@ type PostgresUsersConfiguration struct {
 type KubernetesMetaConfiguration struct {
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
-	PodServiceAccountDefinition            string              `json:"pod_service_account_definition,omitempty"`
-	PodServiceAccountRoleBindingDefinition string              `json:"pod_service_account_role_binding_definition,omitempty"`
-	PodTerminateGracePeriod                spec.Duration       `json:"pod_terminate_grace_period,omitempty"`
-	WatchedNamespace                       string              `json:"watched_namespace,omitempty"`
-	PDBNameFormat                          stringTemplate      `json:"pdb_name_format,omitempty"`
-	SecretNameTemplate                     stringTemplate      `json:"secret_name_template,omitempty"`
-	OAuthTokenSecretName                   spec.NamespacedName `json:"oauth_token_secret_name,omitempty"`
-	InfrastructureRolesSecretName          spec.NamespacedName `json:"infrastructure_roles_secret_name,omitempty"`
-	PodRoleLabel                           string              `json:"pod_role_label,omitempty"`
-	ClusterLabels                          map[string]string   `json:"cluster_labels,omitempty"`
-	ClusterNameLabel                       string              `json:"cluster_name_label,omitempty"`
-	NodeReadinessLabel                     map[string]string   `json:"node_readiness_label,omitempty"`
+	PodServiceAccountDefinition            string                `json:"pod_service_account_definition,omitempty"`
+	PodServiceAccountRoleBindingDefinition string                `json:"pod_service_account_role_binding_definition,omitempty"`
+	PodTerminateGracePeriod                Duration              `json:"pod_terminate_grace_period,omitempty"`
+	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
+	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
+	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
+	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
+	InfrastructureRolesSecretName          spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
+	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
+	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
+	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
+	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
@@ -60,20 +62,20 @@ type PostgresPodResourcesDefaults struct {
 }
 
 type OperatorTimeouts struct {
-	ResourceCheckInterval  spec.Duration `json:"resource_check_interval,omitempty"`
-	ResourceCheckTimeout   spec.Duration `json:"resource_check_timeout,omitempty"`
-	PodLabelWaitTimeout    spec.Duration `json:"pod_label_wait_timeout,omitempty"`
-	PodDeletionWaitTimeout spec.Duration `json:"pod_deletion_wait_timeout,omitempty"`
-	ReadyWaitInterval      spec.Duration `json:"ready_wait_interval,omitempty"`
-	ReadyWaitTimeout       spec.Duration `json:"ready_wait_timeout,omitempty"`
+	ResourceCheckInterval  Duration `json:"resource_check_interval,omitempty"`
+	ResourceCheckTimeout   Duration `json:"resource_check_timeout,omitempty"`
+	PodLabelWaitTimeout    Duration `json:"pod_label_wait_timeout,omitempty"`
+	PodDeletionWaitTimeout Duration `json:"pod_deletion_wait_timeout,omitempty"`
+	ReadyWaitInterval      Duration `json:"ready_wait_interval,omitempty"`
+	ReadyWaitTimeout       Duration `json:"ready_wait_timeout,omitempty"`
 }
 
 type LoadBalancerConfiguration struct {
-	DbHostedZone              string         `json:"db_hosted_zone,omitempty"`
-	EnableMasterLoadBalancer  bool           `json:"enable_master_load_balancer,omitempty"`
-	EnableReplicaLoadBalancer bool           `json:"enable_replica_load_balancer,omitempty"`
-	MasterDNSNameFormat       stringTemplate `json:"master_dns_name_format,omitempty"`
-	ReplicaDNSNameFormat      stringTemplate `json:"replica_dns_name_format,omitempty"`
+	DbHostedZone              string                `json:"db_hosted_zone,omitempty"`
+	EnableMasterLoadBalancer  bool                  `json:"enable_master_load_balancer,omitempty"`
+	EnableReplicaLoadBalancer bool                  `json:"enable_replica_load_balancer,omitempty"`
+	MasterDNSNameFormat       config.StringTemplate `json:"master_dns_name_format,omitempty"`
+	ReplicaDNSNameFormat      config.StringTemplate `json:"replica_dns_name_format,omitempty"`
 }
 
 type AWSGCPConfiguration struct {
@@ -121,8 +123,8 @@ type OperatorConfigurationData struct {
 	Workers                    uint32                       `json:"workers,omitempty"`
 	MinInstances               int32                        `json:"min_instances,omitempty"`
 	MaxInstances               int32                        `json:"max_instances,omitempty"`
-	ResyncPeriod               spec.Duration                `json:"resync_period,omitempty"`
-	RepairPeriod               spec.Duration                `json:"repair_period,omitempty"`
+	ResyncPeriod               Duration                     `json:"resync_period,omitempty"`
+	RepairPeriod               Duration                     `json:"repair_period,omitempty"`
 	Sidecars                   map[string]string            `json:"sidecar_docker_images,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration   `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration  `json:"kubernetes"`
@@ -143,67 +145,4 @@ type OperatorConfigurationUsers struct {
 	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
 }
 
-type OperatorConfigurationCopy OperatorConfiguration
-type OperatorConfigurationListCopy OperatorConfigurationList
-
-func (opc *OperatorConfiguration) UnmarshalJSON(data []byte) error {
-	var ref OperatorConfigurationCopy
-	if err := json.Unmarshal(data, &ref); err != nil {
-		return err
-	}
-	*opc = OperatorConfiguration(ref)
-	return nil
-}
-
-func (opc *OperatorConfiguration) DeepCopyInto(out *OperatorConfiguration) {
-	if opc != nil {
-		*out = deepcopy.Copy(*opc).(OperatorConfiguration)
-	}
-}
-
-func (opc *OperatorConfiguration) DeepCopy() *OperatorConfiguration {
-	if opc == nil {
-		return nil
-	}
-	out := new(OperatorConfiguration)
-	opc.DeepCopyInto(out)
-	return out
-}
-
-func (opc *OperatorConfiguration) DeepCopyObject() runtime.Object {
-	if c := opc.DeepCopy(); c != nil {
-		return c
-	}
-	return nil
-}
-
-func (opcl *OperatorConfigurationList) UnmarshalJSON(data []byte) error {
-	var ref OperatorConfigurationListCopy
-	if err := json.Unmarshal(data, &ref); err != nil {
-		return nil
-	}
-	*opcl = OperatorConfigurationList(ref)
-	return nil
-}
-
-func (opcl *OperatorConfigurationList) DeepCopyInto(out *OperatorConfigurationList) {
-	if opcl != nil {
-		*out = deepcopy.Copy(*opcl).(OperatorConfigurationList)
-	}
-}
-
-func (opcl *OperatorConfigurationList) DeepCopy() *OperatorConfigurationList {
-	if opcl == nil {
-		return nil
-	}
-	out := new(OperatorConfigurationList)
-	opcl.DeepCopyInto(out)
-	return out
-}
-
-func (opcl *OperatorConfigurationList) DeepCopyObject() runtime.Object {
-	if c := opcl.DeepCopy(); c != nil {
-		return c
-	}
-	return nil
-}
+type Duration time.Duration
