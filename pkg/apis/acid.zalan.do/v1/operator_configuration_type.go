@@ -9,6 +9,8 @@ import (
 )
 
 // +genclient
+// +genclient:onlyVerbs=get
+// +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type OperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`

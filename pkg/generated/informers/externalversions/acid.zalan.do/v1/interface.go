@@ -30,8 +30,6 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// OperatorConfigurations returns a OperatorConfigurationInformer.
-	OperatorConfigurations() OperatorConfigurationInformer
 	// Postgresqls returns a PostgresqlInformer.
 	Postgresqls() PostgresqlInformer
 }
@@ -45,11 +43,6 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
-}
-
-// OperatorConfigurations returns a OperatorConfigurationInformer.
-func (v *version) OperatorConfigurations() OperatorConfigurationInformer {
-	return &operatorConfigurationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Postgresqls returns a PostgresqlInformer.

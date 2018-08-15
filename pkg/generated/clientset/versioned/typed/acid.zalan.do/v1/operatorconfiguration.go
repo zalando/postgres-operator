@@ -25,11 +25,9 @@ SOFTWARE.
 package v1
 
 import (
-	v1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidzalandov1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	scheme "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned/scheme"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -41,14 +39,7 @@ type OperatorConfigurationsGetter interface {
 
 // OperatorConfigurationInterface has methods to work with OperatorConfiguration resources.
 type OperatorConfigurationInterface interface {
-	Create(*v1.OperatorConfiguration) (*v1.OperatorConfiguration, error)
-	Update(*v1.OperatorConfiguration) (*v1.OperatorConfiguration, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.OperatorConfiguration, error)
-	List(opts metav1.ListOptions) (*v1.OperatorConfigurationList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.OperatorConfiguration, err error)
+	Get(name string, options v1.GetOptions) (*acidzalandov1.OperatorConfiguration, error)
 	OperatorConfigurationExpansion
 }
 
@@ -67,96 +58,13 @@ func newOperatorConfigurations(c *AcidV1Client, namespace string) *operatorConfi
 }
 
 // Get takes name of the operatorConfiguration, and returns the corresponding operatorConfiguration object, and an error if there is any.
-func (c *operatorConfigurations) Get(name string, options metav1.GetOptions) (result *v1.OperatorConfiguration, err error) {
-	result = &v1.OperatorConfiguration{}
+func (c *operatorConfigurations) Get(name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
+	result = &acidzalandov1.OperatorConfiguration{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("operatorconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of OperatorConfigurations that match those selectors.
-func (c *operatorConfigurations) List(opts metav1.ListOptions) (result *v1.OperatorConfigurationList, err error) {
-	result = &v1.OperatorConfigurationList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested operatorConfigurations.
-func (c *operatorConfigurations) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
-}
-
-// Create takes the representation of a operatorConfiguration and creates it.  Returns the server's representation of the operatorConfiguration, and an error, if there is any.
-func (c *operatorConfigurations) Create(operatorConfiguration *v1.OperatorConfiguration) (result *v1.OperatorConfiguration, err error) {
-	result = &v1.OperatorConfiguration{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		Body(operatorConfiguration).
-		Do().
-		Into(result)
-	return
-}
-
-// Update takes the representation of a operatorConfiguration and updates it. Returns the server's representation of the operatorConfiguration, and an error, if there is any.
-func (c *operatorConfigurations) Update(operatorConfiguration *v1.OperatorConfiguration) (result *v1.OperatorConfiguration, err error) {
-	result = &v1.OperatorConfiguration{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		Name(operatorConfiguration.Name).
-		Body(operatorConfiguration).
-		Do().
-		Into(result)
-	return
-}
-
-// Delete takes name of the operatorConfiguration and deletes it. Returns an error if one occurs.
-func (c *operatorConfigurations) Delete(name string, options *metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		Name(name).
-		Body(options).
-		Do().
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *operatorConfigurations) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
-		Body(options).
-		Do().
-		Error()
-}
-
-// Patch applies the patch and returns the patched operatorConfiguration.
-func (c *operatorConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.OperatorConfiguration, err error) {
-	result = &v1.OperatorConfiguration{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("operatorconfigurations").
-		SubResource(subresources...).
-		Name(name).
-		Body(data).
 		Do().
 		Into(result)
 	return
