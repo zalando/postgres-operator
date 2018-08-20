@@ -163,7 +163,7 @@ See comments there for minor issues that can sometimes broke the generation proc
 * [Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/) - intro post on the topic
 * Code generation in [Prometheus](https://github.com/coreos/prometheus-operator) and [etcd](https://github.com/coreos/etcd-operator) operators
 
-To debug the generated API locally, use the [kubectl proxy](https://kubernetes.io/docs/tasks/access-kubernetes-api/http-proxy-access-api/) and `kubectl --v=8` log level to display contents of HTTP requests.
+To debug the generated API locally, use the [kubectl proxy](https://kubernetes.io/docs/tasks/access-kubernetes-api/http-proxy-access-api/) and `kubectl --v=8` log level to display contents of HTTP requests (run the operator itself with `--v=8` to log all REST API requests). To attach a debugger to the operator, use the `-outofcluster` option to run the operator locally on the developer's laptop (and not in a docker container).
 
 # Debugging the operator
 
