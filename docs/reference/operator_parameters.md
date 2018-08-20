@@ -377,6 +377,9 @@ key.
   List of roles that cannot be overwritten by an application, team or
   infrastructure role. The default is `admin`.
 
+* **postgres_admin_teams**
+  List of teams which members need superuser roles in each PG database cluster to administer Postgres and maintain infrastructure built around it. The default is `postgres_admin`.
+
 ## Logging and REST API
 
 Parameters affecting logging and REST API listener. In the CRD-based configuration they are grouped under the `logging_rest_api` key.

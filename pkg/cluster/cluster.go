@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"encoding/json"
+
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -722,11 +723,13 @@ func (c *Cluster) initRobotUsers() error {
 	return nil
 }
 
-func (c *Cluster) initHumanUsers() error {
-	teamMembers, err := c.getTeamMembers()
+func (c *Cluster) initTeamMembers(teamID string, isPostgresAdminTeam bool) error {
+	teamMembers, err := c.getTeamMembers(teamID)
+
 	if err != nil {
-		return fmt.Errorf("could not get list of team members: %v", err)
+		return fmt.Errorf("could not get list of team members for team %v: %v", teamID, err)
 	}
+
 	for _, username := range teamMembers {
 		flags := []string{constants.RoleFlagLogin}
 		memberOf := []string{c.OpConfig.PamRoleName}
@@ -734,7 +737,7 @@ func (c *Cluster) initHumanUsers() error {
 		if c.shouldAvoidProtectedOrSystemRole(username, "API role") {
 			continue
 		}
-		if c.OpConfig.EnableTeamSuperuser {
+		if c.OpConfig.EnableTeamSuperuser || isPostgresAdminTeam {
 			flags = append(flags, constants.RoleFlagSuperuser)
 		} else {
 			if c.OpConfig.TeamAdminRole != "" {
@@ -756,6 +759,17 @@ func (c *Cluster) initHumanUsers() error {
 			c.pgUsers[username] = newRole
 		}
 	}
+
+	return nil
+}
+
+func (c *Cluster) initHumanUsers() error {
+
+	for _, postgresAdminTeam := range c.OpConfig.PostgresAdminTeams {
+		c.initTeamMembers(postgresAdminTeam, true /*isPostgresAdminTeam*/)
+	}
+
+	c.initTeamMembers(c.Spec.TeamID, false /*isPostgresAdminTeam*/)
 
 	return nil
 }

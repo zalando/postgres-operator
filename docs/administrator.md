@@ -208,3 +208,13 @@ generated from the current cluster manifest. There are two types of scans: a
 `sync scan`, running every `resync_period` seconds for every cluster, and the
 `repair scan`, coming every `repair_period` only for those clusters that didn't
 report success as a result of the last operation applied to them.
+
+## Postgres roles supported by the operator
+
+The operator is capable of maintaining roles of multiple kinds within a Postgres database cluster:
+
+1. **System roles** are roles necessary for the proper work of Postgres itself such as a replication role or the initial superuser role. Operator delegates creating such roles to Patroni and only establishes relevant secrets.
+
+2. **Infrastructure roles** are roles for processes originating from external systems, e.g. monitoring robots. The operator creates such roles assuming k8s secrets with their credentials exist beforehand.
+
+3. **Human users**. Human users can originate from either the Teams API or a Postgres manifest. Operator differentiates between product teams that may be granted admin rights to maintain there own Postgres cluster, and the Postgres administrator teams that get superuser access to all PG databases running in a k8s cluster for the purposes of maintaining and troubleshooting.
