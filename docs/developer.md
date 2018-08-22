@@ -151,6 +151,20 @@ minikube. The following steps will get you the docker image built and deployed.
     $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
 ```
 
+# Code generation
+
+The operator employs k8s-provided code generation to obtain deep copy methods and Kubernetes-like APIs for its custom resource definitons, namely the Postgres CRD and the operator CRD. The usage of the code generation follows conventions from the k8s community. Relevant scripts live in the `hack` directory:  the `update-codegen.sh` triggers code generation for the APIs defined in `pkg/apis/acid.zalan.do/`, 
+the `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI). The `/pkg/generated/` contains the resultant code. To make these scripts work, you may need to `export GOPATH=$(go env GOPATH)`
+
+References for code generation are:
+* [Relevant pull request](https://github.com/zalando-incubator/postgres-operator/pull/369)
+See comments there for minor issues that can sometimes broke the generation process.
+* [Code generator source code](https://github.com/kubernetes/code-generator)
+* [Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/) - intro post on the topic
+* Code generation in [Prometheus](https://github.com/coreos/prometheus-operator) and [etcd](https://github.com/coreos/etcd-operator) operators
+
+To debug the generated API locally, use the [kubectl proxy](https://kubernetes.io/docs/tasks/access-kubernetes-api/http-proxy-access-api/) and `kubectl --v=8` log level to display contents of HTTP requests (run the operator itself with `--v=8` to log all REST API requests). To attach a debugger to the operator, use the `-outofcluster` option to run the operator locally on the developer's laptop (and not in a docker container).
+
 # Debugging the operator
 
 There is a web interface in the operator to observe its internal state. The
