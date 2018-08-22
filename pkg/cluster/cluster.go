@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"encoding/json"
+
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
@@ -162,7 +163,7 @@ func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
 	// we should take advantage of it.
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.OpConfig.WatchedNamespace).Patch(c.Name, types.MergePatchType, patch)
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch)
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
 	}
