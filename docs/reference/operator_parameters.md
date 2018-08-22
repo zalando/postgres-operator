@@ -45,7 +45,7 @@ They will be deprecated and removed in the future.
 
 Variable names are underscore-separated words.
 
-**Important:** the default parameter values mentioned below are values hardcoded into the operator codebase. They are likely be overwritten in your local operator installation via either operator configmap or CRD. 
+**Important:** for configmap configuration, the default parameter values mentioned below are values hardcoded into the operator codebase. They are likely be overwritten in your local operator installation via your local version of the operator configmap.  In the case you use the operator CRD, there are no hardcoded defaults. All the CRD defaults are provided with the [operator's default configuration manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
 
 ## General
 
