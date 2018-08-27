@@ -723,11 +723,11 @@ func (c *Cluster) initRobotUsers() error {
 	return nil
 }
 
-func (c *Cluster) initTeamMembers(teamID string, isPostgresAdminTeam bool) error {
+func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) error {
 	teamMembers, err := c.getTeamMembers(teamID)
 
 	if err != nil {
-		return fmt.Errorf("could not get list of team members for team %v: %v", teamID, err)
+		return fmt.Errorf("could not get list of team members for team %q: %v", teamID, err)
 	}
 
 	for _, username := range teamMembers {
@@ -737,7 +737,7 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresAdminTeam bool) error
 		if c.shouldAvoidProtectedOrSystemRole(username, "API role") {
 			continue
 		}
-		if c.OpConfig.EnableTeamSuperuser || isPostgresAdminTeam {
+		if c.OpConfig.EnableTeamSuperuser || isPostgresSuperuserTeam {
 			flags = append(flags, constants.RoleFlagSuperuser)
 		} else {
 			if c.OpConfig.TeamAdminRole != "" {
@@ -765,11 +765,24 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresAdminTeam bool) error
 
 func (c *Cluster) initHumanUsers() error {
 
-	for _, postgresAdminTeam := range c.OpConfig.PostgresAdminTeams {
-		c.initTeamMembers(postgresAdminTeam, true /*isPostgresAdminTeam*/)
+	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
+		err := c.initTeamMembers(postgresSuperuserTeam, true /*isPostgresSuperuserTeam*/)
+		if err != nil {
+			return fmt.Errorf("Cannot create a team %q of Postgres superusers: %v", postgresSuperuserTeam, err)
+		}
 	}
 
-	c.initTeamMembers(c.Spec.TeamID, false /*isPostgresAdminTeam*/)
+	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
+		if postgresSuperuserTeam == c.Spec.TeamID {
+			c.logger.Infof("Team %q owning the cluster is also a team of superusers. Created superuser roles for its members instead of admin roles.", c.Spec.TeamID)
+			return nil
+		}
+	}
+
+	err := c.initTeamMembers(c.Spec.TeamID, false /*isPostgresSuperuserTeam*/)
+	if err != nil {
+		return fmt.Errorf("Cannot create a team %q of admins owning the PG cluster: %v", c.Spec.TeamID, err)
+	}
 
 	return nil
 }

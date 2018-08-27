@@ -377,8 +377,8 @@ key.
   List of roles that cannot be overwritten by an application, team or
   infrastructure role. The default is `admin`.
 
-* **postgres_admin_teams**
-  List of teams which members need superuser roles in each PG database cluster to administer Postgres and maintain infrastructure built around it. The default is `postgres_admin`.
+* **postgres_superuser_teams**
+  List of teams which members need the superuser role in each PG database cluster to administer Postgres and maintain infrastructure built around it. The default is `postgres_superuser`.
 
 ## Logging and REST API
 

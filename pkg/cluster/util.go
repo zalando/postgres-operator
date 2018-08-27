@@ -229,7 +229,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		c.logger.Warnf("could not get team info for team %v, returning empty list of team members: %v", teamID, err)
+		c.logger.Warnf("could not get team info for team %q, returning empty list of team members: %v", teamID, err)
 		return []string{}, nil
 	}
 
