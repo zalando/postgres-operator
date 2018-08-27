@@ -217,7 +217,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	}
 
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled, returning empty list of members for team %v", teamID)
+		c.logger.Debugf("team API is disabled, returning empty list of members for team %q", teamID)
 		return []string{}, nil
 	}
 

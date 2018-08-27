@@ -3,9 +3,10 @@ package v1
 import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 
+	"time"
+
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"time"
 )
 
 // +genclient
@@ -99,6 +100,7 @@ type TeamsAPIConfiguration struct {
 	PamRoleName              string            `json:"pam_role_name,omitempty"`
 	PamConfiguration         string            `json:"pam_configuration,omitempty"`
 	ProtectedRoles           []string          `json:"protected_role_names,omitempty"`
+	PostgresSuperuserTeams   []string          `json:"postgres_superuser_teams,omitempty"`
 }
 
 type LoggingRESTAPIConfiguration struct {
