@@ -261,7 +261,7 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 					Name:       "postgres_superuser",
 					Password:   "",
 					Flags:      []string{"LOGIN"},
-					MemberOf:   []string{"zalandos"},
+					MemberOf:   []string{cl.OpConfig.PamRoleName},
 					Parameters: map[string]string(nil)}},
 			superuserTeams: []string{"postgres_superusers"},
 			teams:          []mockTeam{teamA},
