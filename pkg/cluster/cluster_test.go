@@ -224,6 +224,7 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 
 	tests := []struct {
 		ownerTeam      string
+		existingRoles  map[string]spec.PgUser
 		superuserTeams []string
 		teams          []mockTeam
 		result         map[string]spec.PgUser
@@ -231,6 +232,7 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 		// case 1: there are two different teams of PG maintainers and one product team
 		{
 			ownerTeam:      "test",
+			existingRoles:  map[string]spec.PgUser{},
 			superuserTeams: []string{"postgres_superusers", "postgres_admins"},
 			teams:          []mockTeam{teamA, teamB, teamTest},
 			result: map[string]spec.PgUser{
@@ -239,9 +241,28 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 				"test_user":          userTest,
 			},
 		},
-		// case 2: the team of superusers also owns a particular PG cluster
+		// case 2: the team of superusers creates a new PG cluster
 		{
 			ownerTeam:      "postgres_superusers",
+			existingRoles:  map[string]spec.PgUser{},
+			superuserTeams: []string{"postgres_superusers"},
+			teams:          []mockTeam{teamA},
+			result: map[string]spec.PgUser{
+				"postgres_superuser": userA,
+			},
+		},
+		// case 3: the team owning the cluster is promoted to the maintainers' status
+		{
+			ownerTeam: "postgres_superusers",
+			existingRoles: map[string]spec.PgUser{
+				// role with the name exists before  w/o superuser privilege
+				"postgres_superuser": spec.PgUser{
+					Origin:     spec.RoleOriginTeamsAPI,
+					Name:       "postgres_superuser",
+					Password:   "",
+					Flags:      []string{"LOGIN"},
+					MemberOf:   []string{"zalandos"},
+					Parameters: map[string]string(nil)}},
 			superuserTeams: []string{"postgres_superusers"},
 			teams:          []mockTeam{teamA},
 			result: map[string]spec.PgUser{
@@ -255,7 +276,7 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 		mockTeamsAPI.teams = tt.teams
 
 		cl.Spec.TeamID = tt.ownerTeam
-		cl.pgUsers = map[string]spec.PgUser{}
+		cl.pgUsers = tt.existingRoles
 		cl.OpConfig.PostgresSuperuserTeams = tt.superuserTeams
 
 		if err := cl.initHumanUsers(); err != nil {
