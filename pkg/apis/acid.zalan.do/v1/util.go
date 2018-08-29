@@ -45,28 +45,28 @@ func parseWeekday(s string) (time.Weekday, error) {
 	return time.Weekday(weekday), nil
 }
 
-func extractClusterName(fullClusterName string, teamName string) (string, error) {
+func extractClusterName(clusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
-	if len(fullClusterName) < teamNameLen+2 {
-		return "", fmt.Errorf("full cluster name must match {TEAM}-{NAME} format. Got full cluster name '%v', team name '%v'", fullClusterName, teamName)
+	if len(clusterName) < teamNameLen+2 {
+		return "", fmt.Errorf("cluster name must match {TEAM}-{NAME} format. Got cluster name '%v', team name '%v'", clusterName, teamName)
 	}
 
 	if teamNameLen == 0 {
 		return "", fmt.Errorf("team name is empty")
 	}
 
-	if strings.ToLower(fullClusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
+	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
 		return "", fmt.Errorf("name must match {TEAM}-{NAME} format")
 	}
-	if len(fullClusterName) > clusterNameMaxLength {
+	if len(clusterName) > clusterNameMaxLength {
 		return "", fmt.Errorf("name cannot be longer than %d characters", clusterNameMaxLength)
 	}
-	if !serviceNameRegex.MatchString(fullClusterName) {
+	if !serviceNameRegex.MatchString(clusterName) {
 		return "", fmt.Errorf("name must confirm to DNS-1035, regex used for validation is %q",
 			serviceNameRegexString)
 	}
 
-	return fullClusterName[teamNameLen+1:], nil
+	return clusterName[teamNameLen+1:], nil
 }
 
 func validateCloneClusterDescription(clone *CloneDescription) error {
