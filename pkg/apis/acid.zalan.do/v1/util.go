@@ -2,10 +2,11 @@ package v1
 
 import (
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"regexp"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -44,28 +45,28 @@ func parseWeekday(s string) (time.Weekday, error) {
 	return time.Weekday(weekday), nil
 }
 
-func extractClusterName(clusterName string, teamName string) (string, error) {
+func extractClusterName(fullClusterName string, teamName string) (string, error) {
 	teamNameLen := len(teamName)
-	if len(clusterName) < teamNameLen+2 {
-		return "", fmt.Errorf("name is too short")
+	if len(fullClusterName) < teamNameLen+2 {
+		return "", fmt.Errorf("full cluster name must match {TEAM}-{NAME} format. Got full cluster name '%v', team name '%v'", fullClusterName, teamName)
 	}
 
 	if teamNameLen == 0 {
 		return "", fmt.Errorf("team name is empty")
 	}
 
-	if strings.ToLower(clusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
+	if strings.ToLower(fullClusterName[:teamNameLen+1]) != strings.ToLower(teamName)+"-" {
 		return "", fmt.Errorf("name must match {TEAM}-{NAME} format")
 	}
-	if len(clusterName) > clusterNameMaxLength {
+	if len(fullClusterName) > clusterNameMaxLength {
 		return "", fmt.Errorf("name cannot be longer than %d characters", clusterNameMaxLength)
 	}
-	if !serviceNameRegex.MatchString(clusterName) {
+	if !serviceNameRegex.MatchString(fullClusterName) {
 		return "", fmt.Errorf("name must confirm to DNS-1035, regex used for validation is %q",
 			serviceNameRegexString)
 	}
 
-	return clusterName[teamNameLen+1:], nil
+	return fullClusterName[teamNameLen+1:], nil
 }
 
 func validateCloneClusterDescription(clone *CloneDescription) error {
