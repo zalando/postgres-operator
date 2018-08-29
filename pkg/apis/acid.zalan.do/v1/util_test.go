@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"testing"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var parseTimeTests = []struct {
@@ -49,8 +50,11 @@ var clusterNames = []struct {
 	{"acid-test", "test", "", errors.New("name must match {TEAM}-{NAME} format")},
 	{"-test", "", "", errors.New("team name is empty")},
 	{"-test", "-", "", errors.New("name must match {TEAM}-{NAME} format")},
-	{"", "-", "", errors.New("name is too short")},
-	{"-", "-", "", errors.New("name is too short")},
+	{"", "-", "", errors.New("cluster name must match {TEAM}-{NAME} format. Got cluster name '', team name '-'")},
+	{"-", "-", "", errors.New("cluster name must match {TEAM}-{NAME} format. Got cluster name '-', team name '-'")},
+	// user may specify the team part of the full cluster name differently from the team name returned by the Teams API
+	// in the case the actual Teams API name is long enough, this will fail the check
+	{"foo-bar", "qwerty", "", errors.New("cluster name must match {TEAM}-{NAME} format. Got cluster name 'foo-bar', team name 'qwerty'")},
 }
 
 var cloneClusterDescriptions = []struct {
