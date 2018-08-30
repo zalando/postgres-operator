@@ -14,7 +14,8 @@ import (
 type CRD struct {
 	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
 	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod      time.Duration `name:"resync_period" default:"5m"`
+	ResyncPeriod      time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod      time.Duration `name:"repair_period" default:"5m"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
@@ -24,6 +25,7 @@ type Resources struct {
 	PodLabelWaitTimeout     time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
 	PodDeletionWaitTimeout  time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
 	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	PodPriorityClassName    string            `name:"pod_priority_class_name"`
 	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
 	ClusterNameLabel        string            `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel            string            `name:"pod_role_label" default:"spilo-role"`
@@ -40,7 +42,7 @@ type Resources struct {
 
 // Auth describes authentication specific configuration parameters
 type Auth struct {
-	SecretNameTemplate            stringTemplate      `name:"secret_name_template" default:"{username}.{cluster}.credentials.{tprkind}.{tprgroup}"`
+	SecretNameTemplate            StringTemplate      `name:"secret_name_template" default:"{username}.{cluster}.credentials.{tprkind}.{tprgroup}"`
 	PamRoleName                   string              `name:"pam_role_name" default:"zalandos"`
 	PamConfiguration              string              `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
 	TeamsAPIUrl                   string              `name:"teams_api_url" default:"https://teams.example.com/api/"`
@@ -68,29 +70,32 @@ type Config struct {
 	Auth
 	Scalyr
 
-	WatchedNamespace string `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	EtcdHost         string `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use k8s as a DCS
-	DockerImage      string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p8"`
+	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use k8s as a DCS
+	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p8"`
+	Sidecars         map[string]string `name:"sidecar_docker_images"`
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
 	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
-	PodServiceAccountDefinition string `name:"pod_service_account_definition" default:""`
-	DbHostedZone                string `name:"db_hosted_zone" default:"db.example.com"`
-	WALES3Bucket                string `name:"wal_s3_bucket"`
-	LogS3Bucket                 string `name:"log_s3_bucket"`
-	KubeIAMRole                 string `name:"kube_iam_role"`
-	DebugLogging                bool   `name:"debug_logging" default:"true"`
-	EnableDBAccess              bool   `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI              bool   `name:"enable_teams_api" default:"true"`
-	EnableTeamSuperuser         bool   `name:"enable_team_superuser" default:"false"`
-	TeamAdminRole               string `name:"team_admin_role" default:"admin"`
-	EnableMasterLoadBalancer    bool   `name:"enable_master_load_balancer" default:"true"`
-	EnableReplicaLoadBalancer   bool   `name:"enable_replica_load_balancer" default:"false"`
+	PodServiceAccountDefinition            string `name:"pod_service_account_definition" default:""`
+	PodServiceAccountRoleBindingDefinition string `name:"pod_service_account_role_binding_definition" default:""`
+	DbHostedZone                           string `name:"db_hosted_zone" default:"db.example.com"`
+	AWSRegion                              string `name:"aws_region" default:"eu-central-1"`
+	WALES3Bucket                           string `name:"wal_s3_bucket"`
+	LogS3Bucket                            string `name:"log_s3_bucket"`
+	KubeIAMRole                            string `name:"kube_iam_role"`
+	DebugLogging                           bool   `name:"debug_logging" default:"true"`
+	EnableDBAccess                         bool   `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI                         bool   `name:"enable_teams_api" default:"true"`
+	EnableTeamSuperuser                    bool   `name:"enable_team_superuser" default:"false"`
+	TeamAdminRole                          string `name:"team_admin_role" default:"admin"`
+	EnableMasterLoadBalancer               bool   `name:"enable_master_load_balancer" default:"true"`
+	EnableReplicaLoadBalancer              bool   `name:"enable_replica_load_balancer" default:"false"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer       *bool             `name:"enable_load_balancer"`
-	MasterDNSNameFormat      stringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
-	ReplicaDNSNameFormat     stringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
-	PDBNameFormat            stringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	MasterDNSNameFormat      StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
+	ReplicaDNSNameFormat     StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	PDBNameFormat            StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	Workers                  uint32            `name:"workers" default:"4"`
 	APIPort                  int               `name:"api_port" default:"8080"`
 	RingLogLines             int               `name:"ring_log_lines" default:"100"`
@@ -98,6 +103,7 @@ type Config struct {
 	TeamAPIRoleConfiguration map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
 	PodTerminateGracePeriod  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	ProtectedRoles           []string          `name:"protected_role_names" default:"admin"`
+	PostgresSuperuserTeams   []string          `name:"postgres_superuser_teams" default:""`
 }
 
 // MustMarshal marshals the config or panics

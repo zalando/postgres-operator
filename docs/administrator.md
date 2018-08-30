@@ -90,13 +90,13 @@ namespace. The operator  performs **no** further syncing of this account.
 
 ## Role-based access control for the operator
 
-The `manifests/operator-rbac.yaml` defines cluster roles and bindings needed
+The `manifests/operator-service-account-rbac.yaml` defines cluster roles and bindings needed
 for the operator to function under access control restrictions. To deploy the
 operator with this RBAC policy use:
 
 ```bash
     $ kubectl create -f manifests/configmap.yaml
-    $ kubectl create -f manifests/operator-rbac.yaml
+    $ kubectl create -f manifests/operator-service-account-rbac.yaml
     $ kubectl create -f manifests/postgres-operator.yaml
     $ kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
@@ -199,3 +199,24 @@ cluster manifest. In the case any of these variables are omitted from the
 manifest, the operator configmap's settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in a namespace watched by the operator.
+
+## Running periodic 'autorepair' scans of Kubernetes objects
+
+The Postgres operator periodically scans all Kubernetes objects belonging to
+each cluster and repairs all discrepancies between them and the definitions
+generated from the current cluster manifest. There are two types of scans: a
+`sync scan`, running every `resync_period` seconds for every cluster, and the
+`repair scan`, coming every `repair_period` only for those clusters that didn't
+report success as a result of the last operation applied to them.
+
+## Postgres roles supported by the operator
+
+The operator is capable of maintaining roles of multiple kinds within a Postgres database cluster:
+
+1. **System roles** are roles necessary for the proper work of Postgres itself such as a replication role or the initial superuser role. The operator delegates creating such roles to Patroni and only establishes relevant secrets.
+
+2. **Infrastructure roles** are roles for processes originating from external systems, e.g. monitoring robots. The operator creates such roles in all PG clusters it manages assuming k8s secrets with the relevant credentials exist beforehand.
+
+3. **Per-cluster robot users** are also roles for processes originating from external systems but defined for an individual Postgres cluster in its manifest. A typical example is a role for connections from an application that uses the database.
+
+4. **Human users** originate from the Teams API that returns list of the team members given a team id. Operator differentiates between (a) product teams that own a particular Postgres cluster and are granted admin rights to maintain it, and (b) Postgres superuser teams that get the superuser access to all PG databases running in a k8s cluster for the purposes of maintaining and troubleshooting.

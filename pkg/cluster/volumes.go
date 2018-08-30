@@ -5,10 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -88,10 +89,11 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 }
 
 // resizeVolumes resize persistent volumes compatible with the given resizer interface
-func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.VolumeResizer) error {
+func (c *Cluster) resizeVolumes(newVolume acidv1.Volume, resizers []volumes.VolumeResizer) error {
 	c.setProcessName("resizing volumes")
 
-	totalCompatible := 0
+	var totalIncompatible int
+
 	newQuantity, err := resource.ParseQuantity(newVolume.Size)
 	if err != nil {
 		return fmt.Errorf("could not parse volume size: %v", err)
@@ -100,7 +102,6 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
-
 	for _, pv := range pvs {
 		volumeSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
 		if volumeSize >= newSize {
@@ -109,11 +110,12 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 			}
 			continue
 		}
+		compatible := false
 		for _, resizer := range resizers {
 			if !resizer.VolumeBelongsToProvider(pv) {
 				continue
 			}
-			totalCompatible++
+			compatible = true
 			if !resizer.IsConnectedToProvider() {
 				err := resizer.ConnectToProvider()
 				if err != nil {
@@ -146,14 +148,18 @@ func (c *Cluster) resizeVolumes(newVolume spec.Volume, resizers []volumes.Volume
 			}
 			c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
 		}
+		if !compatible {
+			c.logger.Warningf("volume %q is incompatible with all available resizing providers", pv.Name)
+			totalIncompatible++
+		}
 	}
-	if len(pvs) > 0 && totalCompatible == 0 {
-		return fmt.Errorf("could not resize EBS volumes: persistent volumes are not compatible with existing resizing providers")
+	if totalIncompatible > 0 {
+		return fmt.Errorf("could not resize EBS volumes: some persistent volumes are not compatible with existing resizing providers")
 	}
 	return nil
 }
 
-func (c *Cluster) volumesNeedResizing(newVolume spec.Volume) (bool, error) {
+func (c *Cluster) volumesNeedResizing(newVolume acidv1.Volume) (bool, error) {
 	vols, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
 	if err != nil {
 		return false, err
@@ -167,7 +173,7 @@ func (c *Cluster) volumesNeedResizing(newVolume spec.Volume) (bool, error) {
 	return false, nil
 }
 
-func (c *Cluster) listVolumesWithManifestSize(newVolume spec.Volume) ([]*v1.PersistentVolume, int64, error) {
+func (c *Cluster) listVolumesWithManifestSize(newVolume acidv1.Volume) ([]*v1.PersistentVolume, int64, error) {
 	newSize, err := resource.ParseQuantity(newVolume.Size)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not parse volume size from the manifest: %v", err)

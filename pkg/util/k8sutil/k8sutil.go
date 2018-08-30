@@ -2,24 +2,22 @@ package k8sutil
 
 import (
 	"fmt"
-	"reflect"
-
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
-	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"reflect"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	acidv1client "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
 )
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -35,11 +33,12 @@ type KubernetesClient struct {
 	v1core.NamespacesGetter
 	v1core.ServiceAccountsGetter
 	v1beta1.StatefulSetsGetter
+	rbacv1beta1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
 
-	RESTClient rest.Interface
-	CRDREST    rest.Interface
+	RESTClient      rest.Interface
+	AcidV1ClientSet *acidv1client.Clientset
 }
 
 // RestConfig creates REST config
@@ -83,20 +82,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.StatefulSetsGetter = client.AppsV1beta1()
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
-
-	cfg2 := *cfg
-	cfg2.GroupVersion = &schema.GroupVersion{
-		Group:   constants.CRDGroup,
-		Version: constants.CRDApiVersion,
-	}
-	cfg2.APIPath = constants.K8sAPIPath
-	cfg2.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
-
-	crd, err := rest.RESTClientFor(&cfg2)
-	if err != nil {
-		return kubeClient, fmt.Errorf("could not get rest client: %v", err)
-	}
-	kubeClient.CRDREST = crd
+	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {
@@ -104,6 +90,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	}
 
 	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1beta1()
+	kubeClient.AcidV1ClientSet = acidv1client.NewForConfigOrDie(cfg)
 
 	return kubeClient, nil
 }

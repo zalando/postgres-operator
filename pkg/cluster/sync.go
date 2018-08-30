@@ -2,11 +2,11 @@ package cluster
 
 import (
 	"fmt"
-	"reflect"
-
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -16,7 +16,8 @@ import (
 
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
 // Unlike the update, sync does not error out if some objects do not exist and takes care of creating them.
-func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
+func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
+	var err error
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var actions []Action = NoActions
@@ -26,15 +27,15 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	defer func() {
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
-			c.setStatus(spec.ClusterStatusSyncFailed)
-		} else if c.Status != spec.ClusterStatusRunning {
-			c.setStatus(spec.ClusterStatusRunning)
+			c.setStatus(acidv1.ClusterStatusSyncFailed)
+		} else if c.Status != acidv1.ClusterStatusRunning {
+			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
-		return
+		return err
 	}
 
 	c.logger.Debugf("syncing secrets")
@@ -42,18 +43,18 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	//TODO: mind the secrets of the deleted/new users
 	if err = c.syncSecrets(); err != nil {
 		err = fmt.Errorf("could not sync secrets: %v", err)
-		return
+		return err
 	}
 
 	c.logger.Debugf("syncing services")
 	if actions, err = c.syncServices(); err != nil {
 		err = fmt.Errorf("could not resolve actions to sync services: %v", err)
-		return
+		return err
 	}
 
 	if err = c.applyActions(actions); err != nil {
 		err = fmt.Errorf("could not apply actions to sync services: %v", err)
-		return
+		return err
 	}
 
 	// potentially enlarge volumes before changing the statefulset. By doing that
@@ -65,38 +66,38 @@ func (c *Cluster) Sync(newSpec *spec.Postgresql) (err error) {
 	c.logger.Debugf("syncing persistent volumes")
 	if err = c.syncVolumes(); err != nil {
 		err = fmt.Errorf("could not sync persistent volumes: %v", err)
-		return
+		return err
 	}
 
 	c.logger.Debugf("syncing statefulsets")
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
-			return
+			return err
 		}
 	}
 
-	// create database objects unless we are running without pods or disabled that feature explicitely
+	// create database objects unless we are running without pods or disabled that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0) {
 		c.logger.Debugf("syncing roles")
 		if err = c.syncRoles(); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)
-			return
+			return err
 		}
 		c.logger.Debugf("syncing databases")
 		if err = c.syncDatabases(); err != nil {
 			err = fmt.Errorf("could not sync databases: %v", err)
-			return
+			return err
 		}
 	}
 
 	c.logger.Debug("syncing pod disruption budgets")
 	if err = c.syncPodDisruptionBudget(false); err != nil {
 		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
-		return
+		return err
 	}
 
-	return
+	return err
 }
 
 func (c *Cluster) syncServices() (actions []Action, err error) {
@@ -135,10 +136,13 @@ func (c *Cluster) applyActions(actions []Action) (err error) {
 }
 
 func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
+	var (
+		svc *v1.Service
+		err error
+	)
 	c.setProcessName("syncing %s service", role)
 
-	svc, err := c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{})
-	if err == nil {
+	if svc, err = c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
 		match, reason := k8sutil.SameService(svc, desiredSvc)
@@ -156,8 +160,8 @@ func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	} else if !k8sutil.ResourceNotFound(err) {
 		return NoActions, fmt.Errorf("could not get %s service: %v", role, err)
 	}
+	// no existing service, create new one
 	c.Services[role] = nil
-
 	c.logger.Infof("could not find the cluster's %s service", role)
 
 	actions, err := c.createService(role)
@@ -171,71 +175,77 @@ func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 }
 
 func (c *Cluster) syncEndpoint(role PostgresRole) error {
+	var (
+		ep  *v1.Endpoints
+		err error
+	)
 	c.setProcessName("syncing %s endpoint", role)
 
-	ep, err := c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
-	if err == nil {
-
+	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{}); err == nil {
+		// TODO: No syncing of endpoints here, is this covered completely by updateService?
 		c.Endpoints[role] = ep
 		return nil
-	} else if !k8sutil.ResourceNotFound(err) {
+	}
+	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get %s endpoint: %v", role, err)
 	}
+	// no existing endpoint, create new one
 	c.Endpoints[role] = nil
-
 	c.logger.Infof("could not find the cluster's %s endpoint", role)
 
-	if ep, err := c.createEndpoint(role); err != nil {
-		if k8sutil.ResourceAlreadyExists(err) {
-			c.logger.Infof("%s endpoint %q already exists", role, util.NameFromMeta(ep.ObjectMeta))
-			ep, err := c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
-			if err == nil {
-				c.Endpoints[role] = ep
-			} else {
-				c.logger.Infof("could not fetch existing %s endpoint: %v", role, err)
-			}
-		} else {
+	if ep, err = c.createEndpoint(role); err == nil {
+		c.logger.Infof("created missing %s endpoint %q", role, util.NameFromMeta(ep.ObjectMeta))
+	} else {
+		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not create missing %s endpoint: %v", role, err)
 		}
-	} else {
-		c.logger.Infof("created missing %s endpoint %q", role, util.NameFromMeta(ep.ObjectMeta))
-		c.Endpoints[role] = ep
+		c.logger.Infof("%s endpoint %q already exists", role, util.NameFromMeta(ep.ObjectMeta))
+		if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not fetch existing %s endpoint: %v", role, err)
+		}
 	}
-
+	c.Endpoints[role] = ep
 	return nil
 }
 
 func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
-	pdb, err := c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(c.podDisruptionBudgetName(), metav1.GetOptions{})
-	if err == nil {
+	var (
+		pdb *policybeta1.PodDisruptionBudget
+		err error
+	)
+	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
 		c.PodDisruptionBudget = pdb
 		newPDB := c.generatePodDisruptionBudget()
 		if match, reason := k8sutil.SamePDB(pdb, newPDB); !match {
 			c.logPDBChanges(pdb, newPDB, isUpdate, reason)
-			if err := c.updatePodDisruptionBudget(newPDB); err != nil {
+			if err = c.updatePodDisruptionBudget(newPDB); err != nil {
 				return err
 			}
 		} else {
 			c.PodDisruptionBudget = pdb
 		}
-
 		return nil
-	} else if !k8sutil.ResourceNotFound(err) {
+
+	}
+	if !k8sutil.ResourceNotFound(err) {
 		return fmt.Errorf("could not get pod disruption budget: %v", err)
 	}
+	// no existing pod disruption budget, create new one
 	c.PodDisruptionBudget = nil
-
 	c.logger.Infof("could not find the cluster's pod disruption budget")
+
 	if pdb, err = c.createPodDisruptionBudget(); err != nil {
-		if k8sutil.ResourceAlreadyExists(err) {
-			c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
-		} else {
+		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not create pod disruption budget: %v", err)
 		}
-	} else {
-		c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
-		c.PodDisruptionBudget = pdb
+		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(c.podDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
+		}
 	}
+
+	c.logger.Infof("created missing pod disruption budget %q", util.NameFromMeta(pdb.ObjectMeta))
+	c.PodDisruptionBudget = pdb
 
 	return nil
 }
@@ -270,7 +280,9 @@ func (c *Cluster) syncStatefulSet() error {
 		podsRollingUpdateRequired = (len(pods) > 0)
 		if podsRollingUpdateRequired {
 			c.logger.Warningf("found pods from the previous statefulset: trigger rolling update")
-			c.applyRollingUpdateFlagforStatefulSet(podsRollingUpdateRequired)
+			if err := c.applyRollingUpdateFlagforStatefulSet(podsRollingUpdateRequired); err != nil {
+				return fmt.Errorf("could not set rolling update flag for the statefulset: %v", err)
+			}
 		}
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
 
@@ -330,6 +342,11 @@ func (c *Cluster) syncStatefulSet() error {
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) has changed and if necessary sets it via the Patroni API
 func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
+	var (
+		err  error
+		pods []v1.Pod
+	)
+
 	// we need to extract those options from the cluster manifest.
 	optionsToSet := make(map[string]string)
 	pgOptions := c.Spec.Parameters
@@ -340,47 +357,55 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 		}
 	}
 
-	if len(optionsToSet) > 0 {
-		pods, err := c.listPods()
-		if err != nil {
-			return err
-		}
-		if len(pods) == 0 {
-			return fmt.Errorf("could not call Patroni API: cluster has no pods")
-		}
-		for _, pod := range pods {
-			podName := util.NameFromMeta(pod.ObjectMeta)
-			c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %v",
-				podName, optionsToSet)
-			if err := c.patroni.SetPostgresParameters(&pod, optionsToSet); err == nil {
-				return nil
-			} else {
-				c.logger.Warningf("could not patch postgres parameters with a pod %s: %v", podName, err)
-			}
-		}
-		return fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
-			len(pods))
+	if len(optionsToSet) == 0 {
+		return nil
 	}
-	return nil
+
+	if pods, err = c.listPods(); err != nil {
+		return err
+	}
+	if len(pods) == 0 {
+		return fmt.Errorf("could not call Patroni API: cluster has no pods")
+	}
+	// try all pods until the first one that is successful, as it doesn't matter which pod
+	// carries the request to change configuration through
+	for _, pod := range pods {
+		podName := util.NameFromMeta(pod.ObjectMeta)
+		c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %v",
+			podName, optionsToSet)
+		if err = c.patroni.SetPostgresParameters(&pod, optionsToSet); err == nil {
+			return nil
+		}
+		c.logger.Warningf("could not patch postgres parameters with a pod %s: %v", podName, err)
+	}
+	return fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
+		len(pods))
 }
 
 func (c *Cluster) syncSecrets() error {
+	var (
+		err    error
+		secret *v1.Secret
+	)
 	c.setProcessName("syncing secrets")
 	secrets := c.generateUserSecrets()
 
 	for secretUsername, secretSpec := range secrets {
-		secret, err := c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec)
+		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec); err == nil {
+			c.Secrets[secret.UID] = secret
+			c.logger.Debugf("created new secret %q, uid: %q", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			continue
+		}
 		if k8sutil.ResourceAlreadyExists(err) {
 			var userMap map[string]spec.PgUser
-			curSecret, err2 := c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name, metav1.GetOptions{})
-			if err2 != nil {
-				return fmt.Errorf("could not get current secret: %v", err2)
+			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name, metav1.GetOptions{}); err != nil {
+				return fmt.Errorf("could not get current secret: %v", err)
 			}
-			if secretUsername != string(curSecret.Data["username"]) {
+			if secretUsername != string(secret.Data["username"]) {
 				c.logger.Warningf("secret %q does not contain the role %q", secretSpec.Name, secretUsername)
 				continue
 			}
-			c.logger.Debugf("secret %q already exists, fetching its password", util.NameFromMeta(curSecret.ObjectMeta))
+			c.logger.Debugf("secret %q already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
 				userMap = c.systemUsers
@@ -392,35 +417,28 @@ func (c *Cluster) syncSecrets() error {
 			}
 			pwdUser := userMap[secretUsername]
 			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
-			if pwdUser.Password != string(curSecret.Data["password"]) && pwdUser.Origin == spec.RoleOriginInfrastructure {
+			if pwdUser.Password != string(secret.Data["password"]) && pwdUser.Origin == spec.RoleOriginInfrastructure {
 				c.logger.Debugf("updating the secret %q from the infrastructure roles", secretSpec.Name)
-				if _, err := c.KubeClient.Secrets(secretSpec.Namespace).Update(secretSpec); err != nil {
+				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(secretSpec); err != nil {
 					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
 				}
 			} else {
 				// for non-infrastructure role - update the role with the password from the secret
-				pwdUser.Password = string(curSecret.Data["password"])
+				pwdUser.Password = string(secret.Data["password"])
 				userMap[secretUsername] = pwdUser
 			}
-
-			continue
 		} else {
-			if err != nil {
-				return fmt.Errorf("could not create secret for user %q: %v", secretUsername, err)
-			}
-			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %q, uid: %q", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			return fmt.Errorf("could not create secret for user %q: %v", secretUsername, err)
 		}
 	}
 
 	return nil
 }
 
-func (c *Cluster) syncRoles() error {
+func (c *Cluster) syncRoles() (err error) {
 	c.setProcessName("syncing roles")
 
 	var (
-		err       error
 		dbUsers   spec.PgUserMap
 		userNames []string
 	)
@@ -429,9 +447,14 @@ func (c *Cluster) syncRoles() error {
 	if err != nil {
 		return fmt.Errorf("could not init db connection: %v", err)
 	}
+
 	defer func() {
-		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close db connection: %v", err)
+		if err2 := c.closeDbConn(); err2 != nil {
+			if err == nil {
+				err = fmt.Errorf("could not close database connection: %v", err2)
+			} else {
+				err = fmt.Errorf("could not close database connection: %v (prior error: %v)", err2, err)
+			}
 		}
 	}()
 
@@ -462,22 +485,13 @@ func (c *Cluster) syncVolumes() error {
 	if !act {
 		return nil
 	}
-	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{}}); err != nil {
+	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{AWSRegion: c.OpConfig.AWSRegion}}); err != nil {
 		return fmt.Errorf("could not sync volumes: %v", err)
 	}
 
 	c.logger.Infof("volumes have been synced successfully")
 
 	return nil
-}
-
-func (c *Cluster) samePDBWith(pdb *policybeta1.PodDisruptionBudget) (match bool, reason string) {
-	match = reflect.DeepEqual(pdb.Spec, c.PodDisruptionBudget.Spec)
-	if !match {
-		reason = "new service spec doesn't match the current one"
-	}
-
-	return
 }
 
 func (c *Cluster) syncDatabases() error {

@@ -1,7 +1,7 @@
 package util
 
 import (
-	"crypto/md5"
+	"crypto/md5" // #nosec we need it to for PostgreSQL md5 passwords
 	"encoding/hex"
 	"math/rand"
 	"regexp"
@@ -48,7 +48,7 @@ func PGUserPassword(user spec.PgUser) string {
 		// Avoid processing already encrypted or empty passwords
 		return user.Password
 	}
-	s := md5.Sum([]byte(user.Password + user.Name))
+	s := md5.Sum([]byte(user.Password + user.Name)) // #nosec, using md5 since PostgreSQL uses it for hashing passwords.
 	return md5prefix + hex.EncodeToString(s[:])
 }
 
@@ -120,6 +120,7 @@ func MapContains(haystack, needle map[string]string) bool {
 	return true
 }
 
+// Coalesce returns the first argument if it is not null, otherwise the second one.
 func Coalesce(val, defaultVal string) string {
 	if val == "" {
 		return defaultVal

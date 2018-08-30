@@ -89,7 +89,14 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
   examples](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
   for details on tolerations and possible values of those keys. When set, this
   value overrides the `pod_toleration` setting from the operator. Optional.
-
+  
+* **podPriorityClassName**
+   a name of the [priority
+   class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
+   that should be assigned to the cluster pods. When not specified, the value
+   is taken from the `pod_priority_class_name` operator parameter, if not set
+   then the default priority class is taken. The priority class itself must be defined in advance.
+   
 ## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key.
@@ -213,3 +220,21 @@ properties of the persistent storage that stores postgres data.
   See [Kubernetes
   documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
   for the details on storage classes. Optional. 
+
+### Sidecar definitions
+
+Those parameters are defined under the `sidecars` key. They consist of a list
+of dictionaries, each defining one sidecar (an extra container running
+along the main postgres container on the same pod). The following keys can be
+defined in the sidecar dictionary:
+
+* **name**
+  name of the sidecar. Required.
+
+* **image**
+  docker image of the sidecar. Required.
+
+* **env**
+  a dictionary of environment variables. Use usual Kubernetes definition
+  (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
+  for environment variables. Optional.

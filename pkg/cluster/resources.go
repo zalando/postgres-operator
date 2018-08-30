@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	RollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
+	rollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 )
 
 func (c *Cluster) listResources() error {
@@ -140,7 +140,7 @@ func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *v1beta1.StatefulSet, 
 	if anno == nil {
 		anno = make(map[string]string)
 	}
-	anno[RollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
+	anno[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
 	sset.SetAnnotations(anno)
 }
 
@@ -162,13 +162,13 @@ func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet,
 	anno := sset.GetAnnotations()
 	flag = defaultValue
 
-	stringFlag, exists := anno[RollingUpdateStatefulsetAnnotationKey]
+	stringFlag, exists := anno[rollingUpdateStatefulsetAnnotationKey]
 	if exists {
 		var err error
 		if flag, err = strconv.ParseBool(stringFlag); err != nil {
 			c.logger.Warnf("error when parsing %q annotation for the statefulset %q: expected boolean value, got %q\n",
-				RollingUpdateStatefulsetAnnotationKey,
-				types.NamespacedName{sset.Namespace, sset.Name},
+				rollingUpdateStatefulsetAnnotationKey,
+				types.NamespacedName{Namespace: sset.Namespace, Name: sset.Name},
 				stringFlag)
 			flag = defaultValue
 		}
@@ -272,10 +272,10 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	c.logger.Debugf("replacing statefulset")
 
 	// Delete the current statefulset without deleting the pods
-	orphanDepencies := true
+	deletePropagationPolicy := metav1.DeletePropagationOrphan
 	oldStatefulset := c.Statefulset
 
-	options := metav1.DeleteOptions{OrphanDependents: &orphanDepencies}
+	options := metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy}
 	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
 		return fmt.Errorf("could not delete statefulset %q: %v", statefulSetName, err)
 	}
@@ -483,7 +483,7 @@ func (c *Cluster) generateEndpointSubsets(role PostgresRole) []v1.EndpointSubset
 	if len(endPointAddresses) > 0 {
 		result = append(result, v1.EndpointSubset{
 			Addresses: endPointAddresses,
-			Ports:     []v1.EndpointPort{{"postgresql", 5432, "TCP"}},
+			Ports:     []v1.EndpointPort{{Name: "postgresql", Port: 5432, Protocol: "TCP"}},
 		})
 	} else if role == Master {
 		c.logger.Warningf("master is not running, generated master endpoint does not contain any addresses")
@@ -624,28 +624,4 @@ func (c *Cluster) GetStatefulSet() *v1beta1.StatefulSet {
 // GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
 func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
-}
-
-func (c *Cluster) createDatabases() error {
-	c.setProcessName("creating databases")
-
-	if len(c.Spec.Databases) == 0 {
-		return nil
-	}
-
-	if err := c.initDbConn(); err != nil {
-		return fmt.Errorf("could not init database connection")
-	}
-	defer func() {
-		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection: %v", err)
-		}
-	}()
-
-	for datname, owner := range c.Spec.Databases {
-		if err := c.executeCreateDatabase(datname, owner); err != nil {
-			return err
-		}
-	}
-	return nil
 }

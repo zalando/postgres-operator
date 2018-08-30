@@ -1,13 +1,15 @@
 package controller
 
 import (
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api/v1"
 
+	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func (c *Controller) podListFunc(options metav1.ListOptions) (runtime.Object, error) {
@@ -30,7 +32,7 @@ func (c *Controller) podWatchFunc(options metav1.ListOptions) (watch.Interface, 
 	return c.KubeClient.Pods(c.opConfig.WatchedNamespace).Watch(opts)
 }
 
-func (c *Controller) dispatchPodEvent(clusterName spec.NamespacedName, event spec.PodEvent) {
+func (c *Controller) dispatchPodEvent(clusterName spec.NamespacedName, event cluster.PodEvent) {
 	c.clustersMu.RLock()
 	cluster, ok := c.clusters[clusterName]
 	c.clustersMu.RUnlock()
@@ -40,19 +42,9 @@ func (c *Controller) dispatchPodEvent(clusterName spec.NamespacedName, event spe
 }
 
 func (c *Controller) podAdd(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return
+	if pod, ok := obj.(*v1.Pod); ok {
+		c.preparePodEventForDispatch(pod, nil, cluster.PodEventAdd)
 	}
-
-	podEvent := spec.PodEvent{
-		PodName:         util.NameFromMeta(pod.ObjectMeta),
-		CurPod:          pod,
-		EventType:       spec.EventAdd,
-		ResourceVersion: pod.ResourceVersion,
-	}
-
-	c.dispatchPodEvent(c.podClusterName(pod), podEvent)
 }
 
 func (c *Controller) podUpdate(prev, cur interface{}) {
@@ -66,29 +58,24 @@ func (c *Controller) podUpdate(prev, cur interface{}) {
 		return
 	}
 
-	podEvent := spec.PodEvent{
-		PodName:         util.NameFromMeta(curPod.ObjectMeta),
-		PrevPod:         prevPod,
+	c.preparePodEventForDispatch(curPod, prevPod, cluster.PodEventUpdate)
+}
+
+func (c *Controller) podDelete(obj interface{}) {
+
+	if pod, ok := obj.(*v1.Pod); ok {
+		c.preparePodEventForDispatch(pod, nil, cluster.PodEventDelete)
+	}
+}
+
+func (c *Controller) preparePodEventForDispatch(curPod, prevPod *v1.Pod, event cluster.PodEventType) {
+	podEvent := cluster.PodEvent{
+		PodName:         types.NamespacedName(util.NameFromMeta(curPod.ObjectMeta)),
 		CurPod:          curPod,
-		EventType:       spec.EventUpdate,
+		PrevPod:         prevPod,
+		EventType:       event,
 		ResourceVersion: curPod.ResourceVersion,
 	}
 
 	c.dispatchPodEvent(c.podClusterName(curPod), podEvent)
-}
-
-func (c *Controller) podDelete(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return
-	}
-
-	podEvent := spec.PodEvent{
-		PodName:         util.NameFromMeta(pod.ObjectMeta),
-		CurPod:          pod,
-		EventType:       spec.EventDelete,
-		ResourceVersion: pod.ResourceVersion,
-	}
-
-	c.dispatchPodEvent(c.podClusterName(pod), podEvent)
 }

@@ -4,7 +4,6 @@ package cluster
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -12,14 +11,17 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	"encoding/json"
+
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -28,6 +30,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/patroni"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 )
 
 var (
@@ -39,10 +42,11 @@ var (
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
 type Config struct {
-	OpConfig            config.Config
-	RestConfig          *rest.Config
-	InfrastructureRoles map[string]spec.PgUser // inherited from the controller
-	PodServiceAccount   *v1.ServiceAccount
+	OpConfig                     config.Config
+	RestConfig                   *rest.Config
+	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
+	PodServiceAccount            *v1.ServiceAccount
+	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
 }
 
 type kubeResources struct {
@@ -58,13 +62,13 @@ type kubeResources struct {
 // Cluster describes postgresql cluster
 type Cluster struct {
 	kubeResources
-	spec.Postgresql
+	acidv1.Postgresql
 	Config
 	logger           *logrus.Entry
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
-	podSubscribers   map[spec.NamespacedName]chan spec.PodEvent
+	podSubscribers   map[spec.NamespacedName]chan PodEvent
 	podSubscribersMu sync.RWMutex
 	pgDb             *sql.DB
 	mu               sync.Mutex
@@ -75,7 +79,7 @@ type Cluster struct {
 	teamsAPIClient   teams.Interface
 	oauthTokenGetter OAuthTokenGetter
 	KubeClient       k8sutil.KubernetesClient //TODO: move clients to the better place?
-	currentProcess   spec.Process
+	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
 	dryRunMode       bool
@@ -89,11 +93,11 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql, logger *logrus.Entry) *Cluster {
-	orphanDependents := true
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry) *Cluster {
+	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
-		e, ok := obj.(spec.PodEvent)
+		e, ok := obj.(PodEvent)
 		if !ok {
 			return "", fmt.Errorf("could not cast to PodEvent")
 		}
@@ -106,20 +110,20 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec spec.Postgresql
 		Postgresql:     pgSpec,
 		pgUsers:        make(map[string]spec.PgUser),
 		systemUsers:    make(map[string]spec.PgUser),
-		podSubscribers: make(map[spec.NamespacedName]chan spec.PodEvent),
+		podSubscribers: make(map[spec.NamespacedName]chan PodEvent),
 		kubeResources: kubeResources{
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &metav1.DeleteOptions{OrphanDependents: &orphanDependents},
+		deleteOptions:    &metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
 		dryRunMode:       false,
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
-	cluster.oauthTokenGetter = NewSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
+	cluster.oauthTokenGetter = newSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
 	cluster.patroni = patroni.New(cluster.logger)
 
 	return cluster
@@ -141,39 +145,36 @@ func (c *Cluster) teamName() string {
 func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	c.processMu.Lock()
 	defer c.processMu.Unlock()
-	c.currentProcess = spec.Process{
+	c.currentProcess = Process{
 		Name:      fmt.Sprintf(procName, args...),
 		StartTime: time.Now(),
 	}
 }
 
-func (c *Cluster) setStatus(status spec.PostgresStatus) {
-	c.Status = status
-	b, err := json.Marshal(status)
+func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
+	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
+	var (
+		err error
+		b   []byte
+	)
+	if b, err = json.Marshal(status); err != nil {
+		c.logger.Errorf("could not marshal status: %v", err)
+	}
+
+	patch := []byte(fmt.Sprintf(`{"status": %s}`, string(b)))
+	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
+	// we should take advantage of it.
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch)
 	if err != nil {
-		c.logger.Fatalf("could not marshal status: %v", err)
+		c.logger.Errorf("could not update status: %v", err)
 	}
-	request := []byte(fmt.Sprintf(`{"status": %s}`, string(b))) //TODO: Look into/wait for k8s go client methods
-
-	_, err = c.KubeClient.CRDREST.Patch(types.MergePatchType).
-		Namespace(c.Namespace).
-		Resource(constants.CRDResource).
-		Name(c.Name).
-		Body(request).
-		DoRaw()
-
-	if k8sutil.ResourceNotFound(err) {
-		c.logger.Warningf("could not set %q status for the non-existing cluster", status)
-		return
-	}
-
-	if err != nil {
-		c.logger.Warningf("could not set %q status for the cluster: %v", status, err)
-	}
+	// update the spec, maintaining the new resourceVersion.
+	c.setSpec(newspec)
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status == spec.ClusterStatusCreating
+	return c.Status == acidv1.ClusterStatusCreating
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
@@ -201,39 +202,6 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
-/*
-  Ensures the service account required by StatefulSets to create pods exists in a namespace before a PG cluster is created there so that a user does not have to deploy the account manually.
-
-  The operator does not sync these accounts after creation.
-*/
-func (c *Cluster) createPodServiceAccounts() error {
-
-	podServiceAccountName := c.Config.OpConfig.PodServiceAccountName
-	_, err := c.KubeClient.ServiceAccounts(c.Namespace).Get(podServiceAccountName, metav1.GetOptions{})
-
-	if err != nil {
-
-		c.setProcessName(fmt.Sprintf("creating pod service account in the namespace %v", c.Namespace))
-
-		c.logger.Infof("the pod service account %q cannot be retrieved in the namespace %q. Trying to deploy the account.", podServiceAccountName, c.Namespace)
-
-		// get a separate copy of service account
-		// to prevent a race condition when setting a namespace for many clusters
-		sa := *c.PodServiceAccount
-		_, err = c.KubeClient.ServiceAccounts(c.Namespace).Create(&sa)
-		if err != nil {
-			return fmt.Errorf("cannot deploy the pod service account %q defined in the config map to the %q namespace: %v", podServiceAccountName, c.Namespace, err)
-		}
-
-		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, c.Namespace)
-
-	} else {
-		c.logger.Infof("successfully found the service account %q used to create pods to the namespace %q", podServiceAccountName, c.Namespace)
-	}
-
-	return nil
-}
-
 // Create creates the new kubernetes objects associated with the cluster.
 func (c *Cluster) Create() error {
 	c.mu.Lock()
@@ -248,13 +216,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.setStatus(spec.ClusterStatusRunning) //TODO: are you sure it's running?
+			c.setStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.setStatus(spec.ClusterStatusAddFailed)
+			c.setStatus(acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.setStatus(spec.ClusterStatusCreating)
+	c.setStatus(acidv1.ClusterStatusCreating)
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
@@ -302,11 +270,6 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pod disruption budget %q has been successfully created", util.NameFromMeta(pdb.ObjectMeta))
 
-	if err = c.createPodServiceAccounts(); err != nil {
-		return fmt.Errorf("could not create pod service account %v : %v", c.OpConfig.PodServiceAccountName, err)
-	}
-	c.logger.Infof("pod service accounts have been successfully synced")
-
 	if c.Statefulset != nil {
 		return fmt.Errorf("statefulset already exists in the cluster")
 	}
@@ -324,7 +287,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pods are ready")
 
-	// create database objects unless we are running without pods or disabled that feature explicitely
+	// create database objects unless we are running without pods or disabled that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
@@ -439,7 +402,6 @@ func (c *Cluster) compareVolumeClaimTemplates(setA, setB *v1beta1.StatefulSet) (
 func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
 	reasons := make([]string, 0)
 	needsRollUpdate := false
-
 	for index, containerA := range setA.Spec.Template.Spec.Containers {
 		containerB := setB.Spec.Template.Spec.Containers[index]
 		for _, check := range c.getContainerChecks() {
@@ -461,8 +423,8 @@ func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []st
 	return needsRollUpdate, reasons
 }
 
-func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (equal bool) {
-	equal = true
+func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
+	equal := true
 	if a != nil {
 		equal = compareResoucesAssumeFirstNotNil(a, b)
 	}
@@ -470,7 +432,7 @@ func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) (e
 		equal = compareResoucesAssumeFirstNotNil(b, a)
 	}
 
-	return
+	return equal
 }
 
 func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
@@ -493,20 +455,20 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
 // (i.e. service) is treated as an error.
-func (c *Cluster) Update(oldSpec, newSpec *spec.Postgresql) error {
+func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setStatus(spec.ClusterStatusUpdating)
+	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.setStatus(spec.ClusterStatusUpdateFailed)
-		} else if c.Status != spec.ClusterStatusRunning {
-			c.setStatus(spec.ClusterStatusRunning)
+			c.setStatus(acidv1.ClusterStatusUpdateFailed)
+		} else if c.Status != acidv1.ClusterStatusRunning {
+			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 
@@ -616,7 +578,7 @@ func (c *Cluster) Delete() {
 	}
 
 	for _, obj := range c.Secrets {
-		if delete, user := c.shouldDeleteSecret(obj); !delete {
+		if doDelete, user := c.shouldDeleteSecret(obj); !doDelete {
 			c.logger.Warningf("not removing secret %q for the system user %q", obj.GetName(), user)
 			continue
 		}
@@ -647,21 +609,29 @@ func (c *Cluster) Delete() {
 	}
 }
 
+//NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
+func (c *Cluster) NeedsRepair() (bool, acidv1.PostgresStatus) {
+	c.specMu.RLock()
+	defer c.specMu.RUnlock()
+	return !c.Status.Success(), c.Status
+
+}
+
 // ReceivePodEvent is called back by the controller in order to add the cluster's pod event to the queue.
-func (c *Cluster) ReceivePodEvent(event spec.PodEvent) {
+func (c *Cluster) ReceivePodEvent(event PodEvent) {
 	if err := c.podEventsQueue.Add(event); err != nil {
 		c.logger.Errorf("error when receiving pod events: %v", err)
 	}
 }
 
 func (c *Cluster) processPodEvent(obj interface{}) error {
-	event, ok := obj.(spec.PodEvent)
+	event, ok := obj.(PodEvent)
 	if !ok {
 		return fmt.Errorf("could not cast to PodEvent")
 	}
 
 	c.podSubscribersMu.RLock()
-	subscriber, ok := c.podSubscribers[event.PodName]
+	subscriber, ok := c.podSubscribers[spec.NamespacedName(event.PodName)]
 	c.podSubscribersMu.RUnlock()
 	if ok {
 		subscriber <- event
@@ -733,11 +703,13 @@ func (c *Cluster) initRobotUsers() error {
 	return nil
 }
 
-func (c *Cluster) initHumanUsers() error {
-	teamMembers, err := c.getTeamMembers()
+func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) error {
+	teamMembers, err := c.getTeamMembers(teamID)
+
 	if err != nil {
-		return fmt.Errorf("could not get list of team members: %v", err)
+		return fmt.Errorf("could not get list of team members for team %q: %v", teamID, err)
 	}
+
 	for _, username := range teamMembers {
 		flags := []string{constants.RoleFlagLogin}
 		memberOf := []string{c.OpConfig.PamRoleName}
@@ -745,7 +717,7 @@ func (c *Cluster) initHumanUsers() error {
 		if c.shouldAvoidProtectedOrSystemRole(username, "API role") {
 			continue
 		}
-		if c.OpConfig.EnableTeamSuperuser {
+		if c.OpConfig.EnableTeamSuperuser || isPostgresSuperuserTeam {
 			flags = append(flags, constants.RoleFlagSuperuser)
 		} else {
 			if c.OpConfig.TeamAdminRole != "" {
@@ -766,6 +738,33 @@ func (c *Cluster) initHumanUsers() error {
 		} else {
 			c.pgUsers[username] = newRole
 		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) initHumanUsers() error {
+
+	var clusterIsOwnedBySuperuserTeam bool
+
+	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
+		err := c.initTeamMembers(postgresSuperuserTeam, true)
+		if err != nil {
+			return fmt.Errorf("Cannot create a team %q of Postgres superusers: %v", postgresSuperuserTeam, err)
+		}
+		if postgresSuperuserTeam == c.Spec.TeamID {
+			clusterIsOwnedBySuperuserTeam = true
+		}
+	}
+
+	if clusterIsOwnedBySuperuserTeam {
+		c.logger.Infof("Team %q owning the cluster is also a team of superusers. Created superuser roles for its members instead of admin roles.", c.Spec.TeamID)
+		return nil
+	}
+
+	err := c.initTeamMembers(c.Spec.TeamID, false)
+	if err != nil {
+		return fmt.Errorf("Cannot create a team %q of admins owning the PG cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil
@@ -796,7 +795,8 @@ func (c *Cluster) initInfrastructureRoles() error {
 }
 
 // resolves naming conflicts between existing and new roles by chosing either of them.
-func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) (result spec.PgUser) {
+func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) spec.PgUser {
+	var result spec.PgUser
 	if newRole.Origin >= currentRole.Origin {
 		result = *newRole
 	} else {
@@ -804,7 +804,7 @@ func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) (result
 	}
 	c.logger.Debugf("resolved a conflict of role %q between %s and %s to %s",
 		newRole.Name, newRole.Origin, currentRole.Origin, result.Origin)
-	return
+	return result
 }
 
 func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) bool {
@@ -820,7 +820,7 @@ func (c *Cluster) shouldAvoidProtectedOrSystemRole(username, purpose string) boo
 }
 
 // GetCurrentProcess provides name of the last process of the cluster
-func (c *Cluster) GetCurrentProcess() spec.Process {
+func (c *Cluster) GetCurrentProcess() Process {
 	c.processMu.RLock()
 	defer c.processMu.RUnlock()
 
@@ -828,8 +828,8 @@ func (c *Cluster) GetCurrentProcess() spec.Process {
 }
 
 // GetStatus provides status of the cluster
-func (c *Cluster) GetStatus() *spec.ClusterStatus {
-	return &spec.ClusterStatus{
+func (c *Cluster) GetStatus() *ClusterStatus {
+	return &ClusterStatus{
 		Cluster: c.Spec.ClusterName,
 		Team:    c.Spec.TeamID,
 		Status:  c.Status,
@@ -843,19 +843,25 @@ func (c *Cluster) GetStatus() *spec.ClusterStatus {
 		PodDisruptionBudget: c.GetPodDisruptionBudget(),
 		CurrentProcess:      c.GetCurrentProcess(),
 
-		Error: c.Error,
+		Error: fmt.Errorf("error: %s", c.Error),
 	}
 }
 
 // Switchover does a switchover (via Patroni) to a candidate pod
 func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
+
+	var err error
 	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
+
+	var wg sync.WaitGroup
 
 	podLabelErr := make(chan error)
 	stopCh := make(chan struct{})
-	defer close(podLabelErr)
+
+	wg.Add(1)
 
 	go func() {
+		defer wg.Done()
 		ch := c.registerPodSubscriber(candidate)
 		defer c.unregisterPodSubscriber(candidate)
 
@@ -863,26 +869,32 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 
 		select {
 		case <-stopCh:
-		case podLabelErr <- func() error {
-			_, err := c.waitForPodLabel(ch, stopCh, &role)
-			return err
+		case podLabelErr <- func() (err2 error) {
+			_, err2 = c.waitForPodLabel(ch, stopCh, &role)
+			return
 		}():
 		}
 	}()
 
-	if err := c.patroni.Switchover(curMaster, candidate.Name); err != nil {
-		close(stopCh)
-		return fmt.Errorf("could not failover: %v", err)
-	}
-	c.logger.Debugf("successfully failed over from %q to %q", curMaster.Name, candidate)
-
-	defer close(stopCh)
-
-	if err := <-podLabelErr; err != nil {
-		return fmt.Errorf("could not get master pod label: %v", err)
+	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
+		c.logger.Debugf("successfully failed over from %q to %q", curMaster.Name, candidate)
+		if err = <-podLabelErr; err != nil {
+			err = fmt.Errorf("could not get master pod label: %v", err)
+		}
+	} else {
+		err = fmt.Errorf("could not failover: %v", err)
 	}
 
-	return nil
+	// signal the role label waiting goroutine to close the shop and go home
+	close(stopCh)
+	// wait until the goroutine terminates, since unregisterPodSubscriber
+	// must be called before the outer return; otherwsise we risk subscribing to the same pod twice.
+	wg.Wait()
+	// close the label waiting channel no sooner than the waiting goroutine terminates.
+	close(podLabelErr)
+
+	return err
+
 }
 
 // Lock locks the cluster
@@ -902,9 +914,9 @@ func (c *Cluster) shouldDeleteSecret(secret *v1.Secret) (delete bool, userName s
 
 type simpleActionWithResult func() error
 
-type ClusterObjectGet func(name string) (spec.NamespacedName, error)
+type clusterObjectGet func(name string) (spec.NamespacedName, error)
 
-type ClusterObjectDelete func(name string) error
+type clusterObjectDelete func(name string) error
 
 func (c *Cluster) deletePatroniClusterObjects() error {
 	// TODO: figure out how to remove leftover patroni objects in other cases
@@ -921,8 +933,8 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 }
 
 func (c *Cluster) deleteClusterObject(
-	get ClusterObjectGet,
-	del ClusterObjectDelete,
+	get clusterObjectGet,
+	del clusterObjectDelete,
 	objType string) error {
 	for _, suffix := range patroniObjectSuffixes {
 		name := fmt.Sprintf("%s-%s", c.Name, suffix)
@@ -950,11 +962,11 @@ func (c *Cluster) deletePatroniClusterEndpoints() error {
 		return util.NameFromMeta(ep.ObjectMeta), err
 	}
 
-	delete := func(name string) error {
+	deleteEndpointFn := func(name string) error {
 		return c.KubeClient.Endpoints(c.Namespace).Delete(name, c.deleteOptions)
 	}
 
-	return c.deleteClusterObject(get, delete, "endpoint")
+	return c.deleteClusterObject(get, deleteEndpointFn, "endpoint")
 }
 
 func (c *Cluster) deletePatroniClusterConfigMaps() error {
@@ -963,9 +975,9 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 		return util.NameFromMeta(cm.ObjectMeta), err
 	}
 
-	delete := func(name string) error {
+	deleteConfigMapFn := func(name string) error {
 		return c.KubeClient.ConfigMaps(c.Namespace).Delete(name, c.deleteOptions)
 	}
 
-	return c.deleteClusterObject(get, delete, "configmap")
+	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
 }

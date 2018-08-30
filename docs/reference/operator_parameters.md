@@ -1,9 +1,54 @@
+There are two mutually-exclusive methods to set the Postgres Operator
+configuration.
 
-Postgres operator is configured via a ConfigMap defined by the
-`CONFIG_MAP_NAME` environment variable. Variable names are underscore-separated
-words.
+* ConfigMaps-based, the legacy one.  The configuration is supplied in a
+  key-value configmap, defined by the `CONFIG_MAP_NAME` environment variable.
+  Non-scalar values, i.e. lists or maps, are encoded in the value strings using
+  the comma-based syntax for lists and coma-separated `key:value` syntax for
+  maps. String values containing ':' should be enclosed in quotes. The
+  configuration is flat, parameter group names below are not reflected in the
+  configuration structure. There is an
+  [example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/configmap.yaml)
+
+* CRD-based configuration.  The configuration is stored in the custom YAML
+  manifest, an instance of the custom resource definition (CRD) called
+  `OperatorConfiguration`.  This CRD is registered by the operator
+  during the start when `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` variable is
+  set to a non-empty value. The CRD-based configuration is a regular YAML
+  document; non-scalar keys are simply represented in the usual YAML way. The
+  usage of the CRD-based configuration is triggered by setting the
+  `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` variable, which should point to the
+  `postgresql-operator-configuration` object name in the operators namespace.
+  There are no default values built-in in the operator, each parameter that is
+  not supplied in the configuration receives an empty value.  In order to
+  create your own configuration just copy the [default
+  one](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+  and change it.
+
+CRD-based configuration is more natural and powerful then the one based on
+ConfigMaps and should be used unless there is a compatibility requirement to
+use an already existing configuration. Even in that case, it should be rather
+straightforward to convert the configmap based configuration into the CRD-based
+one and restart the operator. The ConfigMaps-based configuration will be
+deprecated and subsequently removed in future releases.
+
+Note that for the CRD-based configuration configuration groups below correspond
+to the non-leaf keys in the target YAML (i.e. for the Kubernetes resources the
+key is `kubernetes`). The key is mentioned alongside the group description. The
+ConfigMap-based configuration is flat and does not allow non-leaf keys.
+
+Since in the CRD-based case the operator needs to create a CRD first, which is
+controlled by the `resource_check_interval` and `resource_check_timeout`
+parameters, those parameters have no effect and are replaced by the
+`CRD_READY_WAIT_INTERVAL` and `CRD_READY_WAIT_TIMEOUT` environment variables.
+They will be deprecated and removed in the future.
+
+Variable names are underscore-separated words.
 
 ## General
+
+Those are top-level keys, containing both leaf keys and groups.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use
@@ -14,6 +59,11 @@ words.
   default image, as it might be not the most up-to-date one. Instead, build
   your own Spilo image from the [github
   repository](https://github.com/zalando/spilo).
+
+* **sidecar_docker_images**
+  a map of sidecar names to docker images for the containers to run alongside
+  Spilo. In case of the name conflict with the definition in the cluster
+  manifest the cluster-specific one is preferred.
 
 * **workers**
   number of working routines the operator spawns to process requests to
@@ -30,9 +80,16 @@ words.
   are applied. The default is `-1`.
 
 * **resync_period**
-  period between consecutive sync requests. The default is `5m`.
+  period between consecutive sync requests. The default is `30m`.
+
+* **repair_period**
+  period between consecutive repair requests. The default is `5m`.
 
 ## Postgres users
+
+Parameters describing Postgres users. In a CRD-configuration, they are grouped
+under the `users` key.
+
 * **super_username**
   postgres `superuser` name to be created by `initdb`. The default is
   `postgres`.
@@ -42,6 +99,11 @@ words.
   `standby`.
 
 ## Kubernetes resources
+
+Parameters to configure cluster-related Kubernetes objects created by the
+operator, as well as some timeouts associated with them. In a CRD-based
+configuration they are grouped under the `kubernetes` key.
+
 * **pod_service_account_name**
   service account used by Patroni running on individual Pods to communicate
   with the operator. Required even if native Kubernetes support in Patroni is
@@ -51,11 +113,18 @@ words.
 * **pod_service_account_definition**
   The operator tries to create the pod Service Account in the namespace that
   doesn't define such an account using the YAML definition provided by this
-  option. If not defined, a simple definition that contains only the name will
+  option. If not defined, a simple definition that contains only the name will be used. The default is empty.
+
+* **pod_service_account_role_binding_definition**
+  This definition must bind pod service account to a role with permission
+  sufficient for the pods to start and for Patroni to access k8s endpoints;
+  service account on its own lacks any such rights starting with k8s v1.8. If
+  not excplicitly defined by the user, a simple definition that binds the
+  account to the operator's own 'zalando-postgres-operator' cluster role will
   be used. The default is empty.
 
 * **pod_terminate_grace_period**
-  Patroni pods are [terminated
+  Postgres pods are [terminated
   forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
   after this timeout. The default is `5m`.
 
@@ -87,7 +156,7 @@ words.
   name of the secret containing infrastructure roles names and passwords.
 
 * **pod_role_label**
-  name of the label assigned to the postgres pods (and services/endpoints) by
+  name of the label assigned to the Postgres pods (and services/endpoints) by
   the operator. The default is `spilo-role`.
 
 * **cluster_labels**
@@ -104,7 +173,7 @@ words.
   considered `ready`. The operator uses values of those labels to detect the
   start of the Kubernetes cluster upgrade procedure and move master pods off
   the nodes to be decommissioned. When the set is not empty, the operator also
-  assigns the `Affinity` clause to the postgres pods to be scheduled only on
+  assigns the `Affinity` clause to the Postgres pods to be scheduled only on
   `ready` nodes. The default is empty.
 
 * **toleration**
@@ -120,8 +189,20 @@ words.
   All variables from that ConfigMap are injected to the pod's environment, on
   conflicts they are overridden by the environment variables generated by the
   operator. The default is empty.
+  
+* **pod_priority_class_name**
+  a name of the [priority
+  class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
+  that should be assigned to the Postgres pods. The priority class itself must be defined in advance.
+  Default is empty (use the default priority class).
+  
 
 ## Kubernetes resource requests
+
+This group allows you to configure resource requests for the Postgres pods.
+Those parameters are grouped under the `postgres_pod_resources` key in a
+CRD-based configuration.
+
 * **default_cpu_request**
   CPU request value for the postgres containers, unless overridden by
   cluster-specific settings. The default is `100m`.
@@ -139,6 +220,13 @@ words.
   settings. The default is `1Gi`.
 
 ## Operator timeouts
+
+This set of parameters define various timeouts related to some operator
+actions, affecting pod operations and CRD creation. In the CRD-based
+configuration `resource_check_interval` and `resource_check_timeout` have no
+effect, and the parameters are grouped under the `timeouts` key in the
+CRD-based configuration.
+
 * **resource_check_interval**
   interval to wait between consecutive attempts to check for the presence of
   some Kubernetes resource (i.e. `StatefulSet` or `PodDisruptionBudget`). The
@@ -155,8 +243,8 @@ words.
   possible issues faster. The default is `10m`.
 
 * **pod_deletion_wait_timeout**
-  timeout when waiting for the pods to be deleted when removing the cluster or
-  recreating pods. The default is `10m`.
+  timeout when waiting for the Postgres pods to be deleted when removing the
+  cluster or recreating pods. The default is `10m`.
 
 * **ready_wait_interval**
   the interval between consecutive attempts waiting for the postgres CRD to be
@@ -166,6 +254,10 @@ words.
   the timeout for the complete postgres CRD creation. The default is `30s`.
 
 ## Load balancer related options
+
+Those options affect the behavior of load balancers created by the operator.
+In the CRD-based configuration they are grouped under the `load_balancer` key.
+
 * **db_hosted_zone**
   DNS zone for the cluster DNS name when the load balancer is configured for
   the cluster. Only used when combined with
@@ -197,22 +289,35 @@ words.
   No other placeholders are allowed.
 
 ## AWS or GSC interaction
+
+The options in this group configure operator interactions with non-Kubernetes
+objects from AWS or Google cloud. They have no effect unless you are using
+either. In the CRD-based configuration those options are grouped under the
+`aws_or_gcp` key.
+
 * **wal_s3_bucket**
   S3 bucket to use for shipping WAL segments with WAL-E. A bucket has to be
-  present and accessible by Patroni managed pods. At the moment, supported
-  services by Spilo are S3 and GCS. The default is empty.
+  present and accessible by Postgres pods. At the moment, supported services by
+  Spilo are S3 and GCS. The default is empty.
 
 * **log_s3_bucket**
   S3 bucket to use for shipping postgres daily logs. Works only with S3 on AWS.
-  The bucket has to be present and accessible by Patroni managed pods. At the
-  moment Spilo does not yet support this. The default is empty.
+  The bucket has to be present and accessible by Postgres pods. At the moment
+  Spilo does not yet support this. The default is empty.
 
 * **kube_iam_role**
-  AWS IAM role to supply in the `iam.amazonaws.com/role` annotation of Patroni
+  AWS IAM role to supply in the `iam.amazonaws.com/role` annotation of Postgres
   pods. Only used when combined with
-  [kube2iam](https://github.com/jtblin/kube2iam) project on AWS. The default is empty.
+  [kube2iam](https://github.com/jtblin/kube2iam) project on AWS. The default is
+  empty.
+
+* **aws_region**
+  AWS region used to store ESB volumes. The default is `eu-central-1`.
 
 ## Debugging the operator
+
+Options to aid debugging of the operator itself. Grouped under the `debug` key.
+
 * **debug_logging**
   boolean parameter that toggles verbose debug logs from the operator. The
   default is `true`.
@@ -222,7 +327,12 @@ words.
   access to the postgres database, i.e. creating databases and users. The default
   is `true`.
   
-### Automatic creation of human users in the database
+## Automatic creation of human users in the database
+
+Options to automate creation of human users with the aid of the teams API
+service. In the CRD-based configuration those are grouped under the `teams_api`
+key.
+
 * **enable_teams_api**
   boolean parameter that toggles usage of the Teams API by the operator.
   The default is `true`.
@@ -267,7 +377,13 @@ words.
   List of roles that cannot be overwritten by an application, team or
   infrastructure role. The default is `admin`.
 
+* **postgres_superuser_teams**
+  List of teams which members need the superuser role in each PG database cluster to administer Postgres and maintain infrastructure built around it. The default is `postgres_superuser`.
+
 ## Logging and REST API
+
+Parameters affecting logging and REST API listener. In the CRD-based configuration they are grouped under the `logging_rest_api` key.
+
 * **api_port**
   REST API listener listens to this port. The default is `8080`.
 
@@ -278,6 +394,11 @@ words.
   number of entries in the cluster history ring buffer. The default is `1000`.
 
 ## Scalyr options
+
+Those parameters define the resource requests/limits and properties of the
+scalyr sidecar. In the CRD-based configuration they are grouped under the
+`scalyr` key.
+
 * **scalyr_api_key**
   API key for the Scalyr sidecar. The default is empty.
 

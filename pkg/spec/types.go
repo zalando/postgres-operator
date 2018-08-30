@@ -2,6 +2,7 @@ package spec
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -11,32 +12,18 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	policyv1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/rest"
 )
-
-// EventType contains type of the events for the TPRs and Pods received from Kubernetes
-type EventType string
 
 // NamespacedName describes the namespace/name pairs used in Kubernetes names.
 type NamespacedName types.NamespacedName
 
-// Possible values for the EventType
-const (
-	EventAdd    EventType = "ADD"
-	EventUpdate EventType = "UPDATE"
-	EventDelete EventType = "DELETE"
-	EventSync   EventType = "SYNC"
-
-	fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-)
+const fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
 // RoleOrigin contains the code of the origin of a role
 type RoleOrigin int
 
-// The rolesOrigin constant values should be sorted by the role priority.
+// The rolesOrigin constant values must be sorted by the role priority for resolveNameConflict(...) to work.
 const (
 	RoleOriginUnknown RoleOrigin = iota
 	RoleOriginManifest
@@ -44,16 +31,6 @@ const (
 	RoleOriginTeamsAPI
 	RoleOriginSystem
 )
-
-// ClusterEvent carries the payload of the Cluster TPR events.
-type ClusterEvent struct {
-	EventTime time.Time
-	UID       types.UID
-	EventType EventType
-	OldSpec   *Postgresql
-	NewSpec   *Postgresql
-	WorkerID  uint32
-}
 
 type syncUserOperation int
 
@@ -63,15 +40,6 @@ const (
 	PGsyncUserAlter
 	PGSyncAlterSet // handle ALTER ROLE SET parameter = value
 )
-
-// PodEvent describes the event for a single Pod
-type PodEvent struct {
-	ResourceVersion string
-	PodName         NamespacedName
-	PrevPod         *v1.Pod
-	CurPod          *v1.Pod
-	EventType       EventType
-}
 
 // PgUser contains information about a single user.
 type PgUser struct {
@@ -107,36 +75,6 @@ type LogEntry struct {
 	Message     string
 }
 
-// Process describes process of the cluster
-type Process struct {
-	Name      string
-	StartTime time.Time
-}
-
-// ClusterStatus describes status of the cluster
-type ClusterStatus struct {
-	Team                string
-	Cluster             string
-	MasterService       *v1.Service
-	ReplicaService      *v1.Service
-	MasterEndpoint      *v1.Endpoints
-	ReplicaEndpoint     *v1.Endpoints
-	StatefulSet         *v1beta1.StatefulSet
-	PodDisruptionBudget *policyv1beta1.PodDisruptionBudget
-
-	CurrentProcess Process
-	Worker         uint32
-	Status         PostgresStatus
-	Spec           PostgresSpec
-	Error          error
-}
-
-// WorkerStatus describes status of the worker
-type WorkerStatus struct {
-	CurrentCluster NamespacedName
-	CurrentProcess Process
-}
-
 // Diff describes diff
 type Diff struct {
 	EventTime   time.Time
@@ -162,10 +100,12 @@ type ControllerConfig struct {
 	RestConfig          *rest.Config `json:"-"`
 	InfrastructureRoles map[string]PgUser
 
-	NoDatabaseAccess bool
-	NoTeamsAPI       bool
-	ConfigMapName    NamespacedName
-	Namespace        string
+	NoDatabaseAccess     bool
+	NoTeamsAPI           bool
+	CRDReadyWaitInterval time.Duration
+	CRDReadyWaitTimeout  time.Duration
+	ConfigMapName        NamespacedName
+	Namespace            string
 }
 
 // cached value for the GetOperatorNamespace
@@ -185,20 +125,38 @@ func (n *NamespacedName) Decode(value string) error {
 	return n.DecodeWorker(value, GetOperatorNamespace())
 }
 
+func (n *NamespacedName) UnmarshalJSON(data []byte) error {
+	result := NamespacedName{}
+	var tmp string
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	if err := result.Decode(tmp); err != nil {
+		return err
+	}
+	*n = result
+	return nil
+}
+
 // DecodeWorker separates the decode logic to (unit) test
 // from obtaining the operator namespace that depends on k8s mounting files at runtime
 func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
-	name := types.NewNamespacedNameFromString(value)
+	var (
+		name types.NamespacedName
+	)
 
-	if strings.Trim(value, string(types.Separator)) != "" && name == (types.NamespacedName{}) {
-		name.Name = value
-		name.Namespace = operatorNamespace
-	} else if name.Namespace == "" {
-		name.Namespace = operatorNamespace
+	result := strings.SplitN(value, string(types.Separator), 2)
+	if len(result) < 2 {
+		name.Name = result[0]
+	} else {
+		name.Name = strings.TrimLeft(result[1], string(types.Separator))
+		name.Namespace = result[0]
 	}
-
 	if name.Name == "" {
 		return fmt.Errorf("incorrect namespaced name: %v", value)
+	}
+	if name.Namespace == "" {
+		name.Namespace = operatorNamespace
 	}
 
 	*n = NamespacedName(name)
@@ -208,6 +166,8 @@ func (n *NamespacedName) DecodeWorker(value, operatorNamespace string) error {
 
 func (r RoleOrigin) String() string {
 	switch r {
+	case RoleOriginUnknown:
+		return "unknown"
 	case RoleOriginManifest:
 		return "manifest role"
 	case RoleOriginInfrastructure:
@@ -216,8 +176,9 @@ func (r RoleOrigin) String() string {
 		return "teams API role"
 	case RoleOriginSystem:
 		return "system role"
+	default:
+		panic(fmt.Sprintf("bogus role origin value %d", r))
 	}
-	return "unknown"
 }
 
 // GetOperatorNamespace assumes serviceaccount secret is mounted by kubernetes

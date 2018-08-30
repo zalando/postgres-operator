@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
@@ -16,11 +16,12 @@ import (
 // EBSVolumeResizer implements volume resizing interface for AWS EBS volumes.
 type EBSVolumeResizer struct {
 	connection *ec2.EC2
+	AWSRegion  string
 }
 
 // ConnectToProvider connects to AWS.
 func (c *EBSVolumeResizer) ConnectToProvider() error {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(constants.AWSRegion)})
+	sess, err := session.NewSession(&aws.Config{Region: aws.String(c.AWSRegion)})
 	if err != nil {
 		return fmt.Errorf("could not establish AWS session: %v", err)
 	}

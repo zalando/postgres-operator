@@ -11,12 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
-	policybeta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 
+	acidzalando "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
@@ -37,7 +39,7 @@ type SecretOauthTokenGetter struct {
 	OAuthTokenSecretName spec.NamespacedName
 }
 
-func NewSecretOauthTokenGetter(kubeClient *k8sutil.KubernetesClient,
+func newSecretOauthTokenGetter(kubeClient *k8sutil.KubernetesClient,
 	OAuthTokenSecretName spec.NamespacedName) *SecretOauthTokenGetter {
 	return &SecretOauthTokenGetter{kubeClient, OAuthTokenSecretName}
 }
@@ -80,7 +82,8 @@ func (c *Cluster) isSystemUsername(username string) bool {
 
 func isValidFlag(flag string) bool {
 	for _, validFlag := range []string{constants.RoleFlagSuperuser, constants.RoleFlagLogin, constants.RoleFlagCreateDB,
-		constants.RoleFlagInherit, constants.RoleFlagReplication, constants.RoleFlagByPassRLS} {
+		constants.RoleFlagInherit, constants.RoleFlagReplication, constants.RoleFlagByPassRLS,
+		constants.RoleFlagCreateRole} {
 		if flag == validFlag || flag == "NO"+validFlag {
 			return true
 		}
@@ -215,17 +218,19 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 	}
 }
 
-func (c *Cluster) logVolumeChanges(old, new spec.Volume) {
+func (c *Cluster) logVolumeChanges(old, new acidv1.Volume) {
 	c.logger.Infof("volume specification has been changed")
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
 }
 
-func (c *Cluster) getTeamMembers() ([]string, error) {
-	if c.Spec.TeamID == "" {
+func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
+
+	if teamID == "" {
 		return nil, fmt.Errorf("no teamId specified")
 	}
+
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debug("team API is disabled, returning empty list of members")
+		c.logger.Debugf("team API is disabled, returning empty list of members for team %q", teamID)
 		return []string{}, nil
 	}
 
@@ -235,16 +240,16 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 		return []string{}, nil
 	}
 
-	teamInfo, err := c.teamsAPIClient.TeamInfo(c.Spec.TeamID, token)
+	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		c.logger.Warnf("could not get team info, returning empty list of team members: %v", err)
+		c.logger.Warnf("could not get team info for team %q, returning empty list of team members: %v", teamID, err)
 		return []string{}, nil
 	}
 
 	return teamInfo.Members, nil
 }
 
-func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
+func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {
 		select {
@@ -266,12 +271,12 @@ func (c *Cluster) waitForPodLabel(podEvents chan spec.PodEvent, stopChan chan st
 	}
 }
 
-func (c *Cluster) waitForPodDeletion(podEvents chan spec.PodEvent) error {
+func (c *Cluster) waitForPodDeletion(podEvents chan PodEvent) error {
 	timeout := time.After(c.OpConfig.PodDeletionWaitTimeout)
 	for {
 		select {
 		case podEvent := <-podEvents:
-			if podEvent.EventType == spec.EventDelete {
+			if podEvent.EventType == PodEventDelete {
 				return nil
 			}
 		case <-timeout:
@@ -385,7 +390,7 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 }
 
 // Returns labels used to create or list k8s objects such as pods
-// For backward compatability, shouldAddExtraLabels must be false
+// For backward compatibility, shouldAddExtraLabels must be false
 // when listing k8s objects. See operator PR #252
 func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 	lbls := make(map[string]string)
@@ -403,7 +408,7 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 }
 
 func (c *Cluster) labelsSelector() *metav1.LabelSelector {
-	return &metav1.LabelSelector{c.labelsSet(false), nil}
+	return &metav1.LabelSelector{MatchLabels: c.labelsSet(false), MatchExpressions: nil}
 }
 
 func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
@@ -437,18 +442,18 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 	return c.OpConfig.SecretNameTemplate.Format(
 		"username", strings.Replace(username, "_", "-", -1),
 		"cluster", clusterName,
-		"tprkind", constants.CRDKind,
-		"tprgroup", constants.CRDGroup)
+		"tprkind", acidv1.PostgresCRDResourceKind,
+		"tprgroup", acidzalando.GroupName)
 }
 
 func masterCandidate(replicas []spec.NamespacedName) spec.NamespacedName {
 	return replicas[rand.Intn(len(replicas))]
 }
 
-func cloneSpec(from *spec.Postgresql) (*spec.Postgresql, error) {
+func cloneSpec(from *acidv1.Postgresql) (*acidv1.Postgresql, error) {
 	var (
 		buf    bytes.Buffer
-		result *spec.Postgresql
+		result *acidv1.Postgresql
 		err    error
 	)
 	enc := gob.NewEncoder(&buf)
@@ -462,13 +467,13 @@ func cloneSpec(from *spec.Postgresql) (*spec.Postgresql, error) {
 	return result, nil
 }
 
-func (c *Cluster) setSpec(newSpec *spec.Postgresql) {
+func (c *Cluster) setSpec(newSpec *acidv1.Postgresql) {
 	c.specMu.Lock()
 	c.Postgresql = *newSpec
 	c.specMu.Unlock()
 }
 
-func (c *Cluster) GetSpec() (*spec.Postgresql, error) {
+func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
 	return cloneSpec(&c.Postgresql)

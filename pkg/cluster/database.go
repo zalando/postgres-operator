@@ -153,12 +153,10 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 
 // getDatabases returns the map of current databases with owners
 // The caller is responsible for opening and closing the database connection
-func (c *Cluster) getDatabases() (map[string]string, error) {
+func (c *Cluster) getDatabases() (dbs map[string]string, err error) {
 	var (
 		rows *sql.Rows
-		err  error
 	)
-	dbs := make(map[string]string)
 
 	if rows, err = c.pgDb.Query(getDatabasesSQL); err != nil {
 		return nil, fmt.Errorf("could not query database: %v", err)
@@ -166,15 +164,20 @@ func (c *Cluster) getDatabases() (map[string]string, error) {
 
 	defer func() {
 		if err2 := rows.Close(); err2 != nil {
-			err = fmt.Errorf("error when closing query cursor: %v", err2)
+			if err != nil {
+				err = fmt.Errorf("error when closing query cursor: %v, previous error: %v", err2, err)
+			} else {
+				err = fmt.Errorf("error when closing query cursor: %v", err2)
+			}
 		}
 	}()
+
+	dbs = make(map[string]string)
 
 	for rows.Next() {
 		var datname, owner string
 
-		err := rows.Scan(&datname, &owner)
-		if err != nil {
+		if err = rows.Scan(&datname, &owner); err != nil {
 			return nil, fmt.Errorf("error when processing row: %v", err)
 		}
 		dbs[datname] = owner
@@ -186,26 +189,24 @@ func (c *Cluster) getDatabases() (map[string]string, error) {
 // executeCreateDatabase creates new database with the given owner.
 // The caller is responsible for openinging and closing the database connection.
 func (c *Cluster) executeCreateDatabase(datname, owner string) error {
-	if !c.databaseNameOwnerValid(datname, owner) {
-		return nil
-	}
-	c.logger.Infof("creating database %q with owner %q", datname, owner)
-
-	if _, err := c.pgDb.Exec(fmt.Sprintf(createDatabaseSQL, datname, owner)); err != nil {
-		return fmt.Errorf("could not execute create database: %v", err)
-	}
-	return nil
+	return c.execCreateOrAlterDatabase(datname, owner, createDatabaseSQL,
+		"creating database", "create database")
 }
 
 // executeCreateDatabase changes the owner of the given database.
 // The caller is responsible for openinging and closing the database connection.
 func (c *Cluster) executeAlterDatabaseOwner(datname string, owner string) error {
+	return c.execCreateOrAlterDatabase(datname, owner, alterDatabaseOwnerSQL,
+		"changing owner for database", "alter database owner")
+}
+
+func (c *Cluster) execCreateOrAlterDatabase(datname, owner, statement, doing, operation string) error {
 	if !c.databaseNameOwnerValid(datname, owner) {
 		return nil
 	}
-	c.logger.Infof("changing database %q owner to %q", datname, owner)
-	if _, err := c.pgDb.Exec(fmt.Sprintf(alterDatabaseOwnerSQL, datname, owner)); err != nil {
-		return fmt.Errorf("could not execute alter database owner: %v", err)
+	c.logger.Infof("%s %q owner %q", doing, datname, owner)
+	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, datname, owner)); err != nil {
+		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
 	return nil
 }
