@@ -2,6 +2,9 @@ package cluster
 
 import (
 	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/Sirupsen/logrus"
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -9,8 +12,6 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
 	"k8s.io/api/core/v1"
-	"reflect"
-	"testing"
 )
 
 const (
@@ -101,6 +102,7 @@ func (m *mockTeamsAPIClient) setMembers(members []string) {
 	m.members = members
 }
 
+// Test adding a member of a product team owning a particular DB cluster
 func TestInitHumanUsers(t *testing.T) {
 
 	var mockTeamsAPI mockTeamsAPIClient
@@ -108,7 +110,9 @@ func TestInitHumanUsers(t *testing.T) {
 	cl.teamsAPIClient = &mockTeamsAPI
 	testName := "TestInitHumanUsers"
 
+	// members of a product team are granted superuser rights for DBs of their team
 	cl.OpConfig.EnableTeamSuperuser = true
+
 	cl.OpConfig.EnableTeamsAPI = true
 	cl.OpConfig.PamRoleName = "zalandos"
 	cl.Spec.TeamID = "test"
@@ -136,6 +140,145 @@ func TestInitHumanUsers(t *testing.T) {
 	for _, tt := range tests {
 		cl.pgUsers = tt.existingRoles
 		mockTeamsAPI.setMembers(tt.teamRoles)
+		if err := cl.initHumanUsers(); err != nil {
+			t.Errorf("%s got an unexpected error %v", testName, err)
+		}
+
+		if !reflect.DeepEqual(cl.pgUsers, tt.result) {
+			t.Errorf("%s expects %#v, got %#v", testName, tt.result, cl.pgUsers)
+		}
+	}
+}
+
+type mockTeam struct {
+	teamID                  string
+	members                 []string
+	isPostgresSuperuserTeam bool
+}
+
+type mockTeamsAPIClientMultipleTeams struct {
+	teams []mockTeam
+}
+
+func (m *mockTeamsAPIClientMultipleTeams) TeamInfo(teamID, token string) (tm *teams.Team, err error) {
+	for _, team := range m.teams {
+		if team.teamID == teamID {
+			return &teams.Team{Members: team.members}, nil
+		}
+	}
+
+	// should not be reached if a slice with teams is populated correctly
+	return nil, nil
+}
+
+// Test adding members of maintenance teams that get superuser rights for all PG databases
+func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
+
+	var mockTeamsAPI mockTeamsAPIClientMultipleTeams
+	cl.oauthTokenGetter = &mockOAuthTokenGetter{}
+	cl.teamsAPIClient = &mockTeamsAPI
+	cl.OpConfig.EnableTeamSuperuser = false
+	testName := "TestInitHumanUsersWithSuperuserTeams"
+
+	cl.OpConfig.EnableTeamsAPI = true
+	cl.OpConfig.PamRoleName = "zalandos"
+
+	teamA := mockTeam{
+		teamID:                  "postgres_superusers",
+		members:                 []string{"postgres_superuser"},
+		isPostgresSuperuserTeam: true,
+	}
+
+	userA := spec.PgUser{
+		Name:     "postgres_superuser",
+		Origin:   spec.RoleOriginTeamsAPI,
+		MemberOf: []string{cl.OpConfig.PamRoleName},
+		Flags:    []string{"LOGIN", "SUPERUSER"},
+	}
+
+	teamB := mockTeam{
+		teamID:                  "postgres_admins",
+		members:                 []string{"postgres_admin"},
+		isPostgresSuperuserTeam: true,
+	}
+
+	userB := spec.PgUser{
+		Name:     "postgres_admin",
+		Origin:   spec.RoleOriginTeamsAPI,
+		MemberOf: []string{cl.OpConfig.PamRoleName},
+		Flags:    []string{"LOGIN", "SUPERUSER"},
+	}
+
+	teamTest := mockTeam{
+		teamID:                  "test",
+		members:                 []string{"test_user"},
+		isPostgresSuperuserTeam: false,
+	}
+
+	userTest := spec.PgUser{
+		Name:     "test_user",
+		Origin:   spec.RoleOriginTeamsAPI,
+		MemberOf: []string{cl.OpConfig.PamRoleName},
+		Flags:    []string{"LOGIN"},
+	}
+
+	tests := []struct {
+		ownerTeam      string
+		existingRoles  map[string]spec.PgUser
+		superuserTeams []string
+		teams          []mockTeam
+		result         map[string]spec.PgUser
+	}{
+		// case 1: there are two different teams of PG maintainers and one product team
+		{
+			ownerTeam:      "test",
+			existingRoles:  map[string]spec.PgUser{},
+			superuserTeams: []string{"postgres_superusers", "postgres_admins"},
+			teams:          []mockTeam{teamA, teamB, teamTest},
+			result: map[string]spec.PgUser{
+				"postgres_superuser": userA,
+				"postgres_admin":     userB,
+				"test_user":          userTest,
+			},
+		},
+		// case 2: the team of superusers creates a new PG cluster
+		{
+			ownerTeam:      "postgres_superusers",
+			existingRoles:  map[string]spec.PgUser{},
+			superuserTeams: []string{"postgres_superusers"},
+			teams:          []mockTeam{teamA},
+			result: map[string]spec.PgUser{
+				"postgres_superuser": userA,
+			},
+		},
+		// case 3: the team owning the cluster is promoted to the maintainers' status
+		{
+			ownerTeam: "postgres_superusers",
+			existingRoles: map[string]spec.PgUser{
+				// role with the name exists before  w/o superuser privilege
+				"postgres_superuser": spec.PgUser{
+					Origin:     spec.RoleOriginTeamsAPI,
+					Name:       "postgres_superuser",
+					Password:   "",
+					Flags:      []string{"LOGIN"},
+					MemberOf:   []string{cl.OpConfig.PamRoleName},
+					Parameters: map[string]string(nil)}},
+			superuserTeams: []string{"postgres_superusers"},
+			teams:          []mockTeam{teamA},
+			result: map[string]spec.PgUser{
+				"postgres_superuser": userA,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+
+		mockTeamsAPI.teams = tt.teams
+
+		cl.Spec.TeamID = tt.ownerTeam
+		cl.pgUsers = tt.existingRoles
+		cl.OpConfig.PostgresSuperuserTeams = tt.superuserTeams
+
 		if err := cl.initHumanUsers(); err != nil {
 			t.Errorf("%s got an unexpected error %v", testName, err)
 		}

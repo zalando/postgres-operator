@@ -210,12 +210,14 @@ func (c *Cluster) logVolumeChanges(old, new acidv1.Volume) {
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
 }
 
-func (c *Cluster) getTeamMembers() ([]string, error) {
-	if c.Spec.TeamID == "" {
+func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
+
+	if teamID == "" {
 		return nil, fmt.Errorf("no teamId specified")
 	}
+
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debug("team API is disabled, returning empty list of members")
+		c.logger.Debugf("team API is disabled, returning empty list of members for team %q", teamID)
 		return []string{}, nil
 	}
 
@@ -225,9 +227,9 @@ func (c *Cluster) getTeamMembers() ([]string, error) {
 		return []string{}, nil
 	}
 
-	teamInfo, err := c.teamsAPIClient.TeamInfo(c.Spec.TeamID, token)
+	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		c.logger.Warnf("could not get team info, returning empty list of team members: %v", err)
+		c.logger.Warnf("could not get team info for team %q, returning empty list of team members: %v", teamID, err)
 		return []string{}, nil
 	}
 

@@ -631,6 +631,11 @@ func (in *TeamsAPIConfiguration) DeepCopyInto(out *TeamsAPIConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.PostgresSuperuserTeams != nil {
+		in, out := &in.PostgresSuperuserTeams, &out.PostgresSuperuserTeams
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
