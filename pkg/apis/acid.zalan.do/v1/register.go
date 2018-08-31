@@ -9,16 +9,6 @@ import (
 )
 
 const (
-	PostgresCRDResourceKind   = "postgresql"
-	PostgresCRDResourcePlural = "postgresqls"
-	PostgresCRDResouceName    = PostgresCRDResourcePlural + "." + acidzalando.GroupName
-	PostgresCRDResourceShort  = "pg"
-
-	OperatorConfigCRDResouceKind    = "OperatorConfiguration"
-	OperatorConfigCRDResourcePlural = "operatorconfigurations"
-	OperatorConfigCRDResourceName   = OperatorConfigCRDResourcePlural + "." + acidzalando.GroupName
-	OperatorConfigCRDResourceShort  = "opconfig"
-
 	APIVersion = "v1"
 )
 
