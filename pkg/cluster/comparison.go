@@ -4,8 +4,8 @@ import (
 	"reflect"
 
 	u "github.com/zalando-incubator/postgres-operator/pkg/util"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/apps/v1beta1"
+	"k8s.io/api/core/v1"
+	"k8s.io/api/apps/v1beta1"
 )
 
 type ContainerCondition func(a, b *v1.Container) bool
