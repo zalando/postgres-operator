@@ -20,6 +20,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	var err error
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	var actions []Action = NoActions
 
 	c.setSpec(newSpec)
 
@@ -46,8 +47,13 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	c.logger.Debugf("syncing services")
-	if err = c.syncServices(); err != nil {
-		err = fmt.Errorf("could not sync services: %v", err)
+	if actions, err = c.syncServices(); err != nil {
+		err = fmt.Errorf("could not resolve actions to sync services: %v", err)
+		return err
+	}
+
+	if err = c.applyActions(actions); err != nil {
+		err = fmt.Errorf("could not apply actions to sync services: %v", err)
 		return err
 	}
 
@@ -94,23 +100,42 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	return err
 }
 
-func (c *Cluster) syncServices() error {
+func (c *Cluster) syncServices() (actions []Action, err error) {
 	for _, role := range []PostgresRole{Master, Replica} {
 		c.logger.Debugf("syncing %s service", role)
 
-		if err := c.syncEndpoint(role); err != nil {
-			return fmt.Errorf("could not sync %s endpont: %v", role, err)
+		if err = c.syncEndpoint(role); err != nil {
+			return NoActions, fmt.Errorf("could not sync %s endpont: %v", role, err)
 		}
 
-		if err := c.syncService(role); err != nil {
-			return fmt.Errorf("could not sync %s service: %v", role, err)
+		if actions, err = c.syncService(role); err != nil {
+			msg := "could prepare actions to sync %s service: %v"
+			return NoActions, fmt.Errorf(msg, role, err)
+		}
+	}
+
+	return actions, nil
+}
+
+func (c *Cluster) applyActions(actions []Action) (err error) {
+	for _, action := range actions {
+		c.logger.Infof("Applying action %s", action.Name())
+	}
+
+	if c.dryRunMode {
+		return nil
+	}
+
+	for _, action := range actions {
+		if err := action.Process(); err != nil {
+			c.logger.Errorf("Can't apply action %s: %v", action.Name(), err)
 		}
 	}
 
 	return nil
 }
 
-func (c *Cluster) syncService(role PostgresRole) error {
+func (c *Cluster) syncService(role PostgresRole) ([]Action, error) {
 	var (
 		svc *v1.Service
 		err error
@@ -120,35 +145,33 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	if svc, err = c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
-		if match, reason := k8sutil.SameService(svc, desiredSvc); !match {
-			c.logServiceChanges(role, svc, desiredSvc, false, reason)
-			if err = c.updateService(role, desiredSvc); err != nil {
-				return fmt.Errorf("could not update %s service to match desired state: %v", role, err)
-			}
-			c.logger.Infof("%s service %q is in the desired state now", role, util.NameFromMeta(desiredSvc.ObjectMeta))
+		match, reason := k8sutil.SameService(svc, desiredSvc)
+		if match {
+			return NoActions, nil
 		}
-		return nil
-	}
-	if !k8sutil.ResourceNotFound(err) {
-		return fmt.Errorf("could not get %s service: %v", role, err)
+		c.logServiceChanges(role, svc, desiredSvc, false, reason)
+
+		actions, err := c.updateService(role, desiredSvc)
+		if err != nil {
+			return NoActions, fmt.Errorf("could not update %s service to match desired state: %v", role, err)
+		}
+
+		return actions, nil
+	} else if !k8sutil.ResourceNotFound(err) {
+		return NoActions, fmt.Errorf("could not get %s service: %v", role, err)
 	}
 	// no existing service, create new one
 	c.Services[role] = nil
 	c.logger.Infof("could not find the cluster's %s service", role)
 
-	if svc, err = c.createService(role); err == nil {
-		c.logger.Infof("created missing %s service %q", role, util.NameFromMeta(svc.ObjectMeta))
-	} else {
-		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not create missing %s service: %v", role, err)
-		}
-		c.logger.Infof("%s service %q already exists", role, util.NameFromMeta(svc.ObjectMeta))
-		if svc, err = c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{}); err != nil {
-			return fmt.Errorf("could not fetch existing %s service: %v", role, err)
-		}
+	actions, err := c.createService(role)
+	if err != nil {
+		return NoActions, fmt.Errorf(
+			"could not calculate actions to create %s service: %v",
+			role, err)
 	}
-	c.Services[role] = svc
-	return nil
+
+	return actions, nil
 }
 
 func (c *Cluster) syncEndpoint(role PostgresRole) error {
@@ -275,7 +298,7 @@ func (c *Cluster) syncStatefulSet() error {
 		c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired)
 
 		cmp := c.compareStatefulSetWith(desiredSS)
-		if !cmp.match {
+		if cmp.update {
 			if cmp.rollingUpdate && !podsRollingUpdateRequired {
 				podsRollingUpdateRequired = true
 				c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired)

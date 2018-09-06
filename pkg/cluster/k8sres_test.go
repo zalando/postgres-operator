@@ -1,21 +1,12 @@
 package cluster
 
 import (
+	u "github.com/zalando-incubator/postgres-operator/pkg/util"
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"testing"
 )
-
-func True() *bool {
-	b := true
-	return &b
-}
-
-func False() *bool {
-	b := false
-	return &b
-}
 
 func TestCreateLoadBalancerLogic(t *testing.T) {
 	var cluster = New(
@@ -40,14 +31,14 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 		{
 			subtest:  "new format, load balancer is enabled for replica",
 			role:     Replica,
-			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: True()},
+			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: u.True()},
 			opConfig: config.Config{},
 			result:   true,
 		},
 		{
 			subtest:  "new format, load balancer is disabled for replica",
 			role:     Replica,
-			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: False()},
+			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: u.False()},
 			opConfig: config.Config{},
 			result:   false,
 		},

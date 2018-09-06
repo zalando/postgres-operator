@@ -82,10 +82,11 @@ type Cluster struct {
 	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+	dryRunMode       bool
 }
 
 type compareStatefulsetResult struct {
-	match         bool
+	update        bool
 	replace       bool
 	rollingUpdate bool
 	reasons       []string
@@ -118,6 +119,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 		deleteOptions:    &metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
+		dryRunMode:       false,
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
@@ -207,9 +209,9 @@ func (c *Cluster) Create() error {
 	var (
 		err error
 
-		service *v1.Service
 		ep      *v1.Endpoints
 		ss      *v1beta1.StatefulSet
+		actions []Action
 	)
 
 	defer func() {
@@ -240,11 +242,13 @@ func (c *Cluster) Create() error {
 		if c.Services[role] != nil {
 			return fmt.Errorf("service already exists in the cluster")
 		}
-		service, err = c.createService(role)
+		actions, err = c.createService(role)
 		if err != nil {
-			return fmt.Errorf("could not create %s service: %v", role, err)
+			msg := "could not prepare actions to create %s service: %v"
+			return fmt.Errorf(msg, role, err)
 		}
-		c.logger.Infof("%s service %q has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
+
+		return c.applyActions(actions)
 	}
 
 	if err = c.initUsers(); err != nil {
@@ -305,55 +309,13 @@ func (c *Cluster) Create() error {
 
 func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
 	reasons := make([]string, 0)
-	var match, needsRollUpdate, needsReplace bool
+	update, needsRollUpdate, needsReplace := false, false, false
 
-	match = true
-	//TODO: improve me
-	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
-		match = false
-		reasons = append(reasons, "new statefulset's number of replicas doesn't match the current one")
-	}
-	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
-		match = false
-		reasons = append(reasons, "new statefulset's annotations doesn't match the current one")
-	}
-	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
-	} else {
-		needsRollUpdate, reasons = c.compareContainers(c.Statefulset, statefulSet)
-	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
 	}
-	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
-	// and the combined effect of all the changes should be applied.
-	// TODO: log all reasons for changing the statefulset, not just the last one.
-	// TODO: make sure this is in sync with generatePodTemplate, ideally by using the same list of fields to generate
-	// the template and the diff
-	if c.Statefulset.Spec.Template.Spec.ServiceAccountName != statefulSet.Spec.Template.Spec.ServiceAccountName {
-		needsReplace = true
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's serviceAccountName service asccount name doesn't match the current one")
-	}
-	if *c.Statefulset.Spec.Template.Spec.TerminationGracePeriodSeconds != *statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds {
-		needsReplace = true
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's terminationGracePeriodSeconds  doesn't match the current one")
-	}
-	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Affinity, statefulSet.Spec.Template.Spec.Affinity) {
-		needsReplace = true
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's pod affinity doesn't match the current one")
-	}
 
-	// Some generated fields like creationTimestamp make it not possible to use DeepCompare on Spec.Template.ObjectMeta
-	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Labels, statefulSet.Spec.Template.Labels) {
-		needsReplace = true
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's metadata labels doesn't match the current one")
-	}
 	if (c.Statefulset.Spec.Selector != nil) && (statefulSet.Spec.Selector != nil) {
 		if !reflect.DeepEqual(c.Statefulset.Spec.Selector.MatchLabels, statefulSet.Spec.Selector.MatchLabels) {
 			// forbid introducing new labels in the selector on the new statefulset, as it would cripple replacements
@@ -362,56 +324,75 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 				c.logger.Warningf("new statefulset introduces extra labels in the label selector, cannot continue")
 				return &compareStatefulsetResult{}
 			}
-			needsReplace = true
-			reasons = append(reasons, "new statefulset's selector doesn't match the current one")
 		}
 	}
 
-	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Annotations, statefulSet.Spec.Template.Annotations) {
-		match = false
-		needsReplace = true
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's pod template metadata annotations doesn't match the current one")
-	}
-	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
-		needsReplace = true
-		reasons = append(reasons, "new statefulset's volumeClaimTemplates contains different number of volumes to the old one")
-	}
-	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
-		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
-		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
-		if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d doesn't match the current one", i))
+	for _, check := range c.getStatefulSetChecks() {
+		if check.statefulSetCondition == nil {
 			continue
 		}
-		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q doesn't match the current one", name))
-		}
-		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
-			name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
-			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q doesn't match the current one", name))
+
+		if check.statefulSetCondition(c.Statefulset, statefulSet) {
+			if util.IsTrue(check.result.needUpdate) {
+				update = true
+			}
+			if util.IsTrue(check.result.needsRollUpdate) {
+				needsRollUpdate = true
+			}
+			if util.IsTrue(check.result.needsReplace) {
+				needsReplace = true
+			}
+
+			reasons = append(reasons, check.reason)
 		}
 	}
+
+	needsRollUpdate, reasons = c.compareContainers(c.Statefulset, statefulSet)
+	needsReplace, reasons = c.compareVolumeClaimTemplates(c.Statefulset, statefulSet)
+
+	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
+	// and the combined effect of all the changes should be applied.
+	// TODO: log all reasons for changing the statefulset, not just the last one.
+	// TODO: make sure this is in sync with generatePodTemplate, ideally by using the same list of fields to generate
+	// the template and the diff
 
 	if needsRollUpdate || needsReplace {
-		match = false
+		update = true
 	}
 
-	return &compareStatefulsetResult{match: match, reasons: reasons, rollingUpdate: needsRollUpdate, replace: needsReplace}
+	return &compareStatefulsetResult{
+		update:        update,
+		reasons:       reasons,
+		rollingUpdate: needsRollUpdate,
+		replace:       needsReplace,
+	}
 }
 
-type containerCondition func(a, b v1.Container) bool
+func (c *Cluster) compareVolumeClaimTemplates(setA, setB *v1beta1.StatefulSet) (bool, []string) {
+	reasons := make([]string, 0)
+	needsReplace := false
 
-type containerCheck struct {
-	condition containerCondition
-	reason    string
-}
+	for index, claimA := range setA.Spec.VolumeClaimTemplates {
+		claimB := setB.Spec.VolumeClaimTemplates[index]
 
-func newCheck(msg string, cond containerCondition) containerCheck {
-	return containerCheck{reason: msg, condition: cond}
+		for _, check := range c.getVolumeClaimChecks() {
+			if check.volumeClaimCondition == nil {
+				continue
+			}
+
+			if !check.volumeClaimCondition(&claimA, &claimB) {
+				continue
+			}
+
+			if util.IsTrue(check.result.needsReplace) {
+				needsReplace = true
+				reasons = append(reasons, fmt.Sprintf(check.reason, index))
+			}
+		}
+
+	}
+
+	return needsReplace, reasons
 }
 
 // compareContainers: compare containers from two stateful sets
@@ -421,25 +402,18 @@ func newCheck(msg string, cond containerCondition) containerCheck {
 func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
 	reasons := make([]string, 0)
 	needsRollUpdate := false
-	checks := []containerCheck{
-		newCheck("new statefulset's container %d name doesn't match the current one",
-			func(a, b v1.Container) bool { return a.Name != b.Name }),
-		newCheck("new statefulset's container %d image doesn't match the current one",
-			func(a, b v1.Container) bool { return a.Image != b.Image }),
-		newCheck("new statefulset's container %d ports don't match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
-		newCheck("new statefulset's container %d resources don't match the current ones",
-			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
-		newCheck("new statefulset's container %d environment doesn't match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
-		newCheck("new statefulset's container %d environment sources don't match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
-	}
-
 	for index, containerA := range setA.Spec.Template.Spec.Containers {
 		containerB := setB.Spec.Template.Spec.Containers[index]
-		for _, check := range checks {
-			if check.condition(containerA, containerB) {
+		for _, check := range c.getContainerChecks() {
+			if check.containerCondition == nil {
+				continue
+			}
+
+			if !check.containerCondition(&containerA, &containerB) {
+				continue
+			}
+
+			if util.IsTrue(check.result.needsRollUpdate) {
 				needsRollUpdate = true
 				reasons = append(reasons, fmt.Sprintf(check.reason, index))
 			}
@@ -508,9 +482,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if !reflect.DeepEqual(c.generateService(Master, &oldSpec.Spec), c.generateService(Master, &newSpec.Spec)) ||
 		!reflect.DeepEqual(c.generateService(Replica, &oldSpec.Spec), c.generateService(Replica, &newSpec.Spec)) {
 		c.logger.Debugf("syncing services")
-		if err := c.syncServices(); err != nil {
-			c.logger.Errorf("could not sync services: %v", err)
+		if actions, err := c.syncServices(); err != nil {
+			c.logger.Errorf("could prepare actions to sync services: %v", err)
 			updateFailed = true
+		} else {
+			if err := c.applyActions(actions); err != nil {
+				updateFailed = true
+			}
 		}
 	}
 
@@ -619,8 +597,10 @@ func (c *Cluster) Delete() {
 			c.logger.Warningf("could not delete %s endpoint: %v", role, err)
 		}
 
-		if err := c.deleteService(role); err != nil {
-			c.logger.Warningf("could not delete %s service: %v", role, err)
+		if actions, err := c.deleteService(role); err != nil {
+			c.logger.Warningf("could prepare actions to delete %s service: %v", role, err)
+		} else {
+			c.applyActions(actions)
 		}
 	}
 
