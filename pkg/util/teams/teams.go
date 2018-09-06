@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // InfrastructureAccount defines an account of the team on some infrastructure (i.e AWS, Google) platform.
