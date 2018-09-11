@@ -1052,6 +1052,11 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 
+	// Avoid creating an unsatisfyable budget.
+	if c.Spec.NumberOfInstances <= 1 {
+		minAvailable = intstr.FromInt(0)
+	}
+
 	return &policybeta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.podDisruptionBudgetName(),
