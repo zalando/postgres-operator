@@ -275,3 +275,12 @@ Type 'help' for list of commands.
 (dlv) c
 PASS
 ```
+
+To test the multinamespace setup, you can use
+```
+./run_operator_locally.sh --rebuild-operator
+```
+It will automatically create an `acid-minimal-cluster` in the namespace `test`. Then you can for example check the Patroni logs:
+```
+kubectl logs acid-minimal-cluster-0 
+```
