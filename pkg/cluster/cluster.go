@@ -209,6 +209,7 @@ func (c *Cluster) PlanForCreate() (plan []Action) {
 	return plan
 }
 
+// TODO: mind the secrets of the deleted/new users
 func (c *Cluster) PlanForSecrets() (plan []Action) {
 	var msg string
 	secrets := c.generateUserSecrets()
@@ -290,10 +291,7 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("users have been initialized")
 
-	if err = c.syncSecrets(); err != nil {
-		return fmt.Errorf("could not create secrets: %v", err)
-	}
-	c.logger.Infof("secrets have been successfully created")
+	// do not sync secrets since they were syncronized before with the plan
 
 	if c.PodDisruptionBudget != nil {
 		return fmt.Errorf("pod disruption budget already exists in the cluster")
