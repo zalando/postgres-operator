@@ -200,6 +200,44 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
+func CreateSecrets() []Action {
+	return nil
+}
+
+func (c *Cluster) PlanForCreate() (plan []Action) {
+	plan = append(plan, c.PlanForSecrets()...)
+	return plan
+}
+
+func (c *Cluster) PlanForSecrets() (plan []Action) {
+	var msg string
+	secrets := c.generateUserSecrets()
+
+	for secretUsername, secretSpec := range secrets {
+		secret, err := c.KubeClient.
+			Secrets(secretSpec.Namespace).
+			Get(secretSpec.Name, metav1.GetOptions{})
+
+		if k8sutil.ResourceNotFound(err) {
+			msg = "Generate plan to create new secret %q"
+			c.logger.Debugf(msg, util.NameFromMeta(secret.ObjectMeta))
+			plan = append(plan, NewCreateSecret(secretUsername, secret, c))
+		}
+
+		if secretUsername != string(secret.Data["username"]) {
+			msg = "Secret %q does not contain the role %q, skip it"
+			c.logger.Warningf(msg, secretSpec.Name, secretUsername)
+			continue
+		}
+
+		msg = "Secret %q already exists, generate update plan"
+		c.logger.Debugf(msg, util.NameFromMeta(secret.ObjectMeta))
+		plan = append(plan, NewUpdateSecret(secretUsername, secret, c))
+	}
+
+	return plan
+}
+
 // Create creates the new kubernetes objects associated with the cluster.
 func (c *Cluster) Create() error {
 	c.mu.Lock()
@@ -1000,4 +1038,42 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	}
 
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
+}
+
+func (c *Cluster) getSecretUser(username string) spec.PgUser {
+	var usersMap map[string]spec.PgUser
+
+	superUser := c.systemUsers[constants.SuperuserKeyName]
+	replicationUser := c.systemUsers[constants.ReplicationUserKeyName]
+
+	if username == superUser.Name {
+		username = constants.SuperuserKeyName
+		usersMap = c.systemUsers
+	} else if username == replicationUser.Name {
+		username = constants.ReplicationUserKeyName
+		usersMap = c.systemUsers
+	} else {
+		usersMap = c.pgUsers
+	}
+
+	return usersMap[username]
+}
+
+func (c *Cluster) setSecretUser(username string, user spec.PgUser) {
+	var usersMap map[string]spec.PgUser
+
+	superUser := c.systemUsers[constants.SuperuserKeyName]
+	replicationUser := c.systemUsers[constants.ReplicationUserKeyName]
+
+	if username == superUser.Name {
+		username = constants.SuperuserKeyName
+		usersMap = c.systemUsers
+	} else if username == replicationUser.Name {
+		username = constants.ReplicationUserKeyName
+		usersMap = c.systemUsers
+	} else {
+		usersMap = c.pgUsers
+	}
+
+	usersMap[username] = user
 }

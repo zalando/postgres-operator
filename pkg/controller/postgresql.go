@@ -160,6 +160,61 @@ func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedNam
 	return cl
 }
 
+func getClusterName(event ClusterEvent) spec.NamespacedName {
+	hasNewName := eventInSlice(event.EventType, []EventType{
+		EventAdd, EventSync, EventRepair,
+	})
+
+	if hasNewName {
+		return util.NameFromMeta(event.NewSpec.ObjectMeta)
+	} else {
+		return util.NameFromMeta(event.OldSpec.ObjectMeta)
+	}
+}
+
+func (c *Controller) generatePlan(event ClusterEvent) []cluster.Action {
+	var clusterName spec.NamespacedName
+
+	log := c.logger.WithField("worker", event.WorkerID)
+	log = log.WithField("cluster-name", getClusterName(event))
+
+	switch event.EventType {
+	case EventAdd:
+		log.Infof("Creation of the cluster started")
+
+		newCluster := c.addCluster(log, clusterName, event.NewSpec)
+		c.curWorkerCluster.Store(event.WorkerID, newCluster)
+		return newCluster.PlanForCreate()
+
+	default:
+		return cluster.NoActions
+	}
+}
+
+func (c *Controller) validatePlan(plan []cluster.Action) (err error) {
+	for _, action := range plan {
+		err = action.Validate()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Controller) applyPlan(plan []cluster.Action) (err error) {
+	for _, action := range plan {
+		err = action.Apply()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (c *Controller) processEvent(event ClusterEvent) {
 	var clusterName spec.NamespacedName
 	var clHistory ringlog.RingLogger
@@ -323,6 +378,16 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 			c.logger.Errorf("could not cast to ClusterEvent")
 		}
 
+		// build plan
+		actions := c.generatePlan(event)
+		if err := c.validatePlan(actions); err != nil {
+			c.logger.Errorf("Invalid plan: %v", err)
+		}
+		if err := c.applyPlan(actions); err != nil {
+			c.logger.Errorf("Could not apply the plan: %v", err)
+		}
+
+		// apply legacy actions, that are not in the plan
 		c.processEvent(event)
 	}
 }

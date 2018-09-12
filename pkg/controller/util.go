@@ -194,3 +194,12 @@ func (c *Controller) podClusterName(pod *v1.Pod) spec.NamespacedName {
 
 	return spec.NamespacedName{}
 }
+
+func eventInSlice(a EventType, list []EventType) bool {
+    for _, b := range list {
+        if b == a {
+            return true
+        }
+    }
+    return false
+}
