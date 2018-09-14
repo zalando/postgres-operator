@@ -200,7 +200,7 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
-func (c *Cluster) PlanForCreate() (plan []Action) {
+func (c *Cluster) PlanForCreate() (plan Plan) {
 	if err := c.initUsers(); err != nil {
 		c.logger.Errorf("Cannot init users: %v", err)
 		return NoActions
@@ -211,7 +211,7 @@ func (c *Cluster) PlanForCreate() (plan []Action) {
 }
 
 // TODO: mind the secrets of the deleted/new users
-func (c *Cluster) PlanForSecrets() (plan []Action) {
+func (c *Cluster) PlanForSecrets() (plan Plan) {
 	var msg string
 	secrets := c.generateUserSecrets()
 

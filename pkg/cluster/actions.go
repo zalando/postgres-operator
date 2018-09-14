@@ -9,6 +9,8 @@ import (
 
 var NoActions []Action = []Action{}
 
+type Plan = []Action
+
 type MetaData struct {
 	cluster   *Cluster
 	namespace string
@@ -90,7 +92,8 @@ func (action UpdateSecret) Apply() error {
 	user := cluster.getSecretUser(action.secretUsername)
 
 	// if this secret belongs to the infrastructure role and the password has
-	// changed - replace it in the secret
+	// changed, we need to replace it in the secret. Otherwise synchronize the
+	// information what we've got in the memory with the data from the secret
 	updateSecret := (user.Password != string(action.secret.Data["password"]) &&
 		user.Origin == spec.RoleOriginInfrastructure)
 
@@ -107,8 +110,8 @@ func (action UpdateSecret) Apply() error {
 			return fmt.Errorf(msg, action.secretUsername, err)
 		}
 	} else {
-		// for non-infrastructure role - update the role with the password from
-		// the secret
+		// for non-infrastructure role - sync the in-memory data. For that we
+		// need to update password for the role with the value from the secret
 		user.Password = string(action.secret.Data["password"])
 		cluster.setSecretUser(action.secretUsername, user)
 	}

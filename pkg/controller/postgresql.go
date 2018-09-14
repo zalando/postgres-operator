@@ -167,12 +167,12 @@ func getClusterName(event ClusterEvent) spec.NamespacedName {
 
 	if hasNewName {
 		return util.NameFromMeta(event.NewSpec.ObjectMeta)
-	} else {
-		return util.NameFromMeta(event.OldSpec.ObjectMeta)
 	}
+
+	return util.NameFromMeta(event.OldSpec.ObjectMeta)
 }
 
-func (c *Controller) generatePlan(event ClusterEvent) []cluster.Action {
+func (c *Controller) generatePlan(event ClusterEvent) cluster.Plan {
 	var clusterName spec.NamespacedName
 
 	log := c.logger.WithField("worker", event.WorkerID)
@@ -191,7 +191,7 @@ func (c *Controller) generatePlan(event ClusterEvent) []cluster.Action {
 	}
 }
 
-func (c *Controller) validatePlan(plan []cluster.Action) (err error) {
+func (c *Controller) validatePlan(plan cluster.Plan) (err error) {
 	for _, action := range plan {
 		err = action.Validate()
 
@@ -203,7 +203,7 @@ func (c *Controller) validatePlan(plan []cluster.Action) (err error) {
 	return nil
 }
 
-func (c *Controller) applyPlan(plan []cluster.Action) (err error) {
+func (c *Controller) applyPlan(plan cluster.Plan) (err error) {
 	for _, action := range plan {
 		err = action.Apply()
 
