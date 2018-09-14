@@ -12,8 +12,7 @@ var NoActions []Action = []Action{}
 type Plan = []Action
 
 type MetaData struct {
-	cluster   *Cluster
-	namespace string
+	cluster *Cluster
 }
 
 type CreateSecret struct {
