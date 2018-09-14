@@ -200,11 +200,12 @@ func (c *Cluster) initUsers() error {
 	return nil
 }
 
-func CreateSecrets() []Action {
-	return nil
-}
-
 func (c *Cluster) PlanForCreate() (plan []Action) {
+	if err := c.initUsers(); err != nil {
+		c.logger.Errorf("Cannot init users: %v", err)
+		return NoActions
+	}
+
 	plan = append(plan, c.PlanForSecrets()...)
 	return plan
 }
