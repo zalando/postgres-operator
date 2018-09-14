@@ -223,7 +223,8 @@ func (c *Cluster) PlanForSecrets() (plan []Action) {
 		if k8sutil.ResourceNotFound(err) {
 			msg = "Generate plan to create new secret %q"
 			c.logger.Debugf(msg, util.NameFromMeta(secret.ObjectMeta))
-			plan = append(plan, NewCreateSecret(secretUsername, secret, c))
+			plan = append(plan, NewCreateSecret(secretUsername, secretSpec, c))
+			continue
 		}
 
 		if secretUsername != string(secret.Data["username"]) {
