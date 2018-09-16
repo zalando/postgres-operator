@@ -1052,8 +1052,8 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
 
-	// Avoid creating an unsatisfyable budget.
-	if c.Spec.NumberOfInstances <= 1 {
+	// Is master disruption is enabled or if there is no master, set the budget to 0.
+	if c.Spec.AllowMasterDisruption || c.Spec.NumberOfInstances <= 0 {
 		minAvailable = intstr.FromInt(0)
 	}
 

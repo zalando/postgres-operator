@@ -114,14 +114,37 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				},
 			},
 		},
-		// With a single instance.
+		// With zero instances.
 		{
 			New(
 				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
-					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 1}},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
+				logger),
+			policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "postgres-myapp-database-pdb",
+					Namespace: "myapp",
+					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
+				},
+				Spec: policyv1beta1.PodDisruptionBudgetSpec{
+					MinAvailable: toIntStr(0),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
+					},
+				},
+			},
+		},
+		// With AllowMasterDisruption.
+		{
+			New(
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb"}},
+				k8sutil.KubernetesClient{},
+				acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
+					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3, AllowMasterDisruption: true}},
 				logger),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
