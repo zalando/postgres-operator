@@ -7,7 +7,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 
+	"fmt"
+
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
+	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 )
 
@@ -94,16 +97,20 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 	}
 
 	clusters := make(map[*cluster.Cluster]bool)
-	masterPods := make(map[*v1.Pod]*cluster.Cluster)
+	movableMasterPods := make(map[*v1.Pod]*cluster.Cluster)
 	movedPods := 0
+	unmovableMasterPods := make(map[spec.NamespacedName]string) // podName -> reason
 	for _, pod := range nodePods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
 		role, ok := pod.Labels[c.opConfig.PodRoleLabel]
-		if !ok || cluster.PostgresRole(role) != cluster.Master {
-			if !ok {
-				c.logger.Warningf("could not move pod %q: pod has no role", podName)
-			}
+
+		if !ok {
+			unmovableMasterPods[podName] = fmt.Sprintf("could not move pod %q: pod has no role label %q", podName, c.opConfig.PodRoleLabel)
+			continue
+		}
+
+		if cluster.PostgresRole(role) != cluster.Master {
 			continue
 		}
 
@@ -113,7 +120,7 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 		cl, ok := c.clusters[clusterName]
 		c.clustersMu.RUnlock()
 		if !ok {
-			c.logger.Warningf("could not move pod %q: pod does not belong to a known cluster", podName)
+			unmovableMasterPods[podName] = fmt.Sprintf("could not move pod %q: pod belongs to the unknown Postgres cluster %q", podName, clusterName)
 			continue
 		}
 
@@ -121,18 +128,18 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 			clusters[cl] = true
 		}
 
-		masterPods[pod] = cl
+		movableMasterPods[pod] = cl
 	}
 
 	for cl := range clusters {
 		cl.Lock()
 	}
 
-	for pod, cl := range masterPods {
+	for pod, cl := range movableMasterPods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
 		if err := cl.MigrateMasterPod(podName); err != nil {
-			c.logger.Errorf("could not move master pod %q: %v", podName, err)
+			unmovableMasterPods[podName] = fmt.Sprintf("could not move master pod %q: %v", podName, err)
 		} else {
 			movedPods++
 		}
@@ -142,14 +149,17 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 		cl.Unlock()
 	}
 
-	totalPods := len(masterPods)
+	totalPods := len(nodePods)
 
-	c.logger.Infof("%d/%d master pods have been moved out from the %q node",
+	c.logger.Infof("%d out of %d master pods have been moved out from the node %q",
 		movedPods, totalPods, nodeName)
 
 	if leftPods := totalPods - movedPods; leftPods > 0 {
-		c.logger.Warnf("could not move master %d/%d pods from the %q node",
+		c.logger.Warnf("could not move %d master pods from the node %q, you may have to delete them manually:",
 			leftPods, totalPods, nodeName)
+		for _, reason := range unmovableMasterPods {
+			c.logger.Warning(reason)
+		}
 	}
 }
 
