@@ -129,13 +129,8 @@ var unmarshalCluster = []struct {
 			Name: "acid-testcluster1",
 		},
 		Status: ClusterStatusInvalid,
-		Error: (&json.UnmarshalTypeError{
-			Value:  "number",
-			Type:   reflect.TypeOf(""),
-			Offset: 126,
-			Struct: "PostgresSpec",
-			Field:  "teamId",
-		}).Error(),
+		// This error message can vary between Go versions, so compute it for the current version.
+		Error: json.Unmarshal([]byte(`{"teamId": 0}`), &PostgresSpec{}).Error(),
 	},
 	[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":"Invalid"}`), nil},
 	{[]byte(`{
