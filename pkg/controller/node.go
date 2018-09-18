@@ -106,7 +106,7 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 		role, ok := pod.Labels[c.opConfig.PodRoleLabel]
 
 		if !ok {
-			unmovableMasterPods[podName] = fmt.Sprintf("could not move pod %q: pod has no role label %q", podName, c.opConfig.PodRoleLabel)
+			unmovableMasterPods[podName] = fmt.Sprintf("could not move pod %q from node %q: pod has no role label %q", podName, nodeName, c.opConfig.PodRoleLabel)
 			continue
 		}
 
@@ -120,7 +120,7 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 		cl, ok := c.clusters[clusterName]
 		c.clustersMu.RUnlock()
 		if !ok {
-			unmovableMasterPods[podName] = fmt.Sprintf("could not move pod %q: pod belongs to the unknown Postgres cluster %q", podName, clusterName)
+			unmovableMasterPods[podName] = fmt.Sprintf("could not move pod %q from node %q: pod belongs to the unknown Postgres cluster %q", podName, nodeName, clusterName)
 			continue
 		}
 
@@ -139,7 +139,7 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 		podName := util.NameFromMeta(pod.ObjectMeta)
 
 		if err := cl.MigrateMasterPod(podName); err != nil {
-			unmovableMasterPods[podName] = fmt.Sprintf("could not move master pod %q: %v", podName, err)
+			unmovableMasterPods[podName] = fmt.Sprintf("could not move master pod %q from node %q: %v", podName, nodeName, err)
 		} else {
 			movedPods++
 		}
