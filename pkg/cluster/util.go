@@ -179,7 +179,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
 		c.logger.Debugf("metadata.annotation diff\n%s\n", util.PrettyDiff(old.Annotations, new.Annotations))
 	}
-	c.logger.Debugf("spec diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+	c.logger.Debugf("spec diff between old and new statefulsets: \n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
