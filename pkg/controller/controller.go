@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
+	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
 	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -24,6 +25,20 @@ import (
 
 	acidv1informer "github.com/zalando-incubator/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
 )
+
+type ClusterFactory interface {
+	addCluster(ctrl *Controller,
+		lg *logrus.Entry,
+		clusterName spec.NamespacedName,
+		pgSpec *acidv1.Postgresql,
+	) *cluster.Cluster
+}
+
+type ClusterGenerator struct {
+	ClusterFactory
+
+	KubeClient k8sutil.KubernetesClient
+}
 
 // Controller represents operator controller
 type Controller struct {
@@ -59,6 +74,8 @@ type Controller struct {
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
 	namespacesWithDefinedRBAC    sync.Map
+
+	clusterFactory ClusterFactory
 }
 
 // NewController creates a new controller
@@ -77,6 +94,7 @@ func NewController(controllerConfig *spec.ControllerConfig) *Controller {
 		teamClusters:     make(map[string][]spec.NamespacedName),
 		stopCh:           make(chan struct{}),
 		podCh:            make(chan cluster.PodEvent),
+		clusterFactory:   &ClusterGenerator{},
 	}
 	logger.Hooks.Add(c)
 

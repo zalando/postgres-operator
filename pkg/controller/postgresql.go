@@ -136,7 +136,7 @@ func (c *Controller) acquireInitialListOfClusters() error {
 			continue
 		}
 		clusterName = util.NameFromMeta(pg.ObjectMeta)
-		c.addCluster(c.logger, clusterName, &pg)
+		c.clusterFactory.addCluster(c, c.logger, clusterName, &pg)
 		c.logger.Debugf("added new cluster: %q", clusterName)
 	}
 	// initiate initial sync of all clusters.
@@ -144,18 +144,20 @@ func (c *Controller) acquireInitialListOfClusters() error {
 	return nil
 }
 
-func (c *Controller) addCluster(lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) *cluster.Cluster {
-	cl := cluster.New(c.makeClusterConfig(), c.KubeClient, *pgSpec, lg)
-	cl.Run(c.stopCh)
+func (c *ClusterGenerator) addCluster(ctrl *Controller,
+	lg *logrus.Entry, clusterName spec.NamespacedName, pgSpec *acidv1.Postgresql) *cluster.Cluster {
+
+	cl := cluster.New(ctrl.makeClusterConfig(), ctrl.KubeClient, *pgSpec, lg)
+	cl.Run(ctrl.stopCh)
 	teamName := strings.ToLower(cl.Spec.TeamID)
 
-	defer c.clustersMu.Unlock()
-	c.clustersMu.Lock()
+	defer ctrl.clustersMu.Unlock()
+	ctrl.clustersMu.Lock()
 
-	c.teamClusters[teamName] = append(c.teamClusters[teamName], clusterName)
-	c.clusters[clusterName] = cl
-	c.clusterLogs[clusterName] = ringlog.New(c.opConfig.RingLogLines)
-	c.clusterHistory[clusterName] = ringlog.New(c.opConfig.ClusterHistoryEntries)
+	ctrl.teamClusters[teamName] = append(ctrl.teamClusters[teamName], clusterName)
+	ctrl.clusters[clusterName] = cl
+	ctrl.clusterLogs[clusterName] = ringlog.New(ctrl.opConfig.RingLogLines)
+	ctrl.clusterHistory[clusterName] = ringlog.New(ctrl.opConfig.ClusterHistoryEntries)
 
 	return cl
 }
@@ -182,7 +184,7 @@ func (c *Controller) generatePlan(event ClusterEvent) cluster.Plan {
 	case EventAdd:
 		log.Infof("Creation of the cluster started")
 
-		newCluster := c.addCluster(log, clusterName, event.NewSpec)
+		newCluster := c.clusterFactory.addCluster(c, log, clusterName, event.NewSpec)
 		c.curWorkerCluster.Store(event.WorkerID, newCluster)
 		return newCluster.PlanForCreate()
 
@@ -272,7 +274,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		lg.Infof("creation of the cluster started")
 
-		cl = c.addCluster(lg, clusterName, event.NewSpec)
+		cl = c.clusterFactory.addCluster(c, lg, clusterName, event.NewSpec)
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
@@ -341,7 +343,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		// no race condition because a cluster is always processed by single worker
 		if !clusterFound {
-			cl = c.addCluster(lg, clusterName, event.NewSpec)
+			cl = c.clusterFactory.addCluster(c, lg, clusterName, event.NewSpec)
 		}
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)

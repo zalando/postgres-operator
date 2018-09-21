@@ -127,6 +127,14 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	return cluster
 }
 
+func (c *Cluster) SetTeamsAPIClient(client teams.Interface) {
+	c.teamsAPIClient = client
+}
+
+func (c *Cluster) SetOAuthTokenGetter(getter OAuthTokenGetter) {
+	c.oauthTokenGetter = getter
+}
+
 func (c *Cluster) clusterName() spec.NamespacedName {
 	return util.NameFromMeta(c.ObjectMeta)
 }
@@ -222,7 +230,7 @@ func (c *Cluster) PlanForSecrets() (plan Plan) {
 
 		if k8sutil.ResourceNotFound(err) {
 			msg = "Generate plan to create new secret %q"
-			c.logger.Debugf(msg, util.NameFromMeta(secret.ObjectMeta))
+			c.logger.Debugf(msg, util.NameFromMeta(secretSpec.ObjectMeta))
 			plan = append(plan, NewCreateSecret(secretUsername, secretSpec, c))
 			continue
 		}
