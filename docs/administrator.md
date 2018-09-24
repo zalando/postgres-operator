@@ -200,7 +200,7 @@ manifest, the operator configmap's settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
 
-To limit the range of IP adresses that can reach a load balancer, speficy the desired ranges in the `allowedSourceRanges` field (applies to both master and replica LBs). To prevent exposing LBs to the entire Internet, this field is set by default to `127.0.0.1/32`. To return to this default, explicitly set the field to the empty sequence `[]`; setting it to `null` or omitting entirely may not work due to [k8s handling of null fields](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes).
+To limit the range of IP adresses that can reach a load balancer, specify the desired ranges in the `allowedSourceRanges` field (applies to both master and replica LBs). To prevent exposing LBs to the entire Internet, this field is set by default to `127.0.0.1/32`. If you want to return to this default by changing the existing manifest, please explicitly set the `allowedSourceRanges` field to the empty sequence `[]`; setting it to `null` or omitting entirely may lead to k8s removing this field from the manifest due to [its handling of null fields](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes). Then the resultant manifest will not have the necessary change, and the operator will respectively do noting with the source ranges.
 
 ## Running periodic 'autorepair' scans of Kubernetes objects
 
