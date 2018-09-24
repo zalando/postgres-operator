@@ -132,16 +132,17 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 	return nil
 }
 
-// setRollingUpdateFlagForStatefulSet sets the indicator or the rolling upgrade requirement
+// setRollingUpdateFlagForStatefulSet sets the indicator or the rolling update requirement
 // in the StatefulSet annotation.
 func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *v1beta1.StatefulSet, val bool) {
 	anno := sset.GetAnnotations()
-	c.logger.Debugf("rolling upgrade flag has been set to %t", val)
 	if anno == nil {
 		anno = make(map[string]string)
 	}
+
 	anno[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
 	sset.SetAnnotations(anno)
+	c.logger.Debugf("statefulset's rolling update annotation has been set to %t", val)
 }
 
 // applyRollingUpdateFlagforStatefulSet sets the rolling update flag for the cluster's StatefulSet
@@ -176,9 +177,9 @@ func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet,
 	return flag
 }
 
-// mergeRollingUpdateFlagUsingCache return the value of the rollingUpdate flag from the passed
+// mergeRollingUpdateFlagUsingCache returns the value of the rollingUpdate flag from the passed
 // statefulset, however, the value can be cleared if there is a cached flag in the cluster that
-// is set to false (the disrepancy could be a result of a failed StatefulSet update).s
+// is set to false (the discrepancy could be a result of a failed StatefulSet update)
 func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *v1beta1.StatefulSet) bool {
 	var (
 		cachedStatefulsetExists, clearRollingUpdateFromCache, podsRollingUpdateRequired bool
@@ -198,7 +199,7 @@ func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *v1beta1.S
 			c.logger.Infof("clearing the rolling update flag based on the cached information")
 			podsRollingUpdateRequired = false
 		} else {
-			c.logger.Infof("found a statefulset with an unfinished pods rolling update")
+			c.logger.Infof("found a statefulset with an unfinished rolling update of the pods")
 
 		}
 	}
