@@ -304,8 +304,7 @@ either. In the CRD-based configuration those options are grouped under the
 
 * **log_s3_bucket**
   S3 bucket to use for shipping postgres daily logs. Works only with S3 on AWS.
-  The bucket has to be present and accessible by Postgres pods. At the moment
-  Spilo does not yet support this. The default is empty.
+  The bucket has to be present and accessible by Postgres pods. The default is empty.
 
 * **kube_iam_role**
   AWS IAM role to supply in the `iam.amazonaws.com/role` annotation of Postgres
