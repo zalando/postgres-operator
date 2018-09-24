@@ -5,7 +5,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -157,10 +157,10 @@ func (c *Controller) initPodServiceAccount() {
 
 	if c.opConfig.PodServiceAccountDefinition == "" {
 		c.opConfig.PodServiceAccountDefinition = `
-		{ "apiVersion": "v1", 
-		  "kind": "ServiceAccount", 
-		  "metadata": { 
-				 "name": "operator" 
+		{ "apiVersion": "v1",
+		  "kind": "ServiceAccount",
+		  "metadata": {
+				 "name": "operator"
 		   }
 		}`
 	}
@@ -193,10 +193,10 @@ func (c *Controller) initRoleBinding() {
 	// we assume the role is created by the k8s administrator
 	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
 		c.opConfig.PodServiceAccountRoleBindingDefinition = `
-		{ 
+		{
 			"apiVersion": "rbac.authorization.k8s.io/v1beta1",
-			"kind": "RoleBinding", 
-			"metadata": { 
+			"kind": "RoleBinding",
+			"metadata": {
 				   "name": "zalando-postgres-operator"
 			},
 			"roleRef": {
@@ -209,7 +209,7 @@ func (c *Controller) initRoleBinding() {
 					"kind": "ServiceAccount",
 					"name": "operator"
 				}
-			]	
+			]
 		}`
 	}
 	c.logger.Info("Parse role bindings")

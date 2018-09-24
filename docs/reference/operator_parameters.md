@@ -45,6 +45,8 @@ They will be deprecated and removed in the future.
 
 Variable names are underscore-separated words.
 
+
+
 ## General
 
 Those are top-level keys, containing both leaf keys and groups.
@@ -420,3 +422,5 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
 * **scalyr_memory_limit**
   Memory limit value for the Scalyr sidecar. The default is `1Gi`.
 
+
+For the configmap operator configuration, the [default parameter values](https://github.com/zalando-incubator/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)

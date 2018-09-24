@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
@@ -256,7 +256,7 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 			ownerTeam: "postgres_superusers",
 			existingRoles: map[string]spec.PgUser{
 				// role with the name exists before  w/o superuser privilege
-				"postgres_superuser": spec.PgUser{
+				"postgres_superuser": {
 					Origin:     spec.RoleOriginTeamsAPI,
 					Name:       "postgres_superuser",
 					Password:   "",

@@ -100,7 +100,7 @@ imports:
   version: b2aad2c9a95d14eb978f29baa6e3a5c3c20eef30
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
-- name: github.com/Sirupsen/logrus
+- name: github.com/sirupsen/logrus
   version: 3e01752db0189b9157070a0e1668a620f9a85da2
 - name: github.com/spf13/pflag
   version: 583c0c0531f06d5278b7d917446061adc344b5cd

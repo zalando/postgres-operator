@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,7 +71,7 @@ func (c *Controller) clusterListAndSync() error {
 		}
 		c.queueEvents(list, event)
 	} else {
-		c.logger.Infof("not enough time passed since the last sync (%s seconds) or repair (%s seconds)",
+		c.logger.Infof("not enough time passed since the last sync (%v seconds) or repair (%v seconds)",
 			timeFromPreviousSync, timeFromPreviousRepair)
 	}
 	return nil
