@@ -72,10 +72,15 @@ func (m *mockTeamsAPIClient) setMembers(members []string) {
 	m.members = members
 }
 
-type mockNoSecretGetter struct {
-}
+type mockNoSecretGetter struct{}
+
+type mockSecretGetter struct{}
 
 type testNoSecret struct {
+	v1core.SecretInterface
+}
+
+type testSecret struct {
 	v1core.SecretInterface
 }
 
@@ -84,13 +89,27 @@ func (c *testNoSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, 
 
 }
 
+func (c *testSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
+	return &v1.Secret{}, nil
+}
+
 func (c *mockNoSecretGetter) Secrets(namespace string) v1core.SecretInterface {
 	return &testNoSecret{}
 }
 
-func mockKubernetesClient() k8sutil.KubernetesClient {
+func (c *mockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
+	return &testSecret{}
+}
+
+func mockK8sClientNoSecrets() k8sutil.KubernetesClient {
 	return k8sutil.KubernetesClient{
 		SecretsGetter: &mockNoSecretGetter{},
+	}
+}
+
+func mockK8sClient() k8sutil.KubernetesClient {
+	return k8sutil.KubernetesClient{
+		SecretsGetter: &mockSecretGetter{},
 	}
 }
 
@@ -129,16 +148,17 @@ func TestGeneratePlan(t *testing.T) {
 	c.opConfig.SuperUsername = "test-superuser"
 	c.opConfig.SecretNameTemplate = "secret"
 	c.clusterFactory = &mockClusterGenerator{}
-	c.KubeClient = mockKubernetesClient()
 
 	tests := []struct {
 		name     string
+		client   k8sutil.KubernetesClient
 		in       ClusterEvent
 		contains cluster.Plan
 		error    string
 	}{
 		{
 			"Cluster add produces plan with a CreateSecret",
+			mockK8sClientNoSecrets(),
 			ClusterEvent{
 				EventType: EventAdd,
 				NewSpec: &acidv1.Postgresql{
@@ -151,8 +171,24 @@ func TestGeneratePlan(t *testing.T) {
 			[]cluster.Action{cluster.CreateSecret{}, cluster.CreateSecret{}},
 			"A plan for a new cluster should create secrets",
 		},
+		{
+			"Cluster add produces plan with an UpdateSecret if they're exist",
+			mockK8sClient(),
+			ClusterEvent{
+				EventType: EventAdd,
+				NewSpec: &acidv1.Postgresql{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "TestCluster",
+						Namespace: "TestNamespace",
+					},
+				},
+			},
+			[]cluster.Action{cluster.UpdateSecret{}, cluster.UpdateSecret{}},
+			"A plan for a new cluster should create secrets",
+		},
 	}
 	for _, tt := range tests {
+		c.KubeClient = tt.client
 		result := c.generatePlan(tt.in)
 		for idx, output := range result {
 			output := reflect.TypeOf(output)
