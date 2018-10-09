@@ -98,7 +98,8 @@ func (action UpdateSecret) Apply() error {
 
 	if updateSecret {
 		msg := "Updating the secret %q from the infrastructure roles"
-		cluster.logger.Debugf(msg, action.secret.Name)
+		name := util.NameFromMeta(action.secret.ObjectMeta)
+		cluster.logger.Debugf(msg, name)
 
 		_, err := cluster.KubeClient.
 			Secrets(action.secret.Namespace).
