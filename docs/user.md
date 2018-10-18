@@ -199,7 +199,7 @@ metadata:
   name: acid-test-cluster
 spec:
   clone:
-    cluster: "acid-batman"
+    cluster: "cluster-to-clone"
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. The
@@ -220,7 +220,7 @@ metadata:
 spec:
   clone:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
-    cluster: "acid-batman"
+    cluster: "cluster-to-clone"
     timestamp: "2017-12-19T12:40:33+01:00"
 ```
 
