@@ -239,7 +239,7 @@ metadata:
 ```
 
 Note that timezone is required for `timestamp`. Otherwise, offset is relative to UTC, see [RFC
-3339 section 5.6|https://www.ietf.org/rfc/rfc3339.txt].
+3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
 
 ## Sidecar Support
