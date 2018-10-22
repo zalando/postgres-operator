@@ -40,6 +40,13 @@ spec:
     pg_hba:
     - hostssl all all 0.0.0.0/0 md5
     - host    all all 0.0.0.0/0 md5
+    replication_slots:
+      permanent_physical_1:
+        type: physical
+      permanent_logical_1:
+        type: logical
+        database: foo
+        plugin: pgoutput
     ttl: 30
     loop_wait: &loop_wait 10
     retry_timeout: 10
