@@ -30,6 +30,13 @@ else
 	DOCKERFILE = Dockerfile
 endif
 
+ifeq ($(CDP_PULL_REQUEST_NUMBER),)
+	CDP_TAG := "-${CDP_BUILD_VERSION}"
+else
+	CDP_TAG := ""
+endif
+
+
 PATH := $(GOPATH)/bin:$(PATH)
 SHELL := env PATH=$(PATH) $(SHELL)
 
@@ -53,7 +60,9 @@ docker-context: scm-source.json linux
 
 docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
 	echo `(env)`
-	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
+	echo "${TAG}"
+	echo "${VERSION}"
+	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.8.1 bash -c "make linux"
