@@ -31,9 +31,7 @@ else
 endif
 
 ifeq ($(CDP_PULL_REQUEST_NUMBER),)
-	CDP_TAG := "-${CDP_BUILD_VERSION}"
-else
-	CDP_TAG := ""
+	CDP_TAG := -${CDP_BUILD_VERSION}
 endif
 
 
@@ -60,8 +58,9 @@ docker-context: scm-source.json linux
 
 docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
 	echo `(env)`
-	echo "${TAG}"
-	echo "${VERSION}"
+	echo "Tag ${TAG}"
+	echo "Version ${VERSION}"
+	echo "CDP tag ${CDP_TAG}"
 	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
 indocker-race:
