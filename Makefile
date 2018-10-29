@@ -52,6 +52,7 @@ docker-context: scm-source.json linux
 	cp build/linux/${BINARY} scm-source.json docker/build/
 
 docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
+	echo `(env)`
 	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
 indocker-race:
