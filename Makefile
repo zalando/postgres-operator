@@ -30,7 +30,7 @@ else
 	DOCKERFILE = Dockerfile
 endif
 
-ifeq ($(CDP_PULL_REQUEST_NUMBER),)
+ifdef CDP_PULL_REQUEST_NUMBER
 	CDP_TAG := -${CDP_BUILD_VERSION}
 endif
 
