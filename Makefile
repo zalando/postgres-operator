@@ -30,6 +30,11 @@ else
 	DOCKERFILE = Dockerfile
 endif
 
+ifdef CDP_PULL_REQUEST_NUMBER
+	CDP_TAG := -${CDP_BUILD_VERSION}
+endif
+
+
 PATH := $(GOPATH)/bin:$(PATH)
 SHELL := env PATH=$(PATH) $(SHELL)
 
@@ -52,13 +57,18 @@ docker-context: scm-source.json linux
 	cp build/linux/${BINARY} scm-source.json docker/build/
 
 docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
-	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
+	echo `(env)`
+	echo "Tag ${TAG}"
+	echo "Version ${VERSION}"
+	echo "CDP tag ${CDP_TAG}"
+	echo "git describe $(shell git describe --tags --always --dirty)"
+	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.8.1 bash -c "make linux"
 
 push:
-	docker push "$(IMAGE):$(TAG)"
+	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
 
 scm-source.json: .git
 	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json

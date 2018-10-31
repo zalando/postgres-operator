@@ -151,6 +151,9 @@ explanation of `ttl` and `loop_wait` parameters.
   patroni `maximum_lag_on_failover` parameter value, optional. The default is
   set by the Spilo docker image. Optional.
 
+* **replication_slots**
+  permanent replication slots that Patroni preserves after failover by re-creating them on the new primary immediately after doing a promote. Slots could be reconfigured with the help of `patronictl edit-config`. It is the responsibility of a user to avoid clashes in names between replication slots automatically created by Patroni for cluster members and permanent replication slots. Optional.
+
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and

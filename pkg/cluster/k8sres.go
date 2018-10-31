@@ -36,11 +36,12 @@ type pgUser struct {
 }
 
 type patroniDCS struct {
-	TTL                      uint32                 `json:"ttl,omitempty"`
-	LoopWait                 uint32                 `json:"loop_wait,omitempty"`
-	RetryTimeout             uint32                 `json:"retry_timeout,omitempty"`
-	MaximumLagOnFailover     float32                `json:"maximum_lag_on_failover,omitempty"`
-	PGBootstrapConfiguration map[string]interface{} `json:"postgresql,omitempty"`
+	TTL                      uint32                       `json:"ttl,omitempty"`
+	LoopWait                 uint32                       `json:"loop_wait,omitempty"`
+	RetryTimeout             uint32                       `json:"retry_timeout,omitempty"`
+	MaximumLagOnFailover     float32                      `json:"maximum_lag_on_failover,omitempty"`
+	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
+	ReplicationSlots         map[string]map[string]string `json:"replication_slots,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -214,6 +215,9 @@ PatroniInitDBParams:
 	}
 	if patroni.TTL != 0 {
 		config.Bootstrap.DCS.TTL = patroni.TTL
+	}
+	if patroni.ReplicationSlots != nil {
+		config.Bootstrap.DCS.ReplicationSlots = patroni.ReplicationSlots
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
