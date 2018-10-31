@@ -238,9 +238,8 @@ metadata:
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
 
-Note that timezone required for `timestamp` (offset relative to UTC, see RFC
-3339 section 5.6)
-
+Note that timezone is required for `timestamp`. Otherwise, offset is relative
+to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
 ## Sidecar Support
 
