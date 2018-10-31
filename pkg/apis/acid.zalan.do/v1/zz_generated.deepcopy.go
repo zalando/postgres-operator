@@ -320,8 +320,8 @@ func (in *Patroni) DeepCopyInto(out *Patroni) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ReplicationSlots != nil {
-		in, out := &in.ReplicationSlots, &out.ReplicationSlots
+	if in.Slots != nil {
+		in, out := &in.Slots, &out.Slots
 		*out = make(map[string]map[string]string, len(*in))
 		for key, val := range *in {
 			var outVal map[string]string

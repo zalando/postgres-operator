@@ -102,7 +102,7 @@ type Patroni struct {
 	LoopWait             uint32                       `json:"loop_wait"`
 	RetryTimeout         uint32                       `json:"retry_timeout"`
 	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
-	ReplicationSlots     map[string]map[string]string `json:"replication_slots"`
+	Slots                map[string]map[string]string `json:"slots"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time

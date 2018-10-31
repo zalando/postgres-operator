@@ -40,7 +40,7 @@ spec:
     pg_hba:
     - hostssl all all 0.0.0.0/0 md5
     - host    all all 0.0.0.0/0 md5
-    replication_slots:
+    slots:
       permanent_physical_1:
         type: physical
       permanent_logical_1:
