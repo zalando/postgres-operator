@@ -962,16 +962,17 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
 
-		// safe default value: lock load balancer to only local address unless overridden explicitly.
-		sourceRanges := []string{localHost}
-
-		allowedSourceRanges := spec.AllowedSourceRanges
-		if len(allowedSourceRanges) >= 0 {
-			sourceRanges = allowedSourceRanges
+		// spec.AllowedSourceRanges evaluates to the empty slice of zero length
+		// when omitted or set to 'null'/empty sequence in the PG manifest
+		if len(spec.AllowedSourceRanges) > 0 {
+			serviceSpec.LoadBalancerSourceRanges = spec.AllowedSourceRanges
+		} else {
+			// safe default value: lock a load balancer only to the local address unless overridden explicitly
+			serviceSpec.LoadBalancerSourceRanges = []string{localHost}
 		}
 
+		c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
 		serviceSpec.Type = v1.ServiceTypeLoadBalancer
-		serviceSpec.LoadBalancerSourceRanges = sourceRanges
 
 		annotations = map[string]string{
 			constants.ZalandoDNSNameAnnotation: dnsName,
