@@ -4,7 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   etcd_host: ""
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p8
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p29
   workers: 4
   min_instances: -1
   max_instances: -1
@@ -68,6 +68,7 @@ configuration:
     protected_role_names: 
       - admin
     # teams_api_url: ""
+    # postgres_superuser_teams: "postgres_superusers"
   logging_rest_api:
     api_port: 8008
     ring_log_lines: 100

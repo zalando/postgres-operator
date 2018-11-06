@@ -379,7 +379,7 @@ key.
   infrastructure role. The default is `admin`.
 
 * **postgres_superuser_teams**
-  List of teams which members need the superuser role in each PG database cluster to administer Postgres and maintain infrastructure built around it. The default is `postgres_superuser`.
+  List of teams which members need the superuser role in each PG database cluster to administer Postgres and maintain infrastructure built around it. The default is empty.
 
 ## Logging and REST API
 

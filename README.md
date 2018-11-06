@@ -67,12 +67,14 @@ kubectl create -f manifests/configmap.yaml  # configuration
 kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
 kubectl create -f manifests/postgres-operator.yaml  # deployment
 
-# create a Postgres cluster
+# create a Postgres cluster in a non-default namespace
+kubectl create namespace test
+kubectl config set-context minikube --namespace=test
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 
 # connect to the Postgres master via psql
 # operator creates the relevant k8s secret
-export HOST_PORT=$(minikube service acid-minimal-cluster --url | sed 's,.*/,,')
+export HOST_PORT=$(minikube service --namespace test acid-minimal-cluster --url | sed 's,.*/,,')
 export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
 export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
@@ -90,11 +92,10 @@ cd postgres-operator
 
 ## Running and testing the operator
 
-The best way to test the operator is to run it in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/).
-Minikube is a tool to run Kubernetes cluster locally.
+The best way to test the operator is to run it locally in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/). See developer docs(`docs/developer.yaml`) for details.
 
 ### Configuration Options
 
-The operator can be configured with the provided ConfigMap (`manifests/configmap.yaml`).
+The operator can be configured with the provided ConfigMap(`manifests/configmap.yaml`) or the operator's own CRD.
 
 

@@ -3,19 +3,19 @@ kind: ConfigMap
 metadata:
   name: postgres-operator
 data:  
-  # if set to the "*", listen to all namespaces
-  # watched_namespace: development
+  watched_namespace: "*" # listen to all namespaces
   cluster_labels: application:spilo
   cluster_name_label: version
   pod_role_label: spilo-role
 
   debug_logging: "true"
   workers: "4"
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p8
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p29
   pod_service_account_name: "zalando-postgres-operator"
   secret_name_template: '{username}.{cluster}.credentials'
   super_username: postgres
   enable_teams_api: "false"
+  # postgres_superuser_teams: "postgres_superusers"
   # enable_team_superuser: "false"
   # team_admin_role: "admin"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local

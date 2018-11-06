@@ -1,4 +1,4 @@
-.PHONY: clean local linux macos docker push scm-source.json
+.PHONY: clean local test linux macos docker push scm-source.json
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
@@ -86,3 +86,6 @@ vet:
 
 deps:
 	@glide install --strip-vendor
+
+test:
+	@go test ./...
