@@ -6,7 +6,7 @@ metadata:
 spec:
   teamId: "ACID"
   volume:
-    size: 5Gi
+    size: 1Gi
   numberOfInstances: 2
   users: #Application/Robot users
     zalando:
@@ -31,7 +31,7 @@ spec:
       memory: 100Mi
     limits:
       cpu: 300m
-      memory: 3000Mi
+      memory: 300Mi
   patroni:
     initdb:
       encoding: "UTF8"

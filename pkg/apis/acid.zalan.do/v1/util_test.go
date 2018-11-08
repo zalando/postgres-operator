@@ -240,8 +240,8 @@ var unmarshalCluster = []struct {
 					Slots:                map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 				},
 				Resources: Resources{
-					ResourceRequest: ResourceDescription{CPU: "10m", Memory: "50Mi"},
-					ResourceLimits:  ResourceDescription{CPU: "300m", Memory: "3000Mi"},
+					ResourceRequests: ResourceDescription{CPU: "10m", Memory: "50Mi"},
+					ResourceLimits:   ResourceDescription{CPU: "300m", Memory: "3000Mi"},
 				},
 
 				TeamID:              "ACID",
