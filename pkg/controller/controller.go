@@ -112,12 +112,20 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.opConfig.SetMemoryRequestToLimit {
 
-		if util.RequestIsSmallerThanLimit(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit) {
+		isSmaller, err := util.RequestIsSmallerThanLimit(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
+		if err != nil {
+			panic(err)
+		}
+		if isSmaller {
 			c.logger.Warningf("The default memory request of %v for Postgres containers is increased to match the default memory limit of %v.", c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
 			c.opConfig.DefaultMemoryRequest = c.opConfig.DefaultMemoryLimit
 		}
 
-		if util.RequestIsSmallerThanLimit(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit) {
+		isSmaller, err = util.RequestIsSmallerThanLimit(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
+		if err != nil {
+			panic(err)
+		}
+		if isSmaller {
 			c.logger.Warningf("The memory request of %v for the Scalyr sidecar container is increased to match the memory limit of %v.", c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
 			c.opConfig.ScalyrMemoryRequest = c.opConfig.ScalyrMemoryLimit
 		}

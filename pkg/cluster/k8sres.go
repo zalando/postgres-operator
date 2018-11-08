@@ -647,7 +647,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	if c.OpConfig.SetMemoryRequestToLimit {
 
-		if util.RequestIsSmallerThanLimit(spec.Resources.ResourceRequests.Memory, spec.Resources.ResourceLimits.Memory) {
+		isSmaller, err := util.RequestIsSmallerThanLimit(spec.Resources.ResourceRequests.Memory, spec.Resources.ResourceLimits.Memory)
+		if err != nil {
+			return nil, err
+		}
+		if isSmaller {
 			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", spec.Resources.ResourceRequests.Memory, spec.Resources.ResourceLimits.Memory)
 			spec.Resources.ResourceRequests.Memory = spec.Resources.ResourceLimits.Memory
 
@@ -655,7 +659,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 		// adjust sidecar containers defined for that particular cluster
 		for _, sidecar := range spec.Sidecars {
-			if util.RequestIsSmallerThanLimit(sidecar.Resources.ResourceRequests.Memory, sidecar.Resources.ResourceLimits.Memory) {
+			isSmaller, err := util.RequestIsSmallerThanLimit(sidecar.Resources.ResourceRequests.Memory, sidecar.Resources.ResourceLimits.Memory)
+			if err != nil {
+				return nil, err
+			}
+			if isSmaller {
 				c.logger.Warningf("The memory request of %v for the %v sidecar container is increased to match the memory limit of %v.", sidecar.Resources.ResourceRequests.Memory, sidecar.Name, sidecar.Resources.ResourceLimits.Memory)
 				sidecar.Resources.ResourceRequests.Memory = sidecar.Resources.ResourceLimits.Memory
 			}

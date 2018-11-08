@@ -3,6 +3,7 @@ package util
 import (
 	"crypto/md5" // #nosec we need it to for PostgreSQL md5 passwords
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"regexp"
 	"strings"
@@ -130,17 +131,17 @@ func Coalesce(val, defaultVal string) string {
 }
 
 // RequestIsSmallerThanLimit
-func RequestIsSmallerThanLimit(requestStr, limitStr string) bool {
+func RequestIsSmallerThanLimit(requestStr, limitStr string) (bool, error) {
 
 	request, err := resource.ParseQuantity(requestStr)
 	if err != nil {
-
+		return false, fmt.Errorf("could not parse memory request %v : %v", requestStr, err)
 	}
 
-	limit, err2 := resource.ParseQuantity(requestStr)
+	limit, err2 := resource.ParseQuantity(limitStr)
 	if err2 != nil {
-
+		return false, fmt.Errorf("could not parse memory limit %v : %v", limitStr, err2)
 	}
 
-	return request.Cmp(limit) == -1
+	return request.Cmp(limit) == -1, nil
 }
