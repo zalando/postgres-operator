@@ -22,7 +22,7 @@ pipeline:
             go version
         - desc: 'Install Docker'
           cmd: |
-            curl -sSL https://get.docker.com/ | sh
+            curl -fLOsS https://delivery.cloud.zalando.com/utils/ensure-docker && sh ensure-docker && rm ensure-docker
         - desc: 'Symlink sources into the GOPATH'
           cmd: |
             mkdir -p $OPERATOR_TOP_DIR
