@@ -647,12 +647,22 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	if c.OpConfig.SetMemoryRequestToLimit {
 
-		if spec.Resources.ResourceLimits.Memory > spec.Resources.ResourceRequests.Memory {
+		if util.RequestIsSmallerThanLimit(spec.Resources.ResourceRequests.Memory, spec.Resources.ResourceLimits.Memory) {
 			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", spec.Resources.ResourceRequests.Memory, spec.Resources.ResourceLimits.Memory)
 			spec.Resources.ResourceRequests.Memory = spec.Resources.ResourceLimits.Memory
+
 		}
 
-		// controller adjusts default and Spilo sidecar container requests (those do not need Sync)
+		// adjust sidecar containers defined for that particular cluster
+		for _, sidecar := range spec.Sidecars {
+			if util.RequestIsSmallerThanLimit(sidecar.Resources.ResourceRequests.Memory, sidecar.Resources.ResourceLimits.Memory) {
+				c.logger.Warningf("The memory request of %v for the %v sidecar container is increased to match the memory limit of %v.", sidecar.Resources.ResourceRequests.Memory, sidecar.Name, sidecar.Resources.ResourceLimits.Memory)
+				sidecar.Resources.ResourceRequests.Memory = sidecar.Resources.ResourceLimits.Memory
+			}
+		}
+
+		// controller adjusts default memory request and Scalyr sidecar container's request
+		// as those do not need to be synced
 
 	}
 

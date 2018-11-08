@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/motomux/pretty"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -126,4 +127,20 @@ func Coalesce(val, defaultVal string) string {
 		return defaultVal
 	}
 	return val
+}
+
+// RequestIsSmallerThanLimit
+func RequestIsSmallerThanLimit(requestStr, limitStr string) bool {
+
+	request, err := resource.ParseQuantity(requestStr)
+	if err != nil {
+
+	}
+
+	limit, err2 := resource.ParseQuantity(requestStr)
+	if err2 != nil {
+
+	}
+
+	return request.Cmp(limit) == -1
 }
