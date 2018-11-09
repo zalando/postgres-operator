@@ -222,7 +222,7 @@ CRD-based configuration.
   settings. The default is `1Gi`.
 
 * **set_memory_request_to_limit**
-  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for Postgres pods with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects sidecar containers as well. The default is `false`.
+  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers (Postgres, Scalyr sidecar, and other sidecars). The default is `false`.
 
 ## Operator timeouts
 
