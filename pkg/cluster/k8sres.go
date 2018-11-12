@@ -647,19 +647,46 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	if c.OpConfig.SetMemoryRequestToLimit {
 
-		isSmaller, err := util.RequestIsSmallerThanLimit(spec.Resources.ResourceRequests.Memory, spec.Resources.ResourceLimits.Memory)
+		// controller adjusts the default memory request at operator startup
+
+		request := spec.Resources.ResourceRequests.Memory
+		if request == "" {
+			request = c.OpConfig.DefaultMemoryRequest
+		}
+
+		limit := spec.Resources.ResourceLimits.Memory
+		if limit == "" {
+			limit = c.OpConfig.DefaultMemoryLimit
+		}
+
+		isSmaller, err := util.RequestIsSmallerThanLimit(request, limit)
 		if err != nil {
 			return nil, err
 		}
 		if isSmaller {
-			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", spec.Resources.ResourceRequests.Memory, spec.Resources.ResourceLimits.Memory)
-			spec.Resources.ResourceRequests.Memory = spec.Resources.ResourceLimits.Memory
+			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
+			spec.Resources.ResourceRequests.Memory = limit
 
 		}
 
+		// controller adjusts the Scalyr sidecar request at operator startup
+		// as this sidecar is managed separately
+
 		// adjust sidecar containers defined for that particular cluster
 		for _, sidecar := range spec.Sidecars {
-			isSmaller, err := util.RequestIsSmallerThanLimit(sidecar.Resources.ResourceRequests.Memory, sidecar.Resources.ResourceLimits.Memory)
+
+			// TODO #413
+			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
+			if request == "" {
+				request = c.OpConfig.DefaultMemoryRequest
+			}
+
+			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
+			if limit == "" {
+				limit = c.OpConfig.DefaultMemoryLimit
+			}
+
+			isSmaller, err := util.RequestIsSmallerThanLimit(sidecarRequest, sidecarLimit)
 			if err != nil {
 				return nil, err
 			}
@@ -668,9 +695,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 				sidecar.Resources.ResourceRequests.Memory = sidecar.Resources.ResourceLimits.Memory
 			}
 		}
-
-		// controller adjusts default memory request and Scalyr sidecar container's request
-		// as those do not need to be synced
 
 	}
 
