@@ -29,7 +29,7 @@ configuration.
   kubectl create -f manifests/operator-service-account-rbac.yaml
   kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
   kubectl create -f manifests/postgresql-operator-default-configuration.yaml
-  kubectl create -f operatorconfigurations postgresql-operator-default-configuration -o yaml
+  kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
   ```
   Note that the operator first registers the definition of the CRD   `OperatorConfiguration` and then waits for an instance of the CRD to be created. In between these two event the operator pod may be failing since it cannot fetch the not-yet-existing `OperatorConfiguration` instance.
 
