@@ -849,8 +849,8 @@ func (c *Cluster) GetCurrentProcess() Process {
 }
 
 // GetStatus provides status of the cluster
-func (c *Cluster) GetStatus() *ClusterStatus {
-	return &ClusterStatus{
+func (c *Cluster) GetStatus() *Status {
+	return &Status{
 		Cluster: c.Spec.ClusterName,
 		Team:    c.Spec.TeamID,
 		Status:  c.Status,

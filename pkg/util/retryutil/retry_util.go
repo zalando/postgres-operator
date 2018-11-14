@@ -17,8 +17,10 @@ type Ticker struct {
 	ticker *time.Ticker
 }
 
+// Stop returns ticker.Stop
 func (t *Ticker) Stop() { t.ticker.Stop() }
 
+// Tick returns ticker.C
 func (t *Ticker) Tick() { <-t.ticker.C }
 
 // Retry is a wrapper around RetryWorker that provides a real RetryTicker

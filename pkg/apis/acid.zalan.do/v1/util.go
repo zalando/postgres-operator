@@ -14,6 +14,7 @@ var (
 	serviceNameRegex = regexp.MustCompile(serviceNameRegexString)
 )
 
+// Clone returns Postgresql.DeepCopy
 func (p *Postgresql) Clone() *Postgresql {
 	if p == nil {
 		return nil
@@ -83,6 +84,7 @@ func validateCloneClusterDescription(clone *CloneDescription) error {
 	return nil
 }
 
+// Success returns status ClusterFailed or not
 func (status PostgresStatus) Success() bool {
 	return status != ClusterStatusAddFailed &&
 		status != ClusterStatusUpdateFailed &&

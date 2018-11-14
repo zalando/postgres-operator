@@ -47,14 +47,14 @@ func init() {
 		log.Printf("Fully qualified configmap name: %v", config.ConfigMapName)
 
 	}
-	if crd_interval := os.Getenv("CRD_READY_WAIT_INTERVAL"); crd_interval != "" {
-		config.CRDReadyWaitInterval = mustParseDuration(crd_interval)
+	if crdInterval := os.Getenv("CRD_READY_WAIT_INTERVAL"); crdInterval != "" {
+		config.CRDReadyWaitInterval = mustParseDuration(crdInterval)
 	} else {
 		config.CRDReadyWaitInterval = 4 * time.Second
 	}
 
-	if crd_timeout := os.Getenv("CRD_READY_WAIT_TIMEOUT"); crd_timeout != "" {
-		config.CRDReadyWaitTimeout = mustParseDuration(crd_timeout)
+	if crdTimeout := os.Getenv("CRD_READY_WAIT_TIMEOUT"); crdTimeout != "" {
+		config.CRDReadyWaitTimeout = mustParseDuration(crdTimeout)
 	} else {
 		config.CRDReadyWaitTimeout = 30 * time.Second
 	}

@@ -1,5 +1,6 @@
 package v1
 
+//Cluster name, cluster status and service name setting
 const (
 	serviceNameMaxLength   = 63
 	clusterNameMaxLength   = serviceNameMaxLength - len("-repl")

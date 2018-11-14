@@ -77,11 +77,7 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 		return err
 	}
 
-	if err := c.waitForPodDeletion(ch); err != nil {
-		return err
-	}
-
-	return nil
+	return c.waitForPodDeletion(ch)
 }
 
 func (c *Cluster) unregisterPodSubscriber(podName spec.NamespacedName) {

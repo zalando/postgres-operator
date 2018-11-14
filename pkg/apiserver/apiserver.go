@@ -31,7 +31,7 @@ type controllerInformer interface {
 	GetOperatorConfig() *config.Config
 	GetStatus() *spec.ControllerStatus
 	TeamClusterList() map[string][]spec.NamespacedName
-	ClusterStatus(team, namespace, cluster string) (*cluster.ClusterStatus, error)
+	ClusterStatus(team, namespace, cluster string) (*cluster.Status, error)
 	ClusterLogs(team, namespace, cluster string) ([]*spec.LogEntry, error)
 	ClusterHistory(team, namespace, cluster string) ([]*spec.Diff, error)
 	ClusterDatabasesMap() map[string][]string

@@ -20,6 +20,7 @@ const (
 	Replica PostgresRole = "replica"
 )
 
+// PodEventType describe value of event type
 type PodEventType string
 
 // Possible values for the EventType
@@ -50,8 +51,8 @@ type WorkerStatus struct {
 	CurrentProcess Process
 }
 
-// ClusterStatus describes status of the cluster
-type ClusterStatus struct {
+// Status describes status of the cluster
+type Status struct {
 	Team                string
 	Cluster             string
 	MasterService       *v1.Service
