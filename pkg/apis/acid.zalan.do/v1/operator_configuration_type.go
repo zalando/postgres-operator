@@ -131,6 +131,7 @@ type OperatorConfigurationData struct {
 	PostgresUsersConfiguration PostgresUsersConfiguration   `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration  `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults `json:"postgres_pod_resources"`
+	SetMemoryRequestToLimit    bool                         `json:"set_memory_request_to_limit,omitempty"`
 	Timeouts                   OperatorTimeouts             `json:"timeouts"`
 	LoadBalancer               LoadBalancerConfiguration    `json:"load_balancer"`
 	AWSGCP                     AWSGCPConfiguration          `json:"aws_or_gcp"`

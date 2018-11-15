@@ -90,6 +90,8 @@ cd postgres-operator
 ./run_operator_locally.sh
 ```
 
+Note we provide the `/manifests` directory as an example only; you should consider adjusting the manifests to your particular setting.
+
 ## Running and testing the operator
 
 The best way to test the operator is to run it locally in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/). See developer docs(`docs/developer.yaml`) for details.
