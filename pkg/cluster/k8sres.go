@@ -92,18 +92,18 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 	defaultRequests := acidv1.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
 	defaultLimits := acidv1.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
 
-	return acidv1.Resources{ResourceRequest: defaultRequests, ResourceLimits: defaultLimits}
+	return acidv1.Resources{ResourceRequests: defaultRequests, ResourceLimits: defaultLimits}
 }
 
 func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
 	var err error
 
-	specRequests := resources.ResourceRequest
+	specRequests := resources.ResourceRequests
 	specLimits := resources.ResourceLimits
 
 	result := v1.ResourceRequirements{}
 
-	result.Requests, err = fillResourceList(specRequests, defaultResources.ResourceRequest)
+	result.Requests, err = fillResourceList(specRequests, defaultResources.ResourceRequests)
 	if err != nil {
 		return nil, fmt.Errorf("could not fill resource requests: %v", err)
 	}
@@ -377,8 +377,8 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 
 			resources, err := generateResourceRequirements(
 				makeResources(
-					sidecar.Resources.ResourceRequest.CPU,
-					sidecar.Resources.ResourceRequest.Memory,
+					sidecar.Resources.ResourceRequests.CPU,
+					sidecar.Resources.ResourceRequests.Memory,
 					sidecar.Resources.ResourceLimits.CPU,
 					sidecar.Resources.ResourceLimits.Memory,
 				),
@@ -625,7 +625,7 @@ func getBucketScopeSuffix(uid string) string {
 
 func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) acidv1.Resources {
 	return acidv1.Resources{
-		ResourceRequest: acidv1.ResourceDescription{
+		ResourceRequests: acidv1.ResourceDescription{
 			CPU:    cpuRequest,
 			Memory: memoryRequest,
 		},
@@ -644,6 +644,60 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		podTemplate         *v1.PodTemplateSpec
 		volumeClaimTemplate *v1.PersistentVolumeClaim
 	)
+
+	if c.OpConfig.SetMemoryRequestToLimit {
+
+		// controller adjusts the default memory request at operator startup
+
+		request := spec.Resources.ResourceRequests.Memory
+		if request == "" {
+			request = c.OpConfig.DefaultMemoryRequest
+		}
+
+		limit := spec.Resources.ResourceLimits.Memory
+		if limit == "" {
+			limit = c.OpConfig.DefaultMemoryLimit
+		}
+
+		isSmaller, err := util.RequestIsSmallerThanLimit(request, limit)
+		if err != nil {
+			return nil, err
+		}
+		if isSmaller {
+			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
+			spec.Resources.ResourceRequests.Memory = limit
+
+		}
+
+		// controller adjusts the Scalyr sidecar request at operator startup
+		// as this sidecar is managed separately
+
+		// adjust sidecar containers defined for that particular cluster
+		for _, sidecar := range spec.Sidecars {
+
+			// TODO #413
+			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
+			if request == "" {
+				request = c.OpConfig.DefaultMemoryRequest
+			}
+
+			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
+			if limit == "" {
+				limit = c.OpConfig.DefaultMemoryLimit
+			}
+
+			isSmaller, err := util.RequestIsSmallerThanLimit(sidecarRequest, sidecarLimit)
+			if err != nil {
+				return nil, err
+			}
+			if isSmaller {
+				c.logger.Warningf("The memory request of %v for the %v sidecar container is increased to match the memory limit of %v.", sidecar.Resources.ResourceRequests.Memory, sidecar.Name, sidecar.Resources.ResourceLimits.Memory)
+				sidecar.Resources.ResourceRequests.Memory = sidecar.Resources.ResourceLimits.Memory
+			}
+		}
+
+	}
+
 	defaultResources := c.makeDefaultResources()
 
 	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)

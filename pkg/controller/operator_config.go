@@ -55,6 +55,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest
 	result.DefaultCPULimit = fromCRD.PostgresPodResources.DefaultCPULimit
 	result.DefaultMemoryLimit = fromCRD.PostgresPodResources.DefaultMemoryLimit
+	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 
 	result.ResourceCheckInterval = time.Duration(fromCRD.Timeouts.ResourceCheckInterval)
 	result.ResourceCheckTimeout = time.Duration(fromCRD.Timeouts.ResourceCheckTimeout)
