@@ -229,7 +229,7 @@ CRD-based configuration.
   settings. The default is `1Gi`.
 
 * **set_memory_request_to_limit**
-  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers (Postgres, Scalyr sidecar, and other sidecars). The default is `false`.
+  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers created by the operator (Postgres, Scalyr sidecar, and other sidecars); to set resources for the operator's own container, change the [operator deployment manually](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13). The default is `false`.
 
 ## Operator timeouts
 

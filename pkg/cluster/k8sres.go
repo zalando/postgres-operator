@@ -645,6 +645,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		volumeClaimTemplate *v1.PersistentVolumeClaim
 	)
 
+	// Improve me. Please.
 	if c.OpConfig.SetMemoryRequestToLimit {
 
 		// controller adjusts the default memory request at operator startup
