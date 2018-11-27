@@ -1,0 +1,5 @@
+# https://github.com/golangci/golangci/wiki/Configuration
+
+service:
+  prepare:
+    - make deps
