@@ -10,4 +10,7 @@ const (
 
 	PostgresConnectRetryTimeout = 2 * time.Minute
 	PostgresConnectTimeout      = 15 * time.Second
+
+	ShmVolumeName = "dshm"
+	ShmVolumePath = "/dev/shm"
 )

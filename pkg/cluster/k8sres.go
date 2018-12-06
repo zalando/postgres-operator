@@ -407,6 +407,7 @@ func generatePodTemplate(
 	podServiceAccountName string,
 	kubeIAMRole string,
 	priorityClassName string,
+	sharedMemory string,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -418,6 +419,13 @@ func generatePodTemplate(
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    containers,
 		Tolerations:                   *tolerationsSpec,
+	}
+
+	if sharedMemory != "" {
+		err := addShmVolume(&podSpec, sharedMemory)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if nodeAffinity != nil {
@@ -733,7 +741,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	volumeMounts := generateVolumeMounts()
 
 	// generate the spilo container
-	spiloContainer := generateSpiloContainer(c.containerName(), &effectiveDockerImage, resourceRequirements, spiloEnvVars, volumeMounts)
+	spiloContainer := generateSpiloContainer(c.containerName(),
+		&effectiveDockerImage,
+		resourceRequirements,
+		spiloEnvVars,
+		volumeMounts,
+	)
 
 	// resolve conflicts between operator-global and per-cluster sidecards
 	sideCars := c.mergeSidecars(spec.Sidecars)
@@ -775,7 +788,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
-		effectivePodPriorityClassName); err != nil {
+		effectivePodPriorityClassName,
+		c.OpConfig.SharedMemory); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
@@ -880,6 +894,38 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	}
 
 	return newcur
+}
+
+// To avoid issues with limited /dev/shm inside docker environment, when
+// PostgreSQL can't allocate enough of dsa segments from it, we can
+// mount an extra memory volume
+//
+// see https://docs.okd.io/latest/dev_guide/shared_memory.html
+func addShmVolume(podSpec *v1.PodSpec, sharedMemory string) error {
+	quantity, err := resource.ParseQuantity(sharedMemory)
+	if err != nil {
+		return fmt.Errorf("could not parse shm_size: %v", err)
+	}
+
+	podSpec.Volumes = []v1.Volume{
+		v1.Volume{
+			Name: constants.ShmVolumeName,
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    "Memory",
+					SizeLimit: &quantity,
+				},
+			},
+		},
+	}
+	mounts := append(podSpec.Containers[0].VolumeMounts,
+		v1.VolumeMount{
+			Name:      constants.ShmVolumeName,
+			MountPath: constants.ShmVolumePath,
+		})
+	podSpec.Containers[0].VolumeMounts = mounts
+
+	return nil
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {

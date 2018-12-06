@@ -38,6 +38,7 @@ type Resources struct {
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
 	MinInstances            int32             `name:"min_instances" default:"-1"`
+	SharedMemory            string            `name:"shm_size" default:""`
 }
 
 // Auth describes authentication specific configuration parameters
