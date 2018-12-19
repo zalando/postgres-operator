@@ -907,23 +907,29 @@ func addShmVolume(podSpec *v1.PodSpec, sharedMemory string) error {
 		return fmt.Errorf("could not parse shm_size: %v", err)
 	}
 
-	podSpec.Volumes = []v1.Volume{
-		v1.Volume{
-			Name: constants.ShmVolumeName,
-			VolumeSource: v1.VolumeSource{
-				EmptyDir: &v1.EmptyDirVolumeSource{
-					Medium:    "Memory",
-					SizeLimit: &quantity,
-				},
+	if quantity.Value() <= constants.MinShmSize {
+		return fmt.Errorf("Requested shm_size %v is less than minimal allowed %v",
+			quantity, constants.MinShmSize)
+	}
+
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: constants.ShmVolumeName,
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    "Memory",
+				SizeLimit: &quantity,
 			},
 		},
-	}
+	})
+
 	mounts := append(podSpec.Containers[0].VolumeMounts,
 		v1.VolumeMount{
 			Name:      constants.ShmVolumeName,
 			MountPath: constants.ShmVolumePath,
 		})
+
 	podSpec.Containers[0].VolumeMounts = mounts
+	podSpec.Volumes = volumes
 
 	return nil
 }

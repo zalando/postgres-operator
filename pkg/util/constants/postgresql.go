@@ -13,4 +13,5 @@ const (
 
 	ShmVolumeName = "dshm"
 	ShmVolumePath = "/dev/shm"
+	MinShmSize    = 64 * 1024 * 1024
 )
