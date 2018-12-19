@@ -499,7 +499,7 @@ func TestMarshal(t *testing.T) {
 			t.Errorf("Marshal error: %v", err)
 		}
 		if !bytes.Equal(m, tt.marshal) {
-			t.Errorf("Marshal Postgresql expected: %q, got: %q", string(tt.marshal), string(m))
+			t.Errorf("Marshal Postgresql \nexpected: %q, \ngot:      %q", string(tt.marshal), string(m))
 		}
 	}
 }
@@ -507,11 +507,11 @@ func TestMarshal(t *testing.T) {
 func TestPostgresMeta(t *testing.T) {
 	for _, tt := range unmarshalCluster {
 		if a := tt.out.GetObjectKind(); a != &tt.out.TypeMeta {
-			t.Errorf("GetObjectKindMeta expected: %v, got: %v", tt.out.TypeMeta, a)
+			t.Errorf("GetObjectKindMeta \nexpected: %v, \ngot:       %v", tt.out.TypeMeta, a)
 		}
 
 		if a := tt.out.GetObjectMeta(); reflect.DeepEqual(a, tt.out.ObjectMeta) {
-			t.Errorf("GetObjectMeta expected: %v, got: %v", tt.out.ObjectMeta, a)
+			t.Errorf("GetObjectMeta \nexpected: %v, \ngot:       %v", tt.out.ObjectMeta, a)
 		}
 	}
 }

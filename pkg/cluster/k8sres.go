@@ -407,7 +407,7 @@ func generatePodTemplate(
 	podServiceAccountName string,
 	kubeIAMRole string,
 	priorityClassName string,
-	sharedMemory string,
+	shmVolume bool,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -421,11 +421,8 @@ func generatePodTemplate(
 		Tolerations:                   *tolerationsSpec,
 	}
 
-	if sharedMemory != "" {
-		err := addShmVolume(&podSpec, sharedMemory)
-		if err != nil {
-			return nil, err
-		}
+	if shmVolume == true {
+		addShmVolume(&podSpec)
 	}
 
 	if nodeAffinity != nil {
@@ -789,7 +786,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
-		c.OpConfig.SharedMemory); err != nil {
+		spec.ShmVolume); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
@@ -901,23 +898,12 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 // mount an extra memory volume
 //
 // see https://docs.okd.io/latest/dev_guide/shared_memory.html
-func addShmVolume(podSpec *v1.PodSpec, sharedMemory string) error {
-	quantity, err := resource.ParseQuantity(sharedMemory)
-	if err != nil {
-		return fmt.Errorf("could not parse shm_size: %v", err)
-	}
-
-	if quantity.Value() <= constants.MinShmSize {
-		return fmt.Errorf("Requested shm_size %v is less than minimal allowed %v",
-			quantity, constants.MinShmSize)
-	}
-
+func addShmVolume(podSpec *v1.PodSpec) {
 	volumes := append(podSpec.Volumes, v1.Volume{
 		Name: constants.ShmVolumeName,
 		VolumeSource: v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{
-				Medium:    "Memory",
-				SizeLimit: &quantity,
+				Medium: "Memory",
 			},
 		},
 	})
@@ -930,8 +916,6 @@ func addShmVolume(podSpec *v1.PodSpec, sharedMemory string) error {
 
 	podSpec.Containers[0].VolumeMounts = mounts
 	podSpec.Volumes = volumes
-
-	return nil
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {

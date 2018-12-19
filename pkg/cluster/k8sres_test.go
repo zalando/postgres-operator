@@ -84,9 +84,7 @@ func TestShmVolume(t *testing.T) {
 	tests := []struct {
 		subTest string
 		podSpec *v1.PodSpec
-		shmSize string
 		shmPos  int
-		err     bool
 	}{
 		{
 			subTest: "empty PodSpec",
@@ -98,9 +96,7 @@ func TestShmVolume(t *testing.T) {
 					},
 				},
 			},
-			shmSize: "512M",
-			shmPos:  0,
-			err:     false,
+			shmPos: 0,
 		},
 		{
 			subTest: "non empty PodSpec",
@@ -114,60 +110,13 @@ func TestShmVolume(t *testing.T) {
 					},
 				},
 			},
-			shmSize: "512M",
-			shmPos:  1,
-			err:     false,
-		},
-		{
-			subTest: "invalid shm size (negative)",
-			podSpec: &v1.PodSpec{
-				Volumes: []v1.Volume{},
-				Containers: []v1.Container{
-					v1.Container{
-						VolumeMounts: []v1.VolumeMount{},
-					},
-				},
-			},
-			shmSize: "-512MB",
-			shmPos:  0,
-			err:     true,
-		},
-		{
-			subTest: "invalid shm size",
-			podSpec: &v1.PodSpec{
-				Volumes: []v1.Volume{},
-				Containers: []v1.Container{
-					v1.Container{
-						VolumeMounts: []v1.VolumeMount{},
-					},
-				},
-			},
-			shmSize: "invalid",
-			shmPos:  0,
-			err:     true,
-		},
-		{
-			subTest: "less than minimal",
-			podSpec: &v1.PodSpec{
-				Volumes: []v1.Volume{},
-				Containers: []v1.Container{
-					v1.Container{
-						VolumeMounts: []v1.VolumeMount{},
-					},
-				},
-			},
-			shmSize: "1MB",
-			shmPos:  0,
-			err:     true,
+			shmPos: 1,
 		},
 	}
 	for _, tt := range tests {
-		err := addShmVolume(tt.podSpec, tt.shmSize)
+		err := addShmVolume(tt.podSpec)
 		if err != nil {
-			if !tt.err {
-				t.Errorf("%s %s: Unexpected error: %#v", testName, tt.subTest, err)
-			}
-
+			t.Errorf("%s %s: Unexpected error: %#v", testName, tt.subTest, err)
 			continue
 		}
 
