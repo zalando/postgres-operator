@@ -114,11 +114,7 @@ func TestShmVolume(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		err := addShmVolume(tt.podSpec)
-		if err != nil {
-			t.Errorf("%s %s: Unexpected error: %#v", testName, tt.subTest, err)
-			continue
-		}
+		addShmVolume(tt.podSpec)
 
 		volumeName := tt.podSpec.Volumes[tt.shmPos].Name
 		volumeMountName := tt.podSpec.Containers[0].VolumeMounts[tt.shmPos].Name

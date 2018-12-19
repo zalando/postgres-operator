@@ -421,7 +421,7 @@ func generatePodTemplate(
 		Tolerations:                   *tolerationsSpec,
 	}
 
-	if shmVolume == true {
+	if shmVolume {
 		addShmVolume(&podSpec)
 	}
 
