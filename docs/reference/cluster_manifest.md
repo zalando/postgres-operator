@@ -97,6 +97,12 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
    is taken from the `pod_priority_class_name` operator parameter, if not set
    then the default priority class is taken. The priority class itself must be defined in advance.
    
+* **shmVolume**
+  Start a database pod without limitations on shm memory. By default docker
+  limit `/dev/shm` to `64M`, which could be not enough if PostgreSQL uses
+  parallel workers heavily. If this option is enabled, to the target database
+  pod will be mounted a new tmpfs volume to remove this limitation.
+
 ## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key.
@@ -111,6 +117,7 @@ Those parameters are grouped under the `postgresql` top-level key.
   a dictionary of postgres parameter names and values to apply to the resulting
   cluster. Optional (Spilo automatically sets reasonable defaults for
   parameters like work_mem or max_connections).
+
 
 ## Patroni parameters
 
