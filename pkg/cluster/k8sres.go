@@ -18,6 +18,7 @@ import (
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -394,6 +395,16 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 		return result, nil
 	}
 	return nil, nil
+}
+
+// Check whether or not we're requested to mount an shm volume,
+// taking into account that PostgreSQL manifest has precedence.
+func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) bool {
+	if pgSpec.ShmVolume != nil {
+		return *pgSpec.ShmVolume
+	}
+
+	return opConfig.ShmVolume
 }
 
 func generatePodTemplate(
@@ -786,7 +797,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
-		spec.ShmVolume); err != nil {
+		mountShmVolumeNeeded(c.OpConfig, spec)); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
