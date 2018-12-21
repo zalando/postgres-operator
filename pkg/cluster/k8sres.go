@@ -919,7 +919,8 @@ func addShmVolume(podSpec *v1.PodSpec) {
 		},
 	})
 
-	mounts := append(podSpec.Containers[0].VolumeMounts,
+	pgIdx := constants.PostgresContainerIdx
+	mounts := append(podSpec.Containers[pgIdx].VolumeMounts,
 		v1.VolumeMount{
 			Name:      constants.ShmVolumeName,
 			MountPath: constants.ShmVolumePath,
