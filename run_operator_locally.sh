@@ -121,7 +121,7 @@ function deploy_self_built_image() {
     # update the tag in the postgres operator conf
     # since the image with this tag already exists on the machine,
     # docker should not attempt to fetch it from the registry due to imagePullPolicy
-    sed --expression "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml > "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
+    sed --expression "s/\(image\:.*\:\).*$/\1$TAG/; s/smoke-tested-//" manifests/postgres-operator.yaml > "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
 
     retry "kubectl create -f \"$PATH_TO_LOCAL_OPERATOR_MANIFEST\"" "attempt to create $PATH_TO_LOCAL_OPERATOR_MANIFEST resource"
 }
