@@ -97,7 +97,7 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
    is taken from the `pod_priority_class_name` operator parameter, if not set
    then the default priority class is taken. The priority class itself must be defined in advance.
 
-* **shmVolume**
+* **enableShmVolume**
   Start a database pod without limitations on shm memory. By default docker
   limit `/dev/shm` to `64M` (see e.g. the [docker
   issue](https://github.com/docker-library/postgres/issues/416), which could be
@@ -105,9 +105,9 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
   present and value is `true`, to the target database pod will be mounted a new
   tmpfs volume to remove this limitation. If it's not present, the decision
   about mounting a volume will be made based on operator configuration
-  (`shm_volume`, which is `true` by default). It it's present and value is
-  `false`, then no volume will be mounted no matter how operator was configured
-  (so you can override the operator configuration).
+  (`enable_shm_volume`, which is `true` by default). It it's present and value
+  is `false`, then no volume will be mounted no matter how operator was
+  configured (so you can override the operator configuration).
 
 ## Postgres parameters
 

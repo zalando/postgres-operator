@@ -19,7 +19,7 @@ spec:
   databases:
     foo: zalando
 #Expert section
-  shmVolume: true
+  enableShmVolume: true
   postgresql:
     version: "10"
     parameters:
