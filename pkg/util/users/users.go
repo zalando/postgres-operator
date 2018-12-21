@@ -116,7 +116,7 @@ func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.D
 		userFlags = append(userFlags, fmt.Sprintf(inRoleTemplate, quoteMemberList(user)))
 	}
 	if user.AdminRole != "" {
-		userFlags = append(userFlags, fmt.Sprintf(adminTemplate, user))
+		userFlags = append(userFlags, fmt.Sprintf(adminTemplate, user.AdminRole))
 	}
 
 	if user.Password == "" {
