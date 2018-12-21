@@ -104,6 +104,7 @@ type Config struct {
 	PodTerminateGracePeriod  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	ProtectedRoles           []string          `name:"protected_role_names" default:"admin"`
 	PostgresSuperuserTeams   []string          `name:"postgres_superuser_teams" default:""`
+	SetMemoryRequestToLimit  bool              `name:"set_memory_request_to_limit" defaults:"false"`
 }
 
 // MustMarshal marshals the config or panics

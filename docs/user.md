@@ -20,7 +20,7 @@ spec:
     - createdb
 
     # role for application foo
-    foo_user:
+    foo_user: # or 'foo_user: []'
 
   #databases: name->owner
   databases:
@@ -74,8 +74,8 @@ for an example of `zalando` role, defined with `superuser` and `createdb`
 flags.
 
 Manifest roles are defined as a dictionary, with a role name as a key and a
-list of role options as a value. For a role without any options supply an empty
-list.
+list of role options as a value. For a role without any options it is best to supply the empty
+list `[]`. It is also possible to leave this field empty as in our example manifests, but in certain cases such empty field may removed by Kubernetes [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes) (`foobar_user:` is equivalent to `foobar_user: null`). 
 
 The operator accepts the following options:  `superuser`, `inherit`, `login`,
 `nologin`, `createrole`, `createdb`, `replication`, `bypassrls`.
@@ -238,9 +238,8 @@ metadata:
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
 
-Note that timezone required for `timestamp` (offset relative to UTC, see RFC
-3339 section 5.6)
-
+Note that timezone is required for `timestamp`. Otherwise, offset is relative
+to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
 ## Sidecar Support
 

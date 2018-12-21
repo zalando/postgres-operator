@@ -321,7 +321,9 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
 	} else {
-		needsRollUpdate, reasons = c.compareContainers(c.Statefulset, statefulSet)
+		var containerReasons []string
+		needsRollUpdate, containerReasons = c.compareContainers(c.Statefulset, statefulSet)
+		reasons = append(reasons, containerReasons...)
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
@@ -329,7 +331,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	}
 	// In the comparisons below, the needsReplace and needsRollUpdate flags are never reset, since checks fall through
 	// and the combined effect of all the changes should be applied.
-	// TODO: log all reasons for changing the statefulset, not just the last one.
 	// TODO: make sure this is in sync with generatePodTemplate, ideally by using the same list of fields to generate
 	// the template and the diff
 	if c.Statefulset.Spec.Template.Spec.ServiceAccountName != statefulSet.Spec.Template.Spec.ServiceAccountName {
@@ -340,7 +341,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	if *c.Statefulset.Spec.Template.Spec.TerminationGracePeriodSeconds != *statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds {
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's terminationGracePeriodSeconds  doesn't match the current one")
+		reasons = append(reasons, "new statefulset's terminationGracePeriodSeconds doesn't match the current one")
 	}
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Affinity, statefulSet.Spec.Template.Spec.Affinity) {
 		needsReplace = true
@@ -416,23 +417,23 @@ func newCheck(msg string, cond containerCondition) containerCheck {
 
 // compareContainers: compare containers from two stateful sets
 // and return:
-// * whether or not roll update is needed
+// * whether or not a rolling update is needed
 // * a list of reasons in a human readable format
 func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
 	reasons := make([]string, 0)
 	needsRollUpdate := false
 	checks := []containerCheck{
-		newCheck("new statefulset's container %d name doesn't match the current one",
+		newCheck("new statefulset's container %s (index %d) name doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
-		newCheck("new statefulset's container %d image doesn't match the current one",
+		newCheck("new statefulset's container %s (index %d) image doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Image != b.Image }),
-		newCheck("new statefulset's container %d ports don't match the current one",
+		newCheck("new statefulset's container %s (index %d) ports don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
-		newCheck("new statefulset's container %d resources don't match the current ones",
+		newCheck("new statefulset's container %s (index %d) resources don't match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
-		newCheck("new statefulset's container %d environment doesn't match the current one",
+		newCheck("new statefulset's container %s (index %d) environment doesn't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
-		newCheck("new statefulset's container %d environment sources don't match the current one",
+		newCheck("new statefulset's container %s (index %d) environment sources don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 	}
 
@@ -441,7 +442,7 @@ func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []st
 		for _, check := range checks {
 			if check.condition(containerA, containerB) {
 				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf(check.reason, index))
+				reasons = append(reasons, fmt.Sprintf(check.reason, containerA.Name, index))
 			}
 		}
 	}

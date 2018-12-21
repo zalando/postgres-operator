@@ -41,12 +41,12 @@ manifests:
 
 ```bash
     $ kubectl create namespace test
-    $ kubectl config set-context --namespace=test
+    $ kubectl config set-context $(kubectl config current-context) --namespace=test
 ```
 
 All subsequent `kubectl` commands will work with the `test` namespace. The
-operator  will run in this namespace and look up needed resources - such as its
-config map - there.
+operator will run in this namespace and look up needed resources - such as its
+config map - there. Please note that the namespace for service accounts and cluster role bindings in [operator RBAC rules](manifests/operator-service-account-rbac.yaml) needs to be adjusted to the non-default value.
 
 ## Specify the namespace to watch
 
@@ -198,7 +198,9 @@ services to an outer network, one can attach load balancers to them by setting
 cluster manifest. In the case any of these variables are omitted from the
 manifest, the operator configmap's settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
-all Postgresql services running in a namespace watched by the operator.
+all Postgresql services running in all namespaces watched by the operator.
+
+To limit the range of IP adresses that can reach a load balancer, specify desired ranges in the `allowedSourceRanges` field (applies to both master and replica LBs). To prevent exposing LBs to the entire Internet, this field is set at cluster creation time to `127.0.0.1/32` unless overwritten explicitly. If you want to revoke all IP ranges from an existing cluster, please set the `allowedSourceRanges` field to `127.0.0.1/32` or to the empty sequence `[]`. Setting the field to `null` or omitting entirely may lead to k8s removing this field from the manifest due to [the k8s handling of null fields](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes). Then the resultant manifest will not have the necessary change, and the operator will respectively do noting with the existing source ranges.
 
 ## Running periodic 'autorepair' scans of Kubernetes objects
 
@@ -220,3 +222,7 @@ The operator is capable of maintaining roles of multiple kinds within a Postgres
 3. **Per-cluster robot users** are also roles for processes originating from external systems but defined for an individual Postgres cluster in its manifest. A typical example is a role for connections from an application that uses the database.
 
 4. **Human users** originate from the Teams API that returns list of the team members given a team id. Operator differentiates between (a) product teams that own a particular Postgres cluster and are granted admin rights to maintain it, and (b) Postgres superuser teams that get the superuser access to all PG databases running in a k8s cluster for the purposes of maintaining and troubleshooting.
+
+## Understanding rolling update of Spilo pods
+
+The operator logs reasons for a rolling update with the `info` level and a diff between the old and new StatefulSet specs with the `debug` level. To benefit from numerous escape characters in the latter log entry, view it in CLI with `echo -e`. Note that the resultant message will contain some noise because the `PodTemplate` used by the operator is yet to be updated with the default values used internally in Kubernetes.

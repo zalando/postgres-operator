@@ -221,6 +221,9 @@ CRD-based configuration.
   memory limits for the postgres containers, unless overridden by cluster-specific
   settings. The default is `1Gi`.
 
+* **set_memory_request_to_limit**
+  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers (Postgres, Scalyr sidecar, and other sidecars). The default is `false`.
+
 ## Operator timeouts
 
 This set of parameters define various timeouts related to some operator
@@ -304,8 +307,7 @@ either. In the CRD-based configuration those options are grouped under the
 
 * **log_s3_bucket**
   S3 bucket to use for shipping postgres daily logs. Works only with S3 on AWS.
-  The bucket has to be present and accessible by Postgres pods. At the moment
-  Spilo does not yet support this. The default is empty.
+  The bucket has to be present and accessible by Postgres pods. The default is empty.
 
 * **kube_iam_role**
   AWS IAM role to supply in the `iam.amazonaws.com/role` annotation of Postgres
@@ -380,7 +382,7 @@ key.
   infrastructure role. The default is `admin`.
 
 * **postgres_superuser_teams**
-  List of teams which members need the superuser role in each PG database cluster to administer Postgres and maintain infrastructure built around it. The default is `postgres_superuser`.
+  List of teams which members need the superuser role in each PG database cluster to administer Postgres and maintain infrastructure built around it. The default is empty.
 
 ## Logging and REST API
 

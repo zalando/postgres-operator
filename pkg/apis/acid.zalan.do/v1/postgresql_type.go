@@ -90,18 +90,19 @@ type ResourceDescription struct {
 
 // Resources describes requests and limits for the cluster resouces.
 type Resources struct {
-	ResourceRequest ResourceDescription `json:"requests,omitempty"`
-	ResourceLimits  ResourceDescription `json:"limits,omitempty"`
+	ResourceRequests ResourceDescription `json:"requests,omitempty"`
+	ResourceLimits   ResourceDescription `json:"limits,omitempty"`
 }
 
 // Patroni contains Patroni-specific configuration
 type Patroni struct {
-	InitDB               map[string]string `json:"initdb"`
-	PgHba                []string          `json:"pg_hba"`
-	TTL                  uint32            `json:"ttl"`
-	LoopWait             uint32            `json:"loop_wait"`
-	RetryTimeout         uint32            `json:"retry_timeout"`
-	MaximumLagOnFailover float32           `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	InitDB               map[string]string            `json:"initdb"`
+	PgHba                []string                     `json:"pg_hba"`
+	TTL                  uint32                       `json:"ttl"`
+	LoopWait             uint32                       `json:"loop_wait"`
+	RetryTimeout         uint32                       `json:"retry_timeout"`
+	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	Slots                map[string]map[string]string `json:"slots"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time

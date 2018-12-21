@@ -94,7 +94,7 @@ function build_operator_binary(){
 
     # redirecting stderr greatly reduces non-informative output during normal builds
     echo "Build operator binary (stderr redirected to /dev/null)..."
-    make tools deps local > /dev/null 2>&1
+    make clean tools deps local test > /dev/null 2>&1
 
 }
 
@@ -215,6 +215,7 @@ function main(){
 
     clean_up
     start_minikube
+    kubectl create namespace test
     start_operator
     forward_ports
     check_health

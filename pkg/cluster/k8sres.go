@@ -36,11 +36,12 @@ type pgUser struct {
 }
 
 type patroniDCS struct {
-	TTL                      uint32                 `json:"ttl,omitempty"`
-	LoopWait                 uint32                 `json:"loop_wait,omitempty"`
-	RetryTimeout             uint32                 `json:"retry_timeout,omitempty"`
-	MaximumLagOnFailover     float32                `json:"maximum_lag_on_failover,omitempty"`
-	PGBootstrapConfiguration map[string]interface{} `json:"postgresql,omitempty"`
+	TTL                      uint32                       `json:"ttl,omitempty"`
+	LoopWait                 uint32                       `json:"loop_wait,omitempty"`
+	RetryTimeout             uint32                       `json:"retry_timeout,omitempty"`
+	MaximumLagOnFailover     float32                      `json:"maximum_lag_on_failover,omitempty"`
+	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
+	Slots                    map[string]map[string]string `json:"slots,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -91,18 +92,18 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 	defaultRequests := acidv1.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
 	defaultLimits := acidv1.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
 
-	return acidv1.Resources{ResourceRequest: defaultRequests, ResourceLimits: defaultLimits}
+	return acidv1.Resources{ResourceRequests: defaultRequests, ResourceLimits: defaultLimits}
 }
 
 func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
 	var err error
 
-	specRequests := resources.ResourceRequest
+	specRequests := resources.ResourceRequests
 	specLimits := resources.ResourceLimits
 
 	result := v1.ResourceRequirements{}
 
-	result.Requests, err = fillResourceList(specRequests, defaultResources.ResourceRequest)
+	result.Requests, err = fillResourceList(specRequests, defaultResources.ResourceRequests)
 	if err != nil {
 		return nil, fmt.Errorf("could not fill resource requests: %v", err)
 	}
@@ -214,6 +215,9 @@ PatroniInitDBParams:
 	}
 	if patroni.TTL != 0 {
 		config.Bootstrap.DCS.TTL = patroni.TTL
+	}
+	if patroni.Slots != nil {
+		config.Bootstrap.DCS.Slots = patroni.Slots
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
@@ -373,8 +377,8 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 
 			resources, err := generateResourceRequirements(
 				makeResources(
-					sidecar.Resources.ResourceRequest.CPU,
-					sidecar.Resources.ResourceRequest.Memory,
+					sidecar.Resources.ResourceRequests.CPU,
+					sidecar.Resources.ResourceRequests.Memory,
 					sidecar.Resources.ResourceLimits.CPU,
 					sidecar.Resources.ResourceLimits.Memory,
 				),
@@ -621,7 +625,7 @@ func getBucketScopeSuffix(uid string) string {
 
 func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) acidv1.Resources {
 	return acidv1.Resources{
-		ResourceRequest: acidv1.ResourceDescription{
+		ResourceRequests: acidv1.ResourceDescription{
 			CPU:    cpuRequest,
 			Memory: memoryRequest,
 		},
@@ -640,6 +644,60 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		podTemplate         *v1.PodTemplateSpec
 		volumeClaimTemplate *v1.PersistentVolumeClaim
 	)
+
+	if c.OpConfig.SetMemoryRequestToLimit {
+
+		// controller adjusts the default memory request at operator startup
+
+		request := spec.Resources.ResourceRequests.Memory
+		if request == "" {
+			request = c.OpConfig.DefaultMemoryRequest
+		}
+
+		limit := spec.Resources.ResourceLimits.Memory
+		if limit == "" {
+			limit = c.OpConfig.DefaultMemoryLimit
+		}
+
+		isSmaller, err := util.RequestIsSmallerThanLimit(request, limit)
+		if err != nil {
+			return nil, err
+		}
+		if isSmaller {
+			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
+			spec.Resources.ResourceRequests.Memory = limit
+
+		}
+
+		// controller adjusts the Scalyr sidecar request at operator startup
+		// as this sidecar is managed separately
+
+		// adjust sidecar containers defined for that particular cluster
+		for _, sidecar := range spec.Sidecars {
+
+			// TODO #413
+			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
+			if request == "" {
+				request = c.OpConfig.DefaultMemoryRequest
+			}
+
+			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
+			if limit == "" {
+				limit = c.OpConfig.DefaultMemoryLimit
+			}
+
+			isSmaller, err := util.RequestIsSmallerThanLimit(sidecarRequest, sidecarLimit)
+			if err != nil {
+				return nil, err
+			}
+			if isSmaller {
+				c.logger.Warningf("The memory request of %v for the %v sidecar container is increased to match the memory limit of %v.", sidecar.Resources.ResourceRequests.Memory, sidecar.Name, sidecar.Resources.ResourceLimits.Memory)
+				sidecar.Resources.ResourceRequests.Memory = sidecar.Resources.ResourceLimits.Memory
+			}
+		}
+
+	}
+
 	defaultResources := c.makeDefaultResources()
 
 	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
@@ -958,16 +1016,17 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
 
-		// safe default value: lock load balancer to only local address unless overridden explicitly.
-		sourceRanges := []string{localHost}
-
-		allowedSourceRanges := spec.AllowedSourceRanges
-		if len(allowedSourceRanges) >= 0 {
-			sourceRanges = allowedSourceRanges
+		// spec.AllowedSourceRanges evaluates to the empty slice of zero length
+		// when omitted or set to 'null'/empty sequence in the PG manifest
+		if len(spec.AllowedSourceRanges) > 0 {
+			serviceSpec.LoadBalancerSourceRanges = spec.AllowedSourceRanges
+		} else {
+			// safe default value: lock a load balancer only to the local address unless overridden explicitly
+			serviceSpec.LoadBalancerSourceRanges = []string{localHost}
 		}
 
+		c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
 		serviceSpec.Type = v1.ServiceTypeLoadBalancer
-		serviceSpec.LoadBalancerSourceRanges = sourceRanges
 
 		annotations = map[string]string{
 			constants.ZalandoDNSNameAnnotation: dnsName,
