@@ -19,6 +19,7 @@ data:
   # postgres_superuser_teams: "postgres_superusers"
   # enable_team_superuser: "false"
   # team_admin_role: "admin"
+  # enable_admin_role_for_users: "true"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
   # team_api_role_configuration: "log_statement:all"
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles

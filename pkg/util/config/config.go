@@ -89,7 +89,7 @@ type Config struct {
 	EnableTeamsAPI                         bool   `name:"enable_teams_api" default:"true"`
 	EnableTeamSuperuser                    bool   `name:"enable_team_superuser" default:"false"`
 	TeamAdminRole                          string `name:"team_admin_role" default:"admin"`
-	AddAdminFlagToRobotRoles               bool   `name:"add_admin_flag_to_robot_roles" default:"true"`
+	EnableAdminRoleForUsers                bool   `name:"enable_admin_role_for_users" default:"true"`
 	EnableMasterLoadBalancer               bool   `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool   `name:"enable_replica_load_balancer" default:"false"`
 	// deprecated and kept for backward compatibility

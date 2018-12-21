@@ -710,7 +710,7 @@ func (c *Cluster) initRobotUsers() error {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
 		}
 		adminRole := ""
-		if c.OpConfig.AddAdminFlagToRobotRoles {
+		if c.OpConfig.EnableAdminRoleForUsers {
 			adminRole = c.OpConfig.TeamAdminRole
 		}
 		newRole := spec.PgUser{
