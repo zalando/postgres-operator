@@ -18,6 +18,7 @@ import (
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -396,6 +397,16 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 	return nil, nil
 }
 
+// Check whether or not we're requested to mount an shm volume,
+// taking into account that PostgreSQL manifest has precedence.
+func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) bool {
+	if pgSpec.ShmVolume != nil {
+		return *pgSpec.ShmVolume
+	}
+
+	return opConfig.ShmVolume
+}
+
 func generatePodTemplate(
 	namespace string,
 	labels labels.Set,
@@ -407,6 +418,7 @@ func generatePodTemplate(
 	podServiceAccountName string,
 	kubeIAMRole string,
 	priorityClassName string,
+	shmVolume bool,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -418,6 +430,10 @@ func generatePodTemplate(
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    containers,
 		Tolerations:                   *tolerationsSpec,
+	}
+
+	if shmVolume {
+		addShmVolume(&podSpec)
 	}
 
 	if nodeAffinity != nil {
@@ -733,7 +749,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	volumeMounts := generateVolumeMounts()
 
 	// generate the spilo container
-	spiloContainer := generateSpiloContainer(c.containerName(), &effectiveDockerImage, resourceRequirements, spiloEnvVars, volumeMounts)
+	spiloContainer := generateSpiloContainer(c.containerName(),
+		&effectiveDockerImage,
+		resourceRequirements,
+		spiloEnvVars,
+		volumeMounts,
+	)
 
 	// resolve conflicts between operator-global and per-cluster sidecards
 	sideCars := c.mergeSidecars(spec.Sidecars)
@@ -775,7 +796,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
-		effectivePodPriorityClassName); err != nil {
+		effectivePodPriorityClassName,
+		mountShmVolumeNeeded(c.OpConfig, spec)); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
@@ -880,6 +902,32 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	}
 
 	return newcur
+}
+
+// To avoid issues with limited /dev/shm inside docker environment, when
+// PostgreSQL can't allocate enough of dsa segments from it, we can
+// mount an extra memory volume
+//
+// see https://docs.okd.io/latest/dev_guide/shared_memory.html
+func addShmVolume(podSpec *v1.PodSpec) {
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: constants.ShmVolumeName,
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium: "Memory",
+			},
+		},
+	})
+
+	pgIdx := constants.PostgresContainerIdx
+	mounts := append(podSpec.Containers[pgIdx].VolumeMounts,
+		v1.VolumeMount{
+			Name:      constants.ShmVolumeName,
+			MountPath: constants.ShmVolumePath,
+		})
+
+	podSpec.Containers[0].VolumeMounts = mounts
+	podSpec.Volumes = volumes
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {

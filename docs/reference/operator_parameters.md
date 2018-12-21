@@ -224,6 +224,14 @@ CRD-based configuration.
 * **set_memory_request_to_limit**
   Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers (Postgres, Scalyr sidecar, and other sidecars). The default is `false`.
 
+* **enable_shm_volume**
+  Instruct operator to start any new database pod without limitations on shm
+  memory. If this option is enabled, to the target database pod will be mounted
+  a new tmpfs volume to remove shm memory limitation (see e.g. the [docker
+  issue](https://github.com/docker-library/postgres/issues/416)). This option
+  is global for an operator object, and can be overwritten by `enableShmVolume`
+  parameter from Postgres manifest. The default is `true`
+
 ## Operator timeouts
 
 This set of parameters define various timeouts related to some operator
