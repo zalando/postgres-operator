@@ -58,15 +58,16 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 		return
 	}
 
-	if util.MapContains(nodeCur.Labels, map[string]string{"master": "true"}) {
+	if !c.nodeIsReady(nodePrev) {
+		c.logger.Debugf("The decommissioned node %v should have already triggered master pod migration. Previous k8s-reported state of the node: %v", util.NameFromMeta(nodePrev.ObjectMeta), nodePrev)
 		return
 	}
 
-	// do nothing if the node should have already triggered an update or
-	// if only one of the label and the unschedulability criteria are met.
-	if !c.nodeIsReady(nodePrev) || c.nodeIsReady(nodeCur) {
+	if c.nodeIsReady(nodeCur) {
+		c.logger.Debugf("The decommissioned node %v become schedulable again. Current k8s-reported state of the node: %v", util.NameFromMeta(nodeCur.ObjectMeta), nodeCur)
 		return
 	}
+
 	c.moveMasterPodsOffNode(nodeCur)
 }
 
