@@ -51,6 +51,7 @@ type PostgresSpec struct {
 	Tolerations          []v1.Toleration      `json:"tolerations,omitempty"`
 	Sidecars             []Sidecar            `json:"sidecars,omitempty"`
 	PodPriorityClassName string               `json:"pod_priority_class_name,omitempty"`
+	ShmVolume            *bool                `json:"enableShmVolume,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
