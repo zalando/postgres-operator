@@ -373,6 +373,9 @@ key.
   role name to grant to team members created from the Teams API. The default is
   `admin`, that role is created by Spilo as a `NOLOGIN` role.
 
+* **enable_admin_role_for_users**
+   if `true`, the `team_admin_role` will have the rights to grant roles coming from PG manifests. Such roles will be created as in "CREATE ROLE 'role_from_manifest' ... ADMIN 'team_admin_role'". The default is `true`.
+
 * **pam_role_name**
   when set, the operator will add all team member roles to this group and add a
   `pg_hba` line to authenticate members of that role via `pam`. The default is
