@@ -334,7 +334,7 @@ Options to aid debugging of the operator itself. Grouped under the `debug` key.
   boolean parameter that toggles verbose debug logs from the operator. The
   default is `true`.
 
-* **enable_db_access**
+* **enable_database_access**
   boolean parameter that toggles the functionality of the operator that require
   access to the postgres database, i.e. creating databases and users. The default
   is `true`.
