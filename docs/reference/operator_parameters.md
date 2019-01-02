@@ -10,29 +10,37 @@ configuration.
   configuration structure. There is an
   [example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/configmap.yaml)
 
-* CRD-based configuration.  The configuration is stored in the custom YAML
-  manifest, an instance of the custom resource definition (CRD) called
-  `OperatorConfiguration`.  This CRD is registered by the operator
-  during the start when `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` variable is
-  set to a non-empty value. The CRD-based configuration is a regular YAML
-  document; non-scalar keys are simply represented in the usual YAML way. The
-  usage of the CRD-based configuration is triggered by setting the
-  `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` variable, which should point to the
-  `postgresql-operator-configuration` object name in the operators namespace.
+* CRD-based configuration. The configuration is stored in a custom YAML
+  manifest. The manifest is an instance of the custom resource definition (CRD) called
+  `OperatorConfiguration`. The operator registers this CRD 
+  during the start and uses it for configuration if the [operator deployment manifest ](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgres-operator.yaml#L21) sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty value. The variable should point to the
+  `postgresql-operator-configuration` object in the operator's namespace.
+
+  The CRD-based configuration is a regular YAML
+  document; non-scalar keys are simply represented in the usual YAML way. 
   There are no default values built-in in the operator, each parameter that is
   not supplied in the configuration receives an empty value.  In order to
   create your own configuration just copy the [default
   one](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
   and change it.
 
-CRD-based configuration is more natural and powerful then the one based on
+  To test the CRD-based configuration locally, use the following
+  ```bash
+  kubectl create -f manifests/operator-service-account-rbac.yaml
+  kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
+  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+  kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
+  ```
+  Note that the operator first registers the definition of the CRD   `OperatorConfiguration` and then waits for an instance of the CRD to be created. In between these two event the operator pod may be failing since it cannot fetch the not-yet-existing `OperatorConfiguration` instance.
+
+The CRD-based configuration is more powerful than the one based on
 ConfigMaps and should be used unless there is a compatibility requirement to
 use an already existing configuration. Even in that case, it should be rather
 straightforward to convert the configmap based configuration into the CRD-based
 one and restart the operator. The ConfigMaps-based configuration will be
 deprecated and subsequently removed in future releases.
 
-Note that for the CRD-based configuration configuration groups below correspond
+Note that for the CRD-based configuration groups of configuration options below correspond
 to the non-leaf keys in the target YAML (i.e. for the Kubernetes resources the
 key is `kubernetes`). The key is mentioned alongside the group description. The
 ConfigMap-based configuration is flat and does not allow non-leaf keys.
@@ -44,7 +52,6 @@ parameters, those parameters have no effect and are replaced by the
 They will be deprecated and removed in the future.
 
 Variable names are underscore-separated words.
-
 
 
 ## General
@@ -222,7 +229,7 @@ CRD-based configuration.
   settings. The default is `1Gi`.
 
 * **set_memory_request_to_limit**
-  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers (Postgres, Scalyr sidecar, and other sidecars). The default is `false`.
+  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers created by the operator (Postgres, Scalyr sidecar, and other sidecars); to set resources for the operator's own container, change the [operator deployment manually](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13). The default is `false`.
 
 * **enable_shm_volume**
   Instruct operator to start any new database pod without limitations on shm

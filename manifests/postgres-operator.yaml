@@ -14,6 +14,13 @@ spec:
       - name: postgres-operator
         image: registry.opensource.zalan.do/acid/smoke-tested-postgres-operator:v1.0.0-21-ge39915c
         imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 500m
+            memory: 250Mi
+          limits:
+            cpu: 2000m
+            memory: 500Mi
         env:
         # provided additional ENV vars can overwrite individual config map entries  
         - name: CONFIG_MAP_NAME
