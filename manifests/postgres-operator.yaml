@@ -16,11 +16,11 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            cpu: 100m
-            memory: 100Mi
+            cpu: 500m
+            memory: 250Mi
           limits:
-            cpu: 200m
-            memory: 200Mi
+            cpu: 2000m
+            memory: 500Mi
         env:
         # provided additional ENV vars can overwrite individual config map entries  
         - name: CONFIG_MAP_NAME
