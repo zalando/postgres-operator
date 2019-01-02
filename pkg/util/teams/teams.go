@@ -43,7 +43,7 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Interface have to implement TeamInfo
+// Interface to the TeamsAPIClient
 type Interface interface {
 	TeamInfo(teamID, token string) (tm *Team, err error)
 }

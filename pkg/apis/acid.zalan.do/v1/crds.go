@@ -6,7 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CRDResource
+// CRDResource* define names necesssary for the k8s CRD API
 const (
 	PostgresCRDResourceKind   = "postgresql"
 	PostgresCRDResourcePlural = "postgresqls"

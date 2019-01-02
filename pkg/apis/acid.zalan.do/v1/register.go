@@ -8,7 +8,7 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
 )
 
-// APIVersion refered API version
+// APIVersion of the `postgresql` and `operator` CRDs
 const (
 	APIVersion = "v1"
 )

@@ -19,7 +19,7 @@ type fieldInfo struct {
 	Field   reflect.Value
 }
 
-// StringTemplate is string
+// StringTemplate is a convenience alias
 type StringTemplate string
 
 func decoderFrom(field reflect.Value) (d decoder) {
@@ -240,7 +240,7 @@ func (f *StringTemplate) Format(a ...string) string {
 	return res
 }
 
-// MarshalJSON returns json.Marshal(byte slice) from StringTemplate
+// MarshalJSON converts a StringTemplate to byte slice
 func (f StringTemplate) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(f))
 }

@@ -14,7 +14,7 @@ import (
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// OperatorConfiguration defines the specification for the OperatorConfigration.
+// OperatorConfiguration defines the specification for the OperatorConfiguration.
 type OperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -24,7 +24,7 @@ type OperatorConfiguration struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// OperatorConfigurationList defines the list of the OperatorConfigration.
+// OperatorConfigurationList is used in the k8s API calls
 type OperatorConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
@@ -32,13 +32,13 @@ type OperatorConfigurationList struct {
 	Items []OperatorConfiguration `json:"items"`
 }
 
-// PostgresUsersConfiguration defines the user of the Postgres.
+// PostgresUsersConfiguration defines the system users of Postgres.
 type PostgresUsersConfiguration struct {
 	SuperUsername       string `json:"super_username,omitempty"`
 	ReplicationUsername string `json:"replication_username,omitempty"`
 }
 
-// KubernetesMetaConfiguration defines the pod service account info
+// KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
 type KubernetesMetaConfiguration struct {
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
@@ -79,7 +79,7 @@ type OperatorTimeouts struct {
 	ReadyWaitTimeout       Duration `json:"ready_wait_timeout,omitempty"`
 }
 
-// LoadBalancerConfiguration defines the LB DNS configration
+// LoadBalancerConfiguration defines the LB configuration
 type LoadBalancerConfiguration struct {
 	DbHostedZone              string                `json:"db_hosted_zone,omitempty"`
 	EnableMasterLoadBalancer  bool                  `json:"enable_master_load_balancer,omitempty"`
@@ -88,7 +88,8 @@ type LoadBalancerConfiguration struct {
 	ReplicaDNSNameFormat      config.StringTemplate `json:"replica_dns_name_format,omitempty"`
 }
 
-//AWSGCPConfiguration defines the configration of AWS s3
+// AWSGCPConfiguration defines the configuration for AWS
+// TODO complete Google Cloud Platform (GCP) configuration
 type AWSGCPConfiguration struct {
 	WALES3Bucket string `json:"wal_s3_bucket,omitempty"`
 	AWSRegion    string `json:"aws_region,omitempty"`
@@ -163,5 +164,5 @@ type OperatorConfigurationUsers struct {
 	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
 }
 
-//Duration is time.Duration
+//Duration shortens this frequently used name
 type Duration time.Duration
