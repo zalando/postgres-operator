@@ -52,8 +52,8 @@ type WorkerStatus struct {
 	CurrentProcess Process
 }
 
-// Status describes status of the cluster
-type Status struct {
+// ClusterStatus describes status of the cluster
+type ClusterStatus struct {
 	Team                string
 	Cluster             string
 	MasterService       *v1.Service
