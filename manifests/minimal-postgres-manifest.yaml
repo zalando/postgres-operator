@@ -15,7 +15,8 @@ spec:
     - createdb
 
     # role for application foo
-    foo_user:
+    foo_user: []
+
   
   #databases: name->owner
   databases:

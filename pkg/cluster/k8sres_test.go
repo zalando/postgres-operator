@@ -1,8 +1,11 @@
 package cluster
 
 import (
+	"k8s.io/api/core/v1"
+
 	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
 	"testing"
 )
@@ -72,6 +75,57 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 		if tt.result != result {
 			t.Errorf("%s %s: Load balancer is %t, expect %t for role %#v and spec %#v",
 				testName, tt.subtest, result, tt.result, tt.role, tt.spec)
+		}
+	}
+}
+
+func TestShmVolume(t *testing.T) {
+	testName := "TestShmVolume"
+	tests := []struct {
+		subTest string
+		podSpec *v1.PodSpec
+		shmPos  int
+	}{
+		{
+			subTest: "empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{},
+				Containers: []v1.Container{
+					v1.Container{
+						VolumeMounts: []v1.VolumeMount{},
+					},
+				},
+			},
+			shmPos: 0,
+		},
+		{
+			subTest: "non empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{v1.Volume{}},
+				Containers: []v1.Container{
+					v1.Container{
+						VolumeMounts: []v1.VolumeMount{
+							v1.VolumeMount{},
+						},
+					},
+				},
+			},
+			shmPos: 1,
+		},
+	}
+	for _, tt := range tests {
+		addShmVolume(tt.podSpec)
+
+		volumeName := tt.podSpec.Volumes[tt.shmPos].Name
+		volumeMountName := tt.podSpec.Containers[0].VolumeMounts[tt.shmPos].Name
+
+		if volumeName != constants.ShmVolumeName {
+			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
+				testName, tt.subTest, constants.ShmVolumeName, volumeName)
+		}
+		if volumeMountName != constants.ShmVolumeName {
+			t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
+				testName, tt.subTest, constants.ShmVolumeName, volumeMountName)
 		}
 	}
 }

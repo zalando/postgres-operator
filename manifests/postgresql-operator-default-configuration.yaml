@@ -4,7 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   etcd_host: ""
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p29
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p42
   workers: 4
   min_instances: -1
   max_instances: -1

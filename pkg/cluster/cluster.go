@@ -709,11 +709,16 @@ func (c *Cluster) initRobotUsers() error {
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
 		}
+		adminRole := ""
+		if c.OpConfig.EnableAdminRoleForUsers {
+			adminRole = c.OpConfig.TeamAdminRole
+		}
 		newRole := spec.PgUser{
-			Origin:   spec.RoleOriginManifest,
-			Name:     username,
-			Password: util.RandomPassword(constants.PasswordLength),
-			Flags:    flags,
+			Origin:    spec.RoleOriginManifest,
+			Name:      username,
+			Password:  util.RandomPassword(constants.PasswordLength),
+			Flags:     flags,
+			AdminRole: adminRole,
 		}
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
