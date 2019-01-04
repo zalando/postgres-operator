@@ -339,7 +339,6 @@ func generateSpiloContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 ) *v1.Container {
-
 	privilegedMode := true
 	return &v1.Container{
 		Name:            name,
@@ -490,6 +489,18 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		{
 			Name:  "PGUSER_SUPERUSER",
 			Value: c.OpConfig.SuperUsername,
+		},
+		{
+			Name:  "KUBERNETES_SCOPE_LABEL",
+			Value: c.OpConfig.ClusterNameLabel,
+		},
+		{
+			Name:  "KUBERNETES_ROLE_LABEL",
+			Value: c.OpConfig.PodRoleLabel,
+		},
+		{
+			Name:  "KUBERNETES_LABELS",
+			Value: labels.Set(c.OpConfig.ClusterLabels).String(),
 		},
 		{
 			Name: "PGPASSWORD_SUPERUSER",
@@ -741,8 +752,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	// generate environment variables for the spilo container
 	spiloEnvVars := deduplicateEnvVars(
-		c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone, customPodEnvVarsList),
-		c.containerName(), c.logger)
+		c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone,
+			customPodEnvVarsList), c.containerName(), c.logger)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
@@ -750,6 +761,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	volumeMounts := generateVolumeMounts()
 
 	// generate the spilo container
+	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
 	spiloContainer := generateSpiloContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
@@ -757,7 +769,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		volumeMounts,
 	)
 
-	// resolve conflicts between operator-global and per-cluster sidecards
+	// resolve conflicts between operator-global and per-cluster sidecars
 	sideCars := c.mergeSidecars(spec.Sidecars)
 
 	resourceRequirementsScalyrSidecar := makeResources(
@@ -786,7 +798,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	// generate pod template for the statefulset, based on the spilo container and sidecards
+	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
