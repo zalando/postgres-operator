@@ -222,7 +222,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 			return fmt.Errorf("could not suitable replica candidate for failover: %v", err)
 		}
 	} else {
-		c.logger.Warningf("Migrating single pod cluster %q, migration will cause longer downtime of the postgres cluster until rescheduled", c.clusterName())
+		c.logger.Warningf("migrating single pod cluster %q, migration will cause longer downtime of the postgres cluster until rescheduled", c.clusterName())
 	}
 
 	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
