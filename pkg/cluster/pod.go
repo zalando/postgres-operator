@@ -219,10 +219,10 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	// We may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case.
 	if *c.Statefulset.Spec.Replicas > 1 {
 		if masterCandidatePod, err = c.masterCandidate(oldMaster.Spec.NodeName); err != nil {
-			return fmt.Errorf("could not suitable replica candidate for failover: %v", err)
+			return fmt.Errorf("could not find suitable replica pod as candidate for failover: %v", err)
 		}
 	} else {
-		c.logger.Warningf("migrating single pod cluster %q, migration will cause longer downtime of the postgres cluster until rescheduled", c.clusterName())
+		c.logger.Warningf("migrating single pod cluster %q, this will cause downtime of the Postgres cluster until pod is back", c.clusterName())
 	}
 
 	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
