@@ -20,9 +20,6 @@ pipeline:
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
             go version
-        - desc: 'Install Docker'
-          cmd: |
-            curl -fLOsS https://delivery.cloud.zalando.com/utils/ensure-docker && sh ensure-docker && rm ensure-docker
         - desc: 'Symlink sources into the GOPATH'
           cmd: |
             mkdir -p $OPERATOR_TOP_DIR

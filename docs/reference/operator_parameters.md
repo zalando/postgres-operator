@@ -308,12 +308,12 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   replaced with the hosted zone (the value of the `db_hosted_zone` parameter).
   No other placeholders are allowed.
 
-## AWS or GSC interaction
+## AWS or GCP interaction
 
 The options in this group configure operator interactions with non-Kubernetes
-objects from AWS or Google cloud. They have no effect unless you are using
+objects from Amazon Web Services (AWS) or Google Cloud Platform (GCP). They have no effect unless you are using
 either. In the CRD-based configuration those options are grouped under the
-`aws_or_gcp` key.
+`aws_or_gcp` key. Note the GCP integration is not yet officially supported.
 
 * **wal_s3_bucket**
   S3 bucket to use for shipping WAL segments with WAL-E. A bucket has to be

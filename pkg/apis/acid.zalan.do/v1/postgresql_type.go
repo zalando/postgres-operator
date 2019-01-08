@@ -9,7 +9,8 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-//Postgresql defines PostgreSQL Custom Resource Definition Object.
+
+// Postgresql defines PostgreSQL Custom Resource Definition Object.
 type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -55,6 +56,7 @@ type PostgresSpec struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PostgresqlList defines a list of PostgreSQL clusters.
 type PostgresqlList struct {
 	metav1.TypeMeta `json:",inline"`

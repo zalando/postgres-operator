@@ -460,6 +460,7 @@ func (c *Cluster) setSpec(newSpec *acidv1.Postgresql) {
 	c.specMu.Unlock()
 }
 
+// GetSpec returns a copy of the operator-side spec of a Postgres cluster in a thread-safe manner
 func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()

@@ -126,6 +126,7 @@ func (n *NamespacedName) Decode(value string) error {
 	return n.DecodeWorker(value, GetOperatorNamespace())
 }
 
+// UnmarshalJSON converts a byte slice to NamespacedName
 func (n *NamespacedName) UnmarshalJSON(data []byte) error {
 	result := NamespacedName{}
 	var tmp string

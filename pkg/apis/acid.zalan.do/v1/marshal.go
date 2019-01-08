@@ -104,6 +104,7 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// UnmarshalJSON convert to Duration from byte slice of json
 func (d *Duration) UnmarshalJSON(b []byte) error {
 	var (
 		v   interface{}

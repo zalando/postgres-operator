@@ -13,6 +13,8 @@ import (
 // +genclient:onlyVerbs=get
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// OperatorConfiguration defines the specification for the OperatorConfiguration.
 type OperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -21,6 +23,8 @@ type OperatorConfiguration struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// OperatorConfigurationList is used in the k8s API calls
 type OperatorConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
@@ -28,11 +32,13 @@ type OperatorConfigurationList struct {
 	Items []OperatorConfiguration `json:"items"`
 }
 
+// PostgresUsersConfiguration defines the system users of Postgres.
 type PostgresUsersConfiguration struct {
 	SuperUsername       string `json:"super_username,omitempty"`
 	ReplicationUsername string `json:"replication_username,omitempty"`
 }
 
+// KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself
 type KubernetesMetaConfiguration struct {
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
@@ -55,6 +61,7 @@ type KubernetesMetaConfiguration struct {
 	PodPriorityClassName    string `json:"pod_priority_class_name,omitempty"`
 }
 
+// PostgresPodResourcesDefaults defines the spec of default resources
 type PostgresPodResourcesDefaults struct {
 	DefaultCPURequest    string `json:"default_cpu_request,omitempty"`
 	DefaultMemoryRequest string `json:"default_memory_request,omitempty"`
@@ -62,6 +69,7 @@ type PostgresPodResourcesDefaults struct {
 	DefaultMemoryLimit   string `json:"default_memory_limit,omitempty"`
 }
 
+// OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait
 type OperatorTimeouts struct {
 	ResourceCheckInterval  Duration `json:"resource_check_interval,omitempty"`
 	ResourceCheckTimeout   Duration `json:"resource_check_timeout,omitempty"`
@@ -71,6 +79,7 @@ type OperatorTimeouts struct {
 	ReadyWaitTimeout       Duration `json:"ready_wait_timeout,omitempty"`
 }
 
+// LoadBalancerConfiguration defines the LB configuration
 type LoadBalancerConfiguration struct {
 	DbHostedZone              string                `json:"db_hosted_zone,omitempty"`
 	EnableMasterLoadBalancer  bool                  `json:"enable_master_load_balancer,omitempty"`
@@ -79,6 +88,8 @@ type LoadBalancerConfiguration struct {
 	ReplicaDNSNameFormat      config.StringTemplate `json:"replica_dns_name_format,omitempty"`
 }
 
+// AWSGCPConfiguration defines the configuration for AWS
+// TODO complete Google Cloud Platform (GCP) configuration
 type AWSGCPConfiguration struct {
 	WALES3Bucket string `json:"wal_s3_bucket,omitempty"`
 	AWSRegion    string `json:"aws_region,omitempty"`
@@ -86,11 +97,13 @@ type AWSGCPConfiguration struct {
 	KubeIAMRole  string `json:"kube_iam_role,omitempty"`
 }
 
+// OperatorDebugConfiguration defines options for the debug mode
 type OperatorDebugConfiguration struct {
 	DebugLogging   bool `json:"debug_logging,omitempty"`
 	EnableDBAccess bool `json:"enable_database_access,omitempty"`
 }
 
+// TeamsAPIConfiguration defines the configration of TeamsAPI
 type TeamsAPIConfiguration struct {
 	EnableTeamsAPI           bool              `json:"enable_teams_api,omitempty"`
 	TeamsAPIUrl              string            `json:"teams_api_url,omitempty"`
@@ -103,12 +116,14 @@ type TeamsAPIConfiguration struct {
 	PostgresSuperuserTeams   []string          `json:"postgres_superuser_teams,omitempty"`
 }
 
+// LoggingRESTAPIConfiguration defines Logging API conf
 type LoggingRESTAPIConfiguration struct {
 	APIPort               int `json:"api_port,omitempty"`
 	RingLogLines          int `json:"ring_log_lines,omitempty"`
 	ClusterHistoryEntries int `json:"cluster_history_entries,omitempty"`
 }
 
+// ScalyrConfiguration defines the configuration for ScalyrAPI
 type ScalyrConfiguration struct {
 	ScalyrAPIKey        string `json:"scalyr_api_key,omitempty"`
 	ScalyrImage         string `json:"scalyr_image,omitempty"`
@@ -119,6 +134,7 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
+// OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	EtcdHost                   string                       `json:"etcd_host,omitempty"`
 	DockerImage                string                       `json:"docker_image,omitempty"`
@@ -141,6 +157,7 @@ type OperatorConfigurationData struct {
 	Scalyr                     ScalyrConfiguration          `json:"scalyr"`
 }
 
+// OperatorConfigurationUsers defines configration for super user
 type OperatorConfigurationUsers struct {
 	SuperUserName            string            `json:"superuser_name,omitempty"`
 	Replication              string            `json:"replication_user_name,omitempty"`
@@ -148,4 +165,5 @@ type OperatorConfigurationUsers struct {
 	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
 }
 
+//Duration shortens this frequently used name
 type Duration time.Duration
