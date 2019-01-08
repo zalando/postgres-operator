@@ -41,12 +41,12 @@ manifests:
 
 ```bash
     $ kubectl create namespace test
-    $ kubectl config set-context --namespace=test
+    $ kubectl config set-context $(kubectl config current-context) --namespace=test
 ```
 
 All subsequent `kubectl` commands will work with the `test` namespace. The
-operator  will run in this namespace and look up needed resources - such as its
-config map - there.
+operator will run in this namespace and look up needed resources - such as its
+config map - there. Please note that the namespace for service accounts and cluster role bindings in [operator RBAC rules](manifests/operator-service-account-rbac.yaml) needs to be adjusted to the non-default value.
 
 ## Specify the namespace to watch
 

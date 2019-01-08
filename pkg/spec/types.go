@@ -49,6 +49,7 @@ type PgUser struct {
 	Flags      []string          `yaml:"user_flags"`
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
+	AdminRole  string            `yaml:"admin_role"`
 }
 
 // PgUserMap maps user names to the definitions.

@@ -4,6 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/zalando-incubator/postgres-operator/badge.svg)](https://coveralls.io/github/zalando-incubator/postgres-operator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zalando-incubator/postgres-operator)](https://goreportcard.com/report/github.com/zalando-incubator/postgres-operator)
 [![GoDoc](https://godoc.org/github.com/zalando-incubator/postgres-operator?status.svg)](https://godoc.org/github.com/zalando-incubator/postgres-operator)
+[![golangci](https://golangci.com/badges/github.com/zalando-incubator/postgres-operator.svg)](https://golangci.com/r/github.com/zalando-incubator/postgres-operator)
 
 ## Introduction
 
@@ -89,6 +90,8 @@ We have automated starting the operator and submitting the `acid-minimal-cluster
 cd postgres-operator
 ./run_operator_locally.sh
 ```
+
+Note we provide the `/manifests` directory as an example only; you should consider adjusting the manifests to your particular setting.
 
 ## Running and testing the operator
 

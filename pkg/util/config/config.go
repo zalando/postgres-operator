@@ -38,6 +38,7 @@ type Resources struct {
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
 	MinInstances            int32             `name:"min_instances" default:"-1"`
+	ShmVolume               bool              `name:"enable_shm_volume" default:"true"`
 }
 
 // Auth describes authentication specific configuration parameters
@@ -89,6 +90,7 @@ type Config struct {
 	EnableTeamsAPI                         bool   `name:"enable_teams_api" default:"true"`
 	EnableTeamSuperuser                    bool   `name:"enable_team_superuser" default:"false"`
 	TeamAdminRole                          string `name:"team_admin_role" default:"admin"`
+	EnableAdminRoleForUsers                bool   `name:"enable_admin_role_for_users" default:"true"`
 	EnableMasterLoadBalancer               bool   `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool   `name:"enable_replica_load_balancer" default:"false"`
 	// deprecated and kept for backward compatibility
@@ -104,6 +106,7 @@ type Config struct {
 	PodTerminateGracePeriod  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	ProtectedRoles           []string          `name:"protected_role_names" default:"admin"`
 	PostgresSuperuserTeams   []string          `name:"postgres_superuser_teams" default:""`
+	SetMemoryRequestToLimit  bool              `name:"set_memory_request_to_limit" defaults:"false"`
 }
 
 // MustMarshal marshals the config or panics
