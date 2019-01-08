@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -118,7 +118,7 @@ func (c *Cluster) movePodFromEndOfLifeNode(pod *v1.Pod) (*v1.Pod, error) {
 	if eol, err = c.podIsEndOfLife(pod); err != nil {
 		return nil, fmt.Errorf("could not get node %q: %v", pod.Spec.NodeName, err)
 	} else if !eol {
-		c.logger.Infof("pod %q is already on a live node", podName)
+		c.logger.Infof("check failed: pod %q is already on a live node", podName)
 		return pod, nil
 	}
 
@@ -158,7 +158,7 @@ func (c *Cluster) masterCandidate(oldNodeName string) (*v1.Pod, error) {
 	}
 
 	if len(replicas) == 0 {
-		c.logger.Warningf("no available master candidates, migration will cause longer downtime of the master instance")
+		c.logger.Warningf("no available master candidates, migration will cause longer downtime of Postgres cluster")
 		return nil, nil
 	}
 
@@ -189,18 +189,18 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		return fmt.Errorf("could not get pod: %v", err)
 	}
 
-	c.logger.Infof("migrating master pod %q", podName)
+	c.logger.Infof("starting process to migrate master pod %q", podName)
 
 	if eol, err = c.podIsEndOfLife(oldMaster); err != nil {
 		return fmt.Errorf("could not get node %q: %v", oldMaster.Spec.NodeName, err)
 	}
 	if !eol {
-		c.logger.Debugf("pod is already on a live node")
+		c.logger.Debugf("no action needed: master pod is already on a live node")
 		return nil
 	}
 
 	if role := PostgresRole(oldMaster.Labels[c.OpConfig.PodRoleLabel]); role != Master {
-		c.logger.Warningf("pod %q is not a master", podName)
+		c.logger.Warningf("no action needed: pod %q is not the master (anymore)", podName)
 		return nil
 	}
 	// we must have a statefulset in the cluster for the migration to work
@@ -215,10 +215,10 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	// We may not have a cached statefulset if the initial cluster sync has aborted, revert to the spec in that case.
 	if *c.Statefulset.Spec.Replicas > 1 {
 		if masterCandidatePod, err = c.masterCandidate(oldMaster.Spec.NodeName); err != nil {
-			return fmt.Errorf("could not get new master candidate: %v", err)
+			return fmt.Errorf("could not find suitable replica pod as candidate for failover: %v", err)
 		}
 	} else {
-		c.logger.Warningf("single master pod for cluster %q, migration will cause longer downtime of the master instance", c.clusterName())
+		c.logger.Warningf("migrating single pod cluster %q, this will cause downtime of the Postgres cluster until pod is back", c.clusterName())
 	}
 
 	// there are two cases for each postgres cluster that has its master pod on the node to migrate from:
@@ -252,15 +252,15 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 		return fmt.Errorf("could not get pod: %v", err)
 	}
 
-	c.logger.Infof("migrating replica pod %q", podName)
+	c.logger.Infof("migrating replica pod %q to live node", podName)
 
 	if replicaPod.Spec.NodeName != fromNodeName {
-		c.logger.Infof("pod %q has already migrated to node %q", podName, replicaPod.Spec.NodeName)
+		c.logger.Infof("check failed: pod %q has already migrated to node %q", podName, replicaPod.Spec.NodeName)
 		return nil
 	}
 
 	if role := PostgresRole(replicaPod.Labels[c.OpConfig.PodRoleLabel]); role != Replica {
-		return fmt.Errorf("pod %q is not a replica", podName)
+		return fmt.Errorf("check failed: pod %q is not a replica", podName)
 	}
 
 	_, err = c.movePodFromEndOfLifeNode(replicaPod)
@@ -292,7 +292,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 }
 
 func (c *Cluster) recreatePods() error {
-	c.setProcessName("recreating pods")
+	c.setProcessName("starting to recreate pods")
 	ls := c.labelsSet(false)
 	namespace := c.Namespace
 
@@ -333,10 +333,10 @@ func (c *Cluster) recreatePods() error {
 		// failover if we have not observed a master pod when re-creating former replicas.
 		if newMasterPod == nil && len(replicas) > 0 {
 			if err := c.Switchover(masterPod, masterCandidate(replicas)); err != nil {
-				c.logger.Warningf("could not perform failover: %v", err)
+				c.logger.Warningf("could not perform switch over: %v", err)
 			}
 		} else if newMasterPod == nil && len(replicas) == 0 {
-			c.logger.Warningf("cannot switch master role before re-creating the pod: no replicas")
+			c.logger.Warningf("cannot perform switch over before re-creating the pod: no replicas")
 		}
 		c.logger.Infof("recreating old master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
