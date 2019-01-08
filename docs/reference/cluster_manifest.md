@@ -261,6 +261,6 @@ defined in the sidecar dictionary:
 
  Those parameters are defined under the `logical_backup` key:
   *   **enable_logical_backup**
-     determines if the logical backup of this cluster should be uploaded to S3. Default: false.
+     determines if the logical backup of this cluster should be taken and uploaded to S3. Default: false.
   *   **logical_backup_schedule**
      backup schedule in Cron format. Default: "30 00 * * *"

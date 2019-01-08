@@ -129,11 +129,8 @@ type UserFlags []string
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus string
 
-// CronSchedule is a convenience alias for string
-type CronSchedule string
-
 // LogicalBackup contains config of a k8s cron job responsible for running pg_dumpall
 type LogicalBackup struct {
-	EnableLogicalBackup   bool         `json:"enable_logical_backup,omitempty"`
-	LogicalBackupSchedule CronSchedule `json:"logical_backup_schedule,omitempty"`
+	EnableLogicalBackup   bool   `json:"enable_logical_backup,omitempty"`
+	LogicalBackupSchedule string `json:"logical_backup_schedule,omitempty"`
 }

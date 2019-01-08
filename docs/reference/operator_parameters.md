@@ -443,4 +443,22 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   Memory limit value for the Scalyr sidecar. The default is `1Gi`.
 
 
+## Logical backup
+
+  These parameters configure a k8s cron job spawned by the operator to produce Postgres logical backups.
+  In the CRD-based configuration those parameters are grouped under the `logical_backup` key.
+
+  * **enable_logical_backup**
+    Determines if the operator should initiate the backup of all Postgres clusters it controls. Default: false.
+  
+  * **logical_backup_schedule**
+    Backup schedule in the cron format. Default: "30 00 * * *"
+  
+  * **logical_backup_docker_image**
+    Docker image for the pods of the cron job. Must implement backup/uploading logic. Default: empty.
+
+  * **logical_backup_s3_bucket**
+    S3 bucket to store backup results. Default: same as the bucket as for WAL.
+
+
 For the configmap operator configuration, the [default parameter values](https://github.com/zalando-incubator/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)

@@ -226,3 +226,13 @@ The operator is capable of maintaining roles of multiple kinds within a Postgres
 ## Understanding rolling update of Spilo pods
 
 The operator logs reasons for a rolling update with the `info` level and a diff between the old and new StatefulSet specs with the `debug` level. To benefit from numerous escape characters in the latter log entry, view it in CLI with `echo -e`. Note that the resultant message will contain some noise because the `PodTemplate` used by the operator is yet to be updated with the default values used internally in Kubernetes.
+
+## Logical backups
+
+The operator can launch k8s cron jobs to do periodic logical backups of all PG clusters under its control. The cron job spawns a separate pod with a single container that connects to one of the Postgres replicas for a backup. The operator updates cron jobs during Sync if a schedule or a docker image of a job changes. Notes:
+
+1. The provided  `registry.opensource.zalan.do/acid/logical-backup` image implements the backup via `pg_dumpall` and upload of (compressed) results to an S3 bucket; `pg_dumpall` requires a `superuser` access to a DB.
+
+2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. 
+
+3. The operator does not remove old backups: it is the responsibility of a k8s cluster administrator to define and implement a retention policy for backups.
