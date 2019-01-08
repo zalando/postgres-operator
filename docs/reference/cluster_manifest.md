@@ -14,6 +14,8 @@ measurements. Please, refer to the [Kubernetes
 documentation](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the possible values of those.
 
+:exclamation: If both operator configmap/CRD and a Postgres cluster manifest define the same parameter, the value from the Postgres cluster manifest is applied.
+
 ## Manifest structure
 
 A postgres manifest is a `YAML` document. On the top level both individual
@@ -254,3 +256,11 @@ defined in the sidecar dictionary:
   a dictionary of environment variables. Use usual Kubernetes definition
   (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
   for environment variables. Optional.
+
+### Logical backup
+
+ Those parameters are defined under the `logical_backup` key:
+  *   **enable_logical_backup**
+     determines if the logical backup of this cluster should be uploaded to S3. Default: false.
+  *   **logical_backup_schedule**
+     backup schedule in Cron format. Default: "30 00 * * *"

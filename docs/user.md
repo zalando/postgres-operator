@@ -308,3 +308,12 @@ every 6 hours.
 Note that if the statefulset is scaled down before resizing the size changes
 are only applied to the volumes attached to the running pods. The size of the
 volumes that correspond to the previously running pods is not changed.
+
+## Logical backups
+
+If you add
+```
+logical_backup:
+  enable_logical_backup: true
+```
+to the cluster manifest, the operator will start a k8s cron job that will periodically execute `pg_dumpall` on the target PG cluster and upload results to an S3 bucket. Note that due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. See configuration reference for details.
