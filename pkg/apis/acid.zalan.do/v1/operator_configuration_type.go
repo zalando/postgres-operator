@@ -97,7 +97,7 @@ type AWSGCPConfiguration struct {
 	KubeIAMRole  string `json:"kube_iam_role,omitempty"`
 }
 
-// OperatorDebugConfiguration defines the configration of debug
+// OperatorDebugConfiguration defines options for the debug mode
 type OperatorDebugConfiguration struct {
 	DebugLogging   bool `json:"debug_logging,omitempty"`
 	EnableDBAccess bool `json:"enable_database_access,omitempty"`
@@ -123,7 +123,7 @@ type LoggingRESTAPIConfiguration struct {
 	ClusterHistoryEntries int `json:"cluster_history_entries,omitempty"`
 }
 
-// ScalyrConfiguration defines the configration of ScalyrAPI
+// ScalyrConfiguration defines the configuration for ScalyrAPI
 type ScalyrConfiguration struct {
 	ScalyrAPIKey        string `json:"scalyr_api_key,omitempty"`
 	ScalyrImage         string `json:"scalyr_image,omitempty"`

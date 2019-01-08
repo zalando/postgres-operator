@@ -84,7 +84,7 @@ func validateCloneClusterDescription(clone *CloneDescription) error {
 	return nil
 }
 
-// Success of the last operation on a Postgres cluster
+// Success of the current Status
 func (status PostgresStatus) Success() bool {
 	return status != ClusterStatusAddFailed &&
 		status != ClusterStatusUpdateFailed &&

@@ -21,7 +21,7 @@ const (
 	Replica PostgresRole = "replica"
 )
 
-// PodEventType describes value of event type
+// PodEventType represents the type of a pod-related event
 type PodEventType string
 
 // Possible values for the EventType
