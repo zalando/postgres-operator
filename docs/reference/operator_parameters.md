@@ -32,7 +32,7 @@ configuration.
   kubectl create -f manifests/postgresql-operator-default-configuration.yaml
   kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
   ```
-  Note that the operator first registers the CRD of the `OperatorConfiguration`
+  Note that the operator first attempts to register the CRD of the `OperatorConfiguration`
   and then waits for an instance to be created. In between these two event the
   operator pod may be failing since it cannot fetch the not-yet-existing
   `OperatorConfiguration` instance.
