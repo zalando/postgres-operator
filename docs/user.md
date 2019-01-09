@@ -316,4 +316,4 @@ If you add
 logical_backup:
   enable_logical_backup: true
 ```
-to the cluster manifest, the operator will start a k8s cron job that will periodically execute `pg_dumpall` on the target PG cluster and upload results to an S3 bucket. Note that due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. See configuration reference for details.
+to the cluster manifest, the operator will start a k8s cron job that will periodically execute `pg_dumpall` on the target PG cluster and upload results to an S3 bucket. Note that due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. See [configuration reference](reference/cluster_manifest.md) for details.

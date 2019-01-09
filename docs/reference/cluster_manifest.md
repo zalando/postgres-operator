@@ -39,7 +39,7 @@ Those parameters are grouped under the `metadata` top-level key.
 
 ## Top-level parameters
 
-Those are parameters grouped directly under  the `spec` key in the manifest.
+These are parameters are grouped directly under  the `spec` key in the manifest.
 
 * **teamId**
   name of the team the cluster belongs to. Changing it after the cluster
