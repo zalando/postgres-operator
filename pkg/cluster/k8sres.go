@@ -45,7 +45,7 @@ type patroniDCS struct {
 	MaximumLagOnFailover     float32                      `json:"maximum_lag_on_failover,omitempty"`
 	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
 	Slots                    map[string]map[string]string `json:"slots,omitempty"`
-	StandbyClusterCfg        map[string]interface{}       `json:"standy_cluster,omitempty"`
+	StandbyClusterCfg        acidv1.PatroniStandbyCluster `json:"standy_cluster,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -158,7 +158,7 @@ func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.
 	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "md5"},
 		map[string]string{"auth-local": "trust"}}
 
-	config.Bootstrap.StandbyClusterCfg = patroni.StandbyCluster
+	config.Bootstrap.DCS.StandbyClusterCfg = patroni.StandbyCluster
 
 	initdbOptionNames := []string{}
 
