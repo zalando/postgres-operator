@@ -2,7 +2,11 @@ package k8sutil
 
 import (
 	"fmt"
+	"reflect"
+
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -15,7 +19,6 @@ import (
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"reflect"
 
 	acidv1client "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
 )
@@ -36,6 +39,7 @@ type KubernetesClient struct {
 	rbacv1beta1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
+	batchv1beta1.CronJobsGetter
 
 	RESTClient      rest.Interface
 	AcidV1ClientSet *acidv1client.Clientset
