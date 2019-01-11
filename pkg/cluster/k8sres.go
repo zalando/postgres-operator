@@ -45,7 +45,7 @@ type patroniDCS struct {
 	MaximumLagOnFailover     float32                      `json:"maximum_lag_on_failover,omitempty"`
 	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
 	Slots                    map[string]map[string]string `json:"slots,omitempty"`
-	StandbyClusterCfg        acidv1.PatroniStandbyCluster `json:"standy_cluster,omitempty"`
+	StandbyClusterCfg        acidv1.PatroniStandbyCluster `json:"standby_cluster,omitempty"`
 }
 
 type pgBootstrap struct {
