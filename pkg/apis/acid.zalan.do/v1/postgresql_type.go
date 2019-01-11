@@ -25,7 +25,6 @@ type PostgresSpec struct {
 	Volume          `json:"volume,omitempty"`
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
-	LogicalBackup   `json:"logical_backup,omitempty"`
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
@@ -53,6 +52,10 @@ type PostgresSpec struct {
 	Sidecars             []Sidecar            `json:"sidecars,omitempty"`
 	PodPriorityClassName string               `json:"pod_priority_class_name,omitempty"`
 	ShmVolume            *bool                `json:"enableShmVolume,omitempty"`
+
+	// LogicalBackup contains config of a k8s cron job responsible for running pg_dumpall
+	EnableLogicalBackup   bool   `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupSchedule string `json:"logicalBackupSchedule,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -128,9 +131,3 @@ type UserFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus string
-
-// LogicalBackup contains config of a k8s cron job responsible for running pg_dumpall
-type LogicalBackup struct {
-	EnableLogicalBackup   bool   `json:"enable_logical_backup,omitempty"`
-	LogicalBackupSchedule string `json:"logical_backup_schedule,omitempty"`
-}

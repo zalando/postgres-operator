@@ -229,10 +229,10 @@ The operator logs reasons for a rolling update with the `info` level and a diff 
 
 ## Logical backups
 
-The operator can launch k8s cron jobs to do periodic logical backups of all PG clusters under its control. The cron job spawns a separate pod with a single container that connects to one of the Postgres replicas for a backup. The operator updates cron jobs during Sync if a schedule or a docker image of a job changes. Notes:
+The operator can manage k8s cron jobs to do periodic logical backups of all PG clusters under its control. The cron job spawns a separate pod with a single container that connects to one of the Postgres replicas for a backup. The operator updates cron jobs during Sync if a schedule or a docker image of a job changes. Notes:
 
 1. The provided  `registry.opensource.zalan.do/acid/logical-backup` image implements the backup via `pg_dumpall` and upload of (compressed) results to an S3 bucket; `pg_dumpall` requires a `superuser` access to a DB.
 
 2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. 
 
-3. The operator does not remove old backups: it is the responsibility of a k8s cluster administrator to define and implement a retention policy for backups.
+3. The operator does not remove old backups.

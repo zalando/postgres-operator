@@ -39,7 +39,7 @@ Those parameters are grouped under the `metadata` top-level key.
 
 ## Top-level parameters
 
-These are parameters are grouped directly under  the `spec` key in the manifest.
+These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **teamId**
   name of the team the cluster belongs to. Changing it after the cluster
@@ -110,6 +110,12 @@ These are parameters are grouped directly under  the `spec` key in the manifest.
   (`enable_shm_volume`, which is `true` by default). It it's present and value
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration).
+
+* **enableLogicalBackup**
+  Determines if the logical backup of this cluster should be taken and uploaded to S3. Default: false.
+
+* **logicalBackupSchedule**
+  Backup schedule in the Cron format. Default: "30 00 \* \* \*"
 
 ## Postgres parameters
 
@@ -256,11 +262,3 @@ defined in the sidecar dictionary:
   a dictionary of environment variables. Use usual Kubernetes definition
   (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
   for environment variables. Optional.
-
-### Logical backup
-
- Those parameters are defined under the `logical_backup` key:
-  *   **enable_logical_backup**
-     determines if the logical backup of this cluster should be taken and uploaded to S3. Default: false.
-  *   **logical_backup_schedule**
-     backup schedule in Cron format. Default: "30 00 * * *"

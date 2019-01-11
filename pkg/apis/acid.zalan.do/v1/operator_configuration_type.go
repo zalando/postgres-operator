@@ -152,8 +152,8 @@ type OperatorConfigurationUsers struct {
 type Duration time.Duration
 
 type OperatorLogicalBackupConfiguration struct {
-	EnableLogicalBackup      bool   `json:"enable_logical_backup,omitempty"`
-	LogicalBackupSchedule    string `json:"logical_backup_schedule,omitempty"`
-	LogicalBackupDockerImage string `json:"logical_backup_docker_image,omitempty"`
-	LogicalBackupS3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
+	Enable      bool   `json:"enable_logical_backup,omitempty"`
+	Schedule    string `json:"logical_backup_schedule,omitempty"`
+	DockerImage string `json:"logical_backup_docker_image,omitempty"`
+	S3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
 }
