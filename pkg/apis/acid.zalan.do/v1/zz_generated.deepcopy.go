@@ -371,7 +371,11 @@ func (in *Patroni) DeepCopyInto(out *Patroni) {
 			(*out)[key] = outVal
 		}
 	}
-	in.StandbyCluster.DeepCopyInto(&out.StandbyCluster)
+	if in.StandbyCluster != nil {
+		in, out := &in.StandbyCluster, &out.StandbyCluster
+		*out = new(PatroniStandbyCluster)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
