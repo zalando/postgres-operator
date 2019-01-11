@@ -296,6 +296,12 @@ func (c *Cluster) Create() error {
 		c.logger.Infof("databases have been successfully created")
 	}
 
+	if c.Postgresql.Spec.EnableLogicalBackup {
+		if err := c.createBackupCronJob(); err != nil {
+			return fmt.Errorf("could not create a k8s cron job for logical backups: %v", err)
+		}
+	}
+
 	if err := c.listResources(); err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
 	}

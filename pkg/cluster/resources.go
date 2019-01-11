@@ -605,6 +605,12 @@ func (c *Cluster) createRoles() (err error) {
 	return c.syncRoles()
 }
 
+func (c *Cluster) createBackupCronJob() (err error) {
+	c.setProcessName("creating a k8s cron job for backups")
+
+	return nil
+}
+
 // GetServiceMaster returns cluster's kubernetes master Service
 func (c *Cluster) GetServiceMaster() *v1.Service {
 	return c.Services[Master]
