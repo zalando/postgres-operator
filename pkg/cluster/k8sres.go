@@ -558,6 +558,31 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 
+	if c.OpConfig.MetricsHost != "" {
+		envVars = append(envVars, []v1.EnvVar{
+			{
+				Name:  "METRICS_HOST",
+				Value: c.OpConfig.MetricHostName,
+			},
+			{
+				Name:  "METRICS_USER",
+				Value: c.OpConfig.MetricUserName,
+			},
+			{
+				Name: "METRICS_PASSWORD",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: c.credentialSecretName(c.OpConfig.MetricUserName),
+						},
+						Key: "password",
+					},
+				},
+			},
+		})
+
+	}
+
 	if len(customPodEnvVarsList) > 0 {
 		envVars = append(envVars, customPodEnvVarsList...)
 	}
