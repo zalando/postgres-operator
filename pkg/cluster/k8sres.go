@@ -20,7 +20,9 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
+	batchv1 "k8s.io/api/batch/v1"
 )
 
 const (
@@ -1194,4 +1196,27 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 	host = clusterName
 	port = "5432"
 	return
+}
+
+func (c *Cluster) generateCronJob() *batchv1beta1.CronJob {
+
+	jobSpec := batchv1.JobSpec{}
+
+	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
+		Spec: jobSpec,
+	}
+
+	cronJob := &batchv1beta1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.podDisruptionBudgetName(),
+			Namespace: c.Namespace,
+			Labels:    c.labelsSet(true),
+		},
+		Spec: batchv1beta1.CronJobSpec{
+			Schedule:    "*/1 * * * *",
+			JobTemplate: jobTemplateSpec,
+		},
+	}
+
+	return cronJob
 }
