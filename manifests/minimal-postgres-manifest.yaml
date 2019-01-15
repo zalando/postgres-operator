@@ -23,3 +23,5 @@ spec:
     foo: zalando
   postgresql:
     version: "10"
+
+  enableLogicalBackup: true

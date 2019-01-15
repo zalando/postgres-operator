@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 
 	"encoding/json"
 
@@ -82,6 +83,8 @@ type Cluster struct {
 	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+
+	backupJob        *batchv1beta1.CronJob  // periodical logical backups independent from WAL archiving
 }
 
 type compareStatefulsetResult struct {

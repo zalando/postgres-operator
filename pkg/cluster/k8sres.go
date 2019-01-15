@@ -20,9 +20,10 @@ import (
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
 	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
@@ -1200,15 +1201,29 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 
 func (c *Cluster) generateCronJob() *batchv1beta1.CronJob {
 
-	jobSpec := batchv1.JobSpec{}
+	jobSpec := batchv1.JobSpec{Template : v1.PodTemplateSpec{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				corev1.Container {
+					Name: "Hello world",
+					Image: "hello-world",
+					Command: []string{"date", "echo Hello from the Kubernetes cluster"},
+
+				},
+
+			},
+		},
+	},
+	}
 
 	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
 		Spec: jobSpec,
+
 	}
 
 	cronJob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.podDisruptionBudgetName(),
+			Name:      "Dummy cron job",
 			Namespace: c.Namespace,
 			Labels:    c.labelsSet(true),
 		},
