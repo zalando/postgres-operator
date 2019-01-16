@@ -57,12 +57,11 @@ $ psql -U postgres
 Postgres operator allows defining roles to be created in the resulting database
 cluster. It covers three use-cases:
 
-* create application roles specific to the cluster described in the manifest:
-  `manifest roles`.
-* create application roles that should be automatically created on every
-  cluster managed by the operator: `infrastructure roles`.
-* automatically create users for every member of the team owning the database
-  cluster: `teams API roles`.
+* `manifest roles`: create application roles specific to the cluster described in the manifest.
+* `infrastructure roles`: create application roles that should be automatically created on every
+  cluster managed by the operator.
+* `teams API roles`: automatically create users for every member of the team owning the database
+  cluster.
 
 In the next sections, we will cover those use cases in more details.
 
@@ -75,7 +74,7 @@ flags.
 
 Manifest roles are defined as a dictionary, with a role name as a key and a
 list of role options as a value. For a role without any options it is best to supply the empty
-list `[]`. It is also possible to leave this field empty as in our example manifests, but in certain cases such empty field may removed by Kubernetes [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes) (`foobar_user:` is equivalent to `foobar_user: null`). 
+list `[]`. It is also possible to leave this field empty as in our example manifests, but in certain cases such empty field may removed by Kubernetes [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes) (`foobar_user:` is equivalent to `foobar_user: null`).
 
 The operator accepts the following options:  `superuser`, `inherit`, `login`,
 `nologin`, `createrole`, `createdb`, `replication`, `bypassrls`.
@@ -99,10 +98,13 @@ An infrastructure role is a role that should be present on every PostgreSQL
 cluster managed by the operator. An example of such a role is a monitoring
 user. There are two ways to define them:
 
-* Exclusively via the infrastructure roles secret (specified by the
-  `infrastructure_roles_secret_name` parameter).
+* With the infrastructure roles secret only
+* With both the the secret and the infrastructure role ConfigMap.
 
-The role definition looks like this (values are base64 encoded):
+### Infrastructure roles secret
+
+The infrastructure roles secret is specified by the `infrastructure_roles_secret_name`
+parameter. The role definition looks like this (values are base64 encoded):
 
 ```yaml
     user1: ZGJ1c2Vy
@@ -110,25 +112,29 @@ The role definition looks like this (values are base64 encoded):
     inrole1: b3BlcmF0b3I=
 ```
 
-A block above describes the infrastructure role 'dbuser' with the password
-'secret' that is the member of the 'operator' role. For the following
+The block above describes the infrastructure role 'dbuser' with password
+'secret' that is a member of the 'operator' role. For the following
 definitions one must increase the index, i.e. the next role will be defined as
-'user2' and so on. Note that there is no way to specify role options (like
-superuser or nologin) this way, and the resulting role will automatically be a
-login role.
+'user2' and so on. The resulting role will automatically be a login role.
 
-*  Via both the infrastructure roles secret and the infrastructure role
-   configmap (with the same name as the infrastructure roles secret).
+Note that with definitions that solely use the infrastructure roles secret
+there is no way to specify role options (like superuser or nologin) or role
+memberships. This is where the ConfigMap comes into play.
 
-The infrastructure roles secret should contain an entry with 'rolename:
-rolepassword' for each role, and the role description should be specified in
-the configmap. Below is the example:
+### Secret plus ConfigMap
+
+A [ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
+allows for defining more details regarding the infrastructure roles.
+Therefore, one should use the new style that specifies infrastructure roles
+using both the secret and a ConfigMap. The ConfigMap must have the same name as
+the secret. The secret should contain an entry with 'rolename:rolepassword' for
+each role.
 
 ```yaml
     dbuser: c2VjcmV0
 ```
 
-and the configmap definition for that user:
+And the role description for that user should be specified in the ConfigMap.
 
 ```yaml
     data:
@@ -140,18 +146,13 @@ and the configmap definition for that user:
           log_statement: all
 ```
 
-Note that the definition above allows for more details than the one that relies
-solely on the infrastructure role secret. In particular, one can allow
-membership in multiple roles via the `inrole` array parameter, define role
-flags via the `user_flags` list and supply per-role options through the
-`db_parameters` dictionary. All those parameters are optional.
+One can allow membership in multiple roles via the `inrole` array parameter,
+define role flags via the `user_flags` list and supply per-role options through
+the `db_parameters` dictionary. All those parameters are optional.
 
-The definitions that solely use the infrastructure roles secret are more
-limited and considered legacy ones; one should use the new style that specifies
-infrastructure roles using both the secret and the configmap. You can mix both
-in the infrastructure role secret, as long as your new-style definition can be
-clearly distinguished from the old-style one (for instance, do not name
-new-style roles`userN`).
+Both definitions can be mixed in the infrastructure role secret, as long as
+your new-style definition can be clearly distinguished from the old-style one
+(for instance, do not name new-style roles `userN`).
 
 Since an infrastructure role is created uniformly on all clusters managed by
 the operator, it makes no sense to define it without the password. Such
