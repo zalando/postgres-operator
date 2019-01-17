@@ -1070,7 +1070,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	}
 
 	if role == Replica {
-		serviceSpec.Selector = c.roleLabelsSet(role)
+		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
 
 	var annotations map[string]string
@@ -1103,7 +1103,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
-			Labels:      c.roleLabelsSet(role),
+			Labels:      c.roleLabelsSet(true, role),
 			Annotations: annotations,
 		},
 		Spec: serviceSpec,
@@ -1117,7 +1117,7 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.endpointName(role),
 			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(role),
+			Labels:    c.roleLabelsSet(false, role),
 		},
 	}
 	if len(subsets) > 0 {
@@ -1181,7 +1181,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.roleLabelsSet(Master),
+				MatchLabels: c.roleLabelsSet(false, Master),
 			},
 		},
 	}

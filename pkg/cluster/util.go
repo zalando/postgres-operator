@@ -398,8 +398,8 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 	return &metav1.LabelSelector{MatchLabels: c.labelsSet(false), MatchExpressions: nil}
 }
 
-func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
-	lbls := c.labelsSet(false)
+func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) labels.Set {
+	lbls := c.labelsSet(shouldAddExtraLabels)
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
 	return lbls
 }
