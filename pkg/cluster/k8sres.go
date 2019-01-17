@@ -1117,7 +1117,7 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.endpointName(role),
 			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(false, role),
+			Labels:    c.roleLabelsSet(true, role),
 		},
 	}
 	if len(subsets) > 0 {

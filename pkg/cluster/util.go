@@ -389,6 +389,19 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 	if shouldAddExtraLabels {
 		// enables filtering resources owned by a team
 		lbls["team"] = c.Postgresql.Spec.TeamID
+
+		// allow to inherit certain labels from the 'postgres' object
+		if spec, err := c.GetSpec(); err == nil {
+			for k, v := range spec.ObjectMeta.Labels {
+				for _, match := range c.OpConfig.InheritedLabels {
+					if k == match {
+						lbls[k] = v
+					}
+				}
+			}
+		} else {
+			c.logger.Warningf("could not get the list of InheritedLabels for cluster %q: %v", c.Name, err)
+		}
 	}
 
 	return labels.Set(lbls)
