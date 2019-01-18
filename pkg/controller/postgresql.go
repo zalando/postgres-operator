@@ -385,8 +385,14 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	if informerOldSpec != nil { //update, delete
 		uid = informerOldSpec.GetUID()
 		clusterName = util.NameFromMeta(informerOldSpec.ObjectMeta)
+
+		// user is fixing previously incorrect spec
 		if eventType == EventUpdate && informerNewSpec.Error == "" && informerOldSpec.Error != "" {
 			eventType = EventSync
+		}
+
+		// set current error to be one of the new spec if present
+		if informerNewSpec != nil {
 			clusterError = informerNewSpec.Error
 		} else {
 			clusterError = informerOldSpec.Error
