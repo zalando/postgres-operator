@@ -116,7 +116,7 @@ be run under the `zalando-postgres-operator` service account.
 
 The service account defined in `operator-rbac.yaml` acquires some privileges
 not really used by the operator (i.e. we only need `list` and `watch` on
-`configmaps` ressources), this is also done intentionally to avoid breaking
+`configmaps` resources), this is also done intentionally to avoid breaking
 things if someone decides to configure the same service account in the
 operator's ConfigMap to run postgres clusters.
 
