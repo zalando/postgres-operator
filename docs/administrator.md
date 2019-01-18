@@ -115,10 +115,10 @@ with the default `operator` account. In the future the operator should ideally
 be run under the `zalando-postgres-operator` service account.
 
 The service account defined in `operator-rbac.yaml` acquires some privileges
-not really used by the operator (i.e. we only need list and watch on
-`configmaps`), this is also done intentionally to avoid breaking things if
-someone decides to configure the same service account in the operator's
-ConfigMap to run postgres clusters.
+not really used by the operator (i.e. we only need `list` and `watch` on
+`configmaps` ressources), this is also done intentionally to avoid breaking
+things if someone decides to configure the same service account in the
+operator's ConfigMap to run postgres clusters.
 
 ### Use taints and tolerations for dedicated PostgreSQL nodes
 
@@ -244,7 +244,7 @@ Postgres database cluster:
 
 The operator logs reasons for a rolling update with the `info` level and 
 a diff between the old and new StatefulSet specs with the `debug` level. 
-To benefit from numerous escape characters in the latter log entry, view it
+To read the latter log entry with the escaped characters rendered, view it
 in CLI with `echo -e`. Note that the resultant message will contain some
 noise because the `PodTemplate` used by the operator is yet to be updated
 with the default values used internally in Kubernetes.
