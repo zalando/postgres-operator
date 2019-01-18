@@ -1,6 +1,6 @@
 ## Create ConfigMap
 
-ConfigMap is used to store the configuration of the operator
+A ConfigMap is used to store the configuration of the operator.
 
 ```bash
     $ kubectl create -f manifests/configmap.yaml
@@ -46,7 +46,9 @@ manifests:
 
 All subsequent `kubectl` commands will work with the `test` namespace. The
 operator will run in this namespace and look up needed resources - such as its
-config map - there. Please note that the namespace for service accounts and cluster role bindings in [operator RBAC rules](manifests/operator-service-account-rbac.yaml) needs to be adjusted to the non-default value.
+ConfigMap - there. Please note that the namespace for service accounts and
+cluster role bindings in [operator RBAC rules](../manifests/operator-service-account-rbac.yaml)
+needs to be adjusted to the non-default value.
 
 ## Specify the namespace to watch
 
@@ -56,8 +58,10 @@ replicas to 5" and reacting to the requests, in this example by actually
 scaling up.
 
 By default, the operator watches the namespace it is deployed to. You can
-change this by altering the `WATCHED_NAMESPACE` env var in the operator
-deployment manifest or the `watched_namespace` field in the operator configmap.
+change this by setting the `WATCHED_NAMESPACE` var in the `env` section of the
+[operator deployment](../manifests/postgres-operator.yaml) manifest or by
+altering the `watched_namespace` field in the operator
+[ConfigMap](../manifests/configmap.yaml#L6).
 In the case both are set, the env var takes the precedence. To make the
 operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
@@ -75,7 +79,7 @@ in the case database pods need to talk to the Kubernetes API (e.g. when using
 Kubernetes-native configuration of Patroni). The operator checks that the
 `pod_service_account_name` exists in the target namespace, and, if not, deploys
 there the `pod_service_account_definition` from the operator
-[`Config`](pkg/util/config/config.go) with the default value of:
+[`Config`](../pkg/util/config/config.go) with the default value of:
 
 ```yaml
 apiVersion: v1
@@ -86,13 +90,13 @@ metadata:
 
 In this definition, the operator overwrites the account's name to match
 `pod_service_account_name` and the `default` namespace to match the target
-namespace. The operator  performs **no** further syncing of this account.
+namespace. The operator performs **no** further syncing of this account.
 
 ## Role-based access control for the operator
 
-The `manifests/operator-service-account-rbac.yaml` defines cluster roles and bindings needed
-for the operator to function under access control restrictions. To deploy the
-operator with this RBAC policy use:
+The `manifests/operator-service-account-rbac.yaml` defines cluster roles and
+bindings needed for the operator to function under access control restrictions.
+To deploy the operator with this RBAC policy use:
 
 ```bash
     $ kubectl create -f manifests/configmap.yaml
@@ -103,18 +107,18 @@ operator with this RBAC policy use:
 
 Note that the service account in `operator-rbac.yaml` is named
 `zalando-postgres-operator`. You may have to change the `service_account_name`
-in the operator configmap and `serviceAccountName` in the postgres-operator
+in the operator ConfigMap and `serviceAccountName` in the postgres-operator
 deployment appropriately.
 
-This is done intentionally, as to avoid breaking those setups that already work
+This is done intentionally to avoid breaking those setups that already work
 with the default `operator` account. In the future the operator should ideally
 be run under the `zalando-postgres-operator` service account.
 
-The service account defined in  `operator-rbac.yaml` acquires some privileges
-not really used by the operator (i.e. we only need list and watch on
-configmaps), this is also done intentionally to avoid breaking things if
-someone decides to configure the same service account in the operator's
-configmap to run postgres clusters.
+The service account defined in `operator-rbac.yaml` acquires some privileges
+not really used by the operator (i.e. we only need `list` and `watch` on
+`configmaps` resources), this is also done intentionally to avoid breaking
+things if someone decides to configure the same service account in the
+operator's ConfigMap to run postgres clusters.
 
 ### Use taints and tolerations for dedicated PostgreSQL nodes
 
@@ -144,12 +148,12 @@ data:
 
 ## Custom Pod Environment Variables
 
-It is possible to configure a config map which is used by the Postgres pods as
+It is possible to configure a ConfigMap which is used by the Postgres pods as
 an additional provider for environment variables.
 
 One use case is to customize the Spilo image and configure it with environment
-variables. The config map with the additional settings is configured in the
-operator's main config map:
+variables. The ConfigMap with the additional settings is configured in the
+operator's main ConfigMap:
 
 **postgres-operator ConfigMap**
 
@@ -186,12 +190,12 @@ instances permitted by each Postgres cluster managed by the operator. If either
 `min_instances` or `max_instances` is set to a non-zero value, the operator may
 adjust the number of instances specified in the cluster manifest to match
 either the min or the max boundary. For instance, of a cluster manifest has 1
-instance and the min_instances is set to 3, the cluster will be created with 3
-instances. By default, both parameters are set to -1.
+instance and the `min_instances` is set to 3, the cluster will be created with 3
+instances. By default, both parameters are set to `-1`.
 
 ## Load balancers
 
-For any Postgresql/Spilo cluster, the operator creates two separate k8s
+For any Postgresql/Spilo cluster, the operator creates two separate Kubernetes
 services: one for the master pod and one for replica pods. To expose these
 services to an outer network, one can attach load balancers to them by setting
 `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the
@@ -200,29 +204,47 @@ manifest, the operator configmap's settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
 
-To limit the range of IP adresses that can reach a load balancer, specify desired ranges in the `allowedSourceRanges` field (applies to both master and replica LBs). To prevent exposing LBs to the entire Internet, this field is set at cluster creation time to `127.0.0.1/32` unless overwritten explicitly. If you want to revoke all IP ranges from an existing cluster, please set the `allowedSourceRanges` field to `127.0.0.1/32` or to the empty sequence `[]`. Setting the field to `null` or omitting entirely may lead to k8s removing this field from the manifest due to [the k8s handling of null fields](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes). Then the resultant manifest will not have the necessary change, and the operator will respectively do noting with the existing source ranges.
+To limit the range of IP adresses that can reach a load balancer, specify the
+desired ranges in the `allowedSourceRanges` field (applies to both master and
+replica load balancers). To prevent exposing load balancers to the entire
+Internet, this field is set at cluster creation time to `127.0.0.1/32` unless
+overwritten explicitly. If you want to revoke all IP ranges from an existing
+cluster, please set the `allowedSourceRanges` field to `127.0.0.1/32` or to an
+empty sequence `[]`. Setting the field to `null` or omitting it entirely may
+lead to Kubernetes removing this field from the manifest due to its
+[handling of null fields](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes).
+Then the resultant manifest will not contain the necessary change, and the
+operator will respectively do noting with the existing source ranges.
 
 ## Running periodic 'autorepair' scans of Kubernetes objects
 
 The Postgres operator periodically scans all Kubernetes objects belonging to
 each cluster and repairs all discrepancies between them and the definitions
-generated from the current cluster manifest. There are two types of scans: a
-`sync scan`, running every `resync_period` seconds for every cluster, and the
-`repair scan`, coming every `repair_period` only for those clusters that didn't
-report success as a result of the last operation applied to them.
+generated from the current cluster manifest. There are two types of scans:
+
+* `sync scan`, running every `resync_period` seconds for every cluster
+
+* `repair scan`, coming every `repair_period` only for those clusters that didn't
+report success as a result of the last operation applied to them. 
 
 ## Postgres roles supported by the operator
 
-The operator is capable of maintaining roles of multiple kinds within a Postgres database cluster:
+The operator is capable of maintaining roles of multiple kinds within a
+Postgres database cluster:
 
-1. **System roles** are roles necessary for the proper work of Postgres itself such as a replication role or the initial superuser role. The operator delegates creating such roles to Patroni and only establishes relevant secrets.
+* **System roles** are roles necessary for the proper work of Postgres itself such as a replication role or the initial superuser role. The operator delegates creating such roles to Patroni and only establishes relevant secrets.
 
-2. **Infrastructure roles** are roles for processes originating from external systems, e.g. monitoring robots. The operator creates such roles in all PG clusters it manages assuming k8s secrets with the relevant credentials exist beforehand.
+* **Infrastructure roles** are roles for processes originating from external systems, e.g. monitoring robots. The operator creates such roles in all Postgres clusters it manages assuming that Kubernetes secrets with the relevant credentials exist beforehand.
 
-3. **Per-cluster robot users** are also roles for processes originating from external systems but defined for an individual Postgres cluster in its manifest. A typical example is a role for connections from an application that uses the database.
+* **Per-cluster robot users** are also roles for processes originating from external systems but defined for an individual Postgres cluster in its manifest. A typical example is a role for connections from an application that uses the database.
 
-4. **Human users** originate from the Teams API that returns list of the team members given a team id. Operator differentiates between (a) product teams that own a particular Postgres cluster and are granted admin rights to maintain it, and (b) Postgres superuser teams that get the superuser access to all PG databases running in a k8s cluster for the purposes of maintaining and troubleshooting.
+* **Human users** originate from the Teams API that returns a list of the team members given a team id. The operator differentiates between (a) product teams that own a particular Postgres cluster and are granted admin rights to maintain it, and (b) Postgres superuser teams that get the superuser access to all Postgres databases running in a Kubernetes cluster for the purposes of maintaining and troubleshooting.
 
 ## Understanding rolling update of Spilo pods
 
-The operator logs reasons for a rolling update with the `info` level and a diff between the old and new StatefulSet specs with the `debug` level. To benefit from numerous escape characters in the latter log entry, view it in CLI with `echo -e`. Note that the resultant message will contain some noise because the `PodTemplate` used by the operator is yet to be updated with the default values used internally in Kubernetes.
+The operator logs reasons for a rolling update with the `info` level and 
+a diff between the old and new StatefulSet specs with the `debug` level. 
+To read the latter log entry with the escaped characters rendered, view it
+in CLI with `echo -e`. Note that the resultant message will contain some
+noise because the `PodTemplate` used by the operator is yet to be updated
+with the default values used internally in Kubernetes.
