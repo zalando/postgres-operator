@@ -3,6 +3,10 @@
 # Deploy a Postgres operator to a minikube aka local Kubernetes cluster
 # Optionally re-build the operator binary beforehand to test local changes
 
+# Known limitations:
+# 1) minikube provides a single node k8s cluster. That is, you will not be able test functions like pod
+#    migration between multiple nodes locally
+
 
 # enable unofficial bash strict mode
 set -o errexit
@@ -13,6 +17,7 @@ IFS=$'\n\t'
 
 readonly PATH_TO_LOCAL_OPERATOR_MANIFEST="/tmp/local-postgres-operator-manifest.yaml"
 readonly PATH_TO_PORT_FORWARED_KUBECTL_PID="/tmp/kubectl-port-forward.pid"
+readonly PATH_TO_THE_PG_CLUSTER_MANIFEST="/tmp/minimal-postgres-manifest.yaml"
 readonly LOCAL_PORT="8080"
 readonly OPERATOR_PORT="8080"
 
@@ -37,18 +42,16 @@ function retry(){
     return 1
 }
 
-
 function display_help(){
-    echo "Usage: $0 [ -r | --rebuild-operator ] [ -h | --help ]"
+    echo "Usage: $0 [ -r | --rebuild-operator ] [ -h | --help ] [ -f | --force-minikube-restart ] [ -t | --deploy-pg-to-namespace-test ]"
 }
-
 
 function clean_up(){
 
     echo "==== CLEAN UP PREVIOUS RUN ==== "
 
     local status
-    status=$(minikube status --format "{{.MinikubeStatus}}" || true)
+    status=$(minikube status --format "{{.Host}}" || true)
 
     if [[ "$status" = "Running" ]] || [[ "$status" = "Stopped" ]]; then
         echo "Delete the existing local cluster so that we can cleanly apply resources from scratch..."
@@ -149,7 +152,7 @@ function start_operator(){
     local -r cmd="kubectl get crd | grep --quiet 'postgresqls.acid.zalan.do'"
     retry "$cmd" "$msg "
 
-    kubectl create -f manifests/minimal-postgres-manifest.yaml
+
 }
 
 
@@ -185,17 +188,37 @@ function check_health(){
     fi
 }
 
+function submit_postgresql_manifest(){
+
+    echo "==== SUBMIT MINIMAL POSTGRES MANIFEST ==== "
+
+    local namespace="default"
+    cp manifests/minimal-postgres-manifest.yaml $PATH_TO_THE_PG_CLUSTER_MANIFEST
+
+    if $should_deploy_pg_to_namespace_test; then
+          kubectl create namespace test
+          namespace="test"
+          sed --in-place 's/namespace: default/namespace: test/'  $PATH_TO_THE_PG_CLUSTER_MANIFEST
+    fi
+
+    kubectl create -f $PATH_TO_THE_PG_CLUSTER_MANIFEST
+    echo "The operator will create the PG cluster with minimal manifest $PATH_TO_THE_PG_CLUSTER_MANIFEST in the ${namespace} namespace"
+
+}
 
 function main(){
 
     if ! [[ $(basename "$PWD") == "postgres-operator" ]]; then
-        echo "Please execute the script only from the root directory of the Postgres opepator repo."
+        echo "Please execute the script only from the root directory of the Postgres operator repo."
         exit 1
     fi
 
     trap "echo 'If you observe issues with minikube VM not starting/not proceeding, consider deleting the .minikube dir and/or rebooting before re-running the script'" EXIT
 
-    local should_build_custom_operator=false # used in start_operator()
+    local should_build_custom_operator=false
+    local should_deploy_pg_to_namespace_test=false
+    local should_restart_minikube=false
+
     while true
     do
         # if the 1st param is unset, use the empty string as a default value
@@ -208,6 +231,14 @@ function main(){
                 should_build_custom_operator=true
                 break
                 ;;
+            -f | --force-minikube-restart) # restarts take minutes so existing minikube is re-used by default
+                should_restart_minikube=true
+                break
+                ;;
+            -t | --deploy-pg-to-namespace-test) # to test multi-namespace support locally
+                should_deploy_pg_to_namespace_test=true
+                break
+                ;;
             *)  break
                 ;;
         esac
@@ -215,13 +246,12 @@ function main(){
 
     clean_up
     start_minikube
-    kubectl create namespace test
     start_operator
+    submit_postgresql_manifest
     forward_ports
     check_health
 
     exit 0
 }
-
 
 main "$@"
