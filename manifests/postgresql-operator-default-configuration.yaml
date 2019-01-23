@@ -46,6 +46,9 @@ configuration:
   load_balancer:
     enable_master_load_balancer: false
     enable_replica_load_balancer: false
+    # custom_service_annotations:
+    #   keyx: valuex
+    #   keyy: valuey
     master_dns_name_format: "{cluster}.{team}.{hostedzone}"
     replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
   aws_or_gcp:

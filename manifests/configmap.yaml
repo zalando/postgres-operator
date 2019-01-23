@@ -15,6 +15,8 @@ data:
   secret_name_template: '{username}.{cluster}.credentials'
   super_username: postgres
   enable_teams_api: "false"
+  # custom_service_annotations:
+  #   "keyx:valuez,keya:valuea"
   # set_memory_request_to_limit: "true"
   # postgres_superuser_teams: "postgres_superusers"
   # enable_team_superuser: "false"

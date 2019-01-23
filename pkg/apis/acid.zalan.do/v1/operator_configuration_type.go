@@ -84,6 +84,7 @@ type LoadBalancerConfiguration struct {
 	DbHostedZone              string                `json:"db_hosted_zone,omitempty"`
 	EnableMasterLoadBalancer  bool                  `json:"enable_master_load_balancer,omitempty"`
 	EnableReplicaLoadBalancer bool                  `json:"enable_replica_load_balancer,omitempty"`
+	CustomServiceAnnotations  map[string]string     `json:"custom_service_annotations,omitempty"`
 	MasterDNSNameFormat       config.StringTemplate `json:"master_dns_name_format,omitempty"`
 	ReplicaDNSNameFormat      config.StringTemplate `json:"replica_dns_name_format,omitempty"`
 }
