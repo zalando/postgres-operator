@@ -6,6 +6,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// CRDResource* define names necesssary for the k8s CRD API
 const (
 	PostgresCRDResourceKind   = "postgresql"
 	PostgresCRDResourcePlural = "postgresqls"
@@ -39,6 +40,7 @@ func buildCRD(name, kind, plural, short string) *apiextv1beta1.CustomResourceDef
 	}
 }
 
+// PostgresCRD returns CustomResourceDefinition built from PostgresCRDResource
 func PostgresCRD() *apiextv1beta1.CustomResourceDefinition {
 	return buildCRD(PostgresCRDResouceName,
 		PostgresCRDResourceKind,
@@ -46,6 +48,7 @@ func PostgresCRD() *apiextv1beta1.CustomResourceDefinition {
 		PostgresCRDResourceShort)
 }
 
+// ConfigurationCRD returns CustomResourceDefinition built from OperatorConfigCRDResource
 func ConfigurationCRD() *apiextv1beta1.CustomResourceDefinition {
 	return buildCRD(OperatorConfigCRDResourceName,
 		OperatorConfigCRDResouceKind,

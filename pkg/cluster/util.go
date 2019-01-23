@@ -179,7 +179,7 @@ func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate 
 	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
 		c.logger.Debugf("metadata.annotation diff\n%s\n", util.PrettyDiff(old.Annotations, new.Annotations))
 	}
-	c.logger.Debugf("spec diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+	c.logger.Debugf("spec diff between old and new statefulsets: \n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
@@ -460,6 +460,7 @@ func (c *Cluster) setSpec(newSpec *acidv1.Postgresql) {
 	c.specMu.Unlock()
 }
 
+// GetSpec returns a copy of the operator-side spec of a Postgres cluster in a thread-safe manner
 func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()

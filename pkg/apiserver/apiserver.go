@@ -48,11 +48,22 @@ type Server struct {
 	controller controllerInformer
 }
 
+const (
+	teamRe      = `(?P<team>[a-zA-Z][a-zA-Z0-9\-_]*)`
+	namespaceRe = `(?P<namespace>[a-z0-9]([-a-z0-9\-_]*[a-z0-9])?)`
+	clusterRe   = `(?P<cluster>[a-zA-Z][a-zA-Z0-9\-_]*)`
+)
+
 var (
-	clusterStatusURL     = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<namespace>[a-z0-9]([-a-z0-9]*[a-z0-9])?)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/?$`)
-	clusterLogsURL       = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<namespace>[a-z0-9]([-a-z0-9]*[a-z0-9])?)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/logs/?$`)
-	clusterHistoryURL    = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/(?P<namespace>[a-z0-9]([-a-z0-9]*[a-z0-9])?)/(?P<cluster>[a-zA-Z][a-zA-Z0-9-]*)/history/?$`)
-	teamURL              = regexp.MustCompile(`^/clusters/(?P<team>[a-zA-Z][a-zA-Z0-9]*)/?$`)
+	clusterStatusRe  = fmt.Sprintf(`^/clusters/%s/%s/%s/?$`, teamRe, namespaceRe, clusterRe)
+	clusterLogsRe    = fmt.Sprintf(`^/clusters/%s/%s/%s/logs/?$`, teamRe, namespaceRe, clusterRe)
+	clusterHistoryRe = fmt.Sprintf(`^/clusters/%s/%s/%s/history/?$`, teamRe, namespaceRe, clusterRe)
+	teamURLRe        = fmt.Sprintf(`^/clusters/%s/?$`, teamRe)
+
+	clusterStatusURL     = regexp.MustCompile(clusterStatusRe)
+	clusterLogsURL       = regexp.MustCompile(clusterLogsRe)
+	clusterHistoryURL    = regexp.MustCompile(clusterHistoryRe)
+	teamURL              = regexp.MustCompile(teamURLRe)
 	workerLogsURL        = regexp.MustCompile(`^/workers/(?P<id>\d+)/logs/?$`)
 	workerEventsQueueURL = regexp.MustCompile(`^/workers/(?P<id>\d+)/queue/?$`)
 	workerStatusURL      = regexp.MustCompile(`^/workers/(?P<id>\d+)/status/?$`)

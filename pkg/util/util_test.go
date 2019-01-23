@@ -69,6 +69,17 @@ var substringMatch = []struct {
 	{regexp.MustCompile(`aaaa (\d+) bbbb`), "aaaa 123 bbbb", nil},
 }
 
+var requestIsSmallerThanLimitTests = []struct {
+	request string
+	limit   string
+	out     bool
+}{
+	{"1G", "2G", true},
+	{"1G", "1Gi", true}, // G is 1000^3 bytes, Gi is 1024^3 bytes
+	{"1024Mi", "1G", false},
+	{"1e9", "1G", false}, // 1e9 bytes == 1G
+}
+
 func TestRandomPassword(t *testing.T) {
 	const pwdLength = 10
 	pwd := RandomPassword(pwdLength)
@@ -140,6 +151,18 @@ func TestMapContains(t *testing.T) {
 		res := MapContains(tt.inA, tt.inB)
 		if res != tt.out {
 			t.Errorf("MapContains expected: %#v, got: %#v", tt.out, res)
+		}
+	}
+}
+
+func TestRequestIsSmallerThanLimit(t *testing.T) {
+	for _, tt := range requestIsSmallerThanLimitTests {
+		res, err := RequestIsSmallerThanLimit(tt.request, tt.limit)
+		if err != nil {
+			t.Errorf("RequestIsSmallerThanLimit returned unexpected error: %#v", err)
+		}
+		if res != tt.out {
+			t.Errorf("RequestIsSmallerThanLimit expected: %#v, got: %#v", tt.out, res)
 		}
 	}
 }

@@ -6,19 +6,20 @@ metadata:
 spec:
   teamId: "ACID"
   volume:
-    size: 5Gi
+    size: 1Gi
   numberOfInstances: 2
   users: #Application/Robot users
     zalando:
     - superuser
     - createdb
   enableMasterLoadBalancer: true
-  enableReplicaLoadBalancer: true 
+  enableReplicaLoadBalancer: true
   allowedSourceRanges: # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
     foo: zalando
 #Expert section
+  enableShmVolume: true
   postgresql:
     version: "10"
     parameters:
@@ -31,7 +32,7 @@ spec:
       memory: 100Mi
     limits:
       cpu: 300m
-      memory: 3000Mi
+      memory: 300Mi
   patroni:
     initdb:
       encoding: "UTF8"
@@ -40,6 +41,13 @@ spec:
     pg_hba:
     - hostssl all all 0.0.0.0/0 md5
     - host    all all 0.0.0.0/0 md5
+    slots:
+      permanent_physical_1:
+        type: physical
+      permanent_logical_1:
+        type: logical
+        database: foo
+        plugin: pgoutput
     ttl: 30
     loop_wait: &loop_wait 10
     retry_timeout: 10

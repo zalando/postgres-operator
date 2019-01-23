@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -280,6 +281,7 @@ func (c *Cluster) syncStatefulSet() error {
 				podsRollingUpdateRequired = true
 				c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired)
 			}
+
 			c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
 
 			if !cmp.replace {

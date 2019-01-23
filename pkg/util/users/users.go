@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"reflect"
+
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
 	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"reflect"
 )
 
 const (
@@ -19,6 +20,7 @@ const (
 	doBlockStmt          = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
 	passwordTemplate     = "ENCRYPTED PASSWORD '%s'"
 	inRoleTemplate       = `IN ROLE %s`
+	adminTemplate        = `ADMIN %s`
 )
 
 // DefaultUserSyncStrategy implements a user sync strategy that merges already existing database users
@@ -112,6 +114,9 @@ func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.D
 	}
 	if len(user.MemberOf) > 0 {
 		userFlags = append(userFlags, fmt.Sprintf(inRoleTemplate, quoteMemberList(user)))
+	}
+	if user.AdminRole != "" {
+		userFlags = append(userFlags, fmt.Sprintf(adminTemplate, user.AdminRole))
 	}
 
 	if user.Password == "" {
