@@ -17,14 +17,8 @@ import (
 )
 
 var (
-	True   = true
-	False  = false
-	logger = logrus.New().WithField("test", "cluster")
-)
-
-const (
-	superUserName       = "postgres"
-	replicationUserName = "standby"
+	True  = true
+	False = false
 )
 
 var mockTeamsAPI mockTeamsAPIClient
