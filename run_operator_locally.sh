@@ -56,7 +56,7 @@ function clean_up(){
     fi
 
     if [[ -e "$PATH_TO_LOCAL_OPERATOR_MANIFEST" ]]; then
-        rm --verbose "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
+        rm -v "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
     fi
 
     # the kubectl process does the port-forwarding between operator and local ports
@@ -70,7 +70,7 @@ function clean_up(){
         if kill "$pid" > /dev/null  2>&1; then
             echo "Kill the kubectl process responsible for port forwarding for minikube so that we can re-use the same ports for forwarding later..."
         fi
-        rm --verbose  "$PATH_TO_PORT_FORWARED_KUBECTL_PID"
+        rm -v  "$PATH_TO_PORT_FORWARED_KUBECTL_PID"
 
     fi
 }
@@ -121,7 +121,7 @@ function deploy_self_built_image() {
     # update the tag in the postgres operator conf
     # since the image with this tag already exists on the machine,
     # docker should not attempt to fetch it from the registry due to imagePullPolicy
-    sed --expression "s/\(image\:.*\:\).*$/\1$TAG/; s/smoke-tested-//" manifests/postgres-operator.yaml > "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
+    sed -e "s/\(image\:.*\:\).*$/\1$TAG/; s/smoke-tested-//" manifests/postgres-operator.yaml > "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
 
     retry "kubectl create -f \"$PATH_TO_LOCAL_OPERATOR_MANIFEST\"" "attempt to create $PATH_TO_LOCAL_OPERATOR_MANIFEST resource"
 }

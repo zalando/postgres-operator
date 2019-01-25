@@ -1093,6 +1093,13 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 			constants.ZalandoDNSNameAnnotation: dnsName,
 			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 		}
+
+		if len(c.OpConfig.CustomServiceAnnotations) != 0 {
+			c.logger.Debugf("There are custom annotations defined, creating them.")
+			for customAnnotationKey, customAnnotationValue := range c.OpConfig.CustomServiceAnnotations {
+				annotations[customAnnotationKey] = customAnnotationValue
+			}
+		}
 	} else if role == Replica {
 		// before PR #258, the replica service was only created if allocated a LB
 		// now we always create the service but warn if the LB is absent

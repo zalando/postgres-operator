@@ -294,6 +294,11 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   cluster.  Can be overridden by individual cluster settings. The default is
   `false`.
 
+* **custom_service_annotations**
+  when load balancing is enabled, LoadBalancer service is created and
+  this parameter takes service annotations that are applied to service.
+  Optional.
+
 * **master_dns_name_format** defines the DNS name string template for the
   master load balancer cluster.  The default is
   `{cluster}.{team}.{hostedzone}`, where `{cluster}` is replaced by the cluster
