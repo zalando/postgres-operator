@@ -6,6 +6,7 @@
 # Known limitations:
 # 1) minikube provides a single node k8s cluster. That is, you will not be able test functions like pod
 #    migration between multiple nodes locally
+# 2) this script configures the operator via configmap, not the operator CRD
 
 
 # enable unofficial bash strict mode
@@ -43,7 +44,7 @@ function retry(){
 }
 
 function display_help(){
-    echo "Usage: $0 [ -r | --rebuild-operator ] [ -h | --help ] [ -f | --force-minikube-restart ] [ -t | --deploy-pg-to-namespace-test ]"
+    echo "Usage: $0 [ -r | --rebuild-operator ] [ -h | --help ] [ -n | --deploy-new-operator-image ] [ -t | --deploy-pg-to-namespace-test ]"
 }
 
 function clean_up(){
@@ -126,7 +127,7 @@ function deploy_self_built_image() {
     # docker should not attempt to fetch it from the registry due to imagePullPolicy
     sed --expression "s/\(image\:.*\:\).*$/\1$TAG/; s/smoke-tested-//" manifests/postgres-operator.yaml > "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
 
-    retry "kubectl create -f \"$PATH_TO_LOCAL_OPERATOR_MANIFEST\"" "attempt to create $PATH_TO_LOCAL_OPERATOR_MANIFEST resource"
+    retry "kubectl apply -f \"$PATH_TO_LOCAL_OPERATOR_MANIFEST\"" "attempt to create $PATH_TO_LOCAL_OPERATOR_MANIFEST resource"
 }
 
 
@@ -142,16 +143,17 @@ function start_operator(){
         retry "kubectl  create -f manifests/\"$file\"" "attempt to create $file resource"
     done
 
+    cp  manifests/postgres-operator.yaml $PATH_TO_LOCAL_OPERATOR_MANIFEST
+
     if [[ "$should_build_custom_operator" = true ]]; then # set in main()
         deploy_self_built_image
     else
-        retry "kubectl  create -f manifests/postgres-operator.yaml" "attempt to create /postgres-operator.yaml resource"
+        retry "kubectl create -f ${PATH_TO_LOCAL_OPERATOR_MANIFEST}" "attempt to create ${PATH_TO_LOCAL_OPERATOR_MANIFEST} resource"
     fi
 
     local -r msg="Wait for the postgresql custom resource definition to register..."
     local -r cmd="kubectl get crd | grep --quiet 'postgresqls.acid.zalan.do'"
     retry "$cmd" "$msg "
-
 
 }
 
@@ -188,6 +190,7 @@ function check_health(){
     fi
 }
 
+
 function submit_postgresql_manifest(){
 
     echo "==== SUBMIT MINIMAL POSTGRES MANIFEST ==== "
@@ -206,6 +209,7 @@ function submit_postgresql_manifest(){
 
 }
 
+
 function main(){
 
     if ! [[ $(basename "$PWD") == "postgres-operator" ]]; then
@@ -217,7 +221,7 @@ function main(){
 
     local should_build_custom_operator=false
     local should_deploy_pg_to_namespace_test=false
-    local should_restart_minikube=false
+    local should_replace_operator_image=false
 
     while true
     do
@@ -227,12 +231,12 @@ function main(){
                 display_help
                 exit 0
                 ;;
-            -r | --rebuild-operator)
+            -r | --rebuild-operator) # with minikube restart
                 should_build_custom_operator=true
                 break
                 ;;
-            -f | --force-minikube-restart) # restarts take minutes so existing minikube is re-used by default
-                should_restart_minikube=true
+            -n | --deploy-new-operator-image) # without minikube restart that takes minutes
+                should_replace_operator_image=true
                 break
                 ;;
             -t | --deploy-pg-to-namespace-test) # to test multi-namespace support locally
@@ -244,6 +248,11 @@ function main(){
         esac
     done
 
+    if ${should_replace_operator_image}; then
+       deploy_self_built_image
+       exit 0
+    fi
+
     clean_up
     start_minikube
     start_operator
@@ -253,5 +262,6 @@ function main(){
 
     exit 0
 }
+
 
 main "$@"
