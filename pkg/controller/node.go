@@ -80,16 +80,18 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	if !c.nodeIsReady(nodePrev) || c.nodeIsReady(nodeCur) {
 		return
 	}
-	err := retryutil.Retry(2 * time.Minute, 10 * time.Minute,
+
+	err := retryutil.Retry(1 * time.Minute, c.opConfig.MasterPodMoveTimeout,
 		func() (bool, error) {
 			err := c.moveMasterPodsOffNode(nodeCur)
 			if  err != nil {
-				return false, fmt.Errorf(("Unable to move master pods off the unschedulable node. Will retry after delay"))
+				return false, fmt.Errorf("unable to move master pods off the unschedulable node; will retry after delay")
 			}
 			return true, nil
 		} )
+
 	if err != nil {
-		c.logger.Warning("Unable to move maser pods")
+		c.logger.Warning("failed to move master pods from the node %q: timeout expired", nodeCur.Name)
 	}
 }
 
