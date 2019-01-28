@@ -205,6 +205,11 @@ configuration they are grouped under the `kubernetes` key.
   that should be assigned to the Postgres pods. The priority class itself must be defined in advance.
   Default is empty (use the default priority class).
   
+ * **master_pod_move_timeout**
+   The period of time to wait for the success of Patroni switchovers from master pods on an unschedulable node
+   to their respective replicas on healthy nodes. The situation where master pods still exist on the old node 
+   after this timeout expires has to be fixed manually. The default is 10 minutes.
+  
 
 ## Kubernetes resource requests
 

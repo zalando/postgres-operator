@@ -41,18 +41,21 @@ func (c *Controller) nodeAdd(obj interface{}) {
 	}
 
 	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
+
 	// check if the node became not ready while the operator was down (otherwise we would have caught it in nodeUpdate)
 	if !c.nodeIsReady(node) {
-		err := retryutil.Retry(2 * time.Minute, 10 * time.Minute,
+
+		err := retryutil.Retry(1 * time.Minute, c.opConfig.MasterPodMoveTimeout,
 			func() (bool, error) {
 				err := c.moveMasterPodsOffNode(node)
 				if  err != nil {
-					return false, fmt.Errorf(("Unable to move master pods off the unschedulable node. Will retry after delay"))
+					return false, fmt.Errorf("unable to move master pods off the unschedulable node; will retry after delay")
 				}
 				return true, nil
 			} )
+
 		if err != nil {
-			c.logger.Warning("Unable to move maser pods")
+			c.logger.Warning("failed to move master pods from the node %q: timeout expired", node.Name)
 		}
 	}
 }
@@ -174,7 +177,7 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) error {
 		return fmt.Errorf("could not move master %d/%d pods from the %q node",
 			leftPods, totalPods, nodeName)
 	}
-	
+
 	return nil
 }
 

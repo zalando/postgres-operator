@@ -50,6 +50,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ClusterNameLabel = fromCRD.Kubernetes.ClusterNameLabel
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
+	result.MasterPodMoveTimeout = fromCRD.Kubernetes.MasterPodMoveTimeout
 
 	result.DefaultCPURequest = fromCRD.PostgresPodResources.DefaultCPURequest
 	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest

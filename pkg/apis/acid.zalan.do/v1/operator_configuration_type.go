@@ -59,6 +59,7 @@ type KubernetesMetaConfiguration struct {
 	// TODO: use namespacedname
 	PodEnvironmentConfigMap string `json:"pod_environment_configmap,omitempty"`
 	PodPriorityClassName    string `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout    time.Duration `json:"master_pod_move_timeout,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
