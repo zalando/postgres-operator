@@ -273,6 +273,32 @@ are always passed to sidecars:
 
 The PostgreSQL volume is shared with sidecars and is mounted at `/home/postgres/pgdata`.
 
+
+## InitContainers Support
+
+Each cluster can specify arbitrary init containers to run. These containers can be
+used to run custom actions before any normal and sidecar containers start.
+An init container can be specified like this:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-minimal-cluster
+spec:
+  ...
+  init_containers:
+    - name: "container-name"
+      image: "company/image:tag"
+      env:
+        - name: "ENV_VAR_NAME"
+          value: "any-k8s-env-things"
+```
+
+`init_containers` accepts full `v1.Container` definition.
+
+
 ## Increase volume size
 
 PostgreSQL operator supports statefulset volume resize if you're using the

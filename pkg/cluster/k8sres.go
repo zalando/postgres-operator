@@ -410,6 +410,7 @@ func generatePodTemplate(
 	namespace string,
 	labels labels.Set,
 	spiloContainer *v1.Container,
+	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
 	tolerationsSpec *[]v1.Toleration,
 	nodeAffinity *v1.Affinity,
@@ -428,6 +429,7 @@ func generatePodTemplate(
 		ServiceAccountName:            podServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    containers,
+		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
 	}
 
@@ -803,6 +805,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		c.Namespace,
 		c.labelsSet(true),
 		spiloContainer,
+		spec.InitContainers,
 		sidecarContainers,
 		&tolerationSpec,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),

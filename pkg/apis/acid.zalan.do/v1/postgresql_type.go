@@ -51,6 +51,7 @@ type PostgresSpec struct {
 	Databases            map[string]string    `json:"databases,omitempty"`
 	Tolerations          []v1.Toleration      `json:"tolerations,omitempty"`
 	Sidecars             []Sidecar            `json:"sidecars,omitempty"`
+	InitContainers       []v1.Container       `json:"init_containers,omitempty"`
 	PodPriorityClassName string               `json:"pod_priority_class_name,omitempty"`
 	ShmVolume            *bool                `json:"enableShmVolume,omitempty"`
 }
