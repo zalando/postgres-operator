@@ -3,6 +3,11 @@
 # Deploy a Postgres operator to a minikube aka local Kubernetes cluster
 # Optionally re-build the operator binary beforehand to test local changes
 
+# Known limitations:
+# 1) minikube provides a single node k8s cluster. That is, you will not be able test functions like pod
+#    migration between multiple nodes locally
+# 2) this script configures the operator via configmap, not the operator CRD
+
 
 # enable unofficial bash strict mode
 set -o errexit
@@ -13,6 +18,7 @@ IFS=$'\n\t'
 
 readonly PATH_TO_LOCAL_OPERATOR_MANIFEST="/tmp/local-postgres-operator-manifest.yaml"
 readonly PATH_TO_PORT_FORWARED_KUBECTL_PID="/tmp/kubectl-port-forward.pid"
+readonly PATH_TO_THE_PG_CLUSTER_MANIFEST="/tmp/minimal-postgres-manifest.yaml"
 readonly LOCAL_PORT="8080"
 readonly OPERATOR_PORT="8080"
 
@@ -37,18 +43,16 @@ function retry(){
     return 1
 }
 
-
 function display_help(){
-    echo "Usage: $0 [ -r | --rebuild-operator ] [ -h | --help ]"
+    echo "Usage: $0 [ -r | --rebuild-operator ] [ -h | --help ] [ -n | --deploy-new-operator-image ] [ -t | --deploy-pg-to-namespace-test ]"
 }
-
 
 function clean_up(){
 
     echo "==== CLEAN UP PREVIOUS RUN ==== "
 
     local status
-    status=$(minikube status --format "{{.MinikubeStatus}}" || true)
+    status=$(minikube status --format "{{.Host}}" || true)
 
     if [[ "$status" = "Running" ]] || [[ "$status" = "Stopped" ]]; then
         echo "Delete the existing local cluster so that we can cleanly apply resources from scratch..."
@@ -123,7 +127,7 @@ function deploy_self_built_image() {
     # docker should not attempt to fetch it from the registry due to imagePullPolicy
     sed -e "s/\(image\:.*\:\).*$/\1$TAG/; s/smoke-tested-//" manifests/postgres-operator.yaml > "$PATH_TO_LOCAL_OPERATOR_MANIFEST"
 
-    retry "kubectl create -f \"$PATH_TO_LOCAL_OPERATOR_MANIFEST\"" "attempt to create $PATH_TO_LOCAL_OPERATOR_MANIFEST resource"
+    retry "kubectl apply -f \"$PATH_TO_LOCAL_OPERATOR_MANIFEST\"" "attempt to create $PATH_TO_LOCAL_OPERATOR_MANIFEST resource"
 }
 
 
@@ -139,17 +143,18 @@ function start_operator(){
         retry "kubectl  create -f manifests/\"$file\"" "attempt to create $file resource"
     done
 
+    cp  manifests/postgres-operator.yaml $PATH_TO_LOCAL_OPERATOR_MANIFEST
+
     if [[ "$should_build_custom_operator" = true ]]; then # set in main()
         deploy_self_built_image
     else
-        retry "kubectl  create -f manifests/postgres-operator.yaml" "attempt to create /postgres-operator.yaml resource"
+        retry "kubectl create -f ${PATH_TO_LOCAL_OPERATOR_MANIFEST}" "attempt to create ${PATH_TO_LOCAL_OPERATOR_MANIFEST} resource"
     fi
 
     local -r msg="Wait for the postgresql custom resource definition to register..."
     local -r cmd="kubectl get crd | grep --quiet 'postgresqls.acid.zalan.do'"
     retry "$cmd" "$msg "
 
-    kubectl create -f manifests/minimal-postgres-manifest.yaml
 }
 
 
@@ -186,16 +191,38 @@ function check_health(){
 }
 
 
+function submit_postgresql_manifest(){
+
+    echo "==== SUBMIT MINIMAL POSTGRES MANIFEST ==== "
+
+    local namespace="default"
+    cp manifests/minimal-postgres-manifest.yaml $PATH_TO_THE_PG_CLUSTER_MANIFEST
+
+    if $should_deploy_pg_to_namespace_test; then
+          kubectl create namespace test
+          namespace="test"
+          sed --in-place 's/namespace: default/namespace: test/'  $PATH_TO_THE_PG_CLUSTER_MANIFEST
+    fi
+
+    kubectl create -f $PATH_TO_THE_PG_CLUSTER_MANIFEST
+    echo "The operator will create the PG cluster with minimal manifest $PATH_TO_THE_PG_CLUSTER_MANIFEST in the ${namespace} namespace"
+
+}
+
+
 function main(){
 
     if ! [[ $(basename "$PWD") == "postgres-operator" ]]; then
-        echo "Please execute the script only from the root directory of the Postgres opepator repo."
+        echo "Please execute the script only from the root directory of the Postgres operator repo."
         exit 1
     fi
 
     trap "echo 'If you observe issues with minikube VM not starting/not proceeding, consider deleting the .minikube dir and/or rebooting before re-running the script'" EXIT
 
-    local should_build_custom_operator=false # used in start_operator()
+    local should_build_custom_operator=false
+    local should_deploy_pg_to_namespace_test=false
+    local should_replace_operator_image=false
+
     while true
     do
         # if the 1st param is unset, use the empty string as a default value
@@ -204,8 +231,16 @@ function main(){
                 display_help
                 exit 0
                 ;;
-            -r | --rebuild-operator)
+            -r | --rebuild-operator) # with minikube restart
                 should_build_custom_operator=true
+                break
+                ;;
+            -n | --deploy-new-operator-image) # without minikube restart that takes minutes
+                should_replace_operator_image=true
+                break
+                ;;
+            -t | --deploy-pg-to-namespace-test) # to test multi-namespace support locally
+                should_deploy_pg_to_namespace_test=true
                 break
                 ;;
             *)  break
@@ -213,10 +248,15 @@ function main(){
         esac
     done
 
+    if ${should_replace_operator_image}; then
+       deploy_self_built_image
+       exit 0
+    fi
+
     clean_up
     start_minikube
-    kubectl create namespace test
     start_operator
+    submit_postgresql_manifest
     forward_ports
     check_health
 

@@ -10,7 +10,7 @@ data:
 
   debug_logging: "true"
   workers: "4"
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p42
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p4
   pod_service_account_name: "zalando-postgres-operator"
   secret_name_template: '{username}.{cluster}.credentials'
   super_username: postgres
