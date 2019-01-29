@@ -28,6 +28,11 @@ manages PostgreSQL clusters on Kubernetes:
 3. Finally, the operator periodically synchronizes the actual state of each
    Postgres cluster with the desired state defined in the cluster's manifest.
 
+Here is a diagram, that summarizes what would be created by the operator, when a
+new Postgres cluster CRD was submitted:
+
+![postgresql-operator](docs/diagrams/operator.png "K8S resources, created by operator")
+
 There is a browser-friendly version of this documentation at
 [postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
 
