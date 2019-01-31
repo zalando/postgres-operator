@@ -494,7 +494,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	defer func() {
 		if updateFailed {
 			c.setStatus(acidv1.ClusterStatusUpdateFailed)
-		} else if c.Status != acidv1.ClusterStatusRunning {
+		} else {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
