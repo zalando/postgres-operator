@@ -33,8 +33,16 @@ new Postgres cluster CRD was submitted:
 
 ![postgresql-operator](docs/diagrams/operator.png "K8S resources, created by operator")
 
-There is a browser-friendly version of this documentation at
-[postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
+This picture is not complete without an overview of what is inside a pod, so
+let's zoom in:
+
+![pod](docs/diagrams/pod.png "Database pod components")
+
+These two diagrams should help you to understand the basics of what kind of
+functionality the operator provides. Below we discuss all everything in more
+details.
+
+There is a browser-friendly version of this documentation at [postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
 
 ## Table of contents
 
