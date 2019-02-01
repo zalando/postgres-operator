@@ -25,8 +25,10 @@ configuration:
     # custom_pod_annotations:
     #   keya: valuea
     #   keyb: valueb
+    enable_init_containers: false
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
+    enable_sidecars: false
     # infrastructure_roles_secret_name: ""
     # inherited_labels:
     # - application

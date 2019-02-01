@@ -82,10 +82,18 @@ Those are top-level keys, containing both leaf keys and groups.
   your own Spilo image from the [github
   repository](https://github.com/zalando/spilo).
 
+* **enable_init_containers**
+  global option to allow for creating init containers to run actions before
+  Spilo is started. Disabled by default.
+
+* **enable_sidecars**
+  global option to allow for creating sidecar containers to run alongside Spilo
+  on the same pod. Disabled by default.
+
 * **sidecar_docker_images**
-  a map of sidecar names to docker images for the containers to run alongside
-  Spilo. In case of the name conflict with the definition in the cluster
-  manifest the cluster-specific one is preferred.
+  a map of sidecar names to docker images to run with Spilo. In case of the name
+  conflict with the definition in the cluster manifest the cluster-specific one
+  is preferred.
 
 * **enable_shm_volume**
   Instruct operator to start any new database pod without limitations on shm
@@ -444,10 +452,19 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_endpoint**
   When using non-AWS S3 storage, endpoint can be set as a ENV variable.
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> ebd09880... Modified dump.sh so it knows how to handle new features. Configurable S3 SSE
 * **logical_backup_s3_sse**
   Specify server side encription that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
 
+<<<<<<< HEAD
+=======
+>>>>>>> 7cd05ba4... Updated documentation for logical backup endpoint, access and secret key.
+=======
+>>>>>>> ebd09880... Modified dump.sh so it knows how to handle new features. Configurable S3 SSE
 * **logical_backup_s3_access_key_id**
   When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
 

@@ -720,6 +720,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	var (
 		err                 error
+		initContainers      []v1.Container
 		sidecarContainers   []v1.Container
 		podTemplate         *v1.PodTemplateSpec
 		volumeClaimTemplate *v1.PersistentVolumeClaim
@@ -784,6 +785,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+
+	if spec.InitContainers != nil {
+		if c.OpConfig.EnableInitContainers {
+			initContainers = spec.InitContainers
+		} else {
+			return nil, fmt.Errorf("InitContainers specified but globally disabled!")
+		}
 	}
 
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
@@ -872,9 +881,15 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate sidecar containers
-	if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
-		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
-		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+	if sideCars != nil {
+		if c.OpConfig.EnableSidecars {
+			if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
+				c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
+				return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+			}
+		} else {
+			return nil, fmt.Errorf("Sidecar containers specified but globally disabled!")
+		}
 	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
@@ -894,7 +909,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.labelsSet(true),
 		annotations,
 		spiloContainer,
-		spec.InitContainers,
+		initContainers,
 		sidecarContainers,
 		&tolerationSpec,
 		effectiveFSGroup,

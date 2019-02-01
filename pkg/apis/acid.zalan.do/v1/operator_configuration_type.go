@@ -160,6 +160,8 @@ type OperatorConfigurationData struct {
 	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
 	Sidecars                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	EnableSidecars             bool                               `json:"enable_sidecars,omitempty"`
+	EnableInitContainers       bool                               `json:"enable_init_containers,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
