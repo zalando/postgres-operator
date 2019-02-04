@@ -782,7 +782,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		if err != nil {
 			return nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
 		}
-		for k, _ := range sc.Data {
+		for k := range sc.Data {
 			sc_key := k
 			if len(c.OpConfig.PodEnvironmentSecretKeys) > 0 {
 				if val, ok := c.OpConfig.PodEnvironmentSecretKeys[k]; ok {
