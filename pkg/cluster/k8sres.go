@@ -769,14 +769,50 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		var cm *v1.ConfigMap
 		cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+			return nil, fmt.Errorf("could not read ConfigMap PodEnvironmentConfigMap: %v", err)
 		}
 		for k, v := range cm.Data {
 			customPodEnvVarsList = append(customPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
 		}
-		sort.Slice(customPodEnvVarsList,
-			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 	}
+
+	if c.OpConfig.PodEnvironmentSecretName != "" {
+		var sc *v1.Secret
+		sc, err = c.KubeClient.Secrets(c.Namespace).Get(c.OpConfig.PodEnvironmentSecretName, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
+		}
+		for k, _ := range sc.Data {
+			sc_key := k
+			if len(c.OpConfig.PodEnvironmentSecretKeys) > 0 {
+				if val, ok := c.OpConfig.PodEnvironmentSecretKeys[k]; ok {
+					sc_key = val
+				} else {
+					c.logger.Debugf("skipping Secret key %s - not found in PodEnvironmentSecretKeys", k)
+					sc_key = ""
+				}
+			}
+			if sc_key != "" {
+				customPodEnvVarsList = append(
+					customPodEnvVarsList,
+					v1.EnvVar{
+						Name: sc_key,
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: c.OpConfig.PodEnvironmentSecretName,
+								},
+								Key: k,
+							},
+						},
+					},
+				)
+			}
+		}
+	}
+
+	sort.Slice(customPodEnvVarsList,
+		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
 	spiloConfiguration := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
 

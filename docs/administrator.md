@@ -235,21 +235,24 @@ spec:
 
 ## Custom Pod Environment Variables
 
+### ConfigMap
+
 It is possible to configure a ConfigMap which is used by the Postgres pods as
 an additional provider for environment variables.
 
 One use case is to customize the Spilo image and configure it with environment
 variables. The ConfigMap with the additional settings is configured in the
-operator's main ConfigMap:
+operator's CRD OperatorConfiguration:
 
-**postgres-operator ConfigMap**
+**OperatorConfiguration CRD**
 
 ```yaml
-apiVersion: v1
-kind: ConfigMap
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
 metadata:
-  name: postgres-operator
-data:
+  name: postgresql-operator-default-configuration
+configuration:
+  ...
   # referencing config map with custom settings
   pod_environment_configmap: postgres-pod-config
   ...
@@ -268,6 +271,46 @@ data:
 ```
 
 This ConfigMap is then added as a source of environment variables to the
+Postgres StatefulSet/pods.
+
+### Secret
+
+It is possible to configure a Secret which is used by the Postgres pods as
+an additional provider for environment variables.
+
+One use case is to customize the Spilo image and configure it with environment
+variables like `AWS_SECRET_ACCESS_KEY`. The Secret with the additional
+settings is configured in the operator's CRD OperatorConfiguration:
+
+**OperatorConfiguration CRD**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-default-configuration
+configuration:
+  ...
+  # referencing config map with custom settings
+  pod_environment_secret_name: postgres-pod-secret
+  pod_environment_secret_keys:
+    minio_secret: AWS_SECRET_ACCESS_KEY
+  ...
+```
+
+**referenced Secret `postgres-pod-secret`**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-pod-secret
+  namespace: default
+data:
+  minio_secret: <base64_secret_value>
+```
+
+This Secret keys are then added as a source of environment variables to the
 Postgres StatefulSet/pods.
 
 ## Limiting the number of instances in clusters with `min_instances` and `max_instances`
