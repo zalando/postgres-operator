@@ -6,10 +6,6 @@
 [![GoDoc](https://godoc.org/github.com/zalando-incubator/postgres-operator?status.svg)](https://godoc.org/github.com/zalando-incubator/postgres-operator)
 [![golangci](https://golangci.com/badges/github.com/zalando-incubator/postgres-operator.svg)](https://golangci.com/r/github.com/zalando-incubator/postgres-operator)
 
-## Google Summer of Code 2019
-
-We apply as a mentoring organization to the Google Summer of Code 2019. Check out our [project ideas](docs/gsoc2019/ideas.md) !
-
 ## Introduction
 
 The Postgres [operator](https://coreos.com/blog/introducing-operators.html)
