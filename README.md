@@ -49,6 +49,11 @@ There is a browser-friendly version of this documentation at
 
 the rest of the document is a tutorial to get you up and running with the operator on Minikube.
 
+   
+## Communicaiton      
+
+We maintain the #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com)
+
 ## Quickstart
 
 Prerequisites:
