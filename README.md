@@ -50,9 +50,11 @@ There is a browser-friendly version of this documentation at
 the rest of the document is a tutorial to get you up and running with the operator on Minikube.
 
    
-## Communicaiton      
+## Community      
 
-We maintain the #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com)
+There are two places to get in touch with the community:
+1. The [GitHub issue tracker](https://github.com/zalando-incubator/postgres-operator/issues)
+2. The #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com)
 
 ## Quickstart
 
