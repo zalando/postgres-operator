@@ -28,6 +28,17 @@ It will be helpful to reject erroneous manifests before they reach the operator 
 * **Mentor(s)**: Sergey Dudoladov [@sdudoladov](https://github.com/sdudoladov) 
 * **Issue**: [#388](https://github.com/zalando-incubator/postgres-operator/issues/388)
 
+###  Design a solution for the local testing of the operator
+
+* **Description**: The current way of testing is to run minikube, either manually or with some tooling around it like `/run-operator_locally.sh` or Vagrant. This has at least three problems:
+First, minikube is a single node cluster, so it is unsuitable for testing vital functions such as pod migration between nodes. Second, minikube starts slowly; that prolongs local testing. 
+Third, every contributor  needs to come up with their own solution for local testing. The task is to come up with a better option which will enable us to conveniently and uniformly  run e2e tests locally / potentially in Travis CI.
+A promising option is the Kubernetes own [kind](https://github.com/kubernetes-sigs/kind)  
+* **Recommended skills**: Docker, shell scripting, basic Kubernetes abstractions
+* **Difficulty**: medium to hard depending on the selected desing
+* **Mentor(s)**: Dmitry Dolgov [@erthalion](https://github.com/erthalion), Sergey Dudoladov [@sdudoladov](https://github.com/sdudoladov) 
+* **Issue**: [#475](https://github.com/zalando-incubator/postgres-operator/issues/475)
+
 ### Detach a Postgres cluster from the operator for maintenance
 
 * **Description**: sometimes a Postgres cluster requires manual maintenance. During such maintenance the operator should ignore all the changes manually applied to the cluster. 
