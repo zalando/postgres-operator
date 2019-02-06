@@ -6,6 +6,9 @@
 [![GoDoc](https://godoc.org/github.com/zalando-incubator/postgres-operator?status.svg)](https://godoc.org/github.com/zalando-incubator/postgres-operator)
 [![golangci](https://golangci.com/badges/github.com/zalando-incubator/postgres-operator.svg)](https://golangci.com/r/github.com/zalando-incubator/postgres-operator)
 
+<img src="docs/diagrams/logo.png" width="200">
+
+
 ## Introduction
 
 The Postgres [operator](https://coreos.com/blog/introducing-operators.html)
@@ -44,6 +47,7 @@ details.
 
 There is a browser-friendly version of this documentation at [postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
 
+
 ## Table of contents
 
 * [concepts](docs/index.md)
@@ -55,6 +59,13 @@ There is a browser-friendly version of this documentation at [postgres-operator.
 * [command-line options and environment variables](docs/reference/command_line_and_environment.md)
 
 the rest of the document is a tutorial to get you up and running with the operator on Minikube.
+
+   
+## Community      
+
+There are two places to get in touch with the community:
+1. The [GitHub issue tracker](https://github.com/zalando-incubator/postgres-operator/issues)
+2. The #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com)
 
 ## Quickstart
 
