@@ -1,6 +1,14 @@
 
 # Google Summer of Code 2019
 
+## Applications steps 
+
+1. Please carefully read the official [Google Summer of Code Student Guide](https://google.github.io/gsocguides/student/) 
+2. Join the #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com) to introduce yourself to the community and get quick feedback on your application.
+3. Select a project from the list of ideas below or propose your own.
+4. Write a proposal draft.  Please open an issue with the label `gsoc2019_application` in the [operator repository](https://github.com/zalando-incubator/postgres-operator/issues)  so that the community members can publicly review it. See proposal instructions below for details.
+5. Submit proposal and the proof of enrollment before April 9 2019 18:00 UTC through the web site of the Program.
+
 ## Project ideas 
 
 
