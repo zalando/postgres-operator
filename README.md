@@ -6,6 +6,8 @@
 [![GoDoc](https://godoc.org/github.com/zalando-incubator/postgres-operator?status.svg)](https://godoc.org/github.com/zalando-incubator/postgres-operator)
 [![golangci](https://golangci.com/badges/github.com/zalando-incubator/postgres-operator.svg)](https://golangci.com/r/github.com/zalando-incubator/postgres-operator)
 
+![The Postgres operator logo](docs/diagrams/logo.png)
+
 ## Introduction
 
 The Postgres [operator](https://coreos.com/blog/introducing-operators.html)
