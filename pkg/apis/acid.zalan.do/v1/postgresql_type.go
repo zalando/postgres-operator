@@ -114,6 +114,7 @@ type CloneDescription struct {
 	ClusterName  string `json:"cluster,omitempty"`
 	UID          string `json:"uid,omitempty"`
 	EndTimestamp string `json:"timestamp,omitempty"`
+	S3WalPath    string `json:"s3_wal_path,omitempty"`
 }
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.

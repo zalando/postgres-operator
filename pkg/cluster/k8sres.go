@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -1145,8 +1146,9 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 	}
 
 	cluster := description.ClusterName
-	result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
 	if description.EndTimestamp == "" {
+		result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
+
 		// cloning with basebackup, make a connection string to the cluster to clone from
 		host, port := c.getClusterServiceConnectionParameters(cluster)
 		// TODO: make some/all of those constants
@@ -1169,10 +1171,25 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
+		cloneScope := cluster
+		cloneS3Bucket := c.OpConfig.WALES3Bucket
+		cloneSuffix := getBucketScopeSuffix(description.UID)
+
+		if description.S3WalPath != "" {
+			f := func(c rune) bool {
+				return c == '/'
+			}
+			pathParts := strings.FieldsFunc(description.S3WalPath, f)
+			cloneS3Bucket = pathParts[1]
+			cloneScope = pathParts[3]
+			cloneSuffix = pathParts[4]
+		}
+
+		result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cloneScope})
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: cloneS3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.UID)})
+		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: cloneSuffix})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
