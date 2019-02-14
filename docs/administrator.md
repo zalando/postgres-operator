@@ -146,6 +146,57 @@ data:
   ...
 ```
 
+### Add cluster-specific labels
+
+In some cases, you might want to add `labels` that are specific to a given
+postgres cluster, in order to identify its child objects.
+The typical use case is to add labels that identifies the `Pods` created by the
+operator, in order to implement fine-controlled `NetworkPolicies`.
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    inherited_labels:
+    - application
+    - environment
+...
+```
+
+**cluster manifest**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: demo-cluster
+  labels:
+    application: my-app
+    environment: demo
+spec:
+...
+```
+
+**network policy**
+
+```yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: netpol-example
+spec:
+  podSelector:
+    matchLabels:
+      application: my-app
+      environment: demo
+...
+```
+
 ## Custom Pod Environment Variables
 
 It is possible to configure a ConfigMap which is used by the Postgres pods as

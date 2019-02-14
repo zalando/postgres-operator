@@ -48,6 +48,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
 	result.PodRoleLabel = fromCRD.Kubernetes.PodRoleLabel
 	result.ClusterLabels = fromCRD.Kubernetes.ClusterLabels
+	result.InheritedLabels = fromCRD.Kubernetes.InheritedLabels
 	result.ClusterNameLabel = fromCRD.Kubernetes.ClusterNameLabel
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName

@@ -27,7 +27,7 @@ func (c *Cluster) listPods() ([]v1.Pod, error) {
 
 func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	listOptions := metav1.ListOptions{
-		LabelSelector: c.roleLabelsSet(role).String(),
+		LabelSelector: c.roleLabelsSet(false, role).String(),
 	}
 
 	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)
