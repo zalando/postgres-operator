@@ -290,24 +290,24 @@ func nodeAffinity(nodeReadinessLabel map[string]string) *v1.Affinity {
 	}
 }
 
-func generatePodAffinity(team string, version string) *v1.Affinity {
+func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1.Affinity) *v1.Affinity {
 	// generate pod anti affinity to avoid multiple on instances on the same node
-	matchLabels := make(map[string]string)
-
-	matchLabels["application"] = "spilo"
-	matchLabels["team"] = team
-	matchLabels["version"] = version
-
-	return &v1.Affinity{
+	podAffinity := v1.Affinity{
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
 				LabelSelector: &metav1.LabelSelector{
-					MatchLabels: matchLabels,
+					MatchLabels: labels,
 				},
-				TopologyKey: "kubernetes.io/hostname",
+				TopologyKey: topologyKey,
 			}},
 		},
 	}
+
+	if nodeAffinity != nil && nodeAffinity.NodeAffinity != nil {
+		podAffinity.NodeAffinity = nodeAffinity.NodeAffinity
+	}
+
+	return &podAffinity
 }
 
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
@@ -439,6 +439,8 @@ func generatePodTemplate(
 	kubeIAMRole string,
 	priorityClassName string,
 	shmVolume bool,
+	podAntiAffinity bool,
+	podAntiAffinityTopologyKey string,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -457,7 +459,11 @@ func generatePodTemplate(
 		addShmVolume(&podSpec)
 	}
 
-	podSpec.Affinity = generatePodAffinity(labels.Get("team"), labels.Get("version"))
+	if podAntiAffinity {
+		podSpec.Affinity = generatePodAffinity(labels, podAntiAffinityTopologyKey, nodeAffinity)
+	} else if nodeAffinity != nil {
+		podSpec.Affinity = nodeAffinity
+	}
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
@@ -831,7 +837,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
-		mountShmVolumeNeeded(c.OpConfig, spec)); err != nil {
+		mountShmVolumeNeeded(c.OpConfig, spec),
+		c.OpConfig.EnablePodAntiAffinity,
+		c.OpConfig.PodAntiAffinityTopologyKey); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
