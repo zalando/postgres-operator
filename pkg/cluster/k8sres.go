@@ -290,6 +290,26 @@ func nodeAffinity(nodeReadinessLabel map[string]string) *v1.Affinity {
 	}
 }
 
+func generatePodAffinity(team string, version string) *v1.Affinity {
+	// generate pod anti affinity to avoid multiple on instances on the same node
+	matchLabels := make(map[string]string)
+
+	matchLabels["application"] = "spilo"
+	matchLabels["team"] = team
+	matchLabels["version"] = version
+
+	return &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: matchLabels,
+				},
+				TopologyKey: "kubernetes.io/hostname",
+			}},
+		},
+	}
+}
+
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
 	// allow to override tolerations by postgresql manifest
 	if len(*tolerationsSpec) > 0 {
@@ -437,9 +457,7 @@ func generatePodTemplate(
 		addShmVolume(&podSpec)
 	}
 
-	if nodeAffinity != nil {
-		podSpec.Affinity = nodeAffinity
-	}
+	podSpec.Affinity = generatePodAffinity(labels.Get("team"), labels.Get("version"))
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
