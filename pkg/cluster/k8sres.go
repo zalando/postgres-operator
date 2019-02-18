@@ -1205,6 +1205,8 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		customVars := customCloneVars(description.S3WalPath)
 		// if the provided path seems valid, then override
 		if len(customVars) > 2 {
+			msg := "Use custom S3WalPath %s from the manifest"
+			c.logger.Warningf(msg, description.S3WalPath)
 			cloneS3Bucket = customVars[0]
 			cloneScope = customVars[1]
 			cloneSuffix = customVars[2]
