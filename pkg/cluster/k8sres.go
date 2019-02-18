@@ -3,6 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -1138,6 +1139,32 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 	return endpoints
 }
 
+// Parse S3 path and, if valid,  return bucket name, scope and suffix,
+// otherwise an empty array.
+func customCloneVars(walPath string) []string {
+	if walPath == "" {
+		return []string{}
+	}
+
+	pathUrl, err := url.Parse(walPath)
+	if err != nil {
+		return []string{}
+	}
+
+	f := func(c rune) bool {
+		return c == '/'
+	}
+	pathParts := strings.FieldsFunc(pathUrl.Path, f)
+	if len(pathParts) <= 2 {
+		return []string{}
+	}
+	return []string{
+		pathUrl.Host,
+		pathParts[1],
+		pathParts[2],
+	}
+}
+
 func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription) []v1.EnvVar {
 	result := make([]v1.EnvVar, 0)
 
@@ -1175,14 +1202,12 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		cloneS3Bucket := c.OpConfig.WALES3Bucket
 		cloneSuffix := getBucketScopeSuffix(description.UID)
 
-		if description.S3WalPath != "" {
-			f := func(c rune) bool {
-				return c == '/'
-			}
-			pathParts := strings.FieldsFunc(description.S3WalPath, f)
-			cloneS3Bucket = pathParts[1]
-			cloneScope = pathParts[3]
-			cloneSuffix = pathParts[4]
+		customVars := customCloneVars(description.S3WalPath)
+		// if the provided path seems valid, then override
+		if len(customVars) > 2 {
+			cloneS3Bucket = customVars[0]
+			cloneScope = customVars[1]
+			cloneSuffix = customVars[2]
 		}
 
 		result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cloneScope})
