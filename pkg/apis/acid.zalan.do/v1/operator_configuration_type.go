@@ -52,6 +52,7 @@ type KubernetesMetaConfiguration struct {
 	InfrastructureRolesSecretName          spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
 	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
+	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	// TODO: use a proper toleration structure?

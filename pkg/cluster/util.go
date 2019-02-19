@@ -389,6 +389,19 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 	if shouldAddExtraLabels {
 		// enables filtering resources owned by a team
 		lbls["team"] = c.Postgresql.Spec.TeamID
+
+		// allow to inherit certain labels from the 'postgres' object
+		if spec, err := c.GetSpec(); err == nil {
+			for k, v := range spec.ObjectMeta.Labels {
+				for _, match := range c.OpConfig.InheritedLabels {
+					if k == match {
+						lbls[k] = v
+					}
+				}
+			}
+		} else {
+			c.logger.Warningf("could not get the list of InheritedLabels for cluster %q: %v", c.Name, err)
+		}
 	}
 
 	return labels.Set(lbls)
@@ -398,8 +411,8 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 	return &metav1.LabelSelector{MatchLabels: c.labelsSet(false), MatchExpressions: nil}
 }
 
-func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
-	lbls := c.labelsSet(false)
+func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) labels.Set {
+	lbls := c.labelsSet(shouldAddExtraLabels)
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
 	return lbls
 }

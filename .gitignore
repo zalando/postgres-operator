@@ -30,3 +30,7 @@ _testmain.go
 .idea
 
 scm-source.json
+
+# diagrams
+*.aux
+*.log
