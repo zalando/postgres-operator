@@ -148,8 +148,8 @@ data:
 
 Note that the Kubernetes version 1.13 brings [taint-based eviction](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/#taint-based-evictions) to the beta stage and enables it by default.
 Postgres pods by default receive tolerations for `unreachable` and `noExecute` taints with the timeout of `5m`.
-Depending on you setup, you may want to adjust these parameters to prevent master pods from being evicted by Kubernetes runtime.
-To prevent eviction completely, specify the toleration without specifying the `tolerationSeconds` value (similar to how Kubernetes own DaemonSets are configured)
+Depending on your setup, you may want to adjust these parameters to prevent master pods from being evicted by the Kubernetes runtime.
+To prevent eviction completely, specify the toleration by leaving out the `tolerationSeconds` value (similar to how Kubernetes' own DaemonSets are configured)
 
 ### Add cluster-specific labels
 
