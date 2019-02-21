@@ -146,6 +146,36 @@ data:
   ...
 ```
 
+### Enable pod anti affinity
+
+To ensure Postgres pods are running on different topologies, you can use [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
+and configure the required topology in the operator ConfigMap.
+
+Enable pod anti affinity by adding following line to the operator ConfigMap:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  enable_pod_antiaffinity: "true"
+```
+
+By default the topology key for the pod anti affinity is set to `kubernetes.io/hostname`,
+you can set another topology key e.g. `failure-domain.beta.kubernetes.io/zone` by adding following line
+to the operator ConfigMap, see [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  enable_pod_antiaffinity: "true"
+  pod_antiaffinity_topology_key: "failure-domain.beta.kubernetes.io/zone"
+```
+
 ### Add cluster-specific labels
 
 In some cases, you might want to add `labels` that are specific to a given

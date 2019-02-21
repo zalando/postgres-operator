@@ -291,7 +291,7 @@ func nodeAffinity(nodeReadinessLabel map[string]string) *v1.Affinity {
 }
 
 func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1.Affinity) *v1.Affinity {
-	// generate pod anti affinity to avoid multiple on instances on the same node
+	// generate pod anti-affinity to avoid multiple pods of the same Postgres cluster in the same topology , e.g. node
 	podAffinity := v1.Affinity{
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
