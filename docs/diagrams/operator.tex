@@ -1,0 +1,101 @@
+\documentclass{article}
+\usepackage{tikz}
+\usepackage[graphics,tightpage,active]{preview}
+\usetikzlibrary{arrows, shadows.blur, positioning, fit, calc, backgrounds}
+\usepackage{lscape}
+
+\pagenumbering{gobble}
+
+\PreviewEnvironment{tikzpicture}
+\PreviewEnvironment{equation}
+\PreviewEnvironment{equation*}
+\newlength{\imagewidth}
+\newlength{\imagescale}
+\pagestyle{empty}
+\thispagestyle{empty}
+
+\begin{document}
+\begin{center}
+\begin{tikzpicture}[
+  scale=0.5,transform shape,
+  font=\sffamily,
+  every matrix/.style={ampersand replacement=\&,column sep=2cm,row sep=2cm},
+  operator/.style={draw,solid,thick,circle,fill=red!20,inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  component/.style={draw,solid,thick,rounded corners,fill=yellow!20,inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  border/.style={draw,dashed,rounded corners,fill=gray!20,inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  pod/.style={draw,solid,thick,rounded corners,fill=blue!20, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  service/.style={draw,solid,thick,rounded corners,fill=blue!20, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  endpoint/.style={draw,solid,thick,rounded corners,fill=blue!20, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  secret/.style={draw,solid,thick,rounded corners,fill=blue!20, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  pvc/.style={draw,solid,thick,rounded corners,fill=blue!20, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  label/.style={rectangle,inner sep=0,outer sep=0},
+  to/.style={->,>=stealth',shorten >=1pt,semithick,font=\sffamily\footnotesize},
+  every node/.style={align=center}]
+
+  % Position the nodes using a matrix layout
+
+  \matrix{
+    \& \node[component] (crd) {CRD}; \\
+    \& \node[operator] (operator) {Operator}; \\
+        \path
+          node[service] (service-master) {Master}
+          node[label, right of=service-master] (service-middle) {}
+          node[label, below of=service-middle] (services-label) {Services}
+          node[service, right=.5cm of service-master] (service-replica) {Replica}
+          node[border, behind path,
+               fit=(service-master)(service-replica)(services-label)
+          ] (services) {};
+    \&
+    \node[component] (sts) {Statefulset}; \& \node[component] (pdb) {Pod Disruption Budget}; \\
+    \path
+      node[service] (master-endpoint) {Master}
+      node[service, right=.5cm of master-endpoint] (replica-endpoint) {Replica}
+      node[label, right of=master-endpoint] (endpoint-middle) {}
+      node[label, below of=endpoint-middle] (endpoint-label) {Endpoints}
+      node[border, behind path,
+           fit=(master-endpoint)(replica-endpoint)(endpoint-label)
+      ] (endpoints) {}; \&
+    \node[component] (pod-template) {Pod Template}; \&
+    \node[border] (secrets) {
+        \begin{tikzpicture}[]
+            \node[secret] (users-secret) at (0, 0) {Users};
+            \node[secret] (robots-secret) at (2, 0) {Robots};
+            \node[secret] (standby-secret) at (4, 0) {Standby};
+        \end{tikzpicture} \\
+        Secrets
+    }; \\ \&
+    \path
+      node[pod] (replica1-pod) {Replica}
+      node[pod, left=.5cm of replica1-pod] (master-pod) {Master}
+      node[pod, right=.5cm of replica1-pod] (replica2-pod) {Replica}
+      node[label, below of=replica1-pod] (pod-label) {Pods}
+      node[border, behind path,
+           fit=(master-pod)(replica1-pod)(replica2-pod)(pod-label)
+      ] (pods) {}; \\ \&
+    \path
+      node[pvc] (replica1-pvc) {Replica}
+      node[pvc, left=.5cm of replica1-pvc] (master-pvc) {Master}
+      node[pvc, right=.5cm of replica1-pvc] (replica2-pvc) {Replica}
+      node[label, below of=replica1-pvc] (pvc-label) {Persistent Volume Claims}
+      node[border, behind path,
+           fit=(master-pvc)(replica1-pvc)(replica2-pvc)(pvc-label)
+      ] (pvcs) {}; \&
+    \\ \& \\
+  };
+
+  % Draw the arrows between the nodes and label them.
+  \draw[to] (crd) -- node[midway,above] {} node[midway,below] {} (operator);
+  \draw[to] (operator) -- node[midway,above] {} node[midway,below] {} (sts);
+  \draw[to] (operator) -- node[midway,above] {} node[midway,below] {} (secrets);
+  \draw[to] (operator) -| node[midway,above] {} node[midway,below] {} (pdb);
+  \draw[to] (service-master) -- node[midway,above] {} node[midway,below] {} (master-endpoint);
+  \draw[to] (service-replica) -- node[midway,above] {} node[midway,below] {} (replica-endpoint);
+  \draw[to] (master-pod) -- node[midway,above] {} node[midway,below] {} (master-pvc);
+  \draw[to] (replica1-pod) -- node[midway,above] {} node[midway,below] {} (replica1-pvc);
+  \draw[to] (replica2-pod) -- node[midway,above] {} node[midway,below] {} (replica2-pvc);
+  \draw[to] (operator) -| node[midway,above] {} node[midway,below] {} (services);
+  \draw[to] (sts) -- node[midway,above] {} node[midway,below] {} (pod-template);
+  \draw[to] (pod-template) -- node[midway,above] {} node[midway,below] {} (pods);
+\end{tikzpicture}
+\end{center}
+\end{document}

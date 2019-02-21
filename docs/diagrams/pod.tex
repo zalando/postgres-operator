@@ -1,0 +1,92 @@
+\documentclass{article}
+\usepackage{tikz}
+\usepackage[graphics,tightpage,active]{preview}
+\usetikzlibrary{arrows, shadows.blur, positioning, fit, calc, backgrounds}
+\usepackage{lscape}
+
+\pagenumbering{gobble}
+
+\PreviewEnvironment{tikzpicture}
+\PreviewEnvironment{equation}
+\PreviewEnvironment{equation*}
+\newlength{\imagewidth}
+\newlength{\imagescale}
+\pagestyle{empty}
+\thispagestyle{empty}
+
+\begin{document}
+\begin{center}
+\begin{tikzpicture}[
+  scale=0.5,transform shape,
+  font=\sffamily,
+  every matrix/.style={ampersand replacement=\&,column sep=2cm,row sep=2cm},
+  pod/.style={draw,solid,thick,circle,fill=red!20,inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  component/.style={draw,solid,thick,rounded corners,fill=yellow!20,inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  border/.style={draw,dashed,rounded corners,fill=gray!20,inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  volume/.style={draw,solid,thick,rounded corners,fill=blue!20, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  sidecar/.style={draw,solid,thick,rounded corners,fill=blue!20, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  k8s-label/.style={draw,solid,thick,rounded corners,fill=blue!20, minimum width=1.5cm, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  affinity/.style={draw,solid,thick,rounded corners,fill=blue!20, minimum width=2cm, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  label/.style={rectangle,inner sep=0,outer sep=0},
+  to/.style={->,>=stealth',shorten >=1pt,semithick,font=\sffamily\footnotesize},
+  every node/.style={align=center}]
+
+  % Position the nodes using a matrix layout
+
+  \matrix{
+    \path
+      node[k8s-label] (app-label) {App}
+      node[k8s-label, right=.25cm of app-label] (role-label) {Role}
+      node[k8s-label, right=.25cm of role-label] (custom-label) {Custom}
+      node[label, below of=role-label] (k8s-label-label) {K8S Labels}
+      node[border, behind path,
+           fit=(app-label)(role-label)(custom-label)(k8s-label-label)
+      ] (k8s-labels) {};  \& \&
+    \path
+      node[affinity] (affinity) {Affinity}
+      node[label, right=.25cm of affinity] (affinity-middle) {}
+      node[affinity, right=.25cm of affinity-middle] (anti-affinity) {Anti-affinity}
+      node[label, below of=affinity-middle] (affinity-label) {Assigning to nodes}
+      node[border, behind path,
+           fit=(affinity)(anti-affinity)(affinity-label)
+      ] (affinity) {}; \\
+    \& \node[pod] (pod) {Pod}; \& \\
+    \path
+      node[volume, minimum width={width("shm-volume")}] (data-volume) {Data}
+      node[volume, right=.25cm of data-volume, minimum width={width("shm-volume")}] (tokens-volume) {Tokens}
+      node[volume, right=.25cm of tokens-volume] (shm-volume) {/dev/shm}
+      node[label, below of=tokens-volume] (volumes-label) {Volumes}
+      node[border, behind path,
+           fit=(data-volume)(shm-volume)(tokens-volume)(volumes-label)
+      ] (volumes) {}; \&
+    \node[component] (spilo) {Spilo}; \&
+    \node[sidecar] (scalyr) {Scalyr}; \& \\ \&
+    \path
+      node[component] (patroni) {Patroni}
+      node[component, below=.25cm of patroni] (postgres) {PostgreSQL}
+      node[border, behind path,
+           fit=(postgres)(patroni)
+      ] (spilo-components) {}; \&
+    \path
+      node[sidecar] (custom-sidecar1) {User defined}
+      node[label, right=.25cm of custom-sidecar1] (sidecars-middle) {}
+      node[sidecar, right=.25cm of sidecars-middle] (custom-sidecar2) {User defined}
+      node[label, below of=sidecars-middle] (sidecars-label) {Custom sidecars}
+      node[border, behind path,
+           fit=(custom-sidecar1)(custom-sidecar2)(sidecars-label)
+      ] (sidecars) {};
+    \\ \& \\
+  };
+
+  % Draw the arrows between the nodes and label them.
+  \draw[to] (pod) to [bend left=25] (volumes);
+  \draw[to] (pod) to [bend left=25] (k8s-labels);
+  \draw[to] (pod) to [bend right=25] (affinity);
+  \draw[to] (pod) to [bend right=25] (scalyr);
+  \draw[to] (pod) to [bend right=25] (sidecars);
+  \draw[to] (pod) -- node[midway,above] {} node[midway,below] {} (spilo);
+  \draw[to] (spilo) -- node[midway,above] {} node[midway,below] {} (spilo-components);
+
+\end{tikzpicture}
+\end{center}
+\end{document}

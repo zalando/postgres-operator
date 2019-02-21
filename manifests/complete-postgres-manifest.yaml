@@ -4,21 +4,26 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 spec:
+  init_containers:
+  - name: date
+    image: busybox
+    command: [ "/bin/date" ]
   teamId: "ACID"
   volume:
-    size: 5Gi
+    size: 1Gi
   numberOfInstances: 2
   users: #Application/Robot users
     zalando:
     - superuser
     - createdb
   enableMasterLoadBalancer: true
-  enableReplicaLoadBalancer: true 
+  enableReplicaLoadBalancer: true
   allowedSourceRanges: # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
     foo: zalando
 #Expert section
+  enableShmVolume: true
   postgresql:
     version: "10"
     parameters:
@@ -31,7 +36,7 @@ spec:
       memory: 100Mi
     limits:
       cpu: 300m
-      memory: 3000Mi
+      memory: 300Mi
   patroni:
     initdb:
       encoding: "UTF8"

@@ -12,7 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -494,7 +494,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	defer func() {
 		if updateFailed {
 			c.setStatus(acidv1.ClusterStatusUpdateFailed)
-		} else if c.Status != acidv1.ClusterStatusRunning {
+		} else {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
@@ -709,11 +709,16 @@ func (c *Cluster) initRobotUsers() error {
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
 		}
+		adminRole := ""
+		if c.OpConfig.EnableAdminRoleForUsers {
+			adminRole = c.OpConfig.TeamAdminRole
+		}
 		newRole := spec.PgUser{
-			Origin:   spec.RoleOriginManifest,
-			Name:     username,
-			Password: util.RandomPassword(constants.PasswordLength),
-			Flags:    flags,
+			Origin:    spec.RoleOriginManifest,
+			Name:      username,
+			Password:  util.RandomPassword(constants.PasswordLength),
+			Flags:     flags,
+			AdminRole: adminRole,
 		}
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
@@ -872,7 +877,7 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
 
 	var err error
-	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
+	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 
 	var wg sync.WaitGroup
 
@@ -898,12 +903,12 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	}()
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
-		c.logger.Debugf("successfully failed over from %q to %q", curMaster.Name, candidate)
+		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		if err = <-podLabelErr; err != nil {
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
-		err = fmt.Errorf("could not failover: %v", err)
+		err = fmt.Errorf("could not switch over: %v", err)
 	}
 
 	// signal the role label waiting goroutine to close the shop and go home

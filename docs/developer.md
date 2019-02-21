@@ -188,13 +188,13 @@ defaults to 4)
 * /workers/$id/logs - log of the operations performed by a given worker
 * /clusters/ - list of teams and clusters known to the operator
 * /clusters/$team - list of clusters for the given team
-* /cluster/$team/$clustername - detailed status of the cluster, including the
+* /clusters/$team/$namespace/$clustername - detailed status of the cluster, including the
   specifications for CRD, master and replica services, endpoints and
   statefulsets, as well as any errors and the worker that cluster is assigned
   to.
-* /cluster/$team/$clustername/logs/ - logs of all operations performed to the
+* /clusters/$team/$namespace/$clustername/logs/ - logs of all operations performed to the
   cluster so far.
-* /cluster/$team/$clustername/history/ - history of cluster changes triggered
+* /clusters/$team/$namespace/$clustername/history/ - history of cluster changes triggered
   by the changes of the manifest (shows the somewhat obscure diff and what
   exactly has triggered the change)
 

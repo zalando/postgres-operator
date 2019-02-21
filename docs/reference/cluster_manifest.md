@@ -33,7 +33,15 @@ Those parameters are grouped under the `metadata` top-level key.
   services, secrets) for the cluster. Changing it after the cluster creation
   results in deploying or updating a completely separate cluster in the target
   namespace. Optional (if present, should match the namespace where the
-  manifest is applied). 
+  manifest is applied).
+
+* **labels**
+  if labels are matching one of the `inherited_labels` [configured in the
+  operator parameters](operator_parameters.md#kubernetes-resources),
+  they will automatically be added to all the objects (StatefulSet, Service,
+  Endpoints, etc.) that are created by the operator.
+  Labels that are set here but not listed as `inherited_labels` in the operator
+  parameters are ignored.
 
 ## Top-level parameters
 
@@ -89,14 +97,26 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
   examples](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
   for details on tolerations and possible values of those keys. When set, this
   value overrides the `pod_toleration` setting from the operator. Optional.
-  
+
 * **podPriorityClassName**
    a name of the [priority
    class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
    that should be assigned to the cluster pods. When not specified, the value
    is taken from the `pod_priority_class_name` operator parameter, if not set
    then the default priority class is taken. The priority class itself must be defined in advance.
-   
+
+* **enableShmVolume**
+  Start a database pod without limitations on shm memory. By default docker
+  limit `/dev/shm` to `64M` (see e.g. the [docker
+  issue](https://github.com/docker-library/postgres/issues/416), which could be
+  not enough if PostgreSQL uses parallel workers heavily. If this option is
+  present and value is `true`, to the target database pod will be mounted a new
+  tmpfs volume to remove this limitation. If it's not present, the decision
+  about mounting a volume will be made based on operator configuration
+  (`enable_shm_volume`, which is `true` by default). It it's present and value
+  is `false`, then no volume will be mounted no matter how operator was
+  configured (so you can override the operator configuration).
+
 ## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key.
@@ -112,6 +132,7 @@ Those parameters are grouped under the `postgresql` top-level key.
   cluster. Optional (Spilo automatically sets reasonable defaults for
   parameters like work_mem or max_connections).
 
+
 ## Patroni parameters
 
 Those parameters are grouped under the `patroni` top-level key. See the [patroni
@@ -122,7 +143,7 @@ explanation of `ttl` and `loop_wait` parameters.
   a map of key-value pairs describing initdb parameters. For `data-checksum`,
   `debug`, `no-locale`, `noclean`, `nosync` and `sync-only` parameters use
   `true` as the value if you want to set them. Changes to this option do not
-  affect the already initialized clusters. Optional. 
+  affect the already initialized clusters. Optional.
 
 * **pg_hba**
   list of custom `pg_hba` lines to replace default ones. Note that the default
@@ -202,7 +223,7 @@ under the `clone` top-level key and do not affect the already running cluster.
   different namespaces) , the operator uses UID in the S3 bucket name in order
   to guarantee uniqueness. Has no effect when cloning from the running
   clusters. Optional.
-  
+
 * **timestamp**
   the timestamp up to which the recovery should proceed. The operator always
   configures non-inclusive recovery target, stopping right before the given
@@ -222,7 +243,7 @@ properties of the persistent storage that stores postgres data.
   the name of the Kubernetes storage class to draw the persistent volume from.
   See [Kubernetes
   documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
-  for the details on storage classes. Optional. 
+  for the details on storage classes. Optional.
 
 ### Sidecar definitions
 

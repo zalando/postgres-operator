@@ -49,6 +49,7 @@ type PgUser struct {
 	Flags      []string          `yaml:"user_flags"`
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
+	AdminRole  string            `yaml:"admin_role"`
 }
 
 // PgUserMap maps user names to the definitions.
@@ -125,6 +126,7 @@ func (n *NamespacedName) Decode(value string) error {
 	return n.DecodeWorker(value, GetOperatorNamespace())
 }
 
+// UnmarshalJSON converts a byte slice to NamespacedName
 func (n *NamespacedName) UnmarshalJSON(data []byte) error {
 	result := NamespacedName{}
 	var tmp string

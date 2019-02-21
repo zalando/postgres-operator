@@ -3,12 +3,14 @@ package util
 import (
 	"crypto/md5" // #nosec we need it to for PostgreSQL md5 passwords
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/motomux/pretty"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando-incubator/postgres-operator/pkg/spec"
@@ -126,4 +128,20 @@ func Coalesce(val, defaultVal string) string {
 		return defaultVal
 	}
 	return val
+}
+
+// RequestIsSmallerThanLimit
+func RequestIsSmallerThanLimit(requestStr, limitStr string) (bool, error) {
+
+	request, err := resource.ParseQuantity(requestStr)
+	if err != nil {
+		return false, fmt.Errorf("could not parse memory request %v : %v", requestStr, err)
+	}
+
+	limit, err2 := resource.ParseQuantity(limitStr)
+	if err2 != nil {
+		return false, fmt.Errorf("could not parse memory limit %v : %v", limitStr, err2)
+	}
+
+	return request.Cmp(limit) == -1, nil
 }

@@ -27,6 +27,7 @@ type Resources struct {
 	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	PodPriorityClassName    string            `name:"pod_priority_class_name"`
 	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
+	InheritedLabels         []string          `name:"inherited_labels" default:""`
 	ClusterNameLabel        string            `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel            string            `name:"pod_role_label" default:"spilo-role"`
 	PodToleration           map[string]string `name:"toleration" default:""`
@@ -38,6 +39,7 @@ type Resources struct {
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
 	MinInstances            int32             `name:"min_instances" default:"-1"`
+	ShmVolume               bool              `name:"enable_shm_volume" default:"true"`
 }
 
 // Auth describes authentication specific configuration parameters
@@ -89,8 +91,12 @@ type Config struct {
 	EnableTeamsAPI                         bool   `name:"enable_teams_api" default:"true"`
 	EnableTeamSuperuser                    bool   `name:"enable_team_superuser" default:"false"`
 	TeamAdminRole                          string `name:"team_admin_role" default:"admin"`
+	EnableAdminRoleForUsers                bool   `name:"enable_admin_role_for_users" default:"true"`
 	EnableMasterLoadBalancer               bool   `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool   `name:"enable_replica_load_balancer" default:"false"`
+	CustomServiceAnnotations			   map[string]string `name:"custom_service_annotations"`
+	EnablePodAntiAffinity                  bool   `name:"enable_pod_antiaffinity" default:"false"`
+	PodAntiAffinityTopologyKey			   string `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer       *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat      StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
@@ -104,6 +110,7 @@ type Config struct {
 	PodTerminateGracePeriod  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	ProtectedRoles           []string          `name:"protected_role_names" default:"admin"`
 	PostgresSuperuserTeams   []string          `name:"postgres_superuser_teams" default:""`
+	SetMemoryRequestToLimit  bool              `name:"set_memory_request_to_limit" defaults:"false"`
 }
 
 // MustMarshal marshals the config or panics

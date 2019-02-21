@@ -4,6 +4,10 @@
 [![Coverage Status](https://coveralls.io/repos/github/zalando-incubator/postgres-operator/badge.svg)](https://coveralls.io/github/zalando-incubator/postgres-operator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/zalando-incubator/postgres-operator)](https://goreportcard.com/report/github.com/zalando-incubator/postgres-operator)
 [![GoDoc](https://godoc.org/github.com/zalando-incubator/postgres-operator?status.svg)](https://godoc.org/github.com/zalando-incubator/postgres-operator)
+[![golangci](https://golangci.com/badges/github.com/zalando-incubator/postgres-operator.svg)](https://golangci.com/r/github.com/zalando-incubator/postgres-operator)
+
+<img src="docs/diagrams/logo.png" width="200">
+
 
 ## Introduction
 
@@ -27,8 +31,22 @@ manages PostgreSQL clusters on Kubernetes:
 3. Finally, the operator periodically synchronizes the actual state of each
    Postgres cluster with the desired state defined in the cluster's manifest.
 
-There is a browser-friendly version of this documentation at
-[postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
+Here is a diagram, that summarizes what would be created by the operator, when a
+new Postgres cluster CRD was submitted:
+
+![postgresql-operator](docs/diagrams/operator.png "K8S resources, created by operator")
+
+This picture is not complete without an overview of what is inside a pod, so
+let's zoom in:
+
+![pod](docs/diagrams/pod.png "Database pod components")
+
+These two diagrams should help you to understand the basics of what kind of
+functionality the operator provides. Below we discuss all everything in more
+details.
+
+There is a browser-friendly version of this documentation at [postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
+
 
 ## Table of contents
 
@@ -41,6 +59,13 @@ There is a browser-friendly version of this documentation at
 * [command-line options and environment variables](docs/reference/command_line_and_environment.md)
 
 the rest of the document is a tutorial to get you up and running with the operator on Minikube.
+
+   
+## Community      
+
+There are two places to get in touch with the community:
+1. The [GitHub issue tracker](https://github.com/zalando-incubator/postgres-operator/issues)
+2. The #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com)
 
 ## Quickstart
 
@@ -89,6 +114,8 @@ We have automated starting the operator and submitting the `acid-minimal-cluster
 cd postgres-operator
 ./run_operator_locally.sh
 ```
+
+Note we provide the `/manifests` directory as an example only; you should consider adjusting the manifests to your particular setting.
 
 ## Running and testing the operator
 

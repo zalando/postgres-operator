@@ -9,7 +9,8 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-//Postgresql defines PostgreSQL Custom Resource Definition Object.
+
+// Postgresql defines PostgreSQL Custom Resource Definition Object.
 type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -50,10 +51,13 @@ type PostgresSpec struct {
 	Databases            map[string]string    `json:"databases,omitempty"`
 	Tolerations          []v1.Toleration      `json:"tolerations,omitempty"`
 	Sidecars             []Sidecar            `json:"sidecars,omitempty"`
+	InitContainers       []v1.Container       `json:"init_containers,omitempty"`
 	PodPriorityClassName string               `json:"pod_priority_class_name,omitempty"`
+	ShmVolume            *bool                `json:"enableShmVolume,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // PostgresqlList defines a list of PostgreSQL clusters.
 type PostgresqlList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -90,8 +94,8 @@ type ResourceDescription struct {
 
 // Resources describes requests and limits for the cluster resouces.
 type Resources struct {
-	ResourceRequest ResourceDescription `json:"requests,omitempty"`
-	ResourceLimits  ResourceDescription `json:"limits,omitempty"`
+	ResourceRequests ResourceDescription `json:"requests,omitempty"`
+	ResourceLimits   ResourceDescription `json:"limits,omitempty"`
 }
 
 // Patroni contains Patroni-specific configuration
