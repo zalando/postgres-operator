@@ -213,6 +213,14 @@ configuration they are grouped under the `kubernetes` key.
   that should be assigned to the Postgres pods. The priority class itself must be defined in advance.
   Default is empty (use the default priority class).
 
+* **enable_pod_antiaffinity**
+  toggles [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/) on the Postgres pods, to avoid multiple pods
+  of the same Postgres cluster in the same topology , e.g. node. The default is `false`.
+
+* **pod_antiaffinity_topology_key**
+  override
+  [topology key](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels)
+  for pod anti affinity. The default is `kubernetes.io/hostname`.
 
 ## Kubernetes resource requests
 

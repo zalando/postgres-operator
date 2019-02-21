@@ -60,6 +60,8 @@ type KubernetesMetaConfiguration struct {
 	// TODO: use namespacedname
 	PodEnvironmentConfigMap string `json:"pod_environment_configmap,omitempty"`
 	PodPriorityClassName    string `json:"pod_priority_class_name,omitempty"`
+	EnablePodAntiAffinity                  bool                  `json:"enable_pod_antiaffinity" default:"false"`
+	PodAntiAffinityTopologyKey			   string                `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources

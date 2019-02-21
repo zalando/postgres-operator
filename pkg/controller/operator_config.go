@@ -53,6 +53,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 
+	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity;
+	result.PodAntiAffinityTopologyKey = fromCRD.Kubernetes.PodAntiAffinityTopologyKey;
+
 	result.DefaultCPURequest = fromCRD.PostgresPodResources.DefaultCPURequest
 	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest
 	result.DefaultCPULimit = fromCRD.PostgresPodResources.DefaultCPULimit
