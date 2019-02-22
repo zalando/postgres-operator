@@ -1,5 +1,5 @@
 site_name: Postgres Operator
-repo_url: https://github.com/zalando-incubator/postgres-operator
+repo_url: https://github.com/zalando/postgres-operator
 theme: readthedocs
 
 pages:

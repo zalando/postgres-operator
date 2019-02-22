@@ -1,11 +1,11 @@
 package v1
 
 import (
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/config"
 
 	"time"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

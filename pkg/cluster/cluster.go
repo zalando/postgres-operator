@@ -21,15 +21,15 @@ import (
 
 	"encoding/json"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/patroni"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
+	"github.com/zalando/postgres-operator/pkg/util/teams"
+	"github.com/zalando/postgres-operator/pkg/util/users"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 )
 

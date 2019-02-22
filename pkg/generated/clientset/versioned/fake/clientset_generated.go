@@ -25,9 +25,9 @@ SOFTWARE.
 package fake
 
 import (
-	clientset "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	fakeacidv1 "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1/fake"
+	clientset "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
+	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

@@ -13,7 +13,7 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/spec"
 )
 
 const (

@@ -13,16 +13,16 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
+	"github.com/zalando/postgres-operator/pkg/apiserver"
+	"github.com/zalando/postgres-operator/pkg/cluster"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/ringlog"
 
-	acidv1informer "github.com/zalando-incubator/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
+	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
 )
 
 // Controller represents operator controller

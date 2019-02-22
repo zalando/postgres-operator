@@ -7,8 +7,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"k8s.io/api/apps/v1beta1"
 )
 
