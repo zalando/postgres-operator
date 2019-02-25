@@ -6,7 +6,7 @@
 1. Please carefully read the official [Google Summer of Code Student Guide](https://google.github.io/gsocguides/student/) 
 2. Join the #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com) to introduce yourself to the community and get quick feedback on your application.
 3. Select a project from the list of ideas below or propose your own.
-4. Write a proposal draft.  Please open an issue with the label `gsoc2019_application` in the [operator repository](https://github.com/zalando-incubator/postgres-operator/issues)  so that the community members can publicly review it. See proposal instructions below for details.
+4. Write a proposal draft.  Please open an issue with the label `gsoc2019_application` in the [operator repository](https://github.com/zalando/postgres-operator/issues)  so that the community members can publicly review it. See proposal instructions below for details.
 5. Submit proposal and the proof of enrollment before April 9 2019 18:00 UTC through the web site of the Program.
 
 ## Project ideas 
@@ -34,7 +34,7 @@ It will be helpful to reject erroneous manifests before they reach the operator 
 * **Recommended skills**: golang, JSON schema
 * **Difficulty**: medium
 * **Mentor(s)**: Sergey Dudoladov [@sdudoladov](https://github.com/sdudoladov) 
-* **Issue**: [#388](https://github.com/zalando-incubator/postgres-operator/issues/388)
+* **Issue**: [#388](https://github.com/zalando/postgres-operator/issues/388)
 
 ###  Design a solution for the local testing of the operator
 
@@ -45,7 +45,7 @@ A promising option is the Kubernetes own [kind](https://github.com/kubernetes-si
 * **Recommended skills**: Docker, shell scripting, basic Kubernetes abstractions
 * **Difficulty**: medium to hard depending on the selected desing
 * **Mentor(s)**: Dmitry Dolgov [@erthalion](https://github.com/erthalion), Sergey Dudoladov [@sdudoladov](https://github.com/sdudoladov) 
-* **Issue**: [#475](https://github.com/zalando-incubator/postgres-operator/issues/475)
+* **Issue**: [#475](https://github.com/zalando/postgres-operator/issues/475)
 
 ### Detach a Postgres cluster from the operator for maintenance
 
@@ -54,11 +54,11 @@ A promising option is the Kubernetes own [kind](https://github.com/kubernetes-si
 * **Recommended skills**: golang, architecture of a Kubernetes operator
 * **Difficulty**: hard - requires significant modification of the operator's internals and careful consideration of the corner cases.
 * **Mentor(s)**: Dmitry Dolgov [@erthalion](https://github.com/erthalion), Sergey Dudoladov [@sdudoladov](https://github.com/sdudoladov) 
-* **Issue**: [#421](https://github.com/zalando-incubator/postgres-operator/issues/421)
+* **Issue**: [#421](https://github.com/zalando/postgres-operator/issues/421)
 
 ### Propose your own idea
 
 Feel free to come up with your own ideas.  For inspiration, 
-see [our bug tracker](https://github.com/zalando-incubator/postgres-operator/issues), 
+see [our bug tracker](https://github.com/zalando/postgres-operator/issues), 
 the [official `CustomResouceDefinition` docs](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/) 
 and [other operators](https://github.com/operator-framework/awesome-operators).

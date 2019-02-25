@@ -4,7 +4,7 @@ pipeline:
       type: script
       env:
         GOPATH: /root/go
-        OPERATOR_TOP_DIR: /root/go/src/github.com/zalando-incubator
+        OPERATOR_TOP_DIR: /root/go/src/github.com/zalando
       commands:
         - desc: 'Update'
           cmd: |

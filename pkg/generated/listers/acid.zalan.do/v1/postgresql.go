@@ -25,7 +25,7 @@ SOFTWARE.
 package v1
 
 import (
-	v1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"

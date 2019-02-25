@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/controller"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/controller"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 )
 
 var (
