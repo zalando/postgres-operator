@@ -89,4 +89,5 @@ deps:
 	@glide install --strip-vendor
 
 test:
+	hack/verify-codegen.sh
 	@go test ./...
