@@ -1,8 +1,8 @@
-hash: 95304b6a8152743c91cc26412dd949f57217d3595b6099e67481d8a8592ebc34
-updated: 2019-02-22T13:35:29.16663344+01:00
+hash: e4d0d48b4142d5d335e48e030621564207f3aa288ea1e41e0d1e4d29135de3e8
+updated: 2019-02-25T14:54:51.736946406+01:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: 416a7057457ed9af569ea3682f7319ec3466044d
+  version: e8b22c9937cae1fee9bc364a88f3752cc4d1ac2f
   subpackages:
   - aws
   - aws/awserr
