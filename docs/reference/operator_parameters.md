@@ -8,12 +8,12 @@ configuration.
   maps. String values containing ':' should be enclosed in quotes. The
   configuration is flat, parameter group names below are not reflected in the
   configuration structure. There is an
-  [example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/configmap.yaml)
+  [example](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
 
 * CRD-based configuration. The configuration is stored in a custom YAML
   manifest. The manifest is an instance of the custom resource definition (CRD) called
   `OperatorConfiguration`. The operator registers this CRD
-  during the start and uses it for configuration if the [operator deployment manifest ](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgres-operator.yaml#L21) sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty value. The variable should point to the
+  during the start and uses it for configuration if the [operator deployment manifest ](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L21) sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty value. The variable should point to the
   `postgresql-operator-configuration` object in the operator's namespace.
 
   The CRD-based configuration is a regular YAML
@@ -21,7 +21,7 @@ configuration.
   There are no default values built-in in the operator, each parameter that is
   not supplied in the configuration receives an empty value.  In order to
   create your own configuration just copy the [default
-  one](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+  one](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
   and change it.
 
   To test the CRD-based configuration locally, use the following
@@ -245,7 +245,7 @@ CRD-based configuration.
   settings. The default is `1Gi`.
 
 * **set_memory_request_to_limit**
-  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers created by the operator (Postgres, Scalyr sidecar, and other sidecars); to set resources for the operator's own container, change the [operator deployment manually](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13). The default is `false`.
+  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers created by the operator (Postgres, Scalyr sidecar, and other sidecars); to set resources for the operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13). The default is `false`.
 
 * **enable_shm_volume**
   Instruct operator to start any new database pod without limitations on shm
@@ -464,4 +464,4 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   Memory limit value for the Scalyr sidecar. The default is `1Gi`.
 
 
-For the configmap operator configuration, the [default parameter values](https://github.com/zalando-incubator/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+For the configmap operator configuration, the [default parameter values](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)

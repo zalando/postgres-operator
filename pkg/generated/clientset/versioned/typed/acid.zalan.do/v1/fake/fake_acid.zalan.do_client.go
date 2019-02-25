@@ -25,7 +25,7 @@ SOFTWARE.
 package fake
 
 import (
-	v1 "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	v1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
