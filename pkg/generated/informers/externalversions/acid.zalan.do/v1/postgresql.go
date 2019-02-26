@@ -27,11 +27,11 @@ package v1
 import (
 	time "time"
 
-	acid_zalan_do_v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
 	v1 "github.com/zalando/postgres-operator/pkg/generated/listers/acid.zalan.do/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
@@ -63,20 +63,20 @@ func NewPostgresqlInformer(client versioned.Interface, namespace string, resyncP
 func NewFilteredPostgresqlInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.AcidV1().Postgresqls(namespace).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.AcidV1().Postgresqls(namespace).Watch(options)
 			},
 		},
-		&acid_zalan_do_v1.Postgresql{},
+		&acidzalandov1.Postgresql{},
 		resyncPeriod,
 		indexers,
 	)
@@ -87,7 +87,7 @@ func (f *postgresqlInformer) defaultInformer(client versioned.Interface, resyncP
 }
 
 func (f *postgresqlInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&acid_zalan_do_v1.Postgresql{}, f.defaultInformer)
+	return f.factory.InformerFor(&acidzalandov1.Postgresql{}, f.defaultInformer)
 }
 
 func (f *postgresqlInformer) Lister() v1.PostgresqlLister {

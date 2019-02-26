@@ -30,7 +30,7 @@ import (
 	time "time"
 
 	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
-	acid_zalan_do "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do"
+	acidzalando "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do"
 	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -178,9 +178,9 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Acid() acid_zalan_do.Interface
+	Acid() acidzalando.Interface
 }
 
-func (f *sharedInformerFactory) Acid() acid_zalan_do.Interface {
-	return acid_zalan_do.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Acid() acidzalando.Interface {
+	return acidzalando.New(f, f.namespace, f.tweakListOptions)
 }

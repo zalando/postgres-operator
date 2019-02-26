@@ -27,7 +27,7 @@ SOFTWARE.
 package v1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -336,7 +336,17 @@ func (in *Patroni) DeepCopyInto(out *Patroni) {
 		in, out := &in.Slots, &out.Slots
 		*out = make(map[string]map[string]string, len(*in))
 		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+			var outVal map[string]string
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make(map[string]string, len(*in))
+				for key, val := range *in {
+					(*out)[key] = val
+				}
+			}
+			(*out)[key] = outVal
 		}
 	}
 	return
@@ -377,39 +387,23 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 	out.Resources = in.Resources
 	if in.EnableMasterLoadBalancer != nil {
 		in, out := &in.EnableMasterLoadBalancer, &out.EnableMasterLoadBalancer
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.EnableReplicaLoadBalancer != nil {
 		in, out := &in.EnableReplicaLoadBalancer, &out.EnableReplicaLoadBalancer
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.UseLoadBalancer != nil {
 		in, out := &in.UseLoadBalancer, &out.UseLoadBalancer
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.ReplicaLoadBalancer != nil {
 		in, out := &in.ReplicaLoadBalancer, &out.ReplicaLoadBalancer
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	if in.AllowedSourceRanges != nil {
 		in, out := &in.AllowedSourceRanges, &out.AllowedSourceRanges
@@ -420,12 +414,15 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		in, out := &in.Users, &out.Users
 		*out = make(map[string]UserFlags, len(*in))
 		for key, val := range *in {
+			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]string, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make(UserFlags, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.MaintenanceWindows != nil {
@@ -445,7 +442,7 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]core_v1.Toleration, len(*in))
+		*out = make([]corev1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -459,19 +456,15 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 	}
 	if in.InitContainers != nil {
 		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]core_v1.Container, len(*in))
+		*out = make([]corev1.Container, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.ShmVolume != nil {
 		in, out := &in.ShmVolume, &out.ShmVolume
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -641,12 +634,12 @@ func (in *Sidecar) DeepCopyInto(out *Sidecar) {
 	out.Resources = in.Resources
 	if in.Ports != nil {
 		in, out := &in.Ports, &out.Ports
-		*out = make([]core_v1.ContainerPort, len(*in))
+		*out = make([]corev1.ContainerPort, len(*in))
 		copy(*out, *in)
 	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]core_v1.EnvVar, len(*in))
+		*out = make([]corev1.EnvVar, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

@@ -25,7 +25,7 @@ SOFTWARE.
 package fake
 
 import (
-	acid_zalan_do_v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,20 +45,20 @@ var postgresqlsResource = schema.GroupVersionResource{Group: "acid.zalan.do", Ve
 var postgresqlsKind = schema.GroupVersionKind{Group: "acid.zalan.do", Version: "v1", Kind: "Postgresql"}
 
 // Get takes name of the postgresql, and returns the corresponding postgresql object, and an error if there is any.
-func (c *FakePostgresqls) Get(name string, options v1.GetOptions) (result *acid_zalan_do_v1.Postgresql, err error) {
+func (c *FakePostgresqls) Get(name string, options v1.GetOptions) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(postgresqlsResource, c.ns, name), &acid_zalan_do_v1.Postgresql{})
+		Invokes(testing.NewGetAction(postgresqlsResource, c.ns, name), &acidzalandov1.Postgresql{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*acid_zalan_do_v1.Postgresql), err
+	return obj.(*acidzalandov1.Postgresql), err
 }
 
 // List takes label and field selectors, and returns the list of Postgresqls that match those selectors.
-func (c *FakePostgresqls) List(opts v1.ListOptions) (result *acid_zalan_do_v1.PostgresqlList, err error) {
+func (c *FakePostgresqls) List(opts v1.ListOptions) (result *acidzalandov1.PostgresqlList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(postgresqlsResource, postgresqlsKind, c.ns, opts), &acid_zalan_do_v1.PostgresqlList{})
+		Invokes(testing.NewListAction(postgresqlsResource, postgresqlsKind, c.ns, opts), &acidzalandov1.PostgresqlList{})
 
 	if obj == nil {
 		return nil, err
@@ -68,8 +68,8 @@ func (c *FakePostgresqls) List(opts v1.ListOptions) (result *acid_zalan_do_v1.Po
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &acid_zalan_do_v1.PostgresqlList{ListMeta: obj.(*acid_zalan_do_v1.PostgresqlList).ListMeta}
-	for _, item := range obj.(*acid_zalan_do_v1.PostgresqlList).Items {
+	list := &acidzalandov1.PostgresqlList{ListMeta: obj.(*acidzalandov1.PostgresqlList).ListMeta}
+	for _, item := range obj.(*acidzalandov1.PostgresqlList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -85,43 +85,43 @@ func (c *FakePostgresqls) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a postgresql and creates it.  Returns the server's representation of the postgresql, and an error, if there is any.
-func (c *FakePostgresqls) Create(postgresql *acid_zalan_do_v1.Postgresql) (result *acid_zalan_do_v1.Postgresql, err error) {
+func (c *FakePostgresqls) Create(postgresql *acidzalandov1.Postgresql) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(postgresqlsResource, c.ns, postgresql), &acid_zalan_do_v1.Postgresql{})
+		Invokes(testing.NewCreateAction(postgresqlsResource, c.ns, postgresql), &acidzalandov1.Postgresql{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*acid_zalan_do_v1.Postgresql), err
+	return obj.(*acidzalandov1.Postgresql), err
 }
 
 // Update takes the representation of a postgresql and updates it. Returns the server's representation of the postgresql, and an error, if there is any.
-func (c *FakePostgresqls) Update(postgresql *acid_zalan_do_v1.Postgresql) (result *acid_zalan_do_v1.Postgresql, err error) {
+func (c *FakePostgresqls) Update(postgresql *acidzalandov1.Postgresql) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(postgresqlsResource, c.ns, postgresql), &acid_zalan_do_v1.Postgresql{})
+		Invokes(testing.NewUpdateAction(postgresqlsResource, c.ns, postgresql), &acidzalandov1.Postgresql{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*acid_zalan_do_v1.Postgresql), err
+	return obj.(*acidzalandov1.Postgresql), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePostgresqls) UpdateStatus(postgresql *acid_zalan_do_v1.Postgresql) (*acid_zalan_do_v1.Postgresql, error) {
+func (c *FakePostgresqls) UpdateStatus(postgresql *acidzalandov1.Postgresql) (*acidzalandov1.Postgresql, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(postgresqlsResource, "status", c.ns, postgresql), &acid_zalan_do_v1.Postgresql{})
+		Invokes(testing.NewUpdateSubresourceAction(postgresqlsResource, "status", c.ns, postgresql), &acidzalandov1.Postgresql{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*acid_zalan_do_v1.Postgresql), err
+	return obj.(*acidzalandov1.Postgresql), err
 }
 
 // Delete takes name of the postgresql and deletes it. Returns an error if one occurs.
 func (c *FakePostgresqls) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(postgresqlsResource, c.ns, name), &acid_zalan_do_v1.Postgresql{})
+		Invokes(testing.NewDeleteAction(postgresqlsResource, c.ns, name), &acidzalandov1.Postgresql{})
 
 	return err
 }
@@ -130,17 +130,17 @@ func (c *FakePostgresqls) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakePostgresqls) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(postgresqlsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &acid_zalan_do_v1.PostgresqlList{})
+	_, err := c.Fake.Invokes(action, &acidzalandov1.PostgresqlList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched postgresql.
-func (c *FakePostgresqls) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *acid_zalan_do_v1.Postgresql, err error) {
+func (c *FakePostgresqls) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(postgresqlsResource, c.ns, name, data, subresources...), &acid_zalan_do_v1.Postgresql{})
+		Invokes(testing.NewPatchSubresourceAction(postgresqlsResource, c.ns, name, data, subresources...), &acidzalandov1.Postgresql{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*acid_zalan_do_v1.Postgresql), err
+	return obj.(*acidzalandov1.Postgresql), err
 }

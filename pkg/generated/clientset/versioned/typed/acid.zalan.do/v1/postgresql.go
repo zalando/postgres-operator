@@ -27,7 +27,7 @@ package v1
 import (
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -44,11 +44,11 @@ type PostgresqlInterface interface {
 	Create(*v1.Postgresql) (*v1.Postgresql, error)
 	Update(*v1.Postgresql) (*v1.Postgresql, error)
 	UpdateStatus(*v1.Postgresql) (*v1.Postgresql, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.Postgresql, error)
-	List(opts meta_v1.ListOptions) (*v1.PostgresqlList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.Postgresql, error)
+	List(opts metav1.ListOptions) (*v1.PostgresqlList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Postgresql, err error)
 	PostgresqlExpansion
 }
@@ -68,7 +68,7 @@ func newPostgresqls(c *AcidV1Client, namespace string) *postgresqls {
 }
 
 // Get takes name of the postgresql, and returns the corresponding postgresql object, and an error if there is any.
-func (c *postgresqls) Get(name string, options meta_v1.GetOptions) (result *v1.Postgresql, err error) {
+func (c *postgresqls) Get(name string, options metav1.GetOptions) (result *v1.Postgresql, err error) {
 	result = &v1.Postgresql{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -81,7 +81,7 @@ func (c *postgresqls) Get(name string, options meta_v1.GetOptions) (result *v1.P
 }
 
 // List takes label and field selectors, and returns the list of Postgresqls that match those selectors.
-func (c *postgresqls) List(opts meta_v1.ListOptions) (result *v1.PostgresqlList, err error) {
+func (c *postgresqls) List(opts metav1.ListOptions) (result *v1.PostgresqlList, err error) {
 	result = &v1.PostgresqlList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -93,7 +93,7 @@ func (c *postgresqls) List(opts meta_v1.ListOptions) (result *v1.PostgresqlList,
 }
 
 // Watch returns a watch.Interface that watches the requested postgresqls.
-func (c *postgresqls) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *postgresqls) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -144,7 +144,7 @@ func (c *postgresqls) UpdateStatus(postgresql *v1.Postgresql) (result *v1.Postgr
 }
 
 // Delete takes name of the postgresql and deletes it. Returns an error if one occurs.
-func (c *postgresqls) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *postgresqls) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("postgresqls").
@@ -155,7 +155,7 @@ func (c *postgresqls) Delete(name string, options *meta_v1.DeleteOptions) error 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *postgresqls) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *postgresqls) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("postgresqls").
