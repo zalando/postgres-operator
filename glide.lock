@@ -1,8 +1,8 @@
-hash: bd5394acf101795aac9da20c104a57344a6c4fd71080bf1b16845367e6360578
-updated: 2018-08-14T15:18:08.144086+02:00
+hash: e4d0d48b4142d5d335e48e030621564207f3aa288ea1e41e0d1e4d29135de3e8
+updated: 2019-02-25T14:54:51.736946406+01:00
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: f831d5a0822a1ad72420ab18c6269bca1ddaf490
+  version: e8b22c9937cae1fee9bc364a88f3752cc4d1ac2f
   subpackages:
   - aws
   - aws/awserr
@@ -13,6 +13,7 @@ imports:
   - aws/credentials
   - aws/credentials/ec2rolecreds
   - aws/credentials/endpointcreds
+  - aws/credentials/processcreds
   - aws/credentials/stscreds
   - aws/csm
   - aws/defaults
@@ -21,6 +22,7 @@ imports:
   - aws/request
   - aws/session
   - aws/signer/v4
+  - internal/ini
   - internal/sdkio
   - internal/sdkrand
   - internal/sdkuri
@@ -43,8 +45,6 @@ imports:
   - spdy
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
-- name: github.com/go-ini/ini
-  version: d58d458bec3cb5adec4b7ddb41131855eac0b33f
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -84,6 +84,8 @@ imports:
   version: c2b33e8439af944379acbdd9c3a5fe0bc44bd8a5
 - name: github.com/json-iterator/go
   version: f2b4162afba35581b6d4a50d3b8f34e33c144682
+- name: github.com/konsorten/go-windows-terminal-sequences
+  version: 5c8c8bd35d3832f5d134ae1e1e375b69a4d25242
 - name: github.com/kr/text
   version: e2ffdb16a802fe2bb95e2e35ff34f0e53aeef34f
 - name: github.com/lib/pq
@@ -101,12 +103,14 @@ imports:
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/sirupsen/logrus
-  version: 3e01752db0189b9157070a0e1668a620f9a85da2
+  version: e1e72e9de974bd926e5c56f83753fba2df402ce5
 - name: github.com/spf13/pflag
   version: 583c0c0531f06d5278b7d917446061adc344b5cd
 - name: golang.org/x/crypto
-  version: c126467f60eb25f8f27e5a981f32a87e3965053f
+  version: 49796115aa4b964c318aad4f3084fdb41e9aa067
   subpackages:
+  - bcrypt
+  - blowfish
   - ssh/terminal
 - name: golang.org/x/net
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
@@ -139,6 +143,7 @@ imports:
 - name: k8s.io/api
   version: 2d6f90ab1293a1fb871cf149423ebb72aa7423aa
   subpackages:
+  - admission/v1beta1
   - admissionregistration/v1alpha1
   - admissionregistration/v1beta1
   - apps/v1
@@ -157,7 +162,6 @@ imports:
   - core/v1
   - events/v1beta1
   - extensions/v1beta1
-  - imagepolicy/v1alpha1
   - networking/v1
   - policy/v1beta1
   - rbac/v1
@@ -296,5 +300,9 @@ imports:
 - name: k8s.io/kube-openapi
   version: 91cfa479c814065e420cee7ed227db0f63a5854e
   subpackages:
+  - pkg/builder
+  - pkg/common
+  - pkg/handler
+  - pkg/util
   - pkg/util/proto
 testImports: []

@@ -1,7 +1,7 @@
 ## Create a manifest for a new PostgreSQL cluster
 
 As an example you can take this
-[minimal example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
+[minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -68,7 +68,7 @@ In the next sections, we will cover those use cases in more details.
 ## Manifest roles
 
 Manifest roles are defined directly in the cluster manifest. See
-[minimal postgres manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
+[minimal postgres manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
 for an example of `zalando` role, defined with `superuser` and `createdb`
 flags.
 
@@ -158,8 +158,8 @@ Since an infrastructure role is created uniformly on all clusters managed by
 the operator, it makes no sense to define it without the password. Such
 definitions will be ignored with a prior warning.
 
-See [infrastructure roles secret](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
-and [infrastructure roles configmap](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml) for the examples.
+See [infrastructure roles secret](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
+and [infrastructure roles configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml) for the examples.
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
@@ -272,6 +272,32 @@ are always passed to sidecars:
   - `POSTGRES_PASSWORD` - the password for the superuser
 
 The PostgreSQL volume is shared with sidecars and is mounted at `/home/postgres/pgdata`.
+
+
+## InitContainers Support
+
+Each cluster can specify arbitrary init containers to run. These containers can be
+used to run custom actions before any normal and sidecar containers start.
+An init container can be specified like this:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-minimal-cluster
+spec:
+  ...
+  init_containers:
+    - name: "container-name"
+      image: "company/image:tag"
+      env:
+        - name: "ENV_VAR_NAME"
+          value: "any-k8s-env-things"
+```
+
+`init_containers` accepts full `v1.Container` definition.
+
 
 ## Increase volume size
 

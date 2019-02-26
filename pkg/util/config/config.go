@@ -7,7 +7,7 @@ import (
 
 	"fmt"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/spec"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
@@ -27,6 +27,7 @@ type Resources struct {
 	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	PodPriorityClassName    string            `name:"pod_priority_class_name"`
 	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
+	InheritedLabels         []string          `name:"inherited_labels" default:""`
 	ClusterNameLabel        string            `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel            string            `name:"pod_role_label" default:"spilo-role"`
 	PodToleration           map[string]string `name:"toleration" default:""`
@@ -95,6 +96,8 @@ type Config struct {
 	EnableMasterLoadBalancer               bool   `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool   `name:"enable_replica_load_balancer" default:"false"`
 	CustomServiceAnnotations			   map[string]string `name:"custom_service_annotations"`
+	EnablePodAntiAffinity                  bool   `name:"enable_pod_antiaffinity" default:"false"`
+	PodAntiAffinityTopologyKey			   string `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer       *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat      StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 Compose, Zalando SE
+Copyright 2019 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ SOFTWARE.
 package fake
 
 import (
-	acidzalandov1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acid_zalan_do_v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
@@ -42,12 +42,12 @@ var operatorconfigurationsResource = schema.GroupVersionResource{Group: "acid.za
 var operatorconfigurationsKind = schema.GroupVersionKind{Group: "acid.zalan.do", Version: "v1", Kind: "OperatorConfiguration"}
 
 // Get takes name of the operatorConfiguration, and returns the corresponding operatorConfiguration object, and an error if there is any.
-func (c *FakeOperatorConfigurations) Get(name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
+func (c *FakeOperatorConfigurations) Get(name string, options v1.GetOptions) (result *acid_zalan_do_v1.OperatorConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(operatorconfigurationsResource, c.ns, name), &acidzalandov1.OperatorConfiguration{})
+		Invokes(testing.NewGetAction(operatorconfigurationsResource, c.ns, name), &acid_zalan_do_v1.OperatorConfiguration{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*acidzalandov1.OperatorConfiguration), err
+	return obj.(*acid_zalan_do_v1.OperatorConfiguration), err
 }
