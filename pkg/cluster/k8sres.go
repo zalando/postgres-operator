@@ -3,9 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"sort"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -1139,32 +1137,6 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 	return endpoints
 }
 
-// Parse S3 path and, if valid,  return bucket name, scope and suffix,
-// otherwise an empty array.
-func customCloneVars(walPath string) []string {
-	if walPath == "" {
-		return []string{}
-	}
-
-	pathUrl, err := url.Parse(walPath)
-	if err != nil {
-		return []string{}
-	}
-
-	f := func(c rune) bool {
-		return c == '/'
-	}
-	pathParts := strings.FieldsFunc(pathUrl.Path, f)
-	if len(pathParts) <= 2 {
-		return []string{}
-	}
-	return []string{
-		pathUrl.Host,
-		pathParts[1],
-		pathParts[2],
-	}
-}
-
 func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription) []v1.EnvVar {
 	result := make([]v1.EnvVar, 0)
 
@@ -1198,25 +1170,35 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
-		cloneScope := cluster
-		cloneS3Bucket := c.OpConfig.WALES3Bucket
-		cloneSuffix := getBucketScopeSuffix(description.UID)
+		if description.S3WalPath == "" {
+			envs := []v1.EnvVar{
+				v1.EnvVar{
+					Name:  "CLONE_SCOPE",
+					Value: cluster,
+				},
+				v1.EnvVar{
+					Name:  "CLONE_WAL_S3_BUCKET",
+					Value: c.OpConfig.WALES3Bucket,
+				},
+				v1.EnvVar{
+					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
+					Value: getBucketScopeSuffix(description.UID),
+				},
+			}
 
-		customVars := customCloneVars(description.S3WalPath)
-		// if the provided path seems valid, then override
-		if len(customVars) > 2 {
-			msg := "Use custom S3WalPath %s from the manifest"
+			result = append(result, envs...)
+		} else {
+			msg := "Use custom parsed S3WalPath %s from the manifest"
 			c.logger.Warningf(msg, description.S3WalPath)
-			cloneS3Bucket = customVars[0]
-			cloneScope = customVars[1]
-			cloneSuffix = customVars[2]
+
+			result = append(result, v1.EnvVar{
+				Name:  "CLONE_WAL_S3_PREFIX",
+				Value: description.S3WalPath,
+			})
 		}
 
-		result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cloneScope})
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: cloneS3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: cloneSuffix})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
