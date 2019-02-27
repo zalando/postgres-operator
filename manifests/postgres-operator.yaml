@@ -12,7 +12,7 @@ spec:
       serviceAccountName: zalando-postgres-operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/smoke-tested-postgres-operator:v1.0.0-21-ge39915c
+        image: registry.opensource.zalan.do/acid/smoke-tested-postgres-operator:v1.0.0-37-g2422d72
         imagePullPolicy: IfNotPresent
         resources:
           requests:

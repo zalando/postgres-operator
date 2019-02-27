@@ -12,7 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -22,15 +22,15 @@ import (
 
 	"encoding/json"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/patroni"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/teams"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/users"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
+	"github.com/zalando/postgres-operator/pkg/util/teams"
+	"github.com/zalando/postgres-operator/pkg/util/users"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 )
 
@@ -503,7 +503,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	defer func() {
 		if updateFailed {
 			c.setStatus(acidv1.ClusterStatusUpdateFailed)
-		} else if c.Status != acidv1.ClusterStatusRunning {
+		} else {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
@@ -886,7 +886,7 @@ func (c *Cluster) GetStatus() *ClusterStatus {
 func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) error {
 
 	var err error
-	c.logger.Debugf("failing over from %q to %q", curMaster.Name, candidate)
+	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
 
 	var wg sync.WaitGroup
 
@@ -912,12 +912,12 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	}()
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
-		c.logger.Debugf("successfully failed over from %q to %q", curMaster.Name, candidate)
+		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
 		if err = <-podLabelErr; err != nil {
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
-		err = fmt.Errorf("could not failover: %v", err)
+		err = fmt.Errorf("could not switch over: %v", err)
 	}
 
 	// signal the role label waiting goroutine to close the shop and go home

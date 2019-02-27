@@ -1,5 +1,5 @@
 /*
-Copyright 2018 Compose, Zalando SE
+Copyright 2019 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,9 +29,9 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
-	acidzalando "github.com/zalando-incubator/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do"
-	internalinterfaces "github.com/zalando-incubator/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	versioned "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
+	acidzalando "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do"
+	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

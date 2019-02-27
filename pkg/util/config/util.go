@@ -19,6 +19,7 @@ type fieldInfo struct {
 	Field   reflect.Value
 }
 
+// StringTemplate is a convenience alias
 type StringTemplate string
 
 func decoderFrom(field reflect.Value) (d decoder) {
@@ -221,12 +222,14 @@ func getMapPairsFromString(value string) (pairs []string, err error) {
 	return
 }
 
+// Decode cast value to StringTemplate
 func (f *StringTemplate) Decode(value string) error {
 	*f = StringTemplate(value)
 
 	return nil
 }
 
+// Format formatted string from StringTemplate
 func (f *StringTemplate) Format(a ...string) string {
 	res := string(*f)
 
@@ -237,6 +240,7 @@ func (f *StringTemplate) Format(a ...string) string {
 	return res
 }
 
+// MarshalJSON converts a StringTemplate to byte slice
 func (f StringTemplate) MarshalJSON() ([]byte, error) {
 	return json.Marshal(string(f))
 }

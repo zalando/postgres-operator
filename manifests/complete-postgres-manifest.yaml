@@ -4,6 +4,10 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 spec:
+  init_containers:
+  - name: date
+    image: busybox
+    command: [ "/bin/date" ]
   teamId: "ACID"
   volume:
     size: 1Gi
