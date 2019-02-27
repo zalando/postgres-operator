@@ -558,6 +558,10 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 			Name:  "PAM_OAUTH2",
 			Value: c.OpConfig.PamConfiguration,
 		},
+		{
+			Name:  "HUMAN_ROLE",
+			Value: c.OpConfig.PamRoleName,
+		},
 	}
 	if spiloConfiguration != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "SPILO_CONFIGURATION", Value: spiloConfiguration})
