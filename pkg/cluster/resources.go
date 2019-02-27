@@ -618,7 +618,7 @@ func (c *Cluster) createBackupCronJob() (err error) {
 	if err != nil {
 		return fmt.Errorf("could not create k8s cron job: %v", err)
 	}
-	c.backupJob = cronJob
+	c.logicalBackupJob = cronJob
 
 	return nil
 }

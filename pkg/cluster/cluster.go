@@ -12,13 +12,13 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/apps/v1beta1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 
 	"encoding/json"
 
@@ -84,7 +84,7 @@ type Cluster struct {
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
 
-	backupJob        *batchv1beta1.CronJob  // periodical logical backups independent from WAL archiving
+	logicalBackupJob *batchv1beta1.CronJob // periodical logical backups independent from WAL archiving
 }
 
 type compareStatefulsetResult struct {
@@ -303,6 +303,7 @@ func (c *Cluster) Create() error {
 		if err := c.createBackupCronJob(); err != nil {
 			return fmt.Errorf("could not create a k8s cron job for logical backups: %v", err)
 		}
+		c.logger.Infof("a k8s cron job for logical backup has been successfully created")
 	}
 
 	if err := c.listResources(); err != nil {

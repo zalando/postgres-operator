@@ -470,7 +470,7 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   In the CRD-based configuration those parameters are grouped under the `logical_backup` key.
 
   * **enable_logical_backup**
-    Determines if the operator should initiate the backup of all Postgres clusters it controls. Default: false.
+    Determines if the operator creates a Kubernets Cron job to do a logical backup of all Postgres clusters it controls. Default: false.
   
   * **logical_backup_schedule**
     Backup schedule in the cron format. Default: "30 00 \* \* \*"
