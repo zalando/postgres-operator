@@ -5,8 +5,8 @@ import (
 
 	"time"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/util/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

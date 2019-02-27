@@ -7,12 +7,12 @@ import (
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/volumes"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/volumes"
 )
 
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.

@@ -93,14 +93,14 @@ would create a directory for the GOPATH (i.e. ~/go) and place the source code
 under the ~/go/src subdirectories.
 
 Given the schema above, the postgres operator source code located at
-`github.com/zalando-incubator/postgres-operator` should be put at
--`~/go/src/github.com/zalando-incubator/postgres-operator`.
+`github.com/zalando/postgres-operator` should be put at
+-`~/go/src/github.com/zalando/postgres-operator`.
 
 ```bash
     $ export GOPATH=~/go
-    $ mkdir -p ${GOPATH}/src/github.com/zalando-incubator/
-    $ cd ${GOPATH}/src/github.com/zalando-incubator/
-    $ git clone https://github.com/zalando-incubator/postgres-operator.git
+    $ mkdir -p ${GOPATH}/src/github.com/zalando/
+    $ cd ${GOPATH}/src/github.com/zalando/
+    $ git clone https://github.com/zalando/postgres-operator.git
 ```
 
 ## Building the operator
@@ -157,7 +157,7 @@ The operator employs k8s-provided code generation to obtain deep copy methods an
 the `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI). The `/pkg/generated/` contains the resultant code. To make these scripts work, you may need to `export GOPATH=$(go env GOPATH)`
 
 References for code generation are:
-* [Relevant pull request](https://github.com/zalando-incubator/postgres-operator/pull/369)
+* [Relevant pull request](https://github.com/zalando/postgres-operator/pull/369)
 See comments there for minor issues that can sometimes broke the generation process.
 * [Code generator source code](https://github.com/kubernetes/code-generator)
 * [Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/) - intro post on the topic

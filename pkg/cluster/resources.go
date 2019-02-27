@@ -11,10 +11,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
 const (

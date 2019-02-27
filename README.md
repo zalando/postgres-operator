@@ -1,13 +1,16 @@
 # Postgres Operator
 
-[![Build Status](https://travis-ci.org/zalando-incubator/postgres-operator.svg?branch=master)](https://travis-ci.org/zalando-incubator/postgres-operator)
-[![Coverage Status](https://coveralls.io/repos/github/zalando-incubator/postgres-operator/badge.svg)](https://coveralls.io/github/zalando-incubator/postgres-operator)
-[![Go Report Card](https://goreportcard.com/badge/github.com/zalando-incubator/postgres-operator)](https://goreportcard.com/report/github.com/zalando-incubator/postgres-operator)
-[![GoDoc](https://godoc.org/github.com/zalando-incubator/postgres-operator?status.svg)](https://godoc.org/github.com/zalando-incubator/postgres-operator)
-[![golangci](https://golangci.com/badges/github.com/zalando-incubator/postgres-operator.svg)](https://golangci.com/r/github.com/zalando-incubator/postgres-operator)
+[![Build Status](https://travis-ci.org/zalando/postgres-operator.svg?branch=master)](https://travis-ci.org/zalando/postgres-operator)
+[![Coverage Status](https://coveralls.io/repos/github/zalando/postgres-operator/badge.svg)](https://coveralls.io/github/zalando/postgres-operator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zalando/postgres-operator)](https://goreportcard.com/report/github.com/zalando/postgres-operator)
+[![GoDoc](https://godoc.org/github.com/zalando/postgres-operator?status.svg)](https://godoc.org/github.com/zalando/postgres-operator)
+[![golangci](https://golangci.com/badges/github.com/zalando/postgres-operator.svg)](https://golangci.com/r/github.com/zalando/postgres-operator)
 
 <img src="docs/diagrams/logo.png" width="200">
 
+# Google Summer of Code
+
+The Postgres Operator made it to the [Google Summer of Code 2019](https://summerofcode.withgoogle.com/)! As a brand new mentoring organization, we are now looking for our first mentees. Check [our ideas](https://github.com/zalando/postgres-operator/blob/master/docs/gsoc-2019/ideas.md#google-summer-of-code-2019) and start discussion in [the issue tracker](https://github.com/zalando/postgres-operator/issues). And don't forget to spread a word about our GSoC participation to attract even more students.
 
 ## Introduction
 
@@ -64,7 +67,7 @@ the rest of the document is a tutorial to get you up and running with the operat
 ## Community      
 
 There are two places to get in touch with the community:
-1. The [GitHub issue tracker](https://github.com/zalando-incubator/postgres-operator/issues)
+1. The [GitHub issue tracker](https://github.com/zalando/postgres-operator/issues)
 2. The #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com)
 
 ## Quickstart
@@ -82,7 +85,7 @@ built-in Kubernetes support.
 ### Local execution
 
 ```bash
-git clone https://github.com/zalando-incubator/postgres-operator.git
+git clone https://github.com/zalando/postgres-operator.git
 cd postgres-operator
 
 minikube start

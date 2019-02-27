@@ -2,7 +2,7 @@ package k8sutil
 
 import (
 	"fmt"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"reflect"
 
-	acidv1client "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned"
+	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 )
 
 // KubernetesClient describes getters for Kubernetes objects
