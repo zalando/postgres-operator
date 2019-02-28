@@ -52,6 +52,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ClusterNameLabel = fromCRD.Kubernetes.ClusterNameLabel
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
+	result.MasterPodMoveTimeout = fromCRD.Kubernetes.MasterPodMoveTimeout
 
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity;
 	result.PodAntiAffinityTopologyKey = fromCRD.Kubernetes.PodAntiAffinityTopologyKey;

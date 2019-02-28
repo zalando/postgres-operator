@@ -1,6 +1,10 @@
 package controller
 
 import (
+	"fmt"
+	"time"
+
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,6 +42,7 @@ func (c *Controller) nodeAdd(obj interface{}) {
 	}
 
 	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
+
 	// check if the node became not ready while the operator was down (otherwise we would have caught it in nodeUpdate)
 	if !c.nodeIsReady(node) {
 		c.moveMasterPodsOffNode(node)
@@ -64,7 +69,9 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 	if !c.nodeIsReady(nodePrev) || c.nodeIsReady(nodeCur) {
 		return
 	}
+
 	c.moveMasterPodsOffNode(nodeCur)
+
 }
 
 func (c *Controller) nodeIsReady(node *v1.Node) bool {
@@ -72,7 +79,7 @@ func (c *Controller) nodeIsReady(node *v1.Node) bool {
 		util.MapContains(node.Labels, map[string]string{"master": "true"}))
 }
 
-func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
+func (c *Controller) attemptToMoveMasterPodsOffNode(node *v1.Node) error {
 	nodeName := util.NameFromMeta(node.ObjectMeta)
 	c.logger.Infof("moving pods: node %q became unschedulable and does not have a ready label: %q",
 		nodeName, c.opConfig.NodeReadinessLabel)
@@ -83,7 +90,7 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 	podList, err := c.KubeClient.Pods(c.opConfig.WatchedNamespace).List(opts)
 	if err != nil {
 		c.logger.Errorf("could not fetch list of the pods: %v", err)
-		return
+		return err
 	}
 
 	nodePods := make([]*v1.Pod, 0)
@@ -148,9 +155,11 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 		movedPods, totalPods, nodeName)
 
 	if leftPods := totalPods - movedPods; leftPods > 0 {
-		c.logger.Warnf("could not move master %d/%d pods from the %q node",
+		return fmt.Errorf("could not move master %d/%d pods from the %q node",
 			leftPods, totalPods, nodeName)
 	}
+
+	return nil
 }
 
 func (c *Controller) nodeDelete(obj interface{}) {
@@ -160,4 +169,22 @@ func (c *Controller) nodeDelete(obj interface{}) {
 	}
 
 	c.logger.Debugf("node has been deleted: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
+}
+
+func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
+
+	err := retryutil.Retry(1*time.Minute, c.opConfig.MasterPodMoveTimeout,
+		func() (bool, error) {
+			err := c.attemptToMoveMasterPodsOffNode(node)
+			if err != nil {
+				return false, fmt.Errorf("unable to move master pods off the unschedulable node; will retry after delay of 1 minute")
+			}
+			return true, nil
+		},
+	)
+
+	if err != nil {
+		c.logger.Warning("failed to move master pods from the node %q: timeout of %v minutes expired", node.Name, c.opConfig.MasterPodMoveTimeout)
+	}
+
 }
