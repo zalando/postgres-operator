@@ -16,7 +16,7 @@ const (
 var (
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
 
-	// An instance of runtime.SchemeBuilder, global for this package
+	// SchemeBuilder : An instance of runtime.SchemeBuilder, global for this package
 	SchemeBuilder      runtime.SchemeBuilder
 	localSchemeBuilder = &SchemeBuilder
 	//AddToScheme is localSchemeBuilder.AddToScheme
