@@ -29,3 +29,50 @@ func TestGetMapPairsFromString(t *testing.T) {
 		}
 	}
 }
+
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    *Config
+		wantErr bool
+	}{
+		{
+			name: "config1",
+			args: &Config{
+				Resources: Resources{
+					MaxInstances: 2,
+					MinInstances: 1,
+				},
+				Workers: 3,
+			},
+			wantErr: false,
+		},
+		{
+			name: "config2",
+			args: &Config{
+				Workers: 0,
+			},
+			wantErr: true,
+		},
+		{
+			name: "config3",
+			args: &Config{
+				Resources: Resources{
+					MaxInstances: 1,
+					MinInstances: 2,
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Validate(tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+
+}

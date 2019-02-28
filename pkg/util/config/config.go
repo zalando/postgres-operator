@@ -79,25 +79,25 @@ type Config struct {
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
 	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
-	PodServiceAccountDefinition            string `name:"pod_service_account_definition" default:""`
-	PodServiceAccountRoleBindingDefinition string `name:"pod_service_account_role_binding_definition" default:""`
-	MasterPodMoveTimeout                   time.Duration `name:"master_pod_move_timeout" default:"20m"`
-	DbHostedZone                           string `name:"db_hosted_zone" default:"db.example.com"`
-	AWSRegion                              string `name:"aws_region" default:"eu-central-1"`
-	WALES3Bucket                           string `name:"wal_s3_bucket"`
-	LogS3Bucket                            string `name:"log_s3_bucket"`
-	KubeIAMRole                            string `name:"kube_iam_role"`
-	DebugLogging                           bool   `name:"debug_logging" default:"true"`
-	EnableDBAccess                         bool   `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI                         bool   `name:"enable_teams_api" default:"true"`
-	EnableTeamSuperuser                    bool   `name:"enable_team_superuser" default:"false"`
-	TeamAdminRole                          string `name:"team_admin_role" default:"admin"`
-	EnableAdminRoleForUsers                bool   `name:"enable_admin_role_for_users" default:"true"`
-	EnableMasterLoadBalancer               bool   `name:"enable_master_load_balancer" default:"true"`
-	EnableReplicaLoadBalancer              bool   `name:"enable_replica_load_balancer" default:"false"`
-	CustomServiceAnnotations			   map[string]string `name:"custom_service_annotations"`
-	EnablePodAntiAffinity                  bool   `name:"enable_pod_antiaffinity" default:"false"`
-	PodAntiAffinityTopologyKey			   string `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
+	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
+	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`
+	MasterPodMoveTimeout                   time.Duration     `name:"master_pod_move_timeout" default:"20m"`
+	DbHostedZone                           string            `name:"db_hosted_zone" default:"db.example.com"`
+	AWSRegion                              string            `name:"aws_region" default:"eu-central-1"`
+	WALES3Bucket                           string            `name:"wal_s3_bucket"`
+	LogS3Bucket                            string            `name:"log_s3_bucket"`
+	KubeIAMRole                            string            `name:"kube_iam_role"`
+	DebugLogging                           bool              `name:"debug_logging" default:"true"`
+	EnableDBAccess                         bool              `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI                         bool              `name:"enable_teams_api" default:"true"`
+	EnableTeamSuperuser                    bool              `name:"enable_team_superuser" default:"false"`
+	TeamAdminRole                          string            `name:"team_admin_role" default:"admin"`
+	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
+	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
+	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
+	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
+	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
+	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer       *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat      StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
@@ -125,7 +125,7 @@ func (c Config) MustMarshal() string {
 }
 
 // NewFromMap creates Config from the map
-func NewFromMap(m map[string]string) *Config {
+func NewFromMap(m map[string]string) (*Config, error) {
 	cfg := Config{}
 	fields, _ := structFields(&cfg)
 
@@ -139,16 +139,16 @@ func NewFromMap(m map[string]string) *Config {
 		if value == "" {
 			continue
 		}
-		err := processField(value, structField.Field)
+		err := ProcessField(value, structField.Field)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 	}
-	if err := validate(&cfg); err != nil {
-		panic(err)
+	if err := Validate(&cfg); err != nil {
+		return nil, err
 	}
 
-	return &cfg
+	return &cfg, nil
 }
 
 // Copy creates a copy of the config
@@ -163,13 +163,13 @@ func Copy(c *Config) Config {
 	return cfg
 }
 
-func validate(cfg *Config) (err error) {
+func Validate(cfg *Config) error {
 	if cfg.MinInstances > 0 && cfg.MaxInstances > 0 && cfg.MinInstances > cfg.MaxInstances {
-		err = fmt.Errorf("minimum number of instances %d is set higher than the maximum number %d",
+		return fmt.Errorf("minimum number of instances %d is set higher than the maximum number %d",
 			cfg.MinInstances, cfg.MaxInstances)
 	}
 	if cfg.Workers == 0 {
-		err = fmt.Errorf("number of workers should be higher than 0")
+		return fmt.Errorf("number of workers should be higher than 0")
 	}
-	return
+	return nil
 }

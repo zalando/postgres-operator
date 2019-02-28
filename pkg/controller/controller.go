@@ -107,7 +107,11 @@ func (c *Controller) initOperatorConfig() {
 		c.logger.Infoln("no ConfigMap specified. Loading default values")
 	}
 
-	c.opConfig = config.NewFromMap(configMapData)
+	var err error
+	c.opConfig, err = config.NewFromMap(configMapData)
+	if err != nil {
+		panic(err)
+	}
 	c.warnOnDeprecatedOperatorParameters()
 
 	if c.opConfig.SetMemoryRequestToLimit {

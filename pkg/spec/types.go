@@ -37,7 +37,7 @@ type syncUserOperation int
 // Possible values for the sync user operation (removal of users is not supported yet)
 const (
 	PGSyncUserAdd = iota
-	PGsyncUserAlter
+	PGSyncUserAlter
 	PGSyncAlterSet // handle ALTER ROLE SET parameter = value
 )
 

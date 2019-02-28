@@ -49,17 +49,17 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 
 			if dbUser.Password != newMD5Password {
 				r.User.Password = newMD5Password
-				r.Kind = spec.PGsyncUserAlter
+				r.Kind = spec.PGSyncUserAlter
 			}
 			if addNewRoles, equal := util.SubstractStringSlices(newUser.MemberOf, dbUser.MemberOf); !equal {
 				r.User.MemberOf = addNewRoles
-				r.Kind = spec.PGsyncUserAlter
+				r.Kind = spec.PGSyncUserAlter
 			}
 			if addNewFlags, equal := util.SubstractStringSlices(newUser.Flags, dbUser.Flags); !equal {
 				r.User.Flags = addNewFlags
-				r.Kind = spec.PGsyncUserAlter
+				r.Kind = spec.PGSyncUserAlter
 			}
-			if r.Kind == spec.PGsyncUserAlter {
+			if r.Kind == spec.PGSyncUserAlter {
 				r.User.Name = newUser.Name
 				reqs = append(reqs, r)
 			}
@@ -80,7 +80,7 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUs
 			if err := strategy.createPgUser(r.User, db); err != nil {
 				return fmt.Errorf("could not create user %q: %v", r.User.Name, err)
 			}
-		case spec.PGsyncUserAlter:
+		case spec.PGSyncUserAlter:
 			if err := strategy.alterPgUser(r.User, db); err != nil {
 				return fmt.Errorf("could not alter user %q: %v", r.User.Name, err)
 			}

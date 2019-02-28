@@ -51,7 +51,7 @@ func structFields(spec interface{}) ([]fieldInfo, error) {
 			fieldName = strings.ToLower(ftype.Name)
 		}
 
-		// Capture information about the config variable
+		// capture information about the config variable
 		info := fieldInfo{
 			Name:    fieldName,
 			Field:   f,
@@ -77,7 +77,7 @@ func structFields(spec interface{}) ([]fieldInfo, error) {
 	return infos, nil
 }
 
-func processField(value string, field reflect.Value) error {
+func ProcessField(value string, field reflect.Value) error {
 	typ := field.Type()
 
 	decoder := decoderFrom(field)
@@ -135,7 +135,7 @@ func processField(value string, field reflect.Value) error {
 		vals := strings.Split(value, ",")
 		sl := reflect.MakeSlice(typ, len(vals), len(vals))
 		for i, val := range vals {
-			err := processField(val, sl.Index(i))
+			err := ProcessField(val, sl.Index(i))
 			if err != nil {
 				return err
 			}
@@ -153,12 +153,12 @@ func processField(value string, field reflect.Value) error {
 				return fmt.Errorf("invalid map item: %q", pair)
 			}
 			k := reflect.New(typ.Key()).Elem()
-			err := processField(kvpair[0], k)
+			err := ProcessField(kvpair[0], k)
 			if err != nil {
 				return err
 			}
 			v := reflect.New(typ.Elem()).Elem()
-			err = processField(kvpair[1], v)
+			err = ProcessField(kvpair[1], v)
 			if err != nil {
 				return err
 			}
