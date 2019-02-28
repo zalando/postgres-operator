@@ -58,11 +58,11 @@ type KubernetesMetaConfiguration struct {
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
-	PodEnvironmentConfigMap string `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName    string `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout    time.Duration `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity                  bool                  `json:"enable_pod_antiaffinity" default:"false"`
-	PodAntiAffinityTopologyKey			   string                `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
+	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout       time.Duration `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity" default:"false"`
+	PodAntiAffinityTopologyKey string        `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
