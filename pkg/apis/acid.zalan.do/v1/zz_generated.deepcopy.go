@@ -371,6 +371,17 @@ func (in *Patroni) DeepCopyInto(out *Patroni) {
 			(*out)[key] = outVal
 		}
 	}
+	if in.StandbyCluster != nil {
+		in, out := &in.StandbyCluster, &out.StandbyCluster
+		*out = make(map[string]interface{}, len(*in))
+		for key, val := range *in {
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = val.DeepCopyinterface{}()
+			}
+		}
+	}
 	return
 }
 
