@@ -92,7 +92,7 @@ type ResourceDescription struct {
 	Memory string `json:"memory"`
 }
 
-// Resources describes requests and limits for the cluster resouces.
+// Resources describes requests and limits for the cluster resources.
 type Resources struct {
 	ResourceRequests ResourceDescription `json:"requests,omitempty"`
 	ResourceLimits   ResourceDescription `json:"limits,omitempty"`

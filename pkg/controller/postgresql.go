@@ -333,8 +333,12 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.Postg
 		c.logger.Warningf("Parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
 
-	noeffect := func(param string, explanation string) {
+	noEffect := func(param string, explanation string) {
 		c.logger.Warningf("Parameter %q takes no effect. %s", param, explanation)
+	}
+
+	notAllowed := func(param string, explanation string) {
+		c.logger.Warningf("Parameter %q is not allowed. %s", param, explanation)
 	}
 
 	if spec.UseLoadBalancer != nil {
@@ -345,12 +349,17 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.Postg
 	}
 
 	if len(spec.MaintenanceWindows) > 0 {
-		noeffect("maintenanceWindows", "Not implemented.")
+		noEffect("maintenanceWindows", "Not implemented.")
 	}
 
 	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
 		(spec.EnableReplicaLoadBalancer != nil || spec.EnableMasterLoadBalancer != nil) {
 		c.logger.Warnf("Both old and new load balancer parameters are present in the manifest, ignoring old ones")
+	}
+
+	isSmaller, err := util.RequestIsSmallerThanLimit(spec.ResourceRequests.Memory, spec.ResourceLimits.Memory)
+	if err == nil && !isSmaller {
+		notAllowed("memoryRequest", "higher than resource limit")
 	}
 }
 

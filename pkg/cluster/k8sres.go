@@ -724,7 +724,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		if isSmaller {
 			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
 			spec.Resources.ResourceRequests.Memory = limit
-
 		}
 
 		// controller adjusts the Scalyr sidecar request at operator startup

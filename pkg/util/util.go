@@ -130,7 +130,7 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
-// RequestIsSmallerThanLimit : ...
+// RequestIsSmallerThanLimit judges the request of the resource is smaller than the limit of the resource
 func RequestIsSmallerThanLimit(requestStr, limitStr string) (bool, error) {
 
 	request, err := resource.ParseQuantity(requestStr)
