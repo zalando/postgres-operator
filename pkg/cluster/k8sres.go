@@ -702,18 +702,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		volumeClaimTemplate *v1.PersistentVolumeClaim
 	)
 
-	// Improve me. Please.
 	if c.OpConfig.SetMemoryRequestToLimit {
 
 		// controller adjusts the default memory request at operator startup
-
-		request := spec.Resources.ResourceRequests.Memory
-		if request == "" {
+		var request, limit string
+		if request = spec.Resources.ResourceRequests.Memory; request == "" {
 			request = c.OpConfig.DefaultMemoryRequest
 		}
-
-		limit := spec.Resources.ResourceLimits.Memory
-		if limit == "" {
+		if limit = spec.Resources.ResourceLimits.Memory; limit == "" {
 			limit = c.OpConfig.DefaultMemoryLimit
 		}
 
@@ -724,7 +720,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		if isSmaller {
 			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
 			spec.Resources.ResourceRequests.Memory = limit
-
 		}
 
 		// controller adjusts the Scalyr sidecar request at operator startup
@@ -732,15 +727,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 		// adjust sidecar containers defined for that particular cluster
 		for _, sidecar := range spec.Sidecars {
-
 			// TODO #413
-			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
-			if request == "" {
+			var sidecarRequest, sidecarLimit string
+			if sidecarRequest = sidecar.Resources.ResourceRequests.Memory; request == "" {
 				request = c.OpConfig.DefaultMemoryRequest
 			}
-
-			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
-			if limit == "" {
+			if sidecarLimit = sidecar.Resources.ResourceLimits.Memory; limit == "" {
 				limit = c.OpConfig.DefaultMemoryLimit
 			}
 
