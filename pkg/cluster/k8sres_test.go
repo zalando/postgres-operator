@@ -91,7 +91,7 @@ func TestShmVolume(t *testing.T) {
 			podSpec: &v1.PodSpec{
 				Volumes: []v1.Volume{},
 				Containers: []v1.Container{
-					v1.Container{
+					{
 						VolumeMounts: []v1.VolumeMount{},
 					},
 				},
@@ -101,11 +101,11 @@ func TestShmVolume(t *testing.T) {
 		{
 			subTest: "non empty PodSpec",
 			podSpec: &v1.PodSpec{
-				Volumes: []v1.Volume{v1.Volume{}},
+				Volumes: []v1.Volume{{}},
 				Containers: []v1.Container{
-					v1.Container{
+					{
 						VolumeMounts: []v1.VolumeMount{
-							v1.VolumeMount{},
+							{},
 						},
 					},
 				},
