@@ -212,6 +212,10 @@ configuration they are grouped under the `kubernetes` key.
   class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
   that should be assigned to the Postgres pods. The priority class itself must be defined in advance.
   Default is empty (use the default priority class).
+  
+ * **master_pod_move_timeout**
+   The period of time to wait for the success of migration of master pods from an unschedulable node.
+   The migration includes Patroni switchovers to respective replicas on healthy nodes. The situation where master pods still exist on the old node after this timeout expires has to be fixed manually. The default is 20 minutes.
 
 * **enable_pod_antiaffinity**
   toggles [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/) on the Postgres pods, to avoid multiple pods
