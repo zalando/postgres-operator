@@ -10,6 +10,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
+
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
 
 const (
@@ -23,6 +25,7 @@ const (
 type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
+	ApplyConfig(server *v1.Pod, config acidv1.Patroni) error
 }
 
 // Patroni API client
@@ -97,6 +100,15 @@ func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]string) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(map[string]map[string]interface{}{"postgresql": {"parameters": parameters}})
+	if err != nil {
+		return fmt.Errorf("could not encode json: %v", err)
+	}
+	return p.httpPostOrPatch(http.MethodPatch, apiURL(server)+configPath, buf)
+}
+
+func (p *Patroni) ApplyConfig(server *v1.Pod, config acidv1.Patroni) error {
+	buf := &bytes.Buffer{}
+	err := json.NewEncoder(buf).Encode(config)
 	if err != nil {
 		return fmt.Errorf("could not encode json: %v", err)
 	}
