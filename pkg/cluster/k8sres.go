@@ -858,12 +858,27 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	numberOfInstances := c.getNumberOfInstances(spec)
 
+	initialPatroniConfig := c.Statefulset.ObjectMeta.Annotations[initialPatroniConfigAnnotationKey]
+	ann := map[string]string{rollingUpdateStatefulsetAnnotationKey: "false"}
+	// Save the initial patroni config for later usage.
+	// Note: if the annotation is empty (during the upgrade path for example), set it to the current specs.
+	// see: issues#501
+	if c.isNewCluster() || initialPatroniConfig == "" {
+		x, err := json.Marshal(spec.Patroni)
+		if err != nil {
+			return nil, fmt.Errorf("could not JSON encode initial patroni config: %v", err)
+		}
+		ann[initialPatroniConfigAnnotationKey] = string(x)
+	} else {
+		ann[initialPatroniConfigAnnotationKey] = initialPatroniConfig
+	}
+
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: map[string]string{rollingUpdateStatefulsetAnnotationKey: "false"},
+			Annotations: ann,
 		},
 		Spec: v1beta1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
