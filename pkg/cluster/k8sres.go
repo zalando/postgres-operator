@@ -860,8 +860,17 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	// the operator has domain-specific logic on how to do rolling updates of PG clusters
 	// so we do not use default rolling updates implemented by stateful sets
-	// that leaves "OnDelete" update strategy as the only option
+	// that leaves the legacy "OnDelete" update strategy as the only option
 	updateStrategy := v1beta1.StatefulSetUpdateStrategy{Type: v1beta1.OnDeleteStatefulSetStrategyType}
+
+	var podManagementPolicy v1beta1.PodManagementPolicyType
+	if c.OpConfig.PodManagementPolicy == "ordered_ready" {
+		podManagementPolicy = v1beta1.OrderedReadyPodManagement
+	} else if c.OpConfig.PodManagementPolicy == "parallel" {
+		podManagementPolicy = v1beta1.ParallelPodManagement
+	} else {
+		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
+	}
 
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -877,6 +886,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
 			UpdateStrategy:       updateStrategy,
+			PodManagementPolicy:  podManagementPolicy,
 		},
 	}
 

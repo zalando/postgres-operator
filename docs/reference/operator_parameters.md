@@ -226,6 +226,11 @@ configuration they are grouped under the `kubernetes` key.
   [topology key](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels)
   for pod anti affinity. The default is `kubernetes.io/hostname`.
 
+* **pod_management_policy**
+  specify the
+  [pod management policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-management-policies)
+  of stateful sets of PG clusters. The default is `ordered_ready`, the second possible value is `parallel`.
+
 ## Kubernetes resource requests
 
 This group allows you to configure resource requests for the Postgres pods.
