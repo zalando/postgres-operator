@@ -184,7 +184,7 @@ func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
 	)
 
 	if err != nil {
-		c.logger.Warning("failed to move master pods from the node %q: timeout of %v minutes expired", node.Name, c.opConfig.MasterPodMoveTimeout)
+		c.logger.Warningf("failed to move master pods from the node %q: timeout of %v minutes expired", node.Name, c.opConfig.MasterPodMoveTimeout)
 	}
 
 }
