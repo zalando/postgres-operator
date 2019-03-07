@@ -1265,7 +1265,7 @@ func (c *Cluster) generateCronJob() *batchv1beta1.CronJob {
 			Labels:    c.labelsSet(true),
 		},
 		Spec: batchv1beta1.CronJobSpec{
-			Schedule:    "*/1 * * * *",
+			Schedule:    c.Postgresql.Spec.LogicalBackupSchedule,
 			JobTemplate: jobTemplateSpec,
 		},
 	}
