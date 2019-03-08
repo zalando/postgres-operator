@@ -317,6 +317,14 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		match = false
 		reasons = append(reasons, "new statefulset's annotations doesn't match the current one")
 	}
+	if len(c.Statefulset.Spec.Template.Spec.InitContainers) != len(statefulSet.Spec.Template.Spec.InitContainers) {
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's init container specification doesn't match the current one")
+	} else {
+		var containerReasons []string
+		needsRollUpdate, containerReasons = c.compareContainers(c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers)
+		reasons = append(reasons, containerReasons...)
+	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
