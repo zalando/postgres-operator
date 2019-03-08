@@ -322,7 +322,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
 	} else {
 		var containerReasons []string
-		needsRollUpdate, containerReasons = c.compareContainers(c.Statefulset, statefulSet)
+		needsRollUpdate, containerReasons = c.compareContainers(c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers)
 		reasons = append(reasons, containerReasons...)
 	}
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
@@ -415,11 +415,11 @@ func newCheck(msg string, cond containerCondition) containerCheck {
 	return containerCheck{reason: msg, condition: cond}
 }
 
-// compareContainers: compare containers from two stateful sets
+// compareContainers: compare two list of Containers
 // and return:
 // * whether or not a rolling update is needed
 // * a list of reasons in a human readable format
-func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
+func (c *Cluster) compareContainers(setA, setB []v1.Container) (bool, []string) {
 	reasons := make([]string, 0)
 	needsRollUpdate := false
 	checks := []containerCheck{
@@ -437,8 +437,8 @@ func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []st
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 	}
 
-	for index, containerA := range setA.Spec.Template.Spec.Containers {
-		containerB := setB.Spec.Template.Spec.Containers[index]
+	for index, containerA := range setA {
+		containerB := setB[index]
 		for _, check := range checks {
 			if check.condition(containerA, containerB) {
 				needsRollUpdate = true
