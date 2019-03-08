@@ -35,7 +35,7 @@ ifdef CDP_PULL_REQUEST_NUMBER
 endif
 
 
-PATH := $(GOPATH)/bin:$(PATH)
+PATH := "$(GOPATH)/bin:$(PATH)"
 SHELL := env PATH=$(PATH) $(SHELL)
 
 default: local
