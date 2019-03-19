@@ -317,14 +317,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		match = false
 		reasons = append(reasons, "new statefulset's annotations doesn't match the current one")
 	}
-	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
-	} else {
-		var containerReasons []string
-		needsRollUpdate, containerReasons = c.compareContainers(c.Statefulset, statefulSet)
-		reasons = append(reasons, containerReasons...)
-	}
+
+	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
+	needsRollUpdate, reasons = c.compareContainers("containers", c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers, needsRollUpdate, reasons)
+
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
@@ -415,34 +411,37 @@ func newCheck(msg string, cond containerCondition) containerCheck {
 	return containerCheck{reason: msg, condition: cond}
 }
 
-// compareContainers: compare containers from two stateful sets
+// compareContainers: compare two list of Containers
 // and return:
 // * whether or not a rolling update is needed
 // * a list of reasons in a human readable format
-func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
-	reasons := make([]string, 0)
-	needsRollUpdate := false
+
+func (c *Cluster) compareContainers(description string, setA, setB []v1.Container, needsRollUpdate bool, reasons []string) (bool, []string) {
+	if len(setA) != len(setB) {
+		return true, append(reasons, fmt.Sprintf("new statefulset %s's length does not match the current ones", description))
+	}
+
 	checks := []containerCheck{
-		newCheck("new statefulset's container %s (index %d) name doesn't match the current one",
+		newCheck("new statefulset %s's %s (index %d) name doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
-		newCheck("new statefulset's container %s (index %d) image doesn't match the current one",
+		newCheck("new statefulset %s's %s (index %d) image doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Image != b.Image }),
-		newCheck("new statefulset's container %s (index %d) ports don't match the current one",
+		newCheck("new statefulset %s's %s (index %d) ports don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
-		newCheck("new statefulset's container %s (index %d) resources don't match the current ones",
+		newCheck("new statefulset %s's %s (index %d) resources don't match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
-		newCheck("new statefulset's container %s (index %d) environment doesn't match the current one",
+		newCheck("new statefulset %s's %s (index %d) environment doesn't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
-		newCheck("new statefulset's container %s (index %d) environment sources don't match the current one",
+		newCheck("new statefulset %s's %s (index %d) environment sources don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 	}
 
-	for index, containerA := range setA.Spec.Template.Spec.Containers {
-		containerB := setB.Spec.Template.Spec.Containers[index]
+	for index, containerA := range setA {
+		containerB := setB[index]
 		for _, check := range checks {
 			if check.condition(containerA, containerB) {
 				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf(check.reason, containerA.Name, index))
+				reasons = append(reasons, fmt.Sprintf(check.reason, description, containerA.Name, index))
 			}
 		}
 	}
