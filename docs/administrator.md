@@ -242,7 +242,20 @@ an additional provider for environment variables.
 
 One use case is to customize the Spilo image and configure it with environment
 variables. The ConfigMap with the additional settings is configured in the
-operator's CRD OperatorConfiguration:
+operator's main ConfigMap or CRD OperatorConfiguration:
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  # referencing config map with custom settings
+  pod_environment_configmap: postgres-pod-config
+  ...
+```
 
 **OperatorConfiguration CRD**
 
@@ -252,7 +265,6 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  ...
   # referencing config map with custom settings
   pod_environment_configmap: postgres-pod-config
   ...
