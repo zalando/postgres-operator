@@ -3,10 +3,10 @@ package cluster
 import (
 	"k8s.io/api/core/v1"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"testing"
 )
 
@@ -91,7 +91,7 @@ func TestShmVolume(t *testing.T) {
 			podSpec: &v1.PodSpec{
 				Volumes: []v1.Volume{},
 				Containers: []v1.Container{
-					v1.Container{
+					{
 						VolumeMounts: []v1.VolumeMount{},
 					},
 				},
@@ -101,11 +101,11 @@ func TestShmVolume(t *testing.T) {
 		{
 			subTest: "non empty PodSpec",
 			podSpec: &v1.PodSpec{
-				Volumes: []v1.Volume{v1.Volume{}},
+				Volumes: []v1.Volume{{}},
 				Containers: []v1.Container{
-					v1.Container{
+					{
 						VolumeMounts: []v1.VolumeMount{
-							v1.VolumeMount{},
+							{},
 						},
 					},
 				},

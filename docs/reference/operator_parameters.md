@@ -8,31 +8,39 @@ configuration.
   maps. String values containing ':' should be enclosed in quotes. The
   configuration is flat, parameter group names below are not reflected in the
   configuration structure. There is an
-  [example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/configmap.yaml)
+  [example](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
 
-* CRD-based configuration.  The configuration is stored in the custom YAML
-  manifest, an instance of the custom resource definition (CRD) called
-  `OperatorConfiguration`.  This CRD is registered by the operator
-  during the start when `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` variable is
-  set to a non-empty value. The CRD-based configuration is a regular YAML
-  document; non-scalar keys are simply represented in the usual YAML way. The
-  usage of the CRD-based configuration is triggered by setting the
-  `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` variable, which should point to the
-  `postgresql-operator-configuration` object name in the operators namespace.
+* CRD-based configuration. The configuration is stored in a custom YAML
+  manifest. The manifest is an instance of the custom resource definition (CRD) called
+  `OperatorConfiguration`. The operator registers this CRD
+  during the start and uses it for configuration if the [operator deployment manifest ](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L21) sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty value. The variable should point to the
+  `postgresql-operator-configuration` object in the operator's namespace.
+
+  The CRD-based configuration is a regular YAML
+  document; non-scalar keys are simply represented in the usual YAML way.
   There are no default values built-in in the operator, each parameter that is
   not supplied in the configuration receives an empty value.  In order to
   create your own configuration just copy the [default
-  one](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+  one](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
   and change it.
 
-CRD-based configuration is more natural and powerful then the one based on
+  To test the CRD-based configuration locally, use the following
+  ```bash
+  kubectl create -f manifests/operator-service-account-rbac.yaml
+  kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
+  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+  kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
+  ```
+  Note that the operator first registers the definition of the CRD   `OperatorConfiguration` and then waits for an instance of the CRD to be created. In between these two event the operator pod may be failing since it cannot fetch the not-yet-existing `OperatorConfiguration` instance.
+
+The CRD-based configuration is more powerful than the one based on
 ConfigMaps and should be used unless there is a compatibility requirement to
 use an already existing configuration. Even in that case, it should be rather
 straightforward to convert the configmap based configuration into the CRD-based
 one and restart the operator. The ConfigMaps-based configuration will be
 deprecated and subsequently removed in future releases.
 
-Note that for the CRD-based configuration configuration groups below correspond
+Note that for the CRD-based configuration groups of configuration options below correspond
 to the non-leaf keys in the target YAML (i.e. for the Kubernetes resources the
 key is `kubernetes`). The key is mentioned alongside the group description. The
 ConfigMap-based configuration is flat and does not allow non-leaf keys.
@@ -44,7 +52,6 @@ parameters, those parameters have no effect and are replaced by the
 They will be deprecated and removed in the future.
 
 Variable names are underscore-separated words.
-
 
 
 ## General
@@ -165,6 +172,14 @@ configuration they are grouped under the `kubernetes` key.
   list of `name:value` pairs for additional labels assigned to the cluster
   objects. The default is `application:spilo`.
 
+* **inherited_labels**
+  list of labels that can be inherited from the cluster manifest, and added to
+  each child objects (`StatefulSet`, `Pod`, `Service` and `Endpoints`) created by
+  the opertor.
+  Typical use case is to dynamically pass labels that are specific to a given
+  postgres cluster, in order to implement `NetworkPolicy`.
+  The default is empty.
+
 * **cluster_name_label**
   name of the label assigned to Kubernetes objects created by the operator that
   indicates which cluster a given object belongs to. The default is
@@ -191,13 +206,30 @@ configuration they are grouped under the `kubernetes` key.
   All variables from that ConfigMap are injected to the pod's environment, on
   conflicts they are overridden by the environment variables generated by the
   operator. The default is empty.
-  
+
 * **pod_priority_class_name**
   a name of the [priority
   class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
   that should be assigned to the Postgres pods. The priority class itself must be defined in advance.
   Default is empty (use the default priority class).
   
+ * **master_pod_move_timeout**
+   The period of time to wait for the success of migration of master pods from an unschedulable node.
+   The migration includes Patroni switchovers to respective replicas on healthy nodes. The situation where master pods still exist on the old node after this timeout expires has to be fixed manually. The default is 20 minutes.
+
+* **enable_pod_antiaffinity**
+  toggles [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/) on the Postgres pods, to avoid multiple pods
+  of the same Postgres cluster in the same topology , e.g. node. The default is `false`.
+
+* **pod_antiaffinity_topology_key**
+  override
+  [topology key](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels)
+  for pod anti affinity. The default is `kubernetes.io/hostname`.
+
+* **pod_management_policy**
+  specify the
+  [pod management policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-management-policies)
+  of stateful sets of PG clusters. The default is `ordered_ready`, the second possible value is `parallel`.
 
 ## Kubernetes resource requests
 
@@ -222,7 +254,7 @@ CRD-based configuration.
   settings. The default is `1Gi`.
 
 * **set_memory_request_to_limit**
-  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers (Postgres, Scalyr sidecar, and other sidecars). The default is `false`.
+  Set `memory_request` to `memory_limit` for all Postgres clusters (the default value is also increased). This prevents certain cases of memory overcommitment at the cost of overprovisioning memory and potential scheduling problems for containers with high memory limits due to the lack of memory on Kubernetes cluster nodes. This affects all containers created by the operator (Postgres, Scalyr sidecar, and other sidecars); to set resources for the operator's own container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13). The default is `false`.
 
 * **enable_shm_volume**
   Instruct operator to start any new database pod without limitations on shm
@@ -287,6 +319,11 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   cluster.  Can be overridden by individual cluster settings. The default is
   `false`.
 
+* **custom_service_annotations**
+  when load balancing is enabled, LoadBalancer service is created and
+  this parameter takes service annotations that are applied to service.
+  Optional.
+
 * **master_dns_name_format** defines the DNS name string template for the
   master load balancer cluster.  The default is
   `{cluster}.{team}.{hostedzone}`, where `{cluster}` is replaced by the cluster
@@ -301,12 +338,12 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   replaced with the hosted zone (the value of the `db_hosted_zone` parameter).
   No other placeholders are allowed.
 
-## AWS or GSC interaction
+## AWS or GCP interaction
 
 The options in this group configure operator interactions with non-Kubernetes
-objects from AWS or Google cloud. They have no effect unless you are using
+objects from Amazon Web Services (AWS) or Google Cloud Platform (GCP). They have no effect unless you are using
 either. In the CRD-based configuration those options are grouped under the
-`aws_or_gcp` key.
+`aws_or_gcp` key. Note the GCP integration is not yet officially supported.
 
 * **wal_s3_bucket**
   S3 bucket to use for shipping WAL segments with WAL-E. A bucket has to be
@@ -334,11 +371,11 @@ Options to aid debugging of the operator itself. Grouped under the `debug` key.
   boolean parameter that toggles verbose debug logs from the operator. The
   default is `true`.
 
-* **enable_db_access**
+* **enable_database_access**
   boolean parameter that toggles the functionality of the operator that require
   access to the postgres database, i.e. creating databases and users. The default
   is `true`.
-  
+
 ## Automatic creation of human users in the database
 
 Options to automate creation of human users with the aid of the teams API
@@ -372,6 +409,9 @@ key.
 * **team_admin_role**
   role name to grant to team members created from the Teams API. The default is
   `admin`, that role is created by Spilo as a `NOLOGIN` role.
+
+* **enable_admin_role_for_users**
+   if `true`, the `team_admin_role` will have the rights to grant roles coming from PG manifests. Such roles will be created as in "CREATE ROLE 'role_from_manifest' ... ADMIN 'team_admin_role'". The default is `true`.
 
 * **pam_role_name**
   when set, the operator will add all team member roles to this group and add a
@@ -433,4 +473,4 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   Memory limit value for the Scalyr sidecar. The default is `1Gi`.
 
 
-For the configmap operator configuration, the [default parameter values](https://github.com/zalando-incubator/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+For the configmap operator configuration, the [default parameter values](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)

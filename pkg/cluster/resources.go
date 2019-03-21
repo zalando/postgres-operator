@@ -11,10 +11,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
 const (
@@ -437,7 +437,11 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 func (c *Cluster) deleteService(role PostgresRole) error {
 	c.logger.Debugf("deleting service %s", role)
 
-	service := c.Services[role]
+	service, ok := c.Services[role]
+	if !ok {
+		c.logger.Debugf("No service for %s role was found, nothing to delete", role)
+		return nil
+	}
 
 	if err := c.KubeClient.Services(service.Namespace).Delete(service.Name, c.deleteOptions); err != nil {
 		return err

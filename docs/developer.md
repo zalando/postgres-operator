@@ -93,14 +93,14 @@ would create a directory for the GOPATH (i.e. ~/go) and place the source code
 under the ~/go/src subdirectories.
 
 Given the schema above, the postgres operator source code located at
-`github.com/zalando-incubator/postgres-operator` should be put at
--`~/go/src/github.com/zalando-incubator/postgres-operator`.
+`github.com/zalando/postgres-operator` should be put at
+-`~/go/src/github.com/zalando/postgres-operator`.
 
 ```bash
     $ export GOPATH=~/go
-    $ mkdir -p ${GOPATH}/src/github.com/zalando-incubator/
-    $ cd ${GOPATH}/src/github.com/zalando-incubator/
-    $ git clone https://github.com/zalando-incubator/postgres-operator.git
+    $ mkdir -p ${GOPATH}/src/github.com/zalando/
+    $ cd ${GOPATH}/src/github.com/zalando/
+    $ git clone https://github.com/zalando/postgres-operator.git
 ```
 
 ## Building the operator
@@ -157,7 +157,7 @@ The operator employs k8s-provided code generation to obtain deep copy methods an
 the `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI). The `/pkg/generated/` contains the resultant code. To make these scripts work, you may need to `export GOPATH=$(go env GOPATH)`
 
 References for code generation are:
-* [Relevant pull request](https://github.com/zalando-incubator/postgres-operator/pull/369)
+* [Relevant pull request](https://github.com/zalando/postgres-operator/pull/369)
 See comments there for minor issues that can sometimes broke the generation process.
 * [Code generator source code](https://github.com/kubernetes/code-generator)
 * [Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/) - intro post on the topic
@@ -188,13 +188,13 @@ defaults to 4)
 * /workers/$id/logs - log of the operations performed by a given worker
 * /clusters/ - list of teams and clusters known to the operator
 * /clusters/$team - list of clusters for the given team
-* /cluster/$team/$clustername - detailed status of the cluster, including the
+* /clusters/$team/$namespace/$clustername - detailed status of the cluster, including the
   specifications for CRD, master and replica services, endpoints and
   statefulsets, as well as any errors and the worker that cluster is assigned
   to.
-* /cluster/$team/$clustername/logs/ - logs of all operations performed to the
+* /clusters/$team/$namespace/$clustername/logs/ - logs of all operations performed to the
   cluster so far.
-* /cluster/$team/$clustername/history/ - history of cluster changes triggered
+* /clusters/$team/$namespace/$clustername/history/ - history of cluster changes triggered
   by the changes of the manifest (shows the somewhat obscure diff and what
   exactly has triggered the change)
 

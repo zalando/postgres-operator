@@ -13,7 +13,7 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/spec"
 )
 
 const (
@@ -130,7 +130,7 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
-// RequestIsSmallerThanLimit
+// RequestIsSmallerThanLimit : ...
 func RequestIsSmallerThanLimit(requestStr, limitStr string) (bool, error) {
 
 	request, err := resource.ParseQuantity(requestStr)

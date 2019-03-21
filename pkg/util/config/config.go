@@ -7,7 +7,7 @@ import (
 
 	"fmt"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/spec"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
@@ -27,6 +27,7 @@ type Resources struct {
 	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
 	PodPriorityClassName    string            `name:"pod_priority_class_name"`
 	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
+	InheritedLabels         []string          `name:"inherited_labels" default:""`
 	ClusterNameLabel        string            `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel            string            `name:"pod_role_label" default:"spilo-role"`
 	PodToleration           map[string]string `name:"toleration" default:""`
@@ -78,20 +79,25 @@ type Config struct {
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
 	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
-	PodServiceAccountDefinition            string `name:"pod_service_account_definition" default:""`
-	PodServiceAccountRoleBindingDefinition string `name:"pod_service_account_role_binding_definition" default:""`
-	DbHostedZone                           string `name:"db_hosted_zone" default:"db.example.com"`
-	AWSRegion                              string `name:"aws_region" default:"eu-central-1"`
-	WALES3Bucket                           string `name:"wal_s3_bucket"`
-	LogS3Bucket                            string `name:"log_s3_bucket"`
-	KubeIAMRole                            string `name:"kube_iam_role"`
-	DebugLogging                           bool   `name:"debug_logging" default:"true"`
-	EnableDBAccess                         bool   `name:"enable_database_access" default:"true"`
-	EnableTeamsAPI                         bool   `name:"enable_teams_api" default:"true"`
-	EnableTeamSuperuser                    bool   `name:"enable_team_superuser" default:"false"`
-	TeamAdminRole                          string `name:"team_admin_role" default:"admin"`
-	EnableMasterLoadBalancer               bool   `name:"enable_master_load_balancer" default:"true"`
-	EnableReplicaLoadBalancer              bool   `name:"enable_replica_load_balancer" default:"false"`
+	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
+	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`
+	MasterPodMoveTimeout                   time.Duration     `name:"master_pod_move_timeout" default:"20m"`
+	DbHostedZone                           string            `name:"db_hosted_zone" default:"db.example.com"`
+	AWSRegion                              string            `name:"aws_region" default:"eu-central-1"`
+	WALES3Bucket                           string            `name:"wal_s3_bucket"`
+	LogS3Bucket                            string            `name:"log_s3_bucket"`
+	KubeIAMRole                            string            `name:"kube_iam_role"`
+	DebugLogging                           bool              `name:"debug_logging" default:"true"`
+	EnableDBAccess                         bool              `name:"enable_database_access" default:"true"`
+	EnableTeamsAPI                         bool              `name:"enable_teams_api" default:"true"`
+	EnableTeamSuperuser                    bool              `name:"enable_team_superuser" default:"false"`
+	TeamAdminRole                          string            `name:"team_admin_role" default:"admin"`
+	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
+	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
+	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
+	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
+	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
+	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer       *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat      StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
@@ -103,6 +109,7 @@ type Config struct {
 	ClusterHistoryEntries    int               `name:"cluster_history_entries" default:"1000"`
 	TeamAPIRoleConfiguration map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
 	PodTerminateGracePeriod  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	PodManagementPolicy      string            `name:"pod_management_policy" default:"ordered_ready"`
 	ProtectedRoles           []string          `name:"protected_role_names" default:"admin"`
 	PostgresSuperuserTeams   []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit  bool              `name:"set_memory_request_to_limit" defaults:"false"`

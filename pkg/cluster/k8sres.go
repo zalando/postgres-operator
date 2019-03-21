@@ -15,11 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -290,6 +290,26 @@ func nodeAffinity(nodeReadinessLabel map[string]string) *v1.Affinity {
 	}
 }
 
+func generatePodAffinity(labels labels.Set, topologyKey string, nodeAffinity *v1.Affinity) *v1.Affinity {
+	// generate pod anti-affinity to avoid multiple pods of the same Postgres cluster in the same topology , e.g. node
+	podAffinity := v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: labels,
+				},
+				TopologyKey: topologyKey,
+			}},
+		},
+	}
+
+	if nodeAffinity != nil && nodeAffinity.NodeAffinity != nil {
+		podAffinity.NodeAffinity = nodeAffinity.NodeAffinity
+	}
+
+	return &podAffinity
+}
+
 func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]string) []v1.Toleration {
 	// allow to override tolerations by postgresql manifest
 	if len(*tolerationsSpec) > 0 {
@@ -339,7 +359,6 @@ func generateSpiloContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 ) *v1.Container {
-
 	privilegedMode := true
 	return &v1.Container{
 		Name:            name,
@@ -411,6 +430,7 @@ func generatePodTemplate(
 	namespace string,
 	labels labels.Set,
 	spiloContainer *v1.Container,
+	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
 	tolerationsSpec *[]v1.Toleration,
 	nodeAffinity *v1.Affinity,
@@ -419,6 +439,8 @@ func generatePodTemplate(
 	kubeIAMRole string,
 	priorityClassName string,
 	shmVolume bool,
+	podAntiAffinity bool,
+	podAntiAffinityTopologyKey string,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -429,6 +451,7 @@ func generatePodTemplate(
 		ServiceAccountName:            podServiceAccountName,
 		TerminationGracePeriodSeconds: &terminateGracePeriodSeconds,
 		Containers:                    containers,
+		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
 	}
 
@@ -436,7 +459,9 @@ func generatePodTemplate(
 		addShmVolume(&podSpec)
 	}
 
-	if nodeAffinity != nil {
+	if podAntiAffinity {
+		podSpec.Affinity = generatePodAffinity(labels, podAntiAffinityTopologyKey, nodeAffinity)
+	} else if nodeAffinity != nil {
 		podSpec.Affinity = nodeAffinity
 	}
 
@@ -492,6 +517,18 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 			Value: c.OpConfig.SuperUsername,
 		},
 		{
+			Name:  "KUBERNETES_SCOPE_LABEL",
+			Value: c.OpConfig.ClusterNameLabel,
+		},
+		{
+			Name:  "KUBERNETES_ROLE_LABEL",
+			Value: c.OpConfig.PodRoleLabel,
+		},
+		{
+			Name:  "KUBERNETES_LABELS",
+			Value: labels.Set(c.OpConfig.ClusterLabels).String(),
+		},
+		{
 			Name: "PGPASSWORD_SUPERUSER",
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -520,6 +557,10 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		{
 			Name:  "PAM_OAUTH2",
 			Value: c.OpConfig.PamConfiguration,
+		},
+		{
+			Name:  "HUMAN_ROLE",
+			Value: c.OpConfig.PamRoleName,
 		},
 	}
 	if spiloConfiguration != "" {
@@ -661,6 +702,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		volumeClaimTemplate *v1.PersistentVolumeClaim
 	)
 
+	// Improve me. Please.
 	if c.OpConfig.SetMemoryRequestToLimit {
 
 		// controller adjusts the default memory request at operator startup
@@ -740,8 +782,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	// generate environment variables for the spilo container
 	spiloEnvVars := deduplicateEnvVars(
-		c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone, customPodEnvVarsList),
-		c.containerName(), c.logger)
+		c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone,
+			customPodEnvVarsList), c.containerName(), c.logger)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
@@ -749,6 +791,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	volumeMounts := generateVolumeMounts()
 
 	// generate the spilo container
+	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
 	spiloContainer := generateSpiloContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
@@ -756,7 +799,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		volumeMounts,
 	)
 
-	// resolve conflicts between operator-global and per-cluster sidecards
+	// resolve conflicts between operator-global and per-cluster sidecars
 	sideCars := c.mergeSidecars(spec.Sidecars)
 
 	resourceRequirementsScalyrSidecar := makeResources(
@@ -785,11 +828,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	// generate pod template for the statefulset, based on the spilo container and sidecards
+	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
 		spiloContainer,
+		spec.InitContainers,
 		sidecarContainers,
 		&tolerationSpec,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
@@ -797,7 +841,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
-		mountShmVolumeNeeded(c.OpConfig, spec)); err != nil {
+		mountShmVolumeNeeded(c.OpConfig, spec),
+		c.OpConfig.EnablePodAntiAffinity,
+		c.OpConfig.PodAntiAffinityTopologyKey); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
@@ -812,6 +858,20 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	numberOfInstances := c.getNumberOfInstances(spec)
 
+	// the operator has domain-specific logic on how to do rolling updates of PG clusters
+	// so we do not use default rolling updates implemented by stateful sets
+	// that leaves the legacy "OnDelete" update strategy as the only option
+	updateStrategy := v1beta1.StatefulSetUpdateStrategy{Type: v1beta1.OnDeleteStatefulSetStrategyType}
+
+	var podManagementPolicy v1beta1.PodManagementPolicyType
+	if c.OpConfig.PodManagementPolicy == "ordered_ready" {
+		podManagementPolicy = v1beta1.OrderedReadyPodManagement
+	} else if c.OpConfig.PodManagementPolicy == "parallel" {
+		podManagementPolicy = v1beta1.ParallelPodManagement
+	} else {
+		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
+	}
+
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
@@ -825,6 +885,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
+			UpdateStrategy:       updateStrategy,
+			PodManagementPolicy:  podManagementPolicy,
 		},
 	}
 
@@ -1057,7 +1119,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	}
 
 	if role == Replica {
-		serviceSpec.Selector = c.roleLabelsSet(role)
+		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
 
 	var annotations map[string]string
@@ -1080,6 +1142,13 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 			constants.ZalandoDNSNameAnnotation: dnsName,
 			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
 		}
+
+		if len(c.OpConfig.CustomServiceAnnotations) != 0 {
+			c.logger.Debugf("There are custom annotations defined, creating them.")
+			for customAnnotationKey, customAnnotationValue := range c.OpConfig.CustomServiceAnnotations {
+				annotations[customAnnotationKey] = customAnnotationValue
+			}
+		}
 	} else if role == Replica {
 		// before PR #258, the replica service was only created if allocated a LB
 		// now we always create the service but warn if the LB is absent
@@ -1090,7 +1159,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
-			Labels:      c.roleLabelsSet(role),
+			Labels:      c.roleLabelsSet(true, role),
 			Annotations: annotations,
 		},
 		Spec: serviceSpec,
@@ -1104,7 +1173,7 @@ func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubse
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.endpointName(role),
 			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(role),
+			Labels:    c.roleLabelsSet(true, role),
 		},
 	}
 	if len(subsets) > 0 {
@@ -1168,7 +1237,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.roleLabelsSet(Master),
+				MatchLabels: c.roleLabelsSet(false, Master),
 			},
 		},
 	}

@@ -1,11 +1,12 @@
 package v1
 
 import (
-	"github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
+	"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// CRDResource* define names necesssary for the k8s CRD API
 const (
 	PostgresCRDResourceKind   = "postgresql"
 	PostgresCRDResourcePlural = "postgresqls"
@@ -39,6 +40,7 @@ func buildCRD(name, kind, plural, short string) *apiextv1beta1.CustomResourceDef
 	}
 }
 
+// PostgresCRD returns CustomResourceDefinition built from PostgresCRDResource
 func PostgresCRD() *apiextv1beta1.CustomResourceDefinition {
 	return buildCRD(PostgresCRDResouceName,
 		PostgresCRDResourceKind,
@@ -46,6 +48,7 @@ func PostgresCRD() *apiextv1beta1.CustomResourceDefinition {
 		PostgresCRDResourceShort)
 }
 
+// ConfigurationCRD returns CustomResourceDefinition built from OperatorConfigCRDResource
 func ConfigurationCRD() *apiextv1beta1.CustomResourceDefinition {
 	return buildCRD(OperatorConfigCRDResourceName,
 		OperatorConfigCRDResouceKind,

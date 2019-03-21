@@ -14,12 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/cluster"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/ringlog"
 )
 
 func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
@@ -385,8 +385,14 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	if informerOldSpec != nil { //update, delete
 		uid = informerOldSpec.GetUID()
 		clusterName = util.NameFromMeta(informerOldSpec.ObjectMeta)
+
+		// user is fixing previously incorrect spec
 		if eventType == EventUpdate && informerNewSpec.Error == "" && informerOldSpec.Error != "" {
 			eventType = EventSync
+		}
+
+		// set current error to be one of the new spec if present
+		if informerNewSpec != nil {
 			clusterError = informerNewSpec.Error
 		} else {
 			clusterError = informerOldSpec.Error

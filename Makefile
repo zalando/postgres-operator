@@ -35,7 +35,7 @@ ifdef CDP_PULL_REQUEST_NUMBER
 endif
 
 
-PATH := $(GOPATH)/bin:$(PATH)
+PATH := "$(GOPATH)/bin:$(PATH)"
 SHELL := env PATH=$(PATH) $(SHELL)
 
 default: local
@@ -44,6 +44,7 @@ clean:
 	rm -rf build scm-source.json
 
 local: ${SOURCES}
+	hack/verify-codegen.sh
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
 
 linux: ${SOURCES}
@@ -88,4 +89,5 @@ deps:
 	@glide install --strip-vendor
 
 test:
+	hack/verify-codegen.sh
 	@go test ./...

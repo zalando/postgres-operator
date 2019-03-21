@@ -4,7 +4,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"time"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
 
 // EventType contains type of the events for the TPRs and Pods received from Kubernetes
