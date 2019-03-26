@@ -788,7 +788,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		}
 
 		hash := sha256.New()
-		hash.Write([]byte(c.OpConfig.PodEnvironmentSecretName))
+		_, _ = hash.Write([]byte(c.OpConfig.PodEnvironmentSecretName))
 
 		sortedKeys := make([]string, 0, len(sc.Data))
 		for k := range sc.Data {
@@ -821,8 +821,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 						},
 					},
 				)
-				hash.Write([]byte(sc_key))
-				hash.Write(sc.Data[k])
+				_, _ = hash.Write([]byte(sc_key))
+				_, _ = hash.Write(sc.Data[k])
 			}
 		}
 
