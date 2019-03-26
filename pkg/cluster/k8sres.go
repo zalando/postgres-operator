@@ -90,14 +90,16 @@ func (c *Cluster) podDisruptionBudgetName() string {
 func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	vars := make([]v1.EnvVar, 0)
 
-	if c.OpConfig.PodEnvironmentConfigMap != "" {
-		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("could not read ConfigMap PodEnvironmentConfigMap: %v", err)
-		}
-		for k, v := range cm.Data {
-			vars = append(vars, v1.EnvVar{Name: k, Value: v})
-		}
+	if c.OpConfig.PodEnvironmentConfigMap == "" {
+		return vars, nil
+	}
+
+	cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not read ConfigMap PodEnvironmentConfigMap: %v", err)
+	}
+	for k, v := range cm.Data {
+		vars = append(vars, v1.EnvVar{Name: k, Value: v})
 	}
 
 	return vars, nil
@@ -107,59 +109,61 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, map[string]st
 	vars := make([]v1.EnvVar, 0)
 	anns := make(map[string]string)
 
-	if c.OpConfig.PodEnvironmentSecretName != "" {
-		secret, err := c.KubeClient.Secrets(c.Namespace).Get(c.OpConfig.PodEnvironmentSecretName, metav1.GetOptions{})
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
-		}
+	if c.OpConfig.PodEnvironmentSecretName == "" {
+		return vars, anns, nil
+	}
 
-		sortedKeys := make([]string, 0)
-		keyToEnvName := make(map[string]string)
-		if len(c.OpConfig.PodEnvironmentSecretKeys) > 0 {
-			for k, v := range c.OpConfig.PodEnvironmentSecretKeys {
-				_, ok := secret.Data[k]
-				if ! ok {
-					return nil, nil, fmt.Errorf("could not read Secret key %s (present in PodEnvironmentSecretKeys)", k)
-				}
-				sortedKeys = append(sortedKeys, k)
-				keyToEnvName[k] = v
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(c.OpConfig.PodEnvironmentSecretName, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
+	}
+
+	sortedKeys := make([]string, 0)
+	keyToEnvName := make(map[string]string)
+	if len(c.OpConfig.PodEnvironmentSecretKeys) > 0 {
+		for k, v := range c.OpConfig.PodEnvironmentSecretKeys {
+			_, ok := secret.Data[k]
+			if ! ok {
+				return nil, nil, fmt.Errorf("could not read Secret key %s (present in PodEnvironmentSecretKeys)", k)
 			}
-		} else {
-			for k := range secret.Data {
-				sortedKeys = append(sortedKeys, k)
-				keyToEnvName[k] = k
-			}
+			sortedKeys = append(sortedKeys, k)
+			keyToEnvName[k] = v
 		}
-		sort.Strings(sortedKeys)
+	} else {
+		for k := range secret.Data {
+			sortedKeys = append(sortedKeys, k)
+			keyToEnvName[k] = k
+		}
+	}
+	sort.Strings(sortedKeys)
 
-		hash := sha256.New()
-		_, _ = hash.Write([]byte(c.OpConfig.PodEnvironmentSecretName))
-		_, _ = hash.Write([]byte("\x00"))
+	hash := sha256.New()
+	_, _ = hash.Write([]byte(c.OpConfig.PodEnvironmentSecretName))
+	_, _ = hash.Write([]byte("\x00"))
 
-		for _, keyName := range sortedKeys {
-			vars = append(
-				vars,
-				v1.EnvVar{
-					Name: keyToEnvName[keyName],
-					ValueFrom: &v1.EnvVarSource{
-						SecretKeyRef: &v1.SecretKeySelector{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: c.OpConfig.PodEnvironmentSecretName,
-							},
-							Key: keyName,
+	for _, keyName := range sortedKeys {
+		vars = append(
+			vars,
+			v1.EnvVar{
+				Name: keyToEnvName[keyName],
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: c.OpConfig.PodEnvironmentSecretName,
 						},
+						Key: keyName,
 					},
 				},
-			)
-			_, _ = hash.Write([]byte(keyToEnvName[keyName]))
-			_, _ = hash.Write([]byte("\x00"))
-			_, _ = hash.Write(secret.Data[keyName])
-			_, _ = hash.Write([]byte("\x00"))
-		}
-
-		annKey := fmt.Sprintf("follow.acid.zalan.do/secret.%s", c.OpConfig.PodEnvironmentSecretName)
-		anns[annKey] = fmt.Sprintf("%x", hash.Sum(nil))
+			},
+		)
+		_, _ = hash.Write([]byte(keyToEnvName[keyName]))
+		_, _ = hash.Write([]byte("\x00"))
+		_, _ = hash.Write(secret.Data[keyName])
+		_, _ = hash.Write([]byte("\x00"))
 	}
+
+	annKey := fmt.Sprintf("follow.acid.zalan.do/secret.%s", c.OpConfig.PodEnvironmentSecretName)
+	anns[annKey] = fmt.Sprintf("%x", hash.Sum(nil))
 
 	return vars, anns, nil
 }
