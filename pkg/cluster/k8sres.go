@@ -87,6 +87,83 @@ func (c *Cluster) podDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
 
+func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
+	vars := make([]v1.EnvVar, 0)
+
+	if c.OpConfig.PodEnvironmentConfigMap != "" {
+		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not read ConfigMap PodEnvironmentConfigMap: %v", err)
+		}
+		for k, v := range cm.Data {
+			vars = append(vars, v1.EnvVar{Name: k, Value: v})
+		}
+	}
+
+	return vars, nil
+}
+
+func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, map[string]string, error) {
+	vars := make([]v1.EnvVar, 0)
+	anns := make(map[string]string)
+
+	if c.OpConfig.PodEnvironmentSecretName != "" {
+		secret, err := c.KubeClient.Secrets(c.Namespace).Get(c.OpConfig.PodEnvironmentSecretName, metav1.GetOptions{})
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
+		}
+
+		sortedKeys := make([]string, 0)
+		keyToEnvName := make(map[string]string)
+		if len(c.OpConfig.PodEnvironmentSecretKeys) > 0 {
+			for k, v := range c.OpConfig.PodEnvironmentSecretKeys {
+				_, ok := secret.Data[k]
+				if ! ok {
+					return nil, nil, fmt.Errorf("could not read Secret key %s (present in PodEnvironmentSecretKeys)", k)
+				}
+				sortedKeys = append(sortedKeys, k)
+				keyToEnvName[k] = v
+			}
+		} else {
+			for k := range secret.Data {
+				sortedKeys = append(sortedKeys, k)
+				keyToEnvName[k] = k
+			}
+		}
+		sort.Strings(sortedKeys)
+
+		hash := sha256.New()
+		_, _ = hash.Write([]byte(c.OpConfig.PodEnvironmentSecretName))
+		_, _ = hash.Write([]byte("\x00"))
+
+		for _, keyName := range sortedKeys {
+			vars = append(
+				vars,
+				v1.EnvVar{
+					Name: keyToEnvName[keyName],
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: c.OpConfig.PodEnvironmentSecretName,
+							},
+							Key: keyName,
+						},
+					},
+				},
+			)
+			_, _ = hash.Write([]byte(keyToEnvName[keyName]))
+			_, _ = hash.Write([]byte("\x00"))
+			_, _ = hash.Write(secret.Data[keyName])
+			_, _ = hash.Write([]byte("\x00"))
+		}
+
+		annKey := fmt.Sprintf("follow.secret.zalando.ai/%s", c.OpConfig.PodEnvironmentSecretName)
+		anns[annKey] = fmt.Sprintf("%x", hash.Sum(nil))
+	}
+
+	return vars, anns, nil
+}
+
 func (c *Cluster) makeDefaultResources() acidv1.Resources {
 
 	config := c.OpConfig
@@ -766,72 +843,20 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	customPodEnvVarsList := make([]v1.EnvVar, 0)
-	customPodAnnotations := make(map[string]string)
-
-	if c.OpConfig.PodEnvironmentConfigMap != "" {
-		var cm *v1.ConfigMap
-		cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("could not read ConfigMap PodEnvironmentConfigMap: %v", err)
-		}
-		for k, v := range cm.Data {
-			customPodEnvVarsList = append(customPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
-		}
+	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
+	if err != nil {
+		return nil, err
 	}
 
-	if c.OpConfig.PodEnvironmentSecretName != "" {
-		var sc *v1.Secret
-		sc, err = c.KubeClient.Secrets(c.Namespace).Get(c.OpConfig.PodEnvironmentSecretName, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
-		}
-
-		hash := sha256.New()
-		_, _ = hash.Write([]byte(c.OpConfig.PodEnvironmentSecretName))
-		_, _ = hash.Write([]byte("\x00"))
-
-		sortedKeys := make([]string, 0, len(sc.Data))
-		for k := range sc.Data {
-			sortedKeys = append(sortedKeys, k)
-		}
-		sort.Strings(sortedKeys)
-
-		for _, k := range sortedKeys {
-			sc_key := k
-			if len(c.OpConfig.PodEnvironmentSecretKeys) > 0 {
-				if val, ok := c.OpConfig.PodEnvironmentSecretKeys[k]; ok {
-					sc_key = val
-				} else {
-					c.logger.Debugf("skipping Secret key %s - not found in PodEnvironmentSecretKeys", k)
-					sc_key = ""
-				}
-			}
-			if sc_key != "" {
-				customPodEnvVarsList = append(
-					customPodEnvVarsList,
-					v1.EnvVar{
-						Name: sc_key,
-						ValueFrom: &v1.EnvVarSource{
-							SecretKeyRef: &v1.SecretKeySelector{
-								LocalObjectReference: v1.LocalObjectReference{
-									Name: c.OpConfig.PodEnvironmentSecretName,
-								},
-								Key: k,
-							},
-						},
-					},
-				)
-				_, _ = hash.Write([]byte(sc_key))
-				_, _ = hash.Write([]byte("\x00"))
-				_, _ = hash.Write(sc.Data[k])
-				_, _ = hash.Write([]byte("\x00"))
-			}
-		}
-
-		customPodAnnotations[fmt.Sprintf("follow.secret.zalando.ai/%s", c.OpConfig.PodEnvironmentSecretName)] = fmt.Sprintf("%x", hash.Sum(nil))
+	secretEnvVarsList, secretPodAnnotations, err := c.getPodEnvironmentSecretVariables()
+	if err != nil {
+		return nil, err
 	}
 
+	customPodAnnotations := secretPodAnnotations
+	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
+
+	// Don't reorder variables - avoid Pod restarts
 	sort.Slice(customPodEnvVarsList,
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
