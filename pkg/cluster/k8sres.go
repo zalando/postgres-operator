@@ -912,8 +912,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	secretEnvVarsAnnKey := fmt.Sprintf("follow.acid.zalan.do/secret.%s", c.OpConfig.PodEnvironmentSecretName)
-	var customPodAnnotations = map[string]string{ secretEnvVarsAnnKey: fmt.Sprintf("%x", secretEnvVarsHash) }
+	secretEnvVarsAnnKey := fmt.Sprintf(constants.PodEnvironmentSecretFollowAnnotationFmt,
+		c.OpConfig.PodEnvironmentSecretName)
+	var customPodAnnotations = map[string]string{
+		secretEnvVarsAnnKey: fmt.Sprintf("%x", secretEnvVarsHash),
+	}
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
