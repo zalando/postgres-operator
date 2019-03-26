@@ -156,6 +156,9 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, map[string]st
 				},
 			},
 		)
+
+		// update hash with environment variable name and secret value
+		// secret key name don't affect Pod (and is already in SecretKeyRef)
 		_, _ = hash.Write([]byte(keyToEnvName[keyName]))
 		_, _ = hash.Write([]byte("\x00"))
 		_, _ = hash.Write(secret.Data[keyName])
