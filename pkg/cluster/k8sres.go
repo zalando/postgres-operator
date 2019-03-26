@@ -157,7 +157,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, map[string]st
 			_, _ = hash.Write([]byte("\x00"))
 		}
 
-		annKey := fmt.Sprintf("follow.secret.zalando.ai/%s", c.OpConfig.PodEnvironmentSecretName)
+		annKey := fmt.Sprintf("follow.acid.zalan.do/secret.%s", c.OpConfig.PodEnvironmentSecretName)
 		anns[annKey] = fmt.Sprintf("%x", hash.Sum(nil))
 	}
 
