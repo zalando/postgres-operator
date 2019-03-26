@@ -105,12 +105,11 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	return vars, nil
 }
 
-func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, map[string]string, error) {
+func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, []byte, error) {
 	vars := make([]v1.EnvVar, 0)
-	anns := make(map[string]string)
 
 	if c.OpConfig.PodEnvironmentSecretName == "" {
-		return vars, anns, nil
+		return vars, nil, nil
 	}
 
 	secret, err := c.KubeClient.Secrets(c.Namespace).Get(c.OpConfig.PodEnvironmentSecretName, metav1.GetOptions{})
@@ -165,10 +164,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, map[string]st
 		_, _ = hash.Write([]byte("\x00"))
 	}
 
-	annKey := fmt.Sprintf("follow.acid.zalan.do/secret.%s", c.OpConfig.PodEnvironmentSecretName)
-	anns[annKey] = fmt.Sprintf("%x", hash.Sum(nil))
-
-	return vars, anns, nil
+	return vars, hash.Sum(nil), nil
 }
 
 func (c *Cluster) makeDefaultResources() acidv1.Resources {
@@ -855,12 +851,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		return nil, err
 	}
 
-	secretEnvVarsList, secretPodAnnotations, err := c.getPodEnvironmentSecretVariables()
+	secretEnvVarsList, secretEnvVarsHash, err := c.getPodEnvironmentSecretVariables()
 	if err != nil {
 		return nil, err
 	}
 
-	customPodAnnotations := secretPodAnnotations
 	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
 
 	// Don't reorder variables - avoid Pod restarts
@@ -916,6 +911,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
+
+	secretEnvVarsAnnKey := fmt.Sprintf("follow.acid.zalan.do/secret.%s", c.OpConfig.PodEnvironmentSecretName)
+	var customPodAnnotations = map[string]string{ secretEnvVarsAnnKey: fmt.Sprintf("%x", secretEnvVarsHash) }
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
