@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -429,6 +430,7 @@ func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) b
 func generatePodTemplate(
 	namespace string,
 	labels labels.Set,
+	annotations map[string]string,
 	spiloContainer *v1.Container,
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
@@ -471,13 +473,14 @@ func generatePodTemplate(
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    labels,
-			Namespace: namespace,
+			Labels:      labels,
+			Namespace:   namespace,
+			Annotations: annotations,
 		},
 		Spec: podSpec,
 	}
 	if kubeIAMRole != "" {
-		template.Annotations = map[string]string{constants.KubeIAmAnnotation: kubeIAMRole}
+		template.Annotations[constants.KubeIAmAnnotation] = kubeIAMRole
 	}
 
 	return &template, nil
@@ -764,6 +767,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	}
 
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
+	customPodAnnotations := make(map[string]string)
 
 	if c.OpConfig.PodEnvironmentConfigMap != "" {
 		var cm *v1.ConfigMap
@@ -782,7 +786,17 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		if err != nil {
 			return nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
 		}
+
+		hash := sha256.New()
+		hash.Write([]byte(c.OpConfig.PodEnvironmentSecretName))
+
+		sortedKeys := make([]string, 0, len(sc.Data))
 		for k := range sc.Data {
+			sortedKeys = append(sortedKeys, k)
+		}
+		sort.Strings(sortedKeys)
+
+		for _, k := range sortedKeys {
 			sc_key := k
 			if len(c.OpConfig.PodEnvironmentSecretKeys) > 0 {
 				if val, ok := c.OpConfig.PodEnvironmentSecretKeys[k]; ok {
@@ -807,8 +821,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 						},
 					},
 				)
+				hash.Write([]byte(sc_key))
+				hash.Write(sc.Data[k])
 			}
 		}
+
+		customPodAnnotations[fmt.Sprintf("follow.secret.zalando.ai/%s", c.OpConfig.PodEnvironmentSecretName)] = fmt.Sprintf("%x", hash.Sum(nil))
 	}
 
 	sort.Slice(customPodEnvVarsList,
@@ -868,6 +886,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
+		customPodAnnotations,
 		spiloContainer,
 		spec.InitContainers,
 		sidecarContainers,
