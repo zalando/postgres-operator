@@ -94,6 +94,13 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 			(*out)[key] = val
 		}
 	}
+	if in.PodEnvironmentSecretKeys != nil {
+		in, out := &in.PodEnvironmentSecretKeys, &out.PodEnvironmentSecretKeys
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
