@@ -284,6 +284,8 @@ data:
 
 This ConfigMap is then added as a source of environment variables to the
 Postgres StatefulSet/pods.
+Changes in the original ConfigMap will be reflected in pods environment after
+periodic resync (performed every `resync_period` seconds).
 
 ### Secret
 
@@ -324,6 +326,8 @@ data:
 
 This Secret keys are then added as a source of environment variables to the
 Postgres StatefulSet/pods.
+Changes in the Secret data will be reflected in pods environments after
+periodic resync (performed every `resync_period` seconds).
 
 ## Limiting the number of instances in clusters with `min_instances` and `max_instances`
 
