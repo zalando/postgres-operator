@@ -912,10 +912,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	customPodAnnotations := make(map[string]string)
+	var customPodAnnotations map[string]string
 	if secretEnvVarsHash != nil {
 		secretEnvVarsAnnKey := fmt.Sprintf(constants.PodEnvironmentSecretFollowAnnotationFmt,
 			c.OpConfig.PodEnvironmentSecretName)
+		customPodAnnotations = make(map[string]string)
 		customPodAnnotations[secretEnvVarsAnnKey] = fmt.Sprintf("%x", secretEnvVarsHash)
 	}
 
