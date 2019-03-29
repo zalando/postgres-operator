@@ -18,12 +18,12 @@ cd postgres-operator
 
 minikube start
 
-# start the operator using helm chart or yaml manifests;
+# start the operator using one of helm chart or yaml manifests;
 
 # - install postgres-operator with helm chart.
 helm install --name postgres-operator ./charts/postgres-operator
 
-# - otherwise you can create postgres-operator with yaml manifests.
+# - install postgres-operator with yaml manifests.
 kubectl create -f manifests/configmap.yaml  # configuration
 kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
 kubectl create -f manifests/postgres-operator.yaml  # deployment
@@ -32,10 +32,10 @@ kubectl create -f manifests/postgres-operator.yaml  # deployment
 # starting the operator may take a few seconds
 # check if operator pod is running
 
-# - if you created using helm chart
+# - if you've created the operator using helm chart
 kubectl get po -l app.kubernetes.io/name=postgres-operator
 
-# - if you created using yaml manifests
+# - if you've created the operator using yaml manifests
 kubectl get po -l name=postgres-operator
 
 
