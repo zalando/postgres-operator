@@ -21,6 +21,10 @@ minikube start
 # start the operator using one of helm chart or yaml manifests;
 
 # - install postgres-operator with helm chart.
+# 1) initialize helm
+kubectl apply -f ./charts/tiller.yaml
+helm init --service-account tiller
+# 2) install postgres-operator chart
 helm install --name postgres-operator ./charts/postgres-operator
 
 # - install postgres-operator with yaml manifests.
