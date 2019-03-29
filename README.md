@@ -34,7 +34,7 @@ manages PostgreSQL clusters on Kubernetes:
 
 # Getting started
 
-For a quick first impression follow the instructions of [this](docs/quickstart)
+For a quick first impression follow the instructions of [this](docs/quickstart.md)
 tutorial.
 
 # Google Summer of Code

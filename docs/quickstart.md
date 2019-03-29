@@ -126,4 +126,4 @@ consider adjusting the manifests to your particular setting.
 
 The operator can be configured with the provided ConfigMap
 (`manifests/configmap.yaml`) or the operator's own CRD. See
-[developer docs](developer.yaml) for details.
+[developer docs](developer.md) for details.
