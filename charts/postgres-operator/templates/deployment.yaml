@@ -34,7 +34,7 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         env:
         - name: CONFIG_MAP_NAME
-          value: "postgres-operator"
+          value: {{ template "postgres-operator.fullname" . }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
       {{- if .Values.imagePullSecrets }}
