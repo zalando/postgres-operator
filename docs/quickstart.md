@@ -11,7 +11,7 @@ for Mac to follow the steps of this tutorial. You would have to replace
 `minikube start` and `minikube delete` with your launch actions for the Docker
 built-in Kubernetes support.
 
-Clone the the repository and change to the directory. Then start minikube.
+Clone the repository and change to the directory. Then start minikube.
 
 ```bash
 git clone https://github.com/zalando/postgres-operator.git
@@ -60,12 +60,13 @@ kubectl get pod -l app.kubernetes.io/name=postgres-operator
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-After the cluster manifest is submitted a StatefulSet will be created which
-rolls out the database instances (Pods and Services). They are named like the
+After the cluster manifest is submitted the operator will create Service and
+Endpoint resources and a StatefulSet which spins up new Pod(s) given the number
+of instances specified in the manifest. All resources are named like the
 cluster. The database pods can be identified by their number suffix, starting
 from `-0`. They run the [Spilo](https://github.com/zalando/spilo) container
-image by Zalando. As for the service resources, there will be one for the master
-pod and another one for all the replicas (`-repl` suffix). Check if all
+image by Zalando. As for the services and endpoints, there will be one for the
+master pod and another one for all the replicas (`-repl` suffix). Check if all
 components are coming up. Use the label `application=spilo` to filter and list
 the label `spilo-role` to see who is currently the master.
 

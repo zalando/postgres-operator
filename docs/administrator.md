@@ -24,9 +24,9 @@ If you prefer to build the image yourself follow up down below.
 
 ### - Helm chart
 
-You can install postgres-operator with also with a [Helm](https://helm.sh/)
-chart. This requires installing the Helm CLI, first and then initializing it
-in the cluster.
+You can install postgres-operator also with a [Helm](https://helm.sh/) chart.
+This requires installing the Helm CLI first and then initializing it in the
+cluster.
 
 ```bash
     $ helm init
