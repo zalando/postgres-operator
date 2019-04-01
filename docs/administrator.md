@@ -22,6 +22,17 @@ Next deploy the postgres-operator from the docker image Zalando is using:
 
 If you prefer to build the image yourself follow up down below.
 
+### - Helm chart
+
+You can install postgres-operator also with a [Helm](https://helm.sh/) chart.
+This requires installing the Helm CLI first and then initializing it in the
+cluster.
+
+```bash
+    $ helm init
+    $ helm install --name my-release ./charts/postgres-operator
+```
+
 ## Check if CustomResourceDefinition has been registered
 
 ```bash
@@ -312,7 +323,7 @@ generated from the current cluster manifest. There are two types of scans:
 * `sync scan`, running every `resync_period` seconds for every cluster
 
 * `repair scan`, coming every `repair_period` only for those clusters that didn't
-report success as a result of the last operation applied to them. 
+report success as a result of the last operation applied to them.
 
 ## Postgres roles supported by the operator
 
@@ -329,8 +340,8 @@ Postgres database cluster:
 
 ## Understanding rolling update of Spilo pods
 
-The operator logs reasons for a rolling update with the `info` level and 
-a diff between the old and new StatefulSet specs with the `debug` level. 
+The operator logs reasons for a rolling update with the `info` level and
+a diff between the old and new StatefulSet specs with the `debug` level.
 To read the latter log entry with the escaped characters rendered, view it
 in CLI with `echo -e`. Note that the resultant message will contain some
 noise because the `PodTemplate` used by the operator is yet to be updated

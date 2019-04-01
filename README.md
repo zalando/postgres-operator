@@ -32,6 +32,11 @@ manages PostgreSQL clusters on Kubernetes:
 4. The operator aims to be hands free and configuration happens only via manifests and its own config.
    This enables easy integration in automated deploy pipelines with no access to Kubernetes directly.
 
+# Getting started
+
+For a quick first impression follow the instructions of [this](docs/quickstart.md)
+tutorial.
+
 # Google Summer of Code
 
 The Postgres Operator made it to the [Google Summer of Code 2019](https://summerofcode.withgoogle.com/)! As a brand new mentoring organization, we are now looking for our first mentees. Check [our ideas](https://github.com/zalando/postgres-operator/blob/master/docs/gsoc-2019/ideas.md#google-summer-of-code-2019) and start discussion in [the issue tracker](https://github.com/zalando/postgres-operator/issues). And don't forget to spread a word about our GSoC participation to attract even more students.
@@ -48,7 +53,7 @@ The Postgres Operator made it to the [Google Summer of Code 2019](https://summer
 
 The rest of this document is a tutorial to get you up and running locally with the operator on Minikube.
 
-## Overview of involved entities 
+## Overview of involved entities
 
 Here is a diagram, that summarizes what would be created by the operator, when a
 new Postgres cluster CRD is submitted:
@@ -64,69 +69,9 @@ These two diagrams should help you to understand the basics of what kind of
 functionality the operator provides.
 
 There is a browser-friendly version of this documentation at [postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
-   
+
 ## Community      
 
 There are two places to get in touch with the community:
 1. The [GitHub issue tracker](https://github.com/zalando/postgres-operator/issues)
 2. The #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com)
-
-## Quickstart
-
-Prerequisites:
-
-* [minikube](https://github.com/kubernetes/minikube/releases)
-* [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl)
-
-Note that you can also use built-in Kubernetes support in the Docker Desktop
-for Mac to follow the steps of this tutorial. You would have to replace
-`minikube start` and `minikube delete` with your launch actionsfor the Docker
-built-in Kubernetes support.
-
-### Local execution
-
-```bash
-git clone https://github.com/zalando/postgres-operator.git
-cd postgres-operator
-
-minikube start
-
-# start the operator; may take a few seconds
-kubectl create -f manifests/configmap.yaml  # configuration
-kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
-kubectl create -f manifests/postgres-operator.yaml  # deployment
-
-# create a Postgres cluster in a non-default namespace
-kubectl create namespace test
-kubectl config set-context minikube --namespace=test
-kubectl create -f manifests/minimal-postgres-manifest.yaml
-
-# connect to the Postgres master via psql
-# operator creates the relevant k8s secret
-export HOST_PORT=$(minikube service --namespace test acid-minimal-cluster --url | sed 's,.*/,,')
-export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
-export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
-export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
-psql -U postgres
-
-# tear down cleanly
-minikube delete
-```
-
-We have automated starting the operator and submitting the `acid-minimal-cluster` for you:
-```bash
-cd postgres-operator
-./run_operator_locally.sh
-```
-
-Note we provide the `/manifests` directory as an example only; you should consider adjusting the manifests to your particular setting.
-
-## Running and testing the operator
-
-The best way to test the operator is to run it locally in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/). See developer docs(`docs/developer.yaml`) for details.
-
-### Configuration Options
-
-The operator can be configured with the provided ConfigMap(`manifests/configmap.yaml`) or the operator's own CRD.
-
-
