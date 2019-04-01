@@ -29,6 +29,16 @@ ConfigMap is used to store the configuration of the operator
 
 ## Deploying the operator
 
+### - Helm chart
+
+You can install postgres-operator with helm chart.
+
+```bash
+    $ helm install --name my-release ./charts/postgres-operator
+```
+
+### - Kubernetes manifest
+
 First you need to install the service account definition in your Minikube cluster.
 
 ```bash
@@ -153,7 +163,7 @@ minikube. The following steps will get you the docker image built and deployed.
 
 # Code generation
 
-The operator employs k8s-provided code generation to obtain deep copy methods and Kubernetes-like APIs for its custom resource definitons, namely the Postgres CRD and the operator CRD. The usage of the code generation follows conventions from the k8s community. Relevant scripts live in the `hack` directory:  the `update-codegen.sh` triggers code generation for the APIs defined in `pkg/apis/acid.zalan.do/`, 
+The operator employs k8s-provided code generation to obtain deep copy methods and Kubernetes-like APIs for its custom resource definitons, namely the Postgres CRD and the operator CRD. The usage of the code generation follows conventions from the k8s community. Relevant scripts live in the `hack` directory:  the `update-codegen.sh` triggers code generation for the APIs defined in `pkg/apis/acid.zalan.do/`,
 the `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI). The `/pkg/generated/` contains the resultant code. To make these scripts work, you may need to `export GOPATH=$(go env GOPATH)`
 
 References for code generation are:
@@ -282,5 +292,5 @@ To test the multinamespace setup, you can use
 ```
 It will automatically create an `acid-minimal-cluster` in the namespace `test`. Then you can for example check the Patroni logs:
 ```
-kubectl logs acid-minimal-cluster-0 
+kubectl logs acid-minimal-cluster-0
 ```
