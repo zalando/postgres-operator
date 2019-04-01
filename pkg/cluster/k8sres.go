@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"sort"
 
 	"github.com/sirupsen/logrus"
@@ -105,6 +106,18 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	return vars, nil
 }
 
+func hashUpdate(prevHash hash.Hash, val []byte) hash.Hash {
+	var newHash hash.Hash
+	if prevHash != nil {
+		newHash = prevHash
+	} else {
+		newHash = sha256.New()
+	}
+	_, _ = newHash.Write(val)
+	_, _ = newHash.Write([]byte("\x00")) // NUL-byte separator
+	return newHash
+}
+
 func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, []byte, error) {
 	vars := make([]v1.EnvVar, 0)
 
@@ -122,7 +135,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, []byte, error
 	if len(c.OpConfig.PodEnvironmentSecretKeys) > 0 {
 		for k, v := range c.OpConfig.PodEnvironmentSecretKeys {
 			_, ok := secret.Data[k]
-			if ! ok {
+			if !ok {
 				return nil, nil, fmt.Errorf("could not read Secret key %s (present in PodEnvironmentSecretKeys)", k)
 			}
 			sortedKeys = append(sortedKeys, k)
@@ -136,9 +149,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, []byte, error
 	}
 	sort.Strings(sortedKeys)
 
-	hash := sha256.New()
-	_, _ = hash.Write([]byte(c.OpConfig.PodEnvironmentSecretName))
-	_, _ = hash.Write([]byte("\x00"))
+	followHash := hashUpdate(nil, []byte(c.OpConfig.PodEnvironmentSecretName))
 
 	for _, keyName := range sortedKeys {
 		vars = append(
@@ -158,13 +169,11 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, []byte, error
 
 		// update hash with environment variable name and secret value
 		// secret key name don't affect Pod (and is already in SecretKeyRef)
-		_, _ = hash.Write([]byte(keyToEnvName[keyName]))
-		_, _ = hash.Write([]byte("\x00"))
-		_, _ = hash.Write(secret.Data[keyName])
-		_, _ = hash.Write([]byte("\x00"))
+		followHash = hashUpdate(followHash, []byte(keyToEnvName[keyName]))
+		followHash = hashUpdate(followHash, secret.Data[keyName])
 	}
 
-	return vars, hash.Sum(nil), nil
+	return vars, followHash.Sum(nil), nil
 }
 
 func (c *Cluster) makeDefaultResources() acidv1.Resources {
