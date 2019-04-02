@@ -67,10 +67,10 @@ type Scalyr struct {
 
 // LogicalBackup
 type LogicalBackup struct {
-	EnableLogicalBackup      bool   `json:"enable_logical_backup,omitempty"`
-	LogicalBackupSchedule    string `json:"logical_backup_schedule,omitempty"`
-	LogicalBackupDockerImage string `json:"logical_backup_docker_image,omitempty"`
-	LogicalBackupS3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
+	EnableLogicalBackup      bool   `name:"enable_logical_backup" default:"false"`
+	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage string `name:"logical_backup_image" default:""`
+	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket"`
 }
 
 // Config describes operator config

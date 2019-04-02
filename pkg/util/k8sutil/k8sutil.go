@@ -87,6 +87,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
+	kubeClient.CronJobsGetter = client.BatchV1beta1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {

@@ -611,9 +611,14 @@ func (c *Cluster) createRoles() (err error) {
 
 func (c *Cluster) createBackupCronJob() (err error) {
 
-	c.setProcessName("creating a k8s cron job for backups")
+	c.setProcessName("creating a k8s cron job for logical backups")
 
-	cronJobSpec := c.generateCronJob()
+	cronJobSpec, err := c.generateCronJob()
+	if err != nil {
+		return fmt.Errorf("could not generate k8s cron job spec: %v", err)
+	}
+	c.logger.Debugf("Generated cronJobSpec: %v", cronJobSpec)
+
 	cronJob, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(cronJobSpec)
 	if err != nil {
 		return fmt.Errorf("could not create k8s cron job: %v", err)

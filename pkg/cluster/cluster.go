@@ -303,7 +303,7 @@ func (c *Cluster) Create() error {
 		if err := c.createBackupCronJob(); err != nil {
 			return fmt.Errorf("could not create a k8s cron job for logical backups: %v", err)
 		}
-		c.logger.Infof("a k8s cron job for logical backup has been successfully created")
+		c.logger.Info("a k8s cron job for logical backup has been successfully created")
 	}
 
 	if err := c.listResources(); err != nil {

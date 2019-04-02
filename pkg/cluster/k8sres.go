@@ -22,7 +22,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -1255,36 +1254,67 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 	return
 }
 
-func (c *Cluster) generateCronJob() *batchv1beta1.CronJob {
+func (c *Cluster) generateCronJob() (*batchv1beta1.CronJob, error) {
 
-	jobSpec := batchv1.JobSpec{Template: v1.PodTemplateSpec{
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				corev1.Container{
-					Name:    "Hello world",
-					Image:   "hello-world",
-					Command: []string{"date", "echo Hello from the Kubernetes cluster"},
-				},
-			},
-		},
-	},
+	var (
+		err         error
+		podTemplate *v1.PodTemplateSpec
+	)
+
+	c.logger.Debug("Generating logical backup pod template")
+
+	defaultResources := c.makeDefaultResources()
+	resourceRequirements, err := generateResourceRequirements(c.Spec.Resources, defaultResources)
+	volumeMounts := generateVolumeMounts()
+
+	logicalBackupContainer := generateSpiloContainer(
+		"logical-backup",
+		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
+		resourceRequirements,
+		[]v1.EnvVar{},
+		volumeMounts,
+	)
+
+	if podTemplate, err = generatePodTemplate(
+		c.Namespace,
+		c.labelsSet(true),
+		logicalBackupContainer,
+		[]v1.Container{},
+		[]v1.Container{},
+		&[]v1.Toleration{},
+		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		c.OpConfig.PodServiceAccountName,
+		c.OpConfig.KubeIAMRole,
+		"",
+		false,
+		false,
+		c.OpConfig.PodAntiAffinityTopologyKey); err != nil {
+		return nil, fmt.Errorf("could not generate pod template for logical backup cron job: %v", err)
 	}
+
+	jobSpec := batchv1.JobSpec{Template: *podTemplate}
 
 	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
 		Spec: jobSpec,
 	}
 
+	schedule := c.Postgresql.Spec.LogicalBackupSchedule
+	if schedule == "" {
+		schedule = c.OpConfig.LogicalBackupSchedule
+	}
+
 	cronJob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "Dummy cron job",
+			Name:      "logical-backup-" + c.clusterName().String(),
 			Namespace: c.Namespace,
 			Labels:    c.labelsSet(true),
 		},
 		Spec: batchv1beta1.CronJobSpec{
-			Schedule:    c.Postgresql.Spec.LogicalBackupSchedule,
+			Schedule:    schedule,
 			JobTemplate: jobTemplateSpec,
 		},
 	}
 
-	return cronJob
+	return cronJob, nil
 }
