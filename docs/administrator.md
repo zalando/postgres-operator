@@ -351,3 +351,5 @@ The operator can manage k8s cron jobs to do periodic logical backups of all PG c
 2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. 
 
 3. The operator does not remove old backups.
+
+For that feature to work, your RBAC policy must enable operations on the `cronjobs` resource from the `batch` API group for the operator service account.
