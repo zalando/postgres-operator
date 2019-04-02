@@ -254,6 +254,10 @@ configuration they are grouped under the `kubernetes` key.
   of stateful sets of PG clusters. The default is `ordered_ready`, the second
   possible value is `parallel`.
 
+* **spilo_fsgroup**
+  the Persistent Volume for the pods in the StatefulSet will be owned by the GID (Group ID) and any files created in that volume.
+  This is required to run Spilo as a non-root process, but requires a custom Spilo image. 
+
 ## Kubernetes resource requests
 
 This group allows you to configure resource requests for the Postgres pods.
