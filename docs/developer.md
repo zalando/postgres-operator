@@ -189,7 +189,7 @@ localhost:8080 by doing:
 The inner 'query' gets the name of the postgres operator pod, and the outer
 enables port forwarding. Afterwards, you can access the operator API with:
 
-    $ curl http://127.0.0.1:8080/$endpoint| jq .
+    $ curl --location http://127.0.0.1:8080/$endpoint | jq .
 
 The available endpoints are listed below. Note that the worker ID is an integer
 from 0 up to 'workers' - 1 (value configured in the operator configuration and
