@@ -15,6 +15,7 @@ data:
   secret_name_template: '{username}.{cluster}.credentials'
   super_username: postgres
   enable_teams_api: "false"
+  spilo_privileged: "false"
   # custom_service_annotations:
   #   "keyx:valuez,keya:valuea"
   # set_memory_request_to_limit: "true"
