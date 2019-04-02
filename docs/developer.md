@@ -29,14 +29,6 @@ ConfigMap is used to store the configuration of the operator
 
 ## Deploying the operator
 
-### - Helm chart
-
-You can install postgres-operator with helm chart.
-
-```bash
-    $ helm install --name my-release ./charts/postgres-operator
-```
-
 ### - Kubernetes manifest
 
 First you need to install the service account definition in your Minikube cluster.
@@ -52,6 +44,17 @@ Next deploy the postgres-operator from the docker image Zalando is using:
 ```
 
 If you prefer to build the image yourself follow up down below.
+
+### - Helm chart
+
+You can install postgres-operator also with a [Helm](https://helm.sh/) chart.
+This requires installing the Helm CLI first and then initializing it in the
+cluster.
+
+```bash
+    $ helm init
+    $ helm install --name my-release ./charts/postgres-operator
+```
 
 ## Check if CustomResourceDefinition has been registered
 
