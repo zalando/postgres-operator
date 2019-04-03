@@ -1266,11 +1266,12 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	defaultResources := c.makeDefaultResources()
 	resourceRequirements, err := generateResourceRequirements(c.Spec.Resources, defaultResources)
 
+	envVars := c.generateLogicalBackupPodEnvVars()
 	logicalBackupContainer := generateSpiloContainer(
 		"logical-backup",
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
 		resourceRequirements,
-		[]v1.EnvVar{},
+		envVars,
 		[]v1.VolumeMount{},
 	)
 
@@ -1320,4 +1321,55 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	}
 
 	return cronJob, nil
+}
+
+// generateLogicalBackupPodEnvVars generates environment variables for the pod started
+// by the logical backup cron job
+func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
+
+	envVars := []v1.EnvVar{
+		{
+			Name:  "CLUSTER_NAME",
+			Value: c.Name,
+		},
+		{
+			Name:  "PG_PORT",
+			Value: "5432",
+		},
+		{
+			Name:  "PGUSER",
+			Value: c.OpConfig.SuperUsername,
+		},
+		{
+			Name: "PGPASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.credentialSecretName(c.OpConfig.SuperUsername),
+					},
+					Key: "password",
+				},
+			},
+		},
+		{
+			Name:  "BUCKET",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
+		},
+		{
+			Name:  "BACKUP",
+			Value: c.Name,
+		},
+		{
+			Name:  "PG_VERSION",
+			Value: c.Spec.PgVersion,
+		},
+		{
+			Name:  "USE_LOGICAL_BACKUP_LABEL",
+			Value: "true",
+		},
+	}
+
+	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+
+	return envVars
 }
