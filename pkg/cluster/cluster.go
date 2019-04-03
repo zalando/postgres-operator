@@ -637,6 +637,11 @@ func (c *Cluster) Delete() {
 	if err := c.deletePatroniClusterObjects(); err != nil {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
 	}
+
+	if err := c.deleteLogicalBackupJob(); err != nil {
+		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+	}
+
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
@@ -1015,4 +1020,15 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	}
 
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
+}
+
+func (c *Cluster) deleteLogicalBackupJob() error {
+
+	if c.logicalBackupJob == nil {
+		return nil
+	}
+
+	c.logger.Debugf("removing the logical backup job")
+
+	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(c.logicalBackupJob.ObjectMeta.Name, c.deleteOptions)
 }
