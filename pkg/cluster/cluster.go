@@ -149,30 +149,30 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
-func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
+func (c *Cluster) setPostgresClusterStatus(postgresClusterStatus acidv1.PostgresStatus) {
 	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
 	var (
 		err error
 		b   []byte
 	)
-	if b, err = json.Marshal(status); err != nil {
-		c.logger.Errorf("could not marshal status: %v", err)
+	if b, err = json.Marshal(postgresClusterStatus); err != nil {
+		c.logger.Errorf("could not marshal Postgres cluster status: %v", err)
 	}
 
-	patch := []byte(fmt.Sprintf(`{"status": %s}`, string(b)))
+	patch := []byte(fmt.Sprintf(`{"Postgres cluster status": %s}`, string(b)))
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
 	// we should take advantage of it.
 	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch)
 	if err != nil {
-		c.logger.Errorf("could not update status: %v", err)
+		c.logger.Errorf("could not update Postgres cluster status: %v", err)
 	}
 	// update the spec, maintaining the new resourceVersion.
 	c.setSpec(newspec)
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status == acidv1.ClusterStatusCreating
+	return c.PostgresClusterStatus == acidv1.ClusterStatusCreating
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
@@ -214,13 +214,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.setStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			c.setPostgresClusterStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.setStatus(acidv1.ClusterStatusAddFailed)
+			c.setPostgresClusterStatus(acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.setStatus(acidv1.ClusterStatusCreating)
+	c.setPostgresClusterStatus(acidv1.ClusterStatusCreating)
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
@@ -487,14 +487,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setStatus(acidv1.ClusterStatusUpdating)
+	c.setPostgresClusterStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.setStatus(acidv1.ClusterStatusUpdateFailed)
+			c.setPostgresClusterStatus(acidv1.ClusterStatusUpdateFailed)
 		} else {
-			c.setStatus(acidv1.ClusterStatusRunning)
+			c.setPostgresClusterStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 
@@ -633,7 +633,7 @@ func (c *Cluster) Delete() {
 func (c *Cluster) NeedsRepair() (bool, acidv1.PostgresStatus) {
 	c.specMu.RLock()
 	defer c.specMu.RUnlock()
-	return !c.Status.Success(), c.Status
+	return !c.PostgresClusterStatus.Success(), c.PostgresClusterStatus
 
 }
 
@@ -853,12 +853,12 @@ func (c *Cluster) GetCurrentProcess() Process {
 }
 
 // GetStatus provides status of the cluster
-func (c *Cluster) GetStatus() *ClusterStatus {
+func (c *Cluster) GetPostgresClusterStatus() *ClusterStatus {
 	return &ClusterStatus{
-		Cluster: c.Spec.ClusterName,
-		Team:    c.Spec.TeamID,
-		Status:  c.Status,
-		Spec:    c.Spec,
+		Cluster:               c.Spec.ClusterName,
+		Team:                  c.Spec.TeamID,
+		PostgresClusterStatus: c.PostgresClusterStatus,
+		Spec:                  c.Spec,
 
 		MasterService:       c.GetServiceMaster(),
 		ReplicaService:      c.GetServiceReplica(),

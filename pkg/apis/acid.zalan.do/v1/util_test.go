@@ -128,7 +128,7 @@ var unmarshalCluster = []struct {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "acid-testcluster1",
 		},
-		Status: ClusterStatusInvalid,
+		PostgresClusterStatus: ClusterStatusInvalid,
 		// This error message can vary between Go versions, so compute it for the current version.
 		Error: json.Unmarshal([]byte(`{"teamId": 0}`), &PostgresSpec{}).Error(),
 	},
@@ -284,9 +284,9 @@ var unmarshalCluster = []struct {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "teapot-testcluster1",
 			},
-			Spec:   PostgresSpec{TeamID: "acid"},
-			Status: ClusterStatusInvalid,
-			Error:  errors.New("name must match {TEAM}-{NAME} format").Error(),
+			Spec:                  PostgresSpec{TeamID: "acid"},
+			PostgresClusterStatus: ClusterStatusInvalid,
+			Error:                 errors.New("name must match {TEAM}-{NAME} format").Error(),
 		},
 		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"teapot-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":"Invalid"}`), nil},
 	{
@@ -350,8 +350,8 @@ var postgresqlList = []struct {
 					AllowedSourceRanges: []string{"185.85.220.0/22"},
 					NumberOfInstances:   1,
 				},
-				Status: ClusterStatusRunning,
-				Error:  "",
+				PostgresClusterStatus: ClusterStatusRunning,
+				Error:                 "",
 			}},
 		},
 		nil},

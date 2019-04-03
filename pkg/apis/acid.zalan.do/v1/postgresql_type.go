@@ -15,9 +15,9 @@ type Postgresql struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PostgresSpec   `json:"spec"`
-	Status PostgresStatus `json:"status,omitempty"`
-	Error  string         `json:"-"`
+	Spec                  PostgresSpec   `json:"spec"`
+	PostgresClusterStatus PostgresStatus `json:"status,omitempty"`
+	Error                 string         `json:"-"`
 }
 
 // PostgresSpec defines the specification for the PostgreSQL TPR.

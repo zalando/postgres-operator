@@ -89,7 +89,7 @@ func (c *Controller) queueEvents(list *acidv1.PostgresqlList, event EventType) {
 		activeClustersCnt++
 		// check if that cluster needs repair
 		if event == EventRepair {
-			if pg.Status.Success() {
+			if pg.PostgresClusterStatus.Success() {
 				continue
 			} else {
 				clustersToRepair++
