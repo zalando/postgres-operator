@@ -613,7 +613,7 @@ func (c *Cluster) createBackupCronJob() (err error) {
 
 	c.setProcessName("creating a k8s cron job for logical backups")
 
-	cronJobSpec, err := c.generateCronJob()
+	cronJobSpec, err := c.generateLogicalBackupJob()
 	if err != nil {
 		return fmt.Errorf("could not generate k8s cron job spec: %v", err)
 	}

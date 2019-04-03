@@ -1254,7 +1254,7 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 	return
 }
 
-func (c *Cluster) generateCronJob() (*batchv1beta1.CronJob, error) {
+func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	var (
 		err         error
@@ -1293,6 +1293,10 @@ func (c *Cluster) generateCronJob() (*batchv1beta1.CronJob, error) {
 		return nil, fmt.Errorf("could not generate pod template for logical backup cron job: %v", err)
 	}
 
+	// pods of k8s jobs support only "OnFailure" or "Never"
+	// but the default is "Always"
+	podTemplate.Spec.RestartPolicy = "OnFailure"
+
 	jobSpec := batchv1.JobSpec{Template: *podTemplate}
 
 	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
@@ -1306,7 +1310,7 @@ func (c *Cluster) generateCronJob() (*batchv1beta1.CronJob, error) {
 
 	cronJob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "logical-backup-" + c.clusterName().String(),
+			Name:      "logical-backup-" + c.clusterName().Namespace + "-" + c.clusterName().Name,
 			Namespace: c.Namespace,
 			Labels:    c.labelsSet(true),
 		},
