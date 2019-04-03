@@ -1265,14 +1265,13 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	defaultResources := c.makeDefaultResources()
 	resourceRequirements, err := generateResourceRequirements(c.Spec.Resources, defaultResources)
-	volumeMounts := generateVolumeMounts()
 
 	logicalBackupContainer := generateSpiloContainer(
 		"logical-backup",
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
 		resourceRequirements,
 		[]v1.EnvVar{},
-		volumeMounts,
+		[]v1.VolumeMount{},
 	)
 
 	if podTemplate, err = generatePodTemplate(
