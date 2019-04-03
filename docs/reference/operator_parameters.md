@@ -212,6 +212,9 @@ configuration they are grouped under the `kubernetes` key.
   class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
   that should be assigned to the Postgres pods. The priority class itself must be defined in advance.
   Default is empty (use the default priority class).
+
+* **spilo_privileged**
+  whether the Spilo container should run in privileged mode. Privileged mode is used for AWS volume resizing and not required if you don't need that capability. The default is `false`.
   
  * **master_pod_move_timeout**
    The period of time to wait for the success of migration of master pods from an unschedulable node.
