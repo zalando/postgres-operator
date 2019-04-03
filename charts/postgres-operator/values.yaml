@@ -25,6 +25,7 @@ config:
   secret_name_template: '{username}.{cluster}.credentials'
   super_username: postgres
   enable_teams_api: "false"
+  spilo_privileged: "false"
   # set_memory_request_to_limit: "true"
   # postgres_superuser_teams: "postgres_superusers"
   # enable_team_superuser: "false"
