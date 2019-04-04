@@ -98,6 +98,8 @@ type Config struct {
 	WALES3Bucket                           string            `name:"wal_s3_bucket"`
 	LogS3Bucket                            string            `name:"log_s3_bucket"`
 	KubeIAMRole                            string            `name:"kube_iam_role"`
+	AdditionalSecretMount                  string            `name:"additional_secret_mount"`
+	AdditionalSecretMountPath              string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
 	DebugLogging                           bool              `name:"debug_logging" default:"true"`
 	EnableDBAccess                         bool              `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI                         bool              `name:"enable_teams_api" default:"true"`
