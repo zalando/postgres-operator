@@ -85,12 +85,12 @@ func validateCloneClusterDescription(clone *CloneDescription) error {
 }
 
 // Success of the current Status
-func (postgresClusterStatus PostgresStatus) Success() bool {
-	return postgresClusterStatus != ClusterStatusAddFailed &&
-		postgresClusterStatus != ClusterStatusUpdateFailed &&
-		postgresClusterStatus != ClusterStatusSyncFailed
+func (postgresStatus PostgresStatus) Success() bool {
+	return postgresStatus.PostgresClusterStatus != ClusterStatusAddFailed &&
+		postgresStatus.PostgresClusterStatus != ClusterStatusUpdateFailed &&
+		postgresStatus.PostgresClusterStatus != ClusterStatusSyncFailed
 }
 
-func (postgresClusterStatus PostgresStatus) String() string {
-	return string(postgresClusterStatus)
+func (postgresStatus PostgresStatus) String() string {
+	return string(postgresStatus.PostgresClusterStatus)
 }

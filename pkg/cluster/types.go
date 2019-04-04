@@ -63,9 +63,9 @@ type ClusterStatus struct {
 	StatefulSet         *v1beta1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 
-	CurrentProcess        Process
-	Worker                uint32
-	PostgresClusterStatus acidv1.PostgresStatus
-	Spec                  acidv1.PostgresSpec
-	Error                 error
+	CurrentProcess Process
+	Worker         uint32
+	Status         acidv1.PostgresStatus
+	Spec           acidv1.PostgresSpec
+	Error          error
 }

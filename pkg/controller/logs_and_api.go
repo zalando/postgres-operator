@@ -29,7 +29,7 @@ func (c *Controller) ClusterStatus(team, namespace, cluster string) (*cluster.Cl
 		return nil, fmt.Errorf("could not find cluster")
 	}
 
-	status := cl.GetPostgresClusterStatus()
+	status := cl.GetStatus()
 	status.Worker = c.clusterWorkerID(clusterName)
 
 	return status, nil
