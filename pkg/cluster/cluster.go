@@ -156,7 +156,7 @@ func (c *Cluster) setStatus(status acidv1.PostgresClusterStatus) {
 		b   []byte
 	)
 	if b, err = json.Marshal(status); err != nil {
-		c.logger.Errorf("could not marshal Postgres cluster status: %v", err)
+		c.logger.Errorf("could not marshal status: %v", err)
 	}
 
 	patch := []byte(fmt.Sprintf(`{"Postgres cluster status": %s}`, string(b)))
