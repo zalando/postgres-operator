@@ -384,7 +384,7 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			Privileged: &privilegedMode,
+			Privileged:             &privilegedMode,
 			ReadOnlyRootFilesystem: &falseBool,
 		},
 	}
