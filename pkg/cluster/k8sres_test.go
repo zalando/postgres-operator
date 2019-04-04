@@ -3,8 +3,6 @@ package cluster
 import (
 	"reflect"
 
-	"k8s.io/api/core/v1"
-
 	"testing"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -12,6 +10,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -386,6 +385,79 @@ func TestCloneEnv(t *testing.T) {
 		if env.Value != tt.env.Value {
 			t.Errorf("%s %s: Expected env value %s, have %s instead",
 				testName, tt.subTest, tt.env.Value, env.Value)
+		}
+	}
+}
+
+func TestSecretVolume(t *testing.T) {
+	testName := "TestSecretVolume"
+	tests := []struct {
+		subTest   string
+		podSpec   *v1.PodSpec
+		secretPos int
+	}{
+		{
+			subTest: "empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{},
+					},
+				},
+			},
+			secretPos: 0,
+		},
+		{
+			subTest: "non empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			secretPos: 1,
+		},
+	}
+	for _, tt := range tests {
+		additionalSecretMount := "aws-iam-s3-role"
+		additionalSecretMountPath := "/meta/credentials"
+
+		volsumb := len(tt.podSpec.Containers[0].VolumeMounts)
+		//fmt.Printf("%+v \n", volsumb)
+
+		addSecretVolume(tt.podSpec, additionalSecretMount, additionalSecretMountPath)
+
+		volumeName := tt.podSpec.Volumes[tt.secretPos].Name
+
+		if volumeName != additionalSecretMount {
+			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
+				testName, tt.subTest, additionalSecretMount, volumeName)
+		}
+
+		for i := range tt.podSpec.Containers {
+			volumeMountName := tt.podSpec.Containers[i].VolumeMounts[tt.secretPos].Name
+
+			if volumeMountName != additionalSecretMount {
+				t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
+					testName, tt.subTest, additionalSecretMount, volumeMountName)
+			}
+		}
+
+		volsuma := len(tt.podSpec.Containers[0].VolumeMounts)
+		//fmt.Printf("%+v \n", volsuma)
+
+		if volsuma != volsumb+1 {
+			t.Errorf("Got not expected number of VolumeMounts: got %v instead of %v",
+				volsuma, volsumb+1)
 		}
 	}
 }
