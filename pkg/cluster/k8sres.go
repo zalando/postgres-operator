@@ -1279,6 +1279,25 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		[]v1.VolumeMount{},
 	)
 
+	labels := map[string]string{
+		"version":    c.Name,
+		"spilo-role": "replica",
+	}
+	podAffinityTerm := v1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+		TopologyKey: "kubernetes.io/hostname",
+	}
+	podAffinity := v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
+				Weight:          1,
+				PodAffinityTerm: podAffinityTerm,
+			},
+			},
+		}}
+
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
@@ -1300,6 +1319,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	// pods of k8s jobs support only "OnFailure" or "Never"
 	// but the default is "Always"
 	podTemplate.Spec.RestartPolicy = "OnFailure"
+	podTemplate.Spec.Affinity = &podAffinity
 
 	jobSpec := batchv1.JobSpec{Template: *podTemplate}
 
