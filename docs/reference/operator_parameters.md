@@ -488,7 +488,7 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
     Docker image for the pods of the cron job. Must implement backup/uploading logic. Default: empty.
 
   * **logical_backup_s3_bucket**
-    S3 bucket to store backup results. Default: same as the bucket as for WAL.
+    S3 bucket to store backup results. The bucket has to be present and accessible by Postgres pods. Default: empty.
 
 
 For the configmap operator configuration, the [default parameter values](https://github.com/zalando-incubator/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
