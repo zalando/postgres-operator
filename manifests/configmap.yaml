@@ -16,6 +16,7 @@ data:
   super_username: postgres
   enable_teams_api: "false"
   spilo_privileged: "false"
+  binaries_path_template: "/usr/lib/postgresql/%s/bin"
   # custom_service_annotations:
   #   "keyx:valuez,keya:valuea"
   # set_memory_request_to_limit: "true"

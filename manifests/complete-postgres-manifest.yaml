@@ -52,6 +52,7 @@ spec:
         type: logical
         database: foo
         plugin: pgoutput
+    binaries_path_template: "/usr/lib/postgresql/%s/bin"
     ttl: 30
     loop_wait: &loop_wait 10
     retry_timeout: 10

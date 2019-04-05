@@ -222,7 +222,13 @@ PatroniInitDBParams:
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
-	config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
+	logger.Infof("binaries: %s", patroni.PgBinariesLocationTemplate)
+	if patroni.PgBinariesLocationTemplate != "" {
+		config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(patroni.PgBinariesLocationTemplate, pg.PgVersion)
+	} else {
+		config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
+	}
+
 	if len(pg.Parameters) > 0 {
 		local, bootstrap := getLocalAndBoostrapPostgreSQLParameters(pg.Parameters)
 

@@ -24,6 +24,7 @@ configuration:
     oauth_token_secret_name: postgresql-operator
     pod_role_label: spilo-role
     spilo_privileged: false
+    binaries_path_template: "/usr/lib/postgresql/%s/bin"
     cluster_labels:
         application: spilo
     # inherited_labels:
