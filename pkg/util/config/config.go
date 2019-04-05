@@ -69,7 +69,7 @@ type Scalyr struct {
 type LogicalBackup struct {
 	EnableLogicalBackup      bool   `name:"enable_logical_backup" default:"false"`
 	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage string `name:"logical_backup_image" default:""`
+	LogicalBackupDockerImage string `name:"logical_backup_docker_image" default:""`
 	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket"`
 }
 
