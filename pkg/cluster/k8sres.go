@@ -1257,14 +1257,18 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	var (
-		err         error
-		podTemplate *v1.PodTemplateSpec
+		err                  error
+		podTemplate          *v1.PodTemplateSpec
+		resourceRequirements *v1.ResourceRequirements
 	)
 
 	c.logger.Debug("Generating logical backup pod template")
 
 	defaultResources := c.makeDefaultResources()
-	resourceRequirements, err := generateResourceRequirements(c.Spec.Resources, defaultResources)
+	resourceRequirements, err = generateResourceRequirements(c.Spec.Resources, defaultResources)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements for the pod of a logical backup cron job: %v", err)
+	}
 
 	envVars := c.generateLogicalBackupPodEnvVars()
 	logicalBackupContainer := generateSpiloContainer(

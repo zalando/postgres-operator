@@ -123,7 +123,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   Determines if the logical backup of this cluster should be taken and uploaded to S3. Default: false.
 
 * **logicalBackupSchedule**
-  Backup schedule in the Cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
+  Schedule for the logical backup k8s cron job. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
 
 ## Postgres parameters
 

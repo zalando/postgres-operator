@@ -482,7 +482,7 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
     Determines if the operator creates a Kubernets Cron job to do a logical backup of all Postgres clusters it controls. Default: false.
   
   * **logical_backup_schedule**
-    Backup schedule in the cron format. Default: "30 00 \* \* \*"
+    Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
   
   * **logical_backup_docker_image**
     Docker image for the pods of the cron job. Must implement backup/uploading logic. Default: empty.
