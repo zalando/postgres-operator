@@ -1316,10 +1316,11 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		return nil, fmt.Errorf("could not generate pod template for logical backup cron job: %v", err)
 	}
 
-	// pods of k8s jobs support only "OnFailure" or "Never"
-	// but the default is "Always"
-	podTemplate.Spec.RestartPolicy = "OnFailure"
 	podTemplate.Spec.Affinity = &podAffinity
+
+	// affects containers within a pod on the same node
+	// pods of k8s jobs support only "OnFailure" or "Never"
+	podTemplate.Spec.RestartPolicy = "Never"
 
 	jobSpec := batchv1.JobSpec{Template: *podTemplate}
 
