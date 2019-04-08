@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"k8s.io/api/apps/v1beta1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -624,6 +625,31 @@ func (c *Cluster) createBackupCronJob() (err error) {
 		return fmt.Errorf("could not create k8s cron job: %v", err)
 	}
 	c.logicalBackupJob = cronJob
+
+	return nil
+}
+
+func (c *Cluster) updateCronJob(newJob *batchv1beta1.CronJob) error {
+	c.setProcessName("updating logical backup job")
+
+	if c.logicalBackupJob == nil {
+		return fmt.Errorf("there is no logical backup job in the cluster")
+	}
+
+	patchData, err := specPatch(newJob.Spec)
+	if err != nil {
+		return fmt.Errorf("could not form patch for the logical backup job: %v", err)
+	}
+
+	// update the backup job spec
+	job, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
+		c.logicalBackupJob.Name,
+		types.MergePatchType,
+		patchData, "")
+	if err != nil {
+		return fmt.Errorf("could not patch logical backup job: %v", err)
+	}
+	c.logicalBackupJob = job
 
 	return nil
 }

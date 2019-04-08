@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,6 +91,16 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	if err = c.syncPodDisruptionBudget(false); err != nil {
 		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
 		return err
+	}
+
+	// create a logical backup job unless we are running without pods or disable that feature explicitly
+	if c.Spec.EnableLogicalBackup && c.getNumberOfInstances(&newSpec.Spec) > 0 {
+
+		c.logger.Debug("syncing logical backup jobs")
+		if err = c.syncLogicalBackupJob(); err != nil {
+			err = fmt.Errorf("could not sync logical backup jobs: %v", err)
+			return err
+		}
 	}
 
 	return err
@@ -514,6 +525,50 @@ func (c *Cluster) syncDatabases() error {
 	for datname, owner := range alterOwnerDatabases {
 		if err = c.executeAlterDatabaseOwner(datname, owner); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncLogicalBackupJob() error {
+	var (
+		job        *batchv1beta1.CronJob
+		desiredJob *batchv1beta1.CronJob
+		err        error
+	)
+	c.setProcessName("syncing the logical backup job")
+
+	if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(c.logicalBackupJob.Name, metav1.GetOptions{}); err == nil {
+
+		desiredJob, err = c.generateLogicalBackupJob()
+		if err = c.updateCronJob(desiredJob); err != nil {
+			return fmt.Errorf("could not generate the desired job state: %v", err)
+		}
+		if match, reason := k8sutil.SameCronJob(job, desiredJob); !match {
+			c.logCronJobChanges(job, desiredJob, false, reason)
+			if err = c.updateCronJob(desiredJob); err != nil {
+				return fmt.Errorf("could not update job to match desired state: %v", err)
+			}
+			c.logger.Info("the logical backup job is in the desired state now")
+		}
+		return nil
+	}
+	if !k8sutil.ResourceNotFound(err) {
+		return fmt.Errorf("could not get logical backp job: %v", err)
+	}
+	// no existing logical backup job, create new one
+	c.logger.Info("could not find the cluster's logical backup job")
+
+	if err = c.createBackupCronJob(); err == nil {
+		c.logger.Infof("created missing logical backup job %q", util.NameFromMeta(job.ObjectMeta))
+	} else {
+		if !k8sutil.ResourceAlreadyExists(err) {
+			return fmt.Errorf("could not create missing logical backup job: %v", err)
+		}
+		c.logger.Infof("logical backup job %q already exists", util.NameFromMeta(job.ObjectMeta))
+		if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(c.logicalBackupJob.Name, metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("could not fetch existing logical backup job: %v", err)
 		}
 	}
 

@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
@@ -39,7 +40,7 @@ type KubernetesClient struct {
 	rbacv1beta1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
-	batchv1beta1.CronJobsGetter
+	clientbatchv1beta1.CronJobsGetter
 
 	RESTClient      rest.Interface
 	AcidV1ClientSet *acidv1client.Clientset
@@ -144,4 +145,22 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	}
 
 	return
+}
+
+// SameCronJob compares Specs of logical backup cron jobs
+func SameCronJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
+
+	if cur.Spec.Schedule != new.Spec.Schedule {
+		return false, fmt.Sprintf("new job's schedule %q doesn't match the current one %q",
+			new.Spec.Schedule, cur.Spec.Schedule)
+	}
+
+	newImage := new.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+	oldImage := cur.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+	if newImage != oldImage {
+		return false, fmt.Sprintf("new job's image %q doesn't match the current one %q",
+			newImage, oldImage)
+	}
+
+	return true, ""
 }
