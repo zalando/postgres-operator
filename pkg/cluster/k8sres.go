@@ -358,8 +358,8 @@ func generateSpiloContainer(
 	resourceRequirements *v1.ResourceRequirements,
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
+	privilegedMode bool,
 ) *v1.Container {
-	privilegedMode := true
 	return &v1.Container{
 		Name:            name,
 		Image:           *dockerImage,
@@ -797,6 +797,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		resourceRequirements,
 		spiloEnvVars,
 		volumeMounts,
+		c.OpConfig.Resources.SpiloPrivileged,
 	)
 
 	// resolve conflicts between operator-global and per-cluster sidecars
