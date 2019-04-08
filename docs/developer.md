@@ -321,7 +321,7 @@ In the case you want to add functionality to the operator that shall be
 controlled via the operator configuration there are a few placed that need to
 be updated. First define the parameters in:
 * the [ConfigMap](../manifests/configmap.yaml) manifest
-* the CR's [default configuration](..manifests/postgresql-operator-default-configuration.yaml)
+* the CR's [default configuration](../manifests/postgresql-operator-default-configuration.yaml)
 * the Helm chart [values](../charts/postgres-operator/values.yaml)
 
 Update the following Go files that obtain the configuration parameter from the
