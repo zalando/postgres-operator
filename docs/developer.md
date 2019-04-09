@@ -318,8 +318,16 @@ kubectl logs acid-minimal-cluster-0
 ## Introduce additional configuration parameters
 
 In the case you want to add functionality to the operator that shall be
-controlled via the operator configuration there are a few placed that need to
-be updated. First define the parameters in:
+controlled via the operator configuration there are a few places that need to
+be updated. As explained [here](reference/operator_parameters.md), it's possible
+to configure the operator either with a ConfigMap or CRD, but currently we aim
+to synchronize parameters everywhere.
+
+Note: If one option is defined in the operator configuration and in the cluster
+[manifest](../manifests/complete-postgres-manifest.yaml), the latter takes
+precedence.
+
+So, first define the parameters in:
 * the [ConfigMap](../manifests/configmap.yaml) manifest
 * the CR's [default configuration](../manifests/postgresql-operator-default-configuration.yaml)
 * the Helm chart [values](../charts/postgres-operator/values.yaml)
@@ -331,10 +339,10 @@ manifest files:
 * [config.go](../pkg/util/config/config.go)
 
 The operator behavior has to be implemented at least in [k8sres.go](../pkg/cluster/k8sres.go).
-Please, reflect your changes in the tests, for example in:
-* [config-test.go](../pkg/util/config/config-test.go)
-* [k8sres_test.go](../pkg/cluster/k8sres-test.go)
-* [cluster_test.go](../cluster/k8sres-test.go)
+Please, reflect your changes in tests, for example in:
+* [config_test.go](../pkg/util/config/config_test.go)
+* [k8sres_test.go](../pkg/cluster/k8sres_test.go)
+* [util_test.go](../pkg/apis/acid.zalan.do/v1/util_test.go)
 
 Finally, document the new configuration option(s) for the operator in its
 [reference](reference/operator_parameters.md) document and explain the feature
