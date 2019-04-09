@@ -159,12 +159,12 @@ func (c *Cluster) setStatus(status acidv1.PostgresClusterStatus) {
 		c.logger.Errorf("could not marshal status: %v", err)
 	}
 
-	subresource := fmt.Sprintf(`{"status":{"PostgresClusterStatus": %s}}`, string(b))
+	patch := []byte(fmt.Sprintf(`{"status":{"PostgresClusterStatus": %s}}`, string(b)))
 
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
 	// we should take advantage of it.
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, make([]byte, 0), subresource)
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch, "status")
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
 	}
