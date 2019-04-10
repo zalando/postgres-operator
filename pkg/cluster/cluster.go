@@ -173,7 +173,7 @@ func (c *Cluster) setStatus(status acidv1.PostgresClusterStatus) {
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status == acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusCreating}
+	return c.Status.PostgresClusterStatus == acidv1.ClusterStatusCreating
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
