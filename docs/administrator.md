@@ -340,11 +340,11 @@ To access cloud resources like S3 from a cluster in a bare metal setup you can u
 `additional_secret_mount` and `additional_secret_mount_path` config parameters.
 With this you can provision cloud credentials to the containers in the pods of the StatefulSet.
 This works this way that it mounts a volume from the given secret in the pod and this can
-then accessed in the container over the configured mount path. Via [Custum Pod Environment Variables](## Custom Pod Environment Variables)
+then accessed in the container over the configured mount path. Via [Custum Pod Environment Variables](#custom-pod-environment-variables)
 you can then point the different cloud sdk's (aws, google etc.) to this mounted secret.
 With this credentials the cloud sdk can then access cloud resources to upload logs etc.
 
-This secrets can be pre provisioned in different ways:
+A secret can be pre provisioned in different ways:
 
 * Generic secret created via `kubectl create secret generic some-cloud-creds --from-file=some-cloud-credentials-file.json`
 
