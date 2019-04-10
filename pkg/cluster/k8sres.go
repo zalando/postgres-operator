@@ -1031,13 +1031,6 @@ func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, addition
 		},
 	})
 
-	//pgIdx := constants.PostgresContainerIdx
-	//mounts := append(podSpec.Containers[pgIdx].VolumeMounts,
-	//	v1.VolumeMount{
-	//		Name:      additionalSecretMount,
-	//		MountPath: additionalSecretMountPath,
-	//	})
-
 	for i := range podSpec.Containers {
 		mounts := append(podSpec.Containers[i].VolumeMounts,
 			v1.VolumeMount{
@@ -1047,7 +1040,6 @@ func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, addition
 		podSpec.Containers[i].VolumeMounts = mounts
 	}
 
-	//podSpec.Containers[0].VolumeMounts = mounts
 	podSpec.Volumes = volumes
 }
 

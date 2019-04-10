@@ -432,7 +432,6 @@ func TestSecretVolume(t *testing.T) {
 		additionalSecretMountPath := "/meta/credentials"
 
 		volsumb := len(tt.podSpec.Containers[0].VolumeMounts)
-		//fmt.Printf("%+v \n", volsumb)
 
 		addSecretVolume(tt.podSpec, additionalSecretMount, additionalSecretMountPath)
 
@@ -453,7 +452,6 @@ func TestSecretVolume(t *testing.T) {
 		}
 
 		volsuma := len(tt.podSpec.Containers[0].VolumeMounts)
-		//fmt.Printf("%+v \n", volsuma)
 
 		if volsuma != volsumb+1 {
 			t.Errorf("Got not expected number of VolumeMounts: got %v instead of %v",
