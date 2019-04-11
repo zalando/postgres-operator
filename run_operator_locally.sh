@@ -256,7 +256,7 @@ function main(){
     clean_up
     start_minikube
     start_operator
-    submit_postgresql_manifest
+    # submit_postgresql_manifest
     forward_ports
     check_health
 

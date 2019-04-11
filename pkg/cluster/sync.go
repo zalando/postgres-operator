@@ -542,8 +542,8 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(c.logicalBackupJob.Name, metav1.GetOptions{}); err == nil {
 
 		desiredJob, err = c.generateLogicalBackupJob()
-		if err = c.updateCronJob(desiredJob); err != nil {
-			return fmt.Errorf("could not generate the desired job state: %v", err)
+		if err != nil {
+			return fmt.Errorf("could not generate the desired cron job state: %v", err)
 		}
 		if match, reason := k8sutil.SameCronJob(job, desiredJob); !match {
 			c.logCronJobChanges(job, desiredJob, false, reason)
@@ -567,7 +567,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			return fmt.Errorf("could not create missing logical backup job: %v", err)
 		}
 		c.logger.Infof("logical backup job %q already exists", util.NameFromMeta(job.ObjectMeta))
-		if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(c.logicalBackupJob.Name, metav1.GetOptions{}); err != nil {
+		if _, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(c.logicalBackupJob.Name, metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing logical backup job: %v", err)
 		}
 	}
