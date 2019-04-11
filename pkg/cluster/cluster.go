@@ -149,7 +149,7 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
-func (c *Cluster) setStatus(status acidv1.PostgresClusterStatus) {
+func (c *Cluster) setStatus(status string) {
 	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
 	var (
 		err error

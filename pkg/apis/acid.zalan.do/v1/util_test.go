@@ -116,96 +116,99 @@ var unmarshalCluster = []struct {
 	out     Postgresql
 	marshal []byte
 	err     error
-}{{
-	[]byte(`{
-  "kind": "Postgresql","apiVersion": "acid.zalan.do/v1",
-  "metadata": {"name": "acid-testcluster1"}, "spec": {"teamId": 100}}`),
-	Postgresql{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Postgresql",
-			APIVersion: "acid.zalan.do/v1",
+}{
+	{
+		in: []byte(`{
+	  "kind": "Postgresql","apiVersion": "acid.zalan.do/v1",
+	  "metadata": {"name": "acid-testcluster1"}, "spec": {"teamId": 100}}`),
+		out: Postgresql{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Postgresql",
+				APIVersion: "acid.zalan.do/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "acid-testcluster1",
+			},
+			Status: PostgresStatus{PostgresClusterStatus: ClusterStatusInvalid},
+			// This error message can vary between Go versions, so compute it for the current version.
+			Error: json.Unmarshal([]byte(`{"teamId": 0}`), &PostgresSpec{}).Error(),
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "acid-testcluster1",
-		},
-		Status: PostgresStatus{PostgresClusterStatus: ClusterStatusInvalid},
-		// This error message can vary between Go versions, so compute it for the current version.
-		Error: json.Unmarshal([]byte(`{"teamId": 0}`), &PostgresSpec{}).Error(),
-	},
-	[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":{"PostgresClusterStatus":"Invalid"}}`), nil},
-	{[]byte(`{
-  "kind": "Postgresql",
-  "apiVersion": "acid.zalan.do/v1",
-  "metadata": {
-    "name": "acid-testcluster1"
-  },
-  "spec": {
-    "teamId": "ACID",
-    "volume": {
-      "size": "5Gi",
-      "storageClass": "SSD"
-    },
-    "numberOfInstances": 2,
-    "users": {
-      "zalando": [
-        "superuser",
-        "createdb"
-      ]
-    },
-    "allowedSourceRanges": [
-      "127.0.0.1/32"
-    ],
-    "postgresql": {
-      "version": "9.6",
-      "parameters": {
-        "shared_buffers": "32MB",
-        "max_connections": "10",
-        "log_statement": "all"
-      }
-    },
-    "resources": {
-      "requests": {
-        "cpu": "10m",
-        "memory": "50Mi"
-      },
-      "limits": {
-        "cpu": "300m",
-        "memory": "3000Mi"
-      }
-    },
-    "clone" : {
-     "cluster": "acid-batman"
-     },
-    "patroni": {
-      "initdb": {
-        "encoding": "UTF8",
-        "locale": "en_US.UTF-8",
-        "data-checksums": "true"
-      },
-      "pg_hba": [
-        "hostssl all all 0.0.0.0/0 md5",
-        "host    all all 0.0.0.0/0 md5"
-      ],
-      "ttl": 30,
-      "loop_wait": 10,
-      "retry_timeout": 10,
-	  "maximum_lag_on_failover": 33554432,
-	  "slots" : {
-		  "permanent_logical_1" : {
-			  "type"     : "logical",
-			  "database" : "foo",
-			  "plugin"   : "pgoutput"
-	       }
+		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":{"PostgresClusterStatus":"Invalid"}}`),
+		err:     nil},
+	{
+		in: []byte(`{
+	  "kind": "Postgresql",
+	  "apiVersion": "acid.zalan.do/v1",
+	  "metadata": {
+	    "name": "acid-testcluster1"
+	  },
+	  "spec": {
+	    "teamId": "ACID",
+	    "volume": {
+	      "size": "5Gi",
+	      "storageClass": "SSD"
+	    },
+	    "numberOfInstances": 2,
+	    "users": {
+	      "zalando": [
+	        "superuser",
+	        "createdb"
+	      ]
+	    },
+	    "allowedSourceRanges": [
+	      "127.0.0.1/32"
+	    ],
+	    "postgresql": {
+	      "version": "9.6",
+	      "parameters": {
+	        "shared_buffers": "32MB",
+	        "max_connections": "10",
+	        "log_statement": "all"
+	      }
+	    },
+	    "resources": {
+	      "requests": {
+	        "cpu": "10m",
+	        "memory": "50Mi"
+	      },
+	      "limits": {
+	        "cpu": "300m",
+	        "memory": "3000Mi"
+	      }
+	    },
+	    "clone" : {
+	     "cluster": "acid-batman"
+	     },
+	    "patroni": {
+	      "initdb": {
+	        "encoding": "UTF8",
+	        "locale": "en_US.UTF-8",
+	        "data-checksums": "true"
+	      },
+	      "pg_hba": [
+	        "hostssl all all 0.0.0.0/0 md5",
+	        "host    all all 0.0.0.0/0 md5"
+	      ],
+	      "ttl": 30,
+	      "loop_wait": 10,
+	      "retry_timeout": 10,
+		    "maximum_lag_on_failover": 33554432,
+			  "slots" : {
+				  "permanent_logical_1" : {
+					  "type"     : "logical",
+					  "database" : "foo",
+					  "plugin"   : "pgoutput"
+			       }
+			  }
+	  	},
+	  	"maintenanceWindows": [
+	    	"Mon:01:00-06:00",
+	    	"Sat:00:00-04:00",
+	    	"05:00-05:15"
+	  	]
 	  }
-    },
-    "maintenanceWindows": [
-      "Mon:01:00-06:00",
-      "Sat:00:00-04:00",
-      "05:00-05:15"
-    ]
-  }
-}`),
-		Postgresql{
+		}`),
+		out: Postgresql{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Postgresql",
 				APIVersion: "acid.zalan.do/v1",
@@ -273,10 +276,11 @@ var unmarshalCluster = []struct {
 			},
 			Error: "",
 		},
-		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"volume":{"size":"5Gi","storageClass":"SSD"},"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"ACID","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00","05:00-05:15"],"clone":{"cluster":"acid-batman"}},"status":{}}`), nil},
+		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"volume":{"size":"5Gi","storageClass":"SSD"},"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"ACID","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00","05:00-05:15"],"clone":{"cluster":"acid-batman"}},"status":{}}`),
+		err:     nil},
 	{
-		[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "teapot-testcluster1"}, "spec": {"teamId": "acid"}}`),
-		Postgresql{
+		in: []byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "teapot-testcluster1"}, "spec": {"teamId": "acid"}}`),
+		out: Postgresql{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Postgresql",
 				APIVersion: "acid.zalan.do/v1",
@@ -288,7 +292,8 @@ var unmarshalCluster = []struct {
 			Status: PostgresStatus{PostgresClusterStatus: ClusterStatusInvalid},
 			Error:  errors.New("name must match {TEAM}-{NAME} format").Error(),
 		},
-		[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"teapot-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":{"PostgresClusterStatus":"Invalid"}}`), nil},
+		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"teapot-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":{"PostgresClusterStatus":"Invalid"}}`),
+		err:     nil},
 	{
 		in: []byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "acid-testcluster1"}, "spec": {"teamId": "acid", "clone": {"cluster": "team-batman"}}}`),
 		out: Postgresql{
@@ -308,15 +313,18 @@ var unmarshalCluster = []struct {
 			},
 			Error: "",
 		},
-		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{"cluster":"team-batman"}},"status":{}}`), err: nil},
-	{[]byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1"`),
-		Postgresql{},
-		[]byte{},
-		errors.New("unexpected end of JSON input")},
-	{[]byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster","creationTimestamp":qaz},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":{"PostgresClusterStatus":"Invalid"}}`),
-		Postgresql{},
-		[]byte{},
-		errors.New("invalid character 'q' looking for beginning of value")}}
+		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{"cluster":"team-batman"}},"status":{}}`),
+		err:     nil},
+	{
+		in:      []byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1"`),
+		out:     Postgresql{},
+		marshal: []byte{},
+		err:     errors.New("unexpected end of JSON input")},
+	{
+		in:      []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster","creationTimestamp":qaz},"spec":{"postgresql":{"version":"","parameters":null},"volume":{"size":"","storageClass":""},"patroni":{"initdb":null,"pg_hba":null,"ttl":0,"loop_wait":0,"retry_timeout":0,"maximum_lag_on_failover":0,"slots":null},"resources":{"requests":{"cpu":"","memory":""},"limits":{"cpu":"","memory":""}},"teamId":"acid","allowedSourceRanges":null,"numberOfInstances":0,"users":null,"clone":{}},"status":{"PostgresClusterStatus":"Invalid"}}`),
+		out:     Postgresql{},
+		marshal: []byte{},
+		err:     errors.New("invalid character 'q' looking for beginning of value")}}
 
 var postgresqlList = []struct {
 	in  []byte

@@ -91,6 +91,11 @@ func (postgresStatus PostgresStatus) Success() bool {
 		postgresStatus.PostgresClusterStatus != ClusterStatusSyncFailed
 }
 
+// Running status of cluster
+func (postgresStatus PostgresStatus) Running() bool {
+	return postgresStatus.PostgresClusterStatus == ClusterStatusRunning
+}
+
 func (postgresStatus PostgresStatus) String() string {
 	return string(postgresStatus.PostgresClusterStatus)
 }

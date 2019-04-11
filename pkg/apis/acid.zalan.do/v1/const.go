@@ -2,14 +2,14 @@ package v1
 
 // 	ClusterStatusUnknown etc : status of a Postgres cluster known to the operator
 const (
-	ClusterStatusUnknown      PostgresClusterStatus = ""
-	ClusterStatusCreating     PostgresClusterStatus = "Creating"
-	ClusterStatusUpdating     PostgresClusterStatus = "Updating"
-	ClusterStatusUpdateFailed PostgresClusterStatus = "UpdateFailed"
-	ClusterStatusSyncFailed   PostgresClusterStatus = "SyncFailed"
-	ClusterStatusAddFailed    PostgresClusterStatus = "CreateFailed"
-	ClusterStatusRunning      PostgresClusterStatus = "Running"
-	ClusterStatusInvalid      PostgresClusterStatus = "Invalid"
+	ClusterStatusUnknown      = ""
+	ClusterStatusCreating     = "Creating"
+	ClusterStatusUpdating     = "Updating"
+	ClusterStatusUpdateFailed = "UpdateFailed"
+	ClusterStatusSyncFailed   = "SyncFailed"
+	ClusterStatusAddFailed    = "CreateFailed"
+	ClusterStatusRunning      = "Running"
+	ClusterStatusInvalid      = "Invalid"
 )
 
 const (
