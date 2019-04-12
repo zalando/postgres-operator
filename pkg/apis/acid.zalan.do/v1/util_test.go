@@ -568,11 +568,14 @@ func TestMarshal(t *testing.T) {
 		err := cluster.UnmarshalJSON(tt.marshal)
 		if err != nil {
 			if tt.err == nil || err.Error() != tt.err.Error() {
-				t.Errorf("Unmarshal expected error: %v, got: %v", tt.err, err)
+				t.Errorf("Backwards compatibility unmarshal expected error: %v, got: %v", tt.err, err)
 			}
 			continue
 		}
 		expected, err := json.Marshal(cluster)
+		if err != nil {
+			t.Errorf("Backwards compatibility marshal error: %v", err)
+		}
 
 		m, err := json.Marshal(tt.out)
 		if err != nil {
