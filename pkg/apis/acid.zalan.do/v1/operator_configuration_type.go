@@ -62,8 +62,9 @@ type KubernetesMetaConfiguration struct {
 	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
 	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
 	MasterPodMoveTimeout       time.Duration `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity" default:"false"`
-	PodAntiAffinityTopologyKey string        `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
+	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources

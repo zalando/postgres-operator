@@ -58,7 +58,9 @@ config:
   resource_check_interval: 3s
   resource_check_timeout: 10m
   resync_period: 5m
-
+  pod_management_policy: "ordered_ready"
+  enable_pod_antiaffinity: "false"
+  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
 rbac:
   # Specifies whether RBAC resources should be created
   create: true
