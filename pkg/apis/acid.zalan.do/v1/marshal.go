@@ -69,6 +69,31 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// UnmarshalJSON converts a JSON to the status subresource definition.
+func (ps *PostgresStatus) UnmarshalJSON(data []byte) error {
+	var got PostgresStatus
+
+	str := string(data)
+	str = strings.Replace(str, "{", "", -1)
+	str = strings.Replace(str, "}", "", -1)
+	str = strings.Replace(str, "\"", "", -1)
+	parts := strings.Split(str, ":")
+
+	if len(parts) == 2 || len(parts) == 3 {
+		if parts[1] != "" {
+			got.PostgresClusterStatus = parts[len(parts)-1]
+		} else {
+			got.PostgresClusterStatus = ClusterStatusUnknown
+		}
+	} else {
+		return fmt.Errorf("incorrect status field of CR")
+	}
+
+	*ps = got
+
+	return nil
+}
+
 // UnmarshalJSON converts a JSON into the PostgreSQL object.
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	var tmp postgresqlCopy
