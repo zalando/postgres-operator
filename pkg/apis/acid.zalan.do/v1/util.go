@@ -96,6 +96,11 @@ func (postgresStatus PostgresStatus) Running() bool {
 	return postgresStatus.PostgresClusterStatus == ClusterStatusRunning
 }
 
+// Creating status of cluster
+func (postgresStatus PostgresStatus) Creating() bool {
+	return postgresStatus.PostgresClusterStatus == ClusterStatusCreating
+}
+
 func (postgresStatus PostgresStatus) String() string {
 	return fmt.Sprintf(`status=%s`, postgresStatus.PostgresClusterStatus)
 }
