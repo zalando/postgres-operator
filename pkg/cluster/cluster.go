@@ -577,6 +577,41 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	// logical backup job
+	func() {
+
+		// special case: create if not existed before
+		// with all other k8s entities a missing object causes an error during update
+		if newSpec.Spec.EnableLogicalBackup && !oldSpec.Spec.EnableLogicalBackup {
+			c.logger.Debugf("creating backup cron job")
+			if err := c.createBackupCronJob(); err != nil {
+				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
+				updateFailed = true
+			}
+		}
+
+		// delete if no longer needed
+		if oldSpec.Spec.EnableLogicalBackup && !newSpec.Spec.EnableLogicalBackup {
+			c.logger.Debugf("deleting backup cron job")
+			if err := c.deleteLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not delete a k8s cron job for logical backups: %v", err)
+				updateFailed = true
+			}
+
+		}
+
+		// apply schedule changes
+		if (c.logicalBackupJob != nil) &&
+			(newSpec.Spec.LogicalBackupSchedule != oldSpec.Spec.LogicalBackupSchedule) {
+			c.logger.Debugf("updating backup cron job")
+			if err := c.syncLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not sync logical backup jobs: %v", err)
+				updateFailed = true
+			}
+		}
+
+	}()
+
 	// Roles and Databases
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
 		c.logger.Debugf("syncing roles")
