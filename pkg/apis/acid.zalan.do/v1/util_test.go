@@ -116,15 +116,13 @@ var postgresStatus = []struct {
 	out PostgresStatus
 	err error
 }{
-	{[]byte(`"status":"Running"`),
+	{[]byte(`{"PostgresClusterStatus":"Running"}`),
 		PostgresStatus{PostgresClusterStatus: ClusterStatusRunning}, nil},
-	{[]byte(`"status":{"PostgresClusterStatus":"Running"}`),
+	{[]byte(`{"PostgresClusterStatus":""}`),
+		PostgresStatus{PostgresClusterStatus: ClusterStatusUnknown}, nil},
+	{[]byte(`"Running"`),
 		PostgresStatus{PostgresClusterStatus: ClusterStatusRunning}, nil},
-	{[]byte(`"status":""`),
-		PostgresStatus{PostgresClusterStatus: ClusterStatusUnknown}, nil},
-	{[]byte(`"status":{}`),
-		PostgresStatus{PostgresClusterStatus: ClusterStatusUnknown}, nil},
-	{[]byte(`"status":`),
+	{[]byte(`""`),
 		PostgresStatus{PostgresClusterStatus: ClusterStatusUnknown}, nil}}
 
 var unmarshalCluster = []struct {

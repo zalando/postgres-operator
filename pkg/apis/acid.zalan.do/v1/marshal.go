@@ -8,6 +8,7 @@ import (
 )
 
 type postgresqlCopy Postgresql
+type postgresStatusCopy PostgresStatus
 
 // MarshalJSON converts a maintenance window definition to JSON.
 func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
@@ -71,25 +72,20 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 
 // UnmarshalJSON converts a JSON to the status subresource definition.
 func (ps *PostgresStatus) UnmarshalJSON(data []byte) error {
-	var got PostgresStatus
+	var (
+		tmp    postgresStatusCopy
+		status string
+	)
 
-	str := string(data)
-	str = strings.Replace(str, "{", "", -1)
-	str = strings.Replace(str, "}", "", -1)
-	str = strings.Replace(str, "\"", "", -1)
-	parts := strings.Split(str, ":")
-
-	if len(parts) == 2 || len(parts) == 3 {
-		if parts[1] != "" {
-			got.PostgresClusterStatus = parts[len(parts)-1]
-		} else {
-			got.PostgresClusterStatus = ClusterStatusUnknown
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		metaErr := json.Unmarshal(data, &status)
+		if metaErr != nil {
+			return fmt.Errorf("Could not parse status: %v; err %v", string(data), metaErr)
 		}
-	} else {
-		return fmt.Errorf("incorrect status field of CR")
+		tmp.PostgresClusterStatus = status
 	}
-
-	*ps = got
+	*ps = PostgresStatus(tmp)
 
 	return nil
 }
