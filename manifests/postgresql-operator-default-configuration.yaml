@@ -23,6 +23,7 @@ configuration:
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     oauth_token_secret_name: postgresql-operator
     pod_role_label: spilo-role
+    spilo_privileged: false
     cluster_labels:
         application: spilo
     # inherited_labels:
@@ -34,6 +35,9 @@ configuration:
     # toleration: {}
     # infrastructure_roles_secret_name: ""
     # pod_environment_configmap: ""
+    pod_management_policy: "ordered_ready"
+    enable_pod_antiaffinity: "false"
+    pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   postgres_pod_resources:
     default_cpu_request: 100m
     default_memory_request: 100Mi

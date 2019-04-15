@@ -11,11 +11,11 @@ pipeline:
             apt-get update
         - desc: 'Install required build software'
           cmd: |
-            apt-get install -y make git apt-transport-https ca-certificates curl
+            apt-get install -y make git apt-transport-https ca-certificates curl build-essential
         - desc: 'Install go'
           cmd: |
             cd /tmp
-            wget -q https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz -O go.tar.gz
+            wget -q https://storage.googleapis.com/golang/go1.12.linux-amd64.tar.gz -O go.tar.gz
             tar -xf go.tar.gz
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
