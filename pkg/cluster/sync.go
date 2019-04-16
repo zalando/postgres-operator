@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -538,6 +538,11 @@ func (c *Cluster) syncLogicalBackupJob() error {
 		err        error
 	)
 	c.setProcessName("syncing the logical backup job")
+
+	// operator pod at startup syncs all clusters, logicalBackupJob will be nil at this point
+	if (c.Postgresql.Spec.EnableLogicalBackup == true) && (c.logicalBackupJob == nil) {
+		c.logicalBackupJob, err = c.generateLogicalBackupJob()
+	}
 
 	if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(c.logicalBackupJob.Name, metav1.GetOptions{}); err == nil {
 
