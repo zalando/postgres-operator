@@ -642,6 +642,12 @@ func (c *Cluster) Delete() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
+	// deleting the cron job also removes pods and batch jobs it created
+	if err := c.deleteLogicalBackupJob(); err != nil {
+		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+	}
+
 	if err := c.deleteStatefulSet(); err != nil {
 		c.logger.Warningf("could not delete statefulset: %v", err)
 	}
@@ -673,10 +679,6 @@ func (c *Cluster) Delete() {
 
 	if err := c.deletePatroniClusterObjects(); err != nil {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
-	}
-
-	if err := c.deleteLogicalBackupJob(); err != nil {
-		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
 	}
 
 }

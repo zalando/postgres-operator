@@ -1265,6 +1265,10 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	c.logger.Debug("Generating logical backup pod template")
 
+	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods/clean-up
+
+	// configure a pod of a batch job
+
 	defaultResources := c.makeDefaultResources()
 	resourceRequirements, err = generateResourceRequirements(c.Spec.Resources, defaultResources)
 	if err != nil {
@@ -1320,11 +1324,17 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	podTemplate.Spec.Affinity = &podAffinity
 
-	// affects containers within a pod on the same node
+	// affects containers within a pod
 	// pods of k8s jobs support only "OnFailure" or "Never"
 	podTemplate.Spec.RestartPolicy = "Never"
 
-	jobSpec := batchv1.JobSpec{Template: *podTemplate}
+	// configure a batch job
+
+	jobSpec := batchv1.JobSpec{
+		Template: *podTemplate,
+	}
+
+	// configure a cron job
 
 	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
 		Spec: jobSpec,
@@ -1342,8 +1352,9 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			Labels:    c.labelsSet(true),
 		},
 		Spec: batchv1beta1.CronJobSpec{
-			Schedule:    schedule,
-			JobTemplate: jobTemplateSpec,
+			Schedule:          schedule,
+			JobTemplate:       jobTemplateSpec,
+			ConcurrencyPolicy: batchv1beta1.ForbidConcurrent,
 		},
 	}
 
