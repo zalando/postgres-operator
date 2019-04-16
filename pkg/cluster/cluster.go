@@ -587,6 +587,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			if err := c.createBackupCronJob(); err != nil {
 				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
 				updateFailed = true
+				return
 			}
 		}
 
@@ -596,6 +597,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			if err := c.deleteLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not delete a k8s cron job for logical backups: %v", err)
 				updateFailed = true
+				return
 			}
 
 		}
