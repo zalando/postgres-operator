@@ -540,8 +540,11 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	c.setProcessName("syncing the logical backup job")
 
 	// operator pod at startup syncs all clusters, logicalBackupJob will be nil at this point
-	if (c.Postgresql.Spec.EnableLogicalBackup == true) && (c.logicalBackupJob == nil) {
+	if c.Postgresql.Spec.EnableLogicalBackup && c.logicalBackupJob == nil {
 		c.logicalBackupJob, err = c.generateLogicalBackupJob()
+		if err != nil {
+			return fmt.Errorf("could not generate the desired cron job state, presumably during the first Sync on operator pod start-up: %v", err)
+		}
 	}
 
 	if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(c.logicalBackupJob.Name, metav1.GetOptions{}); err == nil {
