@@ -55,6 +55,7 @@ data:
   resource_check_timeout: 10m
   resync_period: 5m
 
-  # enable_logical_backup: "true"
+  # enable_logical_backup: "false"
   # logical_backup_schedule: "30 00 * * *"
-  logical_backup_docker_image: registry.opensource.zalan.do/acid/logical-backup:master-42
+  # logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:master-42"
+  # logical_backup_s3_bucket: "your-s3-bucket"

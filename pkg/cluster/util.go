@@ -13,7 +13,7 @@ import (
 
 	"k8s.io/api/apps/v1beta1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -495,7 +495,6 @@ func (c *Cluster) logCronJobChanges(old, new *batchv1beta1.CronJob, isUpdate boo
 			c.logicalBackupJob.Name,
 		)
 	}
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if reason != "" {
 		c.logger.Infof("reason: %s", reason)

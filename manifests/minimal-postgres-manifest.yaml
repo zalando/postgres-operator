@@ -17,11 +17,8 @@ spec:
     # role for application foo
     foo_user: []
 
-  
   #databases: name->owner
   databases:
     foo: zalando
   postgresql:
     version: "10"
-
-  enableLogicalBackup: true
