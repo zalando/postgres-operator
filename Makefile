@@ -79,7 +79,6 @@ scm-source.json: .git
 
 tools:
 	@go get -u honnef.co/go/tools/cmd/staticcheck
-	@go get -u github.com/Masterminds/glide
 
 fmt:
 	@gofmt -l -w -s $(DIRS)
@@ -89,7 +88,7 @@ vet:
 	@staticcheck $(PKG)
 
 deps:
-	@glide install --strip-vendor
+	@go mod vendor
 
 test:
 	hack/verify-codegen.sh

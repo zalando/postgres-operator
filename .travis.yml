@@ -11,11 +11,10 @@ go:
   - "1.12.x"
 
 before_install:
-  - go get github.com/Masterminds/glide
   - go get github.com/mattn/goveralls
 
 install:
-  - make deps
+  - make GO111MODULE=on deps
 
 script:
   - hack/verify-codegen.sh
