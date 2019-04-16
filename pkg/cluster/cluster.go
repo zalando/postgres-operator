@@ -300,7 +300,7 @@ func (c *Cluster) Create() error {
 	}
 
 	if c.Postgresql.Spec.EnableLogicalBackup {
-		if err := c.createBackupCronJob(); err != nil {
+		if err := c.createLogicalBackupJob(); err != nil {
 			return fmt.Errorf("could not create a k8s cron job for logical backups: %v", err)
 		}
 		c.logger.Info("a k8s cron job for logical backup has been successfully created")
@@ -584,7 +584,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		// with all other k8s entities a missing object causes an error during update
 		if newSpec.Spec.EnableLogicalBackup && !oldSpec.Spec.EnableLogicalBackup {
 			c.logger.Debugf("creating backup cron job")
-			if err := c.createBackupCronJob(); err != nil {
+			if err := c.createLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
 				updateFailed = true
 				return

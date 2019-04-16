@@ -7,7 +7,7 @@ import (
 
 	"k8s.io/api/apps/v1beta1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -610,7 +610,7 @@ func (c *Cluster) createRoles() (err error) {
 	return c.syncRoles()
 }
 
-func (c *Cluster) createBackupCronJob() (err error) {
+func (c *Cluster) createLogicalBackupJob() (err error) {
 
 	c.setProcessName("creating a k8s cron job for logical backups")
 

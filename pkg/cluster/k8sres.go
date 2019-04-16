@@ -354,7 +354,7 @@ func generateVolumeMounts() []v1.VolumeMount {
 	}
 }
 
-func generateSpiloContainer(
+func generateContainer(
 	name string,
 	dockerImage *string,
 	resourceRequirements *v1.ResourceRequirements,
@@ -794,7 +794,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	// generate the spilo container
 	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
-	spiloContainer := generateSpiloContainer(c.containerName(),
+	spiloContainer := generateContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
 		spiloEnvVars,
@@ -1263,31 +1263,30 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		resourceRequirements *v1.ResourceRequirements
 	)
 
+	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods and clean-up
+
 	c.logger.Debug("Generating logical backup pod template")
 
-	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods/clean-up
-
-	// configure a pod of a batch job
-
+	// allocate for the backup pod the same amount of resources as for normal DB pods
 	defaultResources := c.makeDefaultResources()
 	resourceRequirements, err = generateResourceRequirements(c.Spec.Resources, defaultResources)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate resource requirements for the pod of a logical backup cron job: %v", err)
+		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
 	}
 
 	envVars := c.generateLogicalBackupPodEnvVars()
-	logicalBackupContainer := generateSpiloContainer(
+	logicalBackupContainer := generateContainer(
 		"logical-backup",
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
 		resourceRequirements,
 		envVars,
 		[]v1.VolumeMount{},
-		c.OpConfig.SpiloPrivileged,
+		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
 	)
 
 	labels := map[string]string{
-		"version":    c.Name,
-		"spilo-role": "replica",
+		"version":     c.Name,
+		"application": "spilo-logical-backup",
 	}
 	podAffinityTerm := v1.PodAffinityTerm{
 		LabelSelector: &metav1.LabelSelector{
@@ -1304,6 +1303,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			},
 		}}
 
+	// re-use the method that generates DB pod templates
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
@@ -1318,15 +1318,13 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		"",
 		false,
 		false,
-		c.OpConfig.PodAntiAffinityTopologyKey); err != nil {
-		return nil, fmt.Errorf("could not generate pod template for logical backup cron job: %v", err)
+		""); err != nil {
+		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
+	// overwrite specifc params of logical backups pods
 	podTemplate.Spec.Affinity = &podAffinity
-
-	// affects containers within a pod
-	// pods of k8s jobs support only "OnFailure" or "Never"
-	podTemplate.Spec.RestartPolicy = "Never"
+	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
 
 	// configure a batch job
 
@@ -1361,8 +1359,6 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	return cronJob, nil
 }
 
-// generateLogicalBackupPodEnvVars generates environment variables for the pod started
-// by the logical backup cron job
 func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 	envVars := []v1.EnvVar{
