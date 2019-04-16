@@ -151,15 +151,10 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 
 func (c *Cluster) setStatus(status string) {
 	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
-	var (
-		err error
-		b   []byte
-	)
-	if b, err = json.Marshal(status); err != nil {
+	patch, err := json.Marshal(acidv1.PostgresStatus{PostgresClusterStatus: status})
+	if err != nil {
 		c.logger.Errorf("could not marshal status: %v", err)
 	}
-
-	patch := []byte(fmt.Sprintf(`{"status":{"PostgresClusterStatus": %s}}`, string(b)))
 
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
