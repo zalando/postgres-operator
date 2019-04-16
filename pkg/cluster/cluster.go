@@ -490,7 +490,8 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 }
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
-// (i.e. service) is treated as an error.
+// (i.e. service) is treated as an error
+// logical backup cron jobs are an exception: they can be freely created/deleted by users
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
 
@@ -580,8 +581,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// logical backup job
 	func() {
 
-		// special case: create if not existed before
-		// with all other k8s entities a missing object causes an error during update
+		// create if it did not exist
 		if newSpec.Spec.EnableLogicalBackup && !oldSpec.Spec.EnableLogicalBackup {
 			c.logger.Debugf("creating backup cron job")
 			if err := c.createLogicalBackupJob(); err != nil {

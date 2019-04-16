@@ -8,7 +8,7 @@ import (
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
 	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
@@ -147,6 +147,10 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	return
 }
 
+func getJobImage(cronJob *batchv1beta1.CronJob) string {
+	return cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+}
+
 // SameCronJob compares Specs of logical backup cron jobs
 func SameCronJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
 
@@ -155,11 +159,11 @@ func SameCronJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
 			new.Spec.Schedule, cur.Spec.Schedule)
 	}
 
-	newImage := new.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
-	oldImage := cur.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
-	if newImage != oldImage {
+	newImage := getJobImage(new)
+	curImage := getJobImage(cur)
+	if newImage != curImage {
 		return false, fmt.Sprintf("new job's image %q doesn't match the current one %q",
-			newImage, oldImage)
+			newImage, curImage)
 	}
 
 	return true, ""
