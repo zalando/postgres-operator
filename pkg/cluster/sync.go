@@ -566,7 +566,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	c.logger.Info("could not find the cluster's logical backup job")
 
 	if err = c.createBackupCronJob(); err == nil {
-		c.logger.Infof("created missing logical backup job %q", util.NameFromMeta(job.ObjectMeta))
+		c.logger.Infof("created missing logical backup job %q", c.logicalBackupJob.Name)
 	} else {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not create missing logical backup job: %v", err)
