@@ -1064,11 +1064,8 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 
 func (c *Cluster) deleteLogicalBackupJob() error {
 
-	if c.logicalBackupJob == nil {
-		return nil
-	}
-
 	c.logger.Debug("removing the logical backup job")
 
+	c.logicalBackupJob = nil
 	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(c.getLogicalBackupJobName(), c.deleteOptions)
 }
