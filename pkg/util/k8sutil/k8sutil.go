@@ -151,8 +151,8 @@ func getJobImage(cronJob *batchv1beta1.CronJob) string {
 	return cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
 }
 
-// SameCronJob compares Specs of logical backup cron jobs
-func SameCronJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
+// SameLogicalBackupJob compares Specs of logical backup cron jobs
+func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
 
 	if cur.Spec.Schedule != new.Spec.Schedule {
 		return false, fmt.Sprintf("new job's schedule %q doesn't match the current one %q",

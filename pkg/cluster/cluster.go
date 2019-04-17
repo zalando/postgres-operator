@@ -582,7 +582,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	func() {
 
 		// create if it did not exist
-		if newSpec.Spec.EnableLogicalBackup && !oldSpec.Spec.EnableLogicalBackup {
+		if !oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup {
 			c.logger.Debugf("creating backup cron job")
 			if err := c.createLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
@@ -603,9 +603,10 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 
 		// apply schedule changes
-		if (c.logicalBackupJob != nil) &&
+		// this is the only parameter of logical backups a user can overwrite in the cluster manifest
+		if (newSpec.Spec.EnableLogicalBackup) &&
 			(newSpec.Spec.LogicalBackupSchedule != oldSpec.Spec.LogicalBackupSchedule) {
-			c.logger.Debugf("updating backup cron job")
+			c.logger.Debugf("updating schedule of the backup cron job")
 			if err := c.syncLogicalBackupJob(); err != nil {
 				c.logger.Errorf("could not sync logical backup jobs: %v", err)
 				updateFailed = true
@@ -1067,7 +1068,7 @@ func (c *Cluster) deleteLogicalBackupJob() error {
 		return nil
 	}
 
-	c.logger.Debugf("removing the logical backup job")
+	c.logger.Debug("removing the logical backup job")
 
-	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(c.logicalBackupJob.ObjectMeta.Name, c.deleteOptions)
+	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(c.getLogicalBackupJobName(), c.deleteOptions)
 }

@@ -1407,3 +1407,8 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 	return envVars
 }
+
+// getLogicalBackupJobName returns the name; the job itself may not exists
+func (c *Cluster) getLogicalBackupJobName() (jobName string) {
+	return "logical-backup-" + c.clusterName().Namespace + "-" + c.clusterName().Name
+}

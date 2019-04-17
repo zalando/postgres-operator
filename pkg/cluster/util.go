@@ -485,17 +485,11 @@ func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
 }
 
-func (c *Cluster) logCronJobChanges(old, new *batchv1beta1.CronJob, isUpdate bool, reason string) {
-	if isUpdate {
-		c.logger.Infof("logical job %q has been changed",
-			c.logicalBackupJob.Name,
-		)
-	} else {
-		c.logger.Infof("logical job %q is not in the desired state and needs to be updated",
-			c.logicalBackupJob.Name,
-		)
-	}
+func (c *Cluster) logLogicalBackupJobChanges(old, new *batchv1beta1.CronJob, reason string) {
 
+	c.logger.Infof("logical job %q is not in the desired state and needs to be updated",
+		c.logicalBackupJob.Name,
+	)
 	if reason != "" {
 		c.logger.Infof("reason: %s", reason)
 	}

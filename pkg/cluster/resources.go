@@ -629,12 +629,8 @@ func (c *Cluster) createLogicalBackupJob() (err error) {
 	return nil
 }
 
-func (c *Cluster) updateCronJob(newJob *batchv1beta1.CronJob) error {
-	c.setProcessName("updating logical backup job")
-
-	if c.logicalBackupJob == nil {
-		return fmt.Errorf("there is no logical backup job in the cluster")
-	}
+func (c *Cluster) patchLogicalBackupJob(newJob *batchv1beta1.CronJob) error {
+	c.setProcessName("patching logical backup job")
 
 	patchData, err := specPatch(newJob.Spec)
 	if err != nil {
