@@ -488,7 +488,7 @@ func (c *Cluster) patroniUsesKubernetes() bool {
 func (c *Cluster) logLogicalBackupJobChanges(old, new *batchv1beta1.CronJob, reason string) {
 
 	c.logger.Infof("logical job %q is not in the desired state and needs to be updated",
-		c.logicalBackupJob.Name,
+		c.getLogicalBackupJobName(),
 	)
 	if reason != "" {
 		c.logger.Infof("reason: %s", reason)

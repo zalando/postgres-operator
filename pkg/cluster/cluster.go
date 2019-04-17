@@ -12,7 +12,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/api/apps/v1beta1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,7 +83,6 @@ type Cluster struct {
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
 
-	logicalBackupJob *batchv1beta1.CronJob // periodical logical backups independent from WAL archiving
 }
 
 type compareStatefulsetResult struct {
@@ -1066,6 +1064,5 @@ func (c *Cluster) deleteLogicalBackupJob() error {
 
 	c.logger.Debug("removing the logical backup job")
 
-	c.logicalBackupJob = nil
 	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(c.getLogicalBackupJobName(), c.deleteOptions)
 }

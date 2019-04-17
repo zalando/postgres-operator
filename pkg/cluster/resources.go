@@ -614,17 +614,16 @@ func (c *Cluster) createLogicalBackupJob() (err error) {
 
 	c.setProcessName("creating a k8s cron job for logical backups")
 
-	cronJobSpec, err := c.generateLogicalBackupJob()
+	logicalBackupJobSpec, err := c.generateLogicalBackupJob()
 	if err != nil {
 		return fmt.Errorf("could not generate k8s cron job spec: %v", err)
 	}
-	c.logger.Debugf("Generated cronJobSpec: %v", cronJobSpec)
+	c.logger.Debugf("Generated cronJobSpec: %v", logicalBackupJobSpec)
 
-	cronJob, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(cronJobSpec)
+	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(logicalBackupJobSpec)
 	if err != nil {
 		return fmt.Errorf("could not create k8s cron job: %v", err)
 	}
-	c.logicalBackupJob = cronJob
 
 	return nil
 }
@@ -638,14 +637,13 @@ func (c *Cluster) patchLogicalBackupJob(newJob *batchv1beta1.CronJob) error {
 	}
 
 	// update the backup job spec
-	job, err := c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
-		c.logicalBackupJob.Name,
+	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
+		c.getLogicalBackupJobName(),
 		types.MergePatchType,
 		patchData, "")
 	if err != nil {
 		return fmt.Errorf("could not patch logical backup job: %v", err)
 	}
-	c.logicalBackupJob = job
 
 	return nil
 }
