@@ -1345,7 +1345,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	cronJob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "logical-backup-" + c.clusterName().Namespace + "-" + c.clusterName().Name,
+			Name:      c.getLogicalBackupJobName(),
 			Namespace: c.Namespace,
 			Labels:    c.labelsSet(true),
 		},
