@@ -318,3 +318,31 @@ func TestShouldDeleteSecret(t *testing.T) {
 		}
 	}
 }
+
+func TestSetStatus(t *testing.T) {
+
+	tests := []struct {
+		status  acidv1.PostgresStatus
+		outcome bool
+	}{
+		{
+			status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusCreating},
+			outcome: cl.Status.Creating(),
+		},
+		{
+			status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusRunning},
+			outcome: cl.Status.Running(),
+		},
+		{
+			status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusSyncFailed},
+			outcome: !cl.Status.Success(),
+		},
+	}
+
+	for _, tt := range tests {
+		cl.setStatus(tt.status.PostgresClusterStatus)
+		if tt.outcome {
+			t.Errorf("Wrong status: %s", cl.Status.String())
+		}
+	}
+}
