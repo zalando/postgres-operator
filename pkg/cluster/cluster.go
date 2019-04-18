@@ -4,6 +4,7 @@ package cluster
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -18,8 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-
-	"encoding/json"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -149,9 +148,9 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
-func (c *Cluster) setStatus(status string) {
+func (c *Cluster) SetStatus(status string) {
 	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
-	patch, err := json.Marshal(&acidv1.PostgresStatus{PostgresClusterStatus: status})
+	patch, err := json.Marshal(acidv1.PostgresStatus{PostgresClusterStatus: status})
 	if err != nil {
 		c.logger.Errorf("could not marshal status: %v", err)
 	}
@@ -210,13 +209,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.setStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			c.SetStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.setStatus(acidv1.ClusterStatusAddFailed)
+			c.SetStatus(acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.setStatus(acidv1.ClusterStatusCreating)
+	c.SetStatus(acidv1.ClusterStatusCreating)
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
@@ -483,14 +482,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setStatus(acidv1.ClusterStatusUpdating)
+	c.SetStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.setStatus(acidv1.ClusterStatusUpdateFailed)
+			c.SetStatus(acidv1.ClusterStatusUpdateFailed)
 		} else {
-			c.setStatus(acidv1.ClusterStatusRunning)
+			c.SetStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 

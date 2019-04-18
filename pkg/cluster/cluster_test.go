@@ -20,10 +20,20 @@ const (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
-var cl = New(Config{OpConfig: config.Config{ProtectedRoles: []string{"admin"},
-	Auth: config.Auth{SuperUsername: superUserName,
-		ReplicationUsername: replicationUserName}}},
-	k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+var cl = New(
+	Config{
+		OpConfig: config.Config{
+			ProtectedRoles: []string{"admin"},
+			Auth: config.Auth{
+				SuperUsername:       superUserName,
+				ReplicationUsername: replicationUserName,
+			},
+		},
+	},
+	k8sutil.KubernetesClient{},
+	acidv1.Postgresql{},
+	logger,
+)
 
 func TestInitRobotUsers(t *testing.T) {
 	testName := "TestInitRobotUsers"
@@ -315,34 +325,6 @@ func TestShouldDeleteSecret(t *testing.T) {
 		if outcome, username := cl.shouldDeleteSecret(tt.secret); outcome != tt.outcome {
 			t.Errorf("%s expects the check for deletion of the username %q secret to return %t, got %t",
 				testName, username, tt.outcome, outcome)
-		}
-	}
-}
-
-func TestSetStatus(t *testing.T) {
-
-	tests := []struct {
-		status  acidv1.PostgresStatus
-		outcome bool
-	}{
-		{
-			status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusCreating},
-			outcome: cl.Status.Creating(),
-		},
-		{
-			status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusRunning},
-			outcome: cl.Status.Running(),
-		},
-		{
-			status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusSyncFailed},
-			outcome: !cl.Status.Success(),
-		},
-	}
-
-	for _, tt := range tests {
-		cl.setStatus(tt.status.PostgresClusterStatus)
-		if tt.outcome {
-			t.Errorf("Wrong status: %s", cl.Status.String())
 		}
 	}
 }

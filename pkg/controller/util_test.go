@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	b64 "encoding/base64"
+
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-
-	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 )
 
 const (
@@ -183,6 +184,36 @@ func TestGetInfrastructureRoles(t *testing.T) {
 		}
 		if !reflect.DeepEqual(roles, test.expectedRoles) {
 			t.Errorf("expected roles output %v does not match the actual %v", test.expectedRoles, roles)
+		}
+	}
+}
+
+func TestSetStatus(t *testing.T) {
+
+	for _, cl := range c.clusters {
+		tests := []struct {
+			status  acidv1.PostgresStatus
+			outcome bool
+		}{
+			{
+				status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusCreating},
+				outcome: cl.Status.Creating(),
+			},
+			{
+				status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusRunning},
+				outcome: cl.Status.Running(),
+			},
+			{
+				status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusInvalid},
+				outcome: !cl.Status.Success(),
+			},
+		}
+
+		for _, tt := range tests {
+			cl.SetStatus(tt.status.PostgresClusterStatus)
+			if tt.outcome {
+				t.Errorf("Wrong status: %s", cl.Status.String())
+			}
 		}
 	}
 }

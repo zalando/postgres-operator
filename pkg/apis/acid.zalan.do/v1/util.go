@@ -102,5 +102,5 @@ func (postgresStatus PostgresStatus) Creating() bool {
 }
 
 func (postgresStatus PostgresStatus) String() string {
-	return fmt.Sprintf(`status=%s`, postgresStatus.PostgresClusterStatus)
+	return fmt.Sprintf(`"status":{"PostgresClusterStatus": %s}`, postgresStatus.PostgresClusterStatus)
 }
