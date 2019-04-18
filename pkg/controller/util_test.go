@@ -7,74 +7,15 @@ import (
 
 	b64 "encoding/base64"
 
-	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
 	testInfrastructureRolesSecretName = "infrastructureroles-test"
 )
-
-type mockSecret struct {
-	v1core.SecretInterface
-}
-
-type mockConfigMap struct {
-	v1core.ConfigMapInterface
-}
-
-func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
-	if name != testInfrastructureRolesSecretName {
-		return nil, fmt.Errorf("NotFound")
-	}
-	secret := &v1.Secret{}
-	secret.Name = mockController.opConfig.ClusterNameLabel
-	secret.Data = map[string][]byte{
-		"user1":     []byte("testrole"),
-		"password1": []byte("testpassword"),
-		"inrole1":   []byte("testinrole"),
-		"foobar":    []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
-	}
-	return secret, nil
-
-}
-
-func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
-	if name != testInfrastructureRolesSecretName {
-		return nil, fmt.Errorf("NotFound")
-	}
-	configmap := &v1.ConfigMap{}
-	configmap.Name = mockController.opConfig.ClusterNameLabel
-	configmap.Data = map[string]string{
-		"foobar": "{}",
-	}
-	return configmap, nil
-}
-
-type MockSecretGetter struct {
-}
-
-type MockConfigMapsGetter struct {
-}
-
-func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
-	return &mockSecret{}
-}
-
-func (c *MockConfigMapsGetter) ConfigMaps(namespace string) v1core.ConfigMapInterface {
-	return &mockConfigMap{}
-}
-
-func newMockKubernetesClient() k8sutil.KubernetesClient {
-	return k8sutil.KubernetesClient{
-		SecretsGetter:    &MockSecretGetter{},
-		ConfigMapsGetter: &MockConfigMapsGetter{},
-	}
-}
 
 func newMockController() *Controller {
 	controller := NewController(&spec.ControllerConfig{})
@@ -82,7 +23,7 @@ func newMockController() *Controller {
 	controller.opConfig.InfrastructureRolesSecretName =
 		spec.NamespacedName{Namespace: v1.NamespaceDefault, Name: testInfrastructureRolesSecretName}
 	controller.opConfig.Workers = 4
-	controller.KubeClient = newMockKubernetesClient()
+	controller.KubeClient = k8sutil.NewMockKubernetesClient()
 	return controller
 }
 
@@ -184,36 +125,6 @@ func TestGetInfrastructureRoles(t *testing.T) {
 		}
 		if !reflect.DeepEqual(roles, test.expectedRoles) {
 			t.Errorf("expected roles output %v does not match the actual %v", test.expectedRoles, roles)
-		}
-	}
-}
-
-func TestSetStatus(t *testing.T) {
-
-	for _, cl := range c.clusters {
-		tests := []struct {
-			status  acidv1.PostgresStatus
-			outcome bool
-		}{
-			{
-				status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusCreating},
-				outcome: cl.Status.Creating(),
-			},
-			{
-				status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusRunning},
-				outcome: cl.Status.Running(),
-			},
-			{
-				status:  acidv1.PostgresStatus{PostgresClusterStatus: acidv1.ClusterStatusInvalid},
-				outcome: !cl.Status.Success(),
-			},
-		}
-
-		for _, tt := range tests {
-			cl.SetStatus(tt.status.PostgresClusterStatus)
-			if tt.outcome {
-				t.Errorf("Wrong status: %s", cl.Status.String())
-			}
 		}
 	}
 }

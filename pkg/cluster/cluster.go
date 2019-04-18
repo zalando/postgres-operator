@@ -148,6 +148,7 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
+// SetStatus of Postgres cluster
 func (c *Cluster) SetStatus(status string) {
 	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
 	patch, err := json.Marshal(acidv1.PostgresStatus{PostgresClusterStatus: status})
