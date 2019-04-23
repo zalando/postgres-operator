@@ -1401,6 +1401,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Name:  "USE_LOGICAL_BACKUP_LABEL",
 			Value: "true",
 		},
+		{
+			Name:  "LOGICAL_BACKUP_BUCKET_SCOPE_SUFFIX",
+			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
 	}
 
 	c.logger.Debugf("Generated logical backup env vars %v", envVars)
