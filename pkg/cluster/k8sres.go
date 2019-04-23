@@ -1385,7 +1385,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: "5432",
 		},
 		{
-			Name:  "PGUSER__SUPERUSER",
+			Name:  "PGUSER_SUPERUSER",
 			Value: c.OpConfig.SuperUsername,
 		},
 		{
