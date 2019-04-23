@@ -1363,19 +1363,33 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 	envVars := []v1.EnvVar{
 		{
-			Name:  "CLUSTER_NAME",
+			Name:  "SCOPE",
 			Value: c.Name,
 		},
+		// Bucket env vars
 		{
-			Name:  "PG_PORT",
+			Name:  "LOGICAL_BACKUP_S3_BUCKET",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
+		// Postgres env vars
+		{
+			Name:  "PGVERSION",
+			Value: c.Spec.PgVersion,
+		},
+		{
+			Name:  "PGPORT",
 			Value: "5432",
 		},
 		{
-			Name:  "PGUSER",
+			Name:  "PGUSER__SUPERUSER",
 			Value: c.OpConfig.SuperUsername,
 		},
 		{
-			Name: "PGPASSWORD",
+			Name: "PGPASSWORD_SUPERUSER",
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
@@ -1384,26 +1398,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 					Key: "password",
 				},
 			},
-		},
-		{
-			Name:  "BUCKET",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
-		},
-		{
-			Name:  "BACKUP",
-			Value: c.Name,
-		},
-		{
-			Name:  "PG_VERSION",
-			Value: c.Spec.PgVersion,
-		},
-		{
-			Name:  "USE_LOGICAL_BACKUP_LABEL",
-			Value: "true",
-		},
-		{
-			Name:  "LOGICAL_BACKUP_BUCKET_SCOPE_SUFFIX",
-			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
 		},
 	}
 
