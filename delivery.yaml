@@ -43,8 +43,8 @@ pipeline:
             go test ./...
         - desc: 'Run e2e tests'
           cmd: |
-            export PATH=$PATH:$HOME/go/bin            
-            go get -u sigs.k8s.io/kind
+            export PATH=$PATH:$HOME/go/bin
+            go get -v -u sigs.k8s.io/kind
             cd $OPERATOR_TOP_DIR/postgres-operator
             kind create cluster --name kind-m --config ./e2e/kind-config-multikind.yaml --loglevel debug
         - desc: 'Push docker image'
