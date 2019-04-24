@@ -44,9 +44,13 @@ pipeline:
         - desc: 'Run e2e tests'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
-            go get -v -u sigs.k8s.io/kind
             cd $OPERATOR_TOP_DIR/postgres-operator
-            kind create cluster --name kind-m --config ./e2e/kind-config-multikind.yaml --loglevel debug
+            go get -u -v sigs.k8s.io/kind
+            echo "INFO install kubectl to test 'kind' from client side"
+            (curl -LO --silent https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl &&
+            chmod +x ./kubectl &&
+            mv ./kubectl /usr/local/bin/kubectl) || exit 1
+            make e2e
         - desc: 'Push docker image'
           cmd: |
             export PATH=$PATH:$HOME/go/bin

@@ -91,3 +91,8 @@ deps:
 test:
 	hack/verify-codegen.sh
 	@go test ./...
+
+e2e:
+	kind create cluster --name kind-m --config ./e2e/kind-config-multikind.yaml --loglevel debug
+	export KUBECONFIG="$(kind get kubeconfig-path --name="kind-m")"
+	kubectl cluster-info
