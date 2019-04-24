@@ -6,6 +6,6 @@ set -o nounset
 set -o pipefail
 IFS=$'\n\t'
 
-kind create cluster --name kind-m2 --config ./e2e/kind-config-multikind.yaml --loglevel debug
+kind create cluster --name kind-m --config ./e2e/kind-config-multikind.yaml --loglevel debug
 export KUBECONFIG="$(kind get kubeconfig-path --name="kind-m")"
 kubectl cluster-info
