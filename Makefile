@@ -1,4 +1,4 @@
-.PHONY: clean local test linux macos docker push scm-source.json
+.PHONY: clean local test linux macos docker push scm-source.json e2e
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
@@ -93,6 +93,4 @@ test:
 	@go test ./...
 
 e2e:
-	kind create cluster --name kind-m --config ./e2e/kind-config-multikind.yaml --loglevel debug
-	export KUBECONFIG="$(kind get kubeconfig-path --name="kind-m")"
-	kubectl cluster-info
+	e2e/mock_e2e.sh
