@@ -10,7 +10,8 @@ After the installation, issue
     $ minikube start
 ```
 
-Note: if you are running on a Mac, you may also use Docker for Mac Kubernetes instead of a docker-machine.
+Note: if you are running on a Mac, you may also use Docker for Mac Kubernetes
+instead of a docker-machine.
 
 Once you have it started successfully, use [the quickstart
 guide](https://github.com/kubernetes/minikube#quickstart) in order to test your
@@ -79,7 +80,8 @@ cluster.
 
 ## Connect to PostgreSQL
 
-We can use the generated secret of the `postgres` robot user to connect to our `acid-minimal-cluster` master running in Minikube:
+We can use the generated secret of the `postgres` robot user to connect to our
+`acid-minimal-cluster` master running in Minikube:
 
 ```bash
     $ export HOST_PORT=$(minikube service acid-minimal-cluster --url | sed 's,.*/,,')
@@ -166,8 +168,15 @@ minikube. The following steps will get you the docker image built and deployed.
 
 # Code generation
 
-The operator employs k8s-provided code generation to obtain deep copy methods and Kubernetes-like APIs for its custom resource definitons, namely the Postgres CRD and the operator CRD. The usage of the code generation follows conventions from the k8s community. Relevant scripts live in the `hack` directory:  the `update-codegen.sh` triggers code generation for the APIs defined in `pkg/apis/acid.zalan.do/`,
-the `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI). The `/pkg/generated/` contains the resultant code. To make these scripts work, you may need to `export GOPATH=$(go env GOPATH)`
+The operator employs k8s-provided code generation to obtain deep copy methods
+and Kubernetes-like APIs for its custom resource definitons, namely the Postgres
+CRD and the operator CRD. The usage of the code generation follows conventions
+from the k8s community. Relevant scripts live in the `hack` directory:
+* `update-codegen.sh` triggers code generation for the APIs defined in `pkg/apis/acid.zalan.do/`,
+* `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI).
+
+The `/pkg/generated/` contains the resultant code. To make these scripts work,
+you may need to `export GOPATH=$(go env GOPATH)`
 
 References for code generation are:
 * [Relevant pull request](https://github.com/zalando/postgres-operator/pull/369)
@@ -176,7 +185,12 @@ See comments there for minor issues that can sometimes broke the generation proc
 * [Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/) - intro post on the topic
 * Code generation in [Prometheus](https://github.com/coreos/prometheus-operator) and [etcd](https://github.com/coreos/etcd-operator) operators
 
-To debug the generated API locally, use the [kubectl proxy](https://kubernetes.io/docs/tasks/access-kubernetes-api/http-proxy-access-api/) and `kubectl --v=8` log level to display contents of HTTP requests (run the operator itself with `--v=8` to log all REST API requests). To attach a debugger to the operator, use the `-outofcluster` option to run the operator locally on the developer's laptop (and not in a docker container).
+To debug the generated API locally, use the
+[kubectl proxy](https://kubernetes.io/docs/tasks/access-kubernetes-api/http-proxy-access-api/)
+and `kubectl --v=8` log level to display contents of HTTP requests (run the
+operator itself with `--v=8` to log all REST API requests). To attach a debugger
+to the operator, use the `-outofcluster` option to run the operator locally on
+the developer's laptop (and not in a docker container).
 
 # Debugging the operator
 
@@ -201,15 +215,15 @@ defaults to 4)
 * /workers/$id/logs - log of the operations performed by a given worker
 * /clusters/ - list of teams and clusters known to the operator
 * /clusters/$team - list of clusters for the given team
-* /clusters/$team/$namespace/$clustername - detailed status of the cluster, including the
-  specifications for CRD, master and replica services, endpoints and
-  statefulsets, as well as any errors and the worker that cluster is assigned
-  to.
-* /clusters/$team/$namespace/$clustername/logs/ - logs of all operations performed to the
-  cluster so far.
-* /clusters/$team/$namespace/$clustername/history/ - history of cluster changes triggered
-  by the changes of the manifest (shows the somewhat obscure diff and what
-  exactly has triggered the change)
+* /clusters/$team/$namespace/$clustername - detailed status of the cluster,
+  including the specifications for CRD, master and replica services, endpoints
+  and statefulsets, as well as any errors and the worker that cluster is
+  assigned to.
+* /clusters/$team/$namespace/$clustername/logs/ - logs of all operations
+  performed to the cluster so far.
+* /clusters/$team/$namespace/$clustername/history/ - history of cluster changes
+  triggered by the changes of the manifest (shows the somewhat obscure diff and
+  what exactly has triggered the change)
 
 The operator also supports pprof endpoints listed at the
 [pprof package](https://golang.org/pkg/net/http/pprof/), such as:
@@ -290,10 +304,46 @@ PASS
 ```
 
 To test the multinamespace setup, you can use
+
 ```
 ./run_operator_locally.sh --rebuild-operator
 ```
-It will automatically create an `acid-minimal-cluster` in the namespace `test`. Then you can for example check the Patroni logs:
+It will automatically create an `acid-minimal-cluster` in the namespace `test`.
+Then you can for example check the Patroni logs:
+
 ```
 kubectl logs acid-minimal-cluster-0
 ```
+
+## Introduce additional configuration parameters
+
+In the case you want to add functionality to the operator that shall be
+controlled via the operator configuration there are a few places that need to
+be updated. As explained [here](reference/operator_parameters.md), it's possible
+to configure the operator either with a ConfigMap or CRD, but currently we aim
+to synchronize parameters everywhere.
+
+Note: If one option is defined in the operator configuration and in the cluster
+[manifest](../manifests/complete-postgres-manifest.yaml), the latter takes
+precedence.
+
+So, first define the parameters in:
+* the [ConfigMap](../manifests/configmap.yaml) manifest
+* the CR's [default configuration](../manifests/postgresql-operator-default-configuration.yaml)
+* the Helm chart [values](../charts/postgres-operator/values.yaml)
+
+Update the following Go files that obtain the configuration parameter from the
+manifest files:
+* [operator_configuration_type.go](../pkg/apis/acid.zalan.do/v1/operator_configuration_type.go)
+* [operator_config.go](../pkg/controller/operator_config.go)
+* [config.go](../pkg/util/config/config.go)
+
+The operator behavior has to be implemented at least in [k8sres.go](../pkg/cluster/k8sres.go).
+Please, reflect your changes in tests, for example in:
+* [config_test.go](../pkg/util/config/config_test.go)
+* [k8sres_test.go](../pkg/cluster/k8sres_test.go)
+* [util_test.go](../pkg/apis/acid.zalan.do/v1/util_test.go)
+
+Finally, document the new configuration option(s) for the operator in its
+[reference](reference/operator_parameters.md) document and explain the feature
+in the [administrator docs](administrator.md).

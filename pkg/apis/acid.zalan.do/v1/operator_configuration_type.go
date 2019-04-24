@@ -45,6 +45,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountDefinition            string                `json:"pod_service_account_definition,omitempty"`
 	PodServiceAccountRoleBindingDefinition string                `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration              `json:"pod_terminate_grace_period,omitempty"`
+	SpiloPrivileged                        bool                  `json:"spilo_privileged,omitemty"`
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
@@ -61,8 +62,9 @@ type KubernetesMetaConfiguration struct {
 	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
 	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
 	MasterPodMoveTimeout       time.Duration `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity" default:"false"`
-	PodAntiAffinityTopologyKey string        `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
+	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
