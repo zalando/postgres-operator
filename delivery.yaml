@@ -46,6 +46,7 @@ pipeline:
             export PATH=$PATH:$HOME/go/bin
             cd $OPERATOR_TOP_DIR/postgres-operator
             go get -u sigs.k8s.io/kind
+            pip3 install -r requirements.txt
             echo "INFO install kubectl to test 'kind' from client side"
             (curl -LO --silent https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl &&
             chmod +x ./kubectl &&
