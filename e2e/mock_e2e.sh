@@ -6,6 +6,16 @@ set -o nounset
 set -o pipefail
 IFS=$'\n\t'
 
-kind create cluster --name kind-m --config ./e2e/kind-config-multikind.yaml --loglevel debug
-export KUBECONFIG="$(kind get kubeconfig-path --name="kind-m")"
+readonly cluster_name="kind-test-postgres-operator"
+
+# avoid interference with previous test runs
+if [[ $(kind get clusters | grep "^${cluster_name}*") != "" ]]
+then
+  rm "$KUBECONFIG"
+  unset KUBECONFIG
+  kind delete cluster --name ${cluster_name}
+fi
+
+kind create cluster --name ${cluster_name} --config ./e2e/kind-config-multikind.yaml
+export KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
 kubectl cluster-info
