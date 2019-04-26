@@ -1,5 +1,5 @@
-dist: xenial
-sudo: true
+dist: trusty
+sudo: false
 
 branches:
   only:
@@ -13,16 +13,10 @@ go:
 before_install:
   - go get github.com/Masterminds/glide
   - go get github.com/mattn/goveralls
-  - go get sigs.k8s.io/kind
-  - sudo apt update
-  - sudo apt-get install -y python3 python3-pip
 
 install:
   - make deps
-  - pip3 install -U pip3
-  - pip3 install -r requirements.txt
 
 script:
   - hack/verify-codegen.sh
-  - make e2e
   - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -v
