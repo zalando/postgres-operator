@@ -94,5 +94,5 @@ test:
 
 e2e:
 	e2e/run.sh
-	# TODO run before tests once there are implemented completely
+	# TODO run before tests once they are implemented completely
 	flake8 --exit-zero
