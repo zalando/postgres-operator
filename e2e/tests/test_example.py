@@ -1,11 +1,34 @@
 
-import unittest
-from kubernetes import client, config
+import unittest, yaml
+from kubernetes import client, config, utils
 from pprint import pprint
+import subprocess
 
 class SampleTestCase(unittest.TestCase):
 
     nodes = set(["kind-test-postgres-operator-worker", "kind-test-postgres-operator-worker2", "kind-test-postgres-operator-worker3"])
+
+    @classmethod
+    def setUpClass(cls):
+
+        # deploy operator 
+
+        _ = config.load_kube_config()
+        k8s_client = client.ApiClient()
+
+        # HACK create_from_yaml fails with multiple object defined within a single file
+        # which is exactly the case with RBAC definition
+        subprocess.run(["kubectl", "create", "-f", "manifests/operator-service-account-rbac.yaml"])
+
+        for filename in ["configmap.yaml", "postgres-operator.yaml"]:
+            path = "manifests/" + filename
+            utils.create_from_yaml(k8s_client, path)
+        
+        #TODO wait until operator pod starts up label ; name=postgres-operator
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
 
     def setUp(self):
         self.config = config.load_kube_config()
