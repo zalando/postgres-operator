@@ -19,6 +19,7 @@ before_install:
 
 install:
   - make deps
+  - pip3 install -U pip3
   - pip3 install -r requirements.txt
 
 script:
