@@ -14,7 +14,7 @@ before_install:
   - go get github.com/Masterminds/glide
   - go get github.com/mattn/goveralls
   - go get sigs.k8s.io/kind
-  - apt-get install -y python3 python3-pip
+  - sudo apt-get install -y python3 python3-pip
 
 install:
   - make deps
