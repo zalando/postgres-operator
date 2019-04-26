@@ -33,7 +33,7 @@ class SampleTestCase(unittest.TestCase):
             if v1_node_var.metadata.labels['lifecycle-status'] == 'ready':
                 labelled_nodes.add(v1_node_var.metadata.name)
 
-        assert self.nodes == labelled_nodes, "nodes incorrectly labelled"
+        self.assertEqual(self.nodes, labelled_nodes,"nodes incorrectly labelled")
 
     def tearDown(self):
         """

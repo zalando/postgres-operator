@@ -11,8 +11,11 @@ readonly cluster_name="kind-test-postgres-operator"
 # avoid interference with previous test runs
 if [[ $(kind get clusters | grep "^${cluster_name}*") != "" ]]
 then
-  rm "$KUBECONFIG"
-  unset KUBECONFIG
+  # true if variable is set; bash >= v4.2
+  if [[ -v KUBECONFIG ]];then 
+      rm "$KUBECONFIG"
+      unset KUBECONFIG
+  fi
   kind delete cluster --name ${cluster_name}
 fi
 
