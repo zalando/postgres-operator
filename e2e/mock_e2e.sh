@@ -23,4 +23,4 @@ kind create cluster --name ${cluster_name} --config ./e2e/kind-config-multikind.
 export KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
 kubectl cluster-info
 
-./e2e/tests.py
+python3 -m unittest discover -s e2e/tests/
