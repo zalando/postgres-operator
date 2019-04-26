@@ -93,4 +93,4 @@ test:
 	@go test ./...
 
 e2e:
-	e2e/mock_e2e.sh
+	e2e/run.sh
