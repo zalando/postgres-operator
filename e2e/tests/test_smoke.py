@@ -5,6 +5,9 @@ from pprint import pprint
 import subprocess
 
 class SmokeTestCase(unittest.TestCase):
+    '''
+    Test the most basic e2e functionality of the operator.
+    '''
 
     @classmethod
     def setUpClass(cls):

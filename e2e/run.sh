@@ -6,7 +6,7 @@ set -o nounset
 set -o pipefail
 IFS=$'\n\t'
 
-readonly cluster_name="kind-test-postgres-operator"
+readonly cluster_name="kind-smoke-test-postgres-operator"
 
 # avoid interference with previous test runs
 if [[ $(kind get clusters | grep "^${cluster_name}*") != "" ]]
@@ -14,7 +14,7 @@ then
   kind delete cluster --name ${cluster_name}
 fi
 
-kind create cluster --name ${cluster_name} --config ./e2e/kind-config-multikind.yaml
+kind create cluster --name ${cluster_name} --config ./e2e/kind-config-smoke-tests.yaml
 export KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
 kubectl cluster-info
 
