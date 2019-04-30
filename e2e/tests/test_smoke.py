@@ -2,13 +2,13 @@
 import unittest, yaml, time
 from kubernetes import client, config, utils
 from pprint import pprint
+import timeout_decorator
 import subprocess
 
 class SmokeTestCase(unittest.TestCase):
     '''
     Test the most basic e2e functionality of the operator.
     '''
-
     @classmethod
     def setUpClass(cls):
         '''
@@ -56,6 +56,7 @@ class SmokeTestCase(unittest.TestCase):
             print("Waiting for the Spilo master pod to start. Current phase: " + str(pod_phase))
             time.sleep(5)
 
+    @timeout_decorator.timeout(60)
     def test_master_is_unique(self):
         """
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master".
@@ -65,6 +66,7 @@ class SmokeTestCase(unittest.TestCase):
         master_pods = v1.list_namespaced_pod('default', label_selector='spilo-role=master,version=acid-minimal-cluster').items
         self.assertEqual(len(master_pods), 1, "Expected 1 master pod,found " + str(len(master_pods)))
 
+    @timeout_decorator.timeout(60)
     def test_scaling(self):
         """
            Scale up from 2 to 3 pods and back to 2 by updating the Postgres manifest at runtime.
