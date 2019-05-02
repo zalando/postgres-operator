@@ -4,7 +4,7 @@ from kubernetes import client, config, utils
 from pprint import pprint
 import timeout_decorator
 import subprocess
-
+import git
 
 class K8sApi:
 
@@ -13,6 +13,8 @@ class K8sApi:
        self.k8s_client = client.ApiClient()
        self.core_v1 = client.CoreV1Api()
        self.crd_api = client.CustomObjectsApi()
+       self.apps_v1 = client.AppsV1Api()
+
 
 
 class SmokeTestCase(unittest.TestCase):
@@ -41,6 +43,26 @@ class SmokeTestCase(unittest.TestCase):
         for filename in ["configmap.yaml", "postgres-operator.yaml"]:
             path = "manifests/" + filename
             utils.create_from_yaml(k8s_api.k8s_client, path)
+        
+        # submit most recent operator image built locally; see VERSION in Makefile
+        repo = git.Repo(".")
+        version = repo.git.describe("--tags", "--always", "--dirty")
+        
+        body = {
+            "spec": {
+                "template": {
+                    "spec": {
+                        "containers": [ 
+                        {
+                          "name" : "postgres-operator",
+                          "image": "registry.opensource.zalan.do/acid/postgres-operator:" + version
+                        }
+                        ]
+                    }
+                 }
+            }
+        }
+        k8s_api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", body)
 
         pod_phase = None
         while pod_phase != 'Running':
