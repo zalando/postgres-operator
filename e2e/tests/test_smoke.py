@@ -2,8 +2,8 @@ import unittest
 import time
 import timeout_decorator
 import subprocess
-import git
 import warnings
+import docker
 
 from kubernetes import client, config, utils
 
@@ -39,9 +39,10 @@ class SmokeTestCase(unittest.TestCase):
         for filename in ["configmap.yaml", "postgres-operator.yaml"]:
             utils.create_from_yaml(k8s_api.k8s_client, "manifests/" + filename)
 
-        # submit the most recent operator image built locally; see VERSION in Makefile
-        # TODO properly fetch the recent image tag from the local Docker
-        version = git.Repo(".").git.describe("--tags", "--always", "--dirty")
+        # submit the most recent operator image built locally
+        # HACK assumes "images lists" returns the most recent image at index 0
+        docker_client = docker.from_env()
+        image = docker_client.images.list(name="registry.opensource.zalan.do/acid/postgres-operator")[0].tags[0]
         body = {
             "spec": {
                 "template": {
@@ -49,7 +50,7 @@ class SmokeTestCase(unittest.TestCase):
                         "containers": [
                             {
                               "name": "postgres-operator",
-                              "image": "registry.opensource.zalan.do/acid/postgres-operator:" + version
+                              "image": image
                             }
                         ]
                     }
@@ -88,7 +89,7 @@ class SmokeTestCase(unittest.TestCase):
         Utils.wait_for_pg_to_scale(k8s, 3, self.RETRY_TIMEOUT_SEC)
         self.assertEqual(3, Utils.count_pods_with_label(k8s, labels))
 
-        # NB `kind` pods may stuck in the Terminating state for a few minutes
+        # TODO `kind` pods may stuck in the Terminating state for a few minutes; reproduce/file a bug report
         Utils.wait_for_pg_to_scale(k8s, 2, self.RETRY_TIMEOUT_SEC)
         self.assertEqual(2, Utils.count_pods_with_label(k8s, labels))
 
@@ -116,7 +117,7 @@ class Utils:
             pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
-            print(f"Wait for the pod '{pod_labels}' to start. Current pod phase: " + pod_phase)
+            print(f"Wait for the pod '{pod_labels}' to start. Current pod phase: {pod_phase}")
             time.sleep(retry_timeout_sec)
 
     @staticmethod
