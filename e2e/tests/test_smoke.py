@@ -12,10 +12,11 @@ class SmokeTestCase(unittest.TestCase):
     Test the most basic functions of the operator.
     '''
 
-    TEST_TIMEOUT_SEC = 240
+    TEST_TIMEOUT_SEC = 300
     RETRY_TIMEOUT_SEC = 5
 
     @classmethod
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
         '''
         Deploy operator to a "kind" cluster created by /e2e/run.sh using examples from /manifests.
