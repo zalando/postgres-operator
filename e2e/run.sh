@@ -18,8 +18,8 @@ kind create cluster --name ${cluster_name} --config ./e2e/kind-config-smoke-test
 export KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
 kubectl cluster-info
 
-version=$(git describe --tags --always --dirty)
-kind load docker-image "registry.opensource.zalan.do/acid/postgres-operator:${version}" --name ${cluster_name}
+image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}"  | head -1)
+kind load docker-image ${image} --name ${cluster_name}
 
 python3 -m unittest discover --start-directory e2e/tests/ &&
 kind delete cluster --name ${cluster_name}
