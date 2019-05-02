@@ -329,6 +329,7 @@ func TestShouldDeleteSecret(t *testing.T) {
 	}
 }
 
+/*
 func TestSetStatus(t *testing.T) {
 
 	tests := []struct {
@@ -356,3 +357,4 @@ func TestSetStatus(t *testing.T) {
 		}
 	}
 }
+*/
