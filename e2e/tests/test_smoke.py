@@ -3,6 +3,7 @@ import time
 import timeout_decorator
 import subprocess
 import git
+import warnings
 
 from kubernetes import client, config, utils
 
@@ -12,7 +13,7 @@ class SmokeTestCase(unittest.TestCase):
     Test the most basic functions of the operator.
     '''
 
-    TEST_TIMEOUT_SEC = 300
+    TEST_TIMEOUT_SEC = 600
     RETRY_TIMEOUT_SEC = 5
 
     @classmethod
@@ -39,6 +40,7 @@ class SmokeTestCase(unittest.TestCase):
             utils.create_from_yaml(k8s_api.k8s_client, "manifests/" + filename)
 
         # submit the most recent operator image built locally; see VERSION in Makefile
+        # TODO properly fetch the recent image tag from the local Docker
         version = git.Repo(".").git.describe("--tags", "--always", "--dirty")
         body = {
             "spec": {
@@ -56,6 +58,7 @@ class SmokeTestCase(unittest.TestCase):
         }
         k8s_api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", body)
 
+        # TODO check if CRD is registered instead
         Utils.wait_for_pod_start(k8s_api, 'name=postgres-operator', cls.RETRY_TIMEOUT_SEC)
 
         # HACK around the lack of Python client for the acid.zalan.do resource
@@ -85,6 +88,7 @@ class SmokeTestCase(unittest.TestCase):
         Utils.wait_for_pg_to_scale(k8s, 3, self.RETRY_TIMEOUT_SEC)
         self.assertEqual(3, Utils.count_pods_with_label(k8s, labels))
 
+        # NB `kind` pods may stuck in the Terminating state for a few minutes
         Utils.wait_for_pg_to_scale(k8s, 2, self.RETRY_TIMEOUT_SEC)
         self.assertEqual(2, Utils.count_pods_with_label(k8s, labels))
 
@@ -92,6 +96,10 @@ class SmokeTestCase(unittest.TestCase):
 class K8sApi:
 
     def __init__(self):
+
+        # https://github.com/kubernetes-client/python/issues/309
+        warnings.simplefilter("ignore", ResourceWarning)
+
         self.config = config.load_kube_config()
         self.k8s_client = client.ApiClient()
         self.core_v1 = client.CoreV1Api()
@@ -108,7 +116,7 @@ class Utils:
             pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
-            print(f"Wait for the {pod_labels} pod to start. Current pod phase: " + pod_phase)
+            print(f"Wait for the pod '{pod_labels}' to start. Current pod phase: " + pod_phase)
             time.sleep(retry_timeout_sec)
 
     @staticmethod
