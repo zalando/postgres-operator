@@ -76,7 +76,7 @@ class SmokeTestCase(unittest.TestCase):
         labels = 'spilo-role=master,version=acid-minimal-cluster'
 
         num_of_master_pods = Utils.count_pods_with_label(k8s, labels)
-        self.assertEqual(num_of_master_pods, 1, f"Expected 1 master pod, found {num_of_master_pods}")
+        self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
@@ -117,7 +117,7 @@ class Utils:
             pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
-            print(f"Wait for the pod '{pod_labels}' to start. Current pod phase: {pod_phase}")
+            print("Wait for the pod '{}' to start. Current pod phase: {}".format(pod_labels, pod_phase))
             time.sleep(retry_timeout_sec)
 
     @staticmethod
@@ -133,7 +133,7 @@ class Utils:
 
         labels = 'version=acid-minimal-cluster'
         while Utils.count_pods_with_label(k8s_api, labels) != number_of_instances:
-            print(f"Waiting for the cluster to scale to {number_of_instances} pods.")
+            print("Waiting for the cluster to scale to {} pods.".format(number_of_instances))
             time.sleep(retry_timeout_sec)
 
     @staticmethod
