@@ -1,4 +1,4 @@
 kubernetes
 flake8
-git
+gitpython
 timeout_decorator
