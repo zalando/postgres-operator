@@ -319,7 +319,7 @@ kubectl logs acid-minimal-cluster-0
 
 The operator provides e2e (end-to-end) tests to ensure various infra parts work smoothly together.
 Such tests employ [kind](https://kind.sigs.k8s.io/) to start a local k8s cluster.
-We intend to execute e2e tests during builds, but you can invoke them locally with `make e2e` from the project's top directory. 
+We intend to execute e2e tests during builds, but you can invoke them locally with `make e2e` from the project's top directory. Each e2e execution tests a Postgres operator image built from the current git branch.
 
 ### Smoke tests
 
