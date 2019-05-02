@@ -149,7 +149,7 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 }
 
 // SetStatus of Postgres cluster
-func (c *Cluster) SetStatus(status string) {
+func (c *Cluster) setStatus(status string) {
 	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
 	patch, err := json.Marshal(acidv1.PostgresStatus{PostgresClusterStatus: status})
 	if err != nil {
@@ -210,13 +210,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.SetStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			c.setStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.SetStatus(acidv1.ClusterStatusAddFailed)
+			c.setStatus(acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.SetStatus(acidv1.ClusterStatusCreating)
+	c.setStatus(acidv1.ClusterStatusCreating)
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
@@ -483,14 +483,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.SetStatus(acidv1.ClusterStatusUpdating)
+	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.SetStatus(acidv1.ClusterStatusUpdateFailed)
+			c.setStatus(acidv1.ClusterStatusUpdateFailed)
 		} else {
-			c.SetStatus(acidv1.ClusterStatusRunning)
+			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 

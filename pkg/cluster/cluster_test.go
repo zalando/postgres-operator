@@ -350,7 +350,7 @@ func TestSetStatus(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		cl.SetStatus(tt.status.PostgresClusterStatus)
+		cl.setStatus(tt.status.PostgresClusterStatus)
 		if tt.outcome {
 			t.Errorf("Wrong status: %s", cl.Status.String())
 		}
