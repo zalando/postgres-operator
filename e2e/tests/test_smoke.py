@@ -40,7 +40,7 @@ class SmokeTestCase(unittest.TestCase):
             utils.create_from_yaml(k8s_api.k8s_client, "manifests/" + filename)
 
         # submit the most recent operator image built locally
-        # HACK assumes "images lists" returns the most recent image at index 0
+        # HACK assumes "images list" returns the most recent image at index 0
         docker_client = docker.from_env()
         image = docker_client.images.list(name="registry.opensource.zalan.do/acid/postgres-operator")[0].tags[0]
         body = {
