@@ -5,7 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
+	"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 )
 
 // APIVersion of the `postgresql` and `operator` CRDs
@@ -16,7 +16,7 @@ const (
 var (
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
 
-	// An instance of runtime.SchemeBuilder, global for this package
+	// SchemeBuilder : An instance of runtime.SchemeBuilder, global for this package
 	SchemeBuilder      runtime.SchemeBuilder
 	localSchemeBuilder = &SchemeBuilder
 	//AddToScheme is localSchemeBuilder.AddToScheme

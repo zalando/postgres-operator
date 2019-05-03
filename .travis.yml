@@ -8,7 +8,7 @@ branches:
 language: go
 
 go:
-  - "1.10.x"
+  - "1.12.x"
 
 before_install:
   - go get github.com/Masterminds/glide
@@ -18,4 +18,5 @@ install:
   - make deps
 
 script:
+  - hack/verify-codegen.sh
   - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -v

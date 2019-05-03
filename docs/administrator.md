@@ -22,6 +22,17 @@ Next deploy the postgres-operator from the docker image Zalando is using:
 
 If you prefer to build the image yourself follow up down below.
 
+### - Helm chart
+
+You can install postgres-operator also with a [Helm](https://helm.sh/) chart.
+This requires installing the Helm CLI first and then initializing it in the
+cluster.
+
+```bash
+    $ helm init
+    $ helm install --name my-release ./charts/postgres-operator
+```
+
 ## Check if CustomResourceDefinition has been registered
 
 ```bash
@@ -146,6 +157,93 @@ data:
   ...
 ```
 
+Note that the Kubernetes version 1.13 brings [taint-based eviction](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/#taint-based-evictions) to the beta stage and enables it by default.
+Postgres pods by default receive tolerations for `unreachable` and `noExecute` taints with the timeout of `5m`.
+Depending on your setup, you may want to adjust these parameters to prevent master pods from being evicted by the Kubernetes runtime.
+To prevent eviction completely, specify the toleration by leaving out the `tolerationSeconds` value (similar to how Kubernetes' own DaemonSets are configured)
+
+### Enable pod anti affinity
+
+To ensure Postgres pods are running on different topologies, you can use [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
+and configure the required topology in the operator ConfigMap.
+
+Enable pod anti affinity by adding following line to the operator ConfigMap:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  enable_pod_antiaffinity: "true"
+```
+
+By default the topology key for the pod anti affinity is set to `kubernetes.io/hostname`,
+you can set another topology key e.g. `failure-domain.beta.kubernetes.io/zone` by adding following line
+to the operator ConfigMap, see [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  enable_pod_antiaffinity: "true"
+  pod_antiaffinity_topology_key: "failure-domain.beta.kubernetes.io/zone"
+```
+
+### Add cluster-specific labels
+
+In some cases, you might want to add `labels` that are specific to a given
+postgres cluster, in order to identify its child objects.
+The typical use case is to add labels that identifies the `Pods` created by the
+operator, in order to implement fine-controlled `NetworkPolicies`.
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    inherited_labels:
+    - application
+    - environment
+...
+```
+
+**cluster manifest**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: demo-cluster
+  labels:
+    application: my-app
+    environment: demo
+spec:
+...
+```
+
+**network policy**
+
+```yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: netpol-example
+spec:
+  podSelector:
+    matchLabels:
+      application: my-app
+      environment: demo
+...
+```
+
+
 ## Custom Pod Environment Variables
 
 It is possible to configure a ConfigMap which is used by the Postgres pods as
@@ -225,7 +323,7 @@ generated from the current cluster manifest. There are two types of scans:
 * `sync scan`, running every `resync_period` seconds for every cluster
 
 * `repair scan`, coming every `repair_period` only for those clusters that didn't
-report success as a result of the last operation applied to them. 
+report success as a result of the last operation applied to them.
 
 ## Postgres roles supported by the operator
 
@@ -242,8 +340,8 @@ Postgres database cluster:
 
 ## Understanding rolling update of Spilo pods
 
-The operator logs reasons for a rolling update with the `info` level and 
-a diff between the old and new StatefulSet specs with the `debug` level. 
+The operator logs reasons for a rolling update with the `info` level and
+a diff between the old and new StatefulSet specs with the `debug` level.
 To read the latter log entry with the escaped characters rendered, view it
 in CLI with `echo -e`. Note that the resultant message will contain some
 noise because the `PodTemplate` used by the operator is yet to be updated

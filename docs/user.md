@@ -1,7 +1,7 @@
 ## Create a manifest for a new PostgreSQL cluster
 
 As an example you can take this
-[minimal example](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
+[minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -43,13 +43,25 @@ $ kubectl get pods -w --show-labels
 
 ## Connect to PostgreSQL
 
-We can use the generated secret of the `postgres` robot user to connect to our `acid-minimal-cluster` master running in Minikube:
+With a `port-forward` on one of the database pods (e.g. the master) you can
+connect to the PostgreSQL database. Use labels to filter for the master pod of
+our test cluster.
 
 ```bash
-$ export PGHOST=db_host
-$ export PGPORT=db_port
+# get name of master pod of acid-minimal-cluster
+export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,version=acid-minimal-cluster,spilo-role=master)
+
+# set up port forward
+kubectl port-forward $PGMASTER 6432:5432
+```
+
+Open another CLI and connect to the database. Use the generated secret of the
+`postgres` robot user to connect to our `acid-minimal-cluster` master running
+in Minikube:
+
+```bash
 $ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
-$ psql -U postgres
+$ psql -U postgres -p 6432
 ```
 
 # Defining database roles in the operator
@@ -68,7 +80,7 @@ In the next sections, we will cover those use cases in more details.
 ## Manifest roles
 
 Manifest roles are defined directly in the cluster manifest. See
-[minimal postgres manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
+[minimal postgres manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
 for an example of `zalando` role, defined with `superuser` and `createdb`
 flags.
 
@@ -158,8 +170,8 @@ Since an infrastructure role is created uniformly on all clusters managed by
 the operator, it makes no sense to define it without the password. Such
 definitions will be ignored with a prior warning.
 
-See [infrastructure roles secret](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
-and [infrastructure roles configmap](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml) for the examples.
+See [infrastructure roles secret](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
+and [infrastructure roles configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml) for the examples.
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 

@@ -5,7 +5,7 @@ Wanna contribute to the Postgres Operator? Yay - here is how!
 ## Reporting issues
 
 If you have a question about patroni or have a problem using it, please read the`README` before filing an issue.
-Also double check with the current issues on our [Issues Tracker](https://github.com/zalando-incubator/postgres-operator/issues).
+Also double check with the current issues on our [Issues Tracker](https://github.com/zalando/postgres-operator/issues).
 
 ## Contributing a pull request
 

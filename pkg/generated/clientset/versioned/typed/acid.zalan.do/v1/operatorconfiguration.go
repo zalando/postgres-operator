@@ -25,8 +25,8 @@ SOFTWARE.
 package v1
 
 import (
-	acidzalandov1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	scheme "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned/scheme"
+	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	rest "k8s.io/client-go/rest"
 )

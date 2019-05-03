@@ -17,13 +17,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	acidzalando "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do"
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/retryutil"
+	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
 // OAuthTokenGetter provides the method for fetching OAuth tokens
@@ -389,6 +389,19 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 	if shouldAddExtraLabels {
 		// enables filtering resources owned by a team
 		lbls["team"] = c.Postgresql.Spec.TeamID
+
+		// allow to inherit certain labels from the 'postgres' object
+		if spec, err := c.GetSpec(); err == nil {
+			for k, v := range spec.ObjectMeta.Labels {
+				for _, match := range c.OpConfig.InheritedLabels {
+					if k == match {
+						lbls[k] = v
+					}
+				}
+			}
+		} else {
+			c.logger.Warningf("could not get the list of InheritedLabels for cluster %q: %v", c.Name, err)
+		}
 	}
 
 	return labels.Set(lbls)
@@ -398,8 +411,8 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 	return &metav1.LabelSelector{MatchLabels: c.labelsSet(false), MatchExpressions: nil}
 }
 
-func (c *Cluster) roleLabelsSet(role PostgresRole) labels.Set {
-	lbls := c.labelsSet(false)
+func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) labels.Set {
+	lbls := c.labelsSet(shouldAddExtraLabels)
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
 	return lbls
 }

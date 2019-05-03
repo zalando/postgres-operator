@@ -1,11 +1,11 @@
 package v1
 
 import (
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/config"
 
 	"time"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -45,6 +45,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountDefinition            string                `json:"pod_service_account_definition,omitempty"`
 	PodServiceAccountRoleBindingDefinition string                `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration              `json:"pod_terminate_grace_period,omitempty"`
+	SpiloPrivileged                        bool                  `json:"spilo_privileged,omitemty"`
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
@@ -52,13 +53,18 @@ type KubernetesMetaConfiguration struct {
 	InfrastructureRolesSecretName          spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
 	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
+	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
-	PodEnvironmentConfigMap string `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName    string `json:"pod_priority_class_name,omitempty"`
+	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout       time.Duration `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
