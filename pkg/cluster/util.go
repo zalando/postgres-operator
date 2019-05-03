@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"k8s.io/api/apps/v1beta1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -483,14 +482,4 @@ func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 
 func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
-}
-
-func (c *Cluster) logLogicalBackupJobChanges(old, new *batchv1beta1.CronJob, reason string) {
-
-	c.logger.Infof("logical job %q is not in the desired state and needs to be updated",
-		c.getLogicalBackupJobName(),
-	)
-	if reason != "" {
-		c.logger.Infof("reason: %s", reason)
-	}
 }
