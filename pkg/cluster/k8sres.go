@@ -1192,9 +1192,8 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 	}
 
 	cluster := description.ClusterName
+	result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
 	if description.EndTimestamp == "" {
-		result = append(result, v1.EnvVar{Name: "CLONE_SCOPE", Value: cluster})
-
 		// cloning with basebackup, make a connection string to the cluster to clone from
 		host, port := c.getClusterServiceConnectionParameters(cluster)
 		// TODO: make some/all of those constants
@@ -1217,12 +1216,14 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
+		msg := "Clone from S3 bucket"
+		c.logger.Info(msg, description.S3WalPath)
+
 		if description.S3WalPath == "" {
+			msg := "Figure out which S3 bucket to use from env"
+			c.logger.Info(msg, description.S3WalPath)
+
 			envs := []v1.EnvVar{
-				v1.EnvVar{
-					Name:  "CLONE_SCOPE",
-					Value: cluster,
-				},
 				v1.EnvVar{
 					Name:  "CLONE_WAL_S3_BUCKET",
 					Value: c.OpConfig.WALES3Bucket,
