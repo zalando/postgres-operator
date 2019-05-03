@@ -1192,7 +1192,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			c.logger.Warningf(msg, description.S3WalPath)
 
 			result = append(result, v1.EnvVar{
-				Name:  "CLONE_WAL_S3_PREFIX",
+				Name:  "CLONE_WALE_S3_PREFIX",
 				Value: description.S3WalPath,
 			})
 		}
