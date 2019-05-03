@@ -540,7 +540,6 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	c.setProcessName("syncing the logical backup job")
 
 	// sync the job if it exists
-	// NB operator pod at startup syncs all clusters, c.logicalBackupJob will be nil during such Sync
 
 	jobName := c.getLogicalBackupJobName()
 	if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(jobName, metav1.GetOptions{}); err == nil {
@@ -554,7 +553,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			if err = c.patchLogicalBackupJob(desiredJob); err != nil {
 				return fmt.Errorf("could not update logical backup job to match desired state: %v", err)
 			}
-			c.logger.Info("the logical backup job is in the desired state now")
+			c.logger.Info("the logical backup job is synced")
 		}
 		return nil
 	}

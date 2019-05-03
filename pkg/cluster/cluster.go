@@ -487,9 +487,10 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 }
 
-// Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
+// Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
 // (i.e. service) is treated as an error
-// logical backup cron jobs are an exception: they can be freely created/deleted by users
+// logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
+// for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
 
@@ -602,7 +603,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 		// apply schedule changes
 		// this is the only parameter of logical backups a user can overwrite in the cluster manifest
-		if (newSpec.Spec.EnableLogicalBackup) &&
+		if (oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup) &&
 			(newSpec.Spec.LogicalBackupSchedule != oldSpec.Spec.LogicalBackupSchedule) {
 			c.logger.Debugf("updating schedule of the backup cron job")
 			if err := c.syncLogicalBackupJob(); err != nil {
@@ -1058,11 +1059,4 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	}
 
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
-}
-
-func (c *Cluster) deleteLogicalBackupJob() error {
-
-	c.logger.Debug("removing the logical backup job")
-
-	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(c.getLogicalBackupJobName(), c.deleteOptions)
 }

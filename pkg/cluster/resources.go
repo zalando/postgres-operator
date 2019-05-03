@@ -648,6 +648,13 @@ func (c *Cluster) patchLogicalBackupJob(newJob *batchv1beta1.CronJob) error {
 	return nil
 }
 
+func (c *Cluster) deleteLogicalBackupJob() error {
+
+	c.logger.Info("removing the logical backup job")
+
+	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(c.getLogicalBackupJobName(), c.deleteOptions)
+}
+
 // GetServiceMaster returns cluster's kubernetes master Service
 func (c *Cluster) GetServiceMaster() *v1.Service {
 	return c.Services[Master]
