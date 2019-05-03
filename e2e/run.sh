@@ -21,5 +21,5 @@ kubectl cluster-info
 image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}"  | head -1)
 kind load docker-image ${image} --name ${cluster_name}
 
-python3 -m unittest discover --start-directory e2e/tests/ &&
+python3 -m unittest discover --start-directory e2e/tests/ -v &&
 kind delete cluster --name ${cluster_name}

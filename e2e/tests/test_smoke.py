@@ -4,6 +4,7 @@ import timeout_decorator
 import subprocess
 import warnings
 import docker
+from halo import Halo
 
 from kubernetes import client, config, utils
 
@@ -113,11 +114,11 @@ class Utils:
     @staticmethod
     def wait_for_pod_start(k8s_api, pod_labels, retry_timeout_sec):
         pod_phase = 'No pod running'
-        while pod_phase != 'Running':
-            pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
-            if pods:
-                pod_phase = pods[0].status.phase
-            print("Wait for the pod '{}' to start. Current pod phase: {}".format(pod_labels, pod_phase))
+        with Halo(text="Wait for the pod '{}' to start. Pod phase: {}".format(pod_labels, pod_phase), spinner='dots'):
+            while pod_phase != 'Running':
+                pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
+                if pods:
+                    pod_phase = pods[0].status.phase
             time.sleep(retry_timeout_sec)
 
     @staticmethod
@@ -132,9 +133,9 @@ class Utils:
                                                        "v1", "default", "postgresqls", "acid-minimal-cluster", body)
 
         labels = 'version=acid-minimal-cluster'
-        while Utils.count_pods_with_label(k8s_api, labels) != number_of_instances:
-            print("Waiting for the cluster to scale to {} pods.".format(number_of_instances))
-            time.sleep(retry_timeout_sec)
+        with Halo(text="Waiting for the cluster to scale to {} pods.".format(number_of_instances), spinner='dots'):
+            while Utils.count_pods_with_label(k8s_api, labels) != number_of_instances:
+                time.sleep(retry_timeout_sec)
 
     @staticmethod
     def count_pods_with_label(k8s_api, labels):
