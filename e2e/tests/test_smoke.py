@@ -35,7 +35,7 @@ class SmokeTestCase(unittest.TestCase):
         # 1. creating RBAC entites with a separate client fails
         #    with "AttributeError: object has no attribute 'select_header_accept'"
         # 2. utils.create_from_yaml cannot create multiple entites from a single file
-        subprocess.run(["kubectl", "create", "-f", "manifests/operator-service-account-rbac.yaml"])
+        # subprocess.run(["kubectl", "create", "-f", "manifests/operator-service-account-rbac.yaml"])
 
         for filename in ["configmap.yaml", "postgres-operator.yaml"]:
             utils.create_from_yaml(k8s_api.k8s_client, "manifests/" + filename)

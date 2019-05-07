@@ -93,7 +93,7 @@ test:
 	@go test ./...
 
 e2e-tools:
-	@pip3 install -r e2e/requirements.txt
+	@pip3 install --user --upgrade -r e2e/requirements.txt
 	@go get -u sigs.k8s.io/kind
 	# assumes kubectl is already isntalled
 
