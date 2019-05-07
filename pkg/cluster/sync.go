@@ -28,7 +28,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
 			c.setStatus(acidv1.ClusterStatusSyncFailed)
-		} else if c.Status != acidv1.ClusterStatusRunning {
+		} else if !c.Status.Running() {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
