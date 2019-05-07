@@ -10,6 +10,7 @@ metadata:
 configuration:
   pod_service_account_name: operator
 {{ toYaml .Values.config | indent 2 }}
+{{ toYaml .Values.configCRD | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   kubernetes:
@@ -25,7 +26,7 @@ configuration:
   debug:
 {{ toYaml .Values.configDebug | indent 4 }}
   teams_api:
-{{ toYaml .Values.configTeamsApi | indent 4 }}
+{{ toYaml .Values.configTeamsApiCRD | indent 4 }}
   logging_rest_api:
 {{ toYaml .Values.configLoggingRestApi | indent 4 }}
   scalyr:

@@ -12,7 +12,7 @@ data:
 {{ toYaml .Values.config | indent 2 }}
 {{ toYaml .Values.configUsers | indent 2 }}
 {{ toYaml .Values.configKubernetes | indent 2 }}
-{{ toYaml .Values.configPostgresPodResources | indent 2 }}
+{{ toYaml .Values.configNamespace | indent 2 }}
 {{ toYaml .Values.configTimeouts | indent 2 }}
 {{ toYaml .Values.configLoadBalancer | indent 2 }}
 {{ toYaml .Values.configAwsOrGcp | indent 2 }}

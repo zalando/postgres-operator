@@ -17,8 +17,16 @@ config:
   cluster_labels: application:spilo
   cluster_name_label: version
   docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p70
-  resync_period: 5m
   workers: "4"
+
+configCRD:
+  enable_pod_antiaffinity: "false"
+  etcd_host: ""
+  min_instances: -1
+  max_instances: -1
+  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  #sidecar_docker_images
+  # example: "exampleimage:exampletag"
 
 configUsers:
   replication_username: standby
@@ -26,27 +34,41 @@ configUsers:
 
 configKubernetes:
   cluster_labels: application:spilo
+  # inherited_labels: ""
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
+  # node_readiness_label: ""
   # oauth_token_secret_name: postgresql-operator
+  # pod_environment_configmap: ""
   pdb_name_format: "postgres-{cluster}-pdb"
   pod_role_label: spilo-role
-  pod_terminate_grace_period: 5m
   secret_name_template: '{username}.{cluster}.credentials'
   spilo_privileged: "false"
+
+configNamespace:
   watched_namespace: "*" # listen to all namespaces
 
 configPostgresPodResources:
+  default_cpu_request: 100m
+  default_memory_request: 100Mi
+  default_cpu_limit: "3"
+  default_memory_limit: 1Gi
   # set_memory_request_to_limit: "true"
 
 configTimeouts:
+  # master_pod_move_timeout: 10m
   pod_deletion_wait_timeout: 10m
   pod_label_wait_timeout: 10m
+  pod_terminate_grace_period: 5m
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
+  resync_period: 5m
+  repair_period: 5m
   resource_check_interval: 3s
   resource_check_timeout: 10m
 
 configLoadBalancer:
+  # custom_service_annotations:
+  # "keyx:valuez,keya:valuea"
   enable_master_load_balancer: "false"
   enable_replica_load_balancer: "false"
   master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
@@ -55,11 +77,16 @@ configLoadBalancer:
 configAwsOrGcp:
   aws_region: eu-central-1
   db_hosted_zone: db.example.com
+  # kube_iam_role: ""
+  # log_s3_bucket: ""
+  # wal_s3_bucket: ""
 
 configDebug:
   debug_logging: "true"
+  enable_database_access: "true"
 
 configTeamsApi:
+  # enable_admin_role_for_users: "true"
   enable_teams_api: "false"
   # enable_team_superuser: "false"
   # pam_configuration: https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
@@ -69,10 +96,29 @@ configTeamsApi:
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
 
+configTeamsApiCRD:
+  enable_team_superuser: "false"
+  # pam_configuration: ""
+  pam_role_name: "zalandos"
+  #postgres_superuser_teams: "postgres_superusers"
+  protected_role_names: "admin"
+  team_admin_role: "admin"
+  # team_api_role_configuration: "log_statement:all"
+  # teams_api_url: http://fake-teams-api.default.svc.cluster.local
+
 configLoggingRestApi:
   api_port: "8080"
   cluster_history_entries: "1000"
   ring_log_lines: "100"
+
+scalyr:
+  scalyr_cpu_request: 100m
+  scalyr_memory_request: 50Mi
+  scalyr_cpu_limit: "1"
+  scalyr_memory_limit: 1Gi
+  # scalyr_api_key: ""
+  # scalyr_image: ""
+  # scalyr_server_url: ""
 
 rbac:
   # Specifies whether RBAC resources should be created
