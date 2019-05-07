@@ -16,7 +16,7 @@ type Postgresql struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   PostgresSpec   `json:"spec"`
-	Status PostgresStatus `json:"status,omitempty"`
+	Status PostgresStatus `json:"status"`
 	Error  string         `json:"-"`
 }
 
@@ -129,4 +129,6 @@ type Sidecar struct {
 type UserFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
-type PostgresStatus string
+type PostgresStatus struct {
+	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+}

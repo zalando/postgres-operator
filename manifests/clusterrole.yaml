@@ -7,6 +7,7 @@ rules:
   - acid.zalan.do
   resources:
   - postgresqls
+  - postgresqls/status
   - operatorconfigurations
   verbs:
   - "*"
