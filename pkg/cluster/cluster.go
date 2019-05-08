@@ -4,6 +4,7 @@ package cluster
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -18,8 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-
-	"encoding/json"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -149,21 +148,24 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
-func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
-	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
-	var (
-		err error
-		b   []byte
-	)
-	if b, err = json.Marshal(status); err != nil {
+// SetStatus of Postgres cluster
+// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
+func (c *Cluster) setStatus(status string) {
+	var pgStatus acidv1.PostgresStatus
+	pgStatus.PostgresClusterStatus = status
+
+	patch, err := json.Marshal(struct {
+		PgStatus interface{} `json:"status"`
+	}{&pgStatus})
+
+	if err != nil {
 		c.logger.Errorf("could not marshal status: %v", err)
 	}
 
-	patch := []byte(fmt.Sprintf(`{"status": %s}`, string(b)))
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
 	// we should take advantage of it.
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch)
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch, "status")
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
 	}
@@ -172,7 +174,7 @@ func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status == acidv1.ClusterStatusCreating
+	return c.Status.Creating()
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.

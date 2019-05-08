@@ -2,6 +2,10 @@ package k8sutil
 
 import (
 	"fmt"
+	"reflect"
+
+	b64 "encoding/base64"
+
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -15,9 +19,9 @@ import (
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"reflect"
 
 	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -39,6 +43,20 @@ type KubernetesClient struct {
 
 	RESTClient      rest.Interface
 	AcidV1ClientSet *acidv1client.Clientset
+}
+
+type mockSecret struct {
+	v1core.SecretInterface
+}
+
+type MockSecretGetter struct {
+}
+
+type mockConfigMap struct {
+	v1core.ConfigMapInterface
+}
+
+type MockConfigMapsGetter struct {
 }
 
 // RestConfig creates REST config
@@ -139,4 +157,50 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	}
 
 	return
+}
+
+func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
+	if name != "infrastructureroles-test" {
+		return nil, fmt.Errorf("NotFound")
+	}
+	secret := &v1.Secret{}
+	secret.Name = "testcluster"
+	secret.Data = map[string][]byte{
+		"user1":     []byte("testrole"),
+		"password1": []byte("testpassword"),
+		"inrole1":   []byte("testinrole"),
+		"foobar":    []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
+	}
+	return secret, nil
+
+}
+
+func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
+	if name != "infrastructureroles-test" {
+		return nil, fmt.Errorf("NotFound")
+	}
+	configmap := &v1.ConfigMap{}
+	configmap.Name = "testcluster"
+	configmap.Data = map[string]string{
+		"foobar": "{}",
+	}
+	return configmap, nil
+}
+
+// Secrets to be mocked
+func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
+	return &mockSecret{}
+}
+
+// ConfigMaps to be mocked
+func (c *MockConfigMapsGetter) ConfigMaps(namespace string) v1core.ConfigMapInterface {
+	return &mockConfigMap{}
+}
+
+// NewMockKubernetesClient for other tests
+func NewMockKubernetesClient() KubernetesClient {
+	return KubernetesClient{
+		SecretsGetter:    &MockSecretGetter{},
+		ConfigMapsGetter: &MockConfigMapsGetter{},
+	}
 }
