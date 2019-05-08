@@ -20,11 +20,9 @@ config:
   workers: "4"
 
 configCRD:
-  enable_pod_antiaffinity: "false"
   etcd_host: ""
   min_instances: -1
   max_instances: -1
-  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   #sidecar_docker_images
   # example: "exampleimage:exampletag"
 
@@ -34,11 +32,14 @@ configUsers:
 
 configKubernetes:
   cluster_labels: application:spilo
+  enable_pod_antiaffinity: "false"
   # inherited_labels: ""
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
   # node_readiness_label: ""
   # oauth_token_secret_name: postgresql-operator
   # pod_environment_configmap: ""
+  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  pod_management_policy: "ordered_ready"
   pdb_name_format: "postgres-{cluster}-pdb"
   pod_role_label: spilo-role
   secret_name_template: '{username}.{cluster}.credentials'
