@@ -2,4 +2,3 @@ kubernetes
 flake8
 timeout_decorator
 docker
-halo
