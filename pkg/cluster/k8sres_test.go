@@ -129,3 +129,82 @@ func TestShmVolume(t *testing.T) {
 		}
 	}
 }
+
+func TestCloneEnv(t *testing.T) {
+	testName := "TestCloneEnv"
+	tests := []struct {
+		subTest   string
+		cloneOpts *acidv1.CloneDescription
+		env       v1.EnvVar
+		envPos    int
+	}{
+		{
+			subTest: "custom s3 path",
+			cloneOpts: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				S3WalPath:    "s3://some/path/",
+				EndTimestamp: "somewhen",
+			},
+			env: v1.EnvVar{
+				Name:  "CLONE_WALE_S3_PREFIX",
+				Value: "s3://some/path/",
+			},
+			envPos: 1,
+		},
+		{
+			subTest: "generated s3 path, bucket",
+			cloneOpts: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				EndTimestamp: "somewhen",
+				UID:          "0000",
+			},
+			env: v1.EnvVar{
+				Name:  "CLONE_WAL_S3_BUCKET",
+				Value: "wale-bucket",
+			},
+			envPos: 1,
+		},
+		{
+			subTest: "generated s3 path, target time",
+			cloneOpts: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				EndTimestamp: "somewhen",
+				UID:          "0000",
+			},
+			env: v1.EnvVar{
+				Name:  "CLONE_TARGET_TIME",
+				Value: "somewhen",
+			},
+			envPos: 4,
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				WALES3Bucket:   "wale-bucket",
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	for _, tt := range tests {
+		envs := cluster.generateCloneEnvironment(tt.cloneOpts)
+
+		env := envs[tt.envPos]
+
+		if env.Name != tt.env.Name {
+			t.Errorf("%s %s: Expected env name %s, have %s instead",
+				testName, tt.subTest, tt.env.Name, env.Name)
+		}
+
+		if env.Value != tt.env.Value {
+			t.Errorf("%s %s: Expected env value %s, have %s instead",
+				testName, tt.subTest, tt.env.Value, env.Value)
+		}
+
+	}
+}
