@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,12 +37,13 @@ type pgUser struct {
 }
 
 type patroniDCS struct {
-	TTL                      uint32                       `json:"ttl,omitempty"`
-	LoopWait                 uint32                       `json:"loop_wait,omitempty"`
-	RetryTimeout             uint32                       `json:"retry_timeout,omitempty"`
-	MaximumLagOnFailover     float32                      `json:"maximum_lag_on_failover,omitempty"`
-	PGBootstrapConfiguration map[string]interface{}       `json:"postgresql,omitempty"`
-	Slots                    map[string]map[string]string `json:"slots,omitempty"`
+	TTL                      uint32                        `json:"ttl,omitempty"`
+	LoopWait                 uint32                        `json:"loop_wait,omitempty"`
+	RetryTimeout             uint32                        `json:"retry_timeout,omitempty"`
+	MaximumLagOnFailover     float32                       `json:"maximum_lag_on_failover,omitempty"`
+	PGBootstrapConfiguration map[string]interface{}        `json:"postgresql,omitempty"`
+	Slots                    map[string]map[string]string  `json:"slots,omitempty"`
+	StandbyClusterCfg        *acidv1.PatroniStandbyCluster `json:"standby_cluster,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -219,6 +220,9 @@ PatroniInitDBParams:
 	}
 	if patroni.Slots != nil {
 		config.Bootstrap.DCS.Slots = patroni.Slots
+	}
+	if patroni.StandbyCluster != nil {
+		config.Bootstrap.DCS.StandbyClusterCfg = patroni.StandbyCluster
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
@@ -778,7 +782,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 	}
 
-	spiloConfiguration := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
+	spiloConfiguration := generateSpiloJSONConfiguration(spec.PostgresqlParam, spec.Patroni, c.OpConfig.PamRoleName, c.logger)
 
 	// generate environment variables for the spilo container
 	spiloEnvVars := deduplicateEnvVars(

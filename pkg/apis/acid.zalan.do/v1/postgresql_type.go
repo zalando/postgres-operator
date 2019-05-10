@@ -3,7 +3,7 @@ package v1
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -107,6 +107,18 @@ type Patroni struct {
 	RetryTimeout         uint32                       `json:"retry_timeout"`
 	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
 	Slots                map[string]map[string]string `json:"slots"`
+	StandbyCluster       *PatroniStandbyCluster       `json:"standby_cluster"`
+}
+
+//StandbyCluster as supported by Patroni
+type PatroniStandbyCluster struct {
+	CreateReplicaMethods  []string `json:"create_replica_methods"`
+	Host                  string   `json:"host"`
+	Port                  string   `json:"port"`
+	PrimarySlotName       string   `json:"primary_slot_name"`
+	RestoreCommand        string   `json:"restore_command"`
+	ArchiveCleanupCommand string   `json:"archive_cleanup_command"`
+	RecoveryMinApplyDelay string   `json:"recovery_min_apply_delay"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time
