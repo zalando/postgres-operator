@@ -317,20 +317,11 @@ kubectl logs acid-minimal-cluster-0
 
 ## End-to-end tests
 
-The operator provides e2e (end-to-end) tests to ensure various infra parts work smoothly together.
-Such tests employ [kind](https://kind.sigs.k8s.io/) to start a local k8s cluster.
-We intend to execute e2e tests during builds, but you can invoke them locally with `make e2e` from the project's top directory; run `make e2e-tools` to install `kind` and Python dependencies before the first run. Each e2e execution tests a Postgres operator image built from the current git branch.
+The operator provides reference e2e (end-to-end) tests to ensure various infra parts work smoothly together.
+Each e2e execution tests a Postgres operator image built from the current git branch. The test runner starts a [kind](https://kind.sigs.k8s.io/) (local k8s) cluster and Docker container with tests. The k8s API client from within the container connects to the `kind` cluster using the standard Docker `bridge` network.
+The tests utilize examples from `/manifests` (ConfigMap is used for the operator configuration) to avoid maintaining yet another set of configuration files. The kind cluster is deleted if tests complete successfully.
 
-### Smoke tests
-
-The first provided collection of [smoke tests](../e2e/tests/test_smoke.py) covers the most basic operator capabilities. These tests utilize examples from `/manifests` (ConfigMap is used for the operator configuration) to avoid maintaining yet another set of configuration files. The `kind-smoke-test-postgres-operator` cluster is deleted if tests complete successfully.
-
-### Contributing tests suites
-
-1. Consider using a separate `kind` cluster per a logically separate collection of tests. This approach enables simple clean up after test success by deleting the relevant cluster.
-2. Make tests time out; for now we use the [timeout-decorator](https://github.com/pnpnpn/timeout-decorator) for that purpose.
-3. Please briefly describe the use case for the new test collection here and in the comments.
-
+End-to-end tests are executed automatically during builds; to invoke them locally use `make e2e-run` from the project's top directory. Run `make e2e-tools e2e-build` to install `kind` and build the tests' image locally before the first run. 
 
 ## Introduce additional configuration parameters
 

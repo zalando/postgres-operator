@@ -3,8 +3,7 @@ import time
 import timeout_decorator
 import subprocess
 import warnings
-import docker
-#from halo import Halo
+import os
 
 from kubernetes import client, config, utils
 
@@ -40,10 +39,7 @@ class SmokeTestCase(unittest.TestCase):
         for filename in ["configmap.yaml", "postgres-operator.yaml"]:
             utils.create_from_yaml(k8s_api.k8s_client, "manifests/" + filename)
 
-        # submit the most recent operator image built locally
-        # HACK assumes "images list" returns the most recent image at index 0
-        # docker_client = docker.from_env()
-        image = "registry.opensource.zalan.do/acid/postgres-operator:v1.1.0-67-g52e53f1-dirty" # docker_client.images.list(name="registry.opensource.zalan.do/acid/postgres-operator")[0].tags[0]
+        # submit the most recent operator image built on the Docker host
         body = {
             "spec": {
                 "template": {
@@ -51,7 +47,7 @@ class SmokeTestCase(unittest.TestCase):
                         "containers": [
                             {
                               "name": "postgres-operator",
-                              "image": image
+                              "image": os.environ['OPERATOR_IMAGE']
                             }
                         ]
                     }
@@ -114,7 +110,6 @@ class Utils:
     @staticmethod
     def wait_for_pod_start(k8s_api, pod_labels, retry_timeout_sec):
         pod_phase = 'No pod running'
-        #with Halo(text="Wait for the pod '{}' to start. Pod phase: {}".format(pod_labels, pod_phase), spinner='dots'):
         while pod_phase != 'Running':
             pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
             if pods:
@@ -133,7 +128,6 @@ class Utils:
                                                        "v1", "default", "postgresqls", "acid-minimal-cluster", body)
 
         labels = 'version=acid-minimal-cluster'
-        #with Halo(text="Waiting for the cluster to scale to {} pods.".format(number_of_instances), spinner='dots'):
         while Utils.count_pods_with_label(k8s_api, labels) != number_of_instances:
             time.sleep(retry_timeout_sec)
 

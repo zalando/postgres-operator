@@ -1,4 +1,4 @@
-.PHONY: clean local test linux macos docker push scm-source.json e2e e2e-tools
+.PHONY: clean local test linux macos docker push scm-source.json e2e-run e2e-tools e2e-build
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
@@ -92,11 +92,11 @@ test:
 	hack/verify-codegen.sh
 	@go test ./...
 
-e2e-tools:
-	@pip3 install -r e2e/requirements.txt
-	@go get -u sigs.k8s.io/kind
-	# assumes kubectl is already isntalled
+e2e-build:
+	docker build --tag="postgres-operator-e2e-tests" -f e2e/Dockerfile .
 
-e2e: docker
+e2e-tools:
+	@go get -u sigs.k8s.io/kind
+
+e2e-run: docker
 	e2e/run.sh
-	flake8 --exit-zero

@@ -1,4 +1,2 @@
-kubernetes
-flake8
-timeout_decorator
-docker
+kubernetes==9.0.0
+timeout_decorator==0.4.1
