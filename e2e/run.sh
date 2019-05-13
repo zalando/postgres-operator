@@ -6,6 +6,8 @@ set -o nounset
 set -o pipefail
 IFS=$'\n\t'
 
+export PATH=$PATH:/tmp/kind
+
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}"  | head -1)
 readonly e2e_test_image=${cluster_name}

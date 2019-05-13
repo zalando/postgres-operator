@@ -96,7 +96,9 @@ e2e-build:
 	docker build --tag="postgres-operator-e2e-tests" -f e2e/Dockerfile .
 
 e2e-tools:
-	@go get -u sigs.k8s.io/kind
+	wget https://github.com/kubernetes-sigs/kind/releases/download/0.2.1/kind-linux-amd64
+	chmod +x kind-linux-amd64
+	mv kind-linux-amd64 /tmp/kind
 
 e2e-run: docker
 	e2e/run.sh
