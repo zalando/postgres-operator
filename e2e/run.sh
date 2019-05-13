@@ -7,6 +7,8 @@ set -o pipefail
 IFS=$'\n\t'
 
 export PATH=$PATH:/tmp/kind
+echo $PATH
+ls -al /tmp/kind
 
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}"  | head -1)
