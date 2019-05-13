@@ -29,7 +29,7 @@ cp $KUBECONFIG ./e2e
 kind_api_server=$(docker inspect --format "{{ .NetworkSettings.IPAddress }}:${kind_api_server_port}" ${cluster_name}-control-plane)
 sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" ${kubeconfig_path}
 
-docker run --rm --mount type=bind,source="$(realpath ${kubeconfig_path})",target=/root/.kube/config -e OPERATOR_IMAGE=${operator_image} ${e2e_test_image}
+docker run --rm --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config -e OPERATOR_IMAGE=${operator_image} ${e2e_test_image}
 
 kind-linux-amd64 delete cluster --name ${cluster_name}
 rm -rf ${kubeconfig_path}
