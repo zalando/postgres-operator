@@ -34,7 +34,7 @@ ifdef CDP_PULL_REQUEST_NUMBER
 	CDP_TAG := -${CDP_BUILD_VERSION}
 endif
 
-
+KIND_PATH := $(GOPATH)/bin
 PATH := $(GOPATH)/bin:$(PATH)
 SHELL := env PATH=$(PATH) $(SHELL)
 
@@ -98,7 +98,7 @@ e2e-build:
 e2e-tools:
 	wget https://github.com/kubernetes-sigs/kind/releases/download/0.2.1/kind-linux-amd64
 	chmod +x kind-linux-amd64
-	mv kind-linux-amd64 /tmp/kind
+	mv kind-linux-amd64 $(KIND_PATH)
 
 e2e-run: docker
 	e2e/run.sh
