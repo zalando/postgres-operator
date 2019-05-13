@@ -22,7 +22,6 @@ kind create cluster --name ${cluster_name} --config ./e2e/kind-cluster-postgres-
 export KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
 
 kind load docker-image ${operator_image} --name ${cluster_name}
-kubectl cluster-info
 
 # use the actual kubeconfig to connect to the 'kind' API server
 # but update the IP address of the API server to the one from the Docker 'bridge' network

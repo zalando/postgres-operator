@@ -45,7 +45,6 @@ pipeline:
           cmd: |
             export PATH=$PATH:$HOME/go/bin
             cd $OPERATOR_TOP_DIR/postgres-operator
-            echo "INFO install kubectl to test 'kind' from client side"
             wget https://github.com/kubernetes-sigs/kind/releases/download/0.2.1/kind-linux-amd64
             chmod +x kind-linux-amd64
             mv kind-linux-amd64 /tmp/kind
