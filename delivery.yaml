@@ -46,7 +46,11 @@ pipeline:
             export PATH=$PATH:$HOME/go/bin
             cd $OPERATOR_TOP_DIR/postgres-operator
             echo "INFO install kubectl to test 'kind' from client side"
-            make e2e-tools e2e-build e2e-run
+            make e2e-build e2e-run
+            wget https://github.com/kubernetes-sigs/kind/releases/download/0.2.1/kind-linux-amd64
+            chmod +x kind-linux-amd64
+            mv kind-linux-amd64 /tmp/kind
+            export PATH=$PATH:/tmp
         - desc: 'Push docker image'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
