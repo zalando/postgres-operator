@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1014,6 +1014,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 		return nil, fmt.Errorf("could not parse volume size: %v", err)
 	}
 
+	volumeMode := v1.PersistentVolumeFilesystem
 	volumeClaim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metadata,
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -1024,6 +1025,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 				},
 			},
 			StorageClassName: storageClassName,
+			VolumeMode:       &volumeMode,
 		},
 	}
 
