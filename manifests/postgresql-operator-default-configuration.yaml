@@ -36,7 +36,7 @@ configuration:
     # infrastructure_roles_secret_name: ""
     # pod_environment_configmap: ""
     pod_management_policy: "ordered_ready"
-    enable_pod_antiaffinity: "false"
+    enable_pod_antiaffinity: false
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   postgres_pod_resources:
     default_cpu_request: 100m
@@ -91,4 +91,3 @@ configuration:
     # scalyr_api_key: ""
     # scalyr_image: ""
     # scalyr_server_url: ""
-

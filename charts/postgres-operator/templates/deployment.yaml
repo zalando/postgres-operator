@@ -17,6 +17,8 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # In order to use the checksum of CRD OperatorConfiguration instead, use the following line instead
+        # checksum/config: {{ include (print $.Template.BasePath "/operatorconfiguration.yaml") . | sha256sum }}
     {{- if .Values.podAnnotations }}
 {{ toYaml .Values.podAnnotations | indent 8 }}
     {{- end }}
