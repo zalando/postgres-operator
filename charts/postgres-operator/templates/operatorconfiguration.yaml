@@ -9,18 +9,22 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
   pod_service_account_name: operator
-{{ toYaml .Values.config | indent 2 }}
+  docker_image: {{ toYaml .Values.docker_image }}
+  repair_period: {{ toYaml .Values.repair_period }}
+  resync_period: {{ toYaml .Values.resync_period }}
 {{ toYaml .Values.configCRD | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   kubernetes:
+    spilo_privileged: {{ toYaml .Values.spilo_privileged }}
 {{ toYaml .Values.configKubernetes | indent 4 }}
+{{ toYaml .Values.configKubernetesCRD | indent 4 }}
   postgres_pod_resources:
 {{ toYaml .Values.configPostgresPodResources | indent 4 }}
   timeouts:
 {{ toYaml .Values.configTimeouts | indent 4 }}
   load_balancer:
-{{ toYaml .Values.configLoadBalancer | indent 4 }}
+{{ toYaml .Values.configLoadBalancerCRD | indent 4 }}
   aws_or_gcp:
 {{ toYaml .Values.configAwsOrGcp | indent 4 }}
   debug:
@@ -28,6 +32,6 @@ configuration:
   teams_api:
 {{ toYaml .Values.configTeamsApiCRD | indent 4 }}
   logging_rest_api:
-{{ toYaml .Values.configLoggingRestApi | indent 4 }}
+{{ toYaml .Values.configLoggingRestApiCRD | indent 4 }}
   scalyr:
 {{ toYaml .Values.configScalyr | indent 4 }}

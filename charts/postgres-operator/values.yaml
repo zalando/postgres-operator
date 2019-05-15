@@ -10,40 +10,52 @@ image:
 # imagePullSecrets:
   # - name: myRegistryKeySecretName
 
+docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p70
 podAnnotations: {}
 podLabels: {}
+repair_period: 5m
+resync_period: 5m
+spilo_privileged: false
 
-config:
+configMap:
   cluster_labels: application:spilo
   cluster_name_label: version
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p70
   workers: "4"
 
 configCRD:
   etcd_host: ""
   min_instances: -1
   max_instances: -1
-  #sidecar_docker_images
-  # example: "exampleimage:exampletag"
+  workers: 4
+  # sidecar_docker_images
+  #  example: "exampleimage:exampletag"
 
 configUsers:
   replication_username: standby
   super_username: postgres
 
 configKubernetes:
-  cluster_labels: application:spilo
-  enable_pod_antiaffinity: "false"
   # inherited_labels: ""
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
   # node_readiness_label: ""
   # oauth_token_secret_name: postgresql-operator
   # pod_environment_configmap: ""
-  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   pod_management_policy: "ordered_ready"
   pdb_name_format: "postgres-{cluster}-pdb"
   pod_role_label: spilo-role
+  pod_terminate_grace_period: 5m
   secret_name_template: '{username}.{cluster}.credentials'
-  spilo_privileged: "false"
+
+configKubernetesCRD:
+  cluster_labels:
+      application: spilo
+  cluster_name_label: cluster-name
+  enable_pod_antiaffinity: false
+  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+  # inherited_labels:
+  # - application
+  # - app
 
 configNamespace:
   watched_namespace: "*" # listen to all namespaces
@@ -53,27 +65,37 @@ configPostgresPodResources:
   default_memory_request: 100Mi
   default_cpu_limit: "3"
   default_memory_limit: 1Gi
-  # set_memory_request_to_limit: "true"
+  # set_memory_request_to_limit: true
 
 configTimeouts:
   # master_pod_move_timeout: 10m
   pod_deletion_wait_timeout: 10m
   pod_label_wait_timeout: 10m
-  pod_terminate_grace_period: 5m
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
-  resync_period: 5m
-  repair_period: 5m
   resource_check_interval: 3s
   resource_check_timeout: 10m
 
 configLoadBalancer:
   # custom_service_annotations:
-  # "keyx:valuez,keya:valuea"
-  enable_master_load_balancer: "false"
+  #   "keyx:valuez,keya:valuea"
+  enable_master_load_balancer: "true"
   enable_replica_load_balancer: "false"
   master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
   replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
+
+configLoadBalancerCRD:
+  # custom_service_annotations:
+  #   keyx: valuez
+  #   keya: valuea
+  enable_master_load_balancer: false
+  enable_replica_load_balancer: false
+  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+
+configDebug:
+  debug_logging: true
+  enable_database_access: true
 
 configAwsOrGcp:
   aws_region: eu-central-1
@@ -82,13 +104,9 @@ configAwsOrGcp:
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
 
-configDebug:
-  debug_logging: "true"
-  enable_database_access: "true"
-
 configTeamsApi:
-  # enable_admin_role_for_users: "true"
   enable_teams_api: "false"
+  # enable_admin_role_for_users: "true"
   # enable_team_superuser: "false"
   # pam_configuration: https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
   # pam_role_name: zalandos
@@ -98,19 +116,27 @@ configTeamsApi:
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
 
 configTeamsApiCRD:
-  enable_team_superuser: "false"
+  enable_teams_api: false
+  enable_team_superuser: false
   # pam_configuration: ""
-  pam_role_name: "zalandos"
-  #postgres_superuser_teams: "postgres_superusers"
-  protected_role_names: "admin"
-  team_admin_role: "admin"
-  # team_api_role_configuration: "log_statement:all"
-  # teams_api_url: http://fake-teams-api.default.svc.cluster.local
+  pam_role_name: zalandos
+  # postgres_superuser_teams: "postgres_superusers"
+  protected_role_names:
+  - admin
+  team_admin_role: admin
+  team_api_role_configuration:
+    log_statement: all
+  # teams_api_url: ""
 
 configLoggingRestApi:
   api_port: "8080"
   cluster_history_entries: "1000"
   ring_log_lines: "100"
+
+configLoggingRestApiCRD:
+  api_port: 8080
+  cluster_history_entries: 1000
+  ring_log_lines: 100
 
 scalyr:
   scalyr_cpu_request: 100m
