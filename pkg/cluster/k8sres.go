@@ -1406,7 +1406,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 		// Postgres env vars
 		{
-			Name:  "PGVERSION",
+			Name:  "PG_VERSION",
 			Value: c.Spec.PgVersion,
 		},
 		{
@@ -1414,11 +1414,19 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: "5432",
 		},
 		{
-			Name:  "PGUSER_SUPERUSER",
+			Name:  "PGUSER",
 			Value: c.OpConfig.SuperUsername,
 		},
 		{
-			Name: "PGPASSWORD_SUPERUSER",
+			Name:  "PGDATABASE",
+			Value: c.OpConfig.SuperUsername,
+		},
+		{
+			Name:  "PGSSLMODE",
+			Value: "require",
+		},
+		{
+			Name: "PGPASSWORD",
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
 					LocalObjectReference: v1.LocalObjectReference{
