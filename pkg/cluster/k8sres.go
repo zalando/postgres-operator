@@ -1016,6 +1016,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 		return nil, fmt.Errorf("could not parse volume size: %v", err)
 	}
 
+	volumeMode := v1.PersistentVolumeFilesystem
 	volumeClaim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metadata,
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -1026,6 +1027,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 				},
 			},
 			StorageClassName: storageClassName,
+			VolumeMode:       &volumeMode,
 		},
 	}
 
@@ -1218,10 +1220,37 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
+		msg := "Clone from S3 bucket"
+		c.logger.Info(msg, description.S3WalPath)
+
+		if description.S3WalPath == "" {
+			msg := "Figure out which S3 bucket to use from env"
+			c.logger.Info(msg, description.S3WalPath)
+
+			envs := []v1.EnvVar{
+				v1.EnvVar{
+					Name:  "CLONE_WAL_S3_BUCKET",
+					Value: c.OpConfig.WALES3Bucket,
+				},
+				v1.EnvVar{
+					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
+					Value: getBucketScopeSuffix(description.UID),
+				},
+			}
+
+			result = append(result, envs...)
+		} else {
+			msg := "Use custom parsed S3WalPath %s from the manifest"
+			c.logger.Warningf(msg, description.S3WalPath)
+
+			result = append(result, v1.EnvVar{
+				Name:  "CLONE_WALE_S3_PREFIX",
+				Value: description.S3WalPath,
+			})
+		}
+
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.UID)})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 

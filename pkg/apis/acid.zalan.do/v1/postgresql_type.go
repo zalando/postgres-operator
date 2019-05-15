@@ -16,7 +16,7 @@ type Postgresql struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   PostgresSpec   `json:"spec"`
-	Status PostgresStatus `json:"status,omitempty"`
+	Status PostgresStatus `json:"status"`
 	Error  string         `json:"-"`
 }
 
@@ -116,6 +116,7 @@ type CloneDescription struct {
 	ClusterName  string `json:"cluster,omitempty"`
 	UID          string `json:"uid,omitempty"`
 	EndTimestamp string `json:"timestamp,omitempty"`
+	S3WalPath    string `json:"s3_wal_path,omitempty"`
 }
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.
@@ -131,4 +132,6 @@ type Sidecar struct {
 type UserFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
-type PostgresStatus string
+type PostgresStatus struct {
+	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+}

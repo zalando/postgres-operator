@@ -32,16 +32,19 @@ kubectl create -f manifests/postgres-operator.yaml  # deployment
 
 ## Helm chart
 
-Another possibility is using a provided [Helm](https://helm.sh/) chart which
-saves you these steps. Therefore, you would need to install the helm CLI on your
-machine. After initializing helm (and its server component Tiller) in your local
-cluster you can install the operator chart.
+Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
+chart which saves you the manual steps. Therefore, you would need to install
+the helm CLI on your machine. After initializing helm (and its server
+component Tiller) in your local cluster you can install the operator chart.
+You can define a release name that is prepended to the operator resource's
+names. Use `--name zalando` to match with the default service account name
+as older operator versions do not support custom names for service accounts.
 
 ```bash
 # 1) initialize helm
 helm init
 # 2) install postgres-operator chart
-helm install --name postgres-operator ./charts/postgres-operator
+helm install --name zalando ./charts/postgres-operator
 ```
 
 ## Create a Postgres cluster
