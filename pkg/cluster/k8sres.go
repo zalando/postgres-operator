@@ -782,7 +782,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 	}
 
-	spiloConfiguration := generateSpiloJSONConfiguration(spec.PostgresqlParam, spec.Patroni, c.OpConfig.PamRoleName, c.logger)
+	spiloConfiguration := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
 
 	// generate environment variables for the spilo container
 	spiloEnvVars := deduplicateEnvVars(
