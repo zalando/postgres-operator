@@ -64,6 +64,10 @@ spec:
   #  cluster: "acid-batman"
   #  timestamp: "2017-12-19T12:40:33+01:00" # timezone required (offset relative to UTC, see RFC 3339 section 5.6)
   #  s3_wal_path: "s3://custom/path/to/bucket"
+  
+  # run periodic backups with k8s cron jobs
+  # enableLogicalBackup: true
+  # logicalBackupSchedule: "30 00 * * *"
   maintenanceWindows:
   - 01:00-06:00 #UTC
   - Sat:00:00-04:00

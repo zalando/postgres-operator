@@ -6,7 +6,8 @@ import (
 	"strings"
 
 	"k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -607,6 +608,51 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 func (c *Cluster) createRoles() (err error) {
 	// TODO: figure out what to do with duplicate names (humans and robots) among pgUsers
 	return c.syncRoles()
+}
+
+func (c *Cluster) createLogicalBackupJob() (err error) {
+
+	c.setProcessName("creating a k8s cron job for logical backups")
+
+	logicalBackupJobSpec, err := c.generateLogicalBackupJob()
+	if err != nil {
+		return fmt.Errorf("could not generate k8s cron job spec: %v", err)
+	}
+	c.logger.Debugf("Generated cronJobSpec: %v", logicalBackupJobSpec)
+
+	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Create(logicalBackupJobSpec)
+	if err != nil {
+		return fmt.Errorf("could not create k8s cron job: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) patchLogicalBackupJob(newJob *batchv1beta1.CronJob) error {
+	c.setProcessName("patching logical backup job")
+
+	patchData, err := specPatch(newJob.Spec)
+	if err != nil {
+		return fmt.Errorf("could not form patch for the logical backup job: %v", err)
+	}
+
+	// update the backup job spec
+	_, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Patch(
+		c.getLogicalBackupJobName(),
+		types.MergePatchType,
+		patchData, "")
+	if err != nil {
+		return fmt.Errorf("could not patch logical backup job: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) deleteLogicalBackupJob() error {
+
+	c.logger.Info("removing the logical backup job")
+
+	return c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Delete(c.getLogicalBackupJobName(), c.deleteOptions)
 }
 
 // GetServiceMaster returns cluster's kubernetes master Service

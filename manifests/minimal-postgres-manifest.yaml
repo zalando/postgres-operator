@@ -17,7 +17,6 @@ spec:
     # role for application foo
     foo_user: []
 
-  
   #databases: name->owner
   databases:
     foo: zalando

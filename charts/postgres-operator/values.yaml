@@ -62,6 +62,9 @@ config:
   pod_management_policy: "ordered_ready"
   enable_pod_antiaffinity: "false"
   pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  logical_backup_schedule: "30 00 * * *"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  logical_backup_s3_bucket: ""
 rbac:
   # Specifies whether RBAC resources should be created
   create: true

@@ -20,6 +20,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -352,7 +354,7 @@ func generateVolumeMounts() []v1.VolumeMount {
 	}
 }
 
-func generateSpiloContainer(
+func generateContainer(
 	name string,
 	dockerImage *string,
 	resourceRequirements *v1.ResourceRequirements,
@@ -792,7 +794,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	// generate the spilo container
 	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
-	spiloContainer := generateSpiloContainer(c.containerName(),
+	spiloContainer := generateContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
 		spiloEnvVars,
@@ -1280,4 +1282,168 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 	host = clusterName
 	port = "5432"
 	return
+}
+
+func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
+
+	var (
+		err                  error
+		podTemplate          *v1.PodTemplateSpec
+		resourceRequirements *v1.ResourceRequirements
+	)
+
+	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods and clean-up
+
+	c.logger.Debug("Generating logical backup pod template")
+
+	// allocate for the backup pod the same amount of resources as for normal DB pods
+	defaultResources := c.makeDefaultResources()
+	resourceRequirements, err = generateResourceRequirements(c.Spec.Resources, defaultResources)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
+	}
+
+	envVars := c.generateLogicalBackupPodEnvVars()
+	logicalBackupContainer := generateContainer(
+		"logical-backup",
+		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
+		resourceRequirements,
+		envVars,
+		[]v1.VolumeMount{},
+		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
+	)
+
+	labels := map[string]string{
+		"version":     c.Name,
+		"application": "spilo-logical-backup",
+	}
+	podAffinityTerm := v1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+		TopologyKey: "kubernetes.io/hostname",
+	}
+	podAffinity := v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
+				Weight:          1,
+				PodAffinityTerm: podAffinityTerm,
+			},
+			},
+		}}
+
+	// re-use the method that generates DB pod templates
+	if podTemplate, err = generatePodTemplate(
+		c.Namespace,
+		c.labelsSet(true),
+		logicalBackupContainer,
+		[]v1.Container{},
+		[]v1.Container{},
+		&[]v1.Toleration{},
+		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		c.OpConfig.PodServiceAccountName,
+		c.OpConfig.KubeIAMRole,
+		"",
+		false,
+		false,
+		""); err != nil {
+		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
+	}
+
+	// overwrite specifc params of logical backups pods
+	podTemplate.Spec.Affinity = &podAffinity
+	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
+
+	// configure a batch job
+
+	jobSpec := batchv1.JobSpec{
+		Template: *podTemplate,
+	}
+
+	// configure a cron job
+
+	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
+		Spec: jobSpec,
+	}
+
+	schedule := c.Postgresql.Spec.LogicalBackupSchedule
+	if schedule == "" {
+		schedule = c.OpConfig.LogicalBackupSchedule
+	}
+
+	cronJob := &batchv1beta1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.getLogicalBackupJobName(),
+			Namespace: c.Namespace,
+			Labels:    c.labelsSet(true),
+		},
+		Spec: batchv1beta1.CronJobSpec{
+			Schedule:          schedule,
+			JobTemplate:       jobTemplateSpec,
+			ConcurrencyPolicy: batchv1beta1.ForbidConcurrent,
+		},
+	}
+
+	return cronJob, nil
+}
+
+func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
+
+	envVars := []v1.EnvVar{
+		{
+			Name:  "SCOPE",
+			Value: c.Name,
+		},
+		// Bucket env vars
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
+		// Postgres env vars
+		{
+			Name:  "PG_VERSION",
+			Value: c.Spec.PgVersion,
+		},
+		{
+			Name:  "PGPORT",
+			Value: "5432",
+		},
+		{
+			Name:  "PGUSER",
+			Value: c.OpConfig.SuperUsername,
+		},
+		{
+			Name:  "PGDATABASE",
+			Value: c.OpConfig.SuperUsername,
+		},
+		{
+			Name:  "PGSSLMODE",
+			Value: "require",
+		},
+		{
+			Name: "PGPASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.credentialSecretName(c.OpConfig.SuperUsername),
+					},
+					Key: "password",
+				},
+			},
+		},
+	}
+
+	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+
+	return envVars
+}
+
+// getLogicalBackupJobName returns the name; the job itself may not exists
+func (c *Cluster) getLogicalBackupJobName() (jobName string) {
+	return "logical-backup-" + c.clusterName().Name
 }
