@@ -141,4 +141,15 @@ rules:
   - bind
   resourceNames:
   - {{ template "postgres-operator.fullname" . }}
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs # enables logical backups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
 {{ end }}
