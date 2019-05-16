@@ -483,9 +483,6 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   These parameters configure a k8s cron job managed by the operator to produce Postgres logical backups.
   In the CRD-based configuration those parameters are grouped under the `logical_backup` key.
 
-  * **enable_logical_backup**
-    Determines if the operator creates a Kubernetes cron job to do logical backups of all Postgres clusters it controls. Default: false.
-  
   * **logical_backup_schedule**
     Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
   

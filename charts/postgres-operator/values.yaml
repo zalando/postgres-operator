@@ -62,7 +62,6 @@ config:
   pod_management_policy: "ordered_ready"
   enable_pod_antiaffinity: "false"
   pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-  enable_logical_backup: "false"
   logical_backup_schedule: "30 00 * * *"
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:master-42"
   logical_backup_s3_bucket: "your-s3-bucket"
