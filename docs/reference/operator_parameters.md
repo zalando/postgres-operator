@@ -487,7 +487,7 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
     Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
   
   * **logical_backup_docker_image**
-    Docker image for the pods of the cron job. Must implement backup logic and correctly handle pod and job restarts. Default: "registry.opensource.zalan.do/acid/logical-backup:master-42" (`pgdumpall` on the replica + upload to S3).
+    Docker image for the pods of the cron job. Must implement backup logic and correctly handle pod and job restarts. The default image runs `pg_dumpall` (on a replica if possible) and uploads compressed results to an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups` Default: "registry.opensource.zalan.do/acid/logical-backup" 
 
   * **logical_backup_s3_bucket**
     S3 bucket to store backup results. The bucket has to be present and accessible by Postgres pods. Default: empty.

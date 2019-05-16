@@ -323,6 +323,9 @@ be updated. As explained [here](reference/operator_parameters.md), it's possible
 to configure the operator either with a ConfigMap or CRD, but currently we aim
 to synchronize parameters everywhere.
 
+When choosing a parameter name for a new option in a PG manifest, keep in mind 
+the naming conventions there. The `snake_case` variables come from the Patroni/Postgres world, while the `camelCase` from the k8s world.
+
 Note: If one option is defined in the operator configuration and in the cluster
 [manifest](../manifests/complete-postgres-manifest.yaml), the latter takes
 precedence.
