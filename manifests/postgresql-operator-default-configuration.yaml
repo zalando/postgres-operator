@@ -91,4 +91,7 @@ configuration:
     # scalyr_api_key: ""
     # scalyr_image: ""
     # scalyr_server_url: ""
-
+  logical_backup:
+    logical_backup_schedule: "30 00 * * *"
+    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+    logical_backup_s3_bucket: ""

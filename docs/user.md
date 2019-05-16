@@ -347,3 +347,11 @@ every 6 hours.
 Note that if the statefulset is scaled down before resizing the size changes
 are only applied to the volumes attached to the running pods. The size of the
 volumes that correspond to the previously running pods is not changed.
+
+## Logical backups
+
+If you add
+```
+  enableLogicalBackup: true
+```
+to the cluster manifest, the operator will create and sync a k8s cron job to do periodic logical backups of this particular Postgres cluster. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. See [configuration reference](reference/cluster_manifest.md) and [administrator documentation](administrator.md) for details on how backups are executed.

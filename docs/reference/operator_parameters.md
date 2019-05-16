@@ -51,6 +51,8 @@ parameters, those parameters have no effect and are replaced by the
 `CRD_READY_WAIT_INTERVAL` and `CRD_READY_WAIT_TIMEOUT` environment variables.
 They will be deprecated and removed in the future.
 
+For the configmap operator configuration, the [default parameter values](https://github.com/zalando-incubator/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando-incubator/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+
 Variable names are underscore-separated words.
 
 
@@ -476,4 +478,16 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   Memory limit value for the Scalyr sidecar. The default is `1Gi`.
 
 
-For the configmap operator configuration, the [default parameter values](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go#L14) mentioned here are likely to be overwritten in your local operator installation via your local version of the operator configmap. In the case you use the operator CRD, all the CRD defaults are provided in the [operator's default configuration manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+## Logical backup
+
+  These parameters configure a k8s cron job managed by the operator to produce Postgres logical backups.
+  In the CRD-based configuration those parameters are grouped under the `logical_backup` key.
+
+  * **logical_backup_schedule**
+    Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
+  
+  * **logical_backup_docker_image**
+    Docker image for the pods of the cron job. Must implement backup logic and correctly handle pod and job restarts. The default image runs `pg_dumpall` (on a replica if possible) and uploads compressed results to an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups` Default: "registry.opensource.zalan.do/acid/logical-backup" 
+
+  * **logical_backup_s3_bucket**
+    S3 bucket to store backup results. The bucket has to be present and accessible by Postgres pods. Default: empty.

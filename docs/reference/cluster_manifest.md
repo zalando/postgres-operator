@@ -14,6 +14,8 @@ measurements. Please, refer to the [Kubernetes
 documentation](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the possible values of those.
 
+:exclamation: If both operator configmap/CRD and a Postgres cluster manifest define the same parameter, the value from the Postgres cluster manifest is applied.
+
 ## Manifest structure
 
 A postgres manifest is a `YAML` document. On the top level both individual
@@ -45,7 +47,7 @@ Those parameters are grouped under the `metadata` top-level key.
 
 ## Top-level parameters
 
-Those are parameters grouped directly under  the `spec` key in the manifest.
+These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **teamId**
   name of the team the cluster belongs to. Changing it after the cluster
@@ -116,6 +118,12 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
   (`enable_shm_volume`, which is `true` by default). It it's present and value
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration).
+
+* **enableLogicalBackup**
+  Determines if the logical backup of this cluster should be taken and uploaded to S3. Default: false.
+
+* **logicalBackupSchedule**
+  Schedule for the logical backup k8s cron job. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
 
 ## Postgres parameters
 

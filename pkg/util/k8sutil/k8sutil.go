@@ -2,8 +2,15 @@ package k8sutil
 
 import (
 	"fmt"
+	"reflect"
+
+	b64 "encoding/base64"
+
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+
 	"github.com/zalando/postgres-operator/pkg/util/constants"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
@@ -15,9 +22,9 @@ import (
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"reflect"
 
 	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // KubernetesClient describes getters for Kubernetes objects
@@ -36,9 +43,24 @@ type KubernetesClient struct {
 	rbacv1beta1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
+	clientbatchv1beta1.CronJobsGetter
 
 	RESTClient      rest.Interface
 	AcidV1ClientSet *acidv1client.Clientset
+}
+
+type mockSecret struct {
+	v1core.SecretInterface
+}
+
+type MockSecretGetter struct {
+}
+
+type mockConfigMap struct {
+	v1core.ConfigMapInterface
+}
+
+type MockConfigMapsGetter struct {
 }
 
 // RestConfig creates REST config
@@ -83,6 +105,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
+	kubeClient.CronJobsGetter = client.BatchV1beta1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {
@@ -139,4 +162,72 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	}
 
 	return
+}
+
+func getJobImage(cronJob *batchv1beta1.CronJob) string {
+	return cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Image
+}
+
+// SameLogicalBackupJob compares Specs of logical backup cron jobs
+func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
+
+	if cur.Spec.Schedule != new.Spec.Schedule {
+		return false, fmt.Sprintf("new job's schedule %q doesn't match the current one %q",
+			new.Spec.Schedule, cur.Spec.Schedule)
+	}
+
+	newImage := getJobImage(new)
+	curImage := getJobImage(cur)
+	if newImage != curImage {
+		return false, fmt.Sprintf("new job's image %q doesn't match the current one %q",
+			newImage, curImage)
+	}
+
+	return true, ""
+}
+
+func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
+	if name != "infrastructureroles-test" {
+		return nil, fmt.Errorf("NotFound")
+	}
+	secret := &v1.Secret{}
+	secret.Name = "testcluster"
+	secret.Data = map[string][]byte{
+		"user1":     []byte("testrole"),
+		"password1": []byte("testpassword"),
+		"inrole1":   []byte("testinrole"),
+		"foobar":    []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
+	}
+	return secret, nil
+
+}
+
+func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
+	if name != "infrastructureroles-test" {
+		return nil, fmt.Errorf("NotFound")
+	}
+	configmap := &v1.ConfigMap{}
+	configmap.Name = "testcluster"
+	configmap.Data = map[string]string{
+		"foobar": "{}",
+	}
+	return configmap, nil
+}
+
+// Secrets to be mocked
+func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
+	return &mockSecret{}
+}
+
+// ConfigMaps to be mocked
+func (c *MockConfigMapsGetter) ConfigMaps(namespace string) v1core.ConfigMapInterface {
+	return &mockConfigMap{}
+}
+
+// NewMockKubernetesClient for other tests
+func NewMockKubernetesClient() KubernetesClient {
+	return KubernetesClient{
+		SecretsGetter:    &MockSecretGetter{},
+		ConfigMapsGetter: &MockConfigMapsGetter{},
+	}
 }

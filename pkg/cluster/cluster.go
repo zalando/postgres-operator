@@ -4,6 +4,7 @@ package cluster
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -18,8 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-
-	"encoding/json"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -82,6 +81,7 @@ type Cluster struct {
 	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+
 }
 
 type compareStatefulsetResult struct {
@@ -149,21 +149,24 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
-func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
-	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
-	var (
-		err error
-		b   []byte
-	)
-	if b, err = json.Marshal(status); err != nil {
+// SetStatus of Postgres cluster
+// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
+func (c *Cluster) setStatus(status string) {
+	var pgStatus acidv1.PostgresStatus
+	pgStatus.PostgresClusterStatus = status
+
+	patch, err := json.Marshal(struct {
+		PgStatus interface{} `json:"status"`
+	}{&pgStatus})
+
+	if err != nil {
 		c.logger.Errorf("could not marshal status: %v", err)
 	}
 
-	patch := []byte(fmt.Sprintf(`{"status": %s}`, string(b)))
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
 	// we should take advantage of it.
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch)
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch, "status")
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
 	}
@@ -172,7 +175,7 @@ func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status == acidv1.ClusterStatusCreating
+	return c.Status.Creating()
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
@@ -294,6 +297,13 @@ func (c *Cluster) Create() error {
 			return fmt.Errorf("could not sync databases: %v", err)
 		}
 		c.logger.Infof("databases have been successfully created")
+	}
+
+	if c.Postgresql.Spec.EnableLogicalBackup {
+		if err := c.createLogicalBackupJob(); err != nil {
+			return fmt.Errorf("could not create a k8s cron job for logical backups: %v", err)
+		}
+		c.logger.Info("a k8s cron job for logical backup has been successfully created")
 	}
 
 	if err := c.listResources(); err != nil {
@@ -479,8 +489,10 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 }
 
-// Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
-// (i.e. service) is treated as an error.
+// Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
+// (i.e. service) is treated as an error
+// logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
+// for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
 
@@ -567,6 +579,43 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	// logical backup job
+	func() {
+
+		// create if it did not exist
+		if !oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup {
+			c.logger.Debugf("creating backup cron job")
+			if err := c.createLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
+				updateFailed = true
+				return
+			}
+		}
+
+		// delete if no longer needed
+		if oldSpec.Spec.EnableLogicalBackup && !newSpec.Spec.EnableLogicalBackup {
+			c.logger.Debugf("deleting backup cron job")
+			if err := c.deleteLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not delete a k8s cron job for logical backups: %v", err)
+				updateFailed = true
+				return
+			}
+
+		}
+
+		// apply schedule changes
+		// this is the only parameter of logical backups a user can overwrite in the cluster manifest
+		if (oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup) &&
+			(newSpec.Spec.LogicalBackupSchedule != oldSpec.Spec.LogicalBackupSchedule) {
+			c.logger.Debugf("updating schedule of the backup cron job")
+			if err := c.syncLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not sync logical backup jobs: %v", err)
+				updateFailed = true
+			}
+		}
+
+	}()
+
 	// Roles and Databases
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
 		c.logger.Debugf("syncing roles")
@@ -594,6 +643,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 func (c *Cluster) Delete() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
+	// deleting the cron job also removes pods and batch jobs it created
+	if err := c.deleteLogicalBackupJob(); err != nil {
+		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+	}
 
 	if err := c.deleteStatefulSet(); err != nil {
 		c.logger.Warningf("could not delete statefulset: %v", err)
@@ -627,6 +682,7 @@ func (c *Cluster) Delete() {
 	if err := c.deletePatroniClusterObjects(); err != nil {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
 	}
+
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
