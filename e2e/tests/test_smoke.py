@@ -100,6 +100,7 @@ class SmokeTestCase(unittest.TestCase):
         master_pod_node = ''
         new_master_pod_node = ''
 
+        # taint node with postgres=:NoExecute to force failover
         body = {
             "spec": {
                 "taints": [
@@ -110,6 +111,8 @@ class SmokeTestCase(unittest.TestCase):
                 ]
             }
         }
+
+        # get nodes of master and replica
         podsList = k8s.core_v1.list_namespaced_pod("default", label_selector=labels)
         for pod in podsList.items:
             if ('spilo-role', 'master') in pod.metadata.labels.items():
@@ -117,6 +120,15 @@ class SmokeTestCase(unittest.TestCase):
             elif ('spilo-role', 'replica') in pod.metadata.labels.items():
                 new_master_pod_node = pod.spec.node_name
 
+        # if both live on the same node, failover will happen to the other kind worker
+        if master_pod_node == new_master_pod_node:
+            nodes = k8s.core_v1.list_node()
+            for n in nodes.items:
+                if "node-role.kubernetes.io/master" not in n.metadata.labels & n.metadata.name != master_pod_node:
+                    new_master_pod_node = n.metadata.name
+                    break
+
+        # patch node and test if master is failing over to the expected node
         k8s.core_v1.patch_node(master_pod_node, body)
         Utils.wait_for_master_failover(k8s, new_master_pod_node, self.RETRY_TIMEOUT_SEC)
 
