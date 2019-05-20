@@ -97,8 +97,18 @@ class SmokeTestCase(unittest.TestCase):
         """
         k8s = K8sApi()
         labels = 'version=acid-minimal-cluster'
-        master_pod_node = ''
-        new_master_pod_node = ''
+
+        # get nodes of master and replica(s) (expected target of new master)
+        current_master_node, failover_targets = get_spilo_nodes(k8s, labels)
+        num_replicas = len(failover_targets)
+
+        # if all pods live on the same node, failover will happen to other worker(s)
+        failover_targets = [x for x in failover_targets if x != current_master_node]
+        if len(failover_targets) == 0:
+            nodes = k8s.core_v1.list_node()
+            for n in nodes.items:
+                if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != current_master_node:
+                    failover_targets.append(n.metadata.name)
 
         # taint node with postgres=:NoExecute to force failover
         body = {
@@ -112,27 +122,13 @@ class SmokeTestCase(unittest.TestCase):
             }
         }
 
-        # get nodes of master and replica
-        podsList = k8s.core_v1.list_namespaced_pod("default", label_selector=labels)
-        for pod in podsList.items:
-            if ('spilo-role', 'master') in pod.metadata.labels.items():
-                master_pod_node = pod.spec.node_name
-            elif ('spilo-role', 'replica') in pod.metadata.labels.items():
-                new_master_pod_node = pod.spec.node_name
+        # patch node and test if master is failing over to one of the expected nodes
+        k8s.core_v1.patch_node(current_master_node, body)
+        Utils.wait_for_master_failover(k8s, failover_targets, self.RETRY_TIMEOUT_SEC)
 
-        # if both live on the same node, failover will happen to the other kind worker
-        if master_pod_node == new_master_pod_node:
-            nodes = k8s.core_v1.list_node()
-            for n in nodes.items:
-                if "node-role.kubernetes.io/master" not in n.metadata.labels & n.metadata.name != master_pod_node:
-                    new_master_pod_node = n.metadata.name
-                    break
-
-        # patch node and test if master is failing over to the expected node
-        k8s.core_v1.patch_node(master_pod_node, body)
-        Utils.wait_for_master_failover(k8s, new_master_pod_node, self.RETRY_TIMEOUT_SEC)
-
-        self.assertTrue(master_pod_node != new_master_pod_node, "Master on {} did not fail over to {}".format(master_pod_node, new_master_pod_node))
+        new_master_node, new_replica_nodes = get_spilo_nodes(k8s, labels)
+        self.assertTrue(current_master_node != new_master_node, "Master on {} did not fail over to {}".format(current_master_node, failover_targets))
+        self.assertTrue(num_replicas == len(new_replica_nodes), "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
 
         # undo the tainting
         body = {
@@ -140,7 +136,7 @@ class SmokeTestCase(unittest.TestCase):
                 "taints": []
             }
         }
-        k8s.core_v1.patch_node(new_master_pod_node, body)
+        k8s.core_v1.patch_node(new_master_node, body)
 
 
 class K8sApi:
@@ -158,6 +154,19 @@ class K8sApi:
 
 
 class Utils:
+
+    @staticmethod
+    def get_spilo_nodes(k8s_api, pod_labels):
+        master_pod_node = ''
+        replica_pod_nodes = []
+        podsList = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels)
+        for pod in podsList.items:
+            if ('spilo-role', 'master') in pod.metadata.labels.items():
+                master_pod_node = pod.spec.node_name
+            elif ('spilo-role', 'replica') in pod.metadata.labels.items():
+                replica_pod_nodes.append(pod.spec.node_name)
+
+        return master_pod_node, replica_pod_nodes
 
     @staticmethod
     def wait_for_pod_start(k8s_api, pod_labels, retry_timeout_sec):
@@ -188,13 +197,13 @@ class Utils:
         return len(k8s_api.core_v1.list_namespaced_pod('default', label_selector=labels).items)
 
     @staticmethod
-    def wait_for_master_failover(k8s_api, expected_master_pod_node, retry_timeout_sec):
+    def wait_for_master_failover(k8s_api, expected_master_nodes, retry_timeout_sec):
         pod_phase = 'Failing over'
-        new_master_pod_node = ''
-        while (pod_phase != 'Running') & (new_master_pod_node != expected_master_pod_node):
+        new_master_node = ''
+        while (pod_phase != 'Running') and (new_master_node not in expected_master_nodes):
             pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector='spilo-role=master,version=acid-minimal-cluster').items
             if pods:
-                new_master_pod_node = pods[0].spec.node_name
+                new_master_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
         time.sleep(retry_timeout_sec)
 
