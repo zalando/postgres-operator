@@ -99,7 +99,7 @@ class SmokeTestCase(unittest.TestCase):
         labels = 'version=acid-minimal-cluster'
 
         # get nodes of master and replica(s) (expected target of new master)
-        current_master_node, failover_targets = get_spilo_nodes(k8s, labels)
+        current_master_node, failover_targets = Utils.get_spilo_nodes(k8s, labels)
         num_replicas = len(failover_targets)
 
         # if all pods live on the same node, failover will happen to other worker(s)
@@ -126,8 +126,8 @@ class SmokeTestCase(unittest.TestCase):
         k8s.core_v1.patch_node(current_master_node, body)
         Utils.wait_for_master_failover(k8s, failover_targets, self.RETRY_TIMEOUT_SEC)
 
-        new_master_node, new_replica_nodes = get_spilo_nodes(k8s, labels)
-        self.assertTrue(current_master_node != new_master_node, "Master on {} did not fail over to {}".format(current_master_node, failover_targets))
+        new_master_node, new_replica_nodes = Utils.get_spilo_nodes(k8s, labels)
+        self.assertTrue(current_master_node != new_master_node, "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
         self.assertTrue(num_replicas == len(new_replica_nodes), "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
 
         # undo the tainting
