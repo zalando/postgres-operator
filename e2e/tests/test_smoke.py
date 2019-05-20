@@ -90,6 +90,46 @@ class SmokeTestCase(unittest.TestCase):
         Utils.wait_for_pg_to_scale(k8s, 2, self.RETRY_TIMEOUT_SEC)
         self.assertEqual(2, Utils.count_pods_with_label(k8s, labels))
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_taint_based_eviction(self):
+        """
+           Add taint "postgres=:NoExecute" to node with master.
+        """
+        k8s = K8sApi()
+        labels = 'version=acid-minimal-cluster'
+        master_pod_node = ''
+        new_master_pod_node = ''
+
+        body = {
+            "spec": {
+                "taints": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "postgres"
+                    }
+                ]
+            }
+        }
+        podsList = k8s.core_v1.list_namespaced_pod("default", label_selector=labels)
+        for pod in podsList.items:
+            if ('spilo-role', 'master') in pod.metadata.labels.items():
+                master_pod_node = pod.spec.node_name
+            elif ('spilo-role', 'replica') in pod.metadata.labels.items():
+                new_master_pod_node = pod.spec.node_name
+
+        k8s.core_v1.patch_node(master_pod_node, body)
+        Utils.wait_for_master_failover(k8s, new_master_pod_node, self.RETRY_TIMEOUT_SEC)
+
+        self.assertTrue(master_pod_node != new_master_pod_node, "Master on {} did not fail over to {}".format(master_pod_node, new_master_pod_node))
+
+        # undo the tainting
+        body = {
+            "spec": {
+                "taints": []
+            }
+        }
+        k8s.core_v1.patch_node(new_master_pod_node, body)
+
 
 class K8sApi:
 
@@ -134,6 +174,17 @@ class Utils:
     @staticmethod
     def count_pods_with_label(k8s_api, labels):
         return len(k8s_api.core_v1.list_namespaced_pod('default', label_selector=labels).items)
+
+    @staticmethod
+    def wait_for_master_failover(k8s_api, expected_master_pod_node, retry_timeout_sec):
+        pod_phase = 'Failing over'
+        new_master_pod_node = ''
+        while (pod_phase != 'Running') & (new_master_pod_node != expected_master_pod_node):
+            pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector='spilo-role=master,version=acid-minimal-cluster').items
+            if pods:
+                new_master_pod_node = pods[0].spec.node_name
+                pod_phase = pods[0].status.phase
+        time.sleep(retry_timeout_sec)
 
 
 if __name__ == '__main__':
