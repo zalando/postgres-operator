@@ -54,6 +54,7 @@ type PostgresSpec struct {
 	InitContainers       []v1.Container       `json:"init_containers,omitempty"`
 	PodPriorityClassName string               `json:"pod_priority_class_name,omitempty"`
 	ShmVolume            *bool                `json:"enableShmVolume,omitempty"`
+	StandbyCluster       StandbyDescription   `json:"standby"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -107,18 +108,13 @@ type Patroni struct {
 	RetryTimeout         uint32                       `json:"retry_timeout"`
 	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
 	Slots                map[string]map[string]string `json:"slots"`
-	StandbyCluster       *PatroniStandbyCluster       `json:"standby_cluster"`
 }
 
-//StandbyCluster as supported by Patroni
-type PatroniStandbyCluster struct {
-	CreateReplicaMethods  []string `json:"create_replica_methods"`
-	Host                  string   `json:"host"`
-	Port                  string   `json:"port"`
-	PrimarySlotName       string   `json:"primary_slot_name"`
-	RestoreCommand        string   `json:"restore_command"`
-	ArchiveCleanupCommand string   `json:"archive_cleanup_command"`
-	RecoveryMinApplyDelay string   `json:"recovery_min_apply_delay"`
+//StandbyCluster
+type StandbyDescription struct {
+	ClusterName string `json:"cluster,omitempty"`
+	UID         string `json:"uid,omitempty"`
+	S3WalPath   string `json:"s3_wal_path,omitempty"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time

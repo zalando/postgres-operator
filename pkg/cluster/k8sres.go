@@ -43,7 +43,6 @@ type patroniDCS struct {
 	MaximumLagOnFailover     float32                       `json:"maximum_lag_on_failover,omitempty"`
 	PGBootstrapConfiguration map[string]interface{}        `json:"postgresql,omitempty"`
 	Slots                    map[string]map[string]string  `json:"slots,omitempty"`
-	StandbyClusterCfg        *acidv1.PatroniStandbyCluster `json:"standby_cluster,omitempty"`
 }
 
 type pgBootstrap struct {
@@ -221,10 +220,6 @@ PatroniInitDBParams:
 	if patroni.Slots != nil {
 		config.Bootstrap.DCS.Slots = patroni.Slots
 	}
-	if patroni.StandbyCluster != nil {
-		config.Bootstrap.DCS.StandbyClusterCfg = patroni.StandbyCluster
-	}
-
 	config.PgLocalConfiguration = make(map[string]interface{})
 	config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
 	if len(pg.Parameters) > 0 {
