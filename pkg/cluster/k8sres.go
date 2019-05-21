@@ -149,7 +149,7 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 	return requests, nil
 }
 
-func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, logger *logrus.Entry) string {
+func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, logger *logrus.Entry) (string, error) {
 	config := spiloConfiguration{}
 
 	config.Bootstrap = pgBootstrap{}
@@ -249,12 +249,9 @@ PatroniInitDBParams:
 			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
 		},
 	}
-	result, err := json.Marshal(config)
-	if err != nil {
-		logger.Errorf("cannot convert spilo configuration into JSON: %v", err)
-		return ""
-	}
-	return string(result)
+
+	res, err := json.Marshal(config)
+	return string(res), err
 }
 
 func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (local, bootstrap map[string]string) {
@@ -780,7 +777,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 	}
 
-	spiloConfiguration := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
+	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
+	}
 
 	// generate environment variables for the spilo container
 	spiloEnvVars := deduplicateEnvVars(
