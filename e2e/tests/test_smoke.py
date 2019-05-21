@@ -200,7 +200,8 @@ class Utils:
     def wait_for_master_failover(k8s_api, expected_master_nodes, retry_timeout_sec):
         pod_phase = 'Failing over'
         new_master_node = ''
-        while (pod_phase != 'Running') and (new_master_node not in expected_master_nodes):
+
+        while (pod_phase != 'Running') or (new_master_node not in expected_master_nodes):
             pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector='spilo-role=master,version=acid-minimal-cluster').items
             if pods:
                 new_master_node = pods[0].spec.node_name
