@@ -125,6 +125,7 @@ class SmokeTestCase(unittest.TestCase):
         # patch node and test if master is failing over to one of the expected nodes
         k8s.core_v1.patch_node(current_master_node, body)
         Utils.wait_for_master_failover(k8s, failover_targets, self.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_pod_start(k8s, 'spilo-role=replica', self.RETRY_TIMEOUT_SEC)
 
         new_master_node, new_replica_nodes = Utils.get_spilo_nodes(k8s, labels)
         self.assertTrue(current_master_node != new_master_node, "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
