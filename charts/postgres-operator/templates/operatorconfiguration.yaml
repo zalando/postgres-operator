@@ -9,14 +9,14 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
   pod_service_account_name: operator
-  docker_image: {{ toYaml .Values.docker_image }}
-  repair_period: {{ toYaml .Values.repair_period }}
-  resync_period: {{ toYaml .Values.resync_period }}
+  docker_image: {{ .Values.docker_image }}
+  repair_period: {{ .Values.repair_period }}
+  resync_period: {{ .Values.resync_period }}
 {{ toYaml .Values.configCRD | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   kubernetes:
-    spilo_privileged: {{ toYaml .Values.spilo_privileged }}
+    spilo_privileged: {{ .Values.spilo_privileged }}
 {{ toYaml .Values.configKubernetes | indent 4 }}
 {{ toYaml .Values.configKubernetesCRD | indent 4 }}
   postgres_pod_resources:

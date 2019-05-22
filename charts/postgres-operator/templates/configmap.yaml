@@ -9,12 +9,12 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
   pod_service_account_name: {{ template "postgres-operator.fullname" . }}
-  docker_image: {{ toYaml .Values.docker_image }}
-  debug_logging: "{{ toYaml .Values.configDebug.debug_logging }}"
-  enable_database_access: "{{ toYaml .Values.configDebug.enable_database_access }}"
-  repair_period: {{ toYaml .Values.repair_period }}
-  resync_period: {{ toYaml .Values.resync_period }}
-  spilo_privileged: "{{ toYaml .Values.spilo_privileged }}"
+  docker_image: {{ .Values.docker_image }}
+  debug_logging: "{{ .Values.configDebug.debug_logging }}"
+  enable_database_access: "{{ .Values.configDebug.enable_database_access }}"
+  repair_period: {{ .Values.repair_period }}
+  resync_period: {{ .Values.resync_period }}
+  spilo_privileged: "{{ .Values.spilo_privileged }}"
 {{ toYaml .Values.configMap | indent 2 }}
 {{ toYaml .Values.configUsers | indent 2 }}
 {{ toYaml .Values.configKubernetes | indent 2 }}
