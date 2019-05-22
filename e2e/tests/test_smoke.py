@@ -65,7 +65,7 @@ class SmokeTestCase(unittest.TestCase):
         Utils.wait_for_pod_start(k8s_api, 'spilo-role=master', cls.RETRY_TIMEOUT_SEC)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_master_is_unique(self):
+    def master_is_unique(self):
         """
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master".
         """
@@ -76,7 +76,7 @@ class SmokeTestCase(unittest.TestCase):
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_scaling(self):
+    def scaling(self):
         """
            Scale up from 2 to 3 pods and back to 2 by updating the Postgres manifest at runtime.
         """
@@ -91,7 +91,7 @@ class SmokeTestCase(unittest.TestCase):
         self.assertEqual(2, Utils.count_pods_with_label(k8s, labels))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_taint_based_eviction(self):
+    def taint_based_eviction(self):
         """
            Add taint "postgres=:NoExecute" to node with master.
         """
@@ -140,6 +140,54 @@ class SmokeTestCase(unittest.TestCase):
         k8s.core_v1.patch_node(new_master_node, body)
 
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_logical_backup_cron_job(self):
+        """
+        Ensure we can (a) create the cron job at user request for a specific PG cluster
+                      (b) update the cluster-wide image of the logical backup pod
+                      (c) delete the job at user request
+
+        Limitations:
+        (a) Does not run the actual batch job because there is no S3 mock to upload backups to
+        (b) Assumes 'acid-minimal-cluster' exists as defined in setUp
+        """
+
+        k8s = K8sApi()
+
+        # create the cron job
+        pg_patch_enable_backup = {
+            "spec": {
+               "enableLogicalBackup" : True,
+               "logicalBackupSchedule" :  "7 7 7 7 *"
+            }
+        }
+        k8s.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
+        Utils.wait_for_logical_backup_job_creation(k8s, self.RETRY_TIMEOUT_SEC)
+
+        # update the cluster-wide image of the logical backup pod
+        config_map_patch = {
+            "data": {
+               "logical_backup_docker_image" : "test-image-name",
+            }
+        }
+        k8s.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
+
+        operator_pod = k8s.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
+        k8s.core_v1.delete_namespaced_pod(operator_pod, "default") # restart reloads the conf
+        Utils.wait_for_pod_start(k8s, 'name=postgres-operator', self.RETRY_TIMEOUT_SEC)
+        #TODO replace this timeout with a meaningful condition to avodi dropping a delete event
+        time.sleep(30)
+
+        # delete the logical backup cron job
+        pg_patch_disable_backup = {
+            "spec": {
+               "enableLogicalBackup" : False,
+            }
+        }
+        k8s.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
+        Utils.wait_for_logical_backup_job_deletion(k8s, self.RETRY_TIMEOUT_SEC)
+
+
 class K8sApi:
 
     def __init__(self):
@@ -152,6 +200,8 @@ class K8sApi:
         self.core_v1 = client.CoreV1Api()
         self.crd = client.CustomObjectsApi()
         self.apps_v1 = client.AppsV1Api()
+        self.custom_objects_api = client.CustomObjectsApi()
+        self.batch_v1_beta1 = client.BatchV1beta1Api()
 
 
 class Utils:
@@ -209,6 +259,18 @@ class Utils:
                 pod_phase = pods[0].status.phase
         time.sleep(retry_timeout_sec)
 
+    @staticmethod
+    def wait_for_logical_backup_job(k8s_api, retry_timeout_sec, expected_num_of_jobs):
+        while (len(k8s_api.batch_v1_beta1.list_namespaced_cron_job("default", label_selector="application=spilo").items) != expected_num_of_jobs):
+            time.sleep(retry_timeout_sec)
+
+    @staticmethod
+    def wait_for_logical_backup_job_deletion(k8s_api, retry_timeout_sec):
+        Utils.wait_for_logical_backup_job(k8s_api,  retry_timeout_sec, expected_num_of_jobs = 0)
+
+    @staticmethod
+    def wait_for_logical_backup_job_creation(k8s_api, retry_timeout_sec):
+        Utils.wait_for_logical_backup_job(k8s_api, retry_timeout_sec, expected_num_of_jobs = 1)
 
 if __name__ == '__main__':
     unittest.main()
