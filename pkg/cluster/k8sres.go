@@ -483,7 +483,7 @@ func generatePodTemplate(
 }
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
-func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, standbyDescription *acidv1.StandbyDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -585,6 +585,10 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 
 	if cloneDescription.ClusterName != "" {
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
+	}
+
+	if standbyDescription.ClusterName != "" {
+		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
 	}
 
 	if len(customPodEnvVarsList) > 0 {
@@ -782,7 +786,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	// generate environment variables for the spilo container
 	spiloEnvVars := deduplicateEnvVars(
 		c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone,
-			customPodEnvVarsList), c.containerName(), c.logger)
+			&spec.StandbyCluster, customPodEnvVarsList), c.containerName(), c.logger)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
@@ -1248,6 +1252,34 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
+
+	return result
+}
+
+func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescription) []v1.EnvVar {
+	result := make([]v1.EnvVar, 0)
+
+	if description.S3WalPath == "" {
+		return result
+	}
+
+	cluster := description.ClusterName
+	result = append(result, v1.EnvVar{Name: "STANDBY_SCOPE", Value: cluster})
+
+	// standby with S3, find out the bucket to setup standby
+	msg := "Standby from S3 bucket"
+	c.logger.Info(msg, description.S3WalPath)
+
+	msg = "Use custom parsed S3WalPath %s from the manifest"
+	c.logger.Warningf(msg, description.S3WalPath)
+
+		result = append(result, v1.EnvVar{
+			Name:  "STANDBY_WALE_S3_PREFIX",
+			Value: description.S3WalPath,
+		})
+
+	result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "CLONE_WITH_WALE"})
+	result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 	return result
 }
