@@ -15,7 +15,6 @@ class SmokeTestCase(unittest.TestCase):
 
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
-    RETRY_TIMEOUT_SEC = 5
     # labels may be assigned before a pod becomes fully operational; so wait a few seconds more
     OPERATOR_POD_START_PERIOD_SEC = 5
 
@@ -56,15 +55,15 @@ class SmokeTestCase(unittest.TestCase):
         }
         k8s.apps_v1.patch_namespaced_deployment("postgres-operator", "default", body)
 
-        Utils.wait_for_pod_start(k8s, 'name=postgres-operator', cls.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_pod_start(k8s, 'name=postgres-operator')
         # reason: CRD may take time to register
-        time.sleep(OPERATOR_POD_START_PERIOD_SEC) 
+        time.sleep(cls.OPERATOR_POD_START_PERIOD_SEC) 
 
         actual_operator_image = k8s.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image)) # shows up after tests finish
 
         subprocess.run(["kubectl", "create", "-f", "manifests/minimal-postgres-manifest.yaml"])
-        Utils.wait_for_pod_start(k8s, 'spilo-role=master', cls.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_pod_start(k8s, 'spilo-role=master')
 
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -86,10 +85,10 @@ class SmokeTestCase(unittest.TestCase):
         k8s = K8sApi()
         labels = "version=acid-minimal-cluster"
 
-        Utils.wait_for_pg_to_scale(k8s, 3, self.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_pg_to_scale(k8s, 3)
         self.assertEqual(3, Utils.count_pods_with_label(k8s, labels))
 
-        Utils.wait_for_pg_to_scale(k8s, 2, self.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_pg_to_scale(k8s, 2)
         self.assertEqual(2, Utils.count_pods_with_label(k8s, labels))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -126,8 +125,8 @@ class SmokeTestCase(unittest.TestCase):
 
         # patch node and test if master is failing over to one of the expected nodes
         k8s.core_v1.patch_node(current_master_node, body)
-        Utils.wait_for_master_failover(k8s, failover_targets, self.RETRY_TIMEOUT_SEC)
-        Utils.wait_for_pod_start(k8s, 'spilo-role=replica', self.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_master_failover(k8s, failover_targets)
+        Utils.wait_for_pod_start(k8s, 'spilo-role=replica')
 
         new_master_node, new_replica_nodes = Utils.get_spilo_nodes(k8s, labels)
         self.assertTrue(current_master_node != new_master_node,
@@ -167,7 +166,7 @@ class SmokeTestCase(unittest.TestCase):
             }
         }
         k8s.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
-        Utils.wait_for_logical_backup_job_creation(k8s, self.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_logical_backup_job_creation(k8s)
         
         jobs = Utils.get_logical_backup_job(k8s).items
         self.assertTrue(1 == len(jobs),
@@ -190,9 +189,9 @@ class SmokeTestCase(unittest.TestCase):
 
         operator_pod = k8s.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
         k8s.core_v1.delete_namespaced_pod(operator_pod, "default") # restart reloads the conf
-        Utils.wait_for_pod_start(k8s, 'name=postgres-operator', self.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_pod_start(k8s, 'name=postgres-operator')
         # reason: patch below is otherwise dropped during pod restart
-        time.sleep(OPERATOR_POD_START_PERIOD_SEC) 
+        time.sleep(self.OPERATOR_POD_START_PERIOD_SEC) 
 
         jobs = Utils.get_logical_backup_job(k8s).items
         actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
@@ -206,7 +205,7 @@ class SmokeTestCase(unittest.TestCase):
             }
         }
         k8s.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
-        Utils.wait_for_logical_backup_job_deletion(k8s, self.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_logical_backup_job_deletion(k8s)
         jobs = Utils.get_logical_backup_job(k8s).items
         self.assertTrue(0 == len(jobs),
                        "Expected 0 logical backup jobs, found {}".format(len(jobs)))
@@ -230,6 +229,8 @@ class K8sApi:
 
 class Utils:
 
+    RETRY_TIMEOUT_SEC = 5
+
     @staticmethod
     def get_spilo_nodes(k8s, pod_labels):
         master_pod_node = ''
@@ -244,16 +245,16 @@ class Utils:
         return master_pod_node, replica_pod_nodes
 
     @staticmethod
-    def wait_for_pod_start(k8s, pod_labels, retry_timeout_sec):
+    def wait_for_pod_start(k8s, pod_labels):
         pod_phase = 'No pod running'
         while pod_phase != 'Running':
             pods = k8s.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
-        time.sleep(retry_timeout_sec)
+            time.sleep(Utils.RETRY_TIMEOUT_SEC)
 
     @staticmethod
-    def wait_for_pg_to_scale(k8s, number_of_instances, retry_timeout_sec):
+    def wait_for_pg_to_scale(k8s, number_of_instances):
 
         body = {
             "spec": {
@@ -265,14 +266,14 @@ class Utils:
 
         labels = 'version=acid-minimal-cluster'
         while Utils.count_pods_with_label(k8s, labels) != number_of_instances:
-            time.sleep(retry_timeout_sec)
+            time.sleep(Utils.RETRY_TIMEOUT_SEC)
 
     @staticmethod
     def count_pods_with_label(k8s, labels):
         return len(k8s.core_v1.list_namespaced_pod('default', label_selector=labels).items)
 
     @staticmethod
-    def wait_for_master_failover(k8s, expected_master_nodes, retry_timeout_sec):
+    def wait_for_master_failover(k8s, expected_master_nodes):
         pod_phase = 'Failing over'
         new_master_node = ''
         labels = 'spilo-role=master,version=acid-minimal-cluster'
@@ -283,24 +284,24 @@ class Utils:
             if pods:
                 new_master_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
-        time.sleep(retry_timeout_sec)
+            time.sleep(Utils.RETRY_TIMEOUT_SEC)
 
     @staticmethod
     def get_logical_backup_job(k8s):
         return k8s.batch_v1_beta1.list_namespaced_cron_job("default", label_selector="application=spilo")
 
     @staticmethod
-    def wait_for_logical_backup_job(k8s, retry_timeout_sec, expected_num_of_jobs):
+    def wait_for_logical_backup_job(k8s, expected_num_of_jobs):
         while (len(Utils.get_logical_backup_job(k8s).items) != expected_num_of_jobs):
-            time.sleep(retry_timeout_sec)
+            time.sleep(Utils.RETRY_TIMEOUT_SEC)
 
     @staticmethod
-    def wait_for_logical_backup_job_deletion(k8s, retry_timeout_sec):
-        Utils.wait_for_logical_backup_job(k8s,  retry_timeout_sec, expected_num_of_jobs = 0)
+    def wait_for_logical_backup_job_deletion(k8s):
+        Utils.wait_for_logical_backup_job(k8s, expected_num_of_jobs = 0)
 
     @staticmethod
-    def wait_for_logical_backup_job_creation(k8s, retry_timeout_sec):
-        Utils.wait_for_logical_backup_job(k8s, retry_timeout_sec, expected_num_of_jobs = 1)
+    def wait_for_logical_backup_job_creation(k8s):
+        Utils.wait_for_logical_backup_job(k8s, expected_num_of_jobs = 1)
 
 if __name__ == '__main__':
     unittest.main()
