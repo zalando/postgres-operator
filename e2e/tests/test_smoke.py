@@ -30,13 +30,14 @@ class SmokeTestCase(unittest.TestCase):
         next invocation of "make e2e" will re-create it.
         '''
 
-        k8s = K8sApi()
+        # set a single k8s wrapper for all tests
+        k8s = cls.k8s = K8s()
 
-        # k8s python client fails with certain resources; we resort to kubectl
+        # k8s python client fails with multiple resources in a single file; we resort to kubectl
         subprocess.run(["kubectl", "create", "-f", "manifests/operator-service-account-rbac.yaml"])
 
         for filename in ["configmap.yaml", "postgres-operator.yaml"]:
-            utils.create_from_yaml(k8s.k8s_client, "manifests/" + filename)
+            utils.create_from_yaml(k8s.api.k8s_client, "manifests/" + filename)
 
         # submit the most recent operator image built on the Docker host
         body = {
@@ -53,60 +54,62 @@ class SmokeTestCase(unittest.TestCase):
                  }
             }
         }
-        k8s.apps_v1.patch_namespaced_deployment("postgres-operator", "default", body)
+        k8s.api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", body)
 
-        Utils.wait_for_pod_start(k8s, 'name=postgres-operator')
+        k8s.wait_for_pod_start('name=postgres-operator')
         # reason: CRD may take time to register
         time.sleep(cls.OPERATOR_POD_START_PERIOD_SEC) 
 
-        actual_operator_image = k8s.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
+        actual_operator_image = k8s.api.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image)) # shows up after tests finish
 
         subprocess.run(["kubectl", "create", "-f", "manifests/minimal-postgres-manifest.yaml"])
-        Utils.wait_for_pod_start(k8s, 'spilo-role=master')
+        k8s.wait_for_pod_start('spilo-role=master')
 
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_master_is_unique(self):
+    def master_is_unique(self):
         """
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master".
         """
-        k8s = K8sApi()
+
+        k8s = self.k8s
         labels = 'spilo-role=master,version=acid-minimal-cluster'
 
-        num_of_master_pods = Utils.count_pods_with_label(k8s, labels)
+        num_of_master_pods = k8s.count_pods_with_label(labels)
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_scaling(self):
+    def scaling(self):
         """
            Scale up from 2 to 3 pods and back to 2 by updating the Postgres manifest at runtime.
         """
-        k8s = K8sApi()
+
+        k8s = self.k8s
         labels = "version=acid-minimal-cluster"
 
-        Utils.wait_for_pg_to_scale(k8s, 3)
-        self.assertEqual(3, Utils.count_pods_with_label(k8s, labels))
+        k8s.wait_for_pg_to_scale(3)
+        self.assertEqual(3, k8s.count_pods_with_label(labels))
 
-        Utils.wait_for_pg_to_scale(k8s, 2)
-        self.assertEqual(2, Utils.count_pods_with_label(k8s, labels))
+        k8s.wait_for_pg_to_scale(2)
+        self.assertEqual(2, k8s.count_pods_with_label(labels))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
         """
            Add taint "postgres=:NoExecute" to node with master.
         """
-        k8s = K8sApi()
+        k8s = self.k8s
         labels = 'version=acid-minimal-cluster'
 
         # get nodes of master and replica(s) (expected target of new master)
-        current_master_node, failover_targets = Utils.get_spilo_nodes(k8s, labels)
+        current_master_node, failover_targets = k8s.get_spilo_nodes(labels)
         num_replicas = len(failover_targets)
 
         # if all pods live on the same node, failover will happen to other worker(s)
         failover_targets = [x for x in failover_targets if x != current_master_node]
         if len(failover_targets) == 0:
-            nodes = k8s.core_v1.list_node()
+            nodes = k8s.api.core_v1.list_node()
             for n in nodes.items:
                 if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != current_master_node:
                     failover_targets.append(n.metadata.name)
@@ -124,11 +127,11 @@ class SmokeTestCase(unittest.TestCase):
         }
 
         # patch node and test if master is failing over to one of the expected nodes
-        k8s.core_v1.patch_node(current_master_node, body)
-        Utils.wait_for_master_failover(k8s, failover_targets)
-        Utils.wait_for_pod_start(k8s, 'spilo-role=replica')
+        k8s.api.core_v1.patch_node(current_master_node, body)
+        k8s.wait_for_master_failover(failover_targets)
+        k8s.wait_for_pod_start('spilo-role=replica')
 
-        new_master_node, new_replica_nodes = Utils.get_spilo_nodes(k8s, labels)
+        new_master_node, new_replica_nodes = k8s.get_spilo_nodes(labels)
         self.assertTrue(current_master_node != new_master_node,
                         "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
         self.assertTrue(num_replicas == len(new_replica_nodes),
@@ -140,7 +143,7 @@ class SmokeTestCase(unittest.TestCase):
                 "taints": []
             }
         }
-        k8s.core_v1.patch_node(new_master_node, body)
+        k8s.api.core_v1.patch_node(new_master_node, body)
 
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -155,7 +158,7 @@ class SmokeTestCase(unittest.TestCase):
         (b) Assumes 'acid-minimal-cluster' exists as defined in setUp
         """
 
-        k8s = K8sApi()
+        k8s = self.k8s
 
         # create the cron job
         schedule = "7 7 7 7 *"
@@ -165,10 +168,10 @@ class SmokeTestCase(unittest.TestCase):
                "logicalBackupSchedule" : schedule
             }
         }
-        k8s.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
-        Utils.wait_for_logical_backup_job_creation(k8s)
+        k8s.api.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
+        k8s.wait_for_logical_backup_job_creation()
         
-        jobs = Utils.get_logical_backup_job(k8s).items
+        jobs = k8s.get_logical_backup_job().items
         self.assertTrue(1 == len(jobs),
                        "Expected 1 logical backup job, found {}".format(len(jobs)))
 
@@ -185,15 +188,15 @@ class SmokeTestCase(unittest.TestCase):
                "logical_backup_docker_image" : image,
             }
         }
-        k8s.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
+        k8s.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
 
-        operator_pod = k8s.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
-        k8s.core_v1.delete_namespaced_pod(operator_pod, "default") # restart reloads the conf
-        Utils.wait_for_pod_start(k8s, 'name=postgres-operator')
+        operator_pod = k8s.api.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
+        k8s.api.core_v1.delete_namespaced_pod(operator_pod, "default") # restart reloads the conf
+        k8s.wait_for_pod_start('name=postgres-operator')
         # reason: patch below is otherwise dropped during pod restart
         time.sleep(self.OPERATOR_POD_START_PERIOD_SEC) 
 
-        jobs = Utils.get_logical_backup_job(k8s).items
+        jobs = k8s.get_logical_backup_job().items
         actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
         self.assertTrue(actual_image == image,
         "Expected job image {}, found {}".format(image, actual_image))
@@ -204,9 +207,9 @@ class SmokeTestCase(unittest.TestCase):
                "enableLogicalBackup" : False,
             }
         }
-        k8s.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
-        Utils.wait_for_logical_backup_job_deletion(k8s)
-        jobs = Utils.get_logical_backup_job(k8s).items
+        k8s.api.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
+        k8s.wait_for_logical_backup_job_deletion()
+        jobs = k8s.get_logical_backup_job().items
         self.assertTrue(0 == len(jobs),
                        "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
@@ -220,11 +223,87 @@ class K8sApi:
 
         self.config = config.load_kube_config()
         self.k8s_client = client.ApiClient()
-        self.core_v1 = client.CoreV1Api()
+
         self.crd = client.CustomObjectsApi()
+        self.core_v1 = client.CoreV1Api()
         self.apps_v1 = client.AppsV1Api()
-        self.custom_objects_api = client.CustomObjectsApi()
         self.batch_v1_beta1 = client.BatchV1beta1Api()
+        self.custom_objects_api = client.CustomObjectsApi()
+
+
+
+class K8s:
+
+    RETRY_TIMEOUT_SEC = 5
+
+    def __init__(self):
+        self.api = K8sApi()
+
+    def get_spilo_nodes(self, pod_labels):
+        master_pod_node = ''
+        replica_pod_nodes = []
+        podsList = self.api.core_v1.list_namespaced_pod('default', label_selector=pod_labels)
+        for pod in podsList.items:
+            if ('spilo-role', 'master') in pod.metadata.labels.items():
+                master_pod_node = pod.spec.node_name
+            elif ('spilo-role', 'replica') in pod.metadata.labels.items():
+                replica_pod_nodes.append(pod.spec.node_name)
+
+        return master_pod_node, replica_pod_nodes
+
+    def wait_for_pod_start(self, pod_labels):
+        pod_phase = 'No pod running'
+        while pod_phase != 'Running':
+            pods = self.api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
+            if pods:
+                pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def wait_for_pg_to_scale(self, number_of_instances):
+
+        body = {
+            "spec": {
+                "numberOfInstances": number_of_instances
+            }
+        }
+        _ = self.api.crd.patch_namespaced_custom_object("acid.zalan.do",
+                                                       "v1", "default", "postgresqls", "acid-minimal-cluster", body)
+
+        labels = 'version=acid-minimal-cluster'
+        while self.count_pods_with_label(labels) != number_of_instances:
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def count_pods_with_label(self, labels):
+        return len(self.api.core_v1.list_namespaced_pod('default', label_selector=labels).items)
+
+    def wait_for_master_failover(self, expected_master_nodes):
+        pod_phase = 'Failing over'
+        new_master_node = ''
+        labels = 'spilo-role=master,version=acid-minimal-cluster'
+
+        while (pod_phase != 'Running') or (new_master_node not in expected_master_nodes):
+            pods = self.api.core_v1.list_namespaced_pod('default', label_selector=labels).items
+
+            if pods:
+                new_master_node = pods[0].spec.node_name
+                pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def get_logical_backup_job(self):
+        return self.api.batch_v1_beta1.list_namespaced_cron_job("default", label_selector="application=spilo")
+
+    def wait_for_logical_backup_job(self, expected_num_of_jobs):
+        while (len(self.api.get_logical_backup_job().items) != expected_num_of_jobs):
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def wait_for_logical_backup_job_deletion(self):
+        Utils.wait_for_logical_backup_job(expected_num_of_jobs = 0)
+
+    def wait_for_logical_backup_job_creation(self):
+        Utils.wait_for_logical_backup_job(expected_num_of_jobs = 1)
+    
+    def create_with_kubectl(self, path):
+        subprocess.run(["kubectl", "create", "-f", path])
 
 
 class Utils:
