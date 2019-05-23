@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.1.0-20-g25e02ad
+  tag: v1.1.0-28-g24d412a
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -10,25 +10,15 @@ image:
 # imagePullSecrets:
   # - name: myRegistryKeySecretName
 
-docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p70
 podAnnotations: {}
 podLabels: {}
+
+# config shared from ConfigMap and CRD
+docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p70
 repair_period: 5m
 resync_period: 5m
 spilo_privileged: false
-
-configMap:
-  cluster_labels: application:spilo
-  cluster_name_label: version
-  workers: "4"
-
-configCRD:
-  etcd_host: ""
-  min_instances: -1
-  max_instances: -1
-  workers: 4
-  # sidecar_docker_images
-  #  example: "exampleimage:exampletag"
+workers: 4
 
 configUsers:
   replication_username: standby
@@ -46,20 +36,6 @@ configKubernetes:
   pod_terminate_grace_period: 5m
   secret_name_template: '{username}.{cluster}.credentials'
 
-configKubernetesCRD:
-  cluster_labels:
-      application: spilo
-  cluster_name_label: cluster-name
-  enable_pod_antiaffinity: false
-  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-  secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
-  # inherited_labels:
-  # - application
-  # - app
-
-configNamespace:
-  watched_namespace: "*" # listen to all namespaces
-
 configPostgresPodResources:
   default_cpu_request: 100m
   default_memory_request: 100Mi
@@ -76,26 +52,14 @@ configTimeouts:
   resource_check_interval: 3s
   resource_check_timeout: 10m
 
-configLoadBalancer:
-  # custom_service_annotations:
-  #   "keyx:valuez,keya:valuea"
-  enable_master_load_balancer: "true"
-  enable_replica_load_balancer: "false"
-  master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
-  replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
-
-configLoadBalancerCRD:
-  # custom_service_annotations:
-  #   keyx: valuez
-  #   keya: valuea
-  enable_master_load_balancer: false
-  enable_replica_load_balancer: false
-  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
-  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
-
 configDebug:
   debug_logging: true
   enable_database_access: true
+
+configLoggingRestApi:
+  api_port: 8080
+  cluster_history_entries: 1000
+  ring_log_lines: 100
 
 configAwsOrGcp:
   aws_region: eu-central-1
@@ -103,6 +67,20 @@ configAwsOrGcp:
   # kube_iam_role: ""
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
+
+# config exclusive to ConfigMap
+configMap:
+  cluster_labels: application:spilo
+  cluster_name_label: version
+  watched_namespace: "*" # listen to all namespaces
+
+configLoadBalancer:
+  # custom_service_annotations:
+  #   "keyx:valuez,keya:valuea"
+  enable_master_load_balancer: "true"
+  enable_replica_load_balancer: "false"
+  master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
+  replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
 
 configTeamsApi:
   enable_teams_api: "false"
@@ -114,6 +92,35 @@ configTeamsApi:
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
+
+# config exclusive to CRD
+configCRD:
+  etcd_host: ""
+  min_instances: -1
+  max_instances: -1
+  # sidecar_docker_images
+  #  example: "exampleimage:exampletag"
+
+configKubernetesCRD:
+  cluster_labels:
+      application: spilo
+  cluster_name_label: cluster-name
+  enable_pod_antiaffinity: false
+  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+  # inherited_labels:
+  # - application
+  # - app
+  # watched_namespace: ""
+
+configLoadBalancerCRD:
+  # custom_service_annotations:
+  #   keyx: valuez
+  #   keya: valuea
+  enable_master_load_balancer: false
+  enable_replica_load_balancer: false
+  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
 
 configTeamsApiCRD:
   enable_teams_api: false
@@ -127,16 +134,6 @@ configTeamsApiCRD:
   team_api_role_configuration:
     log_statement: all
   # teams_api_url: ""
-
-configLoggingRestApi:
-  api_port: "8080"
-  cluster_history_entries: "1000"
-  ring_log_lines: "100"
-
-configLoggingRestApiCRD:
-  api_port: 8080
-  cluster_history_entries: 1000
-  ring_log_lines: 100
 
 scalyr:
   scalyr_cpu_request: 100m
@@ -156,7 +153,8 @@ serviceAccount:
   create: true
   # The name of the ServiceAccount to use.
   # If not set and create is true, a name is generated using the fullname template
-  name:
+  # When relying solely on the OperatorConfiguration CRD, set this value to "operator"
+  name: ""
 
 priorityClassName: ""
 

@@ -8,14 +8,16 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
-  pod_service_account_name: operator
   docker_image: {{ .Values.docker_image }}
   repair_period: {{ .Values.repair_period }}
   resync_period: {{ .Values.resync_period }}
+  workers: {{ .Values.workers }}
 {{ toYaml .Values.configCRD | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   kubernetes:
+    oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
+    pod_service_account_name: operator
     spilo_privileged: {{ .Values.spilo_privileged }}
 {{ toYaml .Values.configKubernetes | indent 4 }}
 {{ toYaml .Values.configKubernetesCRD | indent 4 }}
@@ -32,6 +34,6 @@ configuration:
   teams_api:
 {{ toYaml .Values.configTeamsApiCRD | indent 4 }}
   logging_rest_api:
-{{ toYaml .Values.configLoggingRestApiCRD | indent 4 }}
+{{ toYaml .Values.configLoggingRestApi | indent 4 }}
   scalyr:
 {{ toYaml .Values.configScalyr | indent 4 }}

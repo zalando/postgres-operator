@@ -29,7 +29,11 @@ spec:
 {{ toYaml .Values.podLabels | indent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ template "postgres-operator.fullname" . }}
+      serviceAccountName: {{- if eq .Values.serviceAccount.name "" }}
+                            {{ template "postgres-operator.fullname" . }}
+                          {{- else }}
+                            {{ .Values.serviceAccount.name }}
+                          {{- end }}
       containers:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
