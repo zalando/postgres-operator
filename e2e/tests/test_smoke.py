@@ -31,13 +31,13 @@ class SmokeTestCase(unittest.TestCase):
         next invocation of "make e2e" will re-create it.
         '''
 
-        k8s_api = K8sApi()
+        k8s = K8sApi()
 
         # k8s python client fails with certain resources; we resort to kubectl
         subprocess.run(["kubectl", "create", "-f", "manifests/operator-service-account-rbac.yaml"])
 
         for filename in ["configmap.yaml", "postgres-operator.yaml"]:
-            utils.create_from_yaml(k8s_api.k8s_client, "manifests/" + filename)
+            utils.create_from_yaml(k8s.k8s_client, "manifests/" + filename)
 
         # submit the most recent operator image built on the Docker host
         body = {
@@ -54,17 +54,17 @@ class SmokeTestCase(unittest.TestCase):
                  }
             }
         }
-        k8s_api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", body)
+        k8s.apps_v1.patch_namespaced_deployment("postgres-operator", "default", body)
 
-        Utils.wait_for_pod_start(k8s_api, 'name=postgres-operator', cls.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_pod_start(k8s, 'name=postgres-operator', cls.RETRY_TIMEOUT_SEC)
         # reason: CRD may take time to register
         time.sleep(OPERATOR_POD_START_PERIOD_SEC) 
 
-        actual_operator_image = k8s_api.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
+        actual_operator_image = k8s.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image)) # shows up after tests finish
 
         subprocess.run(["kubectl", "create", "-f", "manifests/minimal-postgres-manifest.yaml"])
-        Utils.wait_for_pod_start(k8s_api, 'spilo-role=master', cls.RETRY_TIMEOUT_SEC)
+        Utils.wait_for_pod_start(k8s, 'spilo-role=master', cls.RETRY_TIMEOUT_SEC)
 
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -231,10 +231,10 @@ class K8sApi:
 class Utils:
 
     @staticmethod
-    def get_spilo_nodes(k8s_api, pod_labels):
+    def get_spilo_nodes(k8s, pod_labels):
         master_pod_node = ''
         replica_pod_nodes = []
-        podsList = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels)
+        podsList = k8s.core_v1.list_namespaced_pod('default', label_selector=pod_labels)
         for pod in podsList.items:
             if ('spilo-role', 'master') in pod.metadata.labels.items():
                 master_pod_node = pod.spec.node_name
@@ -244,41 +244,41 @@ class Utils:
         return master_pod_node, replica_pod_nodes
 
     @staticmethod
-    def wait_for_pod_start(k8s_api, pod_labels, retry_timeout_sec):
+    def wait_for_pod_start(k8s, pod_labels, retry_timeout_sec):
         pod_phase = 'No pod running'
         while pod_phase != 'Running':
-            pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
+            pods = k8s.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
         time.sleep(retry_timeout_sec)
 
     @staticmethod
-    def wait_for_pg_to_scale(k8s_api, number_of_instances, retry_timeout_sec):
+    def wait_for_pg_to_scale(k8s, number_of_instances, retry_timeout_sec):
 
         body = {
             "spec": {
                 "numberOfInstances": number_of_instances
             }
         }
-        _ = k8s_api.crd.patch_namespaced_custom_object("acid.zalan.do",
+        _ = k8s.crd.patch_namespaced_custom_object("acid.zalan.do",
                                                        "v1", "default", "postgresqls", "acid-minimal-cluster", body)
 
         labels = 'version=acid-minimal-cluster'
-        while Utils.count_pods_with_label(k8s_api, labels) != number_of_instances:
+        while Utils.count_pods_with_label(k8s, labels) != number_of_instances:
             time.sleep(retry_timeout_sec)
 
     @staticmethod
-    def count_pods_with_label(k8s_api, labels):
-        return len(k8s_api.core_v1.list_namespaced_pod('default', label_selector=labels).items)
+    def count_pods_with_label(k8s, labels):
+        return len(k8s.core_v1.list_namespaced_pod('default', label_selector=labels).items)
 
     @staticmethod
-    def wait_for_master_failover(k8s_api, expected_master_nodes, retry_timeout_sec):
+    def wait_for_master_failover(k8s, expected_master_nodes, retry_timeout_sec):
         pod_phase = 'Failing over'
         new_master_node = ''
         labels = 'spilo-role=master,version=acid-minimal-cluster'
 
         while (pod_phase != 'Running') or (new_master_node not in expected_master_nodes):
-            pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=labels).items
+            pods = k8s.core_v1.list_namespaced_pod('default', label_selector=labels).items
 
             if pods:
                 new_master_node = pods[0].spec.node_name
@@ -286,21 +286,21 @@ class Utils:
         time.sleep(retry_timeout_sec)
 
     @staticmethod
-    def get_logical_backup_job(k8s_api):
-        return k8s_api.batch_v1_beta1.list_namespaced_cron_job("default", label_selector="application=spilo")
+    def get_logical_backup_job(k8s):
+        return k8s.batch_v1_beta1.list_namespaced_cron_job("default", label_selector="application=spilo")
 
     @staticmethod
-    def wait_for_logical_backup_job(k8s_api, retry_timeout_sec, expected_num_of_jobs):
-        while (len(Utils.get_logical_backup_job(k8s_api).items) != expected_num_of_jobs):
+    def wait_for_logical_backup_job(k8s, retry_timeout_sec, expected_num_of_jobs):
+        while (len(Utils.get_logical_backup_job(k8s).items) != expected_num_of_jobs):
             time.sleep(retry_timeout_sec)
 
     @staticmethod
-    def wait_for_logical_backup_job_deletion(k8s_api, retry_timeout_sec):
-        Utils.wait_for_logical_backup_job(k8s_api,  retry_timeout_sec, expected_num_of_jobs = 0)
+    def wait_for_logical_backup_job_deletion(k8s, retry_timeout_sec):
+        Utils.wait_for_logical_backup_job(k8s,  retry_timeout_sec, expected_num_of_jobs = 0)
 
     @staticmethod
-    def wait_for_logical_backup_job_creation(k8s_api, retry_timeout_sec):
-        Utils.wait_for_logical_backup_job(k8s_api, retry_timeout_sec, expected_num_of_jobs = 1)
+    def wait_for_logical_backup_job_creation(k8s, retry_timeout_sec):
+        Utils.wait_for_logical_backup_job(k8s, retry_timeout_sec, expected_num_of_jobs = 1)
 
 if __name__ == '__main__':
     unittest.main()
