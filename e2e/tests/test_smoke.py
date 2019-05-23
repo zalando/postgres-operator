@@ -33,11 +33,10 @@ class SmokeTestCase(unittest.TestCase):
         # set a single k8s wrapper for all tests
         k8s = cls.k8s = K8s()
 
-        # k8s python client fails with multiple resources in a single file; we resort to kubectl
-        subprocess.run(["kubectl", "create", "-f", "manifests/operator-service-account-rbac.yaml"])
-
-        for filename in ["configmap.yaml", "postgres-operator.yaml"]:
-            utils.create_from_yaml(k8s.api.k8s_client, "manifests/" + filename)
+        for filename in ["operator-service-account-rbac.yaml", 
+                         "configmap.yaml", 
+                         "postgres-operator.yaml"]:
+            k8s.create_with_kubectl("manifests/" + filename)
 
         # submit the most recent operator image built on the Docker host
         body = {
@@ -63,12 +62,12 @@ class SmokeTestCase(unittest.TestCase):
         actual_operator_image = k8s.api.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image)) # shows up after tests finish
 
-        subprocess.run(["kubectl", "create", "-f", "manifests/minimal-postgres-manifest.yaml"])
+        k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         k8s.wait_for_pod_start('spilo-role=master')
 
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def master_is_unique(self):
+    def test_master_is_unique(self):
         """
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master".
         """
@@ -80,7 +79,7 @@ class SmokeTestCase(unittest.TestCase):
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def scaling(self):
+    def test_scaling(self):
         """
            Scale up from 2 to 3 pods and back to 2 by updating the Postgres manifest at runtime.
         """
