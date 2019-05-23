@@ -14,7 +14,7 @@ podAnnotations: {}
 podLabels: {}
 
 # config shared from ConfigMap and CRD
-docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p70
+docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
 repair_period: 5m
 resync_period: 5m
 spilo_privileged: false
