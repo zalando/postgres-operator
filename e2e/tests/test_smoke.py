@@ -65,7 +65,7 @@ class SmokeTestCase(unittest.TestCase):
         Utils.wait_for_pod_start(k8s_api, 'spilo-role=master', cls.RETRY_TIMEOUT_SEC)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def master_is_unique(self):
+    def test_master_is_unique(self):
         """
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master".
         """
@@ -76,7 +76,7 @@ class SmokeTestCase(unittest.TestCase):
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def scaling(self):
+    def test_scaling(self):
         """
            Scale up from 2 to 3 pods and back to 2 by updating the Postgres manifest at runtime.
         """
@@ -91,7 +91,7 @@ class SmokeTestCase(unittest.TestCase):
         self.assertEqual(2, Utils.count_pods_with_label(k8s, labels))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def taint_based_eviction(self):
+    def test_taint_based_eviction(self):
         """
            Add taint "postgres=:NoExecute" to node with master.
         """
@@ -175,8 +175,8 @@ class SmokeTestCase(unittest.TestCase):
         operator_pod = k8s.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
         k8s.core_v1.delete_namespaced_pod(operator_pod, "default") # restart reloads the conf
         Utils.wait_for_pod_start(k8s, 'name=postgres-operator', self.RETRY_TIMEOUT_SEC)
-        #TODO replace this timeout with a meaningful condition to avodi dropping a delete event
-        time.sleep(30)
+        #HACK avoid dropping a delete event when the operator pod has the label but is still starting 
+        time.sleep(10)
 
         # delete the logical backup cron job
         pg_patch_disable_backup = {
