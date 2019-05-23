@@ -128,8 +128,10 @@ class SmokeTestCase(unittest.TestCase):
         Utils.wait_for_pod_start(k8s, 'spilo-role=replica', self.RETRY_TIMEOUT_SEC)
 
         new_master_node, new_replica_nodes = Utils.get_spilo_nodes(k8s, labels)
-        self.assertTrue(current_master_node != new_master_node, "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
-        self.assertTrue(num_replicas == len(new_replica_nodes), "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
+        self.assertTrue(current_master_node != new_master_node,
+                        "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
+        self.assertTrue(num_replicas == len(new_replica_nodes),
+                        "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
 
         # undo the tainting
         body = {
@@ -251,9 +253,11 @@ class Utils:
     def wait_for_master_failover(k8s_api, expected_master_nodes, retry_timeout_sec):
         pod_phase = 'Failing over'
         new_master_node = ''
+        labels = 'spilo-role=master,version=acid-minimal-cluster'
 
         while (pod_phase != 'Running') or (new_master_node not in expected_master_nodes):
-            pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector='spilo-role=master,version=acid-minimal-cluster').items
+            pods = k8s_api.core_v1.list_namespaced_pod('default', label_selector=labels).items
+
             if pods:
                 new_master_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
