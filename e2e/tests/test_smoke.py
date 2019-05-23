@@ -13,6 +13,7 @@ class SmokeTestCase(unittest.TestCase):
     Test the most basic functions of the operator.
     '''
 
+    # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
     RETRY_TIMEOUT_SEC = 5
 
@@ -30,10 +31,7 @@ class SmokeTestCase(unittest.TestCase):
 
         k8s_api = K8sApi()
 
-        # HACK
-        # 1. creating RBAC entites with a separate client fails
-        #    with "AttributeError: object has no attribute 'select_header_accept'"
-        # 2. utils.create_from_yaml cannot create multiple entites from a single file
+        # k8s python client fails with certain resources; we resort to kubectl
         subprocess.run(["kubectl", "create", "-f", "manifests/operator-service-account-rbac.yaml"])
 
         for filename in ["configmap.yaml", "postgres-operator.yaml"]:
@@ -58,11 +56,12 @@ class SmokeTestCase(unittest.TestCase):
 
         # TODO check if CRD is registered instead
         Utils.wait_for_pod_start(k8s_api, 'name=postgres-operator', cls.RETRY_TIMEOUT_SEC)
+        actual_operator_image = k8s_api.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
+        print("Tested operator image: {}".format(actual_operator_image)) # shows up after tests finish
 
-        # HACK around the lack of Python client for the acid.zalan.do resource
         subprocess.run(["kubectl", "create", "-f", "manifests/minimal-postgres-manifest.yaml"])
-
         Utils.wait_for_pod_start(k8s_api, 'spilo-role=master', cls.RETRY_TIMEOUT_SEC)
+
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_master_is_unique(self):
@@ -86,7 +85,6 @@ class SmokeTestCase(unittest.TestCase):
         Utils.wait_for_pg_to_scale(k8s, 3, self.RETRY_TIMEOUT_SEC)
         self.assertEqual(3, Utils.count_pods_with_label(k8s, labels))
 
-        # TODO `kind` pods may stuck in the Terminating state for a few minutes; reproduce/file a bug report
         Utils.wait_for_pg_to_scale(k8s, 2, self.RETRY_TIMEOUT_SEC)
         self.assertEqual(2, Utils.count_pods_with_label(k8s, labels))
 
