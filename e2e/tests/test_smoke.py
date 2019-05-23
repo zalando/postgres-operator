@@ -157,19 +157,31 @@ class SmokeTestCase(unittest.TestCase):
         k8s = K8sApi()
 
         # create the cron job
+        schedule = "7 7 7 7 *"
         pg_patch_enable_backup = {
             "spec": {
                "enableLogicalBackup" : True,
-               "logicalBackupSchedule" :  "7 7 7 7 *"
+               "logicalBackupSchedule" : schedule
             }
         }
         k8s.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
         Utils.wait_for_logical_backup_job_creation(k8s, self.RETRY_TIMEOUT_SEC)
+        
+        jobs = Utils.get_logical_backup_job(k8s).items
+        self.assertTrue(1 == len(jobs),
+                       "Expected 1 logical backup job, found {}".format(len(jobs)))
+
+        job = jobs[0]
+        self.assertTrue(job.metadata.name == "logical-backup-acid-minimal-cluster",
+        "Expected job name {}, found {}".format("logical-backup-acid-minimal-cluster", job.metadata.name))
+        self.assertTrue(job.spec.schedule == schedule,
+        "Expected {} schedule, found {}".format(schedule, job.spec.schedule))
 
         # update the cluster-wide image of the logical backup pod
+        image = "test-image-name"
         config_map_patch = {
             "data": {
-               "logical_backup_docker_image" : "test-image-name",
+               "logical_backup_docker_image" : image,
             }
         }
         k8s.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
@@ -180,6 +192,11 @@ class SmokeTestCase(unittest.TestCase):
         #HACK avoid dropping a delete event when the operator pod has the label but is still starting 
         time.sleep(10)
 
+        jobs = Utils.get_logical_backup_job(k8s).items
+        actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
+        self.assertTrue(actual_image == image,
+        "Expected job image {}, found {}".format(image, actual_image))
+
         # delete the logical backup cron job
         pg_patch_disable_backup = {
             "spec": {
@@ -188,6 +205,9 @@ class SmokeTestCase(unittest.TestCase):
         }
         k8s.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
         Utils.wait_for_logical_backup_job_deletion(k8s, self.RETRY_TIMEOUT_SEC)
+        jobs = Utils.get_logical_backup_job(k8s).items
+        self.assertTrue(0 == len(jobs),
+                       "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
 
 class K8sApi:
@@ -264,8 +284,12 @@ class Utils:
         time.sleep(retry_timeout_sec)
 
     @staticmethod
+    def get_logical_backup_job(k8s_api):
+        return k8s_api.batch_v1_beta1.list_namespaced_cron_job("default", label_selector="application=spilo")
+
+    @staticmethod
     def wait_for_logical_backup_job(k8s_api, retry_timeout_sec, expected_num_of_jobs):
-        while (len(k8s_api.batch_v1_beta1.list_namespaced_cron_job("default", label_selector="application=spilo").items) != expected_num_of_jobs):
+        while (len(Utils.get_logical_backup_job(k8s_api).items) != expected_num_of_jobs):
             time.sleep(retry_timeout_sec)
 
     @staticmethod
