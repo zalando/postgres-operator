@@ -16,6 +16,8 @@ class SmokeTestCase(unittest.TestCase):
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
     RETRY_TIMEOUT_SEC = 5
+    # labels may be assigned before a pod becomes fully operational; so wait a few seconds more
+    OPERATOR_POD_START_PERIOD_SEC = 5
 
     @classmethod
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -54,8 +56,10 @@ class SmokeTestCase(unittest.TestCase):
         }
         k8s_api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", body)
 
-        # TODO check if CRD is registered instead
         Utils.wait_for_pod_start(k8s_api, 'name=postgres-operator', cls.RETRY_TIMEOUT_SEC)
+        # reason: CRD may take time to register
+        time.sleep(OPERATOR_POD_START_PERIOD_SEC) 
+
         actual_operator_image = k8s_api.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image)) # shows up after tests finish
 
@@ -187,8 +191,8 @@ class SmokeTestCase(unittest.TestCase):
         operator_pod = k8s.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
         k8s.core_v1.delete_namespaced_pod(operator_pod, "default") # restart reloads the conf
         Utils.wait_for_pod_start(k8s, 'name=postgres-operator', self.RETRY_TIMEOUT_SEC)
-        #HACK avoid dropping a delete event when the operator pod has the label but is still starting 
-        time.sleep(10)
+        # reason: patch below is otherwise dropped during pod restart
+        time.sleep(OPERATOR_POD_START_PERIOD_SEC) 
 
         jobs = Utils.get_logical_backup_job(k8s).items
         actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
