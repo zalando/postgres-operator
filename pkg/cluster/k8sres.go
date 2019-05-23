@@ -432,7 +432,7 @@ func generatePodTemplate(
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
 	tolerationsSpec *[]v1.Toleration,
-	spiloFSGroup int64,
+	spiloFSGroup *int64,
 	nodeAffinity *v1.Affinity,
 	terminateGracePeriod int64,
 	podServiceAccountName string,
@@ -448,8 +448,8 @@ func generatePodTemplate(
 	containers = append(containers, sidecarContainers...)
 	securityContext := v1.PodSecurityContext{}
 
-	if spiloFSGroup != 0 {
-		securityContext.FSGroup = &spiloFSGroup
+	if spiloFSGroup != nil {
+		securityContext.FSGroup = spiloFSGroup
 	}
 
 	podSpec := v1.PodSpec{
@@ -838,6 +838,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
+	// determine the FSGroup for the spilo pod
+	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
+	if spec.SpiloFSGroup != nil {
+		effectiveFSGroup = spec.SpiloFSGroup
+	}
+
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
@@ -846,7 +852,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		spec.InitContainers,
 		sidecarContainers,
 		&tolerationSpec,
-		c.OpConfig.Resources.SpiloFSGroup,
+		effectiveFSGroup,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
