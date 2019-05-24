@@ -264,7 +264,7 @@ class K8s:
     def wait_for_operator_pod_start(self):
         self. wait_for_pod_start("name=postgres-operator")
         # HACK operator must register CRD / add existing PG clusters after pod start up
-        # for local execution 10 suffices
+        # for local execution ~ 10 seconds suffices
         time.sleep(30)
 
     def wait_for_pod_start(self, pod_labels, namespace='default'):
