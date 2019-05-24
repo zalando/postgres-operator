@@ -21,21 +21,22 @@ function start_kind(){
   fi
 
   kind-linux-amd64 create cluster --name ${cluster_name} --config ./e2e/kind-cluster-postgres-operator-e2e-tests.yaml
-  kind-linux-amd64 load docker-image ${operator_image} --name ${cluster_name}
-  export KUBECONFIG="$(kind-linux-amd64 get kubeconfig-path --name=${cluster_name})"
+  kind-linux-amd64 load docker-image "${operator_image}" --name ${cluster_name}
+  KUBECONFIG="$(kind-linux-amd64 get kubeconfig-path --name=${cluster_name})"
+  export KUBECONFIG
 }
 
 function set_kind_api_server_ip(){
   # use the actual kubeconfig to connect to the 'kind' API server
   # but update the IP address of the API server to the one from the Docker 'bridge' network
-  cp ${KUBECONFIG} /tmp
+  cp "${KUBECONFIG}" /tmp
   readonly local kind_api_server_port=6443 # well-known in the 'kind' codebase
-  readonly local kind_api_server=$(docker inspect --format "{{ .NetworkSettings.IPAddress }}:${kind_api_server_port}" ${cluster_name}-control-plane)
-  sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" ${kubeconfig_path}
+  readonly local kind_api_server=$(docker inspect --format "{{ .NetworkSettings.IPAddress }}:${kind_api_server_port}" "${cluster_name}"-control-plane)
+  sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
 }
 
 function run_tests(){
-  docker run --rm --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config -e OPERATOR_IMAGE=${operator_image} ${e2e_test_image}
+  docker run --rm --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_image}"
 }
 
 function clean_up(){
