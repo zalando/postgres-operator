@@ -40,6 +40,7 @@ function run_tests(){
 }
 
 function clean_up(){
+  unset KUBECONFIG 
   kind-linux-amd64 delete cluster --name ${cluster_name}
   rm -rf ${kubeconfig_path}
 }
