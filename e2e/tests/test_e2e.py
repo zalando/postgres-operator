@@ -6,7 +6,7 @@ import warnings
 import os
 import yaml
 
-from kubernetes import client, config, utils
+from kubernetes import client, config
 
 
 class EndToEndTestCase(unittest.TestCase):
@@ -38,19 +38,19 @@ class EndToEndTestCase(unittest.TestCase):
             operator_deployment["spec"]["template"]["spec"]["containers"][0]["image"] = os.environ['OPERATOR_IMAGE']
             yaml.dump(operator_deployment, f, Dumper=yaml.Dumper)
 
-        for filename in ["operator-service-account-rbac.yaml", 
-                         "configmap.yaml", 
+        for filename in ["operator-service-account-rbac.yaml",
+                         "configmap.yaml",
                          "postgres-operator.yaml"]:
             k8s.create_with_kubectl("manifests/" + filename)
 
         k8s.wait_for_operator_pod_start()
 
-        actual_operator_image = k8s.api.core_v1.list_namespaced_pod('default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
-        print("Tested operator image: {}".format(actual_operator_image)) # shows up after tests finish
+        actual_operator_image = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
+        print("Tested operator image: {}".format(actual_operator_image))  # shows up after tests finish
 
         k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         k8s.wait_for_pod_start('spilo-role=master')
-
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
@@ -121,7 +121,6 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.api.core_v1.patch_node(new_master_node, body)
 
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_logical_backup_cron_job(self):
         """
@@ -140,54 +139,58 @@ class EndToEndTestCase(unittest.TestCase):
         schedule = "7 7 7 7 *"
         pg_patch_enable_backup = {
             "spec": {
-               "enableLogicalBackup" : True,
-               "logicalBackupSchedule" : schedule
+               "enableLogicalBackup": True,
+               "logicalBackupSchedule": schedule
             }
         }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
         k8s.wait_for_logical_backup_job_creation()
-        
+
         jobs = k8s.get_logical_backup_job().items
-        self.assertTrue(1 == len(jobs),
-                       "Expected 1 logical backup job, found {}".format(len(jobs)))
+        self.assertTrue(1 == len(jobs), "Expected 1 logical backup job, found {}".format(len(jobs)))
 
         job = jobs[0]
         self.assertTrue(job.metadata.name == "logical-backup-acid-minimal-cluster",
-        "Expected job name {}, found {}".format("logical-backup-acid-minimal-cluster", job.metadata.name))
+                        "Expected job name {}, found {}"
+                        .format("logical-backup-acid-minimal-cluster", job.metadata.name))
         self.assertTrue(job.spec.schedule == schedule,
-        "Expected {} schedule, found {}".format(schedule, job.spec.schedule))
+                        "Expected {} schedule, found {}"
+                        .format(schedule, job.spec.schedule))
 
         # update the cluster-wide image of the logical backup pod
         image = "test-image-name"
         config_map_patch = {
             "data": {
-               "logical_backup_docker_image" : image,
+               "logical_backup_docker_image": image,
             }
         }
         k8s.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
 
-        operator_pod = k8s.api.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
-        k8s.api.core_v1.delete_namespaced_pod(operator_pod, "default") # restart reloads the conf
+        operator_pod = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector="name=postgres-operator").items[0].metadata.name
+        k8s.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf
         k8s.wait_for_operator_pod_start()
 
         jobs = k8s.get_logical_backup_job().items
         actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
         self.assertTrue(actual_image == image,
-        "Expected job image {}, found {}".format(image, actual_image))
+                        "Expected job image {}, found {}".format(image, actual_image))
 
         # delete the logical backup cron job
         pg_patch_disable_backup = {
             "spec": {
-               "enableLogicalBackup" : False,
+               "enableLogicalBackup": False,
             }
         }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
         k8s.wait_for_logical_backup_job_deletion()
         jobs = k8s.get_logical_backup_job().items
         self.assertTrue(0 == len(jobs),
-                       "Expected 0 logical backup jobs, found {}".format(len(jobs)))
+                        "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
-    def assert_master_is_unique(self):
+    def assert_master_is_unique(self, namespace='default'):
         """
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
            To be called manually after operations that affect pods
@@ -196,7 +199,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         labels = 'spilo-role=master,version=acid-minimal-cluster'
 
-        num_of_master_pods = k8s.count_pods_with_label(labels)
+        num_of_master_pods = k8s.count_pods_with_label(labels, namespace)
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
 
 
@@ -224,10 +227,10 @@ class K8s:
     def __init__(self):
         self.api = K8sApi()
 
-    def get_spilo_nodes(self, pod_labels):
+    def get_spilo_nodes(self, pod_labels, namespace='default'):
         master_pod_node = ''
         replica_pod_nodes = []
-        podsList = self.api.core_v1.list_namespaced_pod('default', label_selector=pod_labels)
+        podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels)
         for pod in podsList.items:
             if ('spilo-role', 'master') in pod.metadata.labels.items():
                 master_pod_node = pod.spec.node_name
@@ -238,59 +241,60 @@ class K8s:
 
     def wait_for_operator_pod_start(self):
         self. wait_for_pod_start("name=postgres-operator")
-        # HACK operator must register CRD / add existing PG clusters after pod start up 
+        # HACK operator must register CRD / add existing PG clusters after pod start up
         time.sleep(10)
 
-    def wait_for_pod_start(self, pod_labels):
+    def wait_for_pod_start(self, pod_labels, namespace='default'):
         pod_phase = 'No pod running'
         while pod_phase != 'Running':
-            pods = self.api.core_v1.list_namespaced_pod('default', label_selector=pod_labels).items
+            pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
 
-    def wait_for_pg_to_scale(self, number_of_instances):
+    def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
 
         body = {
             "spec": {
                 "numberOfInstances": number_of_instances
             }
         }
-        _ = self.api.custom_objects_api.patch_namespaced_custom_object("acid.zalan.do",
-                                                       "v1", "default", "postgresqls", "acid-minimal-cluster", body)
+        _ = self.api.custom_objects_api.patch_namespaced_custom_object(
+                    "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
 
         labels = 'version=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
             pass
 
-    def count_pods_with_label(self, labels):
-        return len(self.api.core_v1.list_namespaced_pod('default', label_selector=labels).items)
+    def count_pods_with_label(self, labels, namespace='default'):
+        return len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items)
 
-    def wait_for_master_failover(self, expected_master_nodes):
+    def wait_for_master_failover(self, expected_master_nodes, namespace='default'):
         pod_phase = 'Failing over'
         new_master_node = ''
         labels = 'spilo-role=master,version=acid-minimal-cluster'
 
         while (pod_phase != 'Running') or (new_master_node not in expected_master_nodes):
-            pods = self.api.core_v1.list_namespaced_pod('default', label_selector=labels).items
+            pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
                 new_master_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
 
-    def get_logical_backup_job(self):
-        return self.api.batch_v1_beta1.list_namespaced_cron_job("default", label_selector="application=spilo")
+    def get_logical_backup_job(self, namespace='default'):
+        return self.api.batch_v1_beta1.list_namespaced_cron_job(namespace, label_selector="application=spilo")
 
     def wait_for_logical_backup_job(self, expected_num_of_jobs):
         while (len(self.get_logical_backup_job().items) != expected_num_of_jobs):
             pass
 
     def wait_for_logical_backup_job_deletion(self):
-        self.wait_for_logical_backup_job(expected_num_of_jobs = 0)
+        self.wait_for_logical_backup_job(expected_num_of_jobs=0)
 
     def wait_for_logical_backup_job_creation(self):
-        self.wait_for_logical_backup_job(expected_num_of_jobs = 1)
+        self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
     def create_with_kubectl(self, path):
         subprocess.run(["kubectl", "create", "-f", path])
+
 
 if __name__ == '__main__':
     unittest.main()
