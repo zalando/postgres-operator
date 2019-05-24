@@ -1004,8 +1004,8 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 	if !c.patroniUsesKubernetes() {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
-	c.logger.Debugf("removing leftover Patroni objects (endpoints or configmaps)")
-	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterConfigMaps} {
+	c.logger.Debugf("removing leftover Patroni objects (endpoints, services and configmaps)")
+	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps} {
 		if err := deleter(); err != nil {
 			return err
 		}
@@ -1035,6 +1035,19 @@ func (c *Cluster) deleteClusterObject(
 		}
 	}
 	return nil
+}
+
+func (c *Cluster) deletePatroniClusterServices() error {
+	get := func(name string) (spec.NamespacedName, error) {
+		svc, err := c.KubeClient.Services(c.Namespace).Get(name, metav1.GetOptions{})
+		return util.NameFromMeta(svc.ObjectMeta), err
+	}
+
+	deleteServiceFn := func(name string) error {
+		return c.KubeClient.Services(c.Namespace).Delete(name, c.deleteOptions)
+	}
+
+	return c.deleteClusterObject(get, deleteServiceFn, "service")
 }
 
 func (c *Cluster) deletePatroniClusterEndpoints() error {
