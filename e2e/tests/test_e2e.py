@@ -32,6 +32,12 @@ class EndToEndTestCase(unittest.TestCase):
         # set a single k8s wrapper for all tests
         k8s = cls.k8s = K8s()
 
+        # operator deploys pod service account there on start up
+        # needed for test_multi_namespace_support()
+        cls.namespace = "test"
+        v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.namespace))
+        k8s.api.core_v1.create_namespace(v1_namespace)
+
         # submit the most recent operator image built on the Docker host
         with open("manifests/postgres-operator.yaml", 'r+') as f:
             operator_deployment = yaml.load(f, Loader=yaml.Loader)
@@ -51,6 +57,22 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         k8s.wait_for_pod_start('spilo-role=master')
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_multi_namespace_support(self):
+        '''
+        Create a customized Postgres cluster in a non-default namespace.
+        '''
+        k8s = self.k8s
+
+        with open("manifests/complete-postgres-manifest.yaml", 'r+') as f:
+            pg_manifest = yaml.load(f, Loader=yaml.Loader)
+            pg_manifest["metadata"]["namespace"] = self.namespace
+            yaml.dump(pg_manifest, f, Dumper=yaml.Dumper)
+
+        k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
+        k8s.wait_for_pod_start("spilo-role=master", self.namespace)
+        self.assert_master_is_unique(self.namespace, version="acid-test-cluster")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
@@ -190,14 +212,14 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertTrue(0 == len(jobs),
                         "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
-    def assert_master_is_unique(self, namespace='default'):
+    def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
         """
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
            To be called manually after operations that affect pods
         """
 
         k8s = self.k8s
-        labels = 'spilo-role=master,version=acid-minimal-cluster'
+        labels = 'spilo-role=master,version=' + version
 
         num_of_master_pods = k8s.count_pods_with_label(labels, namespace)
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
