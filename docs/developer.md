@@ -203,7 +203,7 @@ localhost:8080 by doing:
 The inner 'query' gets the name of the postgres operator pod, and the outer
 enables port forwarding. Afterwards, you can access the operator API with:
 
-    $ curl http://127.0.0.1:8080/$endpoint| jq .
+    $ curl --location http://127.0.0.1:8080/$endpoint | jq .
 
 The available endpoints are listed below. Note that the worker ID is an integer
 from 0 up to 'workers' - 1 (value configured in the operator configuration and
@@ -322,6 +322,9 @@ controlled via the operator configuration there are a few places that need to
 be updated. As explained [here](reference/operator_parameters.md), it's possible
 to configure the operator either with a ConfigMap or CRD, but currently we aim
 to synchronize parameters everywhere.
+
+When choosing a parameter name for a new option in a PG manifest, keep in mind 
+the naming conventions there. The `snake_case` variables come from the Patroni/Postgres world, while the `camelCase` from the k8s world.
 
 Note: If one option is defined in the operator configuration and in the cluster
 [manifest](../manifests/complete-postgres-manifest.yaml), the latter takes

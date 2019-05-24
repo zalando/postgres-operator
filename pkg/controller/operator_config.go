@@ -106,5 +106,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
 	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
 
+	result.LogicalBackupSchedule = fromCRD.LogicalBackup.Schedule
+	result.LogicalBackupDockerImage = fromCRD.LogicalBackup.DockerImage
+	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
+
 	return result
 }

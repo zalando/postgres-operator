@@ -29,6 +29,8 @@ configuration:
 {{ toYaml .Values.configLoadBalancerCRD | indent 4 }}
   aws_or_gcp:
 {{ toYaml .Values.configAwsOrGcp | indent 4 }}
+  logical_backup:
+{{ toYaml .Values.configLogicalBackup | indent 4 }}
   debug:
 {{ toYaml .Values.configDebug | indent 4 }}
   teams_api:

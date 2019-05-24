@@ -66,12 +66,20 @@ type Scalyr struct {
 	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
 }
 
+// LogicalBackup
+type LogicalBackup struct {
+	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket" default:""`
+}
+
 // Config describes operator config
 type Config struct {
 	CRD
 	Resources
 	Auth
 	Scalyr
+	LogicalBackup
 
 	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use k8s as a DCS

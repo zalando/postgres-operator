@@ -149,4 +149,15 @@ rules:
     {{- else }}
       {{ .Values.serviceAccount.name }}
     {{- end }}
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs # enables logical backups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
 {{ end }}

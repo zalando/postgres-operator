@@ -340,9 +340,18 @@ Postgres database cluster:
 
 ## Understanding rolling update of Spilo pods
 
-The operator logs reasons for a rolling update with the `info` level and
-a diff between the old and new StatefulSet specs with the `debug` level.
-To read the latter log entry with the escaped characters rendered, view it
-in CLI with `echo -e`. Note that the resultant message will contain some
-noise because the `PodTemplate` used by the operator is yet to be updated
-with the default values used internally in Kubernetes.
+The operator logs reasons for a rolling update with the `info` level and a diff between the old and new StatefulSet specs with the `debug` level. To benefit from numerous escape characters in the latter log entry, view it in CLI with `echo -e`. Note that the resultant message will contain some noise because the `PodTemplate` used by the operator is yet to be updated with the default values used internally in Kubernetes.
+
+## Logical backups
+
+The operator can manage k8s cron jobs to run logical backups of Postgres clusters. The cron job periodically spawns a batch job that runs a single pod. The backup script within this pod's container can connect to a DB for a logical backup. The operator updates cron jobs during Sync if the job schedule changes; the job name acts as the job identifier. These jobs are to be enabled for each indvidual Postgres cluster by setting `enableLogicalBackup: true` in its manifest. Notes:
+
+1. The provided  `registry.opensource.zalan.do/acid/logical-backup` image implements the backup via `pg_dumpall` and upload of (compressed) results to an S3 bucket; `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when possible.
+
+2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. 
+
+3. The operator does not remove old backups.
+
+4. You may use your own image by overwriting the relevant field in the operator configuration. Any such image must ensure the logical backup is able to finish [in presence of pod restarts](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#handling-pod-and-container-failures) and [simultaneous invocations](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) of the backup cron job.
+
+5. For that feature to work, your RBAC policy must enable operations on the `cronjobs` resource from the `batch` API group for the operator service account. See [example RBAC](../manifests/operator-service-account-rbac.yaml)

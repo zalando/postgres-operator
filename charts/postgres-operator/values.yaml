@@ -68,6 +68,11 @@ configAwsOrGcp:
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
 
+configLogicalBackup:
+  logical_backup_schedule: "30 00 * * *"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  logical_backup_s3_bucket: ""
+
 # config exclusive to ConfigMap
 configMap:
   cluster_labels: application:spilo
