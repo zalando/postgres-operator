@@ -1,8 +1,8 @@
 hash: e4d0d48b4142d5d335e48e030621564207f3aa288ea1e41e0d1e4d29135de3e8
-updated: 2019-02-25T14:54:51.736946406+01:00
+updated: 2019-05-26T11:41:36.821582552+05:30
 imports:
 - name: github.com/aws/aws-sdk-go
-  version: e8b22c9937cae1fee9bc364a88f3752cc4d1ac2f
+  version: 8943f83bb1e98c94710f767576fe17cc29adb4dd
   subpackages:
   - aws
   - aws/awserr
@@ -29,6 +29,7 @@ imports:
   - internal/shareddefaults
   - private/protocol
   - private/protocol/ec2query
+  - private/protocol/json/jsonutil
   - private/protocol/query
   - private/protocol/query/queryutil
   - private/protocol/rest
@@ -103,7 +104,7 @@ imports:
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/sirupsen/logrus
-  version: e1e72e9de974bd926e5c56f83753fba2df402ce5
+  version: 839c75faf7f98a33d445d181f3018b5c3409a45e
 - name: github.com/spf13/pflag
   version: 583c0c0531f06d5278b7d917446061adc344b5cd
 - name: golang.org/x/crypto
@@ -143,7 +144,6 @@ imports:
 - name: k8s.io/api
   version: 2d6f90ab1293a1fb871cf149423ebb72aa7423aa
   subpackages:
-  - admission/v1beta1
   - admissionregistration/v1alpha1
   - admissionregistration/v1beta1
   - apps/v1
