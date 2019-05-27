@@ -68,7 +68,7 @@ docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
 docker-logical-backup: scm-source.json
 	mv scm-source.json ./docker/logical-backup
 	docker build --rm -t "$(LB_IMAGE)" ./docker/logical-backup
-	docker push "$LB_IMAGE"
+	docker push "$(LB_IMAGE)"
 	rm ./docker/logical-backup/scm-source.json
 
 indocker-race:
