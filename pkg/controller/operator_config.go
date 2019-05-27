@@ -42,6 +42,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodEnvironmentConfigMap = fromCRD.Kubernetes.PodEnvironmentConfigMap
 	result.PodTerminateGracePeriod = time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod)
 	result.SpiloPrivileged = fromCRD.Kubernetes.SpiloPrivileged
+	result.ClusterDomain = fromCRD.Kubernetes.ClusterDomain
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate

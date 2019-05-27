@@ -13,6 +13,7 @@ data:
   docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p70
   pod_service_account_name: "zalando-postgres-operator"
   secret_name_template: '{username}.{cluster}.credentials'
+  cluster_domain: cluster.local
   super_username: postgres
   enable_teams_api: "false"
   spilo_privileged: "false"
