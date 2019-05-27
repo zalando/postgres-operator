@@ -270,3 +270,36 @@ defined in the sidecar dictionary:
   a dictionary of environment variables. Use usual Kubernetes definition
   (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
   for environment variables. Optional.
+
+* **resources** see below. Optional.
+
+#### Sidecar container resources
+
+Those parameters define [CPU and memory requests and
+limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
+for the sidecar container. They are grouped under the `resources` key for each sidecar.
+There are two subgroups, `requests` and `limits`.
+
+##### Requests
+
+CPU and memory requests for the sidecar container.
+
+* **cpu**
+  CPU requests for the sidecar container. Optional, overrides the
+  `default_cpu_requests` operator configuration parameter. Optional.
+
+* **memory**
+  memory requests for the sidecar container. Optional, overrides the
+  `default_memory_request` operator configuration parameter. Optional.
+
+##### Limits
+
+CPU and memory limits for the sidecar container.
+
+* **cpu**
+  CPU limits for the sidecar container. Optional, overrides the
+  `default_cpu_limits` operator configuration parameter. Optional.
+
+* **memory**
+  memory limits for the sidecar container. Optional, overrides the
+  `default_memory_limits` operator configuration parameter. Optional.

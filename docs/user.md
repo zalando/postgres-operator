@@ -270,6 +270,13 @@ spec:
   sidecars:
     - name: "container-name"
       image: "company/image:tag"
+      resources:
+        limits:
+          cpu: 500m
+          memory: 500Mi
+        requests:
+          cpu: 100m
+          memory: 100Mi
       env:
         - name: "ENV_VAR_NAME"
           value: "any-k8s-env-things"
