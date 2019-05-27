@@ -1,5 +1,13 @@
 #! /usr/bin/env bash
-set -ex
+
+# enable unofficial bash strict mode
+set -o errexit
+set -o nounset
+set -o pipefail
+IFS=$'\n\t'
+
+# make script trace visible via `kubectl logs`
+set -o xtrace 
 
 ALL_DB_SIZE_QUERY="select sum(pg_database_size(datname)::numeric) from pg_database;"
 PG_BIN=$PG_DIR/$PG_VERSION/bin
@@ -14,7 +22,8 @@ function estimate_size {
 }
 
 function dump {
-    "$PG_BIN"/pg_dumpall "$PG_EXTRA_OPTIONS"
+    # settings are taken from the environment
+    "$PG_BIN"/pg_dumpall
 }
 
 function compress {
