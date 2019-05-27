@@ -17,9 +17,9 @@ pipeline:
             IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
             if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
             then
-              LB_IMAGE=registry-write.opensource.zalan.do/acid/logical-backup
+              "LB_IMAGE=registry-write.opensource.zalan.do/acid/logical-backup:${CDP_BUILD_VERSION}"
             else
-              LB_IMAGE=registry-write.opensource.zalan.do/acid/logical-backup-test
+              "LB_IMAGE=registry-write.opensource.zalan.do/acid/logical-backup-test:${CDP_BUILD_VERSION}"
             fi
             docker build -t "$LB_IMAGE" ./docker/logical-backup
             docker push "$LB_IMAGE"
