@@ -27,6 +27,7 @@ RUN apt-get update     \
     && rm -rf /var/lib/apt/lists/*
 
 COPY dump.sh /dump.sh
+COPY scm-source.json /scm-source.json
 
 ENV PG_DIR=/usr/lib/postgresql/
 

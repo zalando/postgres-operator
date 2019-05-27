@@ -21,8 +21,7 @@ pipeline:
             else
               LB_IMAGE=registry-write.opensource.zalan.do/acid/logical-backup-test:${CDP_BUILD_VERSION}
             fi
-            docker build -t "$LB_IMAGE" ./docker/logical-backup
-            docker push "$LB_IMAGE"
+            make docker-logical-backup
         - desc: 'Install go'
           cmd: |
             cd /tmp

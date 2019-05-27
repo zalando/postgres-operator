@@ -65,6 +65,12 @@ docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
 	echo "git describe $(shell git describe --tags --always --dirty)"
 	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
+docker-logical-backup: scm-source.json linux
+	mv scm-source.json ./docker/logical-backup
+	docker build --rm -t "$(LB_IMAGE)" ./docker/logical-backup
+	docker push "$LB_IMAGE"
+	rm ./docker/logical-backup/scm-source.json
+
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.8.1 bash -c "make linux"
 
