@@ -12,6 +12,17 @@ pipeline:
         - desc: 'Install required build software'
           cmd: |
             apt-get install -y make git apt-transport-https ca-certificates curl build-essential
+        - desc: 'Build logical backup image'
+          cmd: |
+            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
+            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
+            then
+              LB_IMAGE=registry-write.opensource.zalan.do/acid/logical-backup
+            else
+              LB_IMAGE=registry-write.opensource.zalan.do/acid/logical-backup-test
+            fi
+            docker build -t "$LB_IMAGE" ./docker/logical-backup
+            docker push "$LB_IMAGE"
         - desc: 'Install go'
           cmd: |
             cd /tmp
