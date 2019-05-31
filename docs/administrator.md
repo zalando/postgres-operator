@@ -103,6 +103,12 @@ In this definition, the operator overwrites the account's name to match
 `pod_service_account_name` and the `default` namespace to match the target
 namespace. The operator performs **no** further syncing of this account.
 
+## Non-default cluster domain
+
+If your cluster uses a different dns domain than `cluster.local`, this needs
+to be set in the operator ConfigMap. This is used by the operator to connect
+to the clusters after creation.
+
 ## Role-based access control for the operator
 
 The `manifests/operator-service-account-rbac.yaml` defines cluster roles and

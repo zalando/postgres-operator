@@ -159,6 +159,11 @@ configuration they are grouped under the `kubernetes` key.
   allowed. The default is
   `{username}.{cluster}.credentials.{tprkind}.{tprgroup}`.
 
+* **cluster_domain**
+  defines the default dns domain for the kubernetes cluster the operator is
+  running in. The default is `cluster.local`. Used by the operator to connect
+  to the postgres clusters after creation.
+
 * **oauth_token_secret_name**
   a name of the secret containing the `OAuth2` token to pass to the teams API.
   The default is `postgresql-operator`.

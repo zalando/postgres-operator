@@ -34,7 +34,7 @@ func (c *Cluster) pgConnectionString() string {
 	password := c.systemUsers[constants.SuperuserKeyName].Password
 
 	return fmt.Sprintf("host='%s' dbname=postgres sslmode=require user='%s' password='%s' connect_timeout='%d'",
-		fmt.Sprintf("%s.%s.svc.cluster.local", c.Name, c.Namespace),
+		fmt.Sprintf("%s.%s.svc.%s", c.Name, c.Namespace, c.OpConfig.ClusterDomain),
 		c.systemUsers[constants.SuperuserKeyName].Name,
 		strings.Replace(password, "$", "\\$", -1),
 		constants.PostgresConnectTimeout/time.Second)
