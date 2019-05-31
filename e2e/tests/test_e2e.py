@@ -40,7 +40,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # submit the most recent operator image built on the Docker host
         with open("manifests/postgres-operator.yaml", 'r+') as f:
-            operator_deployment = yaml.load(f, Loader=yaml.Loader)
+            operator_deployment = yaml.safe_load(f)
             operator_deployment["spec"]["template"]["spec"]["containers"][0]["image"] = os.environ['OPERATOR_IMAGE']
             yaml.dump(operator_deployment, f, Dumper=yaml.Dumper)
 
@@ -66,7 +66,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
 
         with open("manifests/complete-postgres-manifest.yaml", 'r+') as f:
-            pg_manifest = yaml.load(f, Loader=yaml.Loader)
+            pg_manifest = yaml.safe_load(f)
             pg_manifest["metadata"]["namespace"] = self.namespace
             yaml.dump(pg_manifest, f, Dumper=yaml.Dumper)
 
@@ -129,9 +129,9 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=replica')
 
         new_master_node, new_replica_nodes = k8s.get_spilo_nodes(labels)
-        self.assertTrue(current_master_node != new_master_node,
+        self.assertNotEqual(current_master_node, new_master_node,
                         "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
-        self.assertTrue(num_replicas == len(new_replica_nodes),
+        self.assertEqual(num_replicas, len(new_replica_nodes),
                         "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
         self.assert_master_is_unique()
 
@@ -170,13 +170,13 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_logical_backup_job_creation()
 
         jobs = k8s.get_logical_backup_job().items
-        self.assertTrue(1 == len(jobs), "Expected 1 logical backup job, found {}".format(len(jobs)))
+        self.assertEqual(1, len(jobs), "Expected 1 logical backup job, found {}".format(len(jobs)))
 
         job = jobs[0]
-        self.assertTrue(job.metadata.name == "logical-backup-acid-minimal-cluster",
+        self.assertEqual(job.metadata.name, "logical-backup-acid-minimal-cluster",
                         "Expected job name {}, found {}"
                         .format("logical-backup-acid-minimal-cluster", job.metadata.name))
-        self.assertTrue(job.spec.schedule == schedule,
+        self.assertEqual(job.spec.schedule, schedule,
                         "Expected {} schedule, found {}"
                         .format(schedule, job.spec.schedule))
 
@@ -196,7 +196,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         jobs = k8s.get_logical_backup_job().items
         actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
-        self.assertTrue(actual_image == image,
+        self.assertEqual(actual_image, image,
                         "Expected job image {}, found {}".format(image, actual_image))
 
         # delete the logical backup cron job
@@ -209,7 +209,7 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
         k8s.wait_for_logical_backup_job_deletion()
         jobs = k8s.get_logical_backup_job().items
-        self.assertTrue(0 == len(jobs),
+        self.assertEqual(0, len(jobs),
                         "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
     def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
