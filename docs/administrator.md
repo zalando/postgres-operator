@@ -346,7 +346,7 @@ The operator logs reasons for a rolling update with the `info` level and a diff 
 
 The operator can manage k8s cron jobs to run logical backups of Postgres clusters. The cron job periodically spawns a batch job that runs a single pod. The backup script within this pod's container can connect to a DB for a logical backup. The operator updates cron jobs during Sync if the job schedule changes; the job name acts as the job identifier. These jobs are to be enabled for each indvidual Postgres cluster by setting `enableLogicalBackup: true` in its manifest. Notes:
 
-1. The provided  `registry.opensource.zalan.do/acid/logical-backup` image implements the backup via `pg_dumpall` and upload of (compressed) results to an S3 bucket; `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when possible.
+1. The [example image](../docker/logical-backup/Dockerfile) implements the backup via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket; the default image ``registry.opensource.zalan.do/acid/logical-backup`` is the same image built with the Zalando-internal CI pipeline. `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when possible.  
 
 2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. 
 
