@@ -254,9 +254,9 @@ class K8s:
         replica_pod_nodes = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels)
         for pod in podsList.items:
-            if ('spilo-role', 'master') in pod.metadata.labels.items():
+            if pod.metadata.labels.get('spilo-role') == 'master':
                 master_pod_node = pod.spec.node_name
-            elif ('spilo-role', 'replica') in pod.metadata.labels.items():
+            elif pod.metadata.labels.get('spilo-role') == 'replica':
                 replica_pod_nodes.append(pod.spec.node_name)
 
         return master_pod_node, replica_pod_nodes
