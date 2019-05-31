@@ -246,6 +246,8 @@ class K8s:
     Wraps around K8 api client and helper methods.
     '''
 
+    RETRY_TIMEOUT_SEC = 5
+
     def __init__(self):
         self.api = K8sApi()
 
@@ -265,7 +267,7 @@ class K8s:
         self. wait_for_pod_start("name=postgres-operator")
         # HACK operator must register CRD / add existing PG clusters after pod start up
         # for local execution ~ 10 seconds suffices
-        time.sleep(30)
+        time.sleep(60)
 
     def wait_for_pod_start(self, pod_labels, namespace='default'):
         pod_phase = 'No pod running'
@@ -273,6 +275,7 @@ class K8s:
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
 
@@ -286,7 +289,7 @@ class K8s:
 
         labels = 'version=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
-            pass
+            time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def count_pods_with_label(self, labels, namespace='default'):
         return len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items)
@@ -301,13 +304,14 @@ class K8s:
             if pods:
                 new_master_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_logical_backup_job(self, namespace='default'):
         return self.api.batch_v1_beta1.list_namespaced_cron_job(namespace, label_selector="application=spilo")
 
     def wait_for_logical_backup_job(self, expected_num_of_jobs):
         while (len(self.get_logical_backup_job().items) != expected_num_of_jobs):
-            pass
+            time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def wait_for_logical_backup_job_deletion(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=0)
