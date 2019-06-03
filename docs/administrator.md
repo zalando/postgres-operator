@@ -1,47 +1,3 @@
-## Create ConfigMap
-
-A ConfigMap is used to store the configuration of the operator.
-
-```bash
-    $ kubectl create -f manifests/configmap.yaml
-```
-
-## Deploying the operator
-
-First you need to install the service account definition in your Minikube cluster.
-
-```bash
-    $ kubectl create -f manifests/operator-service-account-rbac.yaml
-```
-
-Next deploy the postgres-operator from the docker image Zalando is using:
-
-```bash
-    $ kubectl create -f manifests/postgres-operator.yaml
-```
-
-If you prefer to build the image yourself follow up down below.
-
-### - Helm chart
-
-You can install postgres-operator also with a [Helm](https://helm.sh/) chart.
-This requires installing the Helm CLI first and then initializing it in the
-cluster.
-
-```bash
-    $ helm init
-    $ helm install --name my-release ./charts/postgres-operator
-```
-
-## Check if CustomResourceDefinition has been registered
-
-```bash
-    $ kubectl get crd
-
-	NAME                          KIND
-	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
-```
-
 # How to configure PostgreSQL operator
 
 ## Select the namespace to deploy to
@@ -354,7 +310,7 @@ The operator can manage k8s cron jobs to run logical backups of Postgres cluster
 
 1. The [example image](../docker/logical-backup/Dockerfile) implements the backup via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket; the default image ``registry.opensource.zalan.do/acid/logical-backup`` is the same image built with the Zalando-internal CI pipeline. `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when possible.  
 
-2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. 
+2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities.
 
 3. The operator does not remove old backups.
 

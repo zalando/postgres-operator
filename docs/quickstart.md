@@ -20,6 +20,12 @@ cd postgres-operator
 minikube start
 ```
 
+If you want to configure the Postgres Operator it must happen before deploying a
+Postgres cluster. This can happen in two ways: Via a ConfigMap or a
+`OperatorConfiguration` object, which adheres a CustomResourceDefinition (CRD).
+More details on configuration can be found [here](reference/operator_parameters.md).
+
+
 ## Manual deployment setup
 
 The Postgres Operator can be installed simply by applying yaml manifests.
@@ -37,8 +43,12 @@ chart which saves you the manual steps. Therefore, you would need to install
 the helm CLI on your machine. After initializing helm (and its server
 component Tiller) in your local cluster you can install the operator chart.
 You can define a release name that is prepended to the operator resource's
-names. Use `--name zalando` to match with the default service account name
-as older operator versions do not support custom names for service accounts.
+names.
+
+Use `--name zalando` to match with the default service account name as older
+operator versions do not support custom names for service accounts. When relying
+solely on the CRD-based configuration edit the `serviceAccount` section in the
+[values yaml file](../charts/values.yaml) by setting the name to `"operator"`.
 
 ```bash
 # 1) initialize helm

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-operator
-data:  
+data:
   watched_namespace: "*" # listen to all namespaces
   cluster_labels: application:spilo
   cluster_name_label: version
@@ -10,7 +10,7 @@ data:
 
   debug_logging: "true"
   workers: "4"
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p70
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
   pod_service_account_name: "zalando-postgres-operator"
   secret_name_template: '{username}.{cluster}.credentials'
   cluster_domain: cluster.local

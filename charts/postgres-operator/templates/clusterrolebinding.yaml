@@ -2,7 +2,11 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ template "postgres-operator.fullname" . }}
+  name: {{- if eq .Values.serviceAccount.name "" }}
+            {{ template "postgres-operator.fullname" . }}
+        {{- else }}
+            {{ .Values.serviceAccount.name }}
+        {{- end }}
   labels:
     app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
     helm.sh/chart: {{ template "postgres-operator.chart" . }}
@@ -11,11 +15,19 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ template "postgres-operator.fullname" . }}
+  name: {{- if eq .Values.serviceAccount.name "" }}
+            {{ template "postgres-operator.fullname" . }}
+        {{- else }}
+            {{ .Values.serviceAccount.name }}
+        {{- end }}
 subjects:
 - kind: ServiceAccount
 # note: the cluster role binding needs to be defined
 # for every namespace the operator service account lives in.
-  name: {{ template "postgres-operator.fullname" . }}
+  name: {{- if eq .Values.serviceAccount.name "" }}
+            {{ template "postgres-operator.fullname" . }}
+        {{- else }}
+            {{ .Values.serviceAccount.name }}
+        {{- end }}
   namespace: {{ .Release.Namespace }}
 {{ end }}

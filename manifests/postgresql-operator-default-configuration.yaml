@@ -4,7 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   etcd_host: ""
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p42
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
   workers: 4
   min_instances: -1
   max_instances: -1
@@ -37,7 +37,7 @@ configuration:
     # infrastructure_roles_secret_name: ""
     # pod_environment_configmap: ""
     pod_management_policy: "ordered_ready"
-    enable_pod_antiaffinity: "false"
+    enable_pod_antiaffinity: false
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   postgres_pod_resources:
     default_cpu_request: 100m

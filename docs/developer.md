@@ -20,17 +20,16 @@ that your setup is working.
 Note: if you use multiple Kubernetes clusters, you can switch to Minikube with
 `kubectl config use-context minikube`
 
-## Create ConfigMap
+## Deploying the operator
 
-ConfigMap is used to store the configuration of the operator
+### Kubernetes manifest
+
+A ConfigMap is used to store the configuration of the operator. Alternatively,
+a CRD-based configuration can be used, as described [here](reference/operator_parameters).
 
 ```bash
     $ kubectl --context minikube  create -f manifests/configmap.yaml
 ```
-
-## Deploying the operator
-
-### - Kubernetes manifest
 
 First you need to install the service account definition in your Minikube cluster.
 
@@ -46,15 +45,23 @@ Next deploy the postgres-operator from the docker image Zalando is using:
 
 If you prefer to build the image yourself follow up down below.
 
-### - Helm chart
+### Helm chart
 
-You can install postgres-operator also with a [Helm](https://helm.sh/) chart.
-This requires installing the Helm CLI first and then initializing it in the
-cluster.
+Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
+chart which saves you the manual steps. Therefore, you would need to install
+the helm CLI on your machine. After initializing helm (and its server
+component Tiller) in your local cluster you can install the operator chart.
+You can define a release name that is prepended to the operator resource's
+names.
+
+Use `--name zalando` to match with the default service account name as older
+operator versions do not support custom names for service accounts. When relying
+solely on the CRD-based configuration edit the `serviceAccount` section in the
+[values yaml file](../charts/values.yaml) by setting the name to `"operator"`.
 
 ```bash
     $ helm init
-    $ helm install --name my-release ./charts/postgres-operator
+    $ helm install --name zalando ./charts/postgres-operator
 ```
 
 ## Check if CustomResourceDefinition has been registered
@@ -323,7 +330,7 @@ be updated. As explained [here](reference/operator_parameters.md), it's possible
 to configure the operator either with a ConfigMap or CRD, but currently we aim
 to synchronize parameters everywhere.
 
-When choosing a parameter name for a new option in a PG manifest, keep in mind 
+When choosing a parameter name for a new option in a PG manifest, keep in mind
 the naming conventions there. The `snake_case` variables come from the Patroni/Postgres world, while the `camelCase` from the k8s world.
 
 Note: If one option is defined in the operator configuration and in the cluster

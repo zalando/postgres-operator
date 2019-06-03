@@ -1,4 +1,3 @@
-
 Individual postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgres CRD` (custom resource
 definition). The following section describes the structure of the manifest and
@@ -14,7 +13,9 @@ measurements. Please, refer to the [Kubernetes
 documentation](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the possible values of those.
 
-:exclamation: If both operator configmap/CRD and a Postgres cluster manifest define the same parameter, the value from the Postgres cluster manifest is applied.
+:exclamation: If both operator configmap/CRD and a Postgres cluster manifest
+define the same parameter, the value from the Postgres cluster manifest is
+applied.
 
 ## Manifest structure
 
@@ -105,7 +106,8 @@ These parameters are grouped directly under  the `spec` key in the manifest.
    class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
    that should be assigned to the cluster pods. When not specified, the value
    is taken from the `pod_priority_class_name` operator parameter, if not set
-   then the default priority class is taken. The priority class itself must be defined in advance.
+   then the default priority class is taken. The priority class itself must be
+   defined in advance.
 
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default docker
@@ -120,10 +122,12 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   configured (so you can override the operator configuration).
 
 * **enableLogicalBackup**
-  Determines if the logical backup of this cluster should be taken and uploaded to S3. Default: false.
+  Determines if the logical backup of this cluster should be taken and uploaded
+  to S3. Default: false.
 
 * **logicalBackupSchedule**
-  Schedule for the logical backup k8s cron job. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
+  Schedule for the logical backup k8s cron job. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
+  into account. Default: "30 00 \* \* \*"
 
 ## Postgres parameters
 
@@ -181,7 +185,12 @@ explanation of `ttl` and `loop_wait` parameters.
   set by the Spilo docker image. Optional.
 
 * **slots**
-  permanent replication slots that Patroni preserves after failover by re-creating them on the new primary immediately after doing a promote. Slots could be reconfigured with the help of `patronictl edit-config`. It is the responsibility of a user to avoid clashes in names between replication slots automatically created by Patroni for cluster members and permanent replication slots. Optional.
+  permanent replication slots that Patroni preserves after failover by
+  re-creating them on the new primary immediately after doing a promote. Slots
+  could be reconfigured with the help of `patronictl edit-config`. It is the
+  responsibility of a user to avoid clashes in names between replication slots
+  automatically created by Patroni for cluster members and permanent replication
+  slots. Optional.
 
 ## Postgres container resources
 
