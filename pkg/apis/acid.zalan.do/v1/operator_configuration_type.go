@@ -49,6 +49,7 @@ type KubernetesMetaConfiguration struct {
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
+	ClusterDomain                          string                `json:"cluster_domain"`
 	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
 	InfrastructureRolesSecretName          spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
 	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`

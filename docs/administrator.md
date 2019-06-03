@@ -1,47 +1,3 @@
-## Create ConfigMap
-
-A ConfigMap is used to store the configuration of the operator.
-
-```bash
-    $ kubectl create -f manifests/configmap.yaml
-```
-
-## Deploying the operator
-
-First you need to install the service account definition in your Minikube cluster.
-
-```bash
-    $ kubectl create -f manifests/operator-service-account-rbac.yaml
-```
-
-Next deploy the postgres-operator from the docker image Zalando is using:
-
-```bash
-    $ kubectl create -f manifests/postgres-operator.yaml
-```
-
-If you prefer to build the image yourself follow up down below.
-
-### - Helm chart
-
-You can install postgres-operator also with a [Helm](https://helm.sh/) chart.
-This requires installing the Helm CLI first and then initializing it in the
-cluster.
-
-```bash
-    $ helm init
-    $ helm install --name my-release ./charts/postgres-operator
-```
-
-## Check if CustomResourceDefinition has been registered
-
-```bash
-    $ kubectl get crd
-
-	NAME                          KIND
-	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
-```
-
 # How to configure PostgreSQL operator
 
 ## Select the namespace to deploy to
@@ -102,6 +58,12 @@ metadata:
 In this definition, the operator overwrites the account's name to match
 `pod_service_account_name` and the `default` namespace to match the target
 namespace. The operator performs **no** further syncing of this account.
+
+## Non-default cluster domain
+
+If your cluster uses a different dns domain than `cluster.local`, this needs
+to be set in the operator ConfigMap. This is used by the operator to connect
+to the clusters after creation.
 
 ## Role-based access control for the operator
 
@@ -346,9 +308,9 @@ The operator logs reasons for a rolling update with the `info` level and a diff 
 
 The operator can manage k8s cron jobs to run logical backups of Postgres clusters. The cron job periodically spawns a batch job that runs a single pod. The backup script within this pod's container can connect to a DB for a logical backup. The operator updates cron jobs during Sync if the job schedule changes; the job name acts as the job identifier. These jobs are to be enabled for each indvidual Postgres cluster by setting `enableLogicalBackup: true` in its manifest. Notes:
 
-1. The provided  `registry.opensource.zalan.do/acid/logical-backup` image implements the backup via `pg_dumpall` and upload of (compressed) results to an S3 bucket; `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when possible.
+1. The [example image](../docker/logical-backup/Dockerfile) implements the backup via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket; the default image ``registry.opensource.zalan.do/acid/logical-backup`` is the same image built with the Zalando-internal CI pipeline. `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when possible.  
 
-2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. 
+2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities.
 
 3. The operator does not remove old backups.
 

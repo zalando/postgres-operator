@@ -25,6 +25,7 @@ configUsers:
   super_username: postgres
 
 configKubernetes:
+  cluster_domain: cluster.local
   # inherited_labels: ""
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
   # node_readiness_label: ""
