@@ -62,7 +62,8 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   the Persistent Volumes for the spilo pods in the StatefulSet will be owned
   and writable by the group ID specified. This will override the **spilo_fsgroup**
   operator parameter. This is required to run Spilo as a non-root process, but
-  requires a custom spilo image.
+  requires a custom spilo image. Note the FSGroup of a Pod cannot be changed
+  without recreating a new Pod.
 
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the

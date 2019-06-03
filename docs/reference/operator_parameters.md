@@ -230,7 +230,8 @@ configuration they are grouped under the `kubernetes` key.
 
 * **spilo_fsgroup**
   the Persistent Volumes for the spilo pods in the StatefulSet will be owned and writable by the group ID specified.
-  This is required to run Spilo as a non-root process, but requires a custom spilo image.
+  This is required to run Spilo as a non-root process, but requires a custom spilo image. Note the FSGroup of a Pod
+  cannot be changed without recreating a new Pod.
 
 * **spilo_privileged**
   whether the Spilo container should run in privileged mode. Privileged mode is
