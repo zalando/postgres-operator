@@ -230,8 +230,7 @@ func (c *Controller) initRoleBinding() {
 	default:
 		c.PodServiceAccountRoleBinding = obj.(*rbacv1beta1.RoleBinding)
 		c.PodServiceAccountRoleBinding.Namespace = ""
-		c.PodServiceAccountRoleBinding.ObjectMeta.Name = c.PodServiceAccount.Name
-		c.PodServiceAccountRoleBinding.RoleRef.Name = c.PodServiceAccount.Name
+		c.PodServiceAccountRoleBinding.ObjectMeta.Name = fmt.Sprintf("%s:%s", c.PodServiceAccount.Name, "zalando-postgres-operator")
 		c.PodServiceAccountRoleBinding.Subjects[0].Name = c.PodServiceAccount.Name
 		c.logger.Info("successfully parsed")
 
