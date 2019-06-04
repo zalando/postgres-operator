@@ -130,9 +130,9 @@ class EndToEndTestCase(unittest.TestCase):
 
         new_master_node, new_replica_nodes = k8s.get_spilo_nodes(labels)
         self.assertNotEqual(current_master_node, new_master_node,
-                        "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
+                            "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
         self.assertEqual(num_replicas, len(new_replica_nodes),
-                        "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
+                         "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
         self.assert_master_is_unique()
 
         # undo the tainting
@@ -174,11 +174,11 @@ class EndToEndTestCase(unittest.TestCase):
 
         job = jobs[0]
         self.assertEqual(job.metadata.name, "logical-backup-acid-minimal-cluster",
-                        "Expected job name {}, found {}"
-                        .format("logical-backup-acid-minimal-cluster", job.metadata.name))
+                         "Expected job name {}, found {}"
+                         .format("logical-backup-acid-minimal-cluster", job.metadata.name))
         self.assertEqual(job.spec.schedule, schedule,
-                        "Expected {} schedule, found {}"
-                        .format(schedule, job.spec.schedule))
+                         "Expected {} schedule, found {}"
+                         .format(schedule, job.spec.schedule))
 
         # update the cluster-wide image of the logical backup pod
         image = "test-image-name"
@@ -197,7 +197,7 @@ class EndToEndTestCase(unittest.TestCase):
         jobs = k8s.get_logical_backup_job().items
         actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
         self.assertEqual(actual_image, image,
-                        "Expected job image {}, found {}".format(image, actual_image))
+                         "Expected job image {}, found {}".format(image, actual_image))
 
         # delete the logical backup cron job
         pg_patch_disable_backup = {
@@ -210,7 +210,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_logical_backup_job_deletion()
         jobs = k8s.get_logical_backup_job().items
         self.assertEqual(0, len(jobs),
-                        "Expected 0 logical backup jobs, found {}".format(len(jobs)))
+                         "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
     def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
         """
