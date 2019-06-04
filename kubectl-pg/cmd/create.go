@@ -20,9 +20,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// createCmd represents the create command
+// createCmd kubectl pg create.
 var createCmd = &cobra.Command{
-	Use:   "create",
+	Use:   "create the resource of type postgresql.",
 	Short: "Create cmd to create k8s objects using manifest files.",
 	Long: `Create cmd creates objects specific to a manifest file.`,
 	Run: func(cmd *cobra.Command, args []string) {

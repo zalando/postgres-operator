@@ -20,9 +20,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// updateCmd represents the update command
+// updateCmd represents kubectl pg update
 var updateCmd = &cobra.Command{
-	Use:   "update",
+	Use:   "update the resource of type postgresql.",
 	Short: "Update cmd to update k8s objects using manifest file.",
 	Long: `Provide the modified manifest file to reflect the changes on the cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {

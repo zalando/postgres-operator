@@ -20,9 +20,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// deleteCmd represents the delete command
+// deleteCmd represents kubectl pg delete.
 var deleteCmd = &cobra.Command{
-	Use:   "delete",
+	Use:   "delete the resource of type postgresql.",
 	Short: "Delete cmd to delete k8s objects by object-name/manifest -file",
 	Long: `Delete cmd deletes the objects specific to a manifest file or an object provided object-name.`,
 	Run: func(cmd *cobra.Command, args []string) {

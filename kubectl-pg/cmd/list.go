@@ -20,9 +20,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// listCmd represents the list command
+// listCmd represents kubectl pg list.
 var listCmd = &cobra.Command{
-	Use:   "list",
+	Use:   "list the resource of type postgresql.",
 	Short: "list cmd list all the resources specific to an object.",
 	Long: `List all the info specific to an objects.`,
 	Run: func(cmd *cobra.Command, args []string) {

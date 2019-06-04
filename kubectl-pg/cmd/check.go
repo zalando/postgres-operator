@@ -20,17 +20,16 @@ import (
 	"github.com/spf13/cobra"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"path/filepath"
+	postgresConstants "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
 
-const postgresCrdName string = "postgresqls.acid.zalan.do"
 
-// checkCmd represents the check command
+// checkCmd represent kubectl pg check.
 var checkCmd = &cobra.Command{
-	Use:   "check",
+	Use:   "checks the postgres CRD presence in k8s cluster.",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -60,7 +59,7 @@ func check() {
 
 	crdInfo,_:=apiexclient.CustomResourceDefinitions().Get(postgresCrdName,metav1.GetOptions{})
 
-	if(crdInfo.Name == postgresCrdName){
+	if(crdInfo.Name == postgresConstants.PostgresCRDResouceName){
 		fmt.Println("postgresql CRD successfully registered.")
 	} else {
 		fmt.Println("postgresql CRD not registered.")
