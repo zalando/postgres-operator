@@ -46,6 +46,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountRoleBindingDefinition string                `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration              `json:"pod_terminate_grace_period,omitempty"`
 	SpiloPrivileged                        bool                  `json:"spilo_privileged,omitemty"`
+	SpiloFSGroup                           *int64                `json:"spilo_fsgroup,omitempty"`
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`

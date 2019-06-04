@@ -228,6 +228,11 @@ configuration they are grouped under the `kubernetes` key.
   that should be assigned to the Postgres pods. The priority class itself must
   be defined in advance. Default is empty (use the default priority class).
 
+* **spilo_fsgroup**
+  the Persistent Volumes for the spilo pods in the StatefulSet will be owned and writable by the group ID specified.
+  This is required to run Spilo as a non-root process, but requires a custom spilo image. Note the FSGroup of a Pod
+  cannot be changed without recreating a new Pod.
+
 * **spilo_privileged**
   whether the Spilo container should run in privileged mode. Privileged mode is
   used for AWS volume resizing and not required if you don't need that

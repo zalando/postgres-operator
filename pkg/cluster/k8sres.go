@@ -432,6 +432,7 @@ func generatePodTemplate(
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
 	tolerationsSpec *[]v1.Toleration,
+	spiloFSGroup *int64,
 	nodeAffinity *v1.Affinity,
 	terminateGracePeriod int64,
 	podServiceAccountName string,
@@ -445,6 +446,11 @@ func generatePodTemplate(
 	terminateGracePeriodSeconds := terminateGracePeriod
 	containers := []v1.Container{*spiloContainer}
 	containers = append(containers, sidecarContainers...)
+	securityContext := v1.PodSecurityContext{}
+
+	if spiloFSGroup != nil {
+		securityContext.FSGroup = spiloFSGroup
+	}
 
 	podSpec := v1.PodSpec{
 		ServiceAccountName:            podServiceAccountName,
@@ -452,6 +458,7 @@ func generatePodTemplate(
 		Containers:                    containers,
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
+		SecurityContext:               &securityContext,
 	}
 
 	if shmVolume {
@@ -831,6 +838,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
+	// determine the FSGroup for the spilo pod
+	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
+	if spec.SpiloFSGroup != nil {
+		effectiveFSGroup = spec.SpiloFSGroup
+	}
+
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
@@ -839,6 +852,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		spec.InitContainers,
 		sidecarContainers,
 		&tolerationSpec,
+		effectiveFSGroup,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
@@ -1340,6 +1354,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		[]v1.Container{},
 		[]v1.Container{},
 		&[]v1.Toleration{},
+		nil,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,

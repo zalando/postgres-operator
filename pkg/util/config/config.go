@@ -25,6 +25,7 @@ type Resources struct {
 	PodLabelWaitTimeout     time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
 	PodDeletionWaitTimeout  time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
 	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	SpiloFSGroup            *int64            `name:"spilo_fsgroup"`
 	PodPriorityClassName    string            `name:"pod_priority_class_name"`
 	ClusterDomain           string            `name:"cluster_domain" default:"cluster.local"`
 	SpiloPrivileged         bool              `name:"spilo_privileged" default:"false"`

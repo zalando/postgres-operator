@@ -58,6 +58,13 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   custom docker image that overrides the **docker_image** operator parameter.
   It should be a [Spilo](https://github.com/zalando/spilo) image.  Optional.
 
+* **spiloFSGroup**
+  the Persistent Volumes for the spilo pods in the StatefulSet will be owned
+  and writable by the group ID specified. This will override the **spilo_fsgroup**
+  operator parameter. This is required to run Spilo as a non-root process, but
+  requires a custom spilo image. Note the FSGroup of a Pod cannot be changed
+  without recreating a new Pod.
+
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_master_load_balancer` parameter) to define whether to enable the load

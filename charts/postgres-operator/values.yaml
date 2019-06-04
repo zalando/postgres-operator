@@ -31,6 +31,7 @@ configKubernetes:
   # node_readiness_label: ""
   # oauth_token_secret_name: postgresql-operator
   # pod_environment_configmap: ""
+  # spilo_fsgroup: "103"
   pod_management_policy: "ordered_ready"
   pdb_name_format: "postgres-{cluster}-pdb"
   pod_role_label: spilo-role
