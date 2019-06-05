@@ -46,10 +46,12 @@ function clean_up(){
 }
 
 function main(){
+
+  trap "clean_up" QUIT TERM EXIT
+
   start_kind
   set_kind_api_server_ip
   run_tests
-  clean_up
   exit 0
 }
 

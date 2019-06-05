@@ -40,7 +40,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # submit the most recent operator image built on the Docker host
         with open("manifests/postgres-operator.yaml", 'r+') as f:
-            operator_deployment = yaml.load(f, Loader=yaml.Loader)
+            operator_deployment = yaml.safe_load(f)
             operator_deployment["spec"]["template"]["spec"]["containers"][0]["image"] = os.environ['OPERATOR_IMAGE']
             yaml.dump(operator_deployment, f, Dumper=yaml.Dumper)
 
@@ -66,7 +66,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
 
         with open("manifests/complete-postgres-manifest.yaml", 'r+') as f:
-            pg_manifest = yaml.load(f, Loader=yaml.Loader)
+            pg_manifest = yaml.safe_load(f)
             pg_manifest["metadata"]["namespace"] = self.namespace
             yaml.dump(pg_manifest, f, Dumper=yaml.Dumper)
 
@@ -129,10 +129,10 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=replica')
 
         new_master_node, new_replica_nodes = k8s.get_spilo_nodes(labels)
-        self.assertTrue(current_master_node != new_master_node,
-                        "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
-        self.assertTrue(num_replicas == len(new_replica_nodes),
-                        "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
+        self.assertNotEqual(current_master_node, new_master_node,
+                            "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
+        self.assertEqual(num_replicas, len(new_replica_nodes),
+                         "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
         self.assert_master_is_unique()
 
         # undo the tainting
@@ -170,15 +170,15 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_logical_backup_job_creation()
 
         jobs = k8s.get_logical_backup_job().items
-        self.assertTrue(1 == len(jobs), "Expected 1 logical backup job, found {}".format(len(jobs)))
+        self.assertEqual(1, len(jobs), "Expected 1 logical backup job, found {}".format(len(jobs)))
 
         job = jobs[0]
-        self.assertTrue(job.metadata.name == "logical-backup-acid-minimal-cluster",
-                        "Expected job name {}, found {}"
-                        .format("logical-backup-acid-minimal-cluster", job.metadata.name))
-        self.assertTrue(job.spec.schedule == schedule,
-                        "Expected {} schedule, found {}"
-                        .format(schedule, job.spec.schedule))
+        self.assertEqual(job.metadata.name, "logical-backup-acid-minimal-cluster",
+                         "Expected job name {}, found {}"
+                         .format("logical-backup-acid-minimal-cluster", job.metadata.name))
+        self.assertEqual(job.spec.schedule, schedule,
+                         "Expected {} schedule, found {}"
+                         .format(schedule, job.spec.schedule))
 
         # update the cluster-wide image of the logical backup pod
         image = "test-image-name"
@@ -196,8 +196,8 @@ class EndToEndTestCase(unittest.TestCase):
 
         jobs = k8s.get_logical_backup_job().items
         actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
-        self.assertTrue(actual_image == image,
-                        "Expected job image {}, found {}".format(image, actual_image))
+        self.assertEqual(actual_image, image,
+                         "Expected job image {}, found {}".format(image, actual_image))
 
         # delete the logical backup cron job
         pg_patch_disable_backup = {
@@ -209,8 +209,8 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
         k8s.wait_for_logical_backup_job_deletion()
         jobs = k8s.get_logical_backup_job().items
-        self.assertTrue(0 == len(jobs),
-                        "Expected 0 logical backup jobs, found {}".format(len(jobs)))
+        self.assertEqual(0, len(jobs),
+                         "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
     def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
         """
@@ -246,6 +246,8 @@ class K8s:
     Wraps around K8 api client and helper methods.
     '''
 
+    RETRY_TIMEOUT_SEC = 5
+
     def __init__(self):
         self.api = K8sApi()
 
@@ -254,9 +256,9 @@ class K8s:
         replica_pod_nodes = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels)
         for pod in podsList.items:
-            if ('spilo-role', 'master') in pod.metadata.labels.items():
+            if pod.metadata.labels.get('spilo-role') == 'master':
                 master_pod_node = pod.spec.node_name
-            elif ('spilo-role', 'replica') in pod.metadata.labels.items():
+            elif pod.metadata.labels.get('spilo-role') == 'replica':
                 replica_pod_nodes.append(pod.spec.node_name)
 
         return master_pod_node, replica_pod_nodes
@@ -265,7 +267,7 @@ class K8s:
         self. wait_for_pod_start("name=postgres-operator")
         # HACK operator must register CRD / add existing PG clusters after pod start up
         # for local execution ~ 10 seconds suffices
-        time.sleep(30)
+        time.sleep(60)
 
     def wait_for_pod_start(self, pod_labels, namespace='default'):
         pod_phase = 'No pod running'
@@ -273,6 +275,7 @@ class K8s:
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
 
@@ -286,7 +289,7 @@ class K8s:
 
         labels = 'version=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
-            pass
+            time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def count_pods_with_label(self, labels, namespace='default'):
         return len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items)
@@ -301,13 +304,14 @@ class K8s:
             if pods:
                 new_master_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_logical_backup_job(self, namespace='default'):
         return self.api.batch_v1_beta1.list_namespaced_cron_job(namespace, label_selector="application=spilo")
 
     def wait_for_logical_backup_job(self, expected_num_of_jobs):
         while (len(self.get_logical_backup_job().items) != expected_num_of_jobs):
-            pass
+            time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def wait_for_logical_backup_job_deletion(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=0)
