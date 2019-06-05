@@ -1,0 +1,59 @@
+version: "2017-09-20"
+pipeline:
+    - id: build-postgres-operator
+      type: script
+      env:
+        GOPATH: /root/go
+        OPERATOR_TOP_DIR: /root/go/src/github.com/zalando
+      commands:
+        - desc: 'Update'
+          cmd: |
+            apt-get update
+        - desc: 'Install required build software'
+          cmd: |
+            apt-get install -y make git apt-transport-https ca-certificates curl build-essential python3 python3-pip
+        - desc: 'Install go'
+          cmd: |
+            cd /tmp
+            wget -q https://storage.googleapis.com/golang/go1.12.linux-amd64.tar.gz -O go.tar.gz
+            tar -xf go.tar.gz
+            mv go /usr/local
+            ln -s /usr/local/go/bin/go /usr/bin/go
+            go version
+        - desc: 'Symlink sources into the GOPATH'
+          cmd: |
+            mkdir -p $OPERATOR_TOP_DIR
+            ln -s $(pwd) $OPERATOR_TOP_DIR/postgres-operator
+        - desc: 'Build docker image'
+          cmd: |
+            export PATH=$PATH:$HOME/go/bin
+            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
+            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
+            then
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+            else
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
+            fi
+            export IMAGE
+            make tools deps docker
+        - desc: 'Run unit tests'
+          cmd: |
+            export PATH=$PATH:$HOME/go/bin
+            cd $OPERATOR_TOP_DIR/postgres-operator
+            go test ./...
+        - desc: 'Run e2e tests'
+          cmd: |
+            cd $OPERATOR_TOP_DIR/postgres-operator
+            make e2e-tools e2e-build e2e-run
+        - desc: 'Push docker image'
+          cmd: |
+            export PATH=$PATH:$HOME/go/bin
+            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
+            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
+            then
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+            else
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
+            fi
+            export IMAGE
+            make push

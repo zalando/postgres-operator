@@ -1,0 +1,22 @@
+package: postgres-operator/kubectl-pg
+import:
+- package: github.com/VineethReddy02/postgres-operator
+  subpackages:
+  - kubectl-pg/cmd
+- package: github.com/fatih/color
+- package: github.com/mitchellh/go-homedir
+- package: github.com/spf13/cobra
+- package: github.com/spf13/viper
+- package: github.com/zalando/postgres-operator
+  subpackages:
+  - pkg/apis/acid.zalan.do/v1
+- package: k8s.io/apiextensions-apiserver
+  subpackages:
+  - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
+- package: k8s.io/apimachinery
+  subpackages:
+  - pkg/apis/meta/v1
+- package: k8s.io/client-go
+  subpackages:
+  - tools/clientcmd
+  - util/homedir

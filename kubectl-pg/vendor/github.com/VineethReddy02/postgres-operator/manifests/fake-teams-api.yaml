@@ -1,0 +1,44 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: fake-teams-api
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: fake-teams-api
+    spec:
+      containers:
+      - name: fake-teams-api
+        image: ikitiki/fake-teams-api:latest
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: fake-teams-api
+spec:
+  selector:
+    name: fake-teams-api
+  ports:
+  - name: server
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  type: NodePort
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-operator
+  namespace: default
+type: Opaque
+data:
+apiVersion: v1
+data:
+  read-only-token-secret: dGVzdHRva2Vu
+  read-only-token-type: QmVhcmVy

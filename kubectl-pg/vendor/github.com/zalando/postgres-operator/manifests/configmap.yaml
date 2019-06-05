@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  watched_namespace: "*" # listen to all namespaces
+  cluster_labels: application:spilo
+  cluster_name_label: version
+  pod_role_label: spilo-role
+
+  debug_logging: "true"
+  workers: "4"
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
+  pod_service_account_name: "zalando-postgres-operator"
+  secret_name_template: '{username}.{cluster}.credentials'
+  cluster_domain: cluster.local
+  super_username: postgres
+  enable_teams_api: "false"
+  spilo_privileged: "false"
+  # custom_service_annotations:
+  #   "keyx:valuez,keya:valuea"
+  # set_memory_request_to_limit: "true"
+  # postgres_superuser_teams: "postgres_superusers"
+  # enable_team_superuser: "false"
+  # team_admin_role: "admin"
+  # enable_admin_role_for_users: "true"
+  # teams_api_url: http://fake-teams-api.default.svc.cluster.local
+  # team_api_role_configuration: "log_statement:all"
+  # infrastructure_roles_secret_name: postgresql-infrastructure-roles
+  # oauth_token_secret_name: postgresql-operator
+  # pam_role_name: zalandos
+  # pam_configuration: |
+  #  https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
+  # inherited_labels: ""
+  aws_region: eu-central-1
+  db_hosted_zone: db.example.com
+  master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
+  replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
+  enable_master_load_balancer: "true"
+  enable_replica_load_balancer: "false"
+
+  pdb_name_format: "postgres-{cluster}-pdb"
+
+  api_port: "8080"
+  ring_log_lines: "100"
+  cluster_history_entries: "1000"
+  pod_terminate_grace_period: 5m
+  pod_deletion_wait_timeout: 10m
+  pod_label_wait_timeout: 10m
+  pod_management_policy: "ordered_ready"
+  ready_wait_interval: 3s
+  ready_wait_timeout: 30s
+  #  master_pod_move_timeout: 10m
+  replication_username: standby
+  resource_check_interval: 3s
+  resource_check_timeout: 10m
+  resync_period: 5m
+
+  # logical_backup_schedule: "30 00 * * *"
+  # logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  # logical_backup_s3_bucket: ""

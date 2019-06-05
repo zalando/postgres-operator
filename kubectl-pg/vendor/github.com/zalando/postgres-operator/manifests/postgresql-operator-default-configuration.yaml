@@ -1,0 +1,99 @@
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-default-configuration
+configuration:
+  etcd_host: ""
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
+  workers: 4
+  min_instances: -1
+  max_instances: -1
+  resync_period: 30m
+  repair_period: 5m
+
+  #sidecar_docker_images:
+  # example: "exampleimage:exampletag"
+  users:
+    super_username: postgres
+    replication_username: standby
+  kubernetes:
+    pod_service_account_name: operator
+    pod_terminate_grace_period: 5m
+    pdb_name_format: "postgres-{cluster}-pdb"
+    secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+    cluster_domain: cluster.local
+    oauth_token_secret_name: postgresql-operator
+    pod_role_label: spilo-role
+    # spilo_fsgroup: 103
+    spilo_privileged: false
+    cluster_labels:
+        application: spilo
+    # inherited_labels:
+    # - application
+    # - app
+    cluster_name_label: cluster-name
+    # watched_namespace:""
+    # node_readiness_label: ""
+    # toleration: {}
+    # infrastructure_roles_secret_name: ""
+    # pod_environment_configmap: ""
+    pod_management_policy: "ordered_ready"
+    enable_pod_antiaffinity: false
+    pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  postgres_pod_resources:
+    default_cpu_request: 100m
+    default_memory_request: 100Mi
+    default_cpu_limit: "3"
+    default_memory_limit: 1Gi
+  timeouts:
+    resource_check_interval: 3s
+    resource_check_timeout: 10m
+    pod_label_wait_timeout: 10m
+    pod_deletion_wait_timeout: 10m
+    ready_wait_interval: 4s
+    ready_wait_timeout: 30s
+  load_balancer:
+    enable_master_load_balancer: false
+    enable_replica_load_balancer: false
+    # custom_service_annotations:
+    #   keyx: valuex
+    #   keyy: valuey
+    master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+    replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+  aws_or_gcp:
+    # db_hosted_zone: ""
+    # wal_s3_bucket: ""
+    # log_s3_bucket: ""
+    # kube_iam_role: ""
+    aws_region: eu-central-1
+  debug:
+    debug_logging: true
+    enable_database_access: true
+  teams_api:
+    enable_teams_api: false
+    team_api_role_configuration:
+      log_statement: all
+    enable_team_superuser: false
+    team_admin_role: admin
+    pam_role_name: zalandos
+    # pam_configuration: ""
+    protected_role_names:
+      - admin
+    # teams_api_url: ""
+    # postgres_superuser_teams: "postgres_superusers"
+  logging_rest_api:
+    api_port: 8008
+    ring_log_lines: 100
+    cluster_history_entries: 1000
+  scalyr:
+    scalyr_cpu_request: 100m
+    scalyr_memory_request: 50Mi
+    scalyr_cpu_limit: "1"
+    scalyr_memory_limit: 1Gi
+    # scalyr_api_key: ""
+    # scalyr_image: ""
+    # scalyr_server_url: ""
+  logical_backup:
+    logical_backup_schedule: "30 00 * * *"
+    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+    logical_backup_s3_bucket: ""

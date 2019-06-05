@@ -1,0 +1,87 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  init_containers:
+  - name: date
+    image: busybox
+    command: [ "/bin/date" ]
+  teamId: "ACID"
+  volume:
+    size: 1Gi
+  numberOfInstances: 2
+  users: #Application/Robot users
+    zalando:
+    - superuser
+    - createdb
+  enableMasterLoadBalancer: true
+  enableReplicaLoadBalancer: true
+  allowedSourceRanges: # load balancers' source ranges for both master and replica services
+  - 127.0.0.1/32
+  databases:
+    foo: zalando
+#Expert section
+  enableShmVolume: true
+  postgresql:
+    version: "10"
+    parameters:
+      shared_buffers: "32MB"
+      max_connections: "10"
+      log_statement: "all"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+    limits:
+      cpu: 300m
+      memory: 300Mi
+  patroni:
+    initdb:
+      encoding: "UTF8"
+      locale: "en_US.UTF-8"
+      data-checksums: "true"
+    pg_hba:
+    - hostssl all all 0.0.0.0/0 md5
+    - host    all all 0.0.0.0/0 md5
+    slots:
+      permanent_physical_1:
+        type: physical
+      permanent_logical_1:
+        type: logical
+        database: foo
+        plugin: pgoutput
+    ttl: 30
+    loop_wait: &loop_wait 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 33554432
+  # restore a Postgres DB with point-in-time-recovery 
+  # with a non-empty timestamp, clone from an S3 bucket using the latest backup before the timestamp
+  # with an empty/absent timestamp, clone from an existing alive cluster using pg_basebackup
+  # clone:
+  #  uid: "efd12e58-5786-11e8-b5a7-06148230260c"
+  #  cluster: "acid-batman"
+  #  timestamp: "2017-12-19T12:40:33+01:00" # timezone required (offset relative to UTC, see RFC 3339 section 5.6)
+  #  s3_wal_path: "s3://custom/path/to/bucket"
+  
+  # run periodic backups with k8s cron jobs
+  # enableLogicalBackup: true
+  # logicalBackupSchedule: "30 00 * * *"
+  maintenanceWindows:
+  - 01:00-06:00 #UTC
+  - Sat:00:00-04:00
+  #sidecars:
+  #  - name: "telegraf-sidecar"
+  #    image: "telegraf:latest"
+  #    resources:
+  #      limits:
+  #        cpu: 500m
+  #        memory: 500Mi
+  #      requests:
+  #        cpu: 100m
+  #        memory: 100Mi
+  #    env:
+  #      - name: "USEFUL_VAR"
+  #        value: "perhaps-true"
+

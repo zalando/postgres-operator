@@ -1,0 +1,23 @@
+apiVersion: v1
+data:
+  # required format (w/o quotes): 'propertyNumber: value'
+  # allowed properties: 'user', 'password', 'inrole'
+  # numbers >= 1 are mandatory
+  # alternatively, supply the user: password pairs and
+  # provide other options in the configmap.
+  # robot_zmon_acid_monitoring
+  user1: cm9ib3Rfem1vbl9hY2lkX21vbml0b3Jpbmc=
+  # robot_zmon
+  inrole1: cm9ib3Rfem1vbg==
+  # testuser
+  user2: dGVzdHVzZXI=
+  # foobar
+  password2: Zm9vYmFy
+  # user batman with the password justice
+  # look for other fields in the infrastructure roles configmap
+  batman: anVzdGljZQ==
+kind: Secret
+metadata:
+  name: postgresql-infrastructure-roles
+  namespace: default
+type: Opaque

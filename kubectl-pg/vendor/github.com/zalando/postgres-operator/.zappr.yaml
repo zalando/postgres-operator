@@ -1,0 +1,5 @@
+# for github.com
+X-Zalando-Team: "acid"
+# type should be one of [code, doc, config, tools, secrets]
+# code will be the default value, if X-Zalando-Type is not found in .zappr.yml
+X-Zalando-Type: code

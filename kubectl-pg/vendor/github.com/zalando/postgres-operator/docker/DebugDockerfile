@@ -1,0 +1,10 @@
+FROM alpine
+MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
+
+# We need root certificates to deal with teams api over https
+RUN apk --no-cache add ca-certificates go git musl-dev
+RUN go get github.com/derekparker/delve/cmd/dlv
+
+COPY build/* /
+
+CMD ["/root/go/bin/dlv", "--listen=:7777", "--headless=true", "--api-version=2", "exec", "/postgres-operator"]

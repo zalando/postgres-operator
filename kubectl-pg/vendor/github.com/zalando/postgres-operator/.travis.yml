@@ -1,0 +1,23 @@
+dist: trusty
+sudo: false
+
+branches:
+  only:
+  - master
+
+language: go
+
+go:
+  - "1.12.x"
+
+before_install:
+  - go get github.com/Masterminds/glide
+  - go get github.com/mattn/goveralls
+
+install:
+  - make deps e2e-tools e2e-build
+
+script:
+  - hack/verify-codegen.sh
+  - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -v
+  - make e2e-run

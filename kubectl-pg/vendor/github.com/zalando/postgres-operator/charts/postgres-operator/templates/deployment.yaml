@@ -1,0 +1,61 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
+    helm.sh/chart: {{ template "postgres-operator.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: {{ template "postgres-operator.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        # In order to use the checksum of CRD OperatorConfiguration instead, use the following line instead
+        # {{ include (print $.Template.BasePath "/operatorconfiguration.yaml") . | sha256sum }}
+    {{- if .Values.podAnnotations }}
+{{ toYaml .Values.podAnnotations | indent 8 }}
+    {{- end }}
+      labels:
+        app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- if .Values.podLabels }}
+{{ toYaml .Values.podLabels | indent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{- if eq .Values.serviceAccount.name "" }}
+                            {{ template "postgres-operator.fullname" . }}
+                          {{- else }}
+                            {{ .Values.serviceAccount.name }}
+                          {{- end }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: CONFIG_MAP_NAME
+          value: {{ template "postgres-operator.fullname" . }}
+        # In order to use the CRD OperatorConfiguration instead, uncomment these lines and comment out the two lines above
+        # - name: POSTGRES_OPERATOR_CONFIGURATION_OBJECT
+        #  value: {{ template "postgres-operator.fullname" . }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{ toYaml .Values.imagePullSecrets | indent 8 }}
+      {{- end }}
+      affinity:
+{{ toYaml .Values.affinity | indent 8 }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+    {{- if .Values.priorityClassName }}
+      priorityClassName: {{ .Values.priorityClassName }}
+    {{- end }}
