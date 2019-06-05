@@ -97,10 +97,10 @@ class EndToEndTestCase(unittest.TestCase):
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
         """
         k8s = self.k8s
-        labels = 'version=acid-minimal-cluster'
+        cluster_label = 'version=acid-minimal-cluster'
 
         # get nodes of master and replica(s) (expected target of new master)
-        current_master_node, failover_targets = k8s.get_spilo_nodes(labels)
+        current_master_node, failover_targets = k8s.get_pg_nodes(cluster_label)
         num_replicas = len(failover_targets)
 
         # if all pods live on the same node, failover will happen to other worker(s)
@@ -128,7 +128,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_master_failover(failover_targets)
         k8s.wait_for_pod_start('spilo-role=replica')
 
-        new_master_node, new_replica_nodes = k8s.get_spilo_nodes(labels)
+        new_master_node, new_replica_nodes = k8s.get_pg_nodes(cluster_label)
         self.assertNotEqual(current_master_node, new_master_node,
                             "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
         self.assertEqual(num_replicas, len(new_replica_nodes),
@@ -251,10 +251,10 @@ class K8s:
     def __init__(self):
         self.api = K8sApi()
 
-    def get_spilo_nodes(self, pod_labels, namespace='default'):
+    def get_pg_nodes(self, pg_cluster_name, namespace='default'):
         master_pod_node = ''
         replica_pod_nodes = []
-        podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels)
+        podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pg_cluster_name)
         for pod in podsList.items:
             if pod.metadata.labels.get('spilo-role') == 'master':
                 master_pod_node = pod.spec.node_name
