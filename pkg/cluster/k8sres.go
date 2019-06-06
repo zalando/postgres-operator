@@ -329,7 +329,7 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 	return []v1.Toleration{}
 }
 
-// isBootstrapOnlyParameter checks asgainst special Patroni bootstrap parameters.
+// isBootstrapOnlyParameter checks against special Patroni bootstrap parameters.
 // Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
 // See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
 func isBootstrapOnlyParameter(param string) bool {
@@ -1366,7 +1366,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
-	// overwrite specifc params of logical backups pods
+	// overwrite specific params of logical backups pods
 	podTemplate.Spec.Affinity = &podAffinity
 	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
 
