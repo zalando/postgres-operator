@@ -361,7 +361,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 	// TODO: check if it possible to change the service type with a patch in future versions of Kubernetes
 	if newService.Spec.Type != c.Services[role].Spec.Type {
 		// service type has changed, need to replace the service completely.
-		// we cannot use just pach the current service, since it may contain attributes incompatible with the new type.
+		// we cannot use just patch the current service, since it may contain attributes incompatible with the new type.
 		var (
 			currentEndpoint *v1.Endpoints
 			err             error
@@ -369,7 +369,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 		if role == Master {
 			// for the master service we need to re-create the endpoint as well. Get the up-to-date version of
-			// the addresses stored in it before the service is deleted (deletion of the service removes the endpooint)
+			// the addresses stored in it before the service is deleted (deletion of the service removes the endpoint)
 			currentEndpoint, err = c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("could not get current cluster %s endpoints: %v", role, err)
