@@ -8,9 +8,21 @@ spec:
   - name: date
     image: busybox
     command: [ "/bin/date" ]
+  sidecars:
+  - name: shiny-sidecar
+    image: busybox
+    command: [ "/bin/sh", "-ec", "sleep 365d" ]
+      resources:
+        limits:
+          cpu: 250m
+          memory: 500Mi
+        requests:
+          cpu: 100m
+          memory: 100Mi
   teamId: "ACID"
   volume:
     size: 1Gi
+    storageClass: my-sc
   numberOfInstances: 2
   users: #Application/Robot users
     zalando:
