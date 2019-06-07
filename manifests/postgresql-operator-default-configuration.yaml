@@ -40,6 +40,7 @@ configuration:
     pod_management_policy: "ordered_ready"
     enable_pod_antiaffinity: false
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+    enable_pod_disruption_budget: true
   postgres_pod_resources:
     default_cpu_request: 100m
     default_memory_request: 100Mi

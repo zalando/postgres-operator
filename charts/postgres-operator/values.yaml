@@ -114,6 +114,7 @@ configKubernetesCRD:
   cluster_name_label: cluster-name
   enable_pod_antiaffinity: false
   pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  enable_pod_disruption_budget: true
   secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
   # inherited_labels:
   # - application
@@ -161,7 +162,7 @@ serviceAccount:
   # The name of the ServiceAccount to use.
   # If not set and create is true, a name is generated using the fullname template
   # When relying solely on the OperatorConfiguration CRD, set this value to "operator"
-  # Otherwise, the operator tries to use the "default" service account which is forbidden 
+  # Otherwise, the operator tries to use the "default" service account which is forbidden
   name: ""
 
 priorityClassName: ""
