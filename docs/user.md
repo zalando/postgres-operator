@@ -254,6 +254,18 @@ metadata:
 Note that timezone is required for `timestamp`. Otherwise, offset is relative
 to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
+## Setting up a standby cluster
+
+Standby clusters are like normal cluster but they are streaming from a remote master. Patroni supports it, [read this](https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster) to know more about them. Currently operator supports setting up standby only through an S3 bucket. For this you need to add a section standby in the YAML file as follows.
+
+```yaml
+spec:
+  standby:
+    uid: "UID of the master cluster"
+    cluster: "Name of the master cluster"
+    s3_wal_path: "s3 bucket path to the master"
+```
+
 ## Sidecar Support
 
 Each cluster can specify arbitrary sidecars to run. These containers could be used for
