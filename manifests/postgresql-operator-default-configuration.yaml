@@ -20,6 +20,7 @@ configuration:
     pod_service_account_name: operator
     pod_terminate_grace_period: 5m
     pdb_name_format: "postgres-{cluster}-pdb"
+    enable_pod_disruption_budget: true
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     cluster_domain: cluster.local
     oauth_token_secret_name: postgresql-operator
@@ -40,7 +41,6 @@ configuration:
     pod_management_policy: "ordered_ready"
     enable_pod_antiaffinity: false
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-    enable_pod_disruption_budget: true
   postgres_pod_resources:
     default_cpu_request: 100m
     default_memory_request: 100Mi
