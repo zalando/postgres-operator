@@ -16,20 +16,74 @@ package cmd
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"io/ioutil"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 )
 
 // deleteCmd represents kubectl pg delete.
 var deleteCmd = &cobra.Command{
-	Use:   "delete the resource of type postgresql.",
-	Short: "Delete cmd to delete k8s objects by object-name/manifest -file",
-	Long: `Delete cmd deletes the objects specific to a manifest file or an object provided object-name.`,
+	Use:   "delete",
+	Short: "Delete command to delete k8s postgresql objects by object-name/manifest file",
+	Long: `Delete command deletes the postgres objects specific to a manifest file or an object provided object-name.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("delete called")
+
+		name,_ :=cmd.Flags().GetString("name")
+		file,_ :=cmd.Flags().GetString("file")
+		if name != "" {
+			deleteByName(name)
+		} else {
+			deleteByFile(file)
+		}
 	},
 }
 
 func init() {
+	deleteCmd.Flags().StringP("name","n","","Delete postgresql resource by it's name.")
+	deleteCmd.Flags().StringP("file","f","","using file.")
 	rootCmd.AddCommand(deleteCmd)
+}
+
+// Delete postgresql by manifest file.
+func deleteByFile(file string) {
+	config := getConfig()
+	postgresConfig,err := PostgresqlLister.NewForConfig(config)
+	ymlFile,err := ioutil.ReadFile(file)
+	if err != nil {
+		panic(err)
+	}
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	obj,_,err := decode([]byte(ymlFile),nil, &v1.Postgresql{})
+	if err!=nil {
+		panic(err)
+	}
+	postgresSql := obj.(*v1.Postgresql)
+	_ , err = postgresConfig.Postgresqls("default").Get(postgresSql.Name, metav1.GetOptions{})
+	if err!=nil {
+		panic(err)
+	}
+	deleteStatus := postgresConfig.Postgresqls("default").Delete(postgresSql.Name,&metav1.DeleteOptions{})
+	if deleteStatus == nil {
+		fmt.Printf("postgresql %s deleted.\n", postgresSql.Name)
+	}
+}
+
+// Delete postgresql by name.
+func deleteByName(name string) {
+	config := getConfig()
+	postgresConfig,err := PostgresqlLister.NewForConfig(config)
+	if err!=nil{
+		panic(err)
+	}
+	postgresSql,err:= postgresConfig.Postgresqls("default").Get(name, metav1.GetOptions{})
+	if err!=nil {
+		panic(err)
+	}
+	deleteStatus:=postgresConfig.Postgresqls("default").Delete(postgresSql.Name, &metav1.DeleteOptions{})
+	if deleteStatus == nil {
+		fmt.Printf("postgresql %s deleted.\n", postgresSql.Name)
+	}
 }

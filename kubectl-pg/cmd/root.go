@@ -27,8 +27,8 @@ var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "kubectl pg, A kubectl plugin to handle postgresql resources.",
-	Short: "A kubectl pg plugin.",
+	Use:   "kubectl-pg",
+	Short: "A kubectl pg plugin",
 	Long: `kubectl pg plugin for interaction with postgres-operator.`,
 }
 

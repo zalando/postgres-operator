@@ -16,20 +16,46 @@ package cmd
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
+	"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	"io/ioutil"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 )
 
 // createCmd kubectl pg create.
 var createCmd = &cobra.Command{
-	Use:   "create the resource of type postgresql.",
-	Short: "Create cmd to create k8s objects using manifest files.",
-	Long: `Create cmd creates objects specific to a manifest file.`,
+	Use:   "create",
+	Short: "Create command to create k8s postgres objects using manifest files",
+	Long: `Create command creates postgres custom resource objects from a manifest file.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("create called")
+		fileName,_ :=cmd.Flags().GetString("file")
+		create(fileName)
 	},
 }
 
+// Create postgresql resources.
+func create(fileName string) {
+	config := getConfig()
+	postgresConfig,err := PostgresqlLister.NewForConfig(config)
+	ymlFile,err := ioutil.ReadFile(fileName)
+	if err != nil {
+		panic(err)
+	}
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	obj,_,err := decode([]byte(ymlFile),nil, &v1.Postgresql{})
+	if err!=nil {
+		panic(err)
+	}
+	postgresSql := obj.(*v1.Postgresql)
+	_,err = postgresConfig.Postgresqls("default").Create(postgresSql)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("postgresql %s created.\n",postgresSql.Name)
+}
+
 func init() {
+	createCmd.Flags().StringP("file","f","","using file.")
 	rootCmd.AddCommand(createCmd)
 }

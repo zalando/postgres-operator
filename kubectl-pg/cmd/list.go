@@ -16,33 +16,36 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // listCmd represents kubectl pg list.
 var listCmd = &cobra.Command{
-	Use:   "list the resource of type postgresql.",
-	Short: "list cmd list all the resources specific to an object.",
-	Long: `List all the info specific to an objects.`,
+	Use:   "list",
+	Short: "List command to list all the resources specific to an postgresql object",
+	Long: `List all the info specific to postgresql objects.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		hiiFlag,_ :=cmd.Flags().GetString("HII")
-		 list(hiiFlag)
+		 list()
 	},
 }
 
-// Experimenting with flags
-func list(HII string){
-	if(HII=="YES") {
-		fmt.Println(HII)
-		color.Green("We have Green")
-		color.Set(color.FgYellow)
-
-		fmt.Println("Existing text will now be in yellow")
-		fmt.Printf("This one %s\n", "too")
-
-		color.Unset() // Don't forget to unset
+// list command to list postgresql objects.
+func list(){
+    config := getConfig()
+	template := "%-32s%-8s%-8s%-8s\n"
+	fmt.Printf(template,"NAME","READY","STATUS", "AGE")
+	postgresConfig,err:=PostgresqlLister.NewForConfig(config)
+	if err != nil {
+		panic(err)
 	}
+	listPostgresslq,_ := postgresConfig.Postgresqls("").List(metav1.ListOptions{})
+	fmt.Println(listPostgresslq)
+	for _,pgObjs := range listPostgresslq.Items {
+		fmt.Printf(template,pgObjs.Name,pgObjs.Status, pgObjs.Namespace, pgObjs.CreationTimestamp)
+	}
+
 }
 func init() {
 	listCmd.Flags().StringP("HII","p","NO","SAY HII")
