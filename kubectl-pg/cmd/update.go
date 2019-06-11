@@ -54,12 +54,12 @@ func updatePgResources(fileName string) {
 		panic(err)
 	}
 	newPostgresObj := obj.(*v1.Postgresql)
-	oldPostgresObj,err := postgresConfig.Postgresqls("default").Get(newPostgresObj.Name, metav1.GetOptions{})
+	oldPostgresObj,err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Get(newPostgresObj.Name, metav1.GetOptions{})
 	if err != nil {
 		panic(err)
 	}
 	newPostgresObj.ResourceVersion = oldPostgresObj.ResourceVersion
-	response,err := postgresConfig.Postgresqls("default").Update(newPostgresObj)
+	response,err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(newPostgresObj)
 	if err != nil {
 		panic(err)
 	}

@@ -19,6 +19,8 @@ import (
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strconv"
+	"time"
 )
 
 // listCmd represents kubectl pg list.
@@ -27,23 +29,24 @@ var listCmd = &cobra.Command{
 	Short: "List command to list all the resources specific to an postgresql object",
 	Long: `List all the info specific to postgresql objects.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		 list()
+		list()
 	},
 }
 
 // list command to list postgresql objects.
 func list(){
-    config := getConfig()
-	template := "%-32s%-8s%-8s%-8s\n"
-	fmt.Printf(template,"NAME","READY","STATUS", "AGE")
+	config := getConfig()
+	template := "%-32s%-12s%-12s%-12s%-12s%-12s\n"
+	fmt.Printf(template,"NAME","STATUS","INSTANCES","VERSION","AGE", "VOLUME")
 	postgresConfig,err:=PostgresqlLister.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 	listPostgresslq,_ := postgresConfig.Postgresqls("").List(metav1.ListOptions{})
-	fmt.Println(listPostgresslq)
 	for _,pgObjs := range listPostgresslq.Items {
-		fmt.Printf(template,pgObjs.Name,pgObjs.Status, pgObjs.Namespace, pgObjs.CreationTimestamp)
+
+		fmt.Printf(template,pgObjs.Name,pgObjs.Status.PostgresClusterStatus,strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
+			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000),pgObjs.Spec.Size)
 	}
 
 }

@@ -48,7 +48,7 @@ func create(fileName string) {
 		panic(err)
 	}
 	postgresSql := obj.(*v1.Postgresql)
-	_,err = postgresConfig.Postgresqls("default").Create(postgresSql)
+	_,err = postgresConfig.Postgresqls(postgresSql.Namespace).Create(postgresSql)
 	if err != nil {
 		panic(err)
 	}

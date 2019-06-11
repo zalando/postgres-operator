@@ -61,11 +61,11 @@ func deleteByFile(file string) {
 		panic(err)
 	}
 	postgresSql := obj.(*v1.Postgresql)
-	_ , err = postgresConfig.Postgresqls("default").Get(postgresSql.Name, metav1.GetOptions{})
+	_ , err = postgresConfig.Postgresqls(postgresSql.Namespace).Get(postgresSql.Name, metav1.GetOptions{})
 	if err!=nil {
 		panic(err)
 	}
-	deleteStatus := postgresConfig.Postgresqls("default").Delete(postgresSql.Name,&metav1.DeleteOptions{})
+	deleteStatus := postgresConfig.Postgresqls(postgresSql.Namespace).Delete(postgresSql.Name,&metav1.DeleteOptions{})
 	if deleteStatus == nil {
 		fmt.Printf("postgresql %s deleted.\n", postgresSql.Name)
 	}
@@ -78,12 +78,21 @@ func deleteByName(name string) {
 	if err!=nil{
 		panic(err)
 	}
-	postgresSql,err:= postgresConfig.Postgresqls("default").Get(name, metav1.GetOptions{})
+	postgresSql,err:= postgresConfig.Postgresqls("").List(metav1.ListOptions{})
 	if err!=nil {
 		panic(err)
 	}
-	deleteStatus:=postgresConfig.Postgresqls("default").Delete(postgresSql.Name, &metav1.DeleteOptions{})
-	if deleteStatus == nil {
-		fmt.Printf("postgresql %s deleted.\n", postgresSql.Name)
+	deleted:=false
+	for _,pgObjs := range postgresSql.Items {
+		if(name == pgObjs.Name) {
+			postgresConfig.Postgresqls(pgObjs.Namespace).Delete(pgObjs.Name, &metav1.DeleteOptions{})
+			deleted=true
+			break
+		}
+	}
+	if deleted {
+		fmt.Printf("postgresql %s deleted.\n", name)
+	} else {
+		fmt.Printf("postgresql %s not found.\n", name)
 	}
 }
