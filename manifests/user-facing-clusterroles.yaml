@@ -25,7 +25,6 @@ rules:
   - acid.zalan.do
   resources:
   - postgresqls
-  - postgresqls/status
   verbs:
   - create
   - update
