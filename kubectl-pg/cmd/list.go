@@ -36,21 +36,24 @@ var listCmd = &cobra.Command{
 // list command to list postgresql objects.
 func list(){
 	config := getConfig()
-	template := "%-32s%-12s%-12s%-12s%-12s%-12s\n"
-	fmt.Printf(template,"NAME","STATUS","INSTANCES","VERSION","AGE", "VOLUME")
 	postgresConfig,err:=PostgresqlLister.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
-	listPostgresslq,_ := postgresConfig.Postgresqls("").List(metav1.ListOptions{})
-	for _,pgObjs := range listPostgresslq.Items {
-
+	listPostgresql,_ := postgresConfig.Postgresqls("").List(metav1.ListOptions{})
+	if len(listPostgresql.Items) == 0 {
+		fmt.Println("No resources found.")
+		return
+	}
+	template := "%-32s%-12s%-12s%-12s%-12s%-12s\n"
+	fmt.Printf(template,"NAME","STATUS","INSTANCES","VERSION","AGE", "VOLUME")
+	for _,pgObjs := range listPostgresql.Items {
 		fmt.Printf(template,pgObjs.Name,pgObjs.Status.PostgresClusterStatus,strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
 			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000),pgObjs.Spec.Size)
 	}
 
 }
+
 func init() {
-	listCmd.Flags().StringP("HII","p","NO","SAY HII")
 	rootCmd.AddCommand(listCmd)
 }
