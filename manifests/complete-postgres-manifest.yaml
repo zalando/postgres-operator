@@ -11,6 +11,7 @@ spec:
   teamId: "ACID"
   volume:
     size: 1Gi
+    #storageClass: my-sc
   numberOfInstances: 2
   users: #Application/Robot users
     zalando:
@@ -37,6 +38,7 @@ spec:
     limits:
       cpu: 300m
       memory: 300Mi
+  # spiloFSGroup: 103    
   patroni:
     initdb:
       encoding: "UTF8"
@@ -67,6 +69,23 @@ spec:
   # Make this a standby cluster and provide the s3 bucket path of source cluster for continuous streaming.
   # standby:
   #   s3_wal_path: "s3://path/to/bucket/containing/wal/of/source/cluster/"
+
+  # run periodic backups with k8s cron jobs
+  # enableLogicalBackup: true
+  # logicalBackupSchedule: "30 00 * * *"
   maintenanceWindows:
   - 01:00-06:00 #UTC
   - Sat:00:00-04:00
+  #sidecars:
+  #  - name: "telegraf-sidecar"
+  #    image: "telegraf:latest"
+  #    resources:
+  #      limits:
+  #        cpu: 500m
+  #        memory: 500Mi
+  #      requests:
+  #        cpu: 100m
+  #        memory: 100Mi
+  #    env:
+  #      - name: "USEFUL_VAR"
+  #        value: "perhaps-true"

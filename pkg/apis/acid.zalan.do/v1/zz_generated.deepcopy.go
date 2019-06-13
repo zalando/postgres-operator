@@ -385,6 +385,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 	out.Volume = in.Volume
 	in.Patroni.DeepCopyInto(&out.Patroni)
 	out.Resources = in.Resources
+	if in.SpiloFSGroup != nil {
+		in, out := &in.SpiloFSGroup, &out.SpiloFSGroup
+		*out = new(int64)
+		**out = **in
+	}
 	if in.EnableMasterLoadBalancer != nil {
 		in, out := &in.EnableMasterLoadBalancer, &out.EnableMasterLoadBalancer
 		*out = new(bool)
