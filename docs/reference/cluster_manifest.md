@@ -176,7 +176,7 @@ explanation of `ttl` and `loop_wait` parameters.
   permanent replication slots that Patroni preserves after failover by re-creating them on the new primary immediately after doing a promote. Slots could be reconfigured with the help of `patronictl edit-config`. It is the responsibility of a user to avoid clashes in names between replication slots automatically created by Patroni for cluster members and permanent replication slots. Optional.
 
 * **standby_cluster**
-  initializes cluster as a standby creating a cascading replication, where elected master is streaming from specified remote location
+  initializes cluster as a standby creating a cascading replication, where standby leader is streaming from specified remote location
 
 ## Postgres container resources
 

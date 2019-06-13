@@ -466,7 +466,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	out.StandbyCluster = in.StandbyCluster
+	if in.StandbyCluster != nil {
+		in, out := &in.StandbyCluster, &out.StandbyCluster
+		*out = new(StandbyDescription)
+		**out = **in
+	}
 	return
 }
 
