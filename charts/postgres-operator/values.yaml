@@ -1,0 +1,187 @@
+image:
+  registry: registry.opensource.zalan.do
+  repository: acid/postgres-operator
+  tag: v1.1.0-28-g24d412a
+  pullPolicy: "IfNotPresent"
+
+# Optionally specify an array of imagePullSecrets.
+# Secrets must be manually created in the namespace.
+# ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+# imagePullSecrets:
+  # - name: myRegistryKeySecretName
+
+podAnnotations: {}
+podLabels: {}
+
+# config shared from ConfigMap and CRD
+docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
+repair_period: 5m
+resync_period: 5m
+spilo_privileged: false
+workers: 4
+
+configUsers:
+  replication_username: standby
+  super_username: postgres
+
+configKubernetes:
+  cluster_domain: cluster.local
+  # inherited_labels: ""
+  # infrastructure_roles_secret_name: postgresql-infrastructure-roles
+  # node_readiness_label: ""
+  # oauth_token_secret_name: postgresql-operator
+  # pod_environment_configmap: ""
+  # spilo_fsgroup: "103"
+  pod_management_policy: "ordered_ready"
+  pdb_name_format: "postgres-{cluster}-pdb"
+  pod_role_label: spilo-role
+  pod_terminate_grace_period: 5m
+  secret_name_template: '{username}.{cluster}.credentials'
+
+configPostgresPodResources:
+  default_cpu_request: 100m
+  default_memory_request: 100Mi
+  default_cpu_limit: "3"
+  default_memory_limit: 1Gi
+  # set_memory_request_to_limit: true
+
+configTimeouts:
+  # master_pod_move_timeout: 10m
+  pod_deletion_wait_timeout: 10m
+  pod_label_wait_timeout: 10m
+  ready_wait_interval: 3s
+  ready_wait_timeout: 30s
+  resource_check_interval: 3s
+  resource_check_timeout: 10m
+
+configDebug:
+  debug_logging: true
+  enable_database_access: true
+
+configLoggingRestApi:
+  api_port: 8080
+  cluster_history_entries: 1000
+  ring_log_lines: 100
+
+configAwsOrGcp:
+  aws_region: eu-central-1
+  db_hosted_zone: db.example.com
+  # kube_iam_role: ""
+  # log_s3_bucket: ""
+  # wal_s3_bucket: ""
+
+configLogicalBackup:
+  logical_backup_schedule: "30 00 * * *"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  logical_backup_s3_bucket: ""
+
+# config exclusive to ConfigMap
+configMap:
+  cluster_labels: application:spilo
+  cluster_name_label: version
+  watched_namespace: "*" # listen to all namespaces
+
+configLoadBalancer:
+  # custom_service_annotations:
+  #   "keyx:valuez,keya:valuea"
+  enable_master_load_balancer: "true"
+  enable_replica_load_balancer: "false"
+  master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
+  replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
+
+configTeamsApi:
+  enable_teams_api: "false"
+  # enable_admin_role_for_users: "true"
+  # enable_team_superuser: "false"
+  # pam_configuration: https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
+  # pam_role_name: zalandos
+  # postgres_superuser_teams: "postgres_superusers"
+  # team_admin_role: "admin"
+  # team_api_role_configuration: "log_statement:all"
+  # teams_api_url: http://fake-teams-api.default.svc.cluster.local
+
+# config exclusive to CRD
+configCRD:
+  etcd_host: ""
+  min_instances: -1
+  max_instances: -1
+  # sidecar_docker_images
+  #  example: "exampleimage:exampletag"
+
+configKubernetesCRD:
+  cluster_labels:
+      application: spilo
+  cluster_name_label: cluster-name
+  enable_pod_antiaffinity: false
+  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+  # inherited_labels:
+  # - application
+  # - app
+  # watched_namespace: ""
+
+configLoadBalancerCRD:
+  # custom_service_annotations:
+  #   keyx: valuez
+  #   keya: valuea
+  enable_master_load_balancer: false
+  enable_replica_load_balancer: false
+  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
+  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
+
+configTeamsApiCRD:
+  enable_teams_api: false
+  enable_team_superuser: false
+  # pam_configuration: ""
+  pam_role_name: zalandos
+  # postgres_superuser_teams: "postgres_superusers"
+  protected_role_names:
+  - admin
+  team_admin_role: admin
+  team_api_role_configuration:
+    log_statement: all
+  # teams_api_url: ""
+
+scalyr:
+  scalyr_cpu_request: 100m
+  scalyr_memory_request: 50Mi
+  scalyr_cpu_limit: "1"
+  scalyr_memory_limit: 1Gi
+  # scalyr_api_key: ""
+  # scalyr_image: ""
+  # scalyr_server_url: ""
+
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+
+serviceAccount:
+  # Specifies whether a ServiceAccount should be created
+  create: true
+  # The name of the ServiceAccount to use.
+  # If not set and create is true, a name is generated using the fullname template
+  # When relying solely on the OperatorConfiguration CRD, set this value to "operator"
+  # Otherwise, the operator tries to use the "default" service account which is forbidden 
+  name: ""
+
+priorityClassName: ""
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 300Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 300Mi
+
+# Affinity for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+affinity: {}
+
+# Tolerations for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []
+
+# Node labels for pod assignment
+# Ref: https://kubernetes.io/docs/user-guide/node-selection/
+nodeSelector: {}

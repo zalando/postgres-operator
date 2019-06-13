@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-operator
-data:  
+data:
   watched_namespace: "*" # listen to all namespaces
   cluster_labels: application:spilo
   cluster_name_label: version
@@ -10,11 +10,13 @@ data:
 
   debug_logging: "true"
   workers: "4"
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p4
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
   pod_service_account_name: "zalando-postgres-operator"
   secret_name_template: '{username}.{cluster}.credentials'
+  cluster_domain: cluster.local
   super_username: postgres
   enable_teams_api: "false"
+  spilo_privileged: "false"
   # custom_service_annotations:
   #   "keyx:valuez,keya:valuea"
   # set_memory_request_to_limit: "true"
@@ -29,6 +31,7 @@ data:
   # pam_role_name: zalandos
   # pam_configuration: |
   #  https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
+  # inherited_labels: ""
   aws_region: eu-central-1
   db_hosted_zone: db.example.com
   master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
@@ -44,6 +47,7 @@ data:
   pod_terminate_grace_period: 5m
   pod_deletion_wait_timeout: 10m
   pod_label_wait_timeout: 10m
+  pod_management_policy: "ordered_ready"
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
   #  master_pod_move_timeout: 10m
@@ -51,3 +55,7 @@ data:
   resource_check_interval: 3s
   resource_check_timeout: 10m
   resync_period: 5m
+
+  # logical_backup_schedule: "30 00 * * *"
+  # logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  # logical_backup_s3_bucket: ""

@@ -4,6 +4,7 @@ package cluster
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -18,8 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-
-	"encoding/json"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -82,6 +81,7 @@ type Cluster struct {
 	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+
 }
 
 type compareStatefulsetResult struct {
@@ -149,21 +149,24 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 	}
 }
 
-func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
-	// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
-	var (
-		err error
-		b   []byte
-	)
-	if b, err = json.Marshal(status); err != nil {
+// SetStatus of Postgres cluster
+// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
+func (c *Cluster) setStatus(status string) {
+	var pgStatus acidv1.PostgresStatus
+	pgStatus.PostgresClusterStatus = status
+
+	patch, err := json.Marshal(struct {
+		PgStatus interface{} `json:"status"`
+	}{&pgStatus})
+
+	if err != nil {
 		c.logger.Errorf("could not marshal status: %v", err)
 	}
 
-	patch := []byte(fmt.Sprintf(`{"status": %s}`, string(b)))
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
 	// we should take advantage of it.
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch)
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch, "status")
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
 	}
@@ -172,7 +175,7 @@ func (c *Cluster) setStatus(status acidv1.PostgresStatus) {
 }
 
 func (c *Cluster) isNewCluster() bool {
-	return c.Status == acidv1.ClusterStatusCreating
+	return c.Status.Creating()
 }
 
 // initUsers populates c.systemUsers and c.pgUsers maps.
@@ -296,6 +299,13 @@ func (c *Cluster) Create() error {
 		c.logger.Infof("databases have been successfully created")
 	}
 
+	if c.Postgresql.Spec.EnableLogicalBackup {
+		if err := c.createLogicalBackupJob(); err != nil {
+			return fmt.Errorf("could not create a k8s cron job for logical backups: %v", err)
+		}
+		c.logger.Info("a k8s cron job for logical backup has been successfully created")
+	}
+
 	if err := c.listResources(); err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
 	}
@@ -317,14 +327,10 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 		match = false
 		reasons = append(reasons, "new statefulset's annotations doesn't match the current one")
 	}
-	if len(c.Statefulset.Spec.Template.Spec.Containers) != len(statefulSet.Spec.Template.Spec.Containers) {
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's container specification doesn't match the current one")
-	} else {
-		var containerReasons []string
-		needsRollUpdate, containerReasons = c.compareContainers(c.Statefulset, statefulSet)
-		reasons = append(reasons, containerReasons...)
-	}
+
+	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
+	needsRollUpdate, reasons = c.compareContainers("containers", c.Statefulset.Spec.Template.Spec.Containers, statefulSet.Spec.Template.Spec.Containers, needsRollUpdate, reasons)
+
 	if len(c.Statefulset.Spec.Template.Spec.Containers) == 0 {
 		c.logger.Warningf("statefulset %q has no container", util.NameFromMeta(c.Statefulset.ObjectMeta))
 		return &compareStatefulsetResult{}
@@ -336,7 +342,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *comp
 	if c.Statefulset.Spec.Template.Spec.ServiceAccountName != statefulSet.Spec.Template.Spec.ServiceAccountName {
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's serviceAccountName service asccount name doesn't match the current one")
+		reasons = append(reasons, "new statefulset's serviceAccountName service account name doesn't match the current one")
 	}
 	if *c.Statefulset.Spec.Template.Spec.TerminationGracePeriodSeconds != *statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds {
 		needsReplace = true
@@ -415,34 +421,37 @@ func newCheck(msg string, cond containerCondition) containerCheck {
 	return containerCheck{reason: msg, condition: cond}
 }
 
-// compareContainers: compare containers from two stateful sets
+// compareContainers: compare two list of Containers
 // and return:
 // * whether or not a rolling update is needed
 // * a list of reasons in a human readable format
-func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []string) {
-	reasons := make([]string, 0)
-	needsRollUpdate := false
+
+func (c *Cluster) compareContainers(description string, setA, setB []v1.Container, needsRollUpdate bool, reasons []string) (bool, []string) {
+	if len(setA) != len(setB) {
+		return true, append(reasons, fmt.Sprintf("new statefulset %s's length does not match the current ones", description))
+	}
+
 	checks := []containerCheck{
-		newCheck("new statefulset's container %s (index %d) name doesn't match the current one",
+		newCheck("new statefulset %s's %s (index %d) name doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
-		newCheck("new statefulset's container %s (index %d) image doesn't match the current one",
+		newCheck("new statefulset %s's %s (index %d) image doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Image != b.Image }),
-		newCheck("new statefulset's container %s (index %d) ports don't match the current one",
+		newCheck("new statefulset %s's %s (index %d) ports don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
-		newCheck("new statefulset's container %s (index %d) resources don't match the current ones",
+		newCheck("new statefulset %s's %s (index %d) resources don't match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
-		newCheck("new statefulset's container %s (index %d) environment doesn't match the current one",
+		newCheck("new statefulset %s's %s (index %d) environment doesn't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
-		newCheck("new statefulset's container %s (index %d) environment sources don't match the current one",
+		newCheck("new statefulset %s's %s (index %d) environment sources don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 	}
 
-	for index, containerA := range setA.Spec.Template.Spec.Containers {
-		containerB := setB.Spec.Template.Spec.Containers[index]
+	for index, containerA := range setA {
+		containerB := setB[index]
 		for _, check := range checks {
 			if check.condition(containerA, containerB) {
 				needsRollUpdate = true
-				reasons = append(reasons, fmt.Sprintf(check.reason, containerA.Name, index))
+				reasons = append(reasons, fmt.Sprintf(check.reason, description, containerA.Name, index))
 			}
 		}
 	}
@@ -453,16 +462,16 @@ func (c *Cluster) compareContainers(setA, setB *v1beta1.StatefulSet) (bool, []st
 func compareResources(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
 	equal := true
 	if a != nil {
-		equal = compareResoucesAssumeFirstNotNil(a, b)
+		equal = compareResourcesAssumeFirstNotNil(a, b)
 	}
 	if equal && (b != nil) {
-		equal = compareResoucesAssumeFirstNotNil(b, a)
+		equal = compareResourcesAssumeFirstNotNil(b, a)
 	}
 
 	return equal
 }
 
-func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
+func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.ResourceRequirements) bool {
 	if b == nil || (len(b.Requests) == 0) {
 		return len(a.Requests) == 0
 	}
@@ -480,8 +489,10 @@ func compareResoucesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resource
 
 }
 
-// Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object.
-// (i.e. service) is treated as an error.
+// Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
+// (i.e. service) is treated as an error
+// logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
+// for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
 
@@ -576,6 +587,43 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	// logical backup job
+	func() {
+
+		// create if it did not exist
+		if !oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup {
+			c.logger.Debugf("creating backup cron job")
+			if err := c.createLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not create a k8s cron job for logical backups: %v", err)
+				updateFailed = true
+				return
+			}
+		}
+
+		// delete if no longer needed
+		if oldSpec.Spec.EnableLogicalBackup && !newSpec.Spec.EnableLogicalBackup {
+			c.logger.Debugf("deleting backup cron job")
+			if err := c.deleteLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not delete a k8s cron job for logical backups: %v", err)
+				updateFailed = true
+				return
+			}
+
+		}
+
+		// apply schedule changes
+		// this is the only parameter of logical backups a user can overwrite in the cluster manifest
+		if (oldSpec.Spec.EnableLogicalBackup && newSpec.Spec.EnableLogicalBackup) &&
+			(newSpec.Spec.LogicalBackupSchedule != oldSpec.Spec.LogicalBackupSchedule) {
+			c.logger.Debugf("updating schedule of the backup cron job")
+			if err := c.syncLogicalBackupJob(); err != nil {
+				c.logger.Errorf("could not sync logical backup jobs: %v", err)
+				updateFailed = true
+			}
+		}
+
+	}()
+
 	// Roles and Databases
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
 		c.logger.Debugf("syncing roles")
@@ -603,6 +651,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 func (c *Cluster) Delete() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
+	// deleting the cron job also removes pods and batch jobs it created
+	if err := c.deleteLogicalBackupJob(); err != nil {
+		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+	}
 
 	if err := c.deleteStatefulSet(); err != nil {
 		c.logger.Warningf("could not delete statefulset: %v", err)
@@ -636,6 +690,7 @@ func (c *Cluster) Delete() {
 	if err := c.deletePatroniClusterObjects(); err != nil {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
 	}
+
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
@@ -828,7 +883,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 	return nil
 }
 
-// resolves naming conflicts between existing and new roles by chosing either of them.
+// resolves naming conflicts between existing and new roles by choosing either of them.
 func (c *Cluster) resolveNameConflict(currentRole, newRole *spec.PgUser) spec.PgUser {
 	var result spec.PgUser
 	if newRole.Origin >= currentRole.Origin {
@@ -922,7 +977,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	// signal the role label waiting goroutine to close the shop and go home
 	close(stopCh)
 	// wait until the goroutine terminates, since unregisterPodSubscriber
-	// must be called before the outer return; otherwsise we risk subscribing to the same pod twice.
+	// must be called before the outer return; otherwise we risk subscribing to the same pod twice.
 	wg.Wait()
 	// close the label waiting channel no sooner than the waiting goroutine terminates.
 	close(podLabelErr)
@@ -957,8 +1012,8 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 	if !c.patroniUsesKubernetes() {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
-	c.logger.Debugf("removing leftover Patroni objects (endpoints or configmaps)")
-	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterConfigMaps} {
+	c.logger.Debugf("removing leftover Patroni objects (endpoints, services and configmaps)")
+	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps} {
 		if err := deleter(); err != nil {
 			return err
 		}
@@ -988,6 +1043,19 @@ func (c *Cluster) deleteClusterObject(
 		}
 	}
 	return nil
+}
+
+func (c *Cluster) deletePatroniClusterServices() error {
+	get := func(name string) (spec.NamespacedName, error) {
+		svc, err := c.KubeClient.Services(c.Namespace).Get(name, metav1.GetOptions{})
+		return util.NameFromMeta(svc.ObjectMeta), err
+	}
+
+	deleteServiceFn := func(name string) error {
+		return c.KubeClient.Services(c.Namespace).Delete(name, c.deleteOptions)
+	}
+
+	return c.deleteClusterObject(get, deleteServiceFn, "service")
 }
 
 func (c *Cluster) deletePatroniClusterEndpoints() error {

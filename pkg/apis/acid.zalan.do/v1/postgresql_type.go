@@ -3,7 +3,7 @@ package v1
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -16,7 +16,7 @@ type Postgresql struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   PostgresSpec   `json:"spec"`
-	Status PostgresStatus `json:"status,omitempty"`
+	Status PostgresStatus `json:"status"`
 	Error  string         `json:"-"`
 }
 
@@ -29,6 +29,8 @@ type PostgresSpec struct {
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
+
+	SpiloFSGroup *int64 `json:"spiloFSGroup,omitempty"`
 
 	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
 	// in that case the var evaluates to nil and the value is taken from the operator config
@@ -43,17 +45,19 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	NumberOfInstances    int32                `json:"numberOfInstances"`
-	Users                map[string]UserFlags `json:"users"`
-	MaintenanceWindows   []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone                CloneDescription     `json:"clone"`
-	ClusterName          string               `json:"-"`
-	Databases            map[string]string    `json:"databases,omitempty"`
-	Tolerations          []v1.Toleration      `json:"tolerations,omitempty"`
-	Sidecars             []Sidecar            `json:"sidecars,omitempty"`
-	InitContainers       []v1.Container       `json:"init_containers,omitempty"`
-	PodPriorityClassName string               `json:"pod_priority_class_name,omitempty"`
-	ShmVolume            *bool                `json:"enableShmVolume,omitempty"`
+	NumberOfInstances     int32                `json:"numberOfInstances"`
+	Users                 map[string]UserFlags `json:"users"`
+	MaintenanceWindows    []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+	Clone                 CloneDescription     `json:"clone"`
+	ClusterName           string               `json:"-"`
+	Databases             map[string]string    `json:"databases,omitempty"`
+	Tolerations           []v1.Toleration      `json:"tolerations,omitempty"`
+	Sidecars              []Sidecar            `json:"sidecars,omitempty"`
+	InitContainers        []v1.Container       `json:"init_containers,omitempty"`
+	PodPriorityClassName  string               `json:"pod_priority_class_name,omitempty"`
+	ShmVolume             *bool                `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup   bool                 `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -114,6 +118,7 @@ type CloneDescription struct {
 	ClusterName  string `json:"cluster,omitempty"`
 	UID          string `json:"uid,omitempty"`
 	EndTimestamp string `json:"timestamp,omitempty"`
+	S3WalPath    string `json:"s3_wal_path,omitempty"`
 }
 
 // Sidecar defines a container to be run in the same pod as the Postgres container.
@@ -129,4 +134,6 @@ type Sidecar struct {
 type UserFlags []string
 
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
-type PostgresStatus string
+type PostgresStatus struct {
+	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+}

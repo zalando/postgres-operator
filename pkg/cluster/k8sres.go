@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,6 +20,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -147,7 +149,7 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 	return requests, nil
 }
 
-func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, logger *logrus.Entry, isNewCluster bool, initialPatroniConfig string) string {
+func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, logger *logrus.Entry, isNewCluster bool, initialPatroniConfig string) (string, error) {
 	config := spiloConfiguration{}
 
 	config.Bootstrap = pgBootstrap{}
@@ -233,7 +235,7 @@ PatroniInitDBParams:
 		} else {
 			if err := json.Unmarshal([]byte(initialPatroniConfig), &oldestKnownPatroniCfg); err != nil {
 				logger.Errorf("cannot decode initial patroni config from annotations: %s (%v)", err, initialPatroniConfig)
-				return ""
+				return "", err
 			}
 		}
 
@@ -266,12 +268,9 @@ PatroniInitDBParams:
 			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
 		},
 	}
-	result, err := json.Marshal(config)
-	if err != nil {
-		logger.Errorf("cannot convert spilo configuration into JSON: %v", err)
-		return ""
-	}
-	return string(result)
+
+	res, err := json.Marshal(config)
+	return string(res), err
 }
 
 func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (local, bootstrap map[string]string) {
@@ -349,7 +348,7 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 	return []v1.Toleration{}
 }
 
-// isBootstrapOnlyParameter checks asgainst special Patroni bootstrap parameters.
+// isBootstrapOnlyParameter checks against special Patroni bootstrap parameters.
 // Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
 // See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
 func isBootstrapOnlyParameter(param string) bool {
@@ -371,14 +370,14 @@ func generateVolumeMounts() []v1.VolumeMount {
 	}
 }
 
-func generateSpiloContainer(
+func generateContainer(
 	name string,
 	dockerImage *string,
 	resourceRequirements *v1.ResourceRequirements,
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
+	privilegedMode bool,
 ) *v1.Container {
-	privilegedMode := true
 	return &v1.Container{
 		Name:            name,
 		Image:           *dockerImage,
@@ -452,6 +451,7 @@ func generatePodTemplate(
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
 	tolerationsSpec *[]v1.Toleration,
+	spiloFSGroup *int64,
 	nodeAffinity *v1.Affinity,
 	terminateGracePeriod int64,
 	podServiceAccountName string,
@@ -465,6 +465,11 @@ func generatePodTemplate(
 	terminateGracePeriodSeconds := terminateGracePeriod
 	containers := []v1.Container{*spiloContainer}
 	containers = append(containers, sidecarContainers...)
+	securityContext := v1.PodSecurityContext{}
+
+	if spiloFSGroup != nil {
+		securityContext.FSGroup = spiloFSGroup
+	}
 
 	podSpec := v1.PodSpec{
 		ServiceAccountName:            podServiceAccountName,
@@ -472,6 +477,7 @@ func generatePodTemplate(
 		Containers:                    containers,
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
+		SecurityContext:               &securityContext,
 	}
 
 	if shmVolume {
@@ -802,7 +808,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	if c.Statefulset != nil {
 		initialPatroniConfig = c.Statefulset.ObjectMeta.Annotations[initialPatroniConfigAnnotationKey]
 	}
-	spiloConfiguration := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger, c.isNewCluster(), initialPatroniConfig)
+	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger, c.isNewCluster(), initialPatroniConfig)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
+	}
 
 	// generate environment variables for the spilo container
 	spiloEnvVars := deduplicateEnvVars(
@@ -816,11 +825,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 
 	// generate the spilo container
 	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
-	spiloContainer := generateSpiloContainer(c.containerName(),
+	spiloContainer := generateContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
 		spiloEnvVars,
 		volumeMounts,
+		c.OpConfig.Resources.SpiloPrivileged,
 	)
 
 	// resolve conflicts between operator-global and per-cluster sidecars
@@ -852,6 +862,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
+	// determine the FSGroup for the spilo pod
+	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
+	if spec.SpiloFSGroup != nil {
+		effectiveFSGroup = spec.SpiloFSGroup
+	}
+
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
@@ -860,6 +876,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		spec.InitContainers,
 		sidecarContainers,
 		&tolerationSpec,
+		effectiveFSGroup,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
@@ -896,6 +913,20 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		ann[initialPatroniConfigAnnotationKey] = initialPatroniConfig
 	}
 
+	// the operator has domain-specific logic on how to do rolling updates of PG clusters
+	// so we do not use default rolling updates implemented by stateful sets
+	// that leaves the legacy "OnDelete" update strategy as the only option
+	updateStrategy := v1beta1.StatefulSetUpdateStrategy{Type: v1beta1.OnDeleteStatefulSetStrategyType}
+
+	var podManagementPolicy v1beta1.PodManagementPolicyType
+	if c.OpConfig.PodManagementPolicy == "ordered_ready" {
+		podManagementPolicy = v1beta1.OrderedReadyPodManagement
+	} else if c.OpConfig.PodManagementPolicy == "parallel" {
+		podManagementPolicy = v1beta1.ParallelPodManagement
+	} else {
+		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
+	}
+
 	statefulSet := &v1beta1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
@@ -909,6 +940,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
+			UpdateStrategy:       updateStrategy,
+			PodManagementPolicy:  podManagementPolicy,
 		},
 	}
 
@@ -1035,6 +1068,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 		return nil, fmt.Errorf("could not parse volume size: %v", err)
 	}
 
+	volumeMode := v1.PersistentVolumeFilesystem
 	volumeClaim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metadata,
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -1045,6 +1079,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 				},
 			},
 			StorageClassName: storageClassName,
+			VolumeMode:       &volumeMode,
 		},
 	}
 
@@ -1237,10 +1272,37 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			})
 	} else {
 		// cloning with S3, find out the bucket to clone
+		msg := "Clone from S3 bucket"
+		c.logger.Info(msg, description.S3WalPath)
+
+		if description.S3WalPath == "" {
+			msg := "Figure out which S3 bucket to use from env"
+			c.logger.Info(msg, description.S3WalPath)
+
+			envs := []v1.EnvVar{
+				{
+					Name:  "CLONE_WAL_S3_BUCKET",
+					Value: c.OpConfig.WALES3Bucket,
+				},
+				{
+					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
+					Value: getBucketScopeSuffix(description.UID),
+				},
+			}
+
+			result = append(result, envs...)
+		} else {
+			msg := "Use custom parsed S3WalPath %s from the manifest"
+			c.logger.Warningf(msg, description.S3WalPath)
+
+			result = append(result, v1.EnvVar{
+				Name:  "CLONE_WALE_S3_PREFIX",
+				Value: description.S3WalPath,
+			})
+		}
+
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
-		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(description.UID)})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
@@ -1272,4 +1334,169 @@ func (c *Cluster) getClusterServiceConnectionParameters(clusterName string) (hos
 	host = clusterName
 	port = "5432"
 	return
+}
+
+func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
+
+	var (
+		err                  error
+		podTemplate          *v1.PodTemplateSpec
+		resourceRequirements *v1.ResourceRequirements
+	)
+
+	// NB: a cron job creates standard batch jobs according to schedule; these batch jobs manage pods and clean-up
+
+	c.logger.Debug("Generating logical backup pod template")
+
+	// allocate for the backup pod the same amount of resources as for normal DB pods
+	defaultResources := c.makeDefaultResources()
+	resourceRequirements, err = generateResourceRequirements(c.Spec.Resources, defaultResources)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
+	}
+
+	envVars := c.generateLogicalBackupPodEnvVars()
+	logicalBackupContainer := generateContainer(
+		"logical-backup",
+		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
+		resourceRequirements,
+		envVars,
+		[]v1.VolumeMount{},
+		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
+	)
+
+	labels := map[string]string{
+		"version":     c.Name,
+		"application": "spilo-logical-backup",
+	}
+	podAffinityTerm := v1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+		TopologyKey: "kubernetes.io/hostname",
+	}
+	podAffinity := v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{{
+				Weight:          1,
+				PodAffinityTerm: podAffinityTerm,
+			},
+			},
+		}}
+
+	// re-use the method that generates DB pod templates
+	if podTemplate, err = generatePodTemplate(
+		c.Namespace,
+		c.labelsSet(true),
+		logicalBackupContainer,
+		[]v1.Container{},
+		[]v1.Container{},
+		&[]v1.Toleration{},
+		nil,
+		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
+		c.OpConfig.PodServiceAccountName,
+		c.OpConfig.KubeIAMRole,
+		"",
+		false,
+		false,
+		""); err != nil {
+		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
+	}
+
+	// overwrite specific params of logical backups pods
+	podTemplate.Spec.Affinity = &podAffinity
+	podTemplate.Spec.RestartPolicy = "Never" // affects containers within a pod
+
+	// configure a batch job
+
+	jobSpec := batchv1.JobSpec{
+		Template: *podTemplate,
+	}
+
+	// configure a cron job
+
+	jobTemplateSpec := batchv1beta1.JobTemplateSpec{
+		Spec: jobSpec,
+	}
+
+	schedule := c.Postgresql.Spec.LogicalBackupSchedule
+	if schedule == "" {
+		schedule = c.OpConfig.LogicalBackupSchedule
+	}
+
+	cronJob := &batchv1beta1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.getLogicalBackupJobName(),
+			Namespace: c.Namespace,
+			Labels:    c.labelsSet(true),
+		},
+		Spec: batchv1beta1.CronJobSpec{
+			Schedule:          schedule,
+			JobTemplate:       jobTemplateSpec,
+			ConcurrencyPolicy: batchv1beta1.ForbidConcurrent,
+		},
+	}
+
+	return cronJob, nil
+}
+
+func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
+
+	envVars := []v1.EnvVar{
+		{
+			Name:  "SCOPE",
+			Value: c.Name,
+		},
+		// Bucket env vars
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
+		// Postgres env vars
+		{
+			Name:  "PG_VERSION",
+			Value: c.Spec.PgVersion,
+		},
+		{
+			Name:  "PGPORT",
+			Value: "5432",
+		},
+		{
+			Name:  "PGUSER",
+			Value: c.OpConfig.SuperUsername,
+		},
+		{
+			Name:  "PGDATABASE",
+			Value: c.OpConfig.SuperUsername,
+		},
+		{
+			Name:  "PGSSLMODE",
+			Value: "require",
+		},
+		{
+			Name: "PGPASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.credentialSecretName(c.OpConfig.SuperUsername),
+					},
+					Key: "password",
+				},
+			},
+		},
+	}
+
+	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+
+	return envVars
+}
+
+// getLogicalBackupJobName returns the name; the job itself may not exists
+func (c *Cluster) getLogicalBackupJobName() (jobName string) {
+	return "logical-backup-" + c.clusterName().Name
 }

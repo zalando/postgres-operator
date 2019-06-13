@@ -1,4 +1,3 @@
-
 Individual postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgres CRD` (custom resource
 definition). The following section describes the structure of the manifest and
@@ -13,6 +12,10 @@ their amount is usually described as a string together with the units of
 measurements. Please, refer to the [Kubernetes
 documentation](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the possible values of those.
+
+:exclamation: If both operator configmap/CRD and a Postgres cluster manifest
+define the same parameter, the value from the Postgres cluster manifest is
+applied.
 
 ## Manifest structure
 
@@ -45,7 +48,7 @@ Those parameters are grouped under the `metadata` top-level key.
 
 ## Top-level parameters
 
-Those are parameters grouped directly under  the `spec` key in the manifest.
+These parameters are grouped directly under  the `spec` key in the manifest.
 
 * **teamId**
   name of the team the cluster belongs to. Changing it after the cluster
@@ -54,6 +57,13 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
 * **dockerImage**
   custom docker image that overrides the **docker_image** operator parameter.
   It should be a [Spilo](https://github.com/zalando/spilo) image.  Optional.
+
+* **spiloFSGroup**
+  the Persistent Volumes for the spilo pods in the StatefulSet will be owned
+  and writable by the group ID specified. This will override the **spilo_fsgroup**
+  operator parameter. This is required to run Spilo as a non-root process, but
+  requires a custom spilo image. Note the FSGroup of a Pod cannot be changed
+  without recreating a new Pod.
 
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
@@ -103,7 +113,8 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
    class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
    that should be assigned to the cluster pods. When not specified, the value
    is taken from the `pod_priority_class_name` operator parameter, if not set
-   then the default priority class is taken. The priority class itself must be defined in advance.
+   then the default priority class is taken. The priority class itself must be
+   defined in advance.
 
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default docker
@@ -116,6 +127,14 @@ Those are parameters grouped directly under  the `spec` key in the manifest.
   (`enable_shm_volume`, which is `true` by default). It it's present and value
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration).
+
+* **enableLogicalBackup**
+  Determines if the logical backup of this cluster should be taken and uploaded
+  to S3. Default: false.
+
+* **logicalBackupSchedule**
+  Schedule for the logical backup k8s cron job. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
+  into account. Default: "30 00 \* \* \*"
 
 ## Postgres parameters
 
@@ -173,7 +192,12 @@ explanation of `ttl` and `loop_wait` parameters.
   set by the Spilo docker image. Optional.
 
 * **slots**
-  permanent replication slots that Patroni preserves after failover by re-creating them on the new primary immediately after doing a promote. Slots could be reconfigured with the help of `patronictl edit-config`. It is the responsibility of a user to avoid clashes in names between replication slots automatically created by Patroni for cluster members and permanent replication slots. Optional.
+  permanent replication slots that Patroni preserves after failover by
+  re-creating them on the new primary immediately after doing a promote. Slots
+  could be reconfigured with the help of `patronictl edit-config`. It is the
+  responsibility of a user to avoid clashes in names between replication slots
+  automatically created by Patroni for cluster members and permanent replication
+  slots. Optional.
 
 ## Postgres container resources
 
@@ -262,3 +286,36 @@ defined in the sidecar dictionary:
   a dictionary of environment variables. Use usual Kubernetes definition
   (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
   for environment variables. Optional.
+
+* **resources** see below. Optional.
+
+#### Sidecar container resources
+
+Those parameters define [CPU and memory requests and
+limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
+for the sidecar container. They are grouped under the `resources` key for each sidecar.
+There are two subgroups, `requests` and `limits`.
+
+##### Requests
+
+CPU and memory requests for the sidecar container.
+
+* **cpu**
+  CPU requests for the sidecar container. Optional, overrides the
+  `default_cpu_requests` operator configuration parameter. Optional.
+
+* **memory**
+  memory requests for the sidecar container. Optional, overrides the
+  `default_memory_request` operator configuration parameter. Optional.
+
+##### Limits
+
+CPU and memory limits for the sidecar container.
+
+* **cpu**
+  CPU limits for the sidecar container. Optional, overrides the
+  `default_cpu_limits` operator configuration parameter. Optional.
+
+* **memory**
+  memory limits for the sidecar container. Optional, overrides the
+  `default_memory_limits` operator configuration parameter. Optional.

@@ -20,10 +20,20 @@ const (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
-var cl = New(Config{OpConfig: config.Config{ProtectedRoles: []string{"admin"},
-	Auth: config.Auth{SuperUsername: superUserName,
-		ReplicationUsername: replicationUserName}}},
-	k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+var cl = New(
+	Config{
+		OpConfig: config.Config{
+			ProtectedRoles: []string{"admin"},
+			Auth: config.Auth{
+				SuperUsername:       superUserName,
+				ReplicationUsername: replicationUserName,
+			},
+		},
+	},
+	k8sutil.NewMockKubernetesClient(),
+	acidv1.Postgresql{},
+	logger,
+)
 
 func TestInitRobotUsers(t *testing.T) {
 	testName := "TestInitRobotUsers"

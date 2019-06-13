@@ -4,7 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   etcd_host: ""
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-11:1.5-p42
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
   workers: 4
   min_instances: -1
   max_instances: -1
@@ -21,8 +21,11 @@ configuration:
     pod_terminate_grace_period: 5m
     pdb_name_format: "postgres-{cluster}-pdb"
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+    cluster_domain: cluster.local
     oauth_token_secret_name: postgresql-operator
     pod_role_label: spilo-role
+    # spilo_fsgroup: 103
+    spilo_privileged: false
     cluster_labels:
         application: spilo
     # inherited_labels:
@@ -34,6 +37,9 @@ configuration:
     # toleration: {}
     # infrastructure_roles_secret_name: ""
     # pod_environment_configmap: ""
+    pod_management_policy: "ordered_ready"
+    enable_pod_antiaffinity: false
+    pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   postgres_pod_resources:
     default_cpu_request: 100m
     default_memory_request: 100Mi
@@ -87,4 +93,7 @@ configuration:
     # scalyr_api_key: ""
     # scalyr_image: ""
     # scalyr_server_url: ""
-
+  logical_backup:
+    logical_backup_schedule: "30 00 * * *"
+    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+    logical_backup_s3_bucket: ""

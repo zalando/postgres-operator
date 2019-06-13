@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "postgres-operator.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
+    helm.sh/chart: {{ template "postgres-operator.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  pod_service_account_name: {{- if eq .Values.serviceAccount.name "" }}
+                                {{ template "postgres-operator.fullname" . }}
+                            {{- else }}
+                                {{ .Values.serviceAccount.name }}
+                            {{- end }}
+  api_port: "{{ .Values.configLoggingRestApi.api_port }}"
+  cluster_history_entries: "{{ .Values.configLoggingRestApi.cluster_history_entries }}"
+  docker_image: {{ .Values.docker_image }}
+  debug_logging: "{{ .Values.configDebug.debug_logging }}"
+  enable_database_access: "{{ .Values.configDebug.enable_database_access }}"
+  repair_period: {{ .Values.repair_period }}
+  resync_period: {{ .Values.resync_period }}
+  ring_log_lines: "{{ .Values.configLoggingRestApi.ring_log_lines }}"
+  spilo_privileged: "{{ .Values.spilo_privileged }}"
+  workers: "{{ .Values.workers }}"
+{{ toYaml .Values.configMap | indent 2 }}
+{{ toYaml .Values.configUsers | indent 2 }}
+{{ toYaml .Values.configKubernetes | indent 2 }}
+{{ toYaml .Values.configTimeouts | indent 2 }}
+{{ toYaml .Values.configLoadBalancer | indent 2 }}
+{{ toYaml .Values.configAwsOrGcp | indent 2 }}
+{{ toYaml .Values.configTeamsApi | indent 2 }}

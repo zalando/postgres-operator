@@ -43,13 +43,25 @@ $ kubectl get pods -w --show-labels
 
 ## Connect to PostgreSQL
 
-We can use the generated secret of the `postgres` robot user to connect to our `acid-minimal-cluster` master running in Minikube:
+With a `port-forward` on one of the database pods (e.g. the master) you can
+connect to the PostgreSQL database. Use labels to filter for the master pod of
+our test cluster.
 
 ```bash
-$ export PGHOST=db_host
-$ export PGPORT=db_port
+# get name of master pod of acid-minimal-cluster
+export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,version=acid-minimal-cluster,spilo-role=master)
+
+# set up port forward
+kubectl port-forward $PGMASTER 6432:5432
+```
+
+Open another CLI and connect to the database. Use the generated secret of the
+`postgres` robot user to connect to our `acid-minimal-cluster` master running
+in Minikube:
+
+```bash
 $ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
-$ psql -U postgres
+$ psql -U postgres -p 6432
 ```
 
 # Defining database roles in the operator
@@ -258,6 +270,13 @@ spec:
   sidecars:
     - name: "container-name"
       image: "company/image:tag"
+      resources:
+        limits:
+          cpu: 500m
+          memory: 500Mi
+        requests:
+          cpu: 100m
+          memory: 100Mi
       env:
         - name: "ENV_VAR_NAME"
           value: "any-k8s-env-things"
@@ -335,3 +354,11 @@ every 6 hours.
 Note that if the statefulset is scaled down before resizing the size changes
 are only applied to the volumes attached to the running pods. The size of the
 volumes that correspond to the previously running pods is not changed.
+
+## Logical backups
+
+If you add
+```
+  enableLogicalBackup: true
+```
+to the cluster manifest, the operator will create and sync a k8s cron job to do periodic logical backups of this particular Postgres cluster. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. See [configuration reference](reference/cluster_manifest.md) and [administrator documentation](administrator.md) for details on how backups are executed.
