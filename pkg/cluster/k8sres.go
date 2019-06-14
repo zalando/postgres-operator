@@ -1266,6 +1266,29 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		result = append(result, v1.EnvVar{Name: "CLONE_METHOD", Value: "CLONE_WITH_WALE"})
 		result = append(result, v1.EnvVar{Name: "CLONE_TARGET_TIME", Value: description.EndTimestamp})
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+
+		if description.S3Endpoint != "" {
+		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
+		   result = append(result, v1.EnvVar{Name: "CLONE_WALE_S3_ENDPOINT", Value: description.S3Endpoint})
+		}
+
+		if description.S3AccessKeyId != "" {
+		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_ACCESS_KEY_ID", Value: description.S3AccessKeyId})
+		}
+
+		if description.S3SecretAccessKey != "" {
+		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_SECRET_ACCESS_KEY", Value: description.S3SecretAccessKey})
+		}
+
+		if description.S3ForcePathStyle != nil {
+		   s3ForcePathStyle := "0"
+
+		   if *description.S3ForcePathStyle {
+			   s3ForcePathStyle = "1"
+		   }
+
+		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: s3ForcePathStyle})
+		}
 	}
 
 	return result

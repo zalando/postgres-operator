@@ -254,6 +254,24 @@ metadata:
 Note that timezone is required for `timestamp`. Otherwise, offset is relative
 to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
+For non AWS S3 following settings can be set to support cloning from other S3 implementations:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-test-cluster
+spec:
+  clone:
+    uid: "efd12e58-5786-11e8-b5a7-06148230260c"
+    cluster: "acid-batman"
+    timestamp: "2017-12-19T12:40:33+01:00"
+    s3_endpoint: https://s3.acme.org
+    s3_access_key_id: 0123456789abcdef0123456789abcdef
+    s3_secret_access_key: 0123456789abcdef0123456789abcdef
+    s3_force_path_style: true
+```
+
 ## Sidecar Support
 
 Each cluster can specify arbitrary sidecars to run. These containers could be used for

@@ -61,12 +61,12 @@ var cloneClusterDescriptions = []struct {
 	in  *CloneDescription
 	err error
 }{
-	{&CloneDescription{"foo+bar", "", "NotEmpty", ""}, nil},
-	{&CloneDescription{"foo+bar", "", "", ""},
+	{&CloneDescription{"foo+bar", "", "NotEmpty", "", "", "", "", nil}, nil},
+	{&CloneDescription{"foo+bar", "", "", "", "", "", "", nil},
 		errors.New(`clone cluster name must confirm to DNS-1035, regex used for validation is "^[a-z]([-a-z0-9]*[a-z0-9])?$"`)},
-	{&CloneDescription{"foobar123456789012345678901234567890123456789012345678901234567890", "", "", ""},
+	{&CloneDescription{"foobar123456789012345678901234567890123456789012345678901234567890", "", "", "", "", "", "", nil},
 		errors.New("clone cluster name must be no longer than 63 characters")},
-	{&CloneDescription{"foobar", "", "", ""}, nil},
+	{&CloneDescription{"foobar", "", "", "", "", "", "", nil}, nil},
 }
 
 var maintenanceWindows = []struct {
