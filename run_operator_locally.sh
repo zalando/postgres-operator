@@ -82,15 +82,15 @@ function clean_up(){
 
 function start_minikube(){
 
-    echo "==== START MINIKUBE ==== "
+    echo "==== START MINIKUBE ===="
     echo "May take a few minutes ..."
 
     minikube start
     kubectl config set-context minikube
 
-    echo "==== MINIKUBE STATUS ==== "
+    echo "==== MINIKUBE STATUS ===="
     minikube status
-
+    echo ""
 }
 
 
@@ -133,7 +133,7 @@ function deploy_self_built_image() {
 
 function start_operator(){
 
-    echo "==== START OPERATOR ==== "
+    echo "==== START OPERATOR ===="
     echo "Certain operations may be retried multiple times..."
 
     # the order of resource initialization is significant

@@ -1,4 +1,4 @@
-.PHONY: clean local test linux macos docker push scm-source.json
+.PHONY: clean local test linux macos docker push scm-source.json e2e-run e2e-tools e2e-build
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
@@ -34,7 +34,7 @@ ifdef CDP_PULL_REQUEST_NUMBER
 	CDP_TAG := -${CDP_BUILD_VERSION}
 endif
 
-
+KIND_PATH := $(GOPATH)/bin
 PATH := $(GOPATH)/bin:$(PATH)
 SHELL := env PATH=$(PATH) $(SHELL)
 
@@ -91,3 +91,16 @@ deps:
 test:
 	hack/verify-codegen.sh
 	@go test ./...
+
+e2e-build:
+	docker build --tag="postgres-operator-e2e-tests" -f e2e/Dockerfile .
+
+e2e-tools:
+	# install pinned version of 'kind' 
+	# leave the name as is to avoid overwriting official binary named `kind`
+	wget https://github.com/kubernetes-sigs/kind/releases/download/v0.3.0/kind-linux-amd64
+	chmod +x kind-linux-amd64
+	mv kind-linux-amd64 $(KIND_PATH)
+
+e2e-run: docker
+	e2e/run.sh

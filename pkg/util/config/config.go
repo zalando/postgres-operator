@@ -25,7 +25,9 @@ type Resources struct {
 	PodLabelWaitTimeout     time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
 	PodDeletionWaitTimeout  time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
 	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	SpiloFSGroup            *int64            `name:"spilo_fsgroup"`
 	PodPriorityClassName    string            `name:"pod_priority_class_name"`
+	ClusterDomain           string            `name:"cluster_domain" default:"cluster.local"`
 	SpiloPrivileged         bool              `name:"spilo_privileged" default:"false"`
 	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels         []string          `name:"inherited_labels" default:""`
@@ -66,16 +68,24 @@ type Scalyr struct {
 	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
 }
 
+// LogicalBackup
+type LogicalBackup struct {
+	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket" default:""`
+}
+
 // Config describes operator config
 type Config struct {
 	CRD
 	Resources
 	Auth
 	Scalyr
+	LogicalBackup
 
 	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use k8s as a DCS
-	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-cdp-10:1.4-p8"`
+	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-11:1.5-p7"`
 	Sidecars         map[string]string `name:"sidecar_docker_images"`
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
 	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`

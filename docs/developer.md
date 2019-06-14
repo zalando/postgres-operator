@@ -20,17 +20,16 @@ that your setup is working.
 Note: if you use multiple Kubernetes clusters, you can switch to Minikube with
 `kubectl config use-context minikube`
 
-## Create ConfigMap
+## Deploying the operator
 
-ConfigMap is used to store the configuration of the operator
+### Kubernetes manifest
+
+A ConfigMap is used to store the configuration of the operator. Alternatively,
+a CRD-based configuration can be used, as described [here](reference/operator_parameters).
 
 ```bash
     $ kubectl --context minikube  create -f manifests/configmap.yaml
 ```
-
-## Deploying the operator
-
-### - Kubernetes manifest
 
 First you need to install the service account definition in your Minikube cluster.
 
@@ -46,15 +45,23 @@ Next deploy the postgres-operator from the docker image Zalando is using:
 
 If you prefer to build the image yourself follow up down below.
 
-### - Helm chart
+### Helm chart
 
-You can install postgres-operator also with a [Helm](https://helm.sh/) chart.
-This requires installing the Helm CLI first and then initializing it in the
-cluster.
+Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
+chart which saves you the manual steps. Therefore, you would need to install
+the helm CLI on your machine. After initializing helm (and its server
+component Tiller) in your local cluster you can install the operator chart.
+You can define a release name that is prepended to the operator resource's
+names.
+
+Use `--name zalando` to match with the default service account name as older
+operator versions do not support custom names for service accounts. When relying
+solely on the CRD-based configuration edit the `serviceAccount` section in the
+[values yaml file](../charts/values.yaml) by setting the name to `"operator"`.
 
 ```bash
     $ helm init
-    $ helm install --name my-release ./charts/postgres-operator
+    $ helm install --name zalando ./charts/postgres-operator
 ```
 
 ## Check if CustomResourceDefinition has been registered
@@ -203,7 +210,7 @@ localhost:8080 by doing:
 The inner 'query' gets the name of the postgres operator pod, and the outer
 enables port forwarding. Afterwards, you can access the operator API with:
 
-    $ curl http://127.0.0.1:8080/$endpoint| jq .
+    $ curl --location http://127.0.0.1:8080/$endpoint | jq .
 
 The available endpoints are listed below. Note that the worker ID is an integer
 from 0 up to 'workers' - 1 (value configured in the operator configuration and
@@ -315,6 +322,16 @@ Then you can for example check the Patroni logs:
 kubectl logs acid-minimal-cluster-0
 ```
 
+## End-to-end tests
+
+The operator provides reference e2e (end-to-end) tests to ensure various infra parts work smoothly together.
+Each e2e execution tests a Postgres operator image built from the current git branch. The test runner starts a [kind](https://kind.sigs.k8s.io/) (local k8s) cluster and Docker container with tests. The k8s API client from within the container connects to the `kind` cluster using the standard Docker `bridge` network.
+The tests utilize examples from `/manifests` (ConfigMap is used for the operator configuration) to avoid maintaining yet another set of configuration files. The kind cluster is deleted if tests complete successfully.
+
+End-to-end tests are executed automatically during builds; to invoke them locally use `make e2e-run` from the project's top directory. Run `make e2e-tools e2e-build` to install `kind` and build the tests' image locally before the first run. 
+
+End-to-end tests are written in Python and use `flake8` for code quality. Please run flake8 [before submitting a PR](http://flake8.pycqa.org/en/latest/user/using-hooks.html).
+
 ## Introduce additional configuration parameters
 
 In the case you want to add functionality to the operator that shall be
@@ -322,6 +339,9 @@ controlled via the operator configuration there are a few places that need to
 be updated. As explained [here](reference/operator_parameters.md), it's possible
 to configure the operator either with a ConfigMap or CRD, but currently we aim
 to synchronize parameters everywhere.
+
+When choosing a parameter name for a new option in a PG manifest, keep in mind
+the naming conventions there. The `snake_case` variables come from the Patroni/Postgres world, while the `camelCase` from the k8s world.
 
 Note: If one option is defined in the operator configuration and in the cluster
 [manifest](../manifests/complete-postgres-manifest.yaml), the latter takes
