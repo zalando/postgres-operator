@@ -268,6 +268,7 @@ spec:
 Things to note:
 
 - An empty string is provided in s3_wal_path of the standby cluster will result in error and no statefulset will be created.
+- Only one pod can be deployed for stand-by cluster.
 - To manually promote the standby_cluster, use patronictl and remove config entry.
 - There is no way to transform a non-standby cluster to standby cluster through operator. Hence, if a cluster is created without standby section in YAML and later modified  by adding that section, there will be no effect on the cluster. However, it can be done through Patroni by adding the standby_cluster section using patronictl edit-config. Note that the transformed standby cluster will not be doing any streaming, rather will just be in standby mode and allow read-only transactions only.
 

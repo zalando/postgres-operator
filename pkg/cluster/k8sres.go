@@ -977,6 +977,11 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	cur := spec.NumberOfInstances
 	newcur := cur
 
+	/* Limit the max number of pods to one, if this is standby-cluster */
+	if spec.StandbyCluster != nil {
+		c.logger.Infof("Standby cluster can have maximum of 1 pod")
+		max = 1
+	}
 	if max >= 0 && newcur > max {
 		newcur = max
 	}
@@ -1285,11 +1290,8 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 		return nil
 	}
 	// standby with S3, find out the bucket to setup standby
-	msg := "Standby from S3 bucket"
+	msg := "Standby from S3 bucket using custom parsed S3WalPath %s from the manifest"
 	c.logger.Info(msg, description.S3WalPath)
-
-	msg = "Use custom parsed S3WalPath %s from the manifest"
-	c.logger.Warningf(msg, description.S3WalPath)
 
 	result = append(result, v1.EnvVar{
 		Name:  "STANDBY_WALE_S3_PREFIX",

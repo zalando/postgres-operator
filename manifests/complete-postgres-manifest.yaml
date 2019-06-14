@@ -66,7 +66,7 @@ spec:
   #  cluster: "acid-batman"
   #  timestamp: "2017-12-19T12:40:33+01:00" # timezone required (offset relative to UTC, see RFC 3339 section 5.6)
   #  s3_wal_path: "s3://custom/path/to/bucket"
-  # Make this a standby cluster and provide the s3 bucket path of source cluster for continuous streaming.
+  # Make this a standby cluster and provide the s3 bucket path of source cluster for continuous streaming. Also change the above mentioned numberOfInstances to 1 for this cluster.
   # standby:
   #   s3_wal_path: "s3://path/to/bucket/containing/wal/of/source/cluster/"
 
