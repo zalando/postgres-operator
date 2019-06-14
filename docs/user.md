@@ -41,6 +41,15 @@ $ kubectl create -f manifests/minimal-postgres-manifest.yaml
 $ kubectl get pods -w --show-labels
 ```
 
+## Give K8S users access to create/list postgresqls
+
+```bash
+$ kubectl create -f manifests/user-facing-clusterroles.yaml
+```
+
+Creates zalando-postgres-operator:users:view, :edit and :admin clusterroles that are
+aggregated into the default roles.
+
 ## Connect to PostgreSQL
 
 With a `port-forward` on one of the database pods (e.g. the master) you can
