@@ -3,6 +3,7 @@ package cmd
 import (
 	"flag"
 	"k8s.io/client-go/tools/clientcmd"
+	"os/exec"
 	"path/filepath"
 	"k8s.io/client-go/util/homedir"
 	restclient "k8s.io/client-go/rest"
@@ -22,4 +23,9 @@ func getConfig()(*restclient.Config){
 		panic(err)
 	}
 	return config
+}
+
+func getCurrentNamespace() (string){
+	currentNamespace, _ := exec.Command("kubectl", "config", "view", "--minify", "--output", "jsonpath={..namespace}").CombinedOutput()
+	return string(currentNamespace)
 }

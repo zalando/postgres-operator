@@ -27,9 +27,20 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List command to list all the resources specific to an postgresql object",
-	Long: `List all the info specific to postgresql objects.`,
+	Long: `List all the info specific to postgresql objects.
+Example:
+kubectl pg list -> List pg resources specific to the current namespace. 
+kubectl pg list all -> List all pg resources across the namespaces.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		list()
+		if len(args) >0 && args[0] == "all" {
+			listAll()
+			return
+		} else if len(args) == 0 {
+			list()
+			return
+		}
+		fmt.Println("Invalid argument with list command.")
+		return
 	},
 }
 
@@ -40,18 +51,44 @@ func list(){
 	if err != nil {
 		panic(err)
 	}
-	listPostgresql,_ := postgresConfig.Postgresqls("").List(metav1.ListOptions{})
+	namespace := getCurrentNamespace()
+	listPostgresql,err:= postgresConfig.Postgresqls(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
 	if len(listPostgresql.Items) == 0 {
-		fmt.Println("No resources found.")
+		fmt.Println("No Resources found.")
 		return
 	}
-	template := "%-32s%-12s%-12s%-12s%-12s%-12s\n"
+	template := "%-32s%-16s%-12s%-12s%-12s%-12s\n"
 	fmt.Printf(template,"NAME","STATUS","INSTANCES","VERSION","AGE", "VOLUME")
 	for _,pgObjs := range listPostgresql.Items {
+
 		fmt.Printf(template,pgObjs.Name,pgObjs.Status.PostgresClusterStatus,strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
 			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000),pgObjs.Spec.Size)
 	}
 
+}
+
+// list command to list postgresql objects across namespaces.
+func listAll(){
+	config := getConfig()
+	postgresConfig,err:=PostgresqlLister.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+	listPostgresql,_ := postgresConfig.Postgresqls("").List(metav1.ListOptions{})
+	if len(listPostgresql.Items) == 0 {
+		fmt.Println("No Resources found.")
+		return
+	}
+	template := "%-32s%-16s%-12s%-12s%-12s%-12s%-12s\n"
+	fmt.Printf(template,"NAME","STATUS","INSTANCES","VERSION","AGE", "VOLUME","NAMESPACE")
+	for _,pgObjs := range listPostgresql.Items {
+
+		fmt.Printf(template,pgObjs.Name,pgObjs.Status.PostgresClusterStatus,strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
+			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000),pgObjs.Spec.Size, pgObjs.Namespace)
+	}
 }
 
 func init() {
