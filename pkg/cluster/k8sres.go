@@ -342,11 +342,12 @@ func isBootstrapOnlyParameter(param string) bool {
 		param == "track_commit_timestamp"
 }
 
-func generateVolumeMounts() []v1.VolumeMount {
+func generateVolumeMounts(volume acidv1.Volume) []v1.VolumeMount {
 	return []v1.VolumeMount{
 		{
 			Name:      constants.DataVolumeName,
 			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
+			SubPath:   volume.SubPath,
 		},
 	}
 }
@@ -800,7 +801,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
 
-	volumeMounts := generateVolumeMounts()
+	volumeMounts := generateVolumeMounts(spec.Volume)
 
 	// generate the spilo container
 	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)

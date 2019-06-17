@@ -282,6 +282,9 @@ properties of the persistent storage that stores postgres data.
   documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
   for the details on storage classes. Optional.
 
+* **subPath**
+  Subpath to use when mounting volume into Spilo container
+
 ### Sidecar definitions
 
 Those parameters are defined under the `sidecars` key. They consist of a list

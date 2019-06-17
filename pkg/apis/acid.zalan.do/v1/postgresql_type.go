@@ -82,6 +82,7 @@ type MaintenanceWindow struct {
 type Volume struct {
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass"`
+	SubPath      string `json:"subPath,omitempty"`
 }
 
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
