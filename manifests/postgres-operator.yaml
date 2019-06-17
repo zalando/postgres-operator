@@ -21,6 +21,10 @@ spec:
           limits:
             cpu: 2000m
             memory: 500Mi
+        securityContext:
+          runAsUser: 1000
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
         env:
         # provided additional ENV vars can overwrite individual config map entries  
         - name: CONFIG_MAP_NAME

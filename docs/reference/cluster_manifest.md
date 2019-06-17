@@ -254,6 +254,19 @@ under the `clone` top-level key and do not affect the already running cluster.
   timestamp. When this parameter is set the operator will not consider cloning
   from the live cluster, even if it is running, and instead goes to S3. Optional.
 
+* **s3_endpoint**
+  the url of the S3-compatible service should be set when cloning from non AWS S3. Optional.
+
+* **s3_access_key_id**
+  the access key id, used for authentication on S3 service. Optional.
+
+* **s3_secret_access_key**
+  the secret access key, used for authentication on S3 service. Optional.
+
+* **s3_force_path_style**
+  to enable path-style addressing(i.e., http://s3.amazonaws.com/BUCKET/KEY) when connecting to an S3-compatible service
+  that lack of support for sub-domain style bucket URLs (i.e., http://BUCKET.s3.amazonaws.com/KEY). Optional.
+
 ### EBS volume resizing
 
 Those parameters are grouped under the `volume` top-level key and define the
