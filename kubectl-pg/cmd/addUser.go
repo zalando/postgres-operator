@@ -55,6 +55,9 @@ func addUser(user string, clusterName string, permissions []string) {
 	if err != nil {
 		panic(err)
 	}
+	if existingRoles ,key := postgresql.Spec.Users[user]; key{
+		permissions = append(permissions,existingRoles...)
+	}
 	postgresql.Spec.Users[user] = permissions
 	updatedPostgresql,err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
