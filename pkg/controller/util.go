@@ -51,17 +51,18 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 
 func (c *Controller) createOperatorCRD(crd *apiextv1beta1.CustomResourceDefinition) error {
 	if _, err := c.KubeClient.CustomResourceDefinitions().Create(crd); err != nil {
-		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not create customResourceDefinition: %v", err)
-		}
-		c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
+		if k8sutil.ResourceAlreadyExists(err) {
+			c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
 
-		patch, err := json.Marshal(crd)
-		if err != nil {
-			return fmt.Errorf("could not marshal new customResourceDefintion: %v", err)
-		}
-		if _, err := c.KubeClient.CustomResourceDefinitions().Patch(crd.Name, types.MergePatchType, patch); err != nil {
-			return fmt.Errorf("could not update customResourceDefinition: %v", err)
+			patch, err := json.Marshal(crd)
+			if err != nil {
+				return fmt.Errorf("could not marshal new customResourceDefintion: %v", err)
+			}
+			if _, err := c.KubeClient.CustomResourceDefinitions().Patch(crd.Name, types.MergePatchType, patch); err != nil {
+				return fmt.Errorf("could not update customResourceDefinition: %v", err)
+			}
+		} else {
+			c.logger.Errorf("could not create customResourceDefinition %q: %v", crd.Name, err)
 		}
 	} else {
 		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)

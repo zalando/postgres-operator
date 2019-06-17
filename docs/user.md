@@ -41,6 +41,15 @@ $ kubectl create -f manifests/minimal-postgres-manifest.yaml
 $ kubectl get pods -w --show-labels
 ```
 
+## Give K8S users access to create/list postgresqls
+
+```bash
+$ kubectl create -f manifests/user-facing-clusterroles.yaml
+```
+
+Creates zalando-postgres-operator:users:view, :edit and :admin clusterroles that are
+aggregated into the default roles.
+
 ## Connect to PostgreSQL
 
 With a `port-forward` on one of the database pods (e.g. the master) you can
@@ -254,6 +263,24 @@ metadata:
 Note that timezone is required for `timestamp`. Otherwise, offset is relative
 to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
+For non AWS S3 following settings can be set to support cloning from other S3 implementations:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-test-cluster
+spec:
+  clone:
+    uid: "efd12e58-5786-11e8-b5a7-06148230260c"
+    cluster: "acid-batman"
+    timestamp: "2017-12-19T12:40:33+01:00"
+    s3_endpoint: https://s3.acme.org
+    s3_access_key_id: 0123456789abcdef0123456789abcdef
+    s3_secret_access_key: 0123456789abcdef0123456789abcdef
+    s3_force_path_style: true
+```
+
 ## Setting up a standby cluster
 
 Standby clusters are like normal cluster but they are streaming from a remote cluster. Patroni supports it, [read this](https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster) to know more about them.
@@ -265,6 +292,7 @@ spec:
   standby:
     s3_wal_path: "s3 bucket path to the master"
 ```
+
 Things to note:
 
 - An empty string is provided in s3_wal_path of the standby cluster will result in error and no statefulset will be created.
