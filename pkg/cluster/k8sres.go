@@ -359,6 +359,8 @@ func generateContainer(
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
 ) *v1.Container {
+	falseBool := false
+
 	return &v1.Container{
 		Name:            name,
 		Image:           *dockerImage,
@@ -382,6 +384,7 @@ func generateContainer(
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
 			Privileged: &privilegedMode,
+			ReadOnlyRootFilesystem: &falseBool,
 		},
 	}
 }
