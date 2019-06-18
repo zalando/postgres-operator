@@ -1,10 +1,11 @@
-## Prerequisites:
+# Quickstart
 
-In order to run the Postgres Operator locally in minikube you need to install
-the following tools:
+## Prerequisites
 
-* [minikube](https://github.com/kubernetes/minikube/releases)
-* [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl)
+The Postgres Operator runs on Kubernetes (K8s) which you have to setup first.
+For local tests we recommend to use solutions such as [minikube](https://github.com/kubernetes/minikube/releases)
+or [kind](https://kind.sigs.k8s.io/). This quickstart guide uses minikube.
+To interact with the K8s infrastructure install it's CLI runtime [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl).
 
 Note that you can also use built-in Kubernetes support in the Docker Desktop
 for Mac to follow the steps of this tutorial. You would have to replace
@@ -20,11 +21,12 @@ cd postgres-operator
 minikube start
 ```
 
-If you want to configure the Postgres Operator it must happen before deploying a
-Postgres cluster. This can happen in two ways: Via a ConfigMap or a
-`OperatorConfiguration` object, which adheres a CustomResourceDefinition (CRD).
-More details on configuration can be found [here](reference/operator_parameters.md).
+## Configuration Options
 
+If you want to configure the Postgres Operator it must happen before deploying a
+Postgres cluster. This can happen in two ways: Via a ConfigMap or a custom
+`OperatorConfiguration` object. More details on configuration can be found
+[here](reference/operator_parameters.md).
 
 ## Manual deployment setup
 
@@ -118,7 +120,6 @@ kubectl delete postgresql acid-minimal-cluster
 minikube delete
 ```
 
-
 ## Running and testing the operator
 
 The best way to test the operator is to run it in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/).
@@ -134,10 +135,3 @@ For convenience, we have automated starting the operator and submitting the
 
 Note we provide the `/manifests` directory as an example only; you should
 consider adjusting the manifests to your particular setting.
-
-
-### Configuration Options
-
-The operator can be configured with the provided ConfigMap
-(`manifests/configmap.yaml`) or the operator's own CRD. See
-[developer docs](developer.md) for details.
