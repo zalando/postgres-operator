@@ -70,7 +70,7 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 			fmt.Printf("%s volume %s is unchanged.\n", response.Name, oldSize)
 		}
 	} else {
-		fmt.Println("volume %s cannot be shrinked.", oldSize)
+		fmt.Printf("volume %s cannot be shrinked.\n", postgresql.Spec.Volume.Size)
 	}
 }
 
