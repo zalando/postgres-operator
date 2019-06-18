@@ -76,6 +76,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(int64)
 		**out = **in
 	}
+	if in.EnablePodDisruptionBudget != nil {
+		in, out := &in.EnablePodDisruptionBudget, &out.EnablePodDisruptionBudget
+		*out = new(bool)
+		**out = **in
+	}
 	out.OAuthTokenSecretName = in.OAuthTokenSecretName
 	out.InfrastructureRolesSecretName = in.InfrastructureRolesSecretName
 	if in.ClusterLabels != nil {
