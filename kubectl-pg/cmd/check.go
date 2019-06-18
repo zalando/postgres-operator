@@ -22,33 +22,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-
 // checkCmd represent kubectl pg check.
 var checkCmd = &cobra.Command{
 	Use:   "check",
-	Short: "Checks the postgresql CRD presence in k8s cluster",
-	Long: `Checks for postgresql CRD across the namespaces in k8s cluster.`,
+	Short: "Checks the Postgres operator is installed in the k8s cluster",
+	Long: `Checks that the Postgres CRD is registered in a k8s cluster. 
+This means that the operator pod was able to start normally.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		check()
 	},
+	Example: "kubectl pg check",
 }
 
 // check validates postgresql CRD registered or not.
 func check() {
-    config:=getConfig()
+	config := getConfig()
 	apiExtClient, err := apiextbeta1.NewForConfig(config)
-	if err!=nil {
+	if err != nil {
 		panic(err)
 	}
 
-	crdInfo,_:=apiExtClient.CustomResourceDefinitions().Get(postgresConstants.PostgresCRDResouceName,metav1.GetOptions{})
+	crdInfo, _ := apiExtClient.CustomResourceDefinitions().Get(postgresConstants.PostgresCRDResouceName, metav1.GetOptions{})
 	if crdInfo.Name == postgresConstants.PostgresCRDResouceName {
-		fmt.Printf("%s CRD registered.\n",crdInfo.Name)
+		fmt.Printf("postgres operator is installed in the k8s cluster.\n")
 	} else {
-		fmt.Printf("%s CRD not registered.\n",postgresConstants.PostgresCRDResouceName)
+		fmt.Printf("postgres operator is not installed in the k8s cluster.\n")
 	}
 }
-
 
 func init() {
 	rootCmd.AddCommand(checkCmd)

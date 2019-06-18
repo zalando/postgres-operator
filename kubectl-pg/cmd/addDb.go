@@ -25,41 +25,41 @@ import (
 // addDbCmd represents the addDb command
 var addDbCmd = &cobra.Command{
 	Use:   "add-db",
-	Short: "Adds a db to the postgres cluster and it's owner",
-	Long:  `Adds a db and it's owner to the cluster owner needs to be added with -o flag.`,
+	Short: "Adds a DB and it's owner to a Postgres cluster. The owner role is created if it does not already exist",
+	Long:  `Adds a DB and it's owner to the cluster owner needs to be added with -o flag.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
 			dbName := args[0]
-			dbOwner,_ := cmd.Flags().GetString("owner")
-			clusterName,_ := cmd.Flags().GetString("clusterName")
-			addDb(dbName,dbOwner, clusterName)
+			dbOwner, _ := cmd.Flags().GetString("owner")
+			clusterName, _ := cmd.Flags().GetString("clusterName")
+			addDb(dbName, dbOwner, clusterName)
 		} else {
 			fmt.Println("database name can't be empty.")
 		}
 
 	},
+	Example: "kubectl pg add-db [DB-NAME] -o [OWNER-NAME] -c [CLUSTER-NAME]",
 }
-
 
 // add db and it's owner to the cluster
 func addDb(dbName string, dbOwner string, clusterName string) {
 	config := getConfig()
-	postgresConfig,err:=PostgresqlLister.NewForConfig(config)
+	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 	namespace := getCurrentNamespace()
-	postgresql,err := postgresConfig.Postgresqls(namespace).Get(clusterName,metav1.GetOptions{})
+	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		panic(err)
 	}
 	postgresql.Spec.Databases[dbName] = dbOwner
-	updatedPostgresql,err := postgresConfig.Postgresqls(namespace).Update(postgresql)
+	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		panic(err)
 	}
 	if updatedPostgresql.ResourceVersion != postgresql.ResourceVersion {
-		fmt.Printf("postgresql %s is updated with new database: %s and as owner: %s.\n", updatedPostgresql.Name,dbName,dbOwner)
+		fmt.Printf("postgresql %s is updated with new database: %s and as owner: %s.\n", updatedPostgresql.Name, dbName, dbOwner)
 	} else {
 		fmt.Printf("postgresql %s is unchanged.\n", updatedPostgresql.Name)
 	}
@@ -67,6 +67,6 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 
 func init() {
 	addDbCmd.Flags().StringP("owner", "o", "", "provide owner of the database.")
-	addDbCmd.Flags().StringP("clusterName", "c", "", "provide the cluster name.")
+	addDbCmd.Flags().StringP("clusterName", "c", "", "provide a postgres cluster name.")
 	rootCmd.AddCommand(addDbCmd)
 }

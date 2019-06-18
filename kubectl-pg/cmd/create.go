@@ -26,36 +26,37 @@ import (
 // createCmd kubectl pg create.
 var createCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Creates postgres object using manifest files",
-	Long: `Creates postgres custom resource objects from a manifest file.`,
+	Short: "Creates postgres object using manifest file",
+	Long:  `Creates postgres custom resource objects from a manifest file.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fileName,_ :=cmd.Flags().GetString("file")
+		fileName, _ := cmd.Flags().GetString("file")
 		create(fileName)
 	},
+	Example: "kubectl pg create -f [FILE-NAME]",
 }
 
 // Create postgresql resources.
 func create(fileName string) {
 	config := getConfig()
-	postgresConfig,err := PostgresqlLister.NewForConfig(config)
-	ymlFile,err := ioutil.ReadFile(fileName)
+	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	ymlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		panic(err)
 	}
 	decode := scheme.Codecs.UniversalDeserializer().Decode
-	obj,_,err := decode([]byte(ymlFile),nil, &v1.Postgresql{})
-	if err!=nil {
-		panic(err)
-	}
-	postgresSql := obj.(*v1.Postgresql)
-	_,err = postgresConfig.Postgresqls(postgresSql.Namespace).Create(postgresSql)
+	obj, _, err := decode([]byte(ymlFile), nil, &v1.Postgresql{})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("postgresql %s created.\n",postgresSql.Name)
+	postgresSql := obj.(*v1.Postgresql)
+	_, err = postgresConfig.Postgresqls(postgresSql.Namespace).Create(postgresSql)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("postgresql %s created.\n", postgresSql.Name)
 }
 
 func init() {
-	createCmd.Flags().StringP("file","f","","using file.")
+	createCmd.Flags().StringP("file", "f", "", "using file.")
 	rootCmd.AddCommand(createCmd)
 }

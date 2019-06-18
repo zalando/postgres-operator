@@ -28,38 +28,39 @@ import (
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Updates postgresql object using manifest file",
-	Long: `Updates the state of cluster using manifest file to reflect the changes on the cluster.`,
+	Long:  `Updates the state of cluster using manifest file to reflect the changes on the cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fileName,_:=cmd.Flags().GetString("file")
+		fileName, _ := cmd.Flags().GetString("file")
 		updatePgResources(fileName)
 	},
+	Example: "kubectl pg update -f [File-NAME]",
 }
 
 func init() {
-	updateCmd.Flags().StringP("file","f","","using file")
+	updateCmd.Flags().StringP("file", "f", "", "using file")
 	rootCmd.AddCommand(updateCmd)
 }
 
 // Update postgresql resources.
 func updatePgResources(fileName string) {
 	config := getConfig()
-	postgresConfig,err := PostgresqlLister.NewForConfig(config)
-	ymlFile,err := ioutil.ReadFile(fileName)
+	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	ymlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		panic(err)
 	}
 	decode := scheme.Codecs.UniversalDeserializer().Decode
-	obj,_,err := decode([]byte(ymlFile),nil, &v1.Postgresql{})
+	obj, _, err := decode([]byte(ymlFile), nil, &v1.Postgresql{})
 	if err != nil {
 		panic(err)
 	}
 	newPostgresObj := obj.(*v1.Postgresql)
-	oldPostgresObj,err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Get(newPostgresObj.Name, metav1.GetOptions{})
+	oldPostgresObj, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Get(newPostgresObj.Name, metav1.GetOptions{})
 	if err != nil {
 		panic(err)
 	}
 	newPostgresObj.ResourceVersion = oldPostgresObj.ResourceVersion
-	response,err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(newPostgresObj)
+	response, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(newPostgresObj)
 	if err != nil {
 		panic(err)
 	}

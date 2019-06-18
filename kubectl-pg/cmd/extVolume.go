@@ -26,26 +26,27 @@ import (
 // extVolumeCmd represents the extVolume command
 var extVolumeCmd = &cobra.Command{
 	Use:   "ext-volume",
-	Short: "Extends the volume of the provided postgresql object",
+	Short: "Increases the volume size of a given Postgres cluster",
 	Long:  `Extends the volume of the postgres cluster. But volume cannot be shrinked.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, _ := cmd.Flags().GetString("clusterName")
 		if len(args) > 0 {
 			volume := args[0]
-			extVolume(volume,clusterName)
+			extVolume(volume, clusterName)
 		}
 	},
+	Example: "kubectl pg ext-volume [VOLUME] -c [CLUSTER-NAME]",
 }
 
 // extend volume with provided size & cluster name
-func extVolume(extendVolume string, clusterName string) {
+func extVolume(increasedVolumeSize string, clusterName string) {
 	config := getConfig()
-	postgresConfig,err:=PostgresqlLister.NewForConfig(config)
+	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 	namespace := getCurrentNamespace()
-	postgresql,err := postgresConfig.Postgresqls(namespace).Get(clusterName,metav1.GetOptions{})
+	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -53,23 +54,23 @@ func extVolume(extendVolume string, clusterName string) {
 	if err != nil {
 		panic(err)
 	}
-	newSize, err := resource.ParseQuantity(extendVolume)
+	newSize, err := resource.ParseQuantity(increasedVolumeSize)
 	if err != nil {
 		panic(err)
 	}
 	if newSize.Value() >= oldSize.Value() {
-		postgresql.Spec.Volume.Size = extendVolume
+		postgresql.Spec.Volume.Size = increasedVolumeSize
 		response, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 		if err != nil {
 			panic(err)
 		}
 		if postgresql.ResourceVersion != response.ResourceVersion {
-			fmt.Printf("%s volume is extended with %s.\n", response.Name,extendVolume)
+			fmt.Printf("%s volume is extended with %s.\n", response.Name, increasedVolumeSize)
 		} else {
-			fmt.Printf("%s is unchanged.\n", response.Name)
+			fmt.Printf("%s volume %s is unchanged.\n", response.Name, oldSize)
 		}
 	} else {
-		fmt.Println("volume cannot be shrinked.")
+		fmt.Println("volume %s cannot be shrinked.", oldSize)
 	}
 }
 

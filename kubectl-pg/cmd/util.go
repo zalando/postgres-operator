@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func getConfig()(*restclient.Config){
+func getConfig() *restclient.Config {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -25,7 +25,7 @@ func getConfig()(*restclient.Config){
 	return config
 }
 
-func getCurrentNamespace() (string){
+func getCurrentNamespace() string {
 	namespace, _ := exec.Command("kubectl", "config", "view", "--minify", "--output", "jsonpath={..namespace}").CombinedOutput()
 	currentNamespace := string(namespace)
 	if currentNamespace == "" {

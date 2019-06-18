@@ -22,13 +22,15 @@ import (
 	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 )
 
 // deleteCmd represents kubectl pg delete.
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Deletes postgresql object by object-name/manifest file",
-	Long:  `Deletes the postgres objects specific to a manifest file or object-name.`,
+	Long: `Deletes the postgres objects specific to a manifest file or object-name.
+Deleting the manifest is sufficient to delete the cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		namespace, _ := cmd.Flags().GetString("namespace")
 		file, _ := cmd.Flags().GetString("file")
@@ -41,10 +43,11 @@ var deleteCmd = &cobra.Command{
 			} else {
 				fmt.Println("cluster name can't be empty")
 			}
-		}  else {
+		} else {
 			fmt.Println("use the flag either -n or -f to delete a resource.")
 		}
 	},
+	Example: "kubectl pg delete -f [FILE-NAME]\nkubectl pg delete [CLUSTER-NAME] -n [NAMESPACE]",
 }
 
 func init() {
@@ -57,18 +60,18 @@ func init() {
 // Delete postgresql by manifest file.
 func deleteByFile(file string) {
 	config := getConfig()
-	postgresConfig,err := PostgresqlLister.NewForConfig(config)
-	ymlFile,err := ioutil.ReadFile(file)
+	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	ymlFile, err := ioutil.ReadFile(file)
 	if err != nil {
 		panic(err)
 	}
 	decode := scheme.Codecs.UniversalDeserializer().Decode
-	obj,_,err := decode([]byte(ymlFile),nil, &v1.Postgresql{})
-	if err!=nil {
+	obj, _, err := decode([]byte(ymlFile), nil, &v1.Postgresql{})
+	if err != nil {
 		panic(err)
 	}
 	postgresSql := obj.(*v1.Postgresql)
-	confirmDeletion(postgresConfig,postgresSql.Name,postgresSql.Namespace)
+	confirmDeletion(postgresConfig, postgresSql.Name, postgresSql.Namespace)
 }
 
 // Delete postgresql by name and namespace.
@@ -78,34 +81,34 @@ func deleteByName(clusterName string, namespace string) {
 	if err != nil {
 		panic(err)
 	}
-	confirmDeletion(postgresConfig,clusterName,namespace)
+	confirmDeletion(postgresConfig, clusterName, namespace)
 }
 
 //Confirm delete & delete postgresql cluster.
-func confirmDeletion(postgresConfig *PostgresqlLister.AcidV1Client,clusterName string, namespace string) {
-	_ , err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
+func confirmDeletion(postgresConfig *PostgresqlLister.AcidV1Client, clusterName string, namespace string) {
+	_, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
-		fmt.Printf("-> postgresql %s not found with the provided namespace %s.\n", clusterName, namespace)
+		fmt.Printf("-> postgresql %s not found with the provided namespace %s : %s \n", clusterName, namespace, err)
 		return
 	}
-	fmt.Println("-> Are you sure in deleting the cluster? (yes/no)")
-	yesNo := ""
-	_, _ = fmt.Scanln(&yesNo)
-	if yesNo == "yes" {
-	enterClusterName:
-		fmt.Print("-> confirm the cluster name: ")
-		confirmClusterName := ""
-		_, _ = fmt.Scan(&confirmClusterName)
-		if clusterName == confirmClusterName {
-			err = postgresConfig.Postgresqls(namespace).Delete(clusterName, &metav1.DeleteOptions{})
-			if err == nil {
-				fmt.Printf("-> postgresql %s deleted.\n", clusterName)
-			} else {
-				fmt.Println(err)
-			}
+enterClusterName:
+	fmt.Println("-> Are you sure you want to remove this PostgreSQL cluster? If so, please type the (NAMESPACE/CLUSTER-NAME) and hit Enter")
+	confirmClusterName := ""
+	_, _ = fmt.Scan(&confirmClusterName)
+	clusterDetails := strings.Split(confirmClusterName, "/")
+	confirmedNamespace := clusterDetails[0]
+	confirmedClusterName := clusterDetails[1]
+	if clusterName == confirmedClusterName {
+		err = postgresConfig.Postgresqls(confirmedNamespace).Delete(confirmedClusterName, &metav1.DeleteOptions{})
+		if err == nil {
+			fmt.Printf("-> postgresql %s deleted from %s.\n", confirmedClusterName, confirmedNamespace)
 		} else {
-			fmt.Println("-> cluster name doesn't match. Please re-enter the cluster name.")
+			fmt.Println(err)
+			fmt.Println("-> cluster name or namespace doesn't match. Please re-enter the NAMESPACE/CLUSTER-NAME.")
 			goto enterClusterName
 		}
+	} else {
+		fmt.Println("-> cluster name or namespace doesn't match. Please re-enter the NAMESPACE/CLUSTER-NAME.")
+		goto enterClusterName
 	}
 }

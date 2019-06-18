@@ -38,33 +38,34 @@ var addUserCmd = &cobra.Command{
 				parsedRoles := strings.Replace(privileges, ",", " ", -1)
 				permissions = strings.Fields(parsedRoles)
 			}
-			addUser(user,clusterName, permissions)
+			addUser(user, clusterName, permissions)
 		}
 	},
+	Example: "kubectl pg add-user [USER] -p [PRIVILEGES] -c [CLUSTER-NAME]",
 }
 
 // add user to the cluster with provided permissions
 func addUser(user string, clusterName string, permissions []string) {
 	config := getConfig()
-	postgresConfig,err:=PostgresqlLister.NewForConfig(config)
+	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 	namespace := getCurrentNamespace()
-	postgresql,err := postgresConfig.Postgresqls(namespace).Get(clusterName,metav1.GetOptions{})
+	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		panic(err)
 	}
-	if existingRoles ,key := postgresql.Spec.Users[user]; key{
-		permissions = append(permissions,existingRoles...)
+	if existingRoles, key := postgresql.Spec.Users[user]; key {
+		permissions = append(permissions, existingRoles...)
 	}
 	postgresql.Spec.Users[user] = permissions
-	updatedPostgresql,err := postgresConfig.Postgresqls(namespace).Update(postgresql)
+	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		panic(err)
 	}
 	if updatedPostgresql.ResourceVersion != postgresql.ResourceVersion {
-		fmt.Printf("postgresql %s is updated with new user %s and with privileges %s.\n", updatedPostgresql.Name,user,permissions)
+		fmt.Printf("postgresql %s is updated with new user %s and with privileges %s.\n", updatedPostgresql.Name, user, permissions)
 	} else {
 		fmt.Printf("postgresql %s is unchanged.\n", updatedPostgresql.Name)
 	}
