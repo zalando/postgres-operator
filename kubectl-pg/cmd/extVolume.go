@@ -67,7 +67,7 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 		if postgresql.ResourceVersion != response.ResourceVersion {
 			fmt.Printf("%s volume is extended with %s.\n", response.Name, increasedVolumeSize)
 		} else {
-			fmt.Printf("%s volume %s is unchanged.\n", response.Name, oldSize)
+			fmt.Printf("%s volume %s is unchanged.\n", response.Name, postgresql.Spec.Volume.Size)
 		}
 	} else {
 		fmt.Printf("volume %s cannot be shrinked.\n", postgresql.Spec.Volume.Size)
