@@ -432,7 +432,7 @@ func TestSecretVolume(t *testing.T) {
 		additionalSecretMount := "aws-iam-s3-role"
 		additionalSecretMountPath := "/meta/credentials"
 
-		volsumb := len(tt.podSpec.Containers[0].VolumeMounts)
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
 
 		addSecretVolume(tt.podSpec, additionalSecretMount, additionalSecretMountPath)
 
@@ -452,11 +452,11 @@ func TestSecretVolume(t *testing.T) {
 			}
 		}
 
-		volsuma := len(tt.podSpec.Containers[0].VolumeMounts)
+		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
 
-		if volsuma != volsumb+1 {
-			t.Errorf("Got not expected number of VolumeMounts: got %v instead of %v",
-				volsuma, volsumb+1)
+		if numMountsCheck != numMounts+1 {
+			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+				numMountsCheck, numMounts+1)
 		}
 	}
 }
