@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Deploy a Postgres operator to a minikube aka local Kubernetes cluster
+# Deploy a Postgres Operator to a minikube aka local Kubernetes cluster
 # Optionally re-build the operator binary beforehand to test local changes
 
 # Known limitations:
@@ -213,7 +213,7 @@ function submit_postgresql_manifest(){
 function main(){
 
     if ! [[ $(basename "$PWD") == "postgres-operator" ]]; then
-        echo "Please execute the script only from the root directory of the Postgres operator repo."
+        echo "Please execute the script only from the root directory of the Postgres Operator repo."
         exit 1
     fi
 

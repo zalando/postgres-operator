@@ -1,25 +1,26 @@
 # Quickstart
 
+This guide aims to give you a quick look and feel for using the Postgres
+Operator on a local Kubernetes environment.
+
 ## Prerequisites
 
 The Postgres Operator runs on Kubernetes (K8s) which you have to setup first.
-For local tests we recommend to use solutions such as [minikube](https://github.com/kubernetes/minikube/releases)
-or [kind](https://kind.sigs.k8s.io/). This quickstart guide uses minikube.
+For local tests we recommend to use one of the following solutions:
+
+* [minikube](https://github.com/kubernetes/minikube/releases), which creates a
+  single-node K8s cluster inside a VM (requires KVM or VirtualBox),
+* [kind](https://kind.sigs.k8s.io/), which allows creating multi-nodes K8s
+  clusters running on Docker (requires Docker)
+
 To interact with the K8s infrastructure install it's CLI runtime [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl).
 
-Note that you can also use built-in Kubernetes support in the Docker Desktop
-for Mac to follow the steps of this tutorial. You would have to replace
+This quickstart assumes that you haved started minikube or created a local kind
+cluster. Note that you can also use built-in Kubernetes support in the Docker
+Desktop for Mac to follow the steps of this tutorial. You would have to replace
 `minikube start` and `minikube delete` with your launch actions for the Docker
 built-in Kubernetes support.
 
-Clone the repository and change to the directory. Then start minikube.
-
-```bash
-git clone https://github.com/zalando/postgres-operator.git
-cd postgres-operator
-
-minikube start
-```
 
 ## Configuration Options
 
@@ -28,17 +29,41 @@ Postgres cluster. This can happen in two ways: Via a ConfigMap or a custom
 `OperatorConfiguration` object. More details on configuration can be found
 [here](reference/operator_parameters.md).
 
-## Manual deployment setup
 
-The Postgres Operator can be installed simply by applying yaml manifests.
+## Deployment options
+
+The Postgres Operator can be deployed in different way:
+
+* Manual deployment
+* Helm chart
+* Operator Lifecycle Manager (OLM)
+
+### Manual deployment setup
+
+The Postgres Operator can be installed simply by applying yaml manifests. Note,
+we provide the `/manifests` directory as an example only; you should consider
+adjusting the manifests to your particular setting (e.g. namespaces).
 
 ```bash
+# First, clone the repository and change to the directory
+git clone https://github.com/zalando/postgres-operator.git
+cd postgres-operator
+
+# apply the manifests in the following order
 kubectl create -f manifests/configmap.yaml  # configuration
 kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
 kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
-## Helm chart
+For convenience, we have automated starting the operator and submitting the
+`acid-minimal-cluster`. From inside the cloned repository execute the
+`run_operator_locally` shell script.
+
+```bash
+./run_operator_locally.sh
+```
+
+### Helm chart
 
 Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
 chart which saves you the manual steps. Therefore, you would need to install
@@ -58,6 +83,21 @@ helm init
 # 2) install postgres-operator chart
 helm install --name zalando ./charts/postgres-operator
 ```
+
+### Operator Lifecycle Manager (OLM)
+
+The [Operator Lifecycle Manager (OLM)](https://github.com/operator-framework/operator-lifecycle-manager)
+has been designed to facilitate the management of K8s operators. You have to
+install it in your K8s environment. When OLM is set up you can simply download
+and deploy the Postgres Operator with the following command:
+
+```bash
+kubectl create -f https://operatorhub.io/install/postgres-operator.yaml
+```
+
+This installs the operator in the `operators` namespace. More information can be
+found on [operatorhub.io](https://operatorhub.io/operator/postgres-operator).
+
 
 ## Create a Postgres cluster
 
@@ -96,6 +136,7 @@ kubectl get pods -l application=spilo -L spilo-role
 kubectl get svc -l application=spilo -L spilo-role
 ```
 
+
 ## Connect to the Postgres cluster via psql
 
 You can retrieve the host and port of the Postgres master from minikube.
@@ -109,29 +150,19 @@ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials
 psql -U postgres
 ```
 
+
 ## Delete a Postgres cluster
 
-To delete a Postgres cluster simply delete the postgresql custom resource.
+To delete a Postgres cluster simply delete the `postgresql` custom resource.
 
 ```bash
 kubectl delete postgresql acid-minimal-cluster
-
-# tear down cleanly
-minikube delete
 ```
 
-## Running and testing the operator
-
-The best way to test the operator is to run it in [minikube](https://kubernetes.io/docs/getting-started-guides/minikube/).
-Minikube is a tool to run Kubernetes cluster locally.
-
-For convenience, we have automated starting the operator and submitting the
-`acid-minimal-cluster`. From inside the cloned repository execute the
-`run_operator_locally` shell script.
-
-```bash
-./run_operator_locally.sh
-```
-
-Note we provide the `/manifests` directory as an example only; you should
-consider adjusting the manifests to your particular setting.
+This should remove the associated StatefulSet, database Pods, Services and
+Endpoints. The PersistentVolumes are released and the PodDisruptionBudget is
+deleted. Secrets however are not deleted. When deleting a cluster while it is
+still starting up it can [happen](https://github.com/zalando/postgres-operator/issues/551)
+the `postgresql` resource is deleted leaving orphaned components behind. This
+can cause troubles when creating a new Postgres cluster. For a fresh setup you
+can delete your local minikube and kind cluster and start again.

@@ -1,120 +1,20 @@
-## Intro
+# Developer Guide
 
-See [minikube installation guide](https://github.com/kubernetes/minikube/releases)
-
-Make sure you use the latest version of Minikube.
-
-After the installation, issue
-
-```bash
-    $ minikube start
-```
-
-Note: if you are running on a Mac, you may also use Docker for Mac Kubernetes
-instead of a docker-machine.
-
-Once you have it started successfully, use [the quickstart
-guide](https://github.com/kubernetes/minikube#quickstart) in order to test your
-that your setup is working.
-
-Note: if you use multiple Kubernetes clusters, you can switch to Minikube with
-`kubectl config use-context minikube`
-
-## Deploying the operator
-
-### Kubernetes manifest
-
-A ConfigMap is used to store the configuration of the operator. Alternatively,
-a CRD-based configuration can be used, as described [here](reference/operator_parameters).
-
-```bash
-    $ kubectl --context minikube  create -f manifests/configmap.yaml
-```
-
-First you need to install the service account definition in your Minikube cluster.
-
-```bash
-    $ kubectl --context minikube create -f manifests/operator-service-account-rbac.yaml
-```
-
-Next deploy the postgres-operator from the docker image Zalando is using:
-
-```bash
-    $ kubectl --context minikube create -f manifests/postgres-operator.yaml
-```
-
-If you prefer to build the image yourself follow up down below.
-
-### Helm chart
-
-Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
-chart which saves you the manual steps. Therefore, you would need to install
-the helm CLI on your machine. After initializing helm (and its server
-component Tiller) in your local cluster you can install the operator chart.
-You can define a release name that is prepended to the operator resource's
-names.
-
-Use `--name zalando` to match with the default service account name as older
-operator versions do not support custom names for service accounts. When relying
-solely on the CRD-based configuration edit the `serviceAccount` section in the
-[values yaml file](../charts/values.yaml) by setting the name to `"operator"`.
-
-```bash
-    $ helm init
-    $ helm install --name zalando ./charts/postgres-operator
-```
-
-## Check if CustomResourceDefinition has been registered
-
-```bash
-    $ kubectl --context minikube   get crd
-
-	NAME                          KIND
-	postgresqls.acid.zalan.do     CustomResourceDefinition.v1beta1.apiextensions.k8s.io
-```
-
-## Create a new Spilo cluster
-
-```bash
-    $ kubectl --context minikube  create -f manifests/minimal-postgres-manifest.yaml
-```
-
-## Watch pods being created
-
-```bash
-    $ kubectl --context minikube  get pods -w --show-labels
-```
-
-## Connect to PostgreSQL
-
-We can use the generated secret of the `postgres` robot user to connect to our
-`acid-minimal-cluster` master running in Minikube:
-
-```bash
-    $ export HOST_PORT=$(minikube service acid-minimal-cluster --url | sed 's,.*/,,')
-    $ export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
-    $ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
-    $ export PGPASSWORD=$(kubectl --context minikube get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
-    $ psql -U postgres
-```
-
-# Setup development environment
-
-The following steps guide you through the setup to work on the operator itself.
+Reed this guide if you want to debug the operator, fix bugs or contribute new
+features and tests.
 
 ## Setting up Go
 
-Postgres operator is written in Go. Use the [installation
-instructions](https://golang.org/doc/install#install) if you don't have Go on
-your system. You won't be able to compile the operator with Go older than 1.7.
-We recommend installing [the latest one](https://golang.org/dl/).
+Postgres Operator is written in Go. Use the [installation instructions](https://golang.org/doc/install#install)
+if you don't have Go on your system. You won't be able to compile the operator
+with Go older than 1.7. We recommend installing [the latest one](https://golang.org/dl/).
 
 Go projects expect their source code and all the dependencies to be located
 under the [GOPATH](https://github.com/golang/go/wiki/GOPATH). Normally, one
 would create a directory for the GOPATH (i.e. ~/go) and place the source code
 under the ~/go/src subdirectories.
 
-Given the schema above, the postgres operator source code located at
+Given the schema above, the Postgres Operator source code located at
 `github.com/zalando/postgres-operator` should be put at
 -`~/go/src/github.com/zalando/postgres-operator`.
 
@@ -173,7 +73,7 @@ minikube. The following steps will get you the docker image built and deployed.
     $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
 ```
 
-# Code generation
+## Code generation
 
 The operator employs k8s-provided code generation to obtain deep copy methods
 and Kubernetes-like APIs for its custom resource definitons, namely the Postgres
@@ -199,7 +99,7 @@ operator itself with `--v=8` to log all REST API requests). To attach a debugger
 to the operator, use the `-outofcluster` option to run the operator locally on
 the developer's laptop (and not in a docker container).
 
-# Debugging the operator
+## Debugging the operator
 
 There is a web interface in the operator to observe its internal state. The
 operator listens on port 8080. It is possible to expose it to the
@@ -325,10 +225,10 @@ kubectl logs acid-minimal-cluster-0
 ## End-to-end tests
 
 The operator provides reference e2e (end-to-end) tests to ensure various infra parts work smoothly together.
-Each e2e execution tests a Postgres operator image built from the current git branch. The test runner starts a [kind](https://kind.sigs.k8s.io/) (local k8s) cluster and Docker container with tests. The k8s API client from within the container connects to the `kind` cluster using the standard Docker `bridge` network.
+Each e2e execution tests a Postgres Operator image built from the current git branch. The test runner starts a [kind](https://kind.sigs.k8s.io/) (local k8s) cluster and Docker container with tests. The k8s API client from within the container connects to the `kind` cluster using the standard Docker `bridge` network.
 The tests utilize examples from `/manifests` (ConfigMap is used for the operator configuration) to avoid maintaining yet another set of configuration files. The kind cluster is deleted if tests complete successfully.
 
-End-to-end tests are executed automatically during builds; to invoke them locally use `make e2e-run` from the project's top directory. Run `make e2e-tools e2e-build` to install `kind` and build the tests' image locally before the first run. 
+End-to-end tests are executed automatically during builds; to invoke them locally use `make e2e-run` from the project's top directory. Run `make e2e-tools e2e-build` to install `kind` and build the tests' image locally before the first run.
 
 End-to-end tests are written in Python and use `flake8` for code quality. Please run flake8 [before submitting a PR](http://flake8.pycqa.org/en/latest/user/using-hooks.html).
 

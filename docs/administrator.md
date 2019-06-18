@@ -278,7 +278,7 @@ operator will respectively do noting with the existing source ranges.
 
 ## Running periodic 'autorepair' scans of Kubernetes objects
 
-The Postgres operator periodically scans all Kubernetes objects belonging to
+The Postgres Operator periodically scans all Kubernetes objects belonging to
 each cluster and repairs all discrepancies between them and the definitions
 generated from the current cluster manifest. There are two types of scans:
 

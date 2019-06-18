@@ -1,3 +1,8 @@
+# User Guide
+
+Learn how to work with the Postgres Operator in a production Kubernetes
+environment.
+
 ## Create a manifest for a new PostgreSQL cluster
 
 As an example you can take this
@@ -75,7 +80,7 @@ $ psql -U postgres -p 6432
 
 # Defining database roles in the operator
 
-Postgres operator allows defining roles to be created in the resulting database
+Postgres Operator allows defining roles to be created in the resulting database
 cluster. It covers three use-cases:
 
 * `manifest roles`: create application roles specific to the cluster described in the manifest.
