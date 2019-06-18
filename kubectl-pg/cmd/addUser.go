@@ -26,8 +26,8 @@ import (
 // addUserCmd represents the addUser command
 var addUserCmd = &cobra.Command{
 	Use:   "add-user",
-	Short: "Add user cmd is to add user to the postgres cluster and it's roles",
-	Long:  `Add user cmd is to add user to the postgres cluster you can add privileges as well with -f flag.`,
+	Short: "Adds a user to the postgres cluster with given privileges",
+	Long:  `Adds a user to the postgres cluster you can add privileges as well with -p flag.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, _ := cmd.Flags().GetString("clusterName")
 		privileges, _ := cmd.Flags().GetString("privileges")

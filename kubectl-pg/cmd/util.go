@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"flag"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"os/exec"
 	"path/filepath"
-	"k8s.io/client-go/util/homedir"
-	restclient "k8s.io/client-go/rest"
 )
 
 func getConfig()(*restclient.Config){
@@ -26,6 +26,11 @@ func getConfig()(*restclient.Config){
 }
 
 func getCurrentNamespace() (string){
-	currentNamespace, _ := exec.Command("kubectl", "config", "view", "--minify", "--output", "jsonpath={..namespace}").CombinedOutput()
-	return string(currentNamespace)
+	namespace, _ := exec.Command("kubectl", "config", "view", "--minify", "--output", "jsonpath={..namespace}").CombinedOutput()
+	currentNamespace := string(namespace)
+	if currentNamespace == "" {
+		currentNamespace = "default"
+		return currentNamespace
+	}
+	return currentNamespace
 }

@@ -27,8 +27,8 @@ import (
 // deleteCmd represents kubectl pg delete.
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "Delete command to delete k8s postgresql objects by object-name/manifest file",
-	Long:  `Delete command deletes the postgres objects specific to a manifest file or an object provided object-name.`,
+	Short: "Deletes postgresql object by object-name/manifest file",
+	Long:  `Deletes the postgres objects specific to a manifest file or object-name.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		namespace, _ := cmd.Flags().GetString("namespace")
 		file, _ := cmd.Flags().GetString("file")

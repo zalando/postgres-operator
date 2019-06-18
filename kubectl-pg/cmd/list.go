@@ -26,13 +26,14 @@ import (
 // listCmd represents kubectl pg list.
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List command to list all the resources specific to an postgresql object",
-	Long: `List all the info specific to postgresql objects.
+	Short: "Lists all the resources of kind postgresql",
+	Long: `Lists all the info specific to postgresql objects.
 Example:
 kubectl pg list -> List pg resources specific to the current namespace. 
 kubectl pg list all -> List all pg resources across the namespaces.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) >0 && args[0] == "all" {
+		allNamespaces,_  := cmd.Flags().GetBool("all-namespaces")
+		if allNamespaces {
 			listAll()
 			return
 		} else if len(args) == 0 {
@@ -40,7 +41,6 @@ kubectl pg list all -> List all pg resources across the namespaces.`,
 			return
 		}
 		fmt.Println("Invalid argument with list command.")
-		return
 	},
 }
 
@@ -63,7 +63,6 @@ func list(){
 	template := "%-32s%-16s%-12s%-12s%-12s%-12s\n"
 	fmt.Printf(template,"NAME","STATUS","INSTANCES","VERSION","AGE", "VOLUME")
 	for _,pgObjs := range listPostgresql.Items {
-
 		fmt.Printf(template,pgObjs.Name,pgObjs.Status.PostgresClusterStatus,strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
 			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000),pgObjs.Spec.Size)
 	}
@@ -85,12 +84,12 @@ func listAll(){
 	template := "%-32s%-16s%-12s%-12s%-12s%-12s%-12s\n"
 	fmt.Printf(template,"NAME","STATUS","INSTANCES","VERSION","AGE", "VOLUME","NAMESPACE")
 	for _,pgObjs := range listPostgresql.Items {
-
 		fmt.Printf(template,pgObjs.Name,pgObjs.Status.PostgresClusterStatus,strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
 			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000),pgObjs.Spec.Size, pgObjs.Namespace)
 	}
 }
 
 func init() {
+	listCmd.Flags().BoolP("all-namespaces", "A", false, "list pg resources across namespaces.")
 	rootCmd.AddCommand(listCmd)
 }

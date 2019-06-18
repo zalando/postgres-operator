@@ -26,8 +26,8 @@ import (
 // extVolumeCmd represents the extVolume command
 var extVolumeCmd = &cobra.Command{
 	Use:   "ext-volume",
-	Short: "Extend Volume command to extend k8s postgresql objects by using cluster name",
-	Long:  `Extend volume command extends the volume of the postgres cluster. Bit volume cannot be shrinked.`,
+	Short: "Extends the volume of the provided postgresql object",
+	Long:  `Extends the volume of the postgres cluster. But volume cannot be shrinked.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, _ := cmd.Flags().GetString("clusterName")
 		if len(args) > 0 {

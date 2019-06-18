@@ -27,7 +27,7 @@ import (
 var checkCmd = &cobra.Command{
 	Use:   "check",
 	Short: "Checks the postgresql CRD presence in k8s cluster",
-	Long: `This command checks for postgresql CRD across the namespaces in k8s cluster`,
+	Long: `Checks for postgresql CRD across the namespaces in k8s cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		check()
 	},

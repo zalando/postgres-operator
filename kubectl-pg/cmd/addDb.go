@@ -25,8 +25,8 @@ import (
 // addDbCmd represents the addDb command
 var addDbCmd = &cobra.Command{
 	Use:   "add-db",
-	Short: "Add db command to add a db to the postgres cluster and it's owner",
-	Long:  `Add db command used to add db and it's owner to the cluster.`,
+	Short: "Adds a db to the postgres cluster and it's owner",
+	Long:  `Adds a db and it's owner to the cluster owner needs to be added with -o flag.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
 			dbName := args[0]

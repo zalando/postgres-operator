@@ -8,7 +8,7 @@ Clone the kubectl pg plugin and build from the source using ```go install``` thi
 
 ```kubectl pg --help``` (or) ```kubectl pg```
 
-### To validate postgresql CRD creation
+### This basically means the operator pod managed to start, so our operator is installed.
 
 ```kubectl pg check```
 
@@ -40,14 +40,18 @@ Clone the kubectl pg plugin and build from the source using ```go install``` thi
 
 ```kubectl pg list all```
 
-### To add-user and roles to existing cluster
+### To add-user and it's roles to an existing pg cluster
 
-```kubectl pg add-user USER01 -p CREATE,UPDATE,DELETE -c acid-minimal-cluster```
+```kubectl pg add-user USER01 -p CREATEDB,LOGIN -c acid-minimal-cluster```
 
-### To add-db and assigning owner to existing cluster
+Privileges can only be [SUPERUSER, REPLICATION, INHERIT, LOGIN, NOLOGIN, CREATEROLE, CREATEDB, BYPASSURL]
+
+Note: A login user is created by default unless NOLOGIN is specified, in which case the operator creates a role.
+
+### To add-db and it's owner to an existing pg cluster
 
 ```kubectl pg add-db DB01 -o OWNER01 -c acid-minimal-cluster```
 
-### To extend volume for an existing cluster
+### To extend volume for an existing pg cluster
 
 ```kubectl pg ext-volume 2Gi -c acid-minimal-cluster```

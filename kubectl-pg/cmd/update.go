@@ -27,8 +27,8 @@ import (
 // updateCmd represents kubectl pg update
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update command to update k8s postgresql objects using manifest file",
-	Long: `Provide the modified postgresql manifest file to reflect the changes on the cluster.`,
+	Short: "Updates postgresql object using manifest file",
+	Long: `Updates the state of cluster using manifest file to reflect the changes on the cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fileName,_:=cmd.Flags().GetString("file")
 		updatePgResources(fileName)

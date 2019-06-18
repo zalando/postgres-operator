@@ -26,8 +26,8 @@ import (
 // createCmd kubectl pg create.
 var createCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create command to create k8s postgres objects using manifest files",
-	Long: `Create command creates postgres custom resource objects from a manifest file.`,
+	Short: "Creates postgres object using manifest files",
+	Long: `Creates postgres custom resource objects from a manifest file.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fileName,_ :=cmd.Flags().GetString("file")
 		create(fileName)
