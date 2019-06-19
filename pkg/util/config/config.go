@@ -110,20 +110,21 @@ type Config struct {
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility
-	EnableLoadBalancer       *bool             `name:"enable_load_balancer"`
-	MasterDNSNameFormat      StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
-	ReplicaDNSNameFormat     StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
-	PDBNameFormat            StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
-	Workers                  uint32            `name:"workers" default:"4"`
-	APIPort                  int               `name:"api_port" default:"8080"`
-	RingLogLines             int               `name:"ring_log_lines" default:"100"`
-	ClusterHistoryEntries    int               `name:"cluster_history_entries" default:"1000"`
-	TeamAPIRoleConfiguration map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
-	PodTerminateGracePeriod  time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
-	PodManagementPolicy      string            `name:"pod_management_policy" default:"ordered_ready"`
-	ProtectedRoles           []string          `name:"protected_role_names" default:"admin"`
-	PostgresSuperuserTeams   []string          `name:"postgres_superuser_teams" default:""`
-	SetMemoryRequestToLimit  bool              `name:"set_memory_request_to_limit" defaults:"false"`
+	EnableLoadBalancer        *bool             `name:"enable_load_balancer"`
+	MasterDNSNameFormat       StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
+	ReplicaDNSNameFormat      StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	PDBNameFormat             StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	EnablePodDisruptionBudget *bool             `name:"enable_pod_disruption_budget" default:"true"`
+	Workers                   uint32            `name:"workers" default:"4"`
+	APIPort                   int               `name:"api_port" default:"8080"`
+	RingLogLines              int               `name:"ring_log_lines" default:"100"`
+	ClusterHistoryEntries     int               `name:"cluster_history_entries" default:"1000"`
+	TeamAPIRoleConfiguration  map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
+	PodTerminateGracePeriod   time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	PodManagementPolicy       string            `name:"pod_management_policy" default:"ordered_ready"`
+	ProtectedRoles            []string          `name:"protected_role_names" default:"admin"`
+	PostgresSuperuserTeams    []string          `name:"postgres_superuser_teams" default:""`
+	SetMemoryRequestToLimit   bool              `name:"set_memory_request_to_limit" default:"false"`
 }
 
 // MustMarshal marshals the config or panics

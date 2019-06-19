@@ -1272,26 +1272,26 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 		if description.S3Endpoint != "" {
-		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
-		   result = append(result, v1.EnvVar{Name: "CLONE_WALE_S3_ENDPOINT", Value: description.S3Endpoint})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
+			result = append(result, v1.EnvVar{Name: "CLONE_WALE_S3_ENDPOINT", Value: description.S3Endpoint})
 		}
 
 		if description.S3AccessKeyId != "" {
-		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_ACCESS_KEY_ID", Value: description.S3AccessKeyId})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ACCESS_KEY_ID", Value: description.S3AccessKeyId})
 		}
 
 		if description.S3SecretAccessKey != "" {
-		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_SECRET_ACCESS_KEY", Value: description.S3SecretAccessKey})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_SECRET_ACCESS_KEY", Value: description.S3SecretAccessKey})
 		}
 
 		if description.S3ForcePathStyle != nil {
-		   s3ForcePathStyle := "0"
+			s3ForcePathStyle := "0"
 
-		   if *description.S3ForcePathStyle {
-			   s3ForcePathStyle = "1"
-		   }
+			if *description.S3ForcePathStyle {
+				s3ForcePathStyle = "1"
+			}
 
-		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: s3ForcePathStyle})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: s3ForcePathStyle})
 		}
 	}
 
@@ -1300,6 +1300,12 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 
 func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
+	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
+
+	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
+	if (pdbEnabled != nil && !*pdbEnabled) || c.Spec.NumberOfInstances <= 0 {
+		minAvailable = intstr.FromInt(0)
+	}
 
 	return &policybeta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{

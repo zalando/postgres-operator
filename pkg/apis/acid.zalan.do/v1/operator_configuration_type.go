@@ -49,6 +49,7 @@ type KubernetesMetaConfiguration struct {
 	SpiloFSGroup                           *int64                `json:"spilo_fsgroup,omitempty"`
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
+	EnablePodDisruptionBudget              *bool                 `json:"enable_pod_disruption_budget,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
 	ClusterDomain                          string                `json:"cluster_domain"`
 	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`

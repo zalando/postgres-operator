@@ -579,6 +579,15 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	// pod disruption budget
+	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances {
+		c.logger.Debug("syncing pod disruption budgets")
+		if err := c.syncPodDisruptionBudget(true); err != nil {
+			c.logger.Errorf("could not sync pod disruption budget: %v", err)
+			updateFailed = true
+		}
+	}
+
 	// logical backup job
 	func() {
 

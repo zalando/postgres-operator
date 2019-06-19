@@ -20,6 +20,7 @@ configuration:
     pod_service_account_name: operator
     pod_terminate_grace_period: 5m
     pdb_name_format: "postgres-{cluster}-pdb"
+    enable_pod_disruption_budget: true
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     cluster_domain: cluster.local
     oauth_token_secret_name: postgresql-operator

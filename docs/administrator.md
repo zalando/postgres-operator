@@ -154,6 +154,22 @@ data:
   pod_antiaffinity_topology_key: "failure-domain.beta.kubernetes.io/zone"
 ```
 
+### Pod Disruption Budget
+
+By default the operator uses a PodDisruptionBudget (PDB) to protect the cluster
+from voluntarily disruptions and hence unwanted DB downtime. The `MinAvailable`
+parameter of the PDB is set to `1` which prevents killing masters in single-node
+clusters and/or the last remaining running instance in a multi-node cluster.
+
+The PDB is only relaxed in two scenarios:
+* If a cluster is scaled down to `0` instances (e.g. for draining nodes)
+* If the PDB is disabled in the configuration (`enable_pod_disruption_budget`)
+
+The PDB is still in place having `MinAvailable` set to `0`. If enabled it will
+be automatically set to `1` on scale up. Disabling PDBs helps avoiding blocking
+Kubernetes upgrades in managed K8s environments at the cost of prolonged DB
+downtime. See PR #384 for the use case.
+
 ### Add cluster-specific labels
 
 In some cases, you might want to add `labels` that are specific to a given
