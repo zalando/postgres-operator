@@ -33,6 +33,8 @@ data:
   #  https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
   # inherited_labels: ""
   aws_region: eu-central-1
+  # additional_secret_mount: "some-secret-name"
+  # additional_secret_mount_path: "/some/dir"
   db_hosted_zone: db.example.com
   master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
   replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'

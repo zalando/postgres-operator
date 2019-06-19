@@ -69,6 +69,8 @@ configAwsOrGcp:
   # kube_iam_role: ""
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
+  # additional_secret_mount: "some-secret-name"
+  # additional_secret_mount_path: "/some/dir"
 
 configLogicalBackup:
   logical_backup_schedule: "30 00 * * *"

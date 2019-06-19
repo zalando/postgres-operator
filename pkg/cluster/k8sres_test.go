@@ -389,3 +389,74 @@ func TestCloneEnv(t *testing.T) {
 		}
 	}
 }
+
+func TestSecretVolume(t *testing.T) {
+	testName := "TestSecretVolume"
+	tests := []struct {
+		subTest   string
+		podSpec   *v1.PodSpec
+		secretPos int
+	}{
+		{
+			subTest: "empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{},
+					},
+				},
+			},
+			secretPos: 0,
+		},
+		{
+			subTest: "non empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			secretPos: 1,
+		},
+	}
+	for _, tt := range tests {
+		additionalSecretMount := "aws-iam-s3-role"
+		additionalSecretMountPath := "/meta/credentials"
+
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		addSecretVolume(tt.podSpec, additionalSecretMount, additionalSecretMountPath)
+
+		volumeName := tt.podSpec.Volumes[tt.secretPos].Name
+
+		if volumeName != additionalSecretMount {
+			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
+				testName, tt.subTest, additionalSecretMount, volumeName)
+		}
+
+		for i := range tt.podSpec.Containers {
+			volumeMountName := tt.podSpec.Containers[i].VolumeMounts[tt.secretPos].Name
+
+			if volumeMountName != additionalSecretMount {
+				t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
+					testName, tt.subTest, additionalSecretMount, volumeMountName)
+			}
+		}
+
+		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		if numMountsCheck != numMounts+1 {
+			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+				numMountsCheck, numMounts+1)
+		}
+	}
+}

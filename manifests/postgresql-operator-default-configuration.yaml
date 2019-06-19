@@ -67,6 +67,8 @@ configuration:
     # log_s3_bucket: ""
     # kube_iam_role: ""
     aws_region: eu-central-1
+    # additional_secret_mount: "some-secret-name"
+    # additional_secret_mount_path: "/some/dir"
   debug:
     debug_logging: true
     enable_database_access: true

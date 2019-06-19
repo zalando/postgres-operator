@@ -86,6 +86,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AWSRegion = fromCRD.AWSGCP.AWSRegion
 	result.LogS3Bucket = fromCRD.AWSGCP.LogS3Bucket
 	result.KubeIAMRole = fromCRD.AWSGCP.KubeIAMRole
+	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
+	result.AdditionalSecretMountPath = fromCRD.AWSGCP.AdditionalSecretMountPath
 
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
 	result.EnableDBAccess = fromCRD.OperatorDebug.EnableDBAccess

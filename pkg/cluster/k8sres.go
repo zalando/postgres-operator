@@ -384,7 +384,7 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			Privileged: &privilegedMode,
+			Privileged:             &privilegedMode,
 			ReadOnlyRootFilesystem: &falseBool,
 		},
 	}
@@ -445,6 +445,8 @@ func generatePodTemplate(
 	shmVolume bool,
 	podAntiAffinity bool,
 	podAntiAffinityTopologyKey string,
+	additionalSecretMount string,
+	additionalSecretMountPath string,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -477,6 +479,10 @@ func generatePodTemplate(
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
+	}
+
+	if additionalSecretMount != "" {
+		addSecretVolume(&podSpec, additionalSecretMount, additionalSecretMountPath)
 	}
 
 	template := v1.PodTemplateSpec{
@@ -864,7 +870,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		effectivePodPriorityClassName,
 		mountShmVolumeNeeded(c.OpConfig, spec),
 		c.OpConfig.EnablePodAntiAffinity,
-		c.OpConfig.PodAntiAffinityTopologyKey); err != nil {
+		c.OpConfig.PodAntiAffinityTopologyKey,
+		c.OpConfig.AdditionalSecretMount,
+		c.OpConfig.AdditionalSecretMountPath); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
@@ -1010,6 +1018,28 @@ func addShmVolume(podSpec *v1.PodSpec) {
 		})
 
 	podSpec.Containers[0].VolumeMounts = mounts
+	podSpec.Volumes = volumes
+}
+
+func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, additionalSecretMountPath string) {
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: additionalSecretMount,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: additionalSecretMount,
+			},
+		},
+	})
+
+	for i := range podSpec.Containers {
+		mounts := append(podSpec.Containers[i].VolumeMounts,
+			v1.VolumeMount{
+				Name:      additionalSecretMount,
+				MountPath: additionalSecretMountPath,
+			})
+		podSpec.Containers[i].VolumeMounts = mounts
+	}
+
 	podSpec.Volumes = volumes
 }
 
@@ -1395,6 +1425,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		"",
 		false,
 		false,
+		"",
+		"",
 		""); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
