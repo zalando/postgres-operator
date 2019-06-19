@@ -30,7 +30,6 @@ func getCurrentNamespace() string {
 	currentNamespace := string(namespace)
 	if currentNamespace == "" {
 		currentNamespace = "default"
-		return currentNamespace
 	}
 	return currentNamespace
 }
