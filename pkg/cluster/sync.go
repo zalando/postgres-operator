@@ -428,6 +428,10 @@ func (c *Cluster) syncSecrets() error {
 func (c *Cluster) syncRoles() (err error) {
 	c.setProcessName("syncing roles")
 
+	if c.Spec.StandbyCluster != nil {
+		c.logger.Info("no need to sync roles for standby cluster")
+		return nil
+	}
 	var (
 		dbUsers   spec.PgUserMap
 		userNames []string
