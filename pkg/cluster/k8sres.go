@@ -979,7 +979,7 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 
 	/* Limit the max number of pods to one, if this is standby-cluster */
 	if spec.StandbyCluster != nil {
-		c.logger.Infof("Standby cluster can have maximum of 1 pod")
+		c.logger.Info("Standby cluster can have maximum of 1 pod")
 		max = 1
 	}
 	if max >= 0 && newcur > max {
@@ -1280,26 +1280,26 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 		result = append(result, v1.EnvVar{Name: "CLONE_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 		if description.S3Endpoint != "" {
-		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
-		   result = append(result, v1.EnvVar{Name: "CLONE_WALE_S3_ENDPOINT", Value: description.S3Endpoint})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ENDPOINT", Value: description.S3Endpoint})
+			result = append(result, v1.EnvVar{Name: "CLONE_WALE_S3_ENDPOINT", Value: description.S3Endpoint})
 		}
 
 		if description.S3AccessKeyId != "" {
-		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_ACCESS_KEY_ID", Value: description.S3AccessKeyId})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ACCESS_KEY_ID", Value: description.S3AccessKeyId})
 		}
 
 		if description.S3SecretAccessKey != "" {
-		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_SECRET_ACCESS_KEY", Value: description.S3SecretAccessKey})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_SECRET_ACCESS_KEY", Value: description.S3SecretAccessKey})
 		}
 
 		if description.S3ForcePathStyle != nil {
-		   s3ForcePathStyle := "0"
+			s3ForcePathStyle := "0"
 
-		   if *description.S3ForcePathStyle {
-			   s3ForcePathStyle = "1"
-		   }
+			if *description.S3ForcePathStyle {
+				s3ForcePathStyle = "1"
+			}
 
-		   result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: s3ForcePathStyle})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: s3ForcePathStyle})
 		}
 	}
 
@@ -1313,8 +1313,8 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 		return nil
 	}
 	// standby with S3, find out the bucket to setup standby
-	msg := "Standby from S3 bucket using custom parsed S3WalPath %s from the manifest"
-	c.logger.Info(msg, description.S3WalPath)
+	msg := "Standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
+	c.logger.Infof(msg, description.S3WalPath)
 
 	result = append(result, v1.EnvVar{
 		Name:  "STANDBY_WALE_S3_PREFIX",
