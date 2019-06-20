@@ -20,6 +20,7 @@ configuration:
     pod_service_account_name: operator
     pod_terminate_grace_period: 5m
     pdb_name_format: "postgres-{cluster}-pdb"
+    enable_pod_disruption_budget: true
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     cluster_domain: cluster.local
     oauth_token_secret_name: postgresql-operator
@@ -66,6 +67,8 @@ configuration:
     # log_s3_bucket: ""
     # kube_iam_role: ""
     aws_region: eu-central-1
+    # additional_secret_mount: "some-secret-name"
+    # additional_secret_mount_path: "/some/dir"
   debug:
     debug_logging: true
     enable_database_access: true

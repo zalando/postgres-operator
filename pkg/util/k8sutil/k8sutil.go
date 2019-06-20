@@ -158,7 +158,7 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	//TODO: improve comparison
 	match = reflect.DeepEqual(new.Spec, cur.Spec)
 	if !match {
-		reason = "new service spec doesn't match the current one"
+		reason = "new PDB spec doesn't match the current one"
 	}
 
 	return

@@ -342,11 +342,12 @@ func isBootstrapOnlyParameter(param string) bool {
 		param == "track_commit_timestamp"
 }
 
-func generateVolumeMounts() []v1.VolumeMount {
+func generateVolumeMounts(volume acidv1.Volume) []v1.VolumeMount {
 	return []v1.VolumeMount{
 		{
 			Name:      constants.DataVolumeName,
 			MountPath: constants.PostgresDataMount, //TODO: fetch from manifest
+			SubPath:   volume.SubPath,
 		},
 	}
 }
@@ -359,6 +360,8 @@ func generateContainer(
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
 ) *v1.Container {
+	falseBool := false
+
 	return &v1.Container{
 		Name:            name,
 		Image:           *dockerImage,
@@ -381,7 +384,8 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			Privileged: &privilegedMode,
+			Privileged:             &privilegedMode,
+			ReadOnlyRootFilesystem: &falseBool,
 		},
 	}
 }
@@ -441,6 +445,8 @@ func generatePodTemplate(
 	shmVolume bool,
 	podAntiAffinity bool,
 	podAntiAffinityTopologyKey string,
+	additionalSecretMount string,
+	additionalSecretMountPath string,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -473,6 +479,10 @@ func generatePodTemplate(
 
 	if priorityClassName != "" {
 		podSpec.PriorityClassName = priorityClassName
+	}
+
+	if additionalSecretMount != "" {
+		addSecretVolume(&podSpec, additionalSecretMount, additionalSecretMountPath)
 	}
 
 	template := v1.PodTemplateSpec{
@@ -804,7 +814,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
 
-	volumeMounts := generateVolumeMounts()
+	volumeMounts := generateVolumeMounts(spec.Volume)
 
 	// generate the spilo container
 	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
@@ -867,7 +877,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		effectivePodPriorityClassName,
 		mountShmVolumeNeeded(c.OpConfig, spec),
 		c.OpConfig.EnablePodAntiAffinity,
-		c.OpConfig.PodAntiAffinityTopologyKey); err != nil {
+		c.OpConfig.PodAntiAffinityTopologyKey,
+		c.OpConfig.AdditionalSecretMount,
+		c.OpConfig.AdditionalSecretMountPath); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
@@ -1018,6 +1030,28 @@ func addShmVolume(podSpec *v1.PodSpec) {
 		})
 
 	podSpec.Containers[0].VolumeMounts = mounts
+	podSpec.Volumes = volumes
+}
+
+func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, additionalSecretMountPath string) {
+	volumes := append(podSpec.Volumes, v1.Volume{
+		Name: additionalSecretMount,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: additionalSecretMount,
+			},
+		},
+	})
+
+	for i := range podSpec.Containers {
+		mounts := append(podSpec.Containers[i].VolumeMounts,
+			v1.VolumeMount{
+				Name:      additionalSecretMount,
+				MountPath: additionalSecretMountPath,
+			})
+		podSpec.Containers[i].VolumeMounts = mounts
+	}
+
 	podSpec.Volumes = volumes
 }
 
@@ -1329,6 +1363,12 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 
 func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(1)
+	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
+
+	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
+	if (pdbEnabled != nil && !*pdbEnabled) || c.Spec.NumberOfInstances <= 0 {
+		minAvailable = intstr.FromInt(0)
+	}
 
 	return &policybeta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1418,6 +1458,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		"",
 		false,
 		false,
+		"",
+		"",
 		""); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}

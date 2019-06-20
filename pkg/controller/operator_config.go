@@ -46,6 +46,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ClusterDomain = fromCRD.Kubernetes.ClusterDomain
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
+	result.EnablePodDisruptionBudget = fromCRD.Kubernetes.EnablePodDisruptionBudget
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
@@ -85,6 +86,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AWSRegion = fromCRD.AWSGCP.AWSRegion
 	result.LogS3Bucket = fromCRD.AWSGCP.LogS3Bucket
 	result.KubeIAMRole = fromCRD.AWSGCP.KubeIAMRole
+	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
+	result.AdditionalSecretMountPath = fromCRD.AWSGCP.AdditionalSecretMountPath
 
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
 	result.EnableDBAccess = fromCRD.OperatorDebug.EnableDBAccess
