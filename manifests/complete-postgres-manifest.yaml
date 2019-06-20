@@ -38,7 +38,7 @@ spec:
     limits:
       cpu: 300m
       memory: 300Mi
-  # spiloFSGroup: 103    
+  # spiloFSGroup: 103
   patroni:
     initdb:
       encoding: "UTF8"
