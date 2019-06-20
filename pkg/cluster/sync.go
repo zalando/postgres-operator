@@ -90,7 +90,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	// create database objects unless we are running without pods or disabled that feature explicitly
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0) {
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Debugf("syncing roles")
 		if err = c.syncRoles(); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)
@@ -428,10 +428,6 @@ func (c *Cluster) syncSecrets() error {
 func (c *Cluster) syncRoles() (err error) {
 	c.setProcessName("syncing roles")
 
-	if c.Spec.StandbyCluster != nil {
-		c.logger.Info("no need to sync roles for standby cluster")
-		return nil
-	}
 	var (
 		dbUsers   spec.PgUserMap
 		userNames []string
