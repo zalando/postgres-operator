@@ -287,7 +287,7 @@ func (c *Cluster) Create() error {
 	c.logger.Infof("pods are ready")
 
 	// create database objects unless we are running without pods or disabled that feature explicitly
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
@@ -626,7 +626,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}()
 
 	// Roles and Databases
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0) {
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
 		c.logger.Debugf("syncing roles")
 		if err := c.syncRoles(); err != nil {
 			c.logger.Errorf("could not sync roles: %v", err)

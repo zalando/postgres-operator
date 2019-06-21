@@ -58,6 +58,7 @@ type PostgresSpec struct {
 	ShmVolume             *bool                `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup   bool                 `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster        *StandbyDescription  `json:"standby"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -112,6 +113,11 @@ type Patroni struct {
 	RetryTimeout         uint32                       `json:"retry_timeout"`
 	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
 	Slots                map[string]map[string]string `json:"slots"`
+}
+
+//StandbyCluster
+type StandbyDescription struct {
+	S3WalPath string `json:"s3_wal_path,omitempty"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time

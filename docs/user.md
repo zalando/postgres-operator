@@ -281,6 +281,23 @@ spec:
     s3_force_path_style: true
 ```
 
+## Setting up a standby cluster
+
+Standby clusters are like normal cluster but they are streaming from a remote cluster. As the first version of this feature, the only scenario covered by operator is to stream from a wal archive of the master. Following the more popular infrastructure of using Amazon's S3 buckets, it is mentioned  as s3_wal_path here. To make a cluster as standby add a section standby in the YAML file as follows.
+
+```yaml
+spec:
+  standby:
+    s3_wal_path: "s3 bucket path to the master"
+```
+
+Things to note:
+
+- An empty string is provided in s3_wal_path of the standby cluster will result in error and no statefulset will be created.
+- Only one pod can be deployed for stand-by cluster.
+- To manually promote the standby_cluster, use patronictl and remove config entry.
+- There is no way to transform a non-standby cluster to standby cluster through operator. Hence, if a cluster is created without standby section in YAML and later modified  by adding that section, there will be no effect on the cluster. However, it can be done through Patroni by adding the [standby_cluster] (https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster) section using patronictl edit-config. Note that the transformed standby cluster will not be doing any streaming, rather will just be in standby mode and allow read-only transactions only.
+
 ## Sidecar Support
 
 Each cluster can specify arbitrary sidecars to run. These containers could be used for

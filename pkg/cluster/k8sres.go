@@ -500,7 +500,7 @@ func generatePodTemplate(
 }
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
-func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, standbyDescription *acidv1.StandbyDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
 	envVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
@@ -602,6 +602,10 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 
 	if cloneDescription.ClusterName != "" {
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
+	}
+
+	if c.Spec.StandbyCluster != nil {
+		envVars = append(envVars, c.generateStandbyEnvironment(standbyDescription)...)
 	}
 
 	if len(customPodEnvVarsList) > 0 {
@@ -793,6 +797,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 		sort.Slice(customPodEnvVarsList,
 			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 	}
+	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" {
+		return nil, fmt.Errorf("s3_wal_path is empty for standby cluster")
+	}
 
 	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
 	if err != nil {
@@ -802,7 +809,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	// generate environment variables for the spilo container
 	spiloEnvVars := deduplicateEnvVars(
 		c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone,
-			customPodEnvVarsList), c.containerName(), c.logger)
+			spec.StandbyCluster, customPodEnvVarsList), c.containerName(), c.logger)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
@@ -982,6 +989,11 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	cur := spec.NumberOfInstances
 	newcur := cur
 
+	/* Limit the max number of pods to one, if this is standby-cluster */
+	if spec.StandbyCluster != nil {
+		c.logger.Info("Standby cluster can have maximum of 1 pod")
+		max = 1
+	}
 	if max >= 0 && newcur > max {
 		newcur = max
 	}
@@ -1324,6 +1336,27 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: s3ForcePathStyle})
 		}
 	}
+
+	return result
+}
+
+func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescription) []v1.EnvVar {
+	result := make([]v1.EnvVar, 0)
+
+	if description.S3WalPath == "" {
+		return nil
+	}
+	// standby with S3, find out the bucket to setup standby
+	msg := "Standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
+	c.logger.Infof(msg, description.S3WalPath)
+
+	result = append(result, v1.EnvVar{
+		Name:  "STANDBY_WALE_S3_PREFIX",
+		Value: description.S3WalPath,
+	})
+
+	result = append(result, v1.EnvVar{Name: "STANDBY_METHOD", Value: "STANDBY_WITH_WALE"})
+	result = append(result, v1.EnvVar{Name: "STANDBY_WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 
 	return result
 }
