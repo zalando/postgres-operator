@@ -8,10 +8,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
-  docker_image: {{ .Values.docker_image }}
-  repair_period: {{ .Values.repair_period }}
-  resync_period: {{ .Values.resync_period }}
-  workers: {{ .Values.workers }}
+{{ toYaml .Values.config | indent 2 }}
 {{ toYaml .Values.configCRD | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}

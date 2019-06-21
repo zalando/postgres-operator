@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.1.0-28-g24d412a
+  tag: v1.1.0-48-g540d58d
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -14,11 +14,11 @@ podAnnotations: {}
 podLabels: {}
 
 # config shared from ConfigMap and CRD
-docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
-repair_period: 5m
-resync_period: 5m
-spilo_privileged: false
-workers: 4
+config:
+  etcd_host: ""
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
+  repair_period: 5m
+  resync_period: 5m
 
 configUsers:
   replication_username: standby
@@ -26,27 +26,27 @@ configUsers:
 
 configKubernetes:
   cluster_domain: cluster.local
-  # inherited_labels: ""
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
+  # master_pod_move_timeout: 10m
   # node_readiness_label: ""
   # oauth_token_secret_name: postgresql-operator
-  # pod_environment_configmap: ""
-  # spilo_fsgroup: "103"
-  pod_management_policy: "ordered_ready"
   pdb_name_format: "postgres-{cluster}-pdb"
+  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
+  # pod_environment_configmap: ""
+  pod_management_policy: "ordered_ready"
   pod_role_label: spilo-role
   pod_terminate_grace_period: 5m
   secret_name_template: '{username}.{cluster}.credentials'
+  # spilo_fsgroup: "103"
+  watched_namespace: "*" # listen to all namespaces
 
 configPostgresPodResources:
   default_cpu_request: 100m
   default_memory_request: 100Mi
   default_cpu_limit: "3"
   default_memory_limit: 1Gi
-  # set_memory_request_to_limit: true
 
 configTimeouts:
-  # master_pod_move_timeout: 10m
   pod_deletion_wait_timeout: 10m
   pod_label_wait_timeout: 10m
   ready_wait_interval: 3s
@@ -64,13 +64,12 @@ configLoggingRestApi:
   ring_log_lines: 100
 
 configAwsOrGcp:
+  # additional_secret_mount: "some-secret-name"
+  # additional_secret_mount_path: "/some/dir"
   aws_region: eu-central-1
-  db_hosted_zone: db.example.com
   # kube_iam_role: ""
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
-  # additional_secret_mount: "some-secret-name"
-  # additional_secret_mount_path: "/some/dir"
 
 configLogicalBackup:
   logical_backup_schedule: "30 00 * * *"
@@ -81,9 +80,18 @@ configLogicalBackup:
 configMap:
   cluster_labels: application:spilo
   cluster_name_label: version
-  watched_namespace: "*" # listen to all namespaces
+  enable_pod_antiaffinity: false
+  enable_pod_disruption_budget: true
+  # inherited_labels: ""
+  max_instances: "-1"
+  min_instances: "-1"
+  # set_memory_request_to_limit: "true"
+  # sidecar_docker_images: ""
+  spilo_privileged: "false"
+  workers: "4"
 
 configLoadBalancer:
+  db_hosted_zone: db.example.com
   # custom_service_annotations:
   #   "keyx:valuez,keya:valuea"
   enable_master_load_balancer: "true"
@@ -92,21 +100,22 @@ configLoadBalancer:
   replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
 
 configTeamsApi:
-  enable_teams_api: "false"
   # enable_admin_role_for_users: "true"
   # enable_team_superuser: "false"
+  enable_teams_api: "false"
   # pam_configuration: https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
   # pam_role_name: zalandos
   # postgres_superuser_teams: "postgres_superusers"
+  # protected_role_names: "admin"
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
 
 # config exclusive to CRD
 configCRD:
-  etcd_host: ""
   min_instances: -1
   max_instances: -1
+  # set_memory_request_to_limit: true
   # sidecar_docker_images
   #  example: "exampleimage:exampletag"
 
@@ -115,15 +124,16 @@ configKubernetesCRD:
       application: spilo
   cluster_name_label: cluster-name
   enable_pod_antiaffinity: false
-  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   enable_pod_disruption_budget: true
   secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+  spilo_privileged: false
   # inherited_labels:
   # - application
   # - app
   # watched_namespace: ""
 
 configLoadBalancerCRD:
+  # db_hosted_zone: ""
   # custom_service_annotations:
   #   keyx: valuez
   #   keya: valuea
@@ -133,6 +143,7 @@ configLoadBalancerCRD:
   replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
 
 configTeamsApiCRD:
+  # enable_admin_role_for_users: true
   enable_teams_api: false
   enable_team_superuser: false
   # pam_configuration: ""

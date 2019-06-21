@@ -4,7 +4,7 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 spec:
-  init_containers:
+  initContainers:
   - name: date
     image: busybox
     command: [ "/bin/date" ]
@@ -58,7 +58,7 @@ spec:
     loop_wait: &loop_wait 10
     retry_timeout: 10
     maximum_lag_on_failover: 33554432
-  # restore a Postgres DB with point-in-time-recovery 
+  # restore a Postgres DB with point-in-time-recovery
   # with a non-empty timestamp, clone from an S3 bucket using the latest backup before the timestamp
   # with an empty/absent timestamp, clone from an existing alive cluster using pg_basebackup
   # clone:

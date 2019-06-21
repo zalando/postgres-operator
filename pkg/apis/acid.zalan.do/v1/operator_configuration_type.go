@@ -121,6 +121,7 @@ type TeamsAPIConfiguration struct {
 	TeamsAPIUrl              string            `json:"teams_api_url,omitempty"`
 	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
 	EnableTeamSuperuser      bool              `json:"enable_team_superuser,omitempty"`
+	EnableAdminRoleForUsers  bool              `json:"enable_admin_role_for_users,omitempty"`
 	TeamAdminRole            string            `json:"team_admin_role,omitempty"`
 	PamRoleName              string            `json:"pam_role_name,omitempty"`
 	PamConfiguration         string            `json:"pam_configuration,omitempty"`

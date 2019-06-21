@@ -95,6 +95,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.TeamsAPIUrl = fromCRD.TeamsAPI.TeamsAPIUrl
 	result.TeamAPIRoleConfiguration = fromCRD.TeamsAPI.TeamAPIRoleConfiguration
 	result.EnableTeamSuperuser = fromCRD.TeamsAPI.EnableTeamSuperuser
+	result.EnableAdminRoleForUsers = fromCRD.TeamsAPI.EnableAdminRoleForUsers
 	result.TeamAdminRole = fromCRD.TeamsAPI.TeamAdminRole
 	result.PamRoleName = fromCRD.TeamsAPI.PamRoleName
 	result.PostgresSuperuserTeams = fromCRD.TeamsAPI.PostgresSuperuserTeams
