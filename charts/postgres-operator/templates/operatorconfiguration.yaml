@@ -15,7 +15,6 @@ configuration:
   kubernetes:
     oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
     pod_service_account_name: operator
-    spilo_privileged: {{ .Values.spilo_privileged }}
 {{ toYaml .Values.configKubernetes | indent 4 }}
 {{ toYaml .Values.configKubernetesCRD | indent 4 }}
   postgres_pod_resources:
