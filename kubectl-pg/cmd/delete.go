@@ -57,7 +57,7 @@ func init() {
 	rootCmd.AddCommand(deleteCmd)
 }
 
-// Delete postgresql by manifest file.
+
 func deleteByFile(file string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
@@ -74,7 +74,7 @@ func deleteByFile(file string) {
 	confirmDeletion(postgresConfig, postgresSql.Name, postgresSql.Namespace)
 }
 
-// Delete postgresql by name and namespace.
+
 func deleteByName(clusterName string, namespace string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
