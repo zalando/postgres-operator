@@ -80,8 +80,8 @@ configLogicalBackup:
 configMap:
   cluster_labels: application:spilo
   cluster_name_label: version
-  enable_pod_antiaffinity: false
-  enable_pod_disruption_budget: true
+  enable_pod_antiaffinity: "false"
+  enable_pod_disruption_budget: "true"
   # inherited_labels: ""
   max_instances: "-1"
   min_instances: "-1"
