@@ -349,7 +349,13 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 	optionsToSet := make(map[string]string)
 	pgOptions := c.Spec.Parameters
 
-	standbyOptions := c.Spec.StandbyCluster.StandbyOptions
+	standbyOptions := make(map[string]string)
+
+	if c.Spec.StandbyCluster != nil {
+		for k, v := range c.Spec.StandbyCluster.StandbyOptions {
+			standbyOptions[k] = v
+		}
+	}
 
 	for k, v := range pgOptions {
 		if isBootstrapOnlyParameter(k) {
@@ -357,7 +363,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 		}
 	}
 
-	if len(optionsToSet) == 0 {
+	if len(optionsToSet) == 0 && len(standbyOptions) == 0 {
 		return nil
 	}
 
@@ -371,10 +377,12 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 	// carries the request to change configuration through
 	for _, pod := range pods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
-		c.logger.Debugf("calling Patroni API on a pod %s to promote the Standby",
-			podName)
-		if err = c.patroni.EditStandby(&pod, standbyOptions); err != nil {
-			c.logger.Warningf("could not patch postgres for standby with a pod %s: %v", podName, err)
+		if len(standbyOptions) > 0 {
+			c.logger.Debugf("calling Patroni API on a pod %s to edit the Standby",
+				podName)
+			if err = c.patroni.EditStandby(&pod, standbyOptions); err != nil {
+				c.logger.Warningf("could not patch postgres for standby with a pod %s: %v", podName, err)
+			}
 		}
 		c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %v",
 			podName, optionsToSet)
