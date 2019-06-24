@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -23,6 +23,7 @@ const (
 type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
+	EditStandby(server *v1.Pod, options map[string]string) error
 }
 
 // Patroni API client
@@ -97,6 +98,17 @@ func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]string) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(map[string]map[string]interface{}{"postgresql": {"parameters": parameters}})
+	if err != nil {
+		return fmt.Errorf("could not encode json: %v", err)
+	}
+	return p.httpPostOrPatch(http.MethodPatch, apiURL(server)+configPath, buf)
+}
+
+//SetPostgresParameters sets Postgres options via Patroni patch API call.
+func (p *Patroni) EditStandby(server *v1.Pod, options map[string]string) error {
+	buf := &bytes.Buffer{}
+	err := json.NewEncoder(buf).Encode(map[string]map[string]interface{}{"standby_cluster": {"restore_command": options}})
+
 	if err != nil {
 		return fmt.Errorf("could not encode json: %v", err)
 	}

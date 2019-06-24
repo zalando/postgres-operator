@@ -23,8 +23,16 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setSpec(newSpec)
+	//Find out how NewSpec requires to edit the standby options of this cluster
+	if newSpec.Spec.StandbyCluster != nil && c.Spec.StandbyCluster == nil {
+		newSpec.Spec.StandbyCluster.StandbyOptions["restore_command"] = ""
+		c.logger.Info("Setting this cluster as standby cluster")
+	} else if newSpec.Spec.StandbyCluster == nil && c.Spec.StandbyCluster != nil {
+		newSpec.Spec.StandbyCluster.StandbyOptions["restore_command"] = "envdir \"/home/postgres/etc/wal-e.d/env-standby\" /scripts/restore_command.sh \"%f\" \"%p\""
+		c.logger.Info("Promoting this cluster into master from standby")
+	}
 
+	c.setSpec(newSpec)
 	defer func() {
 		if err != nil {
 			c.logger.Warningf("error while syncing cluster state: %v", err)
@@ -341,6 +349,8 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 	optionsToSet := make(map[string]string)
 	pgOptions := c.Spec.Parameters
 
+	standbyOptions := c.Spec.StandbyCluster.StandbyOptions
+
 	for k, v := range pgOptions {
 		if isBootstrapOnlyParameter(k) {
 			optionsToSet[k] = v
@@ -361,6 +371,11 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 	// carries the request to change configuration through
 	for _, pod := range pods {
 		podName := util.NameFromMeta(pod.ObjectMeta)
+		c.logger.Debugf("calling Patroni API on a pod %s to promote the Standby",
+			podName)
+		if err = c.patroni.EditStandby(&pod, standbyOptions); err != nil {
+			c.logger.Warningf("could not patch postgres for standby with a pod %s: %v", podName, err)
+		}
 		c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %v",
 			podName, optionsToSet)
 		if err = c.patroni.SetPostgresParameters(&pod, optionsToSet); err == nil {
