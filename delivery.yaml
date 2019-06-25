@@ -54,7 +54,7 @@ pipeline:
             then
               IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
             else
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test-debug
             fi
             export IMAGE
             make push
