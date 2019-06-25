@@ -30,7 +30,7 @@ pipeline:
             IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
             if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
             then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-debug
             else
               IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test-debug
             fi
@@ -52,7 +52,7 @@ pipeline:
             IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
             if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
             then
-              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-debug
             else
               IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test-debug
             fi
