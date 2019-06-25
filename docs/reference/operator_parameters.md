@@ -478,7 +478,7 @@ key.
   `https://info.example.com/oauth2/tokeninfo?access_token= uid
   realm=/employees`.
 
-* **protected_roles**
+* **protected_role_names**
   List of roles that cannot be overwritten by an application, team or
   infrastructure role. The default is `admin`.
 

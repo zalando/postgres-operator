@@ -24,6 +24,7 @@ func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, con
 func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigurationData) *config.Config {
 	result := &config.Config{}
 
+	// general config
 	result.EtcdHost = fromCRD.EtcdHost
 	result.DockerImage = fromCRD.DockerImage
 	result.Workers = fromCRD.Workers
@@ -33,9 +34,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
 	result.Sidecars = fromCRD.Sidecars
 
+	// user config
 	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername
 	result.ReplicationUsername = fromCRD.PostgresUsersConfiguration.ReplicationUsername
 
+	// kubernetes config
 	result.PodServiceAccountName = fromCRD.Kubernetes.PodServiceAccountName
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
@@ -58,16 +61,17 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 	result.PodManagementPolicy = fromCRD.Kubernetes.PodManagementPolicy
 	result.MasterPodMoveTimeout = fromCRD.Kubernetes.MasterPodMoveTimeout
-
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
 	result.PodAntiAffinityTopologyKey = fromCRD.Kubernetes.PodAntiAffinityTopologyKey
 
+	// Postgres Pod resources
 	result.DefaultCPURequest = fromCRD.PostgresPodResources.DefaultCPURequest
 	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest
 	result.DefaultCPULimit = fromCRD.PostgresPodResources.DefaultCPULimit
 	result.DefaultMemoryLimit = fromCRD.PostgresPodResources.DefaultMemoryLimit
-	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
+	result.SetMemoryRequestToLimit = fromCRD.PostgresPodResources.SetMemoryRequestToLimit
 
+	// timeout config
 	result.ResourceCheckInterval = time.Duration(fromCRD.Timeouts.ResourceCheckInterval)
 	result.ResourceCheckTimeout = time.Duration(fromCRD.Timeouts.ResourceCheckTimeout)
 	result.PodLabelWaitTimeout = time.Duration(fromCRD.Timeouts.PodLabelWaitTimeout)
@@ -75,6 +79,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ReadyWaitInterval = time.Duration(fromCRD.Timeouts.ReadyWaitInterval)
 	result.ReadyWaitTimeout = time.Duration(fromCRD.Timeouts.ReadyWaitTimeout)
 
+	// load balancer config
 	result.DbHostedZone = fromCRD.LoadBalancer.DbHostedZone
 	result.EnableMasterLoadBalancer = fromCRD.LoadBalancer.EnableMasterLoadBalancer
 	result.EnableReplicaLoadBalancer = fromCRD.LoadBalancer.EnableReplicaLoadBalancer
@@ -82,6 +87,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.MasterDNSNameFormat = fromCRD.LoadBalancer.MasterDNSNameFormat
 	result.ReplicaDNSNameFormat = fromCRD.LoadBalancer.ReplicaDNSNameFormat
 
+	// AWS or GCP config
 	result.WALES3Bucket = fromCRD.AWSGCP.WALES3Bucket
 	result.AWSRegion = fromCRD.AWSGCP.AWSRegion
 	result.LogS3Bucket = fromCRD.AWSGCP.LogS3Bucket
@@ -89,8 +95,16 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
 	result.AdditionalSecretMountPath = fromCRD.AWSGCP.AdditionalSecretMountPath
 
+	// logical backup config
+	result.LogicalBackupSchedule = fromCRD.LogicalBackup.Schedule
+	result.LogicalBackupDockerImage = fromCRD.LogicalBackup.DockerImage
+	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
+
+	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
 	result.EnableDBAccess = fromCRD.OperatorDebug.EnableDBAccess
+
+	// Teams API config
 	result.EnableTeamsAPI = fromCRD.TeamsAPI.EnableTeamsAPI
 	result.TeamsAPIUrl = fromCRD.TeamsAPI.TeamsAPIUrl
 	result.TeamAPIRoleConfiguration = fromCRD.TeamsAPI.TeamAPIRoleConfiguration
@@ -98,12 +112,16 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableAdminRoleForUsers = fromCRD.TeamsAPI.EnableAdminRoleForUsers
 	result.TeamAdminRole = fromCRD.TeamsAPI.TeamAdminRole
 	result.PamRoleName = fromCRD.TeamsAPI.PamRoleName
+	result.PamConfiguration = fromCRD.TeamsAPI.PamConfiguration
+	result.ProtectedRoles = fromCRD.TeamsAPI.ProtectedRoles
 	result.PostgresSuperuserTeams = fromCRD.TeamsAPI.PostgresSuperuserTeams
 
+	// logging REST API config
 	result.APIPort = fromCRD.LoggingRESTAPI.APIPort
 	result.RingLogLines = fromCRD.LoggingRESTAPI.RingLogLines
 	result.ClusterHistoryEntries = fromCRD.LoggingRESTAPI.ClusterHistoryEntries
 
+	// Scalyr config
 	result.ScalyrAPIKey = fromCRD.Scalyr.ScalyrAPIKey
 	result.ScalyrImage = fromCRD.Scalyr.ScalyrImage
 	result.ScalyrServerURL = fromCRD.Scalyr.ScalyrServerURL
@@ -111,10 +129,6 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ScalyrMemoryRequest = fromCRD.Scalyr.ScalyrMemoryRequest
 	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
 	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
-
-	result.LogicalBackupSchedule = fromCRD.LogicalBackup.Schedule
-	result.LogicalBackupDockerImage = fromCRD.LogicalBackup.DockerImage
-	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 
 	return result
 }

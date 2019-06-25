@@ -67,7 +67,7 @@ data:
   ring_log_lines: "100"
   secret_name_template: '{username}.{cluster}.credentials'
   # sidecar_docker_images: ""
-  # set_memory_request_to_limit: "true"
+  # set_memory_request_to_limit: "false"
   spilo_privileged: "false"
   super_username: postgres
   # team_admin_role: "admin"

@@ -72,10 +72,11 @@ type KubernetesMetaConfiguration struct {
 
 // PostgresPodResourcesDefaults defines the spec of default resources
 type PostgresPodResourcesDefaults struct {
-	DefaultCPURequest    string `json:"default_cpu_request,omitempty"`
-	DefaultMemoryRequest string `json:"default_memory_request,omitempty"`
-	DefaultCPULimit      string `json:"default_cpu_limit,omitempty"`
-	DefaultMemoryLimit   string `json:"default_memory_limit,omitempty"`
+	DefaultCPURequest       string `json:"default_cpu_request,omitempty"`
+	DefaultMemoryRequest    string `json:"default_memory_request,omitempty"`
+	DefaultCPULimit         string `json:"default_cpu_limit,omitempty"`
+	DefaultMemoryLimit      string `json:"default_memory_limit,omitempty"`
+	SetMemoryRequestToLimit bool   `json:"set_memory_request_to_limit,omitempty"`
 }
 
 // OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait
@@ -160,7 +161,6 @@ type OperatorConfigurationData struct {
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
-	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
 	Timeouts                   OperatorTimeouts                   `json:"timeouts"`
 	LoadBalancer               LoadBalancerConfiguration          `json:"load_balancer"`
 	AWSGCP                     AWSGCPConfiguration                `json:"aws_or_gcp"`
