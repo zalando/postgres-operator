@@ -351,7 +351,7 @@ metadata:
   name: acid-minimal-cluster
 spec:
   ...
-  initContainers:
+  init_containers:
     - name: "container-name"
       image: "company/image:tag"
       env:
@@ -359,7 +359,7 @@ spec:
           value: "any-k8s-env-things"
 ```
 
-`initContainers` accepts full `v1.Container` definition.
+`init_containers` accepts full `v1.Container` definition.
 
 
 ## Increase volume size

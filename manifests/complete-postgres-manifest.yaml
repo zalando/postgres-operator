@@ -4,7 +4,8 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 spec:
-  initContainers:
+  dockerImage: registry.opensource.zalan.do/acid/spilo-11:1.5-p8
+  init_containers:
   - name: date
     image: busybox
     command: [ "/bin/date" ]
