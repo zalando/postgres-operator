@@ -1,12 +1,11 @@
 # User Guide
 
-Learn how to work with the Postgres Operator in a production Kubernetes
-environment.
+Learn how to work with the Postgres Operator in a Kubernetes environment.
 
 ## Create a manifest for a new PostgreSQL cluster
 
-As an example you can take this
-[minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
+Make sure you have [set up](quickstart.md) the operator. Then you can create a
+new Postgres cluster by applying manifest like this [minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -34,7 +33,8 @@ spec:
     version: "10"
 ```
 
-## Create a new Spilo cluster
+If you have clone the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
+you can find this example also in the manifests folder:
 
 ```bash
 $ kubectl create -f manifests/minimal-postgres-manifest.yaml
@@ -52,8 +52,8 @@ $ kubectl get pods -w --show-labels
 $ kubectl create -f manifests/user-facing-clusterroles.yaml
 ```
 
-Creates zalando-postgres-operator:users:view, :edit and :admin clusterroles that are
-aggregated into the default roles.
+Creates zalando-postgres-operator:users:view, :edit and :admin clusterroles that
+are aggregated into the default roles.
 
 ## Connect to PostgreSQL
 
@@ -83,11 +83,13 @@ $ psql -U postgres -p 6432
 Postgres Operator allows defining roles to be created in the resulting database
 cluster. It covers three use-cases:
 
-* `manifest roles`: create application roles specific to the cluster described in the manifest.
-* `infrastructure roles`: create application roles that should be automatically created on every
+* `manifest roles`: create application roles specific to the cluster described
+in the manifest.
+* `infrastructure roles`: create application roles that should be automatically
+created on every
   cluster managed by the operator.
-* `teams API roles`: automatically create users for every member of the team owning the database
-  cluster.
+* `teams API roles`: automatically create users for every member of the team
+owning the database cluster.
 
 In the next sections, we will cover those use cases in more details.
 
@@ -99,8 +101,11 @@ for an example of `zalando` role, defined with `superuser` and `createdb`
 flags.
 
 Manifest roles are defined as a dictionary, with a role name as a key and a
-list of role options as a value. For a role without any options it is best to supply the empty
-list `[]`. It is also possible to leave this field empty as in our example manifests, but in certain cases such empty field may removed by Kubernetes [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes) (`foobar_user:` is equivalent to `foobar_user: null`).
+list of role options as a value. For a role without any options it is best to
+supply the empty list `[]`. It is also possible to leave this field empty as in
+our example manifests, but in certain cases such empty field may removed by
+Kubernetes [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes)
+(`foobar_user:` is equivalent to `foobar_user: null`).
 
 The operator accepts the following options:  `superuser`, `inherit`, `login`,
 `nologin`, `createrole`, `createdb`, `replication`, `bypassrls`.
@@ -268,7 +273,8 @@ metadata:
 Note that timezone is required for `timestamp`. Otherwise, offset is relative
 to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
-For non AWS S3 following settings can be set to support cloning from other S3 implementations:
+For non AWS S3 following settings can be set to support cloning from other S3
+implementations:
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -288,8 +294,9 @@ spec:
 
 ## Sidecar Support
 
-Each cluster can specify arbitrary sidecars to run. These containers could be used for
-log aggregation, monitoring, backups or other tasks. A sidecar can be specified like this:
+Each cluster can specify arbitrary sidecars to run. These containers could be
+used for log aggregation, monitoring, backups or other tasks. A sidecar can be
+specified like this:
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -314,21 +321,22 @@ spec:
           value: "any-k8s-env-things"
 ```
 
-In addition to any environment variables you specify, the following environment variables
-are always passed to sidecars:
+In addition to any environment variables you specify, the following environment
+variables are always passed to sidecars:
 
   - `POD_NAME` - field reference to `metadata.name`
   - `POD_NAMESPACE` - field reference to `metadata.namespace`
   - `POSTGRES_USER` - the superuser that can be used to connect to the database
   - `POSTGRES_PASSWORD` - the password for the superuser
 
-The PostgreSQL volume is shared with sidecars and is mounted at `/home/postgres/pgdata`.
+The PostgreSQL volume is shared with sidecars and is mounted at
+`/home/postgres/pgdata`.
 
 
 ## InitContainers Support
 
-Each cluster can specify arbitrary init containers to run. These containers can be
-used to run custom actions before any normal and sidecar containers start.
+Each cluster can specify arbitrary init containers to run. These containers can
+be used to run custom actions before any normal and sidecar containers start.
 An init container can be specified like this:
 
 ```yaml
@@ -393,4 +401,11 @@ If you add
 ```
   enableLogicalBackup: true
 ```
-to the cluster manifest, the operator will create and sync a k8s cron job to do periodic logical backups of this particular Postgres cluster. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. See [configuration reference](reference/cluster_manifest.md) and [administrator documentation](administrator.md) for details on how backups are executed.
+to the cluster manifest, the operator will create and sync a k8s cron job to do
+periodic logical backups of this particular Postgres cluster. Due to the
+[limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
+it is highly advisable to set up additional monitoring for this feature; such
+monitoring is outside of the scope of operator responsibilities. See
+[configuration reference](reference/cluster_manifest.md) and
+[administrator documentation](administrator.md) for details on how backups are
+executed.

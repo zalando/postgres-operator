@@ -1,4 +1,7 @@
-# How to configure PostgreSQL operator
+# Administrator Guide
+
+Learn how to configure and manage the Postgres Operator in your Kubernetes
+environment.
 
 ## Select the namespace to deploy to
 
@@ -120,13 +123,17 @@ data:
 ```
 
 Note that the Kubernetes version 1.13 brings [taint-based eviction](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/#taint-based-evictions) to the beta stage and enables it by default.
-Postgres pods by default receive tolerations for `unreachable` and `noExecute` taints with the timeout of `5m`.
-Depending on your setup, you may want to adjust these parameters to prevent master pods from being evicted by the Kubernetes runtime.
-To prevent eviction completely, specify the toleration by leaving out the `tolerationSeconds` value (similar to how Kubernetes' own DaemonSets are configured)
+Postgres pods by default receive tolerations for `unreachable` and `noExecute`
+taints with the timeout of `5m`. Depending on your setup, you may want to adjust
+these parameters to prevent master pods from being evicted by the Kubernetes
+runtime. To prevent eviction completely, specify the toleration by leaving out
+the `tolerationSeconds` value (similar to how Kubernetes' own DaemonSets are
+configured)
 
 ### Enable pod anti affinity
 
-To ensure Postgres pods are running on different topologies, you can use [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
+To ensure Postgres pods are running on different topologies, you can use
+[pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
 and configure the required topology in the operator ConfigMap.
 
 Enable pod anti affinity by adding following line to the operator ConfigMap:
@@ -140,9 +147,10 @@ data:
   enable_pod_antiaffinity: "true"
 ```
 
-By default the topology key for the pod anti affinity is set to `kubernetes.io/hostname`,
-you can set another topology key e.g. `failure-domain.beta.kubernetes.io/zone` by adding following line
-to the operator ConfigMap, see [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys:
+By default the topology key for the pod anti affinity is set to
+`kubernetes.io/hostname`, you can set another topology key e.g.
+`failure-domain.beta.kubernetes.io/zone` by adding following line to the
+operator ConfigMap, see [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys:
 
 ```yaml
 apiVersion: v1
@@ -157,9 +165,9 @@ data:
 ### Add cluster-specific labels
 
 In some cases, you might want to add `labels` that are specific to a given
-postgres cluster, in order to identify its child objects.
-The typical use case is to add labels that identifies the `Pods` created by the
-operator, in order to implement fine-controlled `NetworkPolicies`.
+postgres cluster, in order to identify its child objects. The typical use case
+is to add labels that identifies the `Pods` created by the operator, in order
+to implement fine-controlled `NetworkPolicies`.
 
 **OperatorConfiguration**
 
@@ -292,28 +300,62 @@ report success as a result of the last operation applied to them.
 The operator is capable of maintaining roles of multiple kinds within a
 Postgres database cluster:
 
-* **System roles** are roles necessary for the proper work of Postgres itself such as a replication role or the initial superuser role. The operator delegates creating such roles to Patroni and only establishes relevant secrets.
+* **System roles** are roles necessary for the proper work of Postgres itself
+such as a replication role or the initial superuser role. The operator delegates
+creating such roles to Patroni and only establishes relevant secrets.
 
-* **Infrastructure roles** are roles for processes originating from external systems, e.g. monitoring robots. The operator creates such roles in all Postgres clusters it manages assuming that Kubernetes secrets with the relevant credentials exist beforehand.
+* **Infrastructure roles** are roles for processes originating from external
+systems, e.g. monitoring robots. The operator creates such roles in all Postgres
+clusters it manages assuming that Kubernetes secrets with the relevant
+credentials exist beforehand.
 
-* **Per-cluster robot users** are also roles for processes originating from external systems but defined for an individual Postgres cluster in its manifest. A typical example is a role for connections from an application that uses the database.
+* **Per-cluster robot users** are also roles for processes originating from
+external systems but defined for an individual Postgres cluster in its manifest.
+A typical example is a role for connections from an application that uses the
+database.
 
-* **Human users** originate from the Teams API that returns a list of the team members given a team id. The operator differentiates between (a) product teams that own a particular Postgres cluster and are granted admin rights to maintain it, and (b) Postgres superuser teams that get the superuser access to all Postgres databases running in a Kubernetes cluster for the purposes of maintaining and troubleshooting.
+* **Human users** originate from the Teams API that returns a list of the team
+members given a team id. The operator differentiates between (a) product teams
+that own a particular Postgres cluster and are granted admin rights to maintain
+it, and (b) Postgres superuser teams that get the superuser access to all
+Postgres databases running in a Kubernetes cluster for the purposes of
+maintaining and troubleshooting.
 
 ## Understanding rolling update of Spilo pods
 
-The operator logs reasons for a rolling update with the `info` level and a diff between the old and new StatefulSet specs with the `debug` level. To benefit from numerous escape characters in the latter log entry, view it in CLI with `echo -e`. Note that the resultant message will contain some noise because the `PodTemplate` used by the operator is yet to be updated with the default values used internally in Kubernetes.
+The operator logs reasons for a rolling update with the `info` level and a diff
+between the old and new StatefulSet specs with the `debug` level. To benefit
+from numerous escape characters in the latter log entry, view it in CLI with
+`echo -e`. Note that the resultant message will contain some noise because the
+`PodTemplate` used by the operator is yet to be updated with the default values
+used internally in Kubernetes.
 
 ## Logical backups
 
-The operator can manage k8s cron jobs to run logical backups of Postgres clusters. The cron job periodically spawns a batch job that runs a single pod. The backup script within this pod's container can connect to a DB for a logical backup. The operator updates cron jobs during Sync if the job schedule changes; the job name acts as the job identifier. These jobs are to be enabled for each indvidual Postgres cluster by setting `enableLogicalBackup: true` in its manifest. Notes:
+The operator can manage k8s cron jobs to run logical backups of Postgres
+clusters. The cron job periodically spawns a batch job that runs a single pod.
+The backup script within this pod's container can connect to a DB for a logical
+backup. The operator updates cron jobs during Sync if the job schedule changes;
+the job name acts as the job identifier. These jobs are to be enabled for each
+individual Postgres cluster by setting `enableLogicalBackup: true` in its
+manifest. Notes:
 
-1. The [example image](../docker/logical-backup/Dockerfile) implements the backup via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket; the default image ``registry.opensource.zalan.do/acid/logical-backup`` is the same image built with the Zalando-internal CI pipeline. `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when possible.  
+1. The [example image](../docker/logical-backup/Dockerfile) implements the
+backup via `pg_dumpall` and upload of compressed and encrypted results to an S3
+bucket; the default image ``registry.opensource.zalan.do/acid/logical-backup``
+is the same image built with the Zalando-internal CI pipeline. `pg_dumpall`
+requires a `superuser` access to a DB and runs on the replica when possible.  
 
-2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities.
+2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
+it is highly advisable to set up additional monitoring for this feature; such
+monitoring is outside of the scope of operator responsibilities.
 
 3. The operator does not remove old backups.
 
-4. You may use your own image by overwriting the relevant field in the operator configuration. Any such image must ensure the logical backup is able to finish [in presence of pod restarts](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#handling-pod-and-container-failures) and [simultaneous invocations](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) of the backup cron job.
+4. You may use your own image by overwriting the relevant field in the operator
+configuration. Any such image must ensure the logical backup is able to finish
+[in presence of pod restarts](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#handling-pod-and-container-failures) and [simultaneous invocations](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) of the backup cron job.
 
-5. For that feature to work, your RBAC policy must enable operations on the `cronjobs` resource from the `batch` API group for the operator service account. See [example RBAC](../manifests/operator-service-account-rbac.yaml)
+5. For that feature to work, your RBAC policy must enable operations on the
+`cronjobs` resource from the `batch` API group for the operator service account.
+See [example RBAC](../manifests/operator-service-account-rbac.yaml)

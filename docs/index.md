@@ -20,6 +20,10 @@ manages PostgreSQL clusters on Kubernetes:
 3. Finally, the operator periodically synchronizes the actual state of each
    Postgres cluster with the desired state defined in the cluster's manifest.
 
+4. The operator aims to be hands free and configuration happens only via
+   manifests and its own config. This enables easy integration in automated
+   deploy pipelines with no access to Kubernetes directly.
+
 ## Concepts
 
 ### Scope
@@ -36,6 +40,22 @@ experience.
 
 Monitoring of clusters is not in scope, for this good tools already exist from
 ZMON to Prometheus and more Postgres specific options.
+
+## Overview of involved entities
+
+Here is a diagram, that summarizes what would be created by the operator, when a
+new Postgres cluster CRD is submitted:
+
+![postgresql-operator](diagrams/operator.png "K8S resources, created by operator")
+
+This picture is not complete without an overview of what is inside a single
+cluster pod, so let's zoom in:
+
+![pod](diagrams/pod.png "Database pod components")
+
+These two diagrams should help you to understand the basics of what kind of
+functionality the operator provides.
+
 
 ### Status
 
