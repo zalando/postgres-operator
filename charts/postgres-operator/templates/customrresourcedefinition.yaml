@@ -54,6 +54,283 @@ spec:
   scope: Namespaced
   subresources:
     status: {}
+  validation:
+    openAPIV3Schema:
+      required:
+        - kind
+        - apiVersion
+        - metadata
+        - spec
+      properties:
+        kind:
+          enum:
+            - postgresql
+        apiVersion:
+          enum:
+            - acid.zalan.do/v1
+        metadata:
+          type: object
+          required:
+            - name
+          properties:
+            annotations:
+              type: object
+              additionalProperties:
+                type: string
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+            name:
+              type: string
+                # Note: the cluster name specified here must begin with the team name.
+            namespace:
+              type: string
+        spec:
+          type: object
+          required:
+            - numberOfInstances
+            - teamId
+            - postgresql
+          properties:
+            allowedSourceRanges:
+              type: array
+              items:
+                type: string
+                pattern: '^(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])$'
+            clone:
+              type: object
+              required:
+                - cluster
+              properties:
+                cluster:
+                  type: string
+                s3_endpoint:
+                  type: string
+                s3_access_key_id:
+                  type: string
+                s3_secret_access_key:
+                  type: string
+                s3_force_path_style:
+                  type: string
+                s3_wal_path:
+                  type: string
+                timestamp:
+                  type: string
+                  pattern: '^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\.[0-9]+)?(([Zz])|([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$'
+                  # The regexp matches the date-time format (RFC 3339 Section 5.6) that specifies a timezone as an offset relative to UTC
+                  # Example: 1996-12-19T16:39:57-08:00
+                  # Note: this field requires a timezone
+                uid:
+                  format: uuid
+                  type: string
+            databases:
+              type: object
+              additionalProperties:
+                type: string
+              # Note: usernames specified here as database owners must be declared in the users key of the spec key.
+            dockerImage:
+              type: string
+            enableLogicalBackup:
+              type: boolean
+            enableMasterLoadBalancer:
+              type: boolean
+            enableReplicaLoadBalancer:
+              type: boolean
+            enableShmVolume:
+              type: boolean
+            logicalBackupSchedule:
+              type: string
+              pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
+            maintenanceWindows:
+              type: array
+              items:
+                type: string
+                pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
+            numberOfInstances:
+              type: integer
+              minimum: 0
+            patroni:
+              type: object
+              properties:
+                initdb:
+                  type: object
+                  additionalProperties:
+                    type: string
+                pg_hba:
+                  type: array
+                  items:
+                    type: string
+                slots:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties:
+                      type: string
+                ttl:
+                  type: integer
+                loop_wait:
+                  type: integer
+                retry_timeout:
+                  type: integer
+                maximum_lag_on_failover:
+                  type: integer
+            podPriorityClassName:
+              type: string
+            postgresql:
+              type: object
+              required:
+                - version
+              properties:
+                version:
+                  enum:
+                    - "9.3"
+                    - "9.4"
+                    - "9.5"
+                    - "9.6"
+                    - "10"
+                    - "11"
+                    - "12"
+                parameters:
+                  type: object
+                  additionalProperties:
+                    type: string
+            replicaLoadBalancer:  # deprecated
+              type: boolean
+            resources:
+              type: object
+              required:
+                - requests
+                - limits
+              properties:
+                limits:
+                  type: object
+                  required:
+                    - cpu
+                    - memory
+                  properties:
+                    cpu:
+                      type: string
+                      # Decimal natural followed by m, or decimal natural followed by
+                      # dot followed by up to three decimal digits.
+                      #
+                      # This is because the Kubernetes CPU resource has millis as the
+                      # maximum precision.  The actual values are checked in code
+                      # because the regular expression would be huge and horrible and
+                      # not very helpful in validation error messages; this one checks
+                      # only the format of the given number.
+                      #
+                      # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+                      pattern: '^(\d+m|\d+\.\d{1,3})$'
+                      # Note: the value specified here must not be zero or be lower
+                      # than the corresponding request.
+                    memory:
+                      type: string
+                      # You can express memory as a plain integer or as a fixed-point
+                      # integer using one of these suffixes: E, P, T, G, M, k. You can
+                      # also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
+                      #
+                      # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+                      pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      # Note: the value specified here must not be zero or be lower
+                      # than the corresponding request.
+                requests:
+                  type: object
+                  required:
+                    - cpu
+                    - memory
+                  properties:
+                    cpu:
+                      type: string
+                      # Decimal natural followed by m, or decimal natural followed by
+                      # dot followed by up to three decimal digits.
+                      #
+                      # This is because the Kubernetes CPU resource has millis as the
+                      # maximum precision.  The actual values are checked in code
+                      # because the regular expression would be huge and horrible and
+                      # not very helpful in validation error messages; this one checks
+                      # only the format of the given number.
+                      #
+                      # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+                      pattern: '^(\d+m|\d+\.\d{1,3})$'
+                      # Note: the value specified here must not be zero or be higher
+                      # than the corresponding limit.
+                    memory:
+                      type: string
+                      # You can express memory as a plain integer or as a fixed-point
+                      # integer using one of these suffixes: E, P, T, G, M, k. You can
+                      # also use the power-of-two equivalents: Ei, Pi, Ti, Gi, Mi, Ki
+                      #
+                      # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
+                      pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                      # Note: the value specified here must not be zero or be higher
+                      # than the corresponding limit.
+            spiloFSGroup:
+              type: integer
+            standby:
+              type: object
+              required:
+                - s3_wal_path
+              properties:
+                s3_wal_path:
+                  type: string
+            teamId:
+              type: string
+            tolerations:
+              type: array
+              items:
+                type: object
+                required:
+                  - key
+                  - operator
+                  - effect
+                properties:
+                  key:
+                    type: string
+                  operator:
+                    enum:
+                      - Equal
+                      - Exists
+                  value:
+                    type: string
+                  effect:
+                    enum:
+                      - NoExecute
+                      - NoSchedule
+                      - PreferNoSchedule
+                  tolerationSeconds:
+                    type: integer
+            useLoadBalancer:  # deprecated
+              type: boolean
+            users:
+              type: object
+              additionalProperties:
+                type: array
+                nullable: true
+                items:
+                  enum: [
+                    bypassrls, nobypassrls,
+                    createdb, nocreatedb,
+                    createrole, nocreaterole,
+                    inherit, noinherit,
+                    login, nologin,
+                    replication, noreplication,
+                    superuser, nosuperuser,
+                  ]
+                  # Note: role flags specified here must not contradict each other.
+            volume:
+              type: object
+              required:
+                - size
+              properties:
+                size:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                  # Note: the value specified here must not be zero.
+                storageClass:
+                  type: string
+                subPath:
+                  type: string
   version: v1
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
@@ -99,5 +376,268 @@ spec:
   scope: Namespaced
   subresources:
     status: {}
+  validation:
+    openAPIV3Schema:
+      required:
+        - kind
+        - apiVersion
+        - metadata
+        - configuration
+      properties:
+        kind:
+          enum:
+            - OperatorConfiguration
+        apiVersion:
+          enum:
+            - acid.zalan.do/v1
+        metadata:
+          type: object
+          required:
+            - name
+          properties:
+            annotations:
+              type: object
+              additionalProperties:
+                type: string
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+            name:
+              type: string
+                # Note: the cluster name specified here must begin with the team name.
+            namespace:
+              type: string
+        configuration:
+          type: object
+          properties:
+            etcd_host:
+              type: string
+              nullable: true
+            docker_image:
+              type: string
+            max_instances:
+              type: integer
+              minimum: -1  # -1 = disabled
+            min_instances:
+              type: integer
+              minimum: -1  # -1 = disabled
+            resync_period:
+              type: string
+            repair_period:
+              type: string
+            set_memory_request_to_limit:
+              type: boolean
+            sidecar_docker_images:
+              type: object
+              additionalProperties:
+                type: string
+            workers:
+              type: integer
+              minimum: 1
+            users:
+              type: object
+              properties:
+                replication_username:
+                   type: string
+                super_username:
+                   type: string
+            kubernetes:
+              type: object
+              properties:
+                cluster_domain:
+                  type: string
+                cluster_labels:
+                  type: object
+                  additionalProperties:
+                    type: string
+                cluster_name_label:
+                  type: string
+                enable_pod_antiaffinity:
+                  type: boolean
+                enable_pod_disruption_budget:
+                  type: boolean
+                infrastructure_roles_secret_name:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                inherited_labels:
+                  type: array
+                  items:
+                    type: string
+                node_readiness_label:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                oauth_token_secret_name:
+                  type: string
+                pdb_name_format:
+                  type: string
+                pod_antiaffinity_topology_key:
+                  type: string
+                pod_environment_configmap:
+                  type: string
+                pod_management_policy:
+                  type: string
+                pod_role_label:
+                  type: string
+                pod_service_account_name:
+                  type: string
+                pod_terminate_grace_period:
+                  type: string
+                secret_name_template:
+                  type: string
+                spilo_fsgroup:
+                  type: integer
+                spilo_privileged:
+                  type: boolean
+                toleration:
+                  type: object
+                  additionalProperties:
+                    type: string
+                watched_namespace:
+                  type: string
+                  nullable: true
+            postgres_pod_resources:
+              type: object
+              properties:
+                default_cpu_limit:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                default_cpu_request:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                default_memory_limit:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                default_memory_request:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+            timeouts:
+              type: object
+              properties:
+                pod_label_wait_timeout:
+                  type: string
+                pod_deletion_wait_timeout:
+                  type: string
+                ready_wait_interval:
+                  type: string
+                ready_wait_timeout:
+                  type: string
+                resource_check_interval:
+                  type: string
+                resource_check_timeout:
+                  type: string
+            load_balancer:
+              type: object
+              properties:
+                db_hosted_zone:
+                  type: string
+                enable_master_load_balancer:
+                  type: boolean
+                enable_replica_load_balancer:
+                  type: boolean
+                custom_service_annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                master_dns_name_format:
+                  type: string
+                replica_dns_name_format:
+                  type: string
+            aws_or_gcp:
+              type: object
+              properties:
+                additional_secret_mount:
+                  type: string
+                additional_secret_mount_path:
+                  type: string
+                aws_region:
+                  type: string
+                kube_iam_role:
+                  type: string
+                log_s3_bucket:
+                  type: string
+                wal_s3_bucket:
+                  type: string
+            logical_backup:
+              type: object
+              properties:
+                logical_backup_schedule:
+                  type: string
+                  pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
+                logical_backup_docker_image:
+                  type: string
+                logical_backup_s3_bucket:
+                  type: string
+            debug:
+              type: object
+              properties:
+                debug_logging:
+                  type: boolean
+                enable_database_access:
+                  type: boolean
+            teams_api:
+              type: object
+              properties:
+                enable_admin_role_for_users:
+                  type: boolean
+                enable_team_superuser:
+                  type: boolean
+                enable_teams_api:
+                  type: boolean
+                pam_configuration:
+                  type: string
+                pam_role_name:
+                  type: string
+                postgres_superuser_teams:
+                  type: array
+                  items:
+                    type: string
+                protected_role_names:
+                  type: array
+                  items:
+                    type: string
+                team_admin_role:
+                  type: string
+                team_api_role_configuration:
+                  type: object
+                  additionalProperties:
+                    type: string
+                teams_api_url:
+                  type: string
+            logging_rest_api:
+              type: object
+              properties:
+                api_port:
+                  type: integer
+                cluster_history_entries:
+                  type: integer
+                ring_log_lines:
+                  type: integer
+            scalyr:
+              type: object
+              properties:
+                scalyr_api_key:
+                  type: string
+                scalyr_cpu_limit:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                scalyr_cpu_request:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                scalyr_image:
+                  type: string
+                scalyr_memory_limit:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                scalyr_memory_request:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                scalyr_server_url:
+                  type: string
   version: v1
 {{ end }}
