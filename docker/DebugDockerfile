@@ -11,6 +11,7 @@ USER 1000:1000
 
 RUN go get github.com/derekparker/delve/cmd/dlv
 
+RUN chmod -R +x /root/go/bin/dlv
 COPY build/* /
 
 CMD ["/root/go/bin/dlv", "--listen=:7777", "--headless=true", "--api-version=2", "exec", "/postgres-operator"]
