@@ -120,6 +120,15 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 		tmp2.Spec.ClusterName = clusterName
 	}
 
+	if tmp2.Spec.InitContainersOld != nil && tmp2.Spec.InitContainers == nil {
+		tmp2.Spec.InitContainers = tmp2.Spec.InitContainersOld
+		tmp2.Spec.InitContainersOld = nil
+	}
+	if tmp2.Spec.PodPriorityClassNameOld != "" && tmp2.Spec.PodPriorityClassName == "" {
+		tmp2.Spec.PodPriorityClassName = tmp2.Spec.PodPriorityClassNameOld
+		tmp2.Spec.PodPriorityClassNameOld = ""
+	}
+
 	*p = tmp2
 
 	return nil
