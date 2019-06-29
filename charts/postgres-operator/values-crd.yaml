@@ -28,6 +28,9 @@ configGeneral:
   # period between consecutive sync requests
   resync_period: 30m
   # map of sidecar names to docker images
+  # can prevent certain cases of memory overcommitment
+  # set_memory_request_to_limit: false
+
   # sidecar_docker_images
   #  example: "exampleimage:exampletag"
 
@@ -103,8 +106,6 @@ configPostgresPodResources:
   default_memory_limit: 1Gi
   # memory request value for the postgres containers
   default_memory_request: 100Mi
-  # can prevent certain cases of memory overcommitment
-  # set_memory_request_to_limit: false
 
 # timeouts related to some operator actions
 configTimeouts:

@@ -32,6 +32,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.MaxInstances = fromCRD.MaxInstances
 	result.ResyncPeriod = time.Duration(fromCRD.ResyncPeriod)
 	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
+	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.Sidecars = fromCRD.Sidecars
 
 	// user config
@@ -69,7 +70,6 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest
 	result.DefaultCPULimit = fromCRD.PostgresPodResources.DefaultCPULimit
 	result.DefaultMemoryLimit = fromCRD.PostgresPodResources.DefaultMemoryLimit
-	result.SetMemoryRequestToLimit = fromCRD.PostgresPodResources.SetMemoryRequestToLimit
 
 	// timeout config
 	result.ResourceCheckInterval = time.Duration(fromCRD.Timeouts.ResourceCheckInterval)

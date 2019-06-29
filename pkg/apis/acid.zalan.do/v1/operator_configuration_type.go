@@ -72,11 +72,10 @@ type KubernetesMetaConfiguration struct {
 
 // PostgresPodResourcesDefaults defines the spec of default resources
 type PostgresPodResourcesDefaults struct {
-	DefaultCPURequest       string `json:"default_cpu_request,omitempty"`
-	DefaultMemoryRequest    string `json:"default_memory_request,omitempty"`
-	DefaultCPULimit         string `json:"default_cpu_limit,omitempty"`
-	DefaultMemoryLimit      string `json:"default_memory_limit,omitempty"`
-	SetMemoryRequestToLimit bool   `json:"set_memory_request_to_limit,omitempty"`
+	DefaultCPURequest    string `json:"default_cpu_request,omitempty"`
+	DefaultMemoryRequest string `json:"default_memory_request,omitempty"`
+	DefaultCPULimit      string `json:"default_cpu_limit,omitempty"`
+	DefaultMemoryLimit   string `json:"default_memory_limit,omitempty"`
 }
 
 // OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait
@@ -157,6 +156,7 @@ type OperatorConfigurationData struct {
 	MaxInstances               int32                              `json:"max_instances,omitempty"`
 	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
 	Sidecars                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`

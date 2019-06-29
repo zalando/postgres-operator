@@ -9,6 +9,7 @@ configuration:
   min_instances: -1
   resync_period: 30m
   repair_period: 5m
+  # set_memory_request_to_limit: false
   # sidecar_docker_images:
   #   example: "exampleimage:exampletag"
   workers: 4
@@ -45,7 +46,6 @@ configuration:
     default_cpu_request: 100m
     default_memory_limit: 1Gi
     default_memory_request: 100Mi
-    # set_memory_request_to_limit: false
   timeouts:
     pod_label_wait_timeout: 10m
     pod_deletion_wait_timeout: 10m
