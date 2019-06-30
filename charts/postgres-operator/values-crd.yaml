@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.1.0-52-g426b2c7-dirty
+  tag: v1.1.0-48-g540d58d
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
