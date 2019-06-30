@@ -20,13 +20,12 @@ import (
 	"strconv"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 // scaleCmd represents the scale command
 var scaleCmd = &cobra.Command{
 	Use:   "scale",
-	Short: "Scales postgresql object by cluster-name",
+	Short: "Add/remove pods to a Postgres cluster",
 	Long: `Scales the postgres objects using cluster-name.
 Scaling to 0 leads to down time.`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -54,7 +53,8 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		panic(err)
 	}
 	if numberOfInstances == 0 {
-		namespace, clusterName = confirmScaleZero(clusterName, namespace)
+		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter\n",namespace,clusterName)
+		confirmAction(clusterName, namespace)
 	}
 	postgresql.Spec.NumberOfInstances = numberOfInstances
 	UpdatedPostgres,err := postgresConfig.Postgresqls(namespace).Update(postgresql)
@@ -62,26 +62,13 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		panic(err)
 	}
 	if UpdatedPostgres.ResourceVersion != postgresql.ResourceVersion {
-		fmt.Printf("scaled postgresql %s from %s to %d instances\n", UpdatedPostgres.Name, UpdatedPostgres.Namespace, UpdatedPostgres.Spec.NumberOfInstances)
+		fmt.Printf("scaled postgresql %s/%s to %d instances\n", UpdatedPostgres.Namespace,UpdatedPostgres.Name,UpdatedPostgres.Spec.NumberOfInstances)
 		return
 	}
 	fmt.Printf("postgresql %s is unchanged.\n", postgresql.Name)
 }
 
-func confirmScaleZero(clusterName string, namespace string)  (confirmedNamespace string, confirmedClusterName string) {
-	fmt.Println("Scaling to zero leads to down time. please type the (NAMESPACE/CLUSTER-NAME) and hit Enter")
-	confirmScale:
-		confirmClusterDetails := ""
-		_, _ = fmt.Scan(&confirmClusterDetails)
-		clusterDetails := strings.Split(confirmClusterDetails, "/")
-		if clusterDetails[0] != namespace || clusterDetails[1] != clusterName {
-			fmt.Println("cluster name or namespace doesn't match. Please re-enter the NAMESPACE/CLUSTER-NAME.")
-			goto confirmScale
-		}
-		confirmedNamespace = clusterDetails[0]
-		confirmedClusterName = clusterDetails[1]
-		return namespace, confirmedClusterName
-}
+
 
 func init() {
 	namespace := getCurrentNamespace()

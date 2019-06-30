@@ -1,10 +1,6 @@
-hash: 14bc7b790cb704622230a380114dc113ac6fb00fd5a1594470836c60f02e1093
-updated: 2019-06-05T22:50:01.396791896+05:30
+hash: 8e48cae9922d7f39d3ccf2f7adb4c7c9a6153321e00b2298d86d150ef8e5388d
+updated: 2019-07-01T00:07:31.328871793+05:30
 imports:
-- name: github.com/fatih/color
-  version: 5b77d2a35fb0ede96d138fc9a99f5c9b6aef11b4
-- name: github.com/fsnotify/fsnotify
-  version: 1485a34d5d5723fea214f5710708e19a831720e4
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/gogo/protobuf
@@ -16,18 +12,6 @@ imports:
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
-- name: github.com/hashicorp/hcl
-  version: 99e2f22d1c94b272184d97dd9d252866409100ab
-  subpackages:
-  - hcl/ast
-  - hcl/parser
-  - hcl/printer
-  - hcl/scanner
-  - hcl/strconv
-  - hcl/token
-  - json/parser
-  - json/scanner
-  - json/token
 - name: github.com/imdario/mergo
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/inconshreveable/mousetrap
@@ -36,47 +20,23 @@ imports:
   version: f2b4162afba35581b6d4a50d3b8f34e33c144682
 - name: github.com/konsorten/go-windows-terminal-sequences
   version: 5c8c8bd35d3832f5d134ae1e1e375b69a4d25242
-- name: github.com/magiconair/properties
-  version: de8848e004dd33dc07a2947b3d76f618a7fc7ef1
-- name: github.com/mattn/go-colorable
-  version: 8029fb3788e5a4a9c00e415f586a6d033f5d38b3
-- name: github.com/mattn/go-isatty
-  version: 1311e847b0cb909da63b5fecfb5370aa66236465
-- name: github.com/mitchellh/go-homedir
-  version: af06845cf3004701891bf4fdb884bfe4920b3727
-- name: github.com/mitchellh/mapstructure
-  version: 3536a929edddb9a5b34bd6861dc4a9647cb459fe
 - name: github.com/modern-go/concurrent
   version: bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
 - name: github.com/modern-go/reflect2
   version: 05fbef0ca5da472bbf96c9322b84a53edc03c9fd
-- name: github.com/pelletier/go-toml
-  version: dba45d427ff48cfb9bcf633db3a8e43b7364e261
 - name: github.com/sirupsen/logrus
   version: 839c75faf7f98a33d445d181f3018b5c3409a45e
-- name: github.com/spf13/afero
-  version: 588a75ec4f32903aa5e39a2619ba6a4631e28424
-  subpackages:
-  - mem
-- name: github.com/spf13/cast
-  version: c01685bb8421cecb276fa517e91f757215f980b3
 - name: github.com/spf13/cobra
   version: 67fc4837d267bc9bfd6e47f77783fcc3dffc68de
-- name: github.com/spf13/jwalterweatherman
-  version: 94f6ae3ed3bceceafa716478c5fbf8d29ca601a1
 - name: github.com/spf13/pflag
   version: 583c0c0531f06d5278b7d917446061adc344b5cd
-- name: github.com/spf13/viper
-  version: b5bf975e5823809fb22c7644d008757f78a4259e
-- name: github.com/VineethReddy02/postgres-operator
-  version: 8299dbcb3a80b98daaa025f668091dfd24454375
-  subpackages:
-  - kubectl-pg/cmd
 - name: github.com/zalando/postgres-operator
   version: 69af2d60e55f4dafc4de76113759d95acebb612a
   subpackages:
   - pkg/apis/acid.zalan.do
   - pkg/apis/acid.zalan.do/v1
+  - pkg/generated/clientset/versioned/scheme
+  - pkg/generated/clientset/versioned/typed/acid.zalan.do/v1
   - pkg/spec
   - pkg/util/config
 - name: golang.org/x/crypto
@@ -122,7 +82,7 @@ imports:
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
-  version: 5420a8b6744d3b0345ab293f6fcba19c978f1183
+  version: 670d4cfef0544295bc27a114dbac37980d83185a
 - name: k8s.io/api
   version: 2d6f90ab1293a1fb871cf149423ebb72aa7423aa
   subpackages:
