@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
 )
 
 // updateCmd represents kubectl pg update
@@ -47,22 +48,22 @@ func updatePgResources(fileName string) {
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	ymlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, _, err := decode([]byte(ymlFile), nil, &v1.Postgresql{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	newPostgresObj := obj.(*v1.Postgresql)
 	oldPostgresObj, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Get(newPostgresObj.Name, metav1.GetOptions{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	newPostgresObj.ResourceVersion = oldPostgresObj.ResourceVersion
 	response, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(newPostgresObj)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if newPostgresObj.ResourceVersion != response.ResourceVersion {
 		fmt.Printf("postgresql %s updated.\n", response.Name)

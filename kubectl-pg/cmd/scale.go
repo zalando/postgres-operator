@@ -17,9 +17,10 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"strconv"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
+	"strconv"
 )
 
 // scaleCmd represents the scale command
@@ -29,11 +30,11 @@ var scaleCmd = &cobra.Command{
 	Long: `Scales the postgres objects using cluster-name.
 Scaling to 0 leads to down time.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		clusterName,_ := cmd.Flags().GetString("clusterName")
-		namespace,_ := cmd.Flags().GetString("namespace")
+		clusterName, _ := cmd.Flags().GetString("clusterName")
+		namespace, _ := cmd.Flags().GetString("namespace")
 		if len(args) > 0 {
-			numberofInstances,_ := strconv.Atoi(args[0])
-			scale(int32(numberofInstances),clusterName, namespace)
+			numberofInstances, _ := strconv.Atoi(args[0])
+			scale(int32(numberofInstances), clusterName, namespace)
 		} else {
 			fmt.Println("Please enter number of instances to scale.")
 		}
@@ -46,29 +47,27 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if numberOfInstances == 0 {
-		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter\n",namespace,clusterName)
+		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter\n", namespace, clusterName)
 		confirmAction(clusterName, namespace)
 	}
 	postgresql.Spec.NumberOfInstances = numberOfInstances
-	UpdatedPostgres,err := postgresConfig.Postgresqls(namespace).Update(postgresql)
+	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if UpdatedPostgres.ResourceVersion != postgresql.ResourceVersion {
-		fmt.Printf("scaled postgresql %s/%s to %d instances\n", UpdatedPostgres.Namespace,UpdatedPostgres.Name,UpdatedPostgres.Spec.NumberOfInstances)
+		fmt.Printf("scaled postgresql %s/%s to %d instances\n", UpdatedPostgres.Namespace, UpdatedPostgres.Name, UpdatedPostgres.Spec.NumberOfInstances)
 		return
 	}
 	fmt.Printf("postgresql %s is unchanged.\n", postgresql.Name)
 }
-
-
 
 func init() {
 	namespace := getCurrentNamespace()

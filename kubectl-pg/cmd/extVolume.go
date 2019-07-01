@@ -21,6 +21,7 @@ import (
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
 )
 
 // extVolumeCmd represents the extVolume command
@@ -43,26 +44,26 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	namespace := getCurrentNamespace()
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	oldSize, err := resource.ParseQuantity(postgresql.Spec.Volume.Size)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	newSize, err := resource.ParseQuantity(increasedVolumeSize)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if newSize.Value() >= oldSize.Value() {
 		postgresql.Spec.Volume.Size = increasedVolumeSize
 		response, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 		if postgresql.ResourceVersion != response.ResourceVersion {
 			fmt.Printf("%s volume is extended with %s.\n", response.Name, increasedVolumeSize)

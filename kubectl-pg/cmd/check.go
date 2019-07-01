@@ -20,6 +20,7 @@ import (
 	postgresConstants "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
 )
 
 // checkCmd represent kubectl pg check.
@@ -39,7 +40,7 @@ func check() {
 	config := getConfig()
 	apiExtClient, err := apiextbeta1.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	crdInfo, _ := apiExtClient.CustomResourceDefinitions().Get(postgresConstants.PostgresCRDResouceName, metav1.GetOptions{})

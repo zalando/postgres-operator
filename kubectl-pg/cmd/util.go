@@ -6,6 +6,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"log"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ func getConfig() *restclient.Config {
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	return config
 }
@@ -42,7 +43,7 @@ func confirmAction(clusterName string, namespace string) {
 		_, _ = fmt.Scan(&confirmClusterDetails)
 		clusterDetails := strings.Split(confirmClusterDetails, "/")
 		if clusterDetails[0] != namespace || clusterDetails[1] != clusterName {
-			fmt.Printf("cluster name or namespace doesn't match. Please re-enter %s/%s\nHint: Press (ctrl+c) to exit\n", namespace,clusterName)
+			fmt.Printf("cluster name or namespace doesn't match. Please re-enter %s/%s\nHint: Press (ctrl+c) to exit\n", namespace, clusterName)
 		} else {
 			return
 		}

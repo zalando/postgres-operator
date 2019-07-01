@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
 )
 
 // addDbCmd represents the addDb command
@@ -46,17 +47,19 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	namespace := getCurrentNamespace()
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	postgresql.Spec.Databases[dbName] = dbOwner
+	if dbName != "postgres" && dbName != "template0" && dbName != "template1" {
+		postgresql.Spec.Databases[dbName] = dbOwner
+	}
 	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if updatedPostgresql.ResourceVersion != postgresql.ResourceVersion {
 		fmt.Printf("postgresql %s is updated with new database: %s and as owner: %s.\n", updatedPostgresql.Name, dbName, dbOwner)

@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
 	"strings"
 )
 
@@ -34,11 +35,30 @@ var addUserCmd = &cobra.Command{
 		if len(args) > 0 {
 			user := args[0]
 			permissions := []string{}
+			perms := []string{}
+			Allowed_Privileges := [...]string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
 			if privileges != "" {
 				parsedRoles := strings.Replace(privileges, ",", " ", -1)
 				permissions = strings.Fields(parsedRoles)
+				invalidPerms := []string{}
+				for _, userPrivilge := range permissions {
+					validPerm := false
+					for _, privilge := range Allowed_Privileges {
+						if privilge == userPrivilge {
+							perms = append(perms, userPrivilge)
+							validPerm = true
+						}
+					}
+					if !validPerm {
+						invalidPerms = append(invalidPerms, userPrivilge)
+					}
+				}
+				if len(invalidPerms) > 0 {
+					fmt.Printf("Invalid privilges %s\n", invalidPerms)
+					return
+				}
 			}
-			addUser(user, clusterName, permissions)
+			addUser(user, clusterName, perms)
 		}
 	},
 	Example: "kubectl pg add-user [USER] -p [PRIVILEGES] -c [CLUSTER-NAME]",
@@ -49,20 +69,32 @@ func addUser(user string, clusterName string, permissions []string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	namespace := getCurrentNamespace()
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+	setUsers := make(map[string]bool)
+	for _, k := range permissions {
+		setUsers[k] = true
 	}
 	if existingRoles, key := postgresql.Spec.Users[user]; key {
-		permissions = append(permissions, existingRoles...)
+		for _, k := range existingRoles {
+			setUsers[k] = true
+		}
 	}
-	postgresql.Spec.Users[user] = permissions
+	finalUsers := []string{}
+	for keys, values := range setUsers {
+		if values {
+			finalUsers = append(finalUsers, keys)
+		}
+	}
+	postgresql.Spec.Users[user] = finalUsers
 	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if updatedPostgresql.ResourceVersion != postgresql.ResourceVersion {
 		fmt.Printf("postgresql %s is updated with new user %s and with privileges %s.\n", updatedPostgresql.Name, user, permissions)

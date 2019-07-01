@@ -21,6 +21,7 @@ import (
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	"log"
 )
 
 // createCmd kubectl pg create.
@@ -41,17 +42,17 @@ func create(fileName string) {
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	ymlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, _, err := decode([]byte(ymlFile), nil, &v1.Postgresql{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	postgresSql := obj.(*v1.Postgresql)
 	_, err = postgresConfig.Postgresqls(postgresSql.Namespace).Create(postgresSql)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	fmt.Printf("postgresql %s created.\n", postgresSql.Name)
 }

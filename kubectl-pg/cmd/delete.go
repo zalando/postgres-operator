@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
 )
 
 // deleteCmd represents kubectl pg delete.
@@ -61,12 +62,12 @@ func deleteByFile(file string) {
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	ymlFile, err := ioutil.ReadFile(file)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, _, err := decode([]byte(ymlFile), nil, &v1.Postgresql{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	postgresSql := obj.(*v1.Postgresql)
 	_, err = postgresConfig.Postgresqls(postgresSql.Namespace).Get(postgresSql.Name, metav1.GetOptions{})
@@ -82,7 +83,7 @@ func deleteByName(clusterName string, namespace string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	_, err = postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {

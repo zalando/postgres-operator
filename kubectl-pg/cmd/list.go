@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"log"
 	"strconv"
 	"time"
 )
@@ -47,12 +48,12 @@ func list() {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	namespace := getCurrentNamespace()
 	listPostgresql, err := postgresConfig.Postgresqls(namespace).List(metav1.ListOptions{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if len(listPostgresql.Items) == 0 {
 		fmt.Println("No Resources found.")
@@ -72,11 +73,11 @@ func listAll() {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	listPostgresql, err := postgresConfig.Postgresqls("").List(metav1.ListOptions{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	if len(listPostgresql.Items) == 0 {
 		fmt.Println("No Resources found.")
