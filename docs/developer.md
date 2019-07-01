@@ -1,6 +1,6 @@
 # Developer Guide
 
-Reed this guide if you want to debug the operator, fix bugs or contribute new
+Read this guide if you want to debug the operator, fix bugs or contribute new
 features and tests.
 
 ## Setting up Go
@@ -63,22 +63,43 @@ The binary will be placed into the build directory.
 
 ## Deploying self build image
 
-The fastest way to run your docker image locally is to reuse the docker from
-minikube. The following steps will get you the docker image built and deployed.
+The fastest way to run and test your docker image locally is to reuse the docker
+from [minikube]((https://github.com/kubernetes/minikube/releases)) or use the
+`load docker-image` from [kind](https://kind.sigs.k8s.io/). The following steps
+will get you the docker image built and deployed.
 
 ```bash
+    # minikube
     $ eval $(minikube docker-env)
     $ export TAG=$(git describe --tags --always --dirty)
     $ make docker
-    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml|kubectl --context minikube create  -f -
+
+    # kind
+    $ export TAG=$(git describe --tags --always --dirty)
+    $ make docker
+    $ kind load docker-image <image> --name <kind-cluster-name>
+```
+
+Then create a new Postgres Operator deployment. You can reuse the provided
+manifest but replace the version and tag. Don't forget to also apply
+configuration and RBAC manifests first, e.g.:
+
+```bash
+    $ kubectl create -f manifests/configmap.yaml
+    $ kubectl create -f manifests/operator-service-account-rbac.yaml
+    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml | kubectl create  -f -
+
+    # check if the operator is coming up
+    $ kubectl get pod -l name=postgres-operator
 ```
 
 ## Code generation
 
-The operator employs k8s-provided code generation to obtain deep copy methods
-and Kubernetes-like APIs for its custom resource definitons, namely the Postgres
-CRD and the operator CRD. The usage of the code generation follows conventions
-from the k8s community. Relevant scripts live in the `hack` directory:
+The operator employs K8s-provided code generation to obtain deep copy methods
+and K8s-like APIs for its custom resource definitions, namely the
+Postgres CRD and the operator CRD. The usage of the code generation follows
+conventions from the k8s community. Relevant scripts live in the `hack`
+directory:
 * `update-codegen.sh` triggers code generation for the APIs defined in `pkg/apis/acid.zalan.do/`,
 * `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI).
 
@@ -110,7 +131,9 @@ localhost:8080 by doing:
 The inner 'query' gets the name of the postgres operator pod, and the outer
 enables port forwarding. Afterwards, you can access the operator API with:
 
+```
     $ curl --location http://127.0.0.1:8080/$endpoint | jq .
+```
 
 The available endpoints are listed below. Note that the worker ID is an integer
 from 0 up to 'workers' - 1 (value configured in the operator configuration and
@@ -150,7 +173,7 @@ need:
 * Install delve locally
 
 ```
-go get -u github.com/derekparker/delve/cmd/dlv
+    $ go get -u github.com/derekparker/delve/cmd/dlv
 ```
 
 * Add following dependencies to the `Dockerfile`
@@ -177,13 +200,13 @@ CMD ["/root/go/bin/dlv", "--listen=:DLV_PORT", "--headless=true", "--api-version
 * Forward the listening port
 
 ```
-kubectl port-forward POD_NAME DLV_PORT:DLV_PORT
+    $ kubectl port-forward POD_NAME DLV_PORT:DLV_PORT
 ```
 
 * Attach to it
 
 ```
-$ dlv connect 127.0.0.1:DLV_PORT
+    $ dlv connect 127.0.0.1:DLV_PORT
 ```
 
 ## Unit tests
@@ -191,46 +214,60 @@ $ dlv connect 127.0.0.1:DLV_PORT
 To run all unit tests, you can simply do:
 
 ```
-$ go test ./...
+    $ go test ./...
 ```
 
 For go 1.9 `vendor` directory would be excluded automatically. For previous
 versions you can exclude it manually:
 
 ```
-$ go test $(glide novendor)
+    $ go test $(glide novendor)
 ```
 
 In case if you need to debug your unit test, it's possible to use delve:
 
 ```
-$ dlv test ./pkg/util/retryutil/
-Type 'help' for list of commands.
-(dlv) c
-PASS
+    $ dlv test ./pkg/util/retryutil/
+    Type 'help' for list of commands.
+    (dlv) c
+    PASS
 ```
 
 To test the multinamespace setup, you can use
 
 ```
-./run_operator_locally.sh --rebuild-operator
+    $ ./run_operator_locally.sh --rebuild-operator
 ```
 It will automatically create an `acid-minimal-cluster` in the namespace `test`.
 Then you can for example check the Patroni logs:
 
 ```
-kubectl logs acid-minimal-cluster-0
+    $ kubectl logs acid-minimal-cluster-0
 ```
 
 ## End-to-end tests
 
-The operator provides reference e2e (end-to-end) tests to ensure various infra parts work smoothly together.
-Each e2e execution tests a Postgres Operator image built from the current git branch. The test runner starts a [kind](https://kind.sigs.k8s.io/) (local k8s) cluster and Docker container with tests. The k8s API client from within the container connects to the `kind` cluster using the standard Docker `bridge` network.
-The tests utilize examples from `/manifests` (ConfigMap is used for the operator configuration) to avoid maintaining yet another set of configuration files. The kind cluster is deleted if tests complete successfully.
+The operator provides reference e2e (end-to-end) tests to ensure various infra
+parts work smoothly together. Each e2e execution tests a Postgres Operator image
+built from the current git branch. The test runner starts a [kind](https://kind.sigs.k8s.io/)
+(local k8s) cluster and Docker container with tests. The k8s API client from
+within the container connects to the `kind` cluster using the standard Docker
+`bridge` network. The tests utilize examples from `/manifests` (ConfigMap is
+used for the operator configuration) to avoid maintaining yet another set of
+configuration files. The kind cluster is deleted if tests complete successfully.
 
-End-to-end tests are executed automatically during builds; to invoke them locally use `make e2e-run` from the project's top directory. Run `make e2e-tools e2e-build` to install `kind` and build the tests' image locally before the first run.
+End-to-end tests are executed automatically during builds:
 
-End-to-end tests are written in Python and use `flake8` for code quality. Please run flake8 [before submitting a PR](http://flake8.pycqa.org/en/latest/user/using-hooks.html).
+```bash
+    # invoke them from the project's top directory
+    $ make e2e-run
+
+    # install kind and build test image before first run
+    $ make e2e-tools e2e-build
+```
+
+End-to-end tests are written in Python and use `flake8` for code quality.
+Please run flake8 [before submitting a PR](http://flake8.pycqa.org/en/latest/user/using-hooks.html).
 
 ## Introduce additional configuration parameters
 
@@ -240,8 +277,11 @@ be updated. As explained [here](reference/operator_parameters.md), it's possible
 to configure the operator either with a ConfigMap or CRD, but currently we aim
 to synchronize parameters everywhere.
 
-When choosing a parameter name for a new option in a PG manifest, keep in mind
-the naming conventions there. The `snake_case` variables come from the Patroni/Postgres world, while the `camelCase` from the k8s world.
+When choosing a parameter name for a new option in a Postgres cluster manifest,
+keep in mind the naming conventions there. We use `camelCase` for manifest
+parameters (with exceptions for certain Patroni/Postgres options) and
+`snake_case` variables in the configuration. Only introduce new manifest
+variables if you feel a per-cluster configuration is necessary.
 
 Note: If one option is defined in the operator configuration and in the cluster
 [manifest](../manifests/complete-postgres-manifest.yaml), the latter takes

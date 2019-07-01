@@ -1,6 +1,6 @@
 # User Guide
 
-Learn how to work with the Postgres Operator in a Kubernetes environment.
+Learn how to work with the Postgres Operator in a Kubernetes (K8s) environment.
 
 ## Create a manifest for a new PostgreSQL cluster
 
@@ -46,15 +46,6 @@ $ kubectl create -f manifests/minimal-postgres-manifest.yaml
 $ kubectl get pods -w --show-labels
 ```
 
-## Give K8S users access to create/list postgresqls
-
-```bash
-$ kubectl create -f manifests/user-facing-clusterroles.yaml
-```
-
-Creates zalando-postgres-operator:users:view, :edit and :admin clusterroles that
-are aggregated into the default roles.
-
 ## Connect to PostgreSQL
 
 With a `port-forward` on one of the database pods (e.g. the master) you can
@@ -97,14 +88,13 @@ In the next sections, we will cover those use cases in more details.
 
 Manifest roles are defined directly in the cluster manifest. See
 [minimal postgres manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
-for an example of `zalando` role, defined with `superuser` and `createdb`
-flags.
+for an example of `zalando` role, defined with `superuser` and `createdb` flags.
 
 Manifest roles are defined as a dictionary, with a role name as a key and a
 list of role options as a value. For a role without any options it is best to
 supply the empty list `[]`. It is also possible to leave this field empty as in
-our example manifests, but in certain cases such empty field may removed by
-Kubernetes [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes)
+our example manifests, but in certain cases such empty field may removed by K8s
+[due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes)
 (`foobar_user:` is equivalent to `foobar_user: null`).
 
 The operator accepts the following options:  `superuser`, `inherit`, `login`,
@@ -117,7 +107,7 @@ The operator automatically generates a password for each manifest role and
 places it in the secret named
 `{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do` in the
 same namespace as the cluster. This way, the application running in the
-Kubernetes cluster and working with the database can obtain the password right
+K8s cluster and working with the database can obtain the password right
 from the secret, without ever sharing it outside of the cluster.
 
 At the moment it is not possible to define membership of the manifest role in
@@ -144,9 +134,9 @@ parameter. The role definition looks like this (values are base64 encoded):
 ```
 
 The block above describes the infrastructure role 'dbuser' with password
-'secret' that is a member of the 'operator' role. For the following
-definitions one must increase the index, i.e. the next role will be defined as
-'user2' and so on. The resulting role will automatically be a login role.
+'secret' that is a member of the 'operator' role. For the following definitions
+one must increase the index, i.e. the next role will be defined as 'user2' and
+so on. The resulting role will automatically be a login role.
 
 Note that with definitions that solely use the infrastructure roles secret
 there is no way to specify role options (like superuser or nologin) or role
@@ -155,11 +145,10 @@ memberships. This is where the ConfigMap comes into play.
 ### Secret plus ConfigMap
 
 A [ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
-allows for defining more details regarding the infrastructure roles.
-Therefore, one should use the new style that specifies infrastructure roles
-using both the secret and a ConfigMap. The ConfigMap must have the same name as
-the secret. The secret should contain an entry with 'rolename:rolepassword' for
-each role.
+allows for defining more details regarding the infrastructure roles. Therefore,
+one should use the new style that specifies infrastructure roles using both the
+secret and a ConfigMap. The ConfigMap must have the same name as the secret.
+The secret should contain an entry with 'rolename:rolepassword' for each role.
 
 ```yaml
     dbuser: c2VjcmV0
@@ -194,9 +183,8 @@ and [infrastructure roles configmap](https://github.com/zalando/postgres-operato
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
-To ensure Postgres pods are running on nodes without any other application
-pods, you can use
-[taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
+To ensure Postgres pods are running on nodes without any other application pods,
+you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
 and configure the required toleration in the manifest.
 
 ```yaml
@@ -257,10 +245,10 @@ spec:
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
-cluster will be cloned from S3, using the latest backup before the
-`timestamp`. In this case, `uid` field is also mandatory - operator will use it
-to find a correct key inside an S3 bucket. You can find this field from
-metadata of a source cluster:
+cluster will be cloned from S3, using the latest backup before the `timestamp`.
+In this case, `uid` field is also mandatory - operator will use it to find a
+correct key inside an S3 bucket. You can find this field from metadata of a
+source cluster:
 
 ```yaml
 apiVersion: acid.zalan.do/v1
@@ -386,14 +374,12 @@ actions:
 
 * call AWS API to change the volume size
 
-* connect to the pod using `kubectl exec` and resize the filesystem with
-  `resize2fs`.
+* connect to pod using `kubectl exec` and resize filesystem with `resize2fs`.
 
 Fist step has a limitation, AWS rate-limits this operation to no more than once
-every 6 hours.
-Note that if the statefulset is scaled down before resizing the size changes
-are only applied to the volumes attached to the running pods. The size of the
-volumes that correspond to the previously running pods is not changed.
+every 6 hours. Note, that if the statefulset is scaled down before resizing the
+size changes are only applied to the volumes attached to the running pods. The
+size of volumes that correspond to the previously running pods is not changed.
 
 ## Logical backups
 
@@ -403,7 +389,7 @@ If you add
 ```
 to the cluster manifest, the operator will create and sync a k8s cron job to do
 periodic logical backups of this particular Postgres cluster. Due to the
-[limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
+[limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
 it is highly advisable to set up additional monitoring for this feature; such
 monitoring is outside of the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and

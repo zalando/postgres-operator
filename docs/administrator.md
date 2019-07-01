@@ -1,9 +1,11 @@
 # Administrator Guide
 
-Learn how to configure and manage the Postgres Operator in your Kubernetes
+Learn how to configure and manage the Postgres Operator in your Kubernetes (K8s)
 environment.
 
-## Select the namespace to deploy to
+## Namespaces
+
+### Select the namespace to deploy to
 
 The operator can run in a namespace other than `default`. For example, to use
 the `test` namespace, run the following before deploying the operator's
@@ -20,7 +22,7 @@ ConfigMap - there. Please note that the namespace for service accounts and
 cluster role bindings in [operator RBAC rules](../manifests/operator-service-account-rbac.yaml)
 needs to be adjusted to the non-default value.
 
-## Specify the namespace to watch
+### Specify the namespace to watch
 
 Watching a namespace for an operator means tracking requests to change
 Postgresql clusters in the namespace such as "increase the number of Postgresql
@@ -39,14 +41,14 @@ Note that for an operator to manage pods in the watched namespace, the
 operator's service account (as specified in the operator deployment manifest)
 has to have appropriate privileges to access the watched namespace. The
 operator may not be able to function in the case it watches all namespaces but
-lacks access rights to any of them (except Kubernetes system namespaces like
+lacks access rights to any of them (except K8s system namespaces like
 `kube-system`). The reason is that for multiple namespaces operations such as
 'list pods' execute at the cluster scope and fail at the first violation of
 access rights.
 
 The watched namespace also needs to have a (possibly different) service account
-in the case database pods need to talk to the Kubernetes API (e.g. when using
-Kubernetes-native configuration of Patroni). The operator checks that the
+in the case database pods need to talk to the K8s API (e.g. when using
+K8s-native configuration of Patroni). The operator checks that the
 `pod_service_account_name` exists in the target namespace, and, if not, deploys
 there the `pod_service_account_definition` from the operator
 [`Config`](../pkg/util/config/config.go) with the default value of:
@@ -64,15 +66,18 @@ namespace. The operator performs **no** further syncing of this account.
 
 ## Non-default cluster domain
 
-If your cluster uses a different dns domain than `cluster.local`, this needs
-to be set in the operator ConfigMap. This is used by the operator to connect
-to the clusters after creation.
+If your cluster uses a different DNS domain than `cluster.local`, this needs
+to be set in the operator configuration (`cluster_domain` variable). This is
+used by the operator to connect to the clusters after creation.
 
 ## Role-based access control for the operator
 
-The `manifests/operator-service-account-rbac.yaml` defines cluster roles and
-bindings needed for the operator to function under access control restrictions.
-To deploy the operator with this RBAC policy use:
+### Service account and cluster roles
+
+The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
+defines the service account, cluster roles and bindings needed for the operator
+to function under access control restrictions. To deploy the operator with this
+RBAC policy use:
 
 ```bash
     $ kubectl create -f manifests/configmap.yaml
@@ -81,26 +86,36 @@ To deploy the operator with this RBAC policy use:
     $ kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-Note that the service account in `operator-rbac.yaml` is named
-`zalando-postgres-operator`. You may have to change the `service_account_name`
-in the operator ConfigMap and `serviceAccountName` in the postgres-operator
-deployment appropriately.
+Note that the service account is named `zalando-postgres-operator`. You may have
+to change the `service_account_name` in the operator ConfigMap and
+`serviceAccountName` in the `postgres-operator` deployment appropriately. This
+is done intentionally to avoid breaking those setups that already work with the
+default `operator` account. In the future the operator should ideally be run
+under the `zalando-postgres-operator` service account.
 
-This is done intentionally to avoid breaking those setups that already work
-with the default `operator` account. In the future the operator should ideally
-be run under the `zalando-postgres-operator` service account.
+The service account defined in `operator-service-account-rbac.yaml` acquires
+some privileges not really used by the operator (i.e. we only need `list` and
+`watch` on `configmaps` resources), this is also done intentionally to avoid
+breaking things if someone decides to configure the same service account in the
+operator's ConfigMap to run Postgres clusters.
 
-The service account defined in `operator-rbac.yaml` acquires some privileges
-not really used by the operator (i.e. we only need `list` and `watch` on
-`configmaps` resources), this is also done intentionally to avoid breaking
-things if someone decides to configure the same service account in the
-operator's ConfigMap to run postgres clusters.
+### Give K8S users access to create/list postgresqls
 
-### Use taints and tolerations for dedicated PostgreSQL nodes
+By default `postgresql` custom resources can only by listed and changed by
+cluster admins. To allow read and/or write access to other human users apply
+the `ùser-facing-clusterrole` manifest:
 
-To ensure Postgres pods are running on nodes without any other application
-pods, you can use
-[taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
+```bash
+$ kubectl create -f manifests/user-facing-clusterroles.yaml
+```
+
+It creates zalando-postgres-operator:user:view, :edit and :admin clusterroles
+that are aggregated into the K8s [default roles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#default-roles-and-role-bindings).
+
+## Use taints and tolerations for dedicated PostgreSQL nodes
+
+To ensure Postgres pods are running on nodes without any other application pods,
+you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
 and configure the required toleration in the operator ConfigMap.
 
 As an example you can set following node taint:
@@ -109,7 +124,7 @@ As an example you can set following node taint:
     $ kubectl taint nodes <nodeName> postgres=:NoSchedule
 ```
 
-And configure the toleration for the PostgreSQL pods by adding following line
+And configure the toleration for the Postgres pods by adding following line
 to the ConfigMap:
 
 ```yaml
@@ -122,15 +137,15 @@ data:
   ...
 ```
 
-Note that the Kubernetes version 1.13 brings [taint-based eviction](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/#taint-based-evictions) to the beta stage and enables it by default.
-Postgres pods by default receive tolerations for `unreachable` and `noExecute`
-taints with the timeout of `5m`. Depending on your setup, you may want to adjust
-these parameters to prevent master pods from being evicted by the Kubernetes
-runtime. To prevent eviction completely, specify the toleration by leaving out
-the `tolerationSeconds` value (similar to how Kubernetes' own DaemonSets are
-configured)
+Note that the K8s version 1.13 brings [taint-based eviction](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/#taint-based-evictions)
+to the beta stage and enables it by default. Postgres pods by default receive
+tolerations for `unreachable` and `noExecute` taints with the timeout of `5m`.
+Depending on your setup, you may want to adjust these parameters to prevent
+master pods from being evicted by the K8s runtime. To prevent eviction
+completely, specify the toleration by leaving out the `tolerationSeconds` value
+(similar to how Kubernetes' own DaemonSets are configured)
 
-### Enable pod anti affinity
+## Enable pod anti affinity
 
 To ensure Postgres pods are running on different topologies, you can use
 [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
@@ -162,10 +177,10 @@ data:
   pod_antiaffinity_topology_key: "failure-domain.beta.kubernetes.io/zone"
 ```
 
-### Add cluster-specific labels
+## Add cluster-specific labels
 
 In some cases, you might want to add `labels` that are specific to a given
-postgres cluster, in order to identify its child objects. The typical use case
+Postgres cluster, in order to identify its child objects. The typical use case
 is to add labels that identifies the `Pods` created by the operator, in order
 to implement fine-controlled `NetworkPolicies`.
 
@@ -251,7 +266,7 @@ data:
 This ConfigMap is then added as a source of environment variables to the
 Postgres StatefulSet/pods.
 
-## Limiting the number of instances in clusters with `min_instances` and `max_instances`
+## Limiting the number of min and max instances in clusters
 
 As a preventive measure, one can restrict the minimum and the maximum number of
 instances permitted by each Postgres cluster managed by the operator. If either
@@ -261,9 +276,9 @@ either the min or the max boundary. For instance, of a cluster manifest has 1
 instance and the `min_instances` is set to 3, the cluster will be created with 3
 instances. By default, both parameters are set to `-1`.
 
-## Load balancers
+## Load balancers and allowed IP ranges
 
-For any Postgresql/Spilo cluster, the operator creates two separate Kubernetes
+For any Postgresql/Spilo cluster, the operator creates two separate K8s
 services: one for the master pod and one for replica pods. To expose these
 services to an outer network, one can attach load balancers to them by setting
 `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the
@@ -279,21 +294,21 @@ Internet, this field is set at cluster creation time to `127.0.0.1/32` unless
 overwritten explicitly. If you want to revoke all IP ranges from an existing
 cluster, please set the `allowedSourceRanges` field to `127.0.0.1/32` or to an
 empty sequence `[]`. Setting the field to `null` or omitting it entirely may
-lead to Kubernetes removing this field from the manifest due to its
+lead to K8s removing this field from the manifest due to its
 [handling of null fields](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes).
 Then the resultant manifest will not contain the necessary change, and the
 operator will respectively do noting with the existing source ranges.
 
-## Running periodic 'autorepair' scans of Kubernetes objects
+## Running periodic 'autorepair' scans of K8s objects
 
-The Postgres Operator periodically scans all Kubernetes objects belonging to
-each cluster and repairs all discrepancies between them and the definitions
-generated from the current cluster manifest. There are two types of scans:
+The Postgres Operator periodically scans all K8s objects belonging to each
+cluster and repairs all discrepancies between them and the definitions generated
+from the current cluster manifest. There are two types of scans:
 
 * `sync scan`, running every `resync_period` seconds for every cluster
 
-* `repair scan`, coming every `repair_period` only for those clusters that didn't
-report success as a result of the last operation applied to them.
+* `repair scan`, coming every `repair_period` only for those clusters that
+didn't report success as a result of the last operation applied to them.
 
 ## Postgres roles supported by the operator
 
@@ -306,7 +321,7 @@ creating such roles to Patroni and only establishes relevant secrets.
 
 * **Infrastructure roles** are roles for processes originating from external
 systems, e.g. monitoring robots. The operator creates such roles in all Postgres
-clusters it manages assuming that Kubernetes secrets with the relevant
+clusters it manages assuming that K8s secrets with the relevant
 credentials exist beforehand.
 
 * **Per-cluster robot users** are also roles for processes originating from
@@ -318,8 +333,8 @@ database.
 members given a team id. The operator differentiates between (a) product teams
 that own a particular Postgres cluster and are granted admin rights to maintain
 it, and (b) Postgres superuser teams that get the superuser access to all
-Postgres databases running in a Kubernetes cluster for the purposes of
-maintaining and troubleshooting.
+Postgres databases running in a K8s cluster for the purposes of maintaining and
+troubleshooting.
 
 ## Understanding rolling update of Spilo pods
 
@@ -328,7 +343,7 @@ between the old and new StatefulSet specs with the `debug` level. To benefit
 from numerous escape characters in the latter log entry, view it in CLI with
 `echo -e`. Note that the resultant message will contain some noise because the
 `PodTemplate` used by the operator is yet to be updated with the default values
-used internally in Kubernetes.
+used internally in K8s.
 
 ## Logical backups
 
@@ -346,7 +361,7 @@ bucket; the default image ``registry.opensource.zalan.do/acid/logical-backup``
 is the same image built with the Zalando-internal CI pipeline. `pg_dumpall`
 requires a `superuser` access to a DB and runs on the replica when possible.  
 
-2. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
+2. Due to the [limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
 it is highly advisable to set up additional monitoring for this feature; such
 monitoring is outside of the scope of operator responsibilities.
 

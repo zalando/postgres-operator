@@ -1,12 +1,12 @@
 # Introduction
 
 The Postgres [operator](https://coreos.com/blog/introducing-operators.html)
-manages PostgreSQL clusters on Kubernetes:
+manages PostgreSQL clusters on Kubernetes (K8s):
 
 1. The operator watches additions, updates, and deletions of PostgreSQL cluster
    manifests and changes the running clusters accordingly.  For example, when a
    user submits a new manifest, the operator fetches that manifest and spawns a
-   new Postgres cluster along with all necessary entities such as Kubernetes
+   new Postgres cluster along with all necessary entities such as K8s
    StatefulSets and Postgres roles.  See this
    [Postgres cluster manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml)
    for settings that a manifest may contain.
@@ -22,7 +22,7 @@ manages PostgreSQL clusters on Kubernetes:
 
 4. The operator aims to be hands free and configuration happens only via
    manifests and its own config. This enables easy integration in automated
-   deploy pipelines with no access to Kubernetes directly.
+   deploy pipelines with no access to K8s directly.
 
 ## Concepts
 
@@ -30,10 +30,10 @@ manages PostgreSQL clusters on Kubernetes:
 
 The scope of the postgres operator is on provisioning, modifying configuration
 and cleaning up Postgres clusters that use Patroni, basically to make it easy
-and convenient to run Patroni based clusters on Kubernetes. The provisioning
-and modifying includes Kubernetes resources on one side but also e.g. database
+and convenient to run Patroni based clusters on K8s. The provisioning
+and modifying includes K8s resources on one side but also e.g. database
 and role provisioning once the cluster is up and running. We try to leave as
-much work as possible to Kubernetes and to Patroni where it fits, especially
+much work as possible to K8s and to Patroni where it fits, especially
 the cluster bootstrap and high availability. The operator is however involved
 in some overarching orchestration, like rolling updates to improve the user
 experience.
@@ -61,9 +61,9 @@ functionality the operator provides.
 
 This project is currently in active development. It is however already
 [used internally by Zalando](https://jobs.zalando.com/tech/blog/postgresql-in-a-time-of-kubernetes/)
-in order to run Postgres clusters on Kubernetes in larger numbers for staging
+in order to run Postgres clusters on K8s in larger numbers for staging
 environments and a growing number of production clusters. In this environment
-the operator is deployed to multiple Kubernetes clusters, where users deploy
+the operator is deployed to multiple K8s clusters, where users deploy
 manifests via our CI/CD infrastructure or rely on a slim user interface to
 create manifests.
 
@@ -71,7 +71,7 @@ Please, report any issues discovered to https://github.com/zalando/postgres-oper
 
 ## Talks
 
-1. "PostgreSQL and Kubernetes: DBaaS without a vendor-lock" talk by Oleksii Kliukin, PostgreSQL Sessions 2018: [video](https://www.youtube.com/watch?v=q26U2rQcqMw) | [slides](https://speakerdeck.com/alexeyklyukin/postgresql-and-kubernetes-dbaas-without-a-vendor-lock)
+1. "PostgreSQL and K8s: DBaaS without a vendor-lock" talk by Oleksii Kliukin, PostgreSQL Sessions 2018: [video](https://www.youtube.com/watch?v=q26U2rQcqMw) | [slides](https://speakerdeck.com/alexeyklyukin/postgresql-and-kubernetes-dbaas-without-a-vendor-lock)
 
 2. "PostgreSQL High Availability on Kubernetes with Patroni" talk by Oleksii Kliukin, Atmosphere 2018: [video](https://www.youtube.com/watch?v=cFlwQOPPkeg) | [slides](https://speakerdeck.com/alexeyklyukin/postgresql-high-availability-on-kubernetes-with-patroni)
 

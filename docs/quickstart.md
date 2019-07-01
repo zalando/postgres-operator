@@ -16,10 +16,10 @@ For local tests we recommend to use one of the following solutions:
 To interact with the K8s infrastructure install it's CLI runtime [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl).
 
 This quickstart assumes that you haved started minikube or created a local kind
-cluster. Note that you can also use built-in Kubernetes support in the Docker
+cluster. Note that you can also use built-in K8s support in the Docker
 Desktop for Mac to follow the steps of this tutorial. You would have to replace
 `minikube start` and `minikube delete` with your launch actions for the Docker
-built-in Kubernetes support.
+built-in K8s support.
 
 
 ## Configuration Options
@@ -32,7 +32,7 @@ Postgres cluster. This can happen in two ways: Via a ConfigMap or a custom
 
 ## Deployment options
 
-The Postgres Operator can be deployed in different way:
+The Postgres Operator can be deployed in different ways:
 
 * Manual deployment
 * Helm chart
@@ -42,7 +42,7 @@ The Postgres Operator can be deployed in different way:
 
 The Postgres Operator can be installed simply by applying yaml manifests. Note,
 we provide the `/manifests` directory as an example only; you should consider
-adjusting the manifests to your particular setting (e.g. namespaces).
+adjusting the manifests to your K8s environment (e.g. namespaces).
 
 ```bash
 # First, clone the repository and change to the directory
@@ -67,15 +67,15 @@ For convenience, we have automated starting the operator and submitting the
 
 Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
 chart which saves you the manual steps. Therefore, you would need to install
-the helm CLI on your machine. After initializing helm (and its server
-component Tiller) in your local cluster you can install the operator chart.
-You can define a release name that is prepended to the operator resource's
-names.
+the helm CLI on your machine. After initializing helm (and its server component
+Tiller) in your local cluster you can install the operator chart. You can define
+a release name that is prepended to the operator resource's names.
 
 Use `--name zalando` to match with the default service account name as older
 operator versions do not support custom names for service accounts. When relying
-solely on the CRD-based configuration edit the `serviceAccount` section in the
-[values yaml file](../charts/values.yaml) by setting the name to `"operator"`.
+solely on the CRD-based configuration use the [values-crd yaml file](../charts/values-crd.yaml)
+and comment the ConfigMap template in the [helmignore](../charts/.helmignore)
+file.
 
 ```bash
 # 1) initialize helm
@@ -139,13 +139,20 @@ kubectl get svc -l application=spilo -L spilo-role
 
 ## Connect to the Postgres cluster via psql
 
-You can retrieve the host and port of the Postgres master from minikube.
-Retrieve the password from the Kubernetes Secret that is created in your cluster.
+You can create a port-forward on a database pod to connect to Postgres. See the
+[user guide](user.md#connect-to-postgresql) for instructions. With minikube it's
+also easy to retrieve the connections string from the K8s service that is
+pointing to the master pod:
 
 ```bash
 export HOST_PORT=$(minikube service acid-minimal-cluster --url | sed 's,.*/,,')
 export PGHOST=$(echo $HOST_PORT | cut -d: -f 1)
 export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
+```
+
+Retrieve the password from the K8s Secret that is created in your cluster.
+
+```bash
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
 psql -U postgres
 ```
@@ -165,4 +172,4 @@ deleted. Secrets however are not deleted. When deleting a cluster while it is
 still starting up it can [happen](https://github.com/zalando/postgres-operator/issues/551)
 the `postgresql` resource is deleted leaving orphaned components behind. This
 can cause troubles when creating a new Postgres cluster. For a fresh setup you
-can delete your local minikube and kind cluster and start again.
+can delete your local minikube or kind cluster and start again.
