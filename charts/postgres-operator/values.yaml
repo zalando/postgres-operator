@@ -18,7 +18,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: "-1"
   # min number of instances in Postgres cluster. -1 = no limit
@@ -178,7 +178,7 @@ configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
   # S3 bucket to store backup results
-  logical_backup_s3_bucket: ""
+  logical_backup_s3_bucket: "my-bucket-url"
 
 # automate creation of human users with teams API service
 configTeamsApi:

@@ -4,7 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   etcd_host: ""
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
   max_instances: -1
   min_instances: -1
   resync_period: 30m
@@ -72,7 +72,7 @@ configuration:
   logical_backup:
     logical_backup_schedule: "30 00 * * *"
     logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
-    logical_backup_s3_bucket: ""
+    logical_backup_s3_bucket: "my-bucket-url"
   debug:
     debug_logging: true
     enable_database_access: true
