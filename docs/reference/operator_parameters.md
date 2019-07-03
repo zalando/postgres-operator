@@ -405,7 +405,7 @@ yet officially supported.
   empty.
 
 * **aws_region**
-  AWS region used to store ESB volumes. The default is `eu-central-1`.
+  AWS region used to store EBS volumes. The default is `eu-central-1`.
 
 * **additional_secret_mount**
   Additional Secret (aws or gcp credentials) to mount in the pod. The default is empty.
