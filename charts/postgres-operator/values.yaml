@@ -15,6 +15,7 @@ podLabels: {}
 
 # config shared from ConfigMap and CRD
 docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p7
+enable_shm_volume: true
 repair_period: 5m
 resync_period: 5m
 spilo_privileged: false

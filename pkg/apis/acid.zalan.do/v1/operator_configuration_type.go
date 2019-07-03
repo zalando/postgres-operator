@@ -155,6 +155,7 @@ type OperatorConfigurationData struct {
 	MaxInstances               int32                              `json:"max_instances,omitempty"`
 	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
+	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
 	Sidecars                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
