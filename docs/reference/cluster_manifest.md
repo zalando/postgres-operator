@@ -61,8 +61,8 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   It should be a [Spilo](https://github.com/zalando/spilo) image.  Optional.
 
 * **spiloFSGroup**
-  the Persistent Volumes for the spilo pods in the StatefulSet will be owned
-  and writable by the group ID specified. This will override the **spilo_fsgroup**
+  the Persistent Volumes for the spilo pods in the StatefulSet will be owned and
+  writable by the group ID specified. This will override the **spilo_fsgroup**
   operator parameter. This is required to run Spilo as a non-root process, but
   requires a custom spilo image. Note the FSGroup of a Pod cannot be changed
   without recreating a new Pod.
@@ -150,8 +150,8 @@ Those parameters are grouped under the `postgresql` top-level key.
 
 * **parameters**
   a dictionary of postgres parameter names and values to apply to the resulting
-  cluster. Optional (Spilo automatically sets reasonable defaults for
-  parameters like work_mem or max_connections).
+  cluster. Optional (Spilo automatically sets reasonable defaults for parameters
+  like work_mem or max_connections).
 
 
 ## Patroni parameters
@@ -255,8 +255,13 @@ under the `clone` top-level key and do not affect the already running cluster.
   timestamp. When this parameter is set the operator will not consider cloning
   from the live cluster, even if it is running, and instead goes to S3. Optional.
 
+* **s3_wal_path**
+  the url to S3 bucket containing the WAL archive of the cluster to be cloned.
+  Optional.
+
 * **s3_endpoint**
-  the url of the S3-compatible service should be set when cloning from non AWS S3. Optional.
+  the url of the S3-compatible service should be set when cloning from non AWS
+  S3. Optional.
 
 * **s3_access_key_id**
   the access key id, used for authentication on S3 service. Optional.
@@ -265,8 +270,20 @@ under the `clone` top-level key and do not affect the already running cluster.
   the secret access key, used for authentication on S3 service. Optional.
 
 * **s3_force_path_style**
-  to enable path-style addressing(i.e., http://s3.amazonaws.com/BUCKET/KEY) when connecting to an S3-compatible service
-  that lack of support for sub-domain style bucket URLs (i.e., http://BUCKET.s3.amazonaws.com/KEY). Optional.
+  to enable path-style addressing(i.e., http://s3.amazonaws.com/BUCKET/KEY)
+  when connecting to an S3-compatible service that lack of support for
+  sub-domain style bucket URLs (i.e., http://BUCKET.s3.amazonaws.com/KEY).
+  Optional.
+
+## Standby cluster
+
+On startup, an existing `standby` top-level key creates a standby Postgres
+cluster streaming from a remote location. So far only streaming from a S3 WAL
+archive is supported.
+
+* **s3_wal_path**
+  the url to S3 bucket containing the WAL archive of the remote primary.
+  Optional.
 
 ## EBS volume resizing
 
@@ -282,6 +299,9 @@ properties of the persistent storage that stores postgres data.
   See [Kubernetes
   documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
   for the details on storage classes. Optional.
+
+* **subPath**
+  Subpath to use when mounting volume into Spilo container
 
 ## Sidecar definitions
 

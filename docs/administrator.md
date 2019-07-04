@@ -177,6 +177,22 @@ data:
   pod_antiaffinity_topology_key: "failure-domain.beta.kubernetes.io/zone"
 ```
 
+## Pod Disruption Budget
+
+By default the operator uses a PodDisruptionBudget (PDB) to protect the cluster
+from voluntarily disruptions and hence unwanted DB downtime. The `MinAvailable`
+parameter of the PDB is set to `1` which prevents killing masters in single-node
+clusters and/or the last remaining running instance in a multi-node cluster.
+
+The PDB is only relaxed in two scenarios:
+* If a cluster is scaled down to `0` instances (e.g. for draining nodes)
+* If the PDB is disabled in the configuration (`enable_pod_disruption_budget`)
+
+The PDB is still in place having `MinAvailable` set to `0`. If enabled it will
+be automatically set to `1` on scale up. Disabling PDBs helps avoiding blocking
+Kubernetes upgrades in managed K8s environments at the cost of prolonged DB
+downtime. See PR #384 for the use case.
+
 ## Add cluster-specific labels
 
 In some cases, you might want to add `labels` that are specific to a given
@@ -371,6 +387,26 @@ monitoring is outside of the scope of operator responsibilities.
 configuration. Any such image must ensure the logical backup is able to finish
 [in presence of pod restarts](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#handling-pod-and-container-failures) and [simultaneous invocations](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) of the backup cron job.
 
+<<<<<<< HEAD
 5. For that feature to work, your RBAC policy must enable operations on the
 `cronjobs` resource from the `batch` API group for the operator service account.
 See [example RBAC](../manifests/operator-service-account-rbac.yaml)
+=======
+5. For that feature to work, your RBAC policy must enable operations on the `cronjobs` resource from the `batch` API group for the operator service account. See [example RBAC](../manifests/operator-service-account-rbac.yaml)
+
+## Access to cloud resources from clusters in non cloud environment
+
+To access cloud resources like S3 from a cluster in a bare metal setup you can use
+`additional_secret_mount` and `additional_secret_mount_path` config parameters.
+With this you can provision cloud credentials to the containers in the pods of the StatefulSet.
+This works this way that it mounts a volume from the given secret in the pod and this can
+then accessed in the container over the configured mount path. Via [Custum Pod Environment Variables](#custom-pod-environment-variables)
+you can then point the different cloud sdk's (aws, google etc.) to this mounted secret.
+With this credentials the cloud sdk can then access cloud resources to upload logs etc.
+
+A secret can be pre provisioned in different ways:
+
+* Generic secret created via `kubectl create secret generic some-cloud-creds --from-file=some-cloud-credentials-file.json`
+
+* Automaticly provisioned via a Controller like [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller). This controller would then also rotate the credentials. Please visit the documention for more information.
+>>>>>>> master

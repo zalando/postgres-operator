@@ -73,20 +73,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// create database objects unless we are running without pods or disabled that feature explicitly
-	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0) {
-		c.logger.Debugf("syncing roles")
-		if err = c.syncRoles(); err != nil {
-			err = fmt.Errorf("could not sync roles: %v", err)
-			return err
-		}
-		c.logger.Debugf("syncing databases")
-		if err = c.syncDatabases(); err != nil {
-			err = fmt.Errorf("could not sync databases: %v", err)
-			return err
-		}
-	}
-
 	c.logger.Debug("syncing pod disruption budgets")
 	if err = c.syncPodDisruptionBudget(false); err != nil {
 		err = fmt.Errorf("could not sync pod disruption budget: %v", err)
@@ -99,6 +85,20 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		c.logger.Debug("syncing logical backup job")
 		if err = c.syncLogicalBackupJob(); err != nil {
 			err = fmt.Errorf("could not sync the logical backup job: %v", err)
+			return err
+		}
+	}
+
+	// create database objects unless we are running without pods or disabled that feature explicitly
+	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+		c.logger.Debugf("syncing roles")
+		if err = c.syncRoles(); err != nil {
+			err = fmt.Errorf("could not sync roles: %v", err)
+			return err
+		}
+		c.logger.Debugf("syncing databases")
+		if err = c.syncDatabases(); err != nil {
+			err = fmt.Errorf("could not sync databases: %v", err)
 			return err
 		}
 	}
