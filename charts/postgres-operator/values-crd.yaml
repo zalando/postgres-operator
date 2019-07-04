@@ -13,6 +13,8 @@ image:
 podAnnotations: {}
 podLabels: {}
 
+configTarget: "OperatorConfigurationCRD"
+
 # general top-level configuration parameters
 configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
@@ -27,10 +29,10 @@ configGeneral:
   repair_period: 5m
   # period between consecutive sync requests
   resync_period: 30m
-  # map of sidecar names to docker images
   # can prevent certain cases of memory overcommitment
   # set_memory_request_to_limit: false
 
+  # map of sidecar names to docker images
   # sidecar_docker_images
   #  example: "exampleimage:exampletag"
 
@@ -140,7 +142,7 @@ configLoadBalancer:
   # defines the DNS name string template for the replica load balancer cluster
   replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
 
-# Options to aid debugging of the operator itself
+# options to aid debugging of the operator itself
 configDebug:
   # toggles verbose debug logs from the operator
   debug_logging: true

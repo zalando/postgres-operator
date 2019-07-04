@@ -13,7 +13,9 @@ image:
 podAnnotations: {}
 podLabels: {}
 
-# config shared from ConfigMap and CRD
+configTarget: "ConfigMap"
+
+# general configuration parameters
 configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
