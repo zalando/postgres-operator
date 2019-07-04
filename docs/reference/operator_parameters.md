@@ -1,3 +1,5 @@
+# Configuration parameters
+
 There are two mutually-exclusive methods to set the Postgres Operator
 configuration.
 
@@ -32,10 +34,10 @@ configuration.
   kubectl create -f manifests/postgresql-operator-default-configuration.yaml
   kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
   ```
-  Note that the operator first attempts to register the CRD of the `OperatorConfiguration`
-  and then waits for an instance to be created. In between these two event the
-  operator pod may be failing since it cannot fetch the not-yet-existing
-  `OperatorConfiguration` instance.
+  Note that the operator first attempts to register the CRD of the
+  `OperatorConfiguration` and then waits for an instance to be created. In
+  between these two event the operator pod may be failing since it cannot fetch
+  the not-yet-existing `OperatorConfiguration` instance.
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
 and should be used unless there is a compatibility requirement to use an already
@@ -145,8 +147,7 @@ configuration they are grouped under the `kubernetes` key.
   be used. The default is empty.
 
 * **pod_terminate_grace_period**
-  Postgres pods are [terminated
-  forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
+  Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
   after this timeout. The default is `5m`.
 
 * **watched_namespace**
@@ -229,8 +230,9 @@ configuration they are grouped under the `kubernetes` key.
   be defined in advance. Default is empty (use the default priority class).
 
 * **spilo_fsgroup**
-  the Persistent Volumes for the spilo pods in the StatefulSet will be owned and writable by the group ID specified.
-  This is required to run Spilo as a non-root process, but requires a custom spilo image. Note the FSGroup of a Pod
+  the Persistent Volumes for the spilo pods in the StatefulSet will be owned and
+  writable by the group ID specified. This is required to run Spilo as a
+  non-root process, but requires a custom spilo image. Note the FSGroup of a Pod
   cannot be changed without recreating a new Pod.
 
 * **spilo_privileged**
@@ -400,6 +402,26 @@ yet officially supported.
 * **aws_region**
   AWS region used to store ESB volumes. The default is `eu-central-1`.
 
+  ## Logical backup
+
+  These parameters configure a k8s cron job managed by the operator to produce
+  Postgres logical backups. In the CRD-based configuration those parameters are
+  grouped under the `logical_backup` key.
+
+  * **logical_backup_schedule**
+    Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
+
+  * **logical_backup_docker_image**
+    An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
+    runs `pg_dumpall` on a replica if possible and uploads compressed results to
+    an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
+    The default image is the same image built with the Zalando-internal CI
+    pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
+
+  * **logical_backup_s3_bucket**
+    S3 bucket to store backup results. The bucket has to be present and
+    accessible by Postgres pods. Default: empty.
+
 ## Debugging the operator
 
 Options to aid debugging of the operator itself. Grouped under the `debug` key.
@@ -514,24 +536,3 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
 
 * **scalyr_memory_limit**
   Memory limit value for the Scalyr sidecar. The default is `1Gi`.
-
-
-## Logical backup
-
-  These parameters configure a k8s cron job managed by the operator to produce
-  Postgres logical backups. In the CRD-based configuration those parameters are
-  grouped under the `logical_backup` key.
-
-  * **logical_backup_schedule**
-    Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
-
-  * **logical_backup_docker_image**
-    An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
-    runs `pg_dumpall` on a replica if possible and uploads compressed results to
-    an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
-    The default image is the same image built with the Zalando-internal CI
-    pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
-
-  * **logical_backup_s3_bucket**
-    S3 bucket to store backup results. The bucket has to be present and
-    accessible by Postgres pods. Default: empty.

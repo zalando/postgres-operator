@@ -72,10 +72,8 @@ Tiller) in your local cluster you can install the operator chart. You can define
 a release name that is prepended to the operator resource's names.
 
 Use `--name zalando` to match with the default service account name as older
-operator versions do not support custom names for service accounts. When relying
-solely on the CRD-based configuration use the [values-crd yaml file](../charts/values-crd.yaml)
-and comment the ConfigMap template in the [helmignore](../charts/.helmignore)
-file.
+operator versions do not support custom names for service accounts. To use
+CRD-based configuration use the [values-crd yaml file](../charts/values-crd.yaml).
 
 ```bash
 # 1) initialize helm

@@ -1,3 +1,5 @@
+# Cluster manifest reference
+
 Individual postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgres CRD` (custom resource
 definition). The following section describes the structure of the manifest and
@@ -201,10 +203,9 @@ explanation of `ttl` and `loop_wait` parameters.
 
 ## Postgres container resources
 
-Those parameters define [CPU and memory requests and
-limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
+Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the postgres container. They are grouped under the `resources` top-level
-key. There are two subgroups, `requests` and `limits`.
+key with subgroups `requests` and `limits`.
 
 ### Requests
 
@@ -218,7 +219,7 @@ CPU and memory requests for the postgres container.
   memory requests for the postgres container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
-#### Limits
+### Limits
 
 CPU and memory limits for the postgres container.
 
@@ -267,7 +268,7 @@ under the `clone` top-level key and do not affect the already running cluster.
   to enable path-style addressing(i.e., http://s3.amazonaws.com/BUCKET/KEY) when connecting to an S3-compatible service
   that lack of support for sub-domain style bucket URLs (i.e., http://BUCKET.s3.amazonaws.com/KEY). Optional.
 
-### EBS volume resizing
+## EBS volume resizing
 
 Those parameters are grouped under the `volume` top-level key and define the
 properties of the persistent storage that stores postgres data.
@@ -282,7 +283,7 @@ properties of the persistent storage that stores postgres data.
   documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
   for the details on storage classes. Optional.
 
-### Sidecar definitions
+## Sidecar definitions
 
 Those parameters are defined under the `sidecars` key. They consist of a list
 of dictionaries, each defining one sidecar (an extra container running
@@ -300,16 +301,11 @@ defined in the sidecar dictionary:
   (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
   for environment variables. Optional.
 
-* **resources** see below. Optional.
+* **resources**
+  [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container)
+  for each sidecar container. Optional.
 
-#### Sidecar container resources
-
-Those parameters define [CPU and memory requests and
-limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
-for the sidecar container. They are grouped under the `resources` key for each sidecar.
-There are two subgroups, `requests` and `limits`.
-
-##### Requests
+### Requests
 
 CPU and memory requests for the sidecar container.
 
@@ -321,7 +317,7 @@ CPU and memory requests for the sidecar container.
   memory requests for the sidecar container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
-##### Limits
+### Limits
 
 CPU and memory limits for the sidecar container.
 
