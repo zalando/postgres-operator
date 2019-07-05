@@ -60,7 +60,7 @@ type PostgresSpec struct {
 	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
 	StandbyCluster        *StandbyDescription  `json:"standby"`
 
-	// deprectaed json tags
+	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
 	PodPriorityClassNameOld string         `json:"pod_priority_class_name,omitempty"`
 }

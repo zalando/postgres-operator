@@ -5,21 +5,15 @@ metadata:
 configuration:
   etcd_host: ""
   docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
+  # enable_shm_volume: true
   max_instances: -1
   min_instances: -1
   resync_period: 30m
   repair_period: 5m
-<<<<<<< HEAD
   # set_memory_request_to_limit: false
   # sidecar_docker_images:
   #   example: "exampleimage:exampletag"
   workers: 4
-=======
-  # enable_shm_volume: true
-
-  #sidecar_docker_images:
-  # example: "exampleimage:exampletag"
->>>>>>> master
   users:
     replication_username: standby
     super_username: postgres

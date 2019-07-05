@@ -108,7 +108,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   for details on tolerations and possible values of those keys. When set, this
   value overrides the `pod_toleration` setting from the operator. Optional.
 
-* **pod_priority_class_name**
+* **podPriorityClassName**
    a name of the [priority
    class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
    that should be assigned to the cluster pods. When not specified, the value
