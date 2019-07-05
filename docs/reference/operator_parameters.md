@@ -85,6 +85,14 @@ Those are top-level keys, containing both leaf keys and groups.
   Spilo. In case of the name conflict with the definition in the cluster
   manifest the cluster-specific one is preferred.
 
+* **enable_shm_volume**
+  Instruct operator to start any new database pod without limitations on shm
+  memory. If this option is enabled, to the target database pod will be mounted
+  a new tmpfs volume to remove shm memory limitation (see e.g. the
+  [docker issue](https://github.com/docker-library/postgres/issues/416)).
+  This option is global for an operator object, and can be overwritten by
+  `enableShmVolume` parameter from Postgres manifest. The default is `true`.
+
 * **workers**
   number of working routines the operator spawns to process requests to
   create/update/delete/sync clusters concurrently. The default is `4`.
@@ -298,14 +306,6 @@ CRD-based configuration.
   container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13).
   The default is `false`.
 
-* **enable_shm_volume**
-  Instruct operator to start any new database pod without limitations on shm
-  memory. If this option is enabled, to the target database pod will be mounted
-  a new tmpfs volume to remove shm memory limitation (see e.g. the [docker
-  issue](https://github.com/docker-library/postgres/issues/416)). This option
-  is global for an operator object, and can be overwritten by `enableShmVolume`
-  parameter from Postgres manifest. The default is `true`
-
 ## Operator timeouts
 
 This set of parameters define various timeouts related to some operator
@@ -405,7 +405,7 @@ yet officially supported.
   empty.
 
 * **aws_region**
-  AWS region used to store ESB volumes. The default is `eu-central-1`.
+  AWS region used to store EBS volumes. The default is `eu-central-1`.
 
 * **additional_secret_mount**
   Additional Secret (aws or gcp credentials) to mount in the pod. The default is empty.

@@ -26,6 +26,17 @@ func init() {
 	rand.Seed(time.Now().Unix())
 }
 
+// helper function to get bool pointers
+func True() *bool {
+	b := true
+	return &b
+}
+
+func False() *bool {
+	b := false
+	return &b
+}
+
 // RandomPassword generates random alphanumeric password of a given length.
 func RandomPassword(n int) string {
 	b := make([]byte, n)

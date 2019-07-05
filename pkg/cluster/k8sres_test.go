@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -16,16 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
-
-func True() *bool {
-	b := true
-	return &b
-}
-
-func False() *bool {
-	b := false
-	return &b
-}
 
 func toIntStr(val int) *intstr.IntOrString {
 	b := intstr.FromInt(val)
@@ -118,14 +109,14 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 		{
 			subtest:  "new format, load balancer is enabled for replica",
 			role:     Replica,
-			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: True()},
+			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: util.True()},
 			opConfig: config.Config{},
 			result:   true,
 		},
 		{
 			subtest:  "new format, load balancer is disabled for replica",
 			role:     Replica,
-			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: False()},
+			spec:     &acidv1.PostgresSpec{EnableReplicaLoadBalancer: util.False()},
 			opConfig: config.Config{},
 			result:   false,
 		},
@@ -208,7 +199,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		// With PodDisruptionBudget disabled.
 		{
 			New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: False()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-pdb", EnablePodDisruptionBudget: util.False()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
@@ -231,7 +222,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 		// With non-default PDBNameFormat and PodDisruptionBudget explicitly enabled.
 		{
 			New(
-				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: True()}},
+				Config{OpConfig: config.Config{Resources: config.Resources{ClusterNameLabel: "cluster-name", PodRoleLabel: "spilo-role"}, PDBNameFormat: "postgres-{cluster}-databass-budget", EnablePodDisruptionBudget: util.True()}},
 				k8sutil.KubernetesClient{},
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},

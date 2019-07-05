@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
   docker_image: {{ .Values.docker_image }}
+  enable_shm_volume: {{ .Values.enable_shm_volume }}
   repair_period: {{ .Values.repair_period }}
   resync_period: {{ .Values.resync_period }}
   workers: {{ .Values.workers }}
