@@ -375,7 +375,7 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   with the hosted zone (the value of the `db_hosted_zone` parameter). No other
   placeholders are allowed.
 
-** **replica_dns_name_format** defines the DNS name string template for the
+* **replica_dns_name_format** defines the DNS name string template for the
   replica load balancer cluster.  The default is
   `{cluster}-repl.{team}.{hostedzone}`, where `{cluster}` is replaced by the
   cluster name, `{team}` is replaced with the team name and `{hostedzone}` is
@@ -415,25 +415,25 @@ yet officially supported.
 * **additional_secret_mount_path**
   Path to mount the above Secret in the filesystem of the container(s). The default is empty.
 
-  ## Logical backup
+## Logical backup
 
-  These parameters configure a k8s cron job managed by the operator to produce
-  Postgres logical backups. In the CRD-based configuration those parameters are
-  grouped under the `logical_backup` key.
+These parameters configure a k8s cron job managed by the operator to produce
+Postgres logical backups. In the CRD-based configuration those parameters are
+grouped under the `logical_backup` key.
 
-  * **logical_backup_schedule**
-    Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
+* **logical_backup_schedule**
+  Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
 
-  * **logical_backup_docker_image**
-    An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
-    runs `pg_dumpall` on a replica if possible and uploads compressed results to
-    an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
-    The default image is the same image built with the Zalando-internal CI
-    pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
+* **logical_backup_docker_image**
+  An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
+  runs `pg_dumpall` on a replica if possible and uploads compressed results to
+  an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
+  The default image is the same image built with the Zalando-internal CI
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
 
-  * **logical_backup_s3_bucket**
-    S3 bucket to store backup results. The bucket has to be present and
-    accessible by Postgres pods. Default: empty.
+* **logical_backup_s3_bucket**
+  S3 bucket to store backup results. The bucket has to be present and
+  accessible by Postgres pods. Default: empty.
 
 ## Debugging the operator
 

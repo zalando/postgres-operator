@@ -56,16 +56,21 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   name of the team the cluster belongs to. Changing it after the cluster
   creation is not supported. Required field.
 
+* **numberOfInstances**
+  total number of  instances for a given cluster. The operator parameters
+  `max_instances` and `min_instances` may also adjust this number. Required
+  field.
+
 * **dockerImage**
   custom docker image that overrides the **docker_image** operator parameter.
-  It should be a [Spilo](https://github.com/zalando/spilo) image.  Optional.
+  It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
 * **spiloFSGroup**
   the Persistent Volumes for the spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This will override the **spilo_fsgroup**
   operator parameter. This is required to run Spilo as a non-root process, but
   requires a custom spilo image. Note the FSGroup of a Pod cannot be changed
-  without recreating a new Pod.
+  without recreating a new Pod. Optional.
 
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
@@ -83,11 +88,6 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   corresponding load balancer is accessible only to the networks defined by
   this parameter. Optional, when empty the load balancer service becomes
   inaccessible from outside of the Kubernetes cluster.
-
-* **numberOfInstances**
-  total number of  instances for a given cluster. The operator parameters
-  `max_instances` and `min_instances` may also adjust this number.  Required
-  field.
 
 * **users**
   a map of usernames to user flags for the users that should be created in the
@@ -116,7 +116,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
    that should be assigned to the cluster pods. When not specified, the value
    is taken from the `pod_priority_class_name` operator parameter, if not set
    then the default priority class is taken. The priority class itself must be
-   defined in advance.
+   defined in advance. Optional.
 
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default docker
@@ -128,19 +128,21 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   about mounting a volume will be made based on operator configuration
   (`enable_shm_volume`, which is `true` by default). It it's present and value
   is `false`, then no volume will be mounted no matter how operator was
-  configured (so you can override the operator configuration).
+  configured (so you can override the operator configuration). Optional.
 
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
-  to S3. Default: false.
+  to S3. Default: false. Optional.
 
 * **logicalBackupSchedule**
-  Schedule for the logical backup k8s cron job. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
-  into account. Default: "30 00 \* \* \*"
+  Schedule for the logical backup k8s cron job. Please take
+  [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
+  into account. Optional. Default is: "30 00 \* \* \*"
 
 ## Postgres parameters
 
-Those parameters are grouped under the `postgresql` top-level key.
+Those parameters are grouped under the `postgresql` top-level key, which is
+required in the manifest.
 
 * **version**
   the postgres major version of the cluster. Looks at the [Spilo
@@ -283,7 +285,7 @@ archive is supported.
 
 * **s3_wal_path**
   the url to S3 bucket containing the WAL archive of the remote primary.
-  Optional.
+  Required when the `standby` section is present.
 
 ## EBS volume resizing
 
@@ -301,7 +303,7 @@ properties of the persistent storage that stores postgres data.
   for the details on storage classes. Optional.
 
 * **subPath**
-  Subpath to use when mounting volume into Spilo container
+  Subpath to use when mounting volume into Spilo container. Optional.
 
 ## Sidecar definitions
 
