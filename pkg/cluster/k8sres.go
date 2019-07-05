@@ -360,8 +360,6 @@ func generateContainer(
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
 ) *v1.Container {
-	falseBool := false
-
 	return &v1.Container{
 		Name:            name,
 		Image:           *dockerImage,
@@ -385,7 +383,7 @@ func generateContainer(
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
 			Privileged:             &privilegedMode,
-			ReadOnlyRootFilesystem: &falseBool,
+			ReadOnlyRootFilesystem: util.False(),
 		},
 	}
 }
@@ -421,9 +419,9 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 
 // Check whether or not we're requested to mount an shm volume,
 // taking into account that PostgreSQL manifest has precedence.
-func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) bool {
-	if pgSpec.ShmVolume != nil {
-		return *pgSpec.ShmVolume
+func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) *bool {
+	if pgSpec.ShmVolume != nil && *pgSpec.ShmVolume {
+		return pgSpec.ShmVolume
 	}
 
 	return opConfig.ShmVolume
@@ -442,7 +440,7 @@ func generatePodTemplate(
 	podServiceAccountName string,
 	kubeIAMRole string,
 	priorityClassName string,
-	shmVolume bool,
+	shmVolume *bool,
 	podAntiAffinity bool,
 	podAntiAffinityTopologyKey string,
 	additionalSecretMount string,
@@ -467,7 +465,7 @@ func generatePodTemplate(
 		SecurityContext:               &securityContext,
 	}
 
-	if shmVolume {
+	if shmVolume != nil && *shmVolume {
 		addShmVolume(&podSpec)
 	}
 
@@ -1456,7 +1454,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		"",
-		false,
+		util.False(),
 		false,
 		"",
 		"",

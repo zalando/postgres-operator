@@ -42,7 +42,7 @@ type Resources struct {
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
 	MinInstances            int32             `name:"min_instances" default:"-1"`
-	ShmVolume               bool              `name:"enable_shm_volume" default:"true"`
+	ShmVolume               *bool             `name:"enable_shm_volume" default:"true"`
 }
 
 // Auth describes authentication specific configuration parameters

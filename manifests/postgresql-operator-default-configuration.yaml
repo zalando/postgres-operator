@@ -10,6 +10,7 @@ configuration:
   max_instances: -1
   resync_period: 30m
   repair_period: 5m
+  # enable_shm_volume: true
 
   #sidecar_docker_images:
   # example: "exampleimage:exampletag"

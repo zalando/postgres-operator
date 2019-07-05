@@ -85,6 +85,14 @@ Those are top-level keys, containing both leaf keys and groups.
   Spilo. In case of the name conflict with the definition in the cluster
   manifest the cluster-specific one is preferred.
 
+* **enable_shm_volume**
+  Instruct operator to start any new database pod without limitations on shm
+  memory. If this option is enabled, to the target database pod will be mounted
+  a new tmpfs volume to remove shm memory limitation (see e.g. the
+  [docker issue](https://github.com/docker-library/postgres/issues/416)).
+  This option is global for an operator object, and can be overwritten by
+  `enableShmVolume` parameter from Postgres manifest. The default is `true`.
+
 * **workers**
   number of working routines the operator spawns to process requests to
   create/update/delete/sync clusters concurrently. The default is `4`.
@@ -297,14 +305,6 @@ CRD-based configuration.
   Scalyr sidecar, and other sidecars); to set resources for the operator's own
   container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13).
   The default is `false`.
-
-* **enable_shm_volume**
-  Instruct operator to start any new database pod without limitations on shm
-  memory. If this option is enabled, to the target database pod will be mounted
-  a new tmpfs volume to remove shm memory limitation (see e.g. the [docker
-  issue](https://github.com/docker-library/postgres/issues/416)). This option
-  is global for an operator object, and can be overwritten by `enableShmVolume`
-  parameter from Postgres manifest. The default is `true`
 
 ## Operator timeouts
 

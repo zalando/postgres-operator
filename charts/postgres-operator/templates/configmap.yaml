@@ -18,6 +18,7 @@ data:
   docker_image: {{ .Values.docker_image }}
   debug_logging: "{{ .Values.configDebug.debug_logging }}"
   enable_database_access: "{{ .Values.configDebug.enable_database_access }}"
+  enable_shm_volume: "{{ .Values.enable_shm_volume }}"
   repair_period: {{ .Values.repair_period }}
   resync_period: {{ .Values.resync_period }}
   ring_log_lines: "{{ .Values.configLoggingRestApi.ring_log_lines }}"
