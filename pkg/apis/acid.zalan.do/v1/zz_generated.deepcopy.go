@@ -513,6 +513,13 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(StandbyDescription)
 		**out = **in
 	}
+	if in.InitContainersOld != nil {
+		in, out := &in.InitContainersOld, &out.InitContainersOld
+		*out = make([]corev1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

@@ -53,12 +53,16 @@ type PostgresSpec struct {
 	Databases             map[string]string    `json:"databases,omitempty"`
 	Tolerations           []v1.Toleration      `json:"tolerations,omitempty"`
 	Sidecars              []Sidecar            `json:"sidecars,omitempty"`
-	InitContainers        []v1.Container       `json:"init_containers,omitempty"`
-	PodPriorityClassName  string               `json:"pod_priority_class_name,omitempty"`
+	InitContainers        []v1.Container       `json:"initContainers,omitempty"`
+	PodPriorityClassName  string               `json:"podPriorityClassName,omitempty"`
 	ShmVolume             *bool                `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup   bool                 `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
 	StandbyCluster        *StandbyDescription  `json:"standby"`
+
+	// deprectaed json tags
+	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
+	PodPriorityClassNameOld string         `json:"pod_priority_class_name,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
