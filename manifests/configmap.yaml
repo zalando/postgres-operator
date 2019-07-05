@@ -26,6 +26,7 @@ data:
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
   enable_replica_load_balancer: "false"
+  # enable_shm_volume: "true"
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""

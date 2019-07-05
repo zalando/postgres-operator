@@ -33,6 +33,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ResyncPeriod = time.Duration(fromCRD.ResyncPeriod)
 	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
+	result.ShmVolume = fromCRD.ShmVolume
 	result.Sidecars = fromCRD.Sidecars
 
 	// user config

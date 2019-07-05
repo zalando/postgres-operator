@@ -85,6 +85,14 @@ Those are top-level keys, containing both leaf keys and groups.
   Spilo. In case of the name conflict with the definition in the cluster
   manifest the cluster-specific one is preferred.
 
+* **enable_shm_volume**
+  Instruct operator to start any new database pod without limitations on shm
+  memory. If this option is enabled, to the target database pod will be mounted
+  a new tmpfs volume to remove shm memory limitation (see e.g. the
+  [docker issue](https://github.com/docker-library/postgres/issues/416)).
+  This option is global for an operator object, and can be overwritten by
+  `enableShmVolume` parameter from Postgres manifest. The default is `true`.
+
 * **workers**
   number of working routines the operator spawns to process requests to
   create/update/delete/sync clusters concurrently. The default is `4`.
@@ -114,7 +122,6 @@ Those are top-level keys, containing both leaf keys and groups.
   Scalyr sidecar, and other sidecars); to set resources for the operator's own
   container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13).
   The default is `false`.
-
 
 ## Postgres users
 
@@ -299,14 +306,6 @@ CRD-based configuration.
   memory limits for the postgres containers, unless overridden by cluster-specific
   settings. The default is `1Gi`.
 
-* **enable_shm_volume**
-  Instruct operator to start any new database pod without limitations on shm
-  memory. If this option is enabled, to the target database pod will be mounted
-  a new tmpfs volume to remove shm memory limitation (see e.g. the [docker
-  issue](https://github.com/docker-library/postgres/issues/416)). This option
-  is global for an operator object, and can be overwritten by `enableShmVolume`
-  parameter from Postgres manifest. The default is `true`
-
 ## Operator timeouts
 
 This set of parameters define various timeouts related to some operator
@@ -374,7 +373,7 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   with the hosted zone (the value of the `db_hosted_zone` parameter). No other
   placeholders are allowed.
 
-** **replica_dns_name_format** defines the DNS name string template for the
+* **replica_dns_name_format** defines the DNS name string template for the
   replica load balancer cluster.  The default is
   `{cluster}-repl.{team}.{hostedzone}`, where `{cluster}` is replaced by the
   cluster name, `{team}` is replaced with the team name and `{hostedzone}` is
@@ -406,7 +405,7 @@ yet officially supported.
   empty.
 
 * **aws_region**
-  AWS region used to store ESB volumes. The default is `eu-central-1`.
+  AWS region used to store EBS volumes. The default is `eu-central-1`.
 
 * **additional_secret_mount**
   Additional Secret (aws or gcp credentials) to mount in the pod. The default is empty.
@@ -529,23 +528,22 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
 * **scalyr_memory_limit**
   Memory limit value for the Scalyr sidecar. The default is `1Gi`.
 
-
 ## Logical backup
 
-  These parameters configure a k8s cron job managed by the operator to produce
-  Postgres logical backups. In the CRD-based configuration those parameters are
-  grouped under the `logical_backup` key.
+These parameters configure a k8s cron job managed by the operator to produce
+Postgres logical backups. In the CRD-based configuration those parameters are
+grouped under the `logical_backup` key.
 
-  * **logical_backup_schedule**
-    Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
+* **logical_backup_schedule**
+  Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
 
-  * **logical_backup_docker_image**
-    An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
-    runs `pg_dumpall` on a replica if possible and uploads compressed results to
-    an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
-    The default image is the same image built with the Zalando-internal CI
-    pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
+* **logical_backup_docker_image**
+  An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
+  runs `pg_dumpall` on a replica if possible and uploads compressed results to
+  an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
+  The default image is the same image built with the Zalando-internal CI
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
 
-  * **logical_backup_s3_bucket**
-    S3 bucket to store backup results. The bucket has to be present and
-    accessible by Postgres pods. Default: empty.
+* **logical_backup_s3_bucket**
+  S3 bucket to store backup results. The bucket has to be present and
+  accessible by Postgres pods. Default: empty.
