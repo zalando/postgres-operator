@@ -46,8 +46,6 @@ Scaling to 0 leads to down time.`,
 }
 
 func scale(numberOfInstances int32, clusterName string, namespace string) {
-	minInstances := int32(-1)
-	maxInstances := int32(-1)
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
@@ -61,7 +59,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter\n", namespace, clusterName)
 		confirmAction(clusterName, namespace)
 	}
-	minInstances, maxInstances = allowedMinMaxInstances(config)
+	minInstances, maxInstances := allowedMinMaxInstances(config)
 	if minInstances == -1 && maxInstances == -1 {
 		postgresql.Spec.NumberOfInstances = numberOfInstances
 	} else if numberOfInstances <= maxInstances && numberOfInstances>= minInstances {
@@ -93,7 +91,8 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 	}
 	operatorContainer:=operator.Spec.Template.Spec.Containers
 	var configMapName, operatorConfigName string
-	var minInstances, maxInstances int
+	minInstances := -1
+	maxInstances := -1
 	for _,envData := range operatorContainer[0].Env {
 		if envData.Name == "CONFIG_MAP_NAME"  {
 			configMapName = envData.Value
