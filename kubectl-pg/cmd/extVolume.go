@@ -60,6 +60,8 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 		log.Fatal(err)
 	}
 	if newSize.Value() >= oldSize.Value() {
+		postgresql.APIVersion = "acid.zalan.do/v1"
+		postgresql.Kind = "postgresql"
 		postgresql.Spec.Volume.Size = increasedVolumeSize
 		response, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 		if err != nil {

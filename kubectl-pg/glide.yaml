@@ -1,12 +1,17 @@
-package: github.com/VineethReddy02/postgres-operator/kubectl-pg
+package: github.com/zalando/postgres-operator/kubectl-pg
 import:
 - package: github.com/spf13/cobra
+- package: github.com/zalando-incubator/postgres-operator
+  subpackages:
+  - pkg/apis/acid.zalan.do/v1
+  - pkgs/apis/acid.zalan.do/v1
 - package: github.com/zalando/postgres-operator
   subpackages:
   - pkg/apis/acid.zalan.do/v1
   - pkg/generated/clientset/versioned/typed/acid.zalan.do/v1
 - package: k8s.io/apiextensions-apiserver
   subpackages:
+  - pkg/apis/apiextensions/v1beta1
   - pkg/client/clientset/clientset/scheme
   - pkg/client/clientset/clientset/typed/apiextensions/v1beta1
 - package: k8s.io/apimachinery

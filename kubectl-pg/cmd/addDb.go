@@ -57,6 +57,8 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 	if dbName != "postgres" && dbName != "template0" && dbName != "template1" {
 		postgresql.Spec.Databases[dbName] = dbOwner
 	}
+	postgresql.APIVersion = "acid.zalan.do/v1"
+	postgresql.Kind ="postgresql"
 	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		log.Fatal(err)

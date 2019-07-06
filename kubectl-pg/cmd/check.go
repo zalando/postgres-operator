@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	postgresConstants "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
@@ -36,19 +37,22 @@ This means that the operator pod was able to start normally.`,
 }
 
 // check validates postgresql CRD registered or not.
-func check() {
+func check() *v1beta1.CustomResourceDefinition {
 	config := getConfig()
 	apiExtClient, err := apiextbeta1.NewForConfig(config)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	crdInfo, _ := apiExtClient.CustomResourceDefinitions().Get(postgresConstants.PostgresCRDResouceName, metav1.GetOptions{})
+	crdInfo, err := apiExtClient.CustomResourceDefinitions().Get(postgresConstants.PostgresCRDResouceName, metav1.GetOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
 	if crdInfo.Name == postgresConstants.PostgresCRDResouceName {
 		fmt.Printf("postgres operator is installed in the k8s cluster.\n")
 	} else {
 		fmt.Printf("postgres operator is not installed in the k8s cluster.\n")
 	}
+	return crdInfo
 }
 
 func init() {

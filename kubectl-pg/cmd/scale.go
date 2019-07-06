@@ -19,6 +19,8 @@ import (
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"log"
 	"strconv"
 )
@@ -44,6 +46,8 @@ Scaling to 0 leads to down time.`,
 }
 
 func scale(numberOfInstances int32, clusterName string, namespace string) {
+	minInstances := int32(-1)
+	maxInstances := int32(-1)
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
@@ -57,7 +61,19 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter\n", namespace, clusterName)
 		confirmAction(clusterName, namespace)
 	}
-	postgresql.Spec.NumberOfInstances = numberOfInstances
+	minInstances, maxInstances = allowedMinMaxInstances(config)
+	if minInstances == -1 && maxInstances == -1 {
+		postgresql.Spec.NumberOfInstances = numberOfInstances
+	} else if numberOfInstances <= maxInstances && numberOfInstances>= minInstances {
+		postgresql.Spec.NumberOfInstances = numberOfInstances
+	} else if minInstances == -1 && numberOfInstances < postgresql.Spec.NumberOfInstances ||
+		 maxInstances == -1 && numberOfInstances > postgresql.Spec.NumberOfInstances{
+		postgresql.Spec.NumberOfInstances = numberOfInstances
+	} else {
+		log.Fatal("cannot scale to the provided instances as they don't adhere to MIN_INSTANCES and MAX_INSTANCES provided in configmap or operatorconfiguration")
+	}
+	postgresql.Kind = "postgresql"
+	postgresql.APIVersion = "acid.zalan.do/v1"
 	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		log.Fatal(err)
@@ -67,6 +83,46 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		return
 	}
 	fmt.Printf("postgresql %s is unchanged.\n", postgresql.Name)
+}
+
+func allowedMinMaxInstances(config *rest.Config) (int32, int32){
+	k8sClient,_ := kubernetes.NewForConfig(config)
+	operator,err :=k8sClient.AppsV1().Deployments(getCurrentNamespace()).Get("postgres-operator",metav1.GetOptions{})
+	if err!= nil {
+		log.Fatal(err)
+	}
+	operatorContainer:=operator.Spec.Template.Spec.Containers
+	var configMapName, operatorConfigName string
+	var minInstances, maxInstances int
+	for _,envData := range operatorContainer[0].Env {
+		if envData.Name == "CONFIG_MAP_NAME"  {
+			configMapName = envData.Value
+		}
+		if envData.Name == "POSTGRES_OPERATOR_CONFIGURATION_OBJECT" {
+			operatorConfigName = envData.Value
+		}
+	}
+	if operatorConfigName == "" {
+		configMap, err := k8sClient.CoreV1().ConfigMaps(getCurrentNamespace()).Get(configMapName, metav1.GetOptions{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		configMapData := configMap.Data
+		for key, value := range configMapData {
+			if key == "min_instances" {
+				minInstances,_ = strconv.Atoi(value)
+			}
+			if key == "max_instances" {
+				maxInstances,_ = strconv.Atoi(value)
+			}
+		}
+	} else if configMapName == "" {
+		pgClient,_ :=	PostgresqlLister.NewForConfig(config)
+		operatorConfig,_ := pgClient.OperatorConfigurations("s").Get(operatorConfigName,metav1.GetOptions{})
+		minInstances = int(operatorConfig.Configuration.MinInstances)
+		maxInstances = int(operatorConfig.Configuration.MaxInstances)
+	}
+	return int32(minInstances), int32(maxInstances)
 }
 
 func init() {

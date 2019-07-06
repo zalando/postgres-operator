@@ -7,6 +7,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -14,18 +15,24 @@ import (
 
 func getConfig() *restclient.Config {
 	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	var config *restclient.Config
+	envKube := os.Getenv("KUBECONFIG")
+	if  envKube != ""{
+		kubeconfig = &envKube
 	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		if home := homedir.HomeDir(); home != "" {
+			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		} else {
+			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		}
 	}
-	flag.Parse()
-
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return config
+		flag.Parse()
+		var err error
+		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return config
 }
 
 func getCurrentNamespace() string {

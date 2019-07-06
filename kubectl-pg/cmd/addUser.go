@@ -92,6 +92,8 @@ func addUser(user string, clusterName string, permissions []string) {
 		}
 	}
 	postgresql.Spec.Users[user] = finalUsers
+	postgresql.APIVersion = "acid.zalan.do/v1"
+	postgresql.Kind ="postgresql"
 	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		log.Fatal(err)

@@ -1,5 +1,5 @@
-hash: d8c4fb4f812e0d6eb6b9e1f234a3cf50dbf7144952159ad43d42844f7a0e3b89
-updated: 2019-07-01T10:55:43.073673234+05:30
+hash: 89db2660b1380627fb6eda3bb620c0ca9fecb695e1a580e2585368787aeaa28f
+updated: 2019-07-06T02:24:32.811327009+05:30
 imports:
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
@@ -42,7 +42,7 @@ imports:
 - name: github.com/json-iterator/go
   version: f2b4162afba35581b6d4a50d3b8f34e33c144682
 - name: github.com/konsorten/go-windows-terminal-sequences
-  version: 5c8c8bd35d3832f5d134ae1e1e375b69a4d25242
+  version: f55edac94c9bbba5d6182a4be46d86a2c9b5b50e
 - name: github.com/modern-go/concurrent
   version: bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
 - name: github.com/modern-go/reflect2
@@ -52,15 +52,23 @@ imports:
 - name: github.com/sirupsen/logrus
   version: 839c75faf7f98a33d445d181f3018b5c3409a45e
 - name: github.com/spf13/cobra
-  version: 67fc4837d267bc9bfd6e47f77783fcc3dffc68de
+  version: f2b07da1e2c38d5f12845a4f607e2e1018cbb1f5
 - name: github.com/spf13/pflag
-  version: 583c0c0531f06d5278b7d917446061adc344b5cd
-- name: github.com/zalando/postgres-operator
-  version: 69af2d60e55f4dafc4de76113759d95acebb612a
+  version: 24fa6976df40757dce6aea913e7b81ade90530e1
+- name: github.com/zalando-incubator/postgres-operator
+  version: ff80fc4d0ffc2e2c97eef44df8e89d38c7f503c1
   subpackages:
   - pkg/apis/acid.zalan.do
   - pkg/apis/acid.zalan.do/v1
   - pkg/generated/clientset/versioned/scheme
+  - pkg/spec
+  - pkg/util/config
+  - pkgs/apis/acid.zalan.do/v1
+- name: github.com/zalando/postgres-operator
+  version: 2e9b6533e7d5e7b42762542185612e609bc7b9f5
+  subpackages:
+  - pkg/apis/acid.zalan.do
+  - pkg/apis/acid.zalan.do/v1
   - pkg/generated/clientset/versioned/typed/acid.zalan.do/v1
   - pkg/spec
   - pkg/util/config

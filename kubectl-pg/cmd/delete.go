@@ -75,7 +75,14 @@ func deleteByFile(file string) {
 		fmt.Printf("-> postgresql %s not found with the provided namespace %s : %s \n", postgresSql.Name, postgresSql.Namespace, err)
 		return
 	}
+	fmt.Printf("-> Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", postgresSql.Namespace, postgresSql.Name)
 	confirmAction(postgresSql.Name, postgresSql.Namespace)
+	postgresSql.APIVersion = "acid.zalan.do/v1"
+	postgresSql.Kind ="postgresql"
+	err = postgresConfig.Postgresqls(postgresSql.Namespace).Delete(postgresSql.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Printf("-> postgresql %s deleted from %s.\n", postgresSql.Name, postgresSql.Namespace)
 }
 
@@ -92,5 +99,9 @@ func deleteByName(clusterName string, namespace string) {
 	}
 	fmt.Printf("-> Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", namespace, clusterName)
 	confirmAction(clusterName, namespace)
+	err = postgresConfig.Postgresqls(namespace).Delete(clusterName, &metav1.DeleteOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Printf("-> postgresql %s deleted from %s.\n", clusterName, namespace)
 }
