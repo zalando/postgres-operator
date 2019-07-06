@@ -385,28 +385,29 @@ monitoring is outside of the scope of operator responsibilities.
 
 4. You may use your own image by overwriting the relevant field in the operator
 configuration. Any such image must ensure the logical backup is able to finish
-[in presence of pod restarts](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#handling-pod-and-container-failures) and [simultaneous invocations](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) of the backup cron job.
+[in presence of pod restarts](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#handling-pod-and-container-failures)
+and [simultaneous invocations](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
+of the backup cron job.
 
-<<<<<<< HEAD
 5. For that feature to work, your RBAC policy must enable operations on the
 `cronjobs` resource from the `batch` API group for the operator service account.
 See [example RBAC](../manifests/operator-service-account-rbac.yaml)
-=======
-5. For that feature to work, your RBAC policy must enable operations on the `cronjobs` resource from the `batch` API group for the operator service account. See [example RBAC](../manifests/operator-service-account-rbac.yaml)
 
 ## Access to cloud resources from clusters in non cloud environment
 
-To access cloud resources like S3 from a cluster in a bare metal setup you can use
-`additional_secret_mount` and `additional_secret_mount_path` config parameters.
-With this you can provision cloud credentials to the containers in the pods of the StatefulSet.
-This works this way that it mounts a volume from the given secret in the pod and this can
-then accessed in the container over the configured mount path. Via [Custum Pod Environment Variables](#custom-pod-environment-variables)
-you can then point the different cloud sdk's (aws, google etc.) to this mounted secret.
-With this credentials the cloud sdk can then access cloud resources to upload logs etc.
+To access cloud resources like S3 from a cluster in a bare metal setup you can
+use `additional_secret_mount` and `additional_secret_mount_path` configuration
+parameters. With this you can provision cloud credentials to the containers in
+the pods of the StatefulSet. This works this way that it mounts a volume from
+the given secret in the pod and this can then accessed in the container over the
+configured mount path. Via [Custum Pod Environment Variables](#custom-pod-environment-variables)
+you can then point the different cloud SDK's (AWS, GCP etc.) to this mounted
+secret. With this credentials the cloud SDK can then access cloud resources to
+upload logs etc.
 
-A secret can be pre provisioned in different ways:
+A secret can be pre-provisioned in different ways:
 
 * Generic secret created via `kubectl create secret generic some-cloud-creds --from-file=some-cloud-credentials-file.json`
-
-* Automaticly provisioned via a Controller like [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller). This controller would then also rotate the credentials. Please visit the documention for more information.
->>>>>>> master
+* Automatically provisioned via a Controller like [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller).
+  This controller would then also rotate the credentials. Please visit the
+  documention for more information.

@@ -422,7 +422,9 @@ Postgres logical backups. In the CRD-based configuration those parameters are
 grouped under the `logical_backup` key.
 
 * **logical_backup_schedule**
-  Backup schedule in the cron format. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule) into account. Default: "30 00 \* \* \*"
+  Backup schedule in the cron format. Please take the
+  [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
+  into account. Default: "30 00 \* \* \*"
 
 * **logical_backup_docker_image**
   An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
