@@ -1,6 +1,10 @@
 hash: 89db2660b1380627fb6eda3bb620c0ca9fecb695e1a580e2585368787aeaa28f
-updated: 2019-07-06T02:24:32.811327009+05:30
+updated: 2019-07-08T01:08:39.802940315+05:30
 imports:
+- name: github.com/docker/spdystream
+  version: 449fdfce4d962303d702fec724ef0ad181c92528
+  subpackages:
+  - spdy
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/gogo/protobuf
@@ -181,9 +185,12 @@ imports:
   - pkg/util/clock
   - pkg/util/errors
   - pkg/util/framer
+  - pkg/util/httpstream
+  - pkg/util/httpstream/spdy
   - pkg/util/intstr
   - pkg/util/json
   - pkg/util/net
+  - pkg/util/remotecommand
   - pkg/util/runtime
   - pkg/util/sets
   - pkg/util/validation
@@ -192,6 +199,7 @@ imports:
   - pkg/util/yaml
   - pkg/version
   - pkg/watch
+  - third_party/forked/golang/netutil
   - third_party/forked/golang/reflect
 - name: k8s.io/client-go
   version: 1f13a808da65775f22cbf47862c4e5898d8f4ca1
@@ -242,9 +250,12 @@ imports:
   - tools/clientcmd/api/v1
   - tools/metrics
   - tools/reference
+  - tools/remotecommand
   - transport
+  - transport/spdy
   - util/cert
   - util/connrotation
+  - util/exec
   - util/flowcontrol
   - util/homedir
   - util/integer
