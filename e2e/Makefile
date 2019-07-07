@@ -18,6 +18,7 @@ GITHEAD          = $(shell git rev-parse --short HEAD)
 GITURL           = $(shell git config --get remote.origin.url)
 GITSTATU         = $(shell git status --porcelain || echo 'no changes')
 TTYFLAGS         = $(shell test -t 0 && echo '-it')
+UNAME_S          = $(shell uname -s)
 
 ifndef GOPATH
 	GOPATH := $(HOME)/go
@@ -32,7 +33,7 @@ clean:
 
 copy: clean
 	mkdir manifests
-	cp ../manifests -r .
+	cp -r ../manifests .
 
 docker: copy
 	docker build --build-arg "VERSION=$(VERSION)" -t "$(IMAGE):$(TAG)" .

@@ -451,6 +451,20 @@ yet officially supported.
   present and accessible by Postgres pods. At the moment, supported services by
   Spilo are S3 and GCS. The default is empty.
 
+* **wal_gs_bucket**
+  GCS bucket to use for shipping WAL segments with WAL-E. A bucket has to be
+  present and accessible by Postgres pods. Note, only the name of the bucket is
+  required. At the moment, supported services by Spilo are S3 and GCS.
+  The default is empty.
+
+* **gcp_credentials**
+  Used to set the GOOGLE_APPLICATION_CREDENTIALS environment variable for the pods.
+  This is used in with conjunction with the `additional_secret_mount` and
+  `additional_secret_mount_path` to properly set the credentials for the spilo
+  containers. This will allow users to use specific
+  [service accounts](https://cloud.google.com/kubernetes-engine/docs/tutorials/authenticating-to-cloud-platform).
+  The default is empty
+
 * **log_s3_bucket**
   S3 bucket to use for shipping Postgres daily logs. Works only with S3 on AWS.
   The bucket has to be present and accessible by Postgres pods. The default is

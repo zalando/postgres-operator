@@ -4,9 +4,7 @@ go 1.14
 
 require (
 	github.com/aws/aws-sdk-go v1.29.33
-	github.com/emicklei/go-restful v2.9.6+incompatible // indirect
-	github.com/evanphx/json-patch v4.5.0+incompatible // indirect
-	github.com/googleapis/gnostic v0.3.0 // indirect
+	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/lib/pq v1.3.0
 	github.com/motomux/pretty v0.0.0-20161209205251-b2aad2c9a95d
 	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
