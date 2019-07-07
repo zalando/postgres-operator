@@ -27,7 +27,7 @@ import (
 	"strconv"
 )
 
-// connectCmd represents the connect command
+// connectCmd represents the kubectl pg connect command
 var connectCmd = &cobra.Command{
 	Use:   "connect",
 	Short: "A ",
@@ -36,23 +36,11 @@ var connectCmd = &cobra.Command{
 		clusterName,_ := cmd.Flags().GetString("clusterName")
 		master,_ := cmd.Flags().GetBool("master")
 		replica,_ := cmd.Flags().GetString("replica")
-		var req Request
-		connect(&req,clusterName,master,replica)
+		connect(clusterName,master,replica)
 	},
 }
 
-type Request struct {
-	masterURL      string
-	kubeconfigPath string
-	Pod       string
-	Container string
-	Namespace string
-	Command   string
-	Arg       string
-}
-
-
-func connect(req *Request, clusterName string,master bool,replica string) {
+func connect(clusterName string,master bool,replica string) {
 	config := getConfig()
 	client,er := kubernetes.NewForConfig(config)
 	if er != nil {
@@ -76,7 +64,7 @@ func connect(req *Request, clusterName string,master bool,replica string) {
 			podName = pod.Name
 			fmt.Printf("connected to %s with name %s\n",podRole, podName)
 			break
-		} else if podRole == "replica" && pod.Name == replica {
+		} else if podRole == "replica" &&  !master  && (pod.Name == replica || replica == "") {
 			podName = pod.Name
 			fmt.Printf("connected to %s with pod name as %s\n",podRole, podName)
 			break
