@@ -31,45 +31,13 @@ var listCmd = &cobra.Command{
 	Long:  `Lists all the info specific to postgresql objects.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		allNamespaces, _ := cmd.Flags().GetBool("all-namespaces")
-		if allNamespaces {
-			listAll()
-			return
-		} else if len(args) == 0 {
-			list()
-			return
-		}
-		fmt.Println("Invalid argument with list command.")
+		listAll(allNamespaces)
 	},
 	Example: "kubectl pg list\nkubectl pg list -A",
 }
 
-// list command to list postgresql objects.
-func list() {
-	config := getConfig()
-	postgresConfig, err := PostgresqlLister.NewForConfig(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	namespace := getCurrentNamespace()
-	listPostgresql, err := postgresConfig.Postgresqls(namespace).List(metav1.ListOptions{})
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(listPostgresql.Items) == 0 {
-		fmt.Println("No Resources found.")
-		return
-	}
-	template := "%-32s%-16s%-12s%-12s%-12s%-12s\n"
-	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME")
-	for _, pgObjs := range listPostgresql.Items {
-		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000), pgObjs.Spec.Size)
-	}
-
-}
-
 // list command to list postgresql objects across namespaces.
-func listAll() {
+func listAll(withNamespace bool) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	if err != nil {
@@ -83,11 +51,20 @@ func listAll() {
 		fmt.Println("No Resources found.")
 		return
 	}
-	template := "%-32s%-16s%-12s%-12s%-12s%-12s%-12s\n"
-	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME", "NAMESPACE")
-	for _, pgObjs := range listPostgresql.Items {
-		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000), pgObjs.Spec.Size, pgObjs.Namespace)
+	if withNamespace {
+		template := "%-32s%-16s%-12s%-12s%-12s%-12s%-12s\n"
+		fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME", "NAMESPACE")
+		for _, pgObjs := range listPostgresql.Items {
+			fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
+				pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000), pgObjs.Spec.Size, pgObjs.Namespace)
+		}
+	} else {
+		template := "%-32s%-16s%-12s%-12s%-12s%-12s\n"
+		fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME")
+		for _, pgObjs := range listPostgresql.Items {
+			fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
+				pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000), pgObjs.Spec.Size)
+		}
 	}
 }
 

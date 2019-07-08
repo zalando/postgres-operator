@@ -32,10 +32,16 @@ var scaleCmd = &cobra.Command{
 	Long: `Scales the postgres objects using cluster-name.
 Scaling to 0 leads to down time.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		clusterName, _ := cmd.Flags().GetString("clusterName")
-		namespace, _ := cmd.Flags().GetString("namespace")
+		clusterName, err := cmd.Flags().GetString("clusterName")
+		namespace, err := cmd.Flags().GetString("namespace")
+		if err != nil {
+			log.Fatal(err)
+		}
 		if len(args) > 0 {
-			numberofInstances, _ := strconv.Atoi(args[0])
+			numberofInstances, err := strconv.Atoi(args[0])
+			if err != nil {
+				log.Fatal(err)
+			}
 			scale(int32(numberofInstances), clusterName, namespace)
 		} else {
 			fmt.Println("Please enter number of instances to scale.")
@@ -56,7 +62,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		log.Fatal(err)
 	}
 	if numberOfInstances == 0 {
-		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter\n", namespace, clusterName)
+		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter this serves to confirm the action\n", namespace, clusterName)
 		confirmAction(clusterName, namespace)
 	}
 	minInstances, maxInstances := allowedMinMaxInstances(config)
@@ -84,7 +90,10 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 }
 
 func allowedMinMaxInstances(config *rest.Config) (int32, int32){
-	k8sClient,_ := kubernetes.NewForConfig(config)
+	k8sClient,err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
 	operator,err :=k8sClient.AppsV1().Deployments(getCurrentNamespace()).Get("postgres-operator",metav1.GetOptions{})
 	if err!= nil {
 		log.Fatal(err)
@@ -116,7 +125,10 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 			}
 		}
 	} else if configMapName == "" {
-		pgClient,_ :=	PostgresqlLister.NewForConfig(config)
+		pgClient,err :=	PostgresqlLister.NewForConfig(config)
+		if err != nil {
+			log.Fatal(err)
+		}
 		operatorConfig,_ := pgClient.OperatorConfigurations("s").Get(operatorConfigName,metav1.GetOptions{})
 		minInstances = int(operatorConfig.Configuration.MinInstances)
 		maxInstances = int(operatorConfig.Configuration.MaxInstances)

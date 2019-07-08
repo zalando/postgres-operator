@@ -24,6 +24,7 @@ import (
 	"strings"
 )
 
+var Allowed_Privileges  = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
 // addUserCmd represents the addUser command
 var addUserCmd = &cobra.Command{
 	Use:   "add-user",
@@ -36,7 +37,7 @@ var addUserCmd = &cobra.Command{
 			user := args[0]
 			permissions := []string{}
 			perms := []string{}
-			Allowed_Privileges := [...]string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
+
 			if privileges != "" {
 				parsedRoles := strings.Replace(privileges, ",", " ", -1)
 				permissions = strings.Fields(parsedRoles)
@@ -54,7 +55,7 @@ var addUserCmd = &cobra.Command{
 					}
 				}
 				if len(invalidPerms) > 0 {
-					fmt.Printf("Invalid privilges %s\n", invalidPerms)
+					fmt.Printf("Invalid privileges %s\n", invalidPerms)
 					return
 				}
 			}
