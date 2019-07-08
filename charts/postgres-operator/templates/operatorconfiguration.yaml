@@ -1,3 +1,4 @@
+{{- if eq .Values.configTarget "OperatorConfigurationCRD" }}
 apiVersion: "acid.zalan.do/v1"
 kind: OperatorConfiguration
 metadata:
@@ -8,26 +9,19 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 configuration:
-  docker_image: {{ .Values.docker_image }}
-  enable_shm_volume: {{ .Values.enable_shm_volume }}
-  repair_period: {{ .Values.repair_period }}
-  resync_period: {{ .Values.resync_period }}
-  workers: {{ .Values.workers }}
-{{ toYaml .Values.configCRD | indent 2 }}
+{{ toYaml .Values.configGeneral | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   kubernetes:
     oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
     pod_service_account_name: operator
-    spilo_privileged: {{ .Values.spilo_privileged }}
 {{ toYaml .Values.configKubernetes | indent 4 }}
-{{ toYaml .Values.configKubernetesCRD | indent 4 }}
   postgres_pod_resources:
 {{ toYaml .Values.configPostgresPodResources | indent 4 }}
   timeouts:
 {{ toYaml .Values.configTimeouts | indent 4 }}
   load_balancer:
-{{ toYaml .Values.configLoadBalancerCRD | indent 4 }}
+{{ toYaml .Values.configLoadBalancer | indent 4 }}
   aws_or_gcp:
 {{ toYaml .Values.configAwsOrGcp | indent 4 }}
   logical_backup:
@@ -35,8 +29,9 @@ configuration:
   debug:
 {{ toYaml .Values.configDebug | indent 4 }}
   teams_api:
-{{ toYaml .Values.configTeamsApiCRD | indent 4 }}
+{{ toYaml .Values.configTeamsApi | indent 4 }}
   logging_rest_api:
 {{ toYaml .Values.configLoggingRestApi | indent 4 }}
   scalyr:
 {{ toYaml .Values.configScalyr | indent 4 }}
+{{- end }}

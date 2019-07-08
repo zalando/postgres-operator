@@ -115,6 +115,16 @@ Those are top-level keys, containing both leaf keys and groups.
 * **repair_period**
   period between consecutive repair requests. The default is `5m`.
 
+* **set_memory_request_to_limit**
+  Set `memory_request` to `memory_limit` for all Postgres clusters (the default
+  value is also increased). This prevents certain cases of memory overcommitment
+  at the cost of overprovisioning memory and potential scheduling problems for
+  containers with high memory limits due to the lack of memory on Kubernetes
+  cluster nodes. This affects all containers created by the operator (Postgres,
+  Scalyr sidecar, and other sidecars); to set resources for the operator's own
+  container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13).
+  The default is `false`.
+
 ## Postgres users
 
 Parameters describing Postgres users. In a CRD-configuration, they are grouped
@@ -296,16 +306,6 @@ CRD-based configuration.
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
   settings. The default is `1Gi`.
-
-* **set_memory_request_to_limit**
-  Set `memory_request` to `memory_limit` for all Postgres clusters (the default
-  value is also increased). This prevents certain cases of memory overcommitment
-  at the cost of overprovisioning memory and potential scheduling problems for
-  containers with high memory limits due to the lack of memory on Kubernetes
-  cluster nodes. This affects all containers created by the operator (Postgres,
-  Scalyr sidecar, and other sidecars); to set resources for the operator's own
-  container, change the [operator deployment manually](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L13).
-  The default is `false`.
 
 ## Operator timeouts
 
@@ -501,7 +501,7 @@ key.
   `https://info.example.com/oauth2/tokeninfo?access_token= uid
   realm=/employees`.
 
-* **protected_roles**
+* **protected_role_names**
   List of roles that cannot be overwritten by an application, team or
   infrastructure role. The default is `admin`.
 
