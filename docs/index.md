@@ -28,7 +28,7 @@ manages PostgreSQL clusters on Kubernetes (K8s):
 
 ### Scope
 
-The scope of the postgres operator is on provisioning, modifying configuration
+The scope of the Postgres Operator is on provisioning, modifying configuration
 and cleaning up Postgres clusters that use Patroni, basically to make it easy
 and convenient to run Patroni based clusters on K8s. The provisioning
 and modifying includes K8s resources on one side but also e.g. database

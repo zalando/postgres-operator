@@ -1,7 +1,7 @@
 # Cluster manifest reference
 
-Individual postgres clusters are described by the Kubernetes *cluster manifest*
-that has the structure defined by the `postgres CRD` (custom resource
+Individual Postgres clusters are described by the Kubernetes *cluster manifest*
+that has the structure defined by the `postgresql` CRD (custom resource
 definition). The following section describes the structure of the manifest and
 the purpose of individual keys. You can take a look at the examples of the
 [minimal](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
@@ -21,7 +21,7 @@ applied.
 
 ## Manifest structure
 
-A postgres manifest is a `YAML` document. On the top level both individual
+A Postgres manifest is a `YAML` document. On the top level both individual
 parameters and parameter groups can be defined. Parameter names are written
 in camelCase.
 
@@ -66,21 +66,21 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
 * **spiloFSGroup**
-  the Persistent Volumes for the spilo pods in the StatefulSet will be owned and
+  the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This will override the **spilo_fsgroup**
   operator parameter. This is required to run Spilo as a non-root process, but
-  requires a custom spilo image. Note the FSGroup of a Pod cannot be changed
+  requires a custom Spilo image. Note the FSGroup of a Pod cannot be changed
   without recreating a new Pod. Optional.
 
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_master_load_balancer` parameter) to define whether to enable the load
-  balancer pointing to the postgres primary. Optional.
+  balancer pointing to the Postgres primary. Optional.
 
 * **enableReplicaLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_replica_load_balancer` parameter) to define whether to enable the
-  load balancer pointing to the postgres standby instances. Optional.
+  load balancer pointing to the Postgres standby instances. Optional.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
@@ -145,20 +145,20 @@ Those parameters are grouped under the `postgresql` top-level key, which is
 required in the manifest.
 
 * **version**
-  the postgres major version of the cluster. Looks at the [Spilo
+  the Postgres major version of the cluster. Looks at the [Spilo
   project](https://github.com/zalando/spilo/releases) for the list of supported
   versions. Changing the cluster version once the cluster has been bootstrapped
   is not supported. Required field.
 
 * **parameters**
-  a dictionary of postgres parameter names and values to apply to the resulting
+  a dictionary of Postgres parameter names and values to apply to the resulting
   cluster. Optional (Spilo automatically sets reasonable defaults for parameters
   like work_mem or max_connections).
 
 
 ## Patroni parameters
 
-Those parameters are grouped under the `patroni` top-level key. See the [patroni
+Those parameters are grouped under the `patroni` top-level key. See the [Patroni
 documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html) for the
 explanation of `ttl` and `loop_wait` parameters.
 
@@ -180,25 +180,25 @@ explanation of `ttl` and `loop_wait` parameters.
     authentication. Optional.
 
 * **ttl**
-  patroni `ttl` parameter value, optional. The default is set by the Spilo
+  Patroni `ttl` parameter value, optional. The default is set by the Spilo
   docker image. Optional.
 
 * **loop_wait**
-  patroni `loop_wait` parameter value, optional. The default is set by the
+  Patroni `loop_wait` parameter value, optional. The default is set by the
   Spilo docker image. Optional.
 
 * **retry_timeout**
-  patroni `retry_timeout` parameter value, optional. The default is set by the
+  Patroni `retry_timeout` parameter value, optional. The default is set by the
   Spilo docker image. Optional.
 
 * **maximum_lag_on_failover**
-  patroni `maximum_lag_on_failover` parameter value, optional. The default is
+  Patroni `maximum_lag_on_failover` parameter value, optional. The default is
   set by the Spilo docker image. Optional.
 
 * **slots**
   permanent replication slots that Patroni preserves after failover by
   re-creating them on the new primary immediately after doing a promote. Slots
-  could be reconfigured with the help of `patronictl edit-config`. It is the
+  could be reconfigured with the help of `Patronictl edit-config`. It is the
   responsibility of a user to avoid clashes in names between replication slots
   automatically created by Patroni for cluster members and permanent replication
   slots. Optional.
@@ -206,31 +206,31 @@ explanation of `ttl` and `loop_wait` parameters.
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
-for the postgres container. They are grouped under the `resources` top-level
+for the Postgres container. They are grouped under the `resources` top-level
 key with subgroups `requests` and `limits`.
 
 ### Requests
 
-CPU and memory requests for the postgres container.
+CPU and memory requests for the Postgres container.
 
 * **cpu**
-  CPU requests for the postgres container. Optional, overrides the
+  CPU requests for the Postgres container. Optional, overrides the
   `default_cpu_requests` operator configuration parameter. Optional.
 
 * **memory**
-  memory requests for the postgres container. Optional, overrides the
+  memory requests for the Postgres container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
 ### Limits
 
-CPU and memory limits for the postgres container.
+CPU and memory limits for the Postgres container.
 
 * **cpu**
-  CPU limits for the postgres container. Optional, overrides the
+  CPU limits for the Postgres container. Optional, overrides the
   `default_cpu_limits` operator configuration parameter. Optional.
 
 * **memory**
-  memory limits for the postgres container. Optional, overrides the
+  memory limits for the Postgres container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
 
 ## Parameters defining how to clone the cluster from another one
@@ -290,7 +290,7 @@ archive is supported.
 ## EBS volume resizing
 
 Those parameters are grouped under the `volume` top-level key and define the
-properties of the persistent storage that stores postgres data.
+properties of the persistent storage that stores Postgres data.
 
 * **size**
   the size of the target EBS volume. Usual Kubernetes size modifiers, i.e. `Gi`
@@ -309,7 +309,7 @@ properties of the persistent storage that stores postgres data.
 
 Those parameters are defined under the `sidecars` key. They consist of a list
 of dictionaries, each defining one sidecar (an extra container running
-along the main postgres container on the same pod). The following keys can be
+along the main Postgres container on the same pod). The following keys can be
 defined in the sidecar dictionary:
 
 * **name**

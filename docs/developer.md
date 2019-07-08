@@ -128,7 +128,7 @@ localhost:8080 by doing:
 
     $ kubectl --context minikube port-forward $(kubectl --context minikube get pod -l name=postgres-operator -o jsonpath={.items..metadata.name}) 8080:8080
 
-The inner 'query' gets the name of the postgres operator pod, and the outer
+The inner 'query' gets the name of the Postgres Operator pod, and the outer
 enables port forwarding. Afterwards, you can access the operator API with:
 
 ```

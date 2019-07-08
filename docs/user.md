@@ -300,7 +300,7 @@ Things to note:
 - An empty string is provided in `s3_wal_path` of the standby cluster will
   result in error and no statefulset will be created.
 - Only one pod can be deployed for stand-by cluster.
-- To manually promote the standby_cluster, use patronictl and remove config
+- To manually promote the standby_cluster, use `patronictl` and remove config
   entry.
 - There is no way to transform a non-standby cluster to become a standby cluster
   through operator. Hence, if a cluster is created without standby section in
