@@ -99,7 +99,7 @@ some privileges not really used by the operator (i.e. we only need `list` and
 breaking things if someone decides to configure the same service account in the
 operator's ConfigMap to run Postgres clusters.
 
-### Give K8S users access to create/list postgresqls
+### Give K8S users access to create/list `postgresqls`
 
 By default `postgresql` custom resources can only by listed and changed by
 cluster admins. To allow read and/or write access to other human users apply

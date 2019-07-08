@@ -54,5 +54,5 @@ The following environment variables are accepted by the operator:
   default is 30s.
 
 * **CRD_READY_WAIT_INTERVAL**
-  defines the  interval between consecutive attempts waiting for the postgresql
-  CRD to be created. The default is 5s.
+  defines the  interval between consecutive attempts waiting for the
+  `postgresql` CRD to be created. The default is 5s.
