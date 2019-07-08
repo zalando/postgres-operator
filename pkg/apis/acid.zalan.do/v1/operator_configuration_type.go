@@ -121,6 +121,7 @@ type TeamsAPIConfiguration struct {
 	TeamsAPIUrl              string            `json:"teams_api_url,omitempty"`
 	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
 	EnableTeamSuperuser      bool              `json:"enable_team_superuser,omitempty"`
+	EnableAdminRoleForUsers  bool              `json:"enable_admin_role_for_users,omitempty"`
 	TeamAdminRole            string            `json:"team_admin_role,omitempty"`
 	PamRoleName              string            `json:"pam_role_name,omitempty"`
 	PamConfiguration         string            `json:"pam_configuration,omitempty"`
@@ -155,12 +156,12 @@ type OperatorConfigurationData struct {
 	MaxInstances               int32                              `json:"max_instances,omitempty"`
 	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
 	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
 	Sidecars                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
-	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
 	Timeouts                   OperatorTimeouts                   `json:"timeouts"`
 	LoadBalancer               LoadBalancerConfiguration          `json:"load_balancer"`
 	AWSGCP                     AWSGCPConfiguration                `json:"aws_or_gcp"`
