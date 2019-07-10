@@ -18,12 +18,12 @@ Docker image that contains PostgreSQL incl. some pre-compiled extensions. Spilo
 also includes [Patroni]((https://github.com/zalando/spilo) to manage highly
 available Postgres cluster powered by streaming replication.
 
-# Getting started
+## Getting started
 
 For a quick first impression follow the instructions of [this](docs/quickstart.md)
 tutorial.
 
-# Documentation
+## Documentation
 
 There is a browser-friendly version of this documentation at
 [postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
@@ -36,7 +36,7 @@ There is a browser-friendly version of this documentation at
 * [cluster manifest reference](docs/reference/cluster_manifest.md)
 * [command-line options and environment variables](docs/reference/command_line_and_environment.md)
 
-# Google Summer of Code
+## Google Summer of Code
 
 The Postgres Operator made it to the [Google Summer of Code 2019](https://summerofcode.withgoogle.com/)!
 As a brand new mentoring organization, we are now looking for our first mentees.
@@ -45,7 +45,7 @@ and start discussion in [the issue tracker](https://github.com/zalando/postgres-
 And don't forget to spread a word about our GSoC participation to attract even
 more students.
 
-# Community      
+## Community
 
 There are two places to get in touch with the community:
 1. The [GitHub issue tracker](https://github.com/zalando/postgres-operator/issues)
