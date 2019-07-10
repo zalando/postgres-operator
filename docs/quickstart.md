@@ -15,20 +15,18 @@ For local tests we recommend to use one of the following solutions:
 
 To interact with the K8s infrastructure install it's CLI runtime [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl).
 
-This quickstart assumes that you haved started minikube or created a local kind
-cluster. Note that you can also use built-in K8s support in the Docker
-Desktop for Mac to follow the steps of this tutorial. You would have to replace
+This quickstart assumes that you have started minikube or created a local kind
+cluster. Note that you can also use built-in K8s support in the Docker Desktop
+for Mac to follow the steps of this tutorial. You would have to replace
 `minikube start` and `minikube delete` with your launch actions for the Docker
 built-in K8s support.
 
-
 ## Configuration Options
 
-If you want to configure the Postgres Operator it must happen before deploying a
-Postgres cluster. This can happen in two ways: Via a ConfigMap or a custom
+If you want to configure the Postgres Operator it must happen before deploying
+a Postgres cluster. This can work in two ways: Via a ConfigMap or a custom
 `OperatorConfiguration` object. More details on configuration can be found
 [here](reference/operator_parameters.md).
-
 
 ## Deployment options
 
@@ -55,9 +53,14 @@ kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and p
 kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
-For convenience, we have automated starting the operator and submitting the
-`acid-minimal-cluster`. From inside the cloned repository execute the
-`run_operator_locally` shell script.
+When using kubectl 1.14 or newer the mentioned manifests could be also be
+bundled in a [Kustomization](https://github.com/kubernetes-sigs/kustomize) so
+that one command is enough.
+
+For convenience, we have automated starting the operator with minikube and
+submitting the [`acid-minimal-cluster`](../manifests/minimal-postgres-manifest).
+From inside the cloned repository execute the `run_operator_locally` shell
+script.
 
 ```bash
 ./run_operator_locally.sh
@@ -96,7 +99,6 @@ kubectl create -f https://operatorhub.io/install/postgres-operator.yaml
 This installs the operator in the `operators` namespace. More information can be
 found on [operatorhub.io](https://operatorhub.io/operator/postgres-operator).
 
-
 ## Create a Postgres cluster
 
 Starting the operator may take a few seconds. Check if the operator pod is
@@ -134,7 +136,6 @@ kubectl get pods -l application=spilo -L spilo-role
 kubectl get svc -l application=spilo -L spilo-role
 ```
 
-
 ## Connect to the Postgres cluster via psql
 
 You can create a port-forward on a database pod to connect to Postgres. See the
@@ -154,7 +155,6 @@ Retrieve the password from the K8s Secret that is created in your cluster.
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
 psql -U postgres
 ```
-
 
 ## Delete a Postgres cluster
 

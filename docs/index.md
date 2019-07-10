@@ -1,4 +1,4 @@
-# Introduction
+# Concepts
 
 The Postgres [operator](https://coreos.com/blog/introducing-operators.html)
 manages PostgreSQL clusters on Kubernetes (K8s):
@@ -8,10 +8,10 @@ manages PostgreSQL clusters on Kubernetes (K8s):
    user submits a new manifest, the operator fetches that manifest and spawns a
    new Postgres cluster along with all necessary entities such as K8s
    StatefulSets and Postgres roles.  See this
-   [Postgres cluster manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml)
+   [Postgres cluster manifest](../manifests/complete-postgres-manifest.yaml)
    for settings that a manifest may contain.
 
-2. The operator also watches updates to [its own configuration](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml)
+2. The operator also watches updates to [its own configuration](../manifests/configmap.yaml)
    and alters running Postgres clusters if necessary.  For instance, if a pod
    docker image is changed, the operator carries out the rolling update.  That
    is, the operator re-spawns one-by-one pods of each StatefulSet it manages
@@ -24,9 +24,7 @@ manages PostgreSQL clusters on Kubernetes (K8s):
    manifests and its own config. This enables easy integration in automated
    deploy pipelines with no access to K8s directly.
 
-## Concepts
-
-### Scope
+## Scope
 
 The scope of the Postgres Operator is on provisioning, modifying configuration
 and cleaning up Postgres clusters that use Patroni, basically to make it easy
@@ -56,8 +54,7 @@ cluster pod, so let's zoom in:
 These two diagrams should help you to understand the basics of what kind of
 functionality the operator provides.
 
-
-### Status
+## Status
 
 This project is currently in active development. It is however already
 [used internally by Zalando](https://jobs.zalando.com/tech/blog/postgresql-in-a-time-of-kubernetes/)
@@ -79,4 +76,4 @@ Please, report any issues discovered to https://github.com/zalando/postgres-oper
 
 4. "Blue elephant on-demand: Postgres + Kubernetes" talk by Oleksii Kliukin and Jan Mussler, FOSDEM 2018: [video](https://fosdem.org/2018/schedule/event/blue_elephant_on_demand_postgres_kubernetes/) | [slides (pdf)](https://www.postgresql.eu/events/fosdem2018/sessions/session/1735/slides/59/FOSDEM%202018_%20Blue_Elephant_On_Demand.pdf)
 
-3. "Kube-Native Postgres" talk by Josh Berkus, KubeCon 2017: [video](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)
+5. "Kube-Native Postgres" talk by Josh Berkus, KubeCon 2017: [video](https://www.youtube.com/watch?v=Zn1vd7sQ_bc)

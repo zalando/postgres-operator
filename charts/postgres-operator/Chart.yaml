@@ -16,5 +16,5 @@ maintainers:
 - name: kimxogus
   email: kgyoo8232@gmail.com
 sources:
-- https://github.com/zalando-incubator/postgres-operator
+- https://github.com/zalando/postgres-operator
 engine: gotpl

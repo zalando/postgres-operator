@@ -12,17 +12,17 @@ with Go older than 1.7. We recommend installing [the latest one](https://golang.
 Go projects expect their source code and all the dependencies to be located
 under the [GOPATH](https://github.com/golang/go/wiki/GOPATH). Normally, one
 would create a directory for the GOPATH (i.e. ~/go) and place the source code
-under the ~/go/src subdirectories.
+under the ~/go/src sub directories.
 
 Given the schema above, the Postgres Operator source code located at
 `github.com/zalando/postgres-operator` should be put at
 -`~/go/src/github.com/zalando/postgres-operator`.
 
 ```bash
-    $ export GOPATH=~/go
-    $ mkdir -p ${GOPATH}/src/github.com/zalando/
-    $ cd ${GOPATH}/src/github.com/zalando/
-    $ git clone https://github.com/zalando/postgres-operator.git
+export GOPATH=~/go
+mkdir -p ${GOPATH}/src/github.com/zalando/
+cd ${GOPATH}/src/github.com/zalando/
+git clone https://github.com/zalando/postgres-operator.git
 ```
 
 ## Building the operator
@@ -30,33 +30,33 @@ Given the schema above, the Postgres Operator source code located at
 You need Glide to fetch all dependencies. Install it with:
 
 ```bash
-    $ make tools
+make tools
 ```
 
 Next, install dependencies with glide by issuing:
 
 ```bash
-    $ make deps
+make deps
 ```
 
 This would take a while to complete. You have to redo `make deps` every time
 you dependencies list changes, i.e. after adding a new library dependency.
 
-Build the operator docker image and pushing it to Pier One:
+Build the operator with the `make docker` command. You may define the TAG
+variable to assign an explicit tag to your docker image and the IMAGE to set
+the image name. By default, the tag is computed with
+`git describe --tags --always --dirty` and the image is
+`registry.opensource.zalan.do/acid/postgres-operator`
 
 ```bash
-    $ make docker push
+export TAG=$(git describe --tags --always --dirty)
+make docker
 ```
-
-You may define the TAG variable to assign an explicit tag to your docker image
-and the IMAGE to set the image name. By default, the tag is computed with
-`git describe --tags --always --dirty` and the image is
-`pierone.stups.zalan.do/acid/postgres-operator`
 
 Building the operator binary (for testing the out-of-cluster option):
 
 ```bash
-    $ make
+make
 ```
 
 The binary will be placed into the build directory.
@@ -64,20 +64,18 @@ The binary will be placed into the build directory.
 ## Deploying self build image
 
 The fastest way to run and test your docker image locally is to reuse the docker
-from [minikube]((https://github.com/kubernetes/minikube/releases)) or use the
+from [minikube](https://github.com/kubernetes/minikube/releases) or use the
 `load docker-image` from [kind](https://kind.sigs.k8s.io/). The following steps
 will get you the docker image built and deployed.
 
 ```bash
-    # minikube
-    $ eval $(minikube docker-env)
-    $ export TAG=$(git describe --tags --always --dirty)
-    $ make docker
+# minikube
+eval $(minikube docker-env)
+make docker
 
-    # kind
-    $ export TAG=$(git describe --tags --always --dirty)
-    $ make docker
-    $ kind load docker-image <image> --name <kind-cluster-name>
+# kind
+make docker
+kind load docker-image <image> --name <kind-cluster-name>
 ```
 
 Then create a new Postgres Operator deployment. You can reuse the provided
@@ -85,12 +83,12 @@ manifest but replace the version and tag. Don't forget to also apply
 configuration and RBAC manifests first, e.g.:
 
 ```bash
-    $ kubectl create -f manifests/configmap.yaml
-    $ kubectl create -f manifests/operator-service-account-rbac.yaml
-    $ sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml | kubectl create  -f -
+kubectl create -f manifests/configmap.yaml
+kubectl create -f manifests/operator-service-account-rbac.yaml
+sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml | kubectl create  -f -
 
-    # check if the operator is coming up
-    $ kubectl get pod -l name=postgres-operator
+# check if the operator is coming up
+kubectl get pod -l name=postgres-operator
 ```
 
 ## Code generation
@@ -124,15 +122,17 @@ the developer's laptop (and not in a docker container).
 
 There is a web interface in the operator to observe its internal state. The
 operator listens on port 8080. It is possible to expose it to the
-localhost:8080 by doing:
+`localhost:8080` by doing:
 
-    $ kubectl --context minikube port-forward $(kubectl --context minikube get pod -l name=postgres-operator -o jsonpath={.items..metadata.name}) 8080:8080
+```bash
+kubectl --context minikube port-forward $(kubectl --context minikube get pod -l name=postgres-operator -o jsonpath={.items..metadata.name}) 8080:8080
+```
 
-The inner 'query' gets the name of the Postgres Operator pod, and the outer
+The inner query gets the name of the Postgres Operator pod, and the outer one
 enables port forwarding. Afterwards, you can access the operator API with:
 
-```
-    $ curl --location http://127.0.0.1:8080/$endpoint | jq .
+```bash
+curl --location http://127.0.0.1:8080/$endpoint | jq .
 ```
 
 The available endpoints are listed below. Note that the worker ID is an integer
@@ -165,15 +165,15 @@ The operator also supports pprof endpoints listed at the
 * /debug/pprof/trace
 
 It's possible to attach a debugger to troubleshoot postgres-operator inside a
-docker container. It's possible with gdb and
-[delve](https://github.com/derekparker/delve). Since the latter one is a
+docker container. It's possible with [gdb](https://www.gnu.org/software/gdb/)
+and [delve](https://github.com/derekparker/delve). Since the latter one is a
 specialized debugger for golang, we will use it as an example. To use it you
 need:
 
 * Install delve locally
 
-```
-    $ go get -u github.com/derekparker/delve/cmd/dlv
+```bash
+go get -u github.com/derekparker/delve/cmd/dlv
 ```
 
 * Add following dependencies to the `Dockerfile`
@@ -184,7 +184,8 @@ RUN go get github.com/derekparker/delve/cmd/dlv
 ```
 
 * Update the `Makefile` to build the project with debugging symbols. For that
-  you need to add `gcflags` to a build target for corresponding OS (e.g. linux)
+  you need to add `gcflags` to a build target for corresponding OS (e.g.
+  GNU/Linux)
 
 ```
 -gcflags "-N -l"
@@ -199,50 +200,50 @@ CMD ["/root/go/bin/dlv", "--listen=:DLV_PORT", "--headless=true", "--api-version
 
 * Forward the listening port
 
-```
-    $ kubectl port-forward POD_NAME DLV_PORT:DLV_PORT
+```bash
+kubectl port-forward POD_NAME DLV_PORT:DLV_PORT
 ```
 
 * Attach to it
 
-```
-    $ dlv connect 127.0.0.1:DLV_PORT
+```bash
+dlv connect 127.0.0.1:DLV_PORT
 ```
 
 ## Unit tests
 
 To run all unit tests, you can simply do:
 
-```
-    $ go test ./...
+```bash
+go test ./...
 ```
 
 For go 1.9 `vendor` directory would be excluded automatically. For previous
 versions you can exclude it manually:
 
-```
-    $ go test $(glide novendor)
+```bash
+go test $(glide novendor)
 ```
 
 In case if you need to debug your unit test, it's possible to use delve:
 
-```
-    $ dlv test ./pkg/util/retryutil/
-    Type 'help' for list of commands.
-    (dlv) c
-    PASS
+```bash
+dlv test ./pkg/util/retryutil/
+Type 'help' for list of commands.
+(dlv) c
+PASS
 ```
 
-To test the multinamespace setup, you can use
+To test the multi-namespace setup, you can use
 
-```
-    $ ./run_operator_locally.sh --rebuild-operator
+```bash
+./run_operator_locally.sh --rebuild-operator
 ```
 It will automatically create an `acid-minimal-cluster` in the namespace `test`.
 Then you can for example check the Patroni logs:
 
-```
-    $ kubectl logs acid-minimal-cluster-0
+```bash
+kubectl logs acid-minimal-cluster-0
 ```
 
 ## End-to-end tests
@@ -259,11 +260,11 @@ configuration files. The kind cluster is deleted if tests complete successfully.
 End-to-end tests are executed automatically during builds:
 
 ```bash
-    # invoke them from the project's top directory
-    $ make e2e-run
+# invoke them from the project's top directory
+make e2e-run
 
-    # install kind and build test image before first run
-    $ make e2e-tools e2e-build
+# install kind and build test image before first run
+make e2e-tools e2e-build
 ```
 
 End-to-end tests are written in Python and use `flake8` for code quality.
@@ -287,10 +288,7 @@ Note: If one option is defined in the operator configuration and in the cluster
 [manifest](../manifests/complete-postgres-manifest.yaml), the latter takes
 precedence.
 
-So, first define the parameters in:
-* the [ConfigMap](../manifests/configmap.yaml) manifest
-* the CR's [default configuration](../manifests/postgresql-operator-default-configuration.yaml)
-* the Helm chart [values](../charts/postgres-operator/values.yaml)
+### Go code
 
 Update the following Go files that obtain the configuration parameter from the
 manifest files:
@@ -298,12 +296,30 @@ manifest files:
 * [operator_config.go](../pkg/controller/operator_config.go)
 * [config.go](../pkg/util/config/config.go)
 
+Postgres manifest parameters are defined in the [api package](../pkg/apis/acid.zalan.do/v1/postgresql_type.go).
 The operator behavior has to be implemented at least in [k8sres.go](../pkg/cluster/k8sres.go).
 Please, reflect your changes in tests, for example in:
 * [config_test.go](../pkg/util/config/config_test.go)
 * [k8sres_test.go](../pkg/cluster/k8sres_test.go)
 * [util_test.go](../pkg/apis/acid.zalan.do/v1/util_test.go)
 
-Finally, document the new configuration option(s) for the operator in its
-[reference](reference/operator_parameters.md) document and explain the feature
-in the [administrator docs](administrator.md).
+### Updating manifest files
+
+For the CRD-based configuration, please update the following files:
+* the default [OperatorConfiguration](../manifests/postgresql-operator-default-configuration.yaml)
+* the Helm chart's [values-crd file](../charts/postgres-operator/values.yaml)
+
+Reflect the changes in the ConfigMap configuration as well (note that numeric
+and boolean parameters have to use double quotes here):
+* [ConfigMap](../manifests/configmap.yaml) manifest
+* the Helm chart's default [values file](../charts/postgres-operator/values.yaml)
+
+### Updating documentation
+
+Finally, add a section for each new configuration option and/or cluster manifest
+parameter in the reference documents:
+* [config reference](reference/operator_parameters.md)
+* [manifest reference](reference/cluster_manifest.md)
+
+It also helps users to explain new features with examples in the
+[administrator docs](administrator.md).

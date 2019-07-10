@@ -12,8 +12,8 @@ the `test` namespace, run the following before deploying the operator's
 manifests:
 
 ```bash
-    $ kubectl create namespace test
-    $ kubectl config set-context $(kubectl config current-context) --namespace=test
+kubectl create namespace test
+kubectl config set-context $(kubectl config current-context) --namespace=test
 ```
 
 All subsequent `kubectl` commands will work with the `test` namespace. The
@@ -24,16 +24,15 @@ needs to be adjusted to the non-default value.
 
 ### Specify the namespace to watch
 
-Watching a namespace for an operator means tracking requests to change
-Postgresql clusters in the namespace such as "increase the number of Postgresql
-replicas to 5" and reacting to the requests, in this example by actually
-scaling up.
+Watching a namespace for an operator means tracking requests to change Postgres
+clusters in the namespace such as "increase the number of Postgres replicas to
+5" and reacting to the requests, in this example by actually scaling up.
 
 By default, the operator watches the namespace it is deployed to. You can
 change this by setting the `WATCHED_NAMESPACE` var in the `env` section of the
 [operator deployment](../manifests/postgres-operator.yaml) manifest or by
 altering the `watched_namespace` field in the operator
-[ConfigMap](../manifests/configmap.yaml#L6).
+[ConfigMap](../manifests/configmap.yaml#L79).
 In the case both are set, the env var takes the precedence. To make the
 operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
@@ -80,10 +79,10 @@ to function under access control restrictions. To deploy the operator with this
 RBAC policy use:
 
 ```bash
-    $ kubectl create -f manifests/configmap.yaml
-    $ kubectl create -f manifests/operator-service-account-rbac.yaml
-    $ kubectl create -f manifests/postgres-operator.yaml
-    $ kubectl create -f manifests/minimal-postgres-manifest.yaml
+kubectl create -f manifests/configmap.yaml
+kubectl create -f manifests/operator-service-account-rbac.yaml
+kubectl create -f manifests/postgres-operator.yaml
+kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
 Note that the service account is named `zalando-postgres-operator`. You may have
@@ -103,10 +102,10 @@ operator's ConfigMap to run Postgres clusters.
 
 By default `postgresql` custom resources can only by listed and changed by
 cluster admins. To allow read and/or write access to other human users apply
-the `ùser-facing-clusterrole` manifest:
+the `user-facing-clusterrole` manifest:
 
 ```bash
-$ kubectl create -f manifests/user-facing-clusterroles.yaml
+kubectl create -f manifests/user-facing-clusterroles.yaml
 ```
 
 It creates zalando-postgres-operator:user:view, :edit and :admin clusterroles
@@ -121,7 +120,7 @@ and configure the required toleration in the operator ConfigMap.
 As an example you can set following node taint:
 
 ```bash
-    $ kubectl taint nodes <nodeName> postgres=:NoSchedule
+kubectl taint nodes <nodeName> postgres=:NoSchedule
 ```
 
 And configure the toleration for the Postgres pods by adding following line
@@ -191,7 +190,8 @@ The PDB is only relaxed in two scenarios:
 The PDB is still in place having `MinAvailable` set to `0`. If enabled it will
 be automatically set to `1` on scale up. Disabling PDBs helps avoiding blocking
 Kubernetes upgrades in managed K8s environments at the cost of prolonged DB
-downtime. See PR #384 for the use case.
+downtime. See PR [#384](https://github.com/zalando/postgres-operator/pull/384)
+for the use case.
 
 ## Add cluster-specific labels
 
@@ -294,7 +294,7 @@ instances. By default, both parameters are set to `-1`.
 
 ## Load balancers and allowed IP ranges
 
-For any Postgresql/Spilo cluster, the operator creates two separate K8s
+For any Postgres/Spilo cluster, the operator creates two separate K8s
 services: one for the master pod and one for replica pods. To expose these
 services to an outer network, one can attach load balancers to them by setting
 `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the
@@ -303,7 +303,7 @@ manifest, the operator configmap's settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
 
-To limit the range of IP adresses that can reach a load balancer, specify the
+To limit the range of IP addresses that can reach a load balancer, specify the
 desired ranges in the `allowedSourceRanges` field (applies to both master and
 replica load balancers). To prevent exposing load balancers to the entire
 Internet, this field is set at cluster creation time to `127.0.0.1/32` unless
@@ -393,14 +393,14 @@ of the backup cron job.
 `cronjobs` resource from the `batch` API group for the operator service account.
 See [example RBAC](../manifests/operator-service-account-rbac.yaml)
 
-## Access to cloud resources from clusters in non cloud environment
+## Access to cloud resources from clusters in non-cloud environment
 
 To access cloud resources like S3 from a cluster in a bare metal setup you can
 use `additional_secret_mount` and `additional_secret_mount_path` configuration
 parameters. With this you can provision cloud credentials to the containers in
 the pods of the StatefulSet. This works this way that it mounts a volume from
 the given secret in the pod and this can then accessed in the container over the
-configured mount path. Via [Custum Pod Environment Variables](#custom-pod-environment-variables)
+configured mount path. Via [Custom Pod Environment Variables](#custom-pod-environment-variables)
 you can then point the different cloud SDK's (AWS, GCP etc.) to this mounted
 secret. With this credentials the cloud SDK can then access cloud resources to
 upload logs etc.
@@ -410,4 +410,4 @@ A secret can be pre-provisioned in different ways:
 * Generic secret created via `kubectl create secret generic some-cloud-creds --from-file=some-cloud-credentials-file.json`
 * Automatically provisioned via a Controller like [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller).
   This controller would then also rotate the credentials. Please visit the
-  documention for more information.
+  documentation for more information.

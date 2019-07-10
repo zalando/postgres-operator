@@ -5,7 +5,7 @@ Learn how to work with the Postgres Operator in a Kubernetes (K8s) environment.
 ## Create a manifest for a new PostgreSQL cluster
 
 Make sure you have [set up](quickstart.md) the operator. Then you can create a
-new Postgres cluster by applying manifest like this [minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
+new Postgres cluster by applying manifest like this [minimal example](../manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -37,13 +37,13 @@ If you have clone the Postgres Operator [repository](https://github.com/zalando/
 you can find this example also in the manifests folder:
 
 ```bash
-$ kubectl create -f manifests/minimal-postgres-manifest.yaml
+kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
 ## Watch pods being created
 
 ```bash
-$ kubectl get pods -w --show-labels
+kubectl get pods -w --show-labels
 ```
 
 ## Connect to PostgreSQL
@@ -65,11 +65,11 @@ Open another CLI and connect to the database. Use the generated secret of the
 in Minikube:
 
 ```bash
-$ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
-$ psql -U postgres -p 6432
+export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+psql -U postgres -p 6432
 ```
 
-# Defining database roles in the operator
+## Defining database roles in the operator
 
 Postgres Operator allows defining roles to be created in the resulting database
 cluster. It covers three use-cases:
@@ -84,10 +84,10 @@ owning the database cluster.
 
 In the next sections, we will cover those use cases in more details.
 
-## Manifest roles
+### Manifest roles
 
 Manifest roles are defined directly in the cluster manifest. See
-[minimal postgres manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
+[minimal postgres manifest](../manifests/minimal-postgres-manifest.yaml)
 for an example of `zalando` role, defined with `superuser` and `createdb` flags.
 
 Manifest roles are defined as a dictionary, with a role name as a key and a
@@ -113,7 +113,7 @@ from the secret, without ever sharing it outside of the cluster.
 At the moment it is not possible to define membership of the manifest role in
 other roles.
 
-## Infrastructure roles
+### Infrastructure roles
 
 An infrastructure role is a role that should be present on every PostgreSQL
 cluster managed by the operator. An example of such a role is a monitoring
@@ -122,7 +122,7 @@ user. There are two ways to define them:
 * With the infrastructure roles secret only
 * With both the the secret and the infrastructure role ConfigMap.
 
-### Infrastructure roles secret
+#### Infrastructure roles secret
 
 The infrastructure roles secret is specified by the `infrastructure_roles_secret_name`
 parameter. The role definition looks like this (values are base64 encoded):
@@ -142,7 +142,7 @@ Note that with definitions that solely use the infrastructure roles secret
 there is no way to specify role options (like superuser or nologin) or role
 memberships. This is where the ConfigMap comes into play.
 
-### Secret plus ConfigMap
+#### Secret plus ConfigMap
 
 A [ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
 allows for defining more details regarding the infrastructure roles. Therefore,
@@ -178,8 +178,9 @@ Since an infrastructure role is created uniformly on all clusters managed by
 the operator, it makes no sense to define it without the password. Such
 definitions will be ignored with a prior warning.
 
-See [infrastructure roles secret](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
-and [infrastructure roles configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml) for the examples.
+See [infrastructure roles secret](../manifests/infrastructure-roles.yaml)
+and [infrastructure roles configmap](../manifests/infrastructure-roles-configmap.yaml)
+for the examples.
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
@@ -206,7 +207,6 @@ You can spin up a new cluster as a clone of the existing one, using a clone
 section in the spec. There are two options here:
 
 * Clone directly from a source cluster using `pg_basebackup`
-
 * Clone from an S3 bucket
 
 ### Clone directly
@@ -351,7 +351,6 @@ variables are always passed to sidecars:
 The PostgreSQL volume is shared with sidecars and is mounted at
 `/home/postgres/pgdata`.
 
-
 ## InitContainers Support
 
 Each cluster can specify arbitrary init containers to run. These containers can
@@ -375,7 +374,6 @@ spec:
 ```
 
 `initContainers` accepts full `v1.Container` definition.
-
 
 ## Increase volume size
 
@@ -414,13 +412,15 @@ size of volumes that correspond to the previously running pods is not changed.
 
 ## Logical backups
 
-If you add
+You can enable logical backups from the cluster manifest by adding the following
+parameter in the spec section:
+
 ```
   enableLogicalBackup: true
 ```
-to the cluster manifest, the operator will create and sync a k8s cron job to do
-periodic logical backups of this particular Postgres cluster. Due to the
-[limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
+
+The operator will create and sync a K8s cron job to do periodic logical backups
+of this particular Postgres cluster. Due to the [limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
 it is highly advisable to set up additional monitoring for this feature; such
 monitoring is outside of the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and
