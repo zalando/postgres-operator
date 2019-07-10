@@ -226,7 +226,7 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   # When relying solely on the OperatorConfiguration CRD, set this value to "operator"
   # Otherwise, the operator tries to use the "default" service account which is forbidden
-  name: ""
+  name:
 
 priorityClassName: ""
 

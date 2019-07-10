@@ -25,6 +25,13 @@ If release name contains chart name it will be used as a full name.
 {{- end -}}
 
 {{/*
+Create a service account name.
+*/}}
+{{- define "postgres-operator.serviceAccountName" -}}
+{{ default (include "postgres-operator.fullname" .) .Values.serviceAccount.name }}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "postgres-operator.chart" -}}

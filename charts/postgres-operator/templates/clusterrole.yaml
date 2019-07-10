@@ -2,11 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: {{- if eq .Values.serviceAccount.name "" }}
-            {{ template "postgres-operator.fullname" . }}
-        {{- else }}
-            {{ .Values.serviceAccount.name }}
-        {{- end }}
+  name: {{ include "postgres-operator.serviceAccountName" . }}
   labels:
     app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
     helm.sh/chart: {{ template "postgres-operator.chart" . }}
@@ -145,11 +141,7 @@ rules:
   verbs:
   - bind
   resourceNames:
-  - {{- if eq .Values.serviceAccount.name "" }}
-      {{ template "postgres-operator.fullname" . }}
-    {{- else }}
-      {{ .Values.serviceAccount.name }}
-    {{- end }}
+  - {{ include "postgres-operator.serviceAccountName" . }}
 - apiGroups:
   - batch
   resources:

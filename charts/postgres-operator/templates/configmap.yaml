@@ -9,11 +9,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
-  pod_service_account_name: {{- if eq .Values.serviceAccount.name "" }}
-                                {{ template "postgres-operator.fullname" . }}
-                            {{- else }}
-                                {{ .Values.serviceAccount.name }}
-                            {{- end }}
+  pod_service_account_name: {{ include "postgres-operator.serviceAccountName" . }}
 {{ toYaml .Values.configGeneral | indent 2 }}
 {{ toYaml .Values.configUsers | indent 2 }}
 {{ toYaml .Values.configKubernetes | indent 2 }}
