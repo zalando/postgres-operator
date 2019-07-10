@@ -38,12 +38,9 @@ There is a browser-friendly version of this documentation at
 
 ## Google Summer of Code
 
-The Postgres Operator made it to the [Google Summer of Code 2019](https://summerofcode.withgoogle.com/)!
-As a brand new mentoring organization, we are now looking for our first mentees.
+The Postgres Operator made it to the [Google Summer of Code 2019](https://summerofcode.withgoogle.com/organizations/5429926902104064/)!
 Check [our ideas](docs/gsoc-2019/ideas.md#google-summer-of-code-2019)
-and start discussion in [the issue tracker](https://github.com/zalando/postgres-operator/issues).
-And don't forget to spread a word about our GSoC participation to attract even
-more students.
+and start discussions in [the issue tracker](https://github.com/zalando/postgres-operator/issues).
 
 ## Community
 
