@@ -15,7 +15,7 @@ pipelines with no access to Kubernetes directly.
 By default, the operator is building up on two other Open Source projects
 developed at Zalando. [Spilo](https://github.com/zalando/spilo) provides the
 Docker image that contains PostgreSQL incl. some pre-compiled extensions. Spilo
-also includes [Patroni]((https://github.com/zalando/spilo) to manage highly
+also includes [Patroni](https://github.com/zalando/spilo) to manage highly
 available Postgres cluster powered by streaming replication.
 
 ## Getting started
