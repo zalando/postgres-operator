@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"strconv"
+	"k8s.io/client-go/rest"
 )
 
 // connectCmd represents the kubectl pg connect command
@@ -36,11 +37,12 @@ var connectCmd = &cobra.Command{
 		clusterName,_ := cmd.Flags().GetString("clusterName")
 		master,_ := cmd.Flags().GetBool("master")
 		replica,_ := cmd.Flags().GetString("replica")
-		connect(clusterName,master,replica)
+		psql,_ := cmd.Flags().GetBool("psql")
+		connect(clusterName,master,replica,psql)
 	},
 }
 
-func connect(clusterName string,master bool,replica string) {
+func connect(clusterName string,master bool,replica string,psql bool) {
 	config := getConfig()
 	client,er := kubernetes.NewForConfig(config)
 	if er != nil {
@@ -70,16 +72,32 @@ func connect(clusterName string,master bool,replica string) {
 			break
 		}
 	}
-	execRequest := client.CoreV1().RESTClient().Post().Resource("pods").
-		Name(podName).
-		Namespace("default").
-		SubResource("exec").
-		Param("container","postgres").
-		Param("command","bash").
-		Param("stdin","true").
-		Param("stdout", "true").
-		Param("stderr","true").
-		Param("tty","true")
+	execRequest := &rest.Request{}
+	if psql {
+		execRequest = client.CoreV1().RESTClient().Post().Resource("pods").
+			Name(podName).
+			Namespace("default").
+			SubResource("exec").
+			Param("container", "postgres").
+			Param("command", "psql").
+			Param("command", "-U").
+			Param("command", "postgres").
+			Param("stdin", "true").
+			Param("stdout", "true").
+			Param("stderr", "true").
+			Param("tty", "true")
+	} else {
+		execRequest = client.CoreV1().RESTClient().Post().Resource("pods").
+			Name(podName).
+			Namespace("default").
+			SubResource("exec").
+			Param("container", "postgres").
+			Param("command", "bash").
+			Param("stdin", "true").
+			Param("stdout", "true").
+			Param("stderr", "true").
+			Param("tty", "true")
+	}
 	exec,err := remotecommand.NewSPDYExecutor(config,"POST",execRequest.URL())
 	if err != nil {
 		log.Fatal(err)
@@ -99,5 +117,6 @@ func init() {
 	connectCmd.Flags().StringP("clusterName", "c", "", "provide the cluster name.")
 	connectCmd.Flags().BoolP("master", "m", false, "connect to master.")
 	connectCmd.Flags().StringP("replica", "r","", "connect to replica.")
+	connectCmd.Flags().BoolP("psql","p",false,"connect to psql prompt")
 	rootCmd.AddCommand(connectCmd)
 }
