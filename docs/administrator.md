@@ -65,9 +65,9 @@ namespace. The operator performs **no** further syncing of this account.
 
 ## Non-default cluster domain
 
-If your cluster uses a different DNS domain than `cluster.local`, this needs
-to be set in the operator configuration (`cluster_domain` variable). This is
-used by the operator to connect to the clusters after creation.
+If your cluster uses a DNS domain other than the default `cluster.local`, this
+needs to be set in the operator configuration (`cluster_domain` variable). This
+is used by the operator to connect to the clusters after creation.
 
 ## Role-based access control for the operator
 
@@ -93,14 +93,14 @@ default `operator` account. In the future the operator should ideally be run
 under the `zalando-postgres-operator` service account.
 
 The service account defined in `operator-service-account-rbac.yaml` acquires
-some privileges not really used by the operator (i.e. we only need `list` and
-`watch` on `configmaps` resources), this is also done intentionally to avoid
-breaking things if someone decides to configure the same service account in the
+some privileges not used by the operator (i.e. we only need `list` and `watch`
+on `configmaps` resources). This is also done intentionally to avoid breaking
+things if someone decides to configure the same service account in the
 operator's ConfigMap to run Postgres clusters.
 
 ### Give K8S users access to create/list `postgresqls`
 
-By default `postgresql` custom resources can only by listed and changed by
+By default `postgresql` custom resources can only be listed and changed by
 cluster admins. To allow read and/or write access to other human users apply
 the `user-facing-clusterrole` manifest:
 
@@ -337,7 +337,7 @@ creating such roles to Patroni and only establishes relevant secrets.
 
 * **Infrastructure roles** are roles for processes originating from external
 systems, e.g. monitoring robots. The operator creates such roles in all Postgres
-clusters it manages assuming that K8s secrets with the relevant
+clusters it manages, assuming that K8s secrets with the relevant
 credentials exist beforehand.
 
 * **Per-cluster robot users** are also roles for processes originating from
@@ -395,19 +395,17 @@ See [example RBAC](../manifests/operator-service-account-rbac.yaml)
 
 ## Access to cloud resources from clusters in non-cloud environment
 
-To access cloud resources like S3 from a cluster in a bare metal setup you can
-use `additional_secret_mount` and `additional_secret_mount_path` configuration
-parameters. With this you can provision cloud credentials to the containers in
-the pods of the StatefulSet. This works this way that it mounts a volume from
-the given secret in the pod and this can then accessed in the container over the
-configured mount path. Via [Custom Pod Environment Variables](#custom-pod-environment-variables)
-you can then point the different cloud SDK's (AWS, GCP etc.) to this mounted
-secret. With this credentials the cloud SDK can then access cloud resources to
-upload logs etc.
+To access cloud resources like S3 from a cluster on bare metal you can use
+`additional_secret_mount` and `additional_secret_mount_path` configuration
+parameters. The cloud credentials will be provisioned in the Postgres containers
+by mounting an additional volume from the given secret to database pods. They
+can then be accessed over the configured mount path. Via
+[Custom Pod Environment Variables](#custom-pod-environment-variables) you can
+point different cloud SDK's (AWS, GCP etc.) to this mounted secret, e.g. to
+access cloud resources for uploading logs etc.
 
 A secret can be pre-provisioned in different ways:
 
 * Generic secret created via `kubectl create secret generic some-cloud-creds --from-file=some-cloud-credentials-file.json`
-* Automatically provisioned via a Controller like [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller).
-  This controller would then also rotate the credentials. Please visit the
-  documentation for more information.
+* Automatically provisioned via a custom K8s controller like
+  [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)

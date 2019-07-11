@@ -167,8 +167,7 @@ The operator also supports pprof endpoints listed at the
 It's possible to attach a debugger to troubleshoot postgres-operator inside a
 docker container. It's possible with [gdb](https://www.gnu.org/software/gdb/)
 and [delve](https://github.com/derekparker/delve). Since the latter one is a
-specialized debugger for golang, we will use it as an example. To use it you
-need:
+specialized debugger for Go, we will use it as an example. To use it you need:
 
 * Install delve locally
 

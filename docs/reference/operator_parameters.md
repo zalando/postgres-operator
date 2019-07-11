@@ -196,7 +196,7 @@ configuration they are grouped under the `kubernetes` key.
   `{username}.{cluster}.credentials.{tprkind}.{tprgroup}`.
 
 * **cluster_domain**
-  defines the default dns domain for the kubernetes cluster the operator is
+  defines the default DNS domain for the kubernetes cluster the operator is
   running in. The default is `cluster.local`. Used by the operator to connect
   to the Postgres clusters after creation.
 

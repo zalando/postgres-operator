@@ -5,8 +5,9 @@ Operator on a local Kubernetes environment.
 
 ## Prerequisites
 
-The Postgres Operator runs on Kubernetes (K8s) which you have to setup first.
-For local tests we recommend to use one of the following solutions:
+Since the Postgres Operator is designed for the Kubernetes (K8s) framework,
+hence set it up first. For local tests we recommend to use one of the following
+solutions:
 
 * [minikube](https://github.com/kubernetes/minikube/releases), which creates a
   single-node K8s cluster inside a VM (requires KVM or VirtualBox),
@@ -23,14 +24,14 @@ built-in K8s support.
 
 ## Configuration Options
 
-If you want to configure the Postgres Operator it must happen before deploying
-a Postgres cluster. This can work in two ways: Via a ConfigMap or a custom
+Configuring the Postgres Operator is only possible before deploying a new
+Postgres cluster. This can work in two ways: via a ConfigMap or a custom
 `OperatorConfiguration` object. More details on configuration can be found
 [here](reference/operator_parameters.md).
 
 ## Deployment options
 
-The Postgres Operator can be deployed in different ways:
+The Postgres Operator can be deployed in the following ways:
 
 * Manual deployment
 * Helm chart
@@ -54,13 +55,12 @@ kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
 When using kubectl 1.14 or newer the mentioned manifests could be also be
-bundled in a [Kustomization](https://github.com/kubernetes-sigs/kustomize) so
-that one command is enough.
+bundled in one [Kustomization](https://github.com/kubernetes-sigs/kustomize)
+manifest.
 
-For convenience, we have automated starting the operator with minikube and
-submitting the [`acid-minimal-cluster`](../manifests/minimal-postgres-manifest).
-From inside the cloned repository execute the `run_operator_locally` shell
-script.
+For convenience, we have automated starting the operator with minikube using the
+`run_operator_locally` script. It applies the [`acid-minimal-cluster`](../manifests/minimal-postgres-manifest).
+manifest.
 
 ```bash
 ./run_operator_locally.sh
@@ -69,14 +69,14 @@ script.
 ### Helm chart
 
 Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
-chart which saves you the manual steps. Therefore, you would need to install
-the helm CLI on your machine. After initializing helm (and its server component
-Tiller) in your local cluster you can install the operator chart. You can define
-a release name that is prepended to the operator resource's names.
+chart which saves you the manual steps. Therefore, install the helm CLI on your
+machine. After initializing helm (and its server component Tiller) in your local
+cluster you can install the operator chart. You can define a release name that
+is prepended to the operator resource's names.
 
 Use `--name zalando` to match with the default service account name as older
 operator versions do not support custom names for service accounts. To use
-CRD-based configuration use the [values-crd yaml file](../charts/values-crd.yaml).
+CRD-based configuration you need to specify the [values-crd yaml file](../charts/values-crd.yaml).
 
 ```bash
 # 1) initialize helm
@@ -88,9 +88,9 @@ helm install --name zalando ./charts/postgres-operator
 ### Operator Lifecycle Manager (OLM)
 
 The [Operator Lifecycle Manager (OLM)](https://github.com/operator-framework/operator-lifecycle-manager)
-has been designed to facilitate the management of K8s operators. You have to
-install it in your K8s environment. When OLM is set up you can simply download
-and deploy the Postgres Operator with the following command:
+has been designed to facilitate management of K8s operators. It has to be
+installed in your K8s environment. When OLM is set up simply download and deploy
+the Postgres Operator with the following command:
 
 ```bash
 kubectl create -f https://operatorhub.io/install/postgres-operator.yaml

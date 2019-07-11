@@ -12,17 +12,17 @@ manages PostgreSQL clusters on Kubernetes (K8s):
    for settings that a manifest may contain.
 
 2. The operator also watches updates to [its own configuration](../manifests/configmap.yaml)
-   and alters running Postgres clusters if necessary.  For instance, if a pod
-   docker image is changed, the operator carries out the rolling update.  That
-   is, the operator re-spawns one-by-one pods of each StatefulSet it manages
+   and alters running Postgres clusters if necessary.  For instance, if the
+   docker image in a pod is changed, the operator carries out the rolling
+   update, which means it re-spawns pods of each managed StatefulSet one-by-one
    with the new Docker image.
 
 3. Finally, the operator periodically synchronizes the actual state of each
    Postgres cluster with the desired state defined in the cluster's manifest.
 
-4. The operator aims to be hands free and configuration happens only via
-   manifests and its own config. This enables easy integration in automated
-   deploy pipelines with no access to K8s directly.
+4. The operator aims to be hands free as configuration works only via manifests.
+   This enables easy integration in automated deploy pipelines with no access to
+   K8s directly.
 
 ## Scope
 
@@ -36,8 +36,10 @@ the cluster bootstrap and high availability. The operator is however involved
 in some overarching orchestration, like rolling updates to improve the user
 experience.
 
-Monitoring of clusters is not in scope, for this good tools already exist from
-ZMON to Prometheus and more Postgres specific options.
+Monitoring or tuning Postgres is not in scope of the operator in the current
+state. Other tools like [ZMON](https://opensource.zalando.com/zmon/),
+[Prometheus](https://prometheus.io/) or more Postgres specific options can be
+used to complement it.
 
 ## Overview of involved entities
 
