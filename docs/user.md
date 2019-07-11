@@ -33,7 +33,7 @@ spec:
     version: "10"
 ```
 
-If you have clone the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
+Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
 you can find this example also in the manifests folder:
 
 ```bash
@@ -93,8 +93,8 @@ for an example of `zalando` role, defined with `superuser` and `createdb` flags.
 Manifest roles are defined as a dictionary, with a role name as a key and a
 list of role options as a value. For a role without any options it is best to
 supply the empty list `[]`. It is also possible to leave this field empty as in
-our example manifests, but in certain cases such empty field may removed by K8s
-[due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes)
+our example manifests. In certain cases such empty field may be missing later
+removed by K8s [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes)
 (`foobar_user:` is equivalent to `foobar_user: null`).
 
 The operator accepts the following options:  `superuser`, `inherit`, `login`,
@@ -107,8 +107,8 @@ The operator automatically generates a password for each manifest role and
 places it in the secret named
 `{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do` in the
 same namespace as the cluster. This way, the application running in the
-K8s cluster and working with the database can obtain the password right
-from the secret, without ever sharing it outside of the cluster.
+K8s cluster and connecting to Postgres can obtain the password right from the
+secret, without ever sharing it outside of the cluster.
 
 At the moment it is not possible to define membership of the manifest role in
 other roles.
@@ -247,7 +247,7 @@ spec:
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
 In this case, `uid` field is also mandatory - operator will use it to find a
-correct key inside an S3 bucket. You can find this field from metadata of a
+correct key inside an S3 bucket. You can find this field in the metadata of the
 source cluster:
 
 ```yaml
@@ -286,8 +286,8 @@ Standby clusters are like normal cluster but they are streaming from a remote
 cluster. As the first version of this feature, the only scenario covered by
 operator is to stream from a WAL archive of the master. Following the more
 popular infrastructure of using Amazon's S3 buckets, it is mentioned as
-`s3_wal_path` here. To make a cluster a standby add a `standby` section in the
-YAML file as follows.
+`s3_wal_path` here. To start a cluster as standby add the following `standby`
+section in the YAML file:
 
 ```yaml
 spec:
@@ -297,16 +297,15 @@ spec:
 
 Things to note:
 
-- An empty string is provided in `s3_wal_path` of the standby cluster will
-  result in error and no statefulset will be created.
+- An empty string in the `s3_wal_path` field of the standby cluster will result
+  in an error and no statefulset will be created.
 - Only one pod can be deployed for stand-by cluster.
 - To manually promote the standby_cluster, use `patronictl` and remove config
   entry.
-- There is no way to transform a non-standby cluster to become a standby cluster
-  through operator. Hence, if a cluster is created without standby section in
-  YAML and later modified  by adding that section, there will be no effect on
-  the cluster. However, it can be done through Patroni by adding the
-  [standby_cluster] (https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster)
+- There is no way to transform a non-standby cluster to a standby cluster
+  through the operator. Adding the standby section to the manifest of a running
+  Postgres cluster will have no effect. However, it can be done through Patroni
+  by adding the [standby_cluster] (https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster)
   section using `patronictl edit-config`. Note that the transformed standby
   cluster will not be doing any streaming. It will be in standby mode and allow
   read-only transactions only.
@@ -407,7 +406,7 @@ actions:
 
 Fist step has a limitation, AWS rate-limits this operation to no more than once
 every 6 hours. Note, that if the statefulset is scaled down before resizing the
-size changes are only applied to the volumes attached to the running pods. The
+new size is only applied to the volumes attached to the running pods. The
 size of volumes that correspond to the previously running pods is not changed.
 
 ## Logical backups
@@ -422,7 +421,7 @@ parameter in the spec section:
 The operator will create and sync a K8s cron job to do periodic logical backups
 of this particular Postgres cluster. Due to the [limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
 it is highly advisable to set up additional monitoring for this feature; such
-monitoring is outside of the scope of operator responsibilities. See
+monitoring is outside the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and
 [administrator documentation](administrator.md) for details on how backups are
 executed.

@@ -8,33 +8,31 @@
 
 <img src="docs/diagrams/logo.png" width="200">
 
-The Postgres operator manages PostgreSQL clusters on Kubernetes. Configuration
-happens only via manifests. Therefore, it integrates easily in automated CI/CD
+The Postgres Operator enables highly-available [PostgreSQL](https://www.postgresql.org/)
+clusters on Kubernetes (K8s) powered by [Patroni](https://github.com/zalando/spilo).
+It is configured only through manifests to ease integration into automated CI/CD
 pipelines with no access to Kubernetes directly.
 
-By default, the operator is building up on two other Open Source projects
-developed at Zalando. [Spilo](https://github.com/zalando/spilo) provides the
-Docker image that contains PostgreSQL incl. some pre-compiled extensions. Spilo
-also includes [Patroni](https://github.com/zalando/spilo) to manage highly
-available Postgres cluster powered by streaming replication.
+The Postgres Operator has been developed at Zalando and is being used in
+production for over two years.
 
 ## Getting started
 
-For a quick first impression follow the instructions of [this](docs/quickstart.md)
-tutorial.
+For a quick first impression follow the instructions of this
+[tutorial](docs/quickstart.md).
 
 ## Documentation
 
 There is a browser-friendly version of this documentation at
 [postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
 
-* [concepts](docs/index.md)
-* [user documentation](docs/user.md)
-* [administrator documentation](docs/administrator.md)
-* [developer documentation](docs/developer.md)
-* [operator configuration reference](docs/reference/operator_parameters.md)
-* [cluster manifest reference](docs/reference/cluster_manifest.md)
-* [command-line options and environment variables](docs/reference/command_line_and_environment.md)
+* [How it works](docs/index.md)
+* [The Postgres experience on K8s](docs/user.md)
+* [DBA options - from RBAC to backup](docs/administrator.md)
+* [Debug and extend the operator](docs/developer.md)
+* [Configuration options](docs/reference/operator_parameters.md)
+* [Postgres manifest reference](docs/reference/cluster_manifest.md)
+* [Command-line options and environment variables](docs/reference/command_line_and_environment.md)
 
 ## Google Summer of Code
 
