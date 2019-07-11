@@ -7,7 +7,7 @@ RUN apk --no-cache add ca-certificates
 COPY build/* /
 
 RUN addgroup -g 1000 pgo
-RUN adduser -D -u 1000 -G pgo -g 'Postgres operator' pgo
+RUN adduser -D -u 1000 -G pgo -g 'Postgres Operator' pgo
 
 USER 1000:1000
 

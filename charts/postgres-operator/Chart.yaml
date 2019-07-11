@@ -3,7 +3,7 @@ name: postgres-operator
 version: 1.2.0
 appVersion: 1.2.0
 home: https://github.com/zalando/postgres-operator
-description: Postgres operator creates and manages PostgreSQL clusters running in Kubernetes
+description: Postgres Operator creates and manages PostgreSQL clusters running in Kubernetes
 keywords:
 - postgres
 - operator
@@ -16,5 +16,5 @@ maintainers:
 - name: kimxogus
   email: kgyoo8232@gmail.com
 sources:
-- https://github.com/zalando-incubator/postgres-operator
+- https://github.com/zalando/postgres-operator
 engine: gotpl

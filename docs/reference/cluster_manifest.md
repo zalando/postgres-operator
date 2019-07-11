@@ -1,10 +1,12 @@
-Individual postgres clusters are described by the Kubernetes *cluster manifest*
-that has the structure defined by the `postgres CRD` (custom resource
+# Cluster manifest reference
+
+Individual Postgres clusters are described by the Kubernetes *cluster manifest*
+that has the structure defined by the `postgresql` CRD (custom resource
 definition). The following section describes the structure of the manifest and
 the purpose of individual keys. You can take a look at the examples of the
-[minimal](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
+[minimal](../manifests/minimal-postgres-manifest.yaml)
 and the
-[complete](https://github.com/zalando/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml)
+[complete](../manifests/complete-postgres-manifest.yaml)
 cluster manifests.
 
 When Kubernetes resources, such as memory, CPU or volumes, are configured,
@@ -19,7 +21,7 @@ applied.
 
 ## Manifest structure
 
-A postgres manifest is a `YAML` document. On the top level both individual
+A Postgres manifest is a `YAML` document. On the top level both individual
 parameters and parameter groups can be defined. Parameter names are written
 in camelCase.
 
@@ -54,26 +56,31 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   name of the team the cluster belongs to. Changing it after the cluster
   creation is not supported. Required field.
 
+* **numberOfInstances**
+  total number of  instances for a given cluster. The operator parameters
+  `max_instances` and `min_instances` may also adjust this number. Required
+  field.
+
 * **dockerImage**
   custom docker image that overrides the **docker_image** operator parameter.
-  It should be a [Spilo](https://github.com/zalando/spilo) image.  Optional.
+  It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
 * **spiloFSGroup**
-  the Persistent Volumes for the spilo pods in the StatefulSet will be owned
-  and writable by the group ID specified. This will override the **spilo_fsgroup**
+  the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
+  writable by the group ID specified. This will override the **spilo_fsgroup**
   operator parameter. This is required to run Spilo as a non-root process, but
-  requires a custom spilo image. Note the FSGroup of a Pod cannot be changed
-  without recreating a new Pod.
+  requires a custom Spilo image. Note the FSGroup of a Pod cannot be changed
+  without recreating a new Pod. Optional.
 
 * **enableMasterLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_master_load_balancer` parameter) to define whether to enable the load
-  balancer pointing to the postgres primary. Optional.
+  balancer pointing to the Postgres primary. Optional.
 
 * **enableReplicaLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_replica_load_balancer` parameter) to define whether to enable the
-  load balancer pointing to the postgres standby instances. Optional.
+  load balancer pointing to the Postgres standby instances. Optional.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
@@ -81,11 +88,6 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   corresponding load balancer is accessible only to the networks defined by
   this parameter. Optional, when empty the load balancer service becomes
   inaccessible from outside of the Kubernetes cluster.
-
-* **numberOfInstances**
-  total number of  instances for a given cluster. The operator parameters
-  `max_instances` and `min_instances` may also adjust this number.  Required
-  field.
 
 * **users**
   a map of usernames to user flags for the users that should be created in the
@@ -114,7 +116,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
    that should be assigned to the cluster pods. When not specified, the value
    is taken from the `pod_priority_class_name` operator parameter, if not set
    then the default priority class is taken. The priority class itself must be
-   defined in advance.
+   defined in advance. Optional.
 
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default docker
@@ -126,35 +128,36 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   about mounting a volume will be made based on operator configuration
   (`enable_shm_volume`, which is `true` by default). It it's present and value
   is `false`, then no volume will be mounted no matter how operator was
-  configured (so you can override the operator configuration).
+  configured (so you can override the operator configuration). Optional.
 
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
-  to S3. Default: false.
+  to S3. Default: false. Optional.
 
 * **logicalBackupSchedule**
-  Schedule for the logical backup k8s cron job. Please take [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
-  into account. Default: "30 00 \* \* \*"
+  Schedule for the logical backup k8s cron job. Please take
+  [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
+  into account. Optional. Default is: "30 00 \* \* \*"
 
 ## Postgres parameters
 
-Those parameters are grouped under the `postgresql` top-level key.
+Those parameters are grouped under the `postgresql` top-level key, which is
+required in the manifest.
 
 * **version**
-  the postgres major version of the cluster. Looks at the [Spilo
+  the Postgres major version of the cluster. Looks at the [Spilo
   project](https://github.com/zalando/spilo/releases) for the list of supported
   versions. Changing the cluster version once the cluster has been bootstrapped
   is not supported. Required field.
 
 * **parameters**
-  a dictionary of postgres parameter names and values to apply to the resulting
-  cluster. Optional (Spilo automatically sets reasonable defaults for
-  parameters like work_mem or max_connections).
-
+  a dictionary of Postgres parameter names and values to apply to the resulting
+  cluster. Optional (Spilo automatically sets reasonable defaults for parameters
+  like `work_mem` or `max_connections`).
 
 ## Patroni parameters
 
-Those parameters are grouped under the `patroni` top-level key. See the [patroni
+Those parameters are grouped under the `patroni` top-level key. See the [Patroni
 documentation](https://patroni.readthedocs.io/en/latest/SETTINGS.html) for the
 explanation of `ttl` and `loop_wait` parameters.
 
@@ -176,19 +179,19 @@ explanation of `ttl` and `loop_wait` parameters.
     authentication. Optional.
 
 * **ttl**
-  patroni `ttl` parameter value, optional. The default is set by the Spilo
+  Patroni `ttl` parameter value, optional. The default is set by the Spilo
   docker image. Optional.
 
 * **loop_wait**
-  patroni `loop_wait` parameter value, optional. The default is set by the
+  Patroni `loop_wait` parameter value, optional. The default is set by the
   Spilo docker image. Optional.
 
 * **retry_timeout**
-  patroni `retry_timeout` parameter value, optional. The default is set by the
+  Patroni `retry_timeout` parameter value, optional. The default is set by the
   Spilo docker image. Optional.
 
 * **maximum_lag_on_failover**
-  patroni `maximum_lag_on_failover` parameter value, optional. The default is
+  Patroni `maximum_lag_on_failover` parameter value, optional. The default is
   set by the Spilo docker image. Optional.
 
 * **slots**
@@ -199,38 +202,34 @@ explanation of `ttl` and `loop_wait` parameters.
   automatically created by Patroni for cluster members and permanent replication
   slots. Optional.
 
-* **standby**
-  initializes cluster as a standby creating a cascading replication, where standby leader is streaming from specified remote location
-
 ## Postgres container resources
 
-Those parameters define [CPU and memory requests and
-limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
-for the postgres container. They are grouped under the `resources` top-level
-key. There are two subgroups, `requests` and `limits`.
+Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
+for the Postgres container. They are grouped under the `resources` top-level
+key with subgroups `requests` and `limits`.
 
 ### Requests
 
-CPU and memory requests for the postgres container.
+CPU and memory requests for the Postgres container.
 
 * **cpu**
-  CPU requests for the postgres container. Optional, overrides the
+  CPU requests for the Postgres container. Optional, overrides the
   `default_cpu_requests` operator configuration parameter. Optional.
 
 * **memory**
-  memory requests for the postgres container. Optional, overrides the
+  memory requests for the Postgres container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
-#### Limits
+### Limits
 
-CPU and memory limits for the postgres container.
+CPU and memory limits for the Postgres container.
 
 * **cpu**
-  CPU limits for the postgres container. Optional, overrides the
+  CPU limits for the Postgres container. Optional, overrides the
   `default_cpu_limits` operator configuration parameter. Optional.
 
 * **memory**
-  memory limits for the postgres container. Optional, overrides the
+  memory limits for the Postgres container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
 
 ## Parameters defining how to clone the cluster from another one
@@ -257,8 +256,13 @@ under the `clone` top-level key and do not affect the already running cluster.
   timestamp. When this parameter is set the operator will not consider cloning
   from the live cluster, even if it is running, and instead goes to S3. Optional.
 
+* **s3_wal_path**
+  the url to S3 bucket containing the WAL archive of the cluster to be cloned.
+  Optional.
+
 * **s3_endpoint**
-  the url of the S3-compatible service should be set when cloning from non AWS S3. Optional.
+  the url of the S3-compatible service should be set when cloning from non AWS
+  S3. Optional.
 
 * **s3_access_key_id**
   the access key id, used for authentication on S3 service. Optional.
@@ -267,13 +271,25 @@ under the `clone` top-level key and do not affect the already running cluster.
   the secret access key, used for authentication on S3 service. Optional.
 
 * **s3_force_path_style**
-  to enable path-style addressing(i.e., http://s3.amazonaws.com/BUCKET/KEY) when connecting to an S3-compatible service
-  that lack of support for sub-domain style bucket URLs (i.e., http://BUCKET.s3.amazonaws.com/KEY). Optional.
+  to enable path-style addressing(i.e., http://s3.amazonaws.com/BUCKET/KEY)
+  when connecting to an S3-compatible service that lack of support for
+  sub-domain style bucket URLs (i.e., http://BUCKET.s3.amazonaws.com/KEY).
+  Optional.
 
-### EBS volume resizing
+## Standby cluster
+
+On startup, an existing `standby` top-level key creates a standby Postgres
+cluster streaming from a remote location. So far only streaming from a S3 WAL
+archive is supported.
+
+* **s3_wal_path**
+  the url to S3 bucket containing the WAL archive of the remote primary.
+  Required when the `standby` section is present.
+
+## EBS volume resizing
 
 Those parameters are grouped under the `volume` top-level key and define the
-properties of the persistent storage that stores postgres data.
+properties of the persistent storage that stores Postgres data.
 
 * **size**
   the size of the target EBS volume. Usual Kubernetes size modifiers, i.e. `Gi`
@@ -286,13 +302,13 @@ properties of the persistent storage that stores postgres data.
   for the details on storage classes. Optional.
 
 * **subPath**
-  Subpath to use when mounting volume into Spilo container
+  Subpath to use when mounting volume into Spilo container. Optional.
 
-### Sidecar definitions
+## Sidecar definitions
 
 Those parameters are defined under the `sidecars` key. They consist of a list
 of dictionaries, each defining one sidecar (an extra container running
-along the main postgres container on the same pod). The following keys can be
+along the main Postgres container on the same pod). The following keys can be
 defined in the sidecar dictionary:
 
 * **name**
@@ -306,16 +322,11 @@ defined in the sidecar dictionary:
   (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
   for environment variables. Optional.
 
-* **resources** see below. Optional.
+* **resources**
+  [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container)
+  for each sidecar container. Optional.
 
-#### Sidecar container resources
-
-Those parameters define [CPU and memory requests and
-limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
-for the sidecar container. They are grouped under the `resources` key for each sidecar.
-There are two subgroups, `requests` and `limits`.
-
-##### Requests
+### Requests
 
 CPU and memory requests for the sidecar container.
 
@@ -327,7 +338,7 @@ CPU and memory requests for the sidecar container.
   memory requests for the sidecar container. Optional, overrides the
   `default_memory_request` operator configuration parameter. Optional.
 
-##### Limits
+### Limits
 
 CPU and memory limits for the sidecar container.
 

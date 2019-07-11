@@ -1,7 +1,11 @@
+# User Guide
+
+Learn how to work with the Postgres Operator in a Kubernetes (K8s) environment.
+
 ## Create a manifest for a new PostgreSQL cluster
 
-As an example you can take this
-[minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
+Make sure you have [set up](quickstart.md) the operator. Then you can create a
+new Postgres cluster by applying manifest like this [minimal example](../manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -29,26 +33,18 @@ spec:
     version: "10"
 ```
 
-## Create a new Spilo cluster
+Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
+you can find this example also in the manifests folder:
 
 ```bash
-$ kubectl create -f manifests/minimal-postgres-manifest.yaml
+kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
 ## Watch pods being created
 
 ```bash
-$ kubectl get pods -w --show-labels
+kubectl get pods -w --show-labels
 ```
-
-## Give K8S users access to create/list postgresqls
-
-```bash
-$ kubectl create -f manifests/user-facing-clusterroles.yaml
-```
-
-Creates zalando-postgres-operator:users:view, :edit and :admin clusterroles that are
-aggregated into the default roles.
 
 ## Connect to PostgreSQL
 
@@ -69,33 +65,37 @@ Open another CLI and connect to the database. Use the generated secret of the
 in Minikube:
 
 ```bash
-$ export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
-$ psql -U postgres -p 6432
+export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+psql -U postgres -p 6432
 ```
 
-# Defining database roles in the operator
+## Defining database roles in the operator
 
-Postgres operator allows defining roles to be created in the resulting database
+Postgres Operator allows defining roles to be created in the resulting database
 cluster. It covers three use-cases:
 
-* `manifest roles`: create application roles specific to the cluster described in the manifest.
-* `infrastructure roles`: create application roles that should be automatically created on every
+* `manifest roles`: create application roles specific to the cluster described
+in the manifest.
+* `infrastructure roles`: create application roles that should be automatically
+created on every
   cluster managed by the operator.
-* `teams API roles`: automatically create users for every member of the team owning the database
-  cluster.
+* `teams API roles`: automatically create users for every member of the team
+owning the database cluster.
 
 In the next sections, we will cover those use cases in more details.
 
-## Manifest roles
+### Manifest roles
 
 Manifest roles are defined directly in the cluster manifest. See
-[minimal postgres manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
-for an example of `zalando` role, defined with `superuser` and `createdb`
-flags.
+[minimal postgres manifest](../manifests/minimal-postgres-manifest.yaml)
+for an example of `zalando` role, defined with `superuser` and `createdb` flags.
 
 Manifest roles are defined as a dictionary, with a role name as a key and a
-list of role options as a value. For a role without any options it is best to supply the empty
-list `[]`. It is also possible to leave this field empty as in our example manifests, but in certain cases such empty field may removed by Kubernetes [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes) (`foobar_user:` is equivalent to `foobar_user: null`).
+list of role options as a value. For a role without any options it is best to
+supply the empty list `[]`. It is also possible to leave this field empty as in
+our example manifests. In certain cases such empty field may be missing later
+removed by K8s [due to the `null` value it gets](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes)
+(`foobar_user:` is equivalent to `foobar_user: null`).
 
 The operator accepts the following options:  `superuser`, `inherit`, `login`,
 `nologin`, `createrole`, `createdb`, `replication`, `bypassrls`.
@@ -107,13 +107,13 @@ The operator automatically generates a password for each manifest role and
 places it in the secret named
 `{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do` in the
 same namespace as the cluster. This way, the application running in the
-Kubernetes cluster and working with the database can obtain the password right
-from the secret, without ever sharing it outside of the cluster.
+K8s cluster and connecting to Postgres can obtain the password right from the
+secret, without ever sharing it outside of the cluster.
 
 At the moment it is not possible to define membership of the manifest role in
 other roles.
 
-## Infrastructure roles
+### Infrastructure roles
 
 An infrastructure role is a role that should be present on every PostgreSQL
 cluster managed by the operator. An example of such a role is a monitoring
@@ -122,7 +122,7 @@ user. There are two ways to define them:
 * With the infrastructure roles secret only
 * With both the the secret and the infrastructure role ConfigMap.
 
-### Infrastructure roles secret
+#### Infrastructure roles secret
 
 The infrastructure roles secret is specified by the `infrastructure_roles_secret_name`
 parameter. The role definition looks like this (values are base64 encoded):
@@ -134,22 +134,21 @@ parameter. The role definition looks like this (values are base64 encoded):
 ```
 
 The block above describes the infrastructure role 'dbuser' with password
-'secret' that is a member of the 'operator' role. For the following
-definitions one must increase the index, i.e. the next role will be defined as
-'user2' and so on. The resulting role will automatically be a login role.
+'secret' that is a member of the 'operator' role. For the following definitions
+one must increase the index, i.e. the next role will be defined as 'user2' and
+so on. The resulting role will automatically be a login role.
 
 Note that with definitions that solely use the infrastructure roles secret
 there is no way to specify role options (like superuser or nologin) or role
 memberships. This is where the ConfigMap comes into play.
 
-### Secret plus ConfigMap
+#### Secret plus ConfigMap
 
 A [ConfigMap](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/)
-allows for defining more details regarding the infrastructure roles.
-Therefore, one should use the new style that specifies infrastructure roles
-using both the secret and a ConfigMap. The ConfigMap must have the same name as
-the secret. The secret should contain an entry with 'rolename:rolepassword' for
-each role.
+allows for defining more details regarding the infrastructure roles. Therefore,
+one should use the new style that specifies infrastructure roles using both the
+secret and a ConfigMap. The ConfigMap must have the same name as the secret.
+The secret should contain an entry with 'rolename:rolepassword' for each role.
 
 ```yaml
     dbuser: c2VjcmV0
@@ -179,14 +178,14 @@ Since an infrastructure role is created uniformly on all clusters managed by
 the operator, it makes no sense to define it without the password. Such
 definitions will be ignored with a prior warning.
 
-See [infrastructure roles secret](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
-and [infrastructure roles configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml) for the examples.
+See [infrastructure roles secret](../manifests/infrastructure-roles.yaml)
+and [infrastructure roles configmap](../manifests/infrastructure-roles-configmap.yaml)
+for the examples.
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
-To ensure Postgres pods are running on nodes without any other application
-pods, you can use
-[taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
+To ensure Postgres pods are running on nodes without any other application pods,
+you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
 and configure the required toleration in the manifest.
 
 ```yaml
@@ -208,7 +207,6 @@ You can spin up a new cluster as a clone of the existing one, using a clone
 section in the spec. There are two options here:
 
 * Clone directly from a source cluster using `pg_basebackup`
-
 * Clone from an S3 bucket
 
 ### Clone directly
@@ -247,10 +245,10 @@ spec:
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
-cluster will be cloned from S3, using the latest backup before the
-`timestamp`. In this case, `uid` field is also mandatory - operator will use it
-to find a correct key inside an S3 bucket. You can find this field from
-metadata of a source cluster:
+cluster will be cloned from S3, using the latest backup before the `timestamp`.
+In this case, `uid` field is also mandatory - operator will use it to find a
+correct key inside an S3 bucket. You can find this field in the metadata of the
+source cluster:
 
 ```yaml
 apiVersion: acid.zalan.do/v1
@@ -263,7 +261,8 @@ metadata:
 Note that timezone is required for `timestamp`. Otherwise, offset is relative
 to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
-For non AWS S3 following settings can be set to support cloning from other S3 implementations:
+For non AWS S3 following settings can be set to support cloning from other S3
+implementations:
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -283,7 +282,12 @@ spec:
 
 ## Setting up a standby cluster
 
-Standby clusters are like normal cluster but they are streaming from a remote cluster. As the first version of this feature, the only scenario covered by operator is to stream from a wal archive of the master. Following the more popular infrastructure of using Amazon's S3 buckets, it is mentioned  as s3_wal_path here. To make a cluster as standby add a section standby in the YAML file as follows.
+Standby clusters are like normal cluster but they are streaming from a remote
+cluster. As the first version of this feature, the only scenario covered by
+operator is to stream from a WAL archive of the master. Following the more
+popular infrastructure of using Amazon's S3 buckets, it is mentioned as
+`s3_wal_path` here. To start a cluster as standby add the following `standby`
+section in the YAML file:
 
 ```yaml
 spec:
@@ -293,15 +297,24 @@ spec:
 
 Things to note:
 
-- An empty string is provided in s3_wal_path of the standby cluster will result in error and no statefulset will be created.
+- An empty string in the `s3_wal_path` field of the standby cluster will result
+  in an error and no statefulset will be created.
 - Only one pod can be deployed for stand-by cluster.
-- To manually promote the standby_cluster, use patronictl and remove config entry.
-- There is no way to transform a non-standby cluster to standby cluster through operator. Hence, if a cluster is created without standby section in YAML and later modified  by adding that section, there will be no effect on the cluster. However, it can be done through Patroni by adding the [standby_cluster] (https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster) section using patronictl edit-config. Note that the transformed standby cluster will not be doing any streaming, rather will just be in standby mode and allow read-only transactions only.
+- To manually promote the standby_cluster, use `patronictl` and remove config
+  entry.
+- There is no way to transform a non-standby cluster to a standby cluster
+  through the operator. Adding the standby section to the manifest of a running
+  Postgres cluster will have no effect. However, it can be done through Patroni
+  by adding the [standby_cluster] (https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster)
+  section using `patronictl edit-config`. Note that the transformed standby
+  cluster will not be doing any streaming. It will be in standby mode and allow
+  read-only transactions only.
 
 ## Sidecar Support
 
-Each cluster can specify arbitrary sidecars to run. These containers could be used for
-log aggregation, monitoring, backups or other tasks. A sidecar can be specified like this:
+Each cluster can specify arbitrary sidecars to run. These containers could be
+used for log aggregation, monitoring, backups or other tasks. A sidecar can be
+specified like this:
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -326,21 +339,21 @@ spec:
           value: "any-k8s-env-things"
 ```
 
-In addition to any environment variables you specify, the following environment variables
-are always passed to sidecars:
+In addition to any environment variables you specify, the following environment
+variables are always passed to sidecars:
 
   - `POD_NAME` - field reference to `metadata.name`
   - `POD_NAMESPACE` - field reference to `metadata.namespace`
   - `POSTGRES_USER` - the superuser that can be used to connect to the database
   - `POSTGRES_PASSWORD` - the password for the superuser
 
-The PostgreSQL volume is shared with sidecars and is mounted at `/home/postgres/pgdata`.
-
+The PostgreSQL volume is shared with sidecars and is mounted at
+`/home/postgres/pgdata`.
 
 ## InitContainers Support
 
-Each cluster can specify arbitrary init containers to run. These containers can be
-used to run custom actions before any normal and sidecar containers start.
+Each cluster can specify arbitrary init containers to run. These containers can
+be used to run custom actions before any normal and sidecar containers start.
 An init container can be specified like this:
 
 ```yaml
@@ -360,7 +373,6 @@ spec:
 ```
 
 `initContainers` accepts full `v1.Container` definition.
-
 
 ## Increase volume size
 
@@ -390,19 +402,26 @@ actions:
 
 * call AWS API to change the volume size
 
-* connect to the pod using `kubectl exec` and resize the filesystem with
-  `resize2fs`.
+* connect to pod using `kubectl exec` and resize filesystem with `resize2fs`.
 
 Fist step has a limitation, AWS rate-limits this operation to no more than once
-every 6 hours.
-Note that if the statefulset is scaled down before resizing the size changes
-are only applied to the volumes attached to the running pods. The size of the
-volumes that correspond to the previously running pods is not changed.
+every 6 hours. Note, that if the statefulset is scaled down before resizing the
+new size is only applied to the volumes attached to the running pods. The
+size of volumes that correspond to the previously running pods is not changed.
 
 ## Logical backups
 
-If you add
+You can enable logical backups from the cluster manifest by adding the following
+parameter in the spec section:
+
 ```
   enableLogicalBackup: true
 ```
-to the cluster manifest, the operator will create and sync a k8s cron job to do periodic logical backups of this particular Postgres cluster. Due to the [limitation of Kubernetes cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations) it is highly advisable to set up additional monitoring for this feature; such monitoring is outside of the scope of operator responsibilities. See [configuration reference](reference/cluster_manifest.md) and [administrator documentation](administrator.md) for details on how backups are executed.
+
+The operator will create and sync a K8s cron job to do periodic logical backups
+of this particular Postgres cluster. Due to the [limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
+it is highly advisable to set up additional monitoring for this feature; such
+monitoring is outside the scope of operator responsibilities. See
+[configuration reference](reference/cluster_manifest.md) and
+[administrator documentation](administrator.md) for details on how backups are
+executed.

@@ -50,9 +50,9 @@ The following environment variables are accepted by the operator:
   `scalyr_api_key` operator parameter.
 
 * **CRD_READY_WAIT_TIMEOUT**
-  defines the timeout for the complete postgres CRD creation. When not set
+  defines the timeout for the complete `postgresql` CRD creation. When not set
   default is 30s.
 
 * **CRD_READY_WAIT_INTERVAL**
-  defines the  interval between consecutive attempts waiting for the postgres
-  CRD to be created. The default is 5s.
+  defines the  interval between consecutive attempts waiting for the
+  `postgresql` CRD to be created. The default is 5s.

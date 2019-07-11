@@ -243,7 +243,7 @@ serviceAccount:
   create: true
   # The name of the ServiceAccount to use.
   # If not set and create is true, a name is generated using the fullname template
-  # When relying solely on the OperatorConfiguration CRD, set this value to "operator"
+  # When relying solely on the OperatorConfiguration CRD, this value has to be "operator"
   # Otherwise, the operator tries to use the "default" service account which is forbidden
   name: operator
 
