@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>PostgreSQL Operator UI</title>
+
+
+    <!-- fonts -->
+
+    <link
+      href="https://fonts.googleapis.com/css?family=Open+Sans|Roboto:300,400"
+      rel="stylesheet"
+    >
+
+
+    <!-- bootstrap -->
+
+    <link
+      crossorigin="anonymous"
+      href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.min.css"
+      integrity="sha256-916EbMg70RQy9LHiGkXzG8hSg9EdNy97GazNG/aiY1w="
+      rel="stylesheet"
+    >
+
+    <link
+      crossorigin="anonymous"
+      href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap-theme.min.css"
+      integrity="sha256-ZT4HPpdCOt2lvDkXokHuhJfdOKSPFLzeAJik5U/Q+l4="
+      rel="stylesheet"
+    >
+
+
+    <!-- other -->
+
+    <link
+      crossorigin="anonymous"
+      href="https://cdnjs.cloudflare.com/ajax/libs/blaze/3.5.2/blaze.min.css"
+      integrity="sha256-5n+FnqayL2YJQucWyxvz4SzjhRqcKvgWE/sh/4FbPao="
+      rel="stylesheet"
+    >
+
+    <link
+      crossorigin="anonymous"
+      href="https://cdnjs.cloudflare.com/ajax/libs/spinkit/1.2.5/spinkit.min.css"
+      integrity="sha256-JLf+H3os8xYfw2Iaq4Nv8MG6dVn1gPNv4EhSWnYG3rc="
+      rel="stylesheet"
+    />
+
+    <link
+      crossorigin="anonymous"
+      href="https://cdnjs.cloudflare.com/ajax/libs/jquery-confirm/3.3.2/jquery-confirm.min.css"
+      integrity="sha256-mAmp1v6ERknmeP2oHZG53W1L+zOdSVsM25WvmZ4U+fU="
+      rel="stylesheet"
+    >
+
+    <link
+      crossorigin="anonymous"
+      href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.css"
+      integrity="sha256-I1UoFd33KHIydu88R9owFaQWzwkiZV4hXXug5aYaM28="
+      rel="stylesheet"
+    >
+
+
+    <!-- self-hosted -->
+    <link href="/css/styles.css" rel="stylesheet">
+    <link href="/css/prism.css" rel="stylesheet">
+    <link href="/favicon.png" rel="icon" type="image/png">
+
+  </head>
+
+  <script>
+    String.prototype.format = function() {
+      var formatted = this;
+      for(arg in arguments) {
+        formatted = formatted.replace("{" + arg + "}", arguments[arg]);
+      }
+      return formatted;
+    };
+  </script>
+
+  <body>
+    <app></app>
+
+
+    <!-- jQuery -->
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+      src="https://code.jquery.com/jquery-3.2.1.min.js"
+    >
+    </script>
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-0Uz1UklrpANuwqJ7M0Z54jiOE/GZwlp2EBSC6slw6j8="
+      src="https://cdnjs.cloudflare.com/ajax/libs/jquery-confirm/3.3.2/jquery-confirm.min.js"
+    >
+    </script>
+
+
+    <!-- riotjs -->
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-L1wbqR0vvN36EcDq7wNvFk+uWm9WrMAFgSQAheWqu1g="
+      src="https://cdnjs.cloudflare.com/ajax/libs/riot/3.9.1/riot.min.js"
+    >
+    </script>
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-dQVFCNWwV4WTuFCMRXLhLIITUiPzYul+Fz35TrYSbGQ="
+      src="https://cdn.jsdelivr.net/npm/riot-route@3.1.3/dist/route+tag.min.js"
+    >
+    </script>
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-EGKMPXH/+n6AHqghd+K5zE3e25X6hIIY0tG30ebuv4g="
+      src="https://cdn.jsdelivr.net/npm/riotgear@3.5.0/dist/rg.min.js"
+    ></script>
+
+
+    <!-- other -->
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+      src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+    >
+    </script>
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-Daf8GuI2eLKHJlOWLRR/zRy9Clqcj4TUSumbxYH9kGI="
+      src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.7.1/clipboard.min.js"
+    >
+    </script>
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-0JaDbGZRXlzkFbV8Xi8ZhH/zZ6QQM0Y3dCkYZ7JYq34="
+      src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.10/handlebars.min.js"
+    >
+    </script>
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-vBJO3VoZ+1/7RMqHp9ENExY+RwfXHhi0WhX2uIOS5c0="
+      src="https://cdnjs.cloudflare.com/ajax/libs/humanize-duration/3.12.1/humanize-duration.js"
+    >
+    </script>
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-wzBMoYcU9BZfRm6cQLFii4K5tkNptkER9p93W/vyCqo="
+      src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.21.0/moment-with-locales.min.js"
+    >
+    </script>
+
+    <script
+      crossorigin="anonymous"
+      integrity="sha256-ff7iz7mLH5QJA9IUC44b+sqjMi7c2aTR9YO2DSzAGZo="
+      src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.js"
+    >
+    </script>
+
+
+    <!-- self-hosted -->
+    <script src="/js/prism.js"></script>
+    <script src="/js/build/app.js"></script>
+
+    {% if google_analytics %}
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="{{ gtag }}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', '{{ google_analytics }}');
+    </script>
+    {% endif %}
+
+  </body>
+</html>

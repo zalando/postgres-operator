@@ -1,4 +1,4 @@
-## Command-line options
+# Command-line options
 
 The following command-line options are supported for the operator:
 

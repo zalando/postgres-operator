@@ -1,0 +1,29 @@
+help-edit
+
+  h2 Help
+
+  .well
+
+    h3(style='margin-top: 0')
+      | Docs
+
+    a(href="{ opts.config.docs_link }")
+      | more...
+
+    h3 Editing
+
+    p.
+      The text box shows you the properties that can currently edit. Verify that the preview shows a valid part of the spec before submitting.  After a successful submit the changes may take some time to be applied.
+
+    h3 Volume size
+
+    p.
+      You need to specify in format "123Gi". You can only increase the volume size. You can only increase volume size once very 6 hours, per AWS limitation.
+
+    virtual(
+      if='{ opts.config.static_network_whitelist && Object.keys(opts.config.static_network_whitelist).length > 0 }'
+    )
+      h3 IP Ranges
+
+      // Raw tags are required here, as otherwise either riotjs removes space it shouldn't, or pugjs adds space it shouldn't.  And it has to be all in one line, as it has to be a pre tag (otherwise the riotjs compiler breaks the whitespace).
+      <pre><virtual each="{ network, network_index in Object.keys(opts.config.static_network_whitelist) }"><virtual if="{ network_index > 0 }"><br></virtual>    # { network }<br><virtual each="{ range, range_index in opts.config.static_network_whitelist[network] }">    - { range }<virtual if="index < network.length - 1"><br></virtual></virtual></virtual></pre>

@@ -1,0 +1,14 @@
+Flask-OAuthlib==0.9.5
+Flask==1.0.2
+backoff==1.5.0
+boto3==1.5.14
+boto==2.48.0
+click==6.7
+furl==1.0.1
+gevent==1.2.2
+jq==0.1.6
+json_delta>=2.0
+kubernetes==3.0.0
+requests==2.20.1
+stups-tokens>=1.1.19
+wal_e==1.1.0

@@ -313,7 +313,7 @@ empty sequence `[]`. Setting the field to `null` or omitting it entirely may
 lead to K8s removing this field from the manifest due to its
 [handling of null fields](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes).
 Then the resultant manifest will not contain the necessary change, and the
-operator will respectively do noting with the existing source ranges.
+operator will respectively do nothing with the existing source ranges.
 
 ## Running periodic 'autorepair' scans of K8s objects
 
@@ -409,3 +409,40 @@ A secret can be pre-provisioned in different ways:
 * Generic secret created via `kubectl create secret generic some-cloud-creds --from-file=some-cloud-credentials-file.json`
 * Automatically provisioned via a custom K8s controller like
   [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)
+
+## Setting up the Postgres Operator UI
+
+With the v1.2 release the Postgres Operator is shipped with a browser-based
+configuration user interface (UI) that simplifies managing Postgres clusters
+with the operator. The UI runs with Node.js and comes with it's own docker
+image.
+
+Run NPM to continuously compile `tags/js` code. Basically, it creates an
+`app.js` file in: `static/build/app.js`
+
+```
+(cd ui/app && npm start)
+```
+
+To build the Docker image open a shell and change to the `ui` folder. Then run:
+
+```
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.2.0 .
+```
+
+Apply all manifests for the `ui/manifests` folder to deploy the Postgres
+Operator UI on K8s. For local tests you don't need the Ingress resource.
+
+```
+kubectl apply -f ui/manifests
+```
+
+Make sure the pods for the operator and the UI are both running. For local
+testing you need to apply proxying and port forwarding so that the UI can talk
+to the K8s and Postgres Operator REST API. You can use the provided
+`run_local.sh` script for this. Make sure it uses the correct URL to your K8s
+API server, e.g. for minikube it would be `https://192.168.99.100:8443`.
+
+```
+./run_local.sh
+```

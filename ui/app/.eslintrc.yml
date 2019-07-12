@@ -1,0 +1,27 @@
+parserOptions:
+  sourceType: module
+env:
+  browser: true
+  node: true
+  es6: true
+extends: 'eslint:recommended'
+rules:
+  indent:
+    - error
+    - 4
+  linebreak-style:
+    - error
+    - unix
+  quotes:
+    - error
+    - single
+  prefer-const:
+    - error
+  no-redeclare:
+    - error
+  no-unused-vars:
+    - warn
+    - argsIgnorePattern: "^_"
+  semi:
+    - error
+    - never

@@ -1,0 +1,205 @@
+edit
+  .container-fluid
+
+    h1.page-header
+      nav(aria-label="breadcrumb")
+        ol.breadcrumb
+
+          li.breadcrumb-item
+            a(href='/#/list')
+              | PostgreSQL clusters
+
+          li.breadcrumb-item(if='{ cluster_path }')
+            a(href='/#/status/{ cluster_path }')
+              | { qname }
+
+          li.breadcrumb-item.active(
+            aria-current='page'
+            if='{ cluster_path }'
+          )
+            a(href='/#/edit/{ cluster_path }')
+              | Edit
+
+    .row(if='{ cluster_path }')
+
+      .col-lg-4
+        h2 Cluster YAML definition
+        div
+          pre
+            code.language-yaml(ref='yamlNice')
+
+      div
+        .col-lg-5
+
+          h3 Edit supported properties
+          textarea.textarea(
+            style='width: 100%; height: 200px; font-family: monospace'
+            ref='changedProperties'
+            onkeyup='{ updateEditable }'
+            onchange='{ updateEditable }'
+          )
+            | { editablePropertiesText }
+
+          h3 Preview changes to spec
+          pre
+            code.language-yaml(ref='yamlEditable')
+              | { editablePropertiesPreview }
+
+          button.btn.btn-success(
+            if='{ opts.read_write }'
+            value='Save changes'
+            onclick='{ saveChanges }'
+          )
+            | Apply changes
+
+          .alert.alert-danger(if='{ saveResult === false }')
+            b Error
+            |
+            | { saveMessage }
+
+          .alert.alert-success(if='{ saveResult === true }')
+            b Changes applied
+            |
+            | updates to cluster pending
+
+        .col-lg-3
+          help-edit(config='{ opts.config }')
+
+  script.
+
+    const yamlParser = require('js-yaml')
+
+    this.updateEditable = e => {
+      if (this.refs.changedProperties.value) {
+        this.editablePropertiesPreview = yamlParser.safeDump(
+          yamlParser.safeLoad(
+            this.refs.changedProperties.value,
+          ),
+        )
+      }
+    }
+
+    this.saveChanges = e => {
+      this.saving = true
+      this.saveResult = null
+      this.saveMessage = ''
+
+      jsonPayload = JSON.stringify(
+        yamlParser.safeLoad(
+          this.refs.changedProperties.value,
+        ),
+      )
+
+      jQuery.ajax({
+        type: 'POST',
+        url: '/postgresqls/' + this.cluster_path,
+        contentType:"application/json",
+        data: jsonPayload,
+        processData: false,
+        success: ()=> {
+          this.saveResult = true
+          this.update()
+          this.pollProgress()
+        },
+        error: (r, status, error) => {
+          this.saveResult = false
+          this.saveMessage = r.responseJSON.error
+          this.update()
+          this.pollProgress()
+        },
+        dataType: "json",
+      })
+    }
+
+    this.pollProgress = () => {
+      jQuery.get(
+        '/postgresqls/' + this.cluster_path,
+      ).then(data => {
+
+        // Input data:
+        const i = {}
+        this.progress.thirdParty = true
+        i.postgresql = this.progress.thirdPartySpec = data
+        i.metadata = i.postgresql.metadata
+        i.spec = i.postgresql.spec
+
+        if (i.metadata.selfLink) { delete i.metadata.selfLink }
+        if (i.metadata.uid) { delete i.metadata.uid }
+        if (i.metadata.resourceVersion) { delete i.metadata.resourceVersion }
+
+        this.update()
+        this.refs.yamlNice.innerHTML = yamlParser.safeDump(i.postgresql, {sortKeys: true})
+
+        // Output data:
+        const o = this.editableProperties = { spec: {} }
+
+        o.spec.allowedSourceRanges = i.spec.allowedSourceRanges || []
+        o.spec.numberOfInstances = i.spec.numberOfInstances
+        o.spec.enableMasterLoadBalancer = i.spec.enableMasterLoadBalancer || false
+        o.spec.enableReplicaLoadBalancer = i.spec.enableReplicaLoadBalancer || false
+        o.spec.volume = { size: i.spec.volume.size }
+
+        if ('users' in i.spec && typeof i.spec.users === 'object') {
+          o.spec.users = Object.mapValues(i.spec.users, roleFlags =>
+            !Array.isArray(roleFlags)
+            ? []
+            : roleFlags.filter(roleFlag => typeof roleFlag === 'string')
+          )
+        }
+
+        if ('databases' in i.spec && typeof i.spec.databases === 'object') {
+          o.spec.databases = Object.filterValues(i.spec.databases, owner =>
+            typeof owner === 'string'
+          )
+        }
+
+        if ('resources' in i.spec && typeof i.spec.resources === 'object') {
+          o.spec.resources = {};
+          ['limits', 'requests'].forEach(section => {
+            const resources = i.spec.resources[section]
+            o.spec.resources[section] = {}
+            if (typeof resources === 'object') {
+              [
+                'cpu',
+                'memory',
+              ].forEach(resourceType => {
+                if (resourceType in resources) {
+                  const resourceClaim = resources[resourceType]
+                  if (typeof resourceClaim === '') {
+                    o.spec.resources[section][resourceType] = resources[resourceType]
+                  }
+                }
+              })
+            }
+          })
+        }
+
+        this.editablePropertiesText = (
+          yamlParser
+          .safeDump(this.editableProperties)
+          .slice(0, -1)
+        )
+        this.editablePropertiesPreview = this.editablePropertiesText
+
+        this.update()
+      })
+    }
+
+    this.on('mount', () => {
+      const namespace = this.namespace = this.opts.namespace
+      const clustername = this.clustername = this.opts.clustername
+      const qname = this.qname = namespace + '/' + clustername
+      const cluster_path = this.cluster_path = (
+        encodeURI(namespace)
+        + '/' + encodeURI(clustername)
+      )
+      this.progress = {
+        requestStatus: 'OK',
+      }
+      this.pollProgress()
+    })
+
+    this.on('updated', () => {
+      this.refs.yamlEditable.innerHTML = this.editablePropertiesPreview
+      Prism.highlightAll()
+    })

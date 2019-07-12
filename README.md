@@ -28,6 +28,7 @@ There is a browser-friendly version of this documentation at
 
 * [How it works](docs/index.md)
 * [The Postgres experience on K8s](docs/user.md)
+* [The Postgres Operator UI](docs/operator-ui.md)
 * [DBA options - from RBAC to backup](docs/administrator.md)
 * [Debug and extend the operator](docs/developer.md)
 * [Configuration options](docs/reference/operator_parameters.md)
