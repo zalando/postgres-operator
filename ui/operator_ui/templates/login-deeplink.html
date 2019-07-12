@@ -1,0 +1,13 @@
+<html>
+    <head>
+        <title>Storing client location ...</title>
+    </head>
+    <body>
+        <script language="javascript">
+            if (document.location.hash != null && document.location.hash != "") {
+                localStorage.setItem("login-url-hash", document.location.hash)
+            }
+            window.location.href = document.location.pathname + "?redirect=1"
+        </script>
+    </body>
+</html>

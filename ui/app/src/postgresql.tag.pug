@@ -1,0 +1,219 @@
+postgresql
+  .container-fluid
+
+    h1.page-header
+      nav(aria-label='breadcrumb')
+        ol.breadcrumb
+
+          li.breadcrumb-item
+            a(href='/#/list')
+              | PostgreSQL clusters
+
+          li.breadcrumb-item(if='{ cluster_path }')
+            a(href='/#/status/{ cluster_path }')
+              | { qname }
+
+    .row(if='{ cluster_path }')
+
+      .col-lg-3
+        h2 Cluster YAML definition
+
+        div(if='{ progress.postgresql }')
+          <pre><code ref="yamlNice" class="language-yaml"></code></pre>
+
+        pre(if='{ !progress.postgresql }')
+          code # Loading
+
+        virtual(if='{ uid }')
+          h3 Cluster UID
+          code { uid }
+
+      .col-lg-6
+
+        div
+
+          .btn-toolbar.pull-right
+            .btn-group(
+              aria-label='Actions'
+              role='group'
+            )
+
+              a.btn.btn-info(
+                href='/#/logs/{ cluster_path }'
+              )
+                | Logs
+
+              a.btn(
+                class='btn-{ opts.read_write ? "primary" : "info" }'
+                if='{ progress.postgresql }'
+                href='/#/clone/{ clustername }/{ uid }/{ encodeURI(new Date().toISOString()) }'
+              )
+                | Clone
+
+              a.btn(
+                class='btn-{ opts.read_write ? "warning" : "info" }'
+                href='/#/edit/{ cluster_path }'
+              )
+                | Edit
+
+              button.btn.btn-danger(
+                if='{ opts.read_write }'
+                onclick='{ delete_cluster }'
+              )
+                | Delete
+
+          h2 Checking status of cluster
+
+        .progress
+          .progress-bar.progress-bar-success(style='width: 20%' if='{ progress.requestStatus === "OK" || progress.masterLabel }')
+          .progress-bar.progress-bar-success(style='width: 20%' if='{ progress.postgresql }')
+          .progress-bar.progress-bar-success(style='width: 20%' if='{ progress.statefulSet }')
+          .progress-bar.progress-bar-success(style='width: 20%' if='{ progress.containerFirst }')
+          .progress-bar.progress-bar-success(style='width: 20%' if='{ progress.masterLabel }')
+          .progress-bar.progress-bar-info.progress-bar-striped.active(if='{ !progress.masterLabel }' style='width: 10%')
+
+        .alert.alert-info(if='{ !progress.requestStatus }') PostgreSQL cluster requested
+        .alert.alert-danger(if='{ progress.requestStatus !== "OK" }') Create request failed
+        .alert.alert-success(if='{ progress.requestStatus === "OK" }') Create request successful ({ new Date(progress.createdTimestamp).toLocaleString() })
+
+        .alert.alert-info(if='{ !progress.statefulSet }') StatefulSet pending
+        .alert.alert-success(if='{ progress.statefulSet }') StatefulSet created
+
+        .alert.alert-info(if='{ progress.statefulSet && !progress.containerFirst }') Waiting for 1st container to spawn
+        .alert.alert-success(if='{ progress.containerFirst }') First PostgreSQL cluster container spawned
+
+        .alert.alert-info(if='{ !progress.postgresql }') PostgreSQL cluster manifest pending
+        .alert.alert-success(if='{ progress.postgresql }') PostgreSQL cluster manifest created
+
+        .alert.alert-info(if='{ progress.containerFirst && !progress.masterLabel }') Waiting for master to become available
+        .alert.alert-success(if='{ progress.masterLabel }') PostgreSQL master available, label is attached
+        .alert.alert-success(if='{ progress.masterLabel && progress.dnsName }') PostgreSQL ready: <strong>{ progress.dnsName }</strong>
+
+      .col-lg-3
+        help-general(config='{ opts.config }')
+
+  script.
+
+    var yamlParser = require('js-yaml')
+
+    this.delete_cluster = _ => this.parent.opts.delete_cluster(
+      this.namespace,
+      this.clustername,
+    )
+
+    this.progress = {}
+    this.progress.requestStatus = 'OK'
+
+    this.pollProgressTimer = false
+
+    this.startPollProgress = () => {
+      this.pollProgressTimer = setInterval(this.pollProgress, 10000)
+    }
+
+    this.stopPollProgress = () => {
+      clearInterval(this.pollProgressTimer)
+      this.pollProgressTimer = false
+    }
+
+    this.pollProgress = () => {
+      jQuery.get(
+        '/postgresqls/' + this.cluster_path,
+      ).done(data => {
+        this.progress.postgresql = true
+        this.progress.postgresqlManifest = data
+        this.progress.createdTimestamp = data.metadata.creationTimestamp
+        this.uid = this.progress.postgresqlManifest.metadata.uid
+        this.update()
+
+        jQuery.get(
+          '/statefulsets/' + this.cluster_path,
+        ).done(data => {
+          this.progress.statefulSet = true
+          this.update()
+
+          jQuery.get(
+            '/statefulsets/' + this.cluster_path + '/pods',
+          ).done(data => {
+            if (data.length > 0) {
+                this.progress.containerFirst = true
+            }
+
+            masters = data.filter((x) => { return x.labels['spilo-role'] === 'master'} )
+            if (masters.length === 1) {
+                this.progress.masterLabel = true
+            }
+
+            this.update()
+
+            jQuery.get(
+              '/services/' + this.cluster_path,
+            ).done(data => {
+              if (data.metadata && data.metadata.annotations && 'zalando.org/dnsname' in data.metadata.annotations) {
+                this.progress.dnsName = data.metadata.annotations['zalando.org/dnsname']
+              } else if (data.metadata && data.metadata.annotations && 'external-dns.alpha.kubernetes.io/hostname' in data.metadata.annotations) {
+                this.progress.dnsName = data.metadata.annotations['external-dns.alpha.kubernetes.io/hostname']
+              } else {
+                // Kubernetes Service name should resolve
+                this.progress.dnsName = data.metadata.name + '.' + data.metadata.namespace
+              }
+
+              this.update()
+            })
+          })
+        })
+      })
+    }
+
+    this.on('mount', () => {
+      this.uid = undefined
+      const namespace = this.namespace = this.opts.namespace
+      const clustername = this.clustername = this.opts.clustername
+      const qname = this.qname = namespace + '/' + clustername
+      const cluster_path = this.cluster_path = (
+        encodeURI(namespace)
+        + '/' + encodeURI(clustername)
+      )
+      this.stopPollProgress()
+      this.pollProgress()
+      this.startPollProgress()
+    })
+
+    this.on('unmount', () =>
+      this.stopPollProgress()
+    )
+
+    this.on('update', () => {
+      if (this.progress.postgresqlManifest) {
+        const manifest = this.progress.postgresqlManifest
+
+        const last_applied = 'kubectl.kubernetes.io/last-applied-configuration'
+        if (manifest.metadata.annotations) {
+          delete manifest.metadata.annotations[last_applied]
+        }
+
+        delete manifest.metadata.creationTimestamp
+        delete manifest.metadata.deletionGracePeriodSeconds
+        delete manifest.metadata.deletionTimestamp
+        delete manifest.metadata.generation
+        delete manifest.metadata.resourceVersion
+        delete manifest.metadata.selfLink
+        delete manifest.metadata.uid
+        delete manifest.status
+
+        if (this.refs.yamlNice) {
+          this.refs.yamlNice.innerHTML = yamlParser.safeDump(
+            this.progress.postgresqlManifest,
+            {
+              sortKeys: true,
+            },
+          )
+        }
+
+      } else {
+        if(this.refs.yamlNice) {
+          this.refs.yamlNice.innerHTML = '# Loading postgresql cluster manifest'
+        }
+      }
+
+      Prism.highlightAll()
+    })

@@ -1,0 +1,472 @@
+restore
+  .container-fluid
+
+    .sk-spinner-pulse(if='{ stored_clusters === undefined }')
+
+    p(if='{ stored_clusters === null }')
+      | Error loading stored clusters.  Please
+      |
+      a(onclick="window.location.reload(true);") try again
+      |
+      | or
+      |
+      a(href="/") start over
+      | .
+
+    p(if='{ stored_clusters && stored_clusters.length === 0 }')
+      | No stored clusters found.
+
+    div(if='{ stored_clusters && stored_clusters.length > 0 }')
+
+      h1.page-header
+        nav(aria-label='breadcrumb')
+          ol.breadcrumb
+
+            li.breadcrumb-item
+              a(href='/#/backups')
+                | PostgreSQL cluster backups ({ stored_clusters.length })
+
+      p
+        | Search:
+        |
+        input(
+          each='{ [filter] }'
+          type='text'
+          onchange='{ edit }'
+          onkeyup='{ edit }'
+          value='{ state }'
+        )
+
+      .stored-clusters.panel-group.collapsible
+        .stored-clusters.panel.panel-default.collapsible(
+          each='{ stored_clusters }'
+          hidden='{ !name.includes(filter.state) }'
+        )
+
+          .stored-clusters.panel-heading.collapsible(
+            id='{ id }-head'
+            class='{ collapsed ? "collapsed" : "" }'
+            data-toggle='collapse'
+            data-target='#{ id }-collapse'
+          )
+            a.panel-title.collapsible
+              | { name }
+
+          .stored-clusters.panel-collapse.collapse.collapsible(
+            id='{ id }-collapse'
+            data-stored-clusters='{ name }'
+          )
+            .stored-clusters.panel-body.collapsible(id='{ id }-body')
+
+              .sk-spinner-pulse(if='{ versions === undefined }')
+
+              p(if='{ versions === null }')
+                | Error loading backups.  Please try again or
+                |
+                a(href="/") start over
+                | .
+
+              p(if='{ versions && versions.length === 0 }')
+                | No backups found.
+
+              div(if='{ versions && versions.length > 0 }')
+
+                .versions.panel-group.collapsible(style='margin-top: 0.3em')
+                  .versions.panel.panel-default.collapsible(each='{ versions }')
+
+                    .versions.panel-heading.collapsible(
+                      id='{ id }-head'
+                      class='{ collapsed ? "collapsed" : "" }'
+                      data-toggle='collapse'
+                      data-target='#{ id }-collapse'
+                    )
+                      a.versions.panel-title.collapsible
+                        | { name }
+
+                    .versions.panel-collapse.collapse.collapsible(
+                      id='{ id }-collapse'
+                      data-stored-clusters='{ parent.name }'
+                      data-versions='{ name }'
+                    )
+
+                      .versions.panel-body.collapsible(id='{ id }-body')
+
+                        .sk-spinner-pulse(if='{ basebackups === undefined }')
+
+                        p(if='{ basebackups === null }')
+                          | Error loading snapshots.  Please try again or
+                          |
+                          a(href="/") start over
+                          | .
+
+                        p(if='{ basebackups && basebackups.length === 0 }')
+                          | No snapshots found.
+
+                        div(if='{ basebackups && basebackups.length > 0 }')
+
+                          div(
+                            style='margin-bottom: 0.3em'
+                          )
+
+                            .pull-left(style='margin-right: 0.3em')
+                              button.btn.btn-primary.pull-left(
+                                id='{ id }-clone'
+                              )
+                                | Clone at latest state
+
+                            div
+                              .input-group
+                                .input-group-btn
+                                  button.btn.btn-info(id='{ id }-pitr')
+                                    | Clone at
+                                .input.form-control(type='text')
+                                  | { clone_time && to_clone_time(clone_time) }
+
+                          .timeline(id='{ id }-timeline')
+
+                          .basebackups.panel-group.collapsible(style='margin-top: 0.3em')
+                            .basebackups.panel.panel-default.collapsible(
+                              each='{ basebackups }'
+                            )
+
+                              .basebackups.panel-heading.collapsible(
+                                id='{ id }-head'
+                                class='{ collapsed ? "collapsed" : "" }'
+                                data-toggle='collapse'
+                                data-target='#{ id }-collapse'
+                              )
+                                a.basebackups.panel-title.collapsible
+                                  | { relative_time(last_modified) }
+                                span.label.label-success(
+                                  if='{ index === basebackups.length - 1 }'
+                                  style='margin-left: 0.5em'
+                                )
+                                  | latest snapshot
+
+                              .basebackups.panel-collapse.collapse.collapsible(
+                                id='{ id }-collapse'
+                                data-stored-clusters='{ parent.parent.name }'
+                                data-versions='{ parent.name }'
+                                data-backups='{ name }'
+                              )
+
+                                .basebackups.panel-body.collapsible(id='{ id }-body')
+
+                                  table.basebackups.table
+
+                                    tr
+                                      th Name
+                                      td { name }
+
+                                    tr
+                                      th Size
+                                      td { expanded_size_bytes }
+
+                                    tr
+                                      th Last modified
+                                      td { relative_time(last_modified) }
+
+                                    tr
+                                      th WAL segment backup start
+                                      td { wal_segment_backup_start }
+
+                                    tr
+                                      th WAL segment backup stop
+                                      td { wal_segment_backup_stop }
+
+                                    tr
+                                      th WAL segment offset backup start
+                                      td { wal_segment_offset_backup_start }
+
+                                    tr
+                                      th WAL segment offset backup stop
+                                      td { wal_segment_offset_backup_stop }
+
+                                  button.btn.btn-info(
+                                    id='{ id }-restore'
+                                  )
+                                    | Clone at this snapshot
+
+
+  script.
+
+    const sort_by = require('sort-by')
+
+    // Pass a refresh callback for this tag to the options constructor argument
+    // used for all Dynamic objects built in this tag:
+    const add_refresh = object => Object.assign(
+      {},
+      object,
+      { refresh: () => this.update() }
+    )
+    const Dynamic = options => this.parent.opts.Dynamic(add_refresh(options))
+
+    const filter = this.filter = Dynamic()
+
+    const to_timestamp = this.to_timestamp = time => (
+      time
+      .replace('T', ' ')
+      .replace('.000Z', '')
+    )
+
+    const trunc_timestamp = this.trunc_timestamp = time => (
+      Math.trunc(time / 1000) * 1000
+    )
+
+    const to_clone_time = this.to_clone_time = time => to_timestamp(
+      new Date(trunc_timestamp(time))
+      .toISOString()
+    )
+
+    const min = (a, b) => a <= b ? a : b
+    const max = (a, b) => a >= b ? a : b
+    const minimum = array => array.reduce(min)
+    const maximum = array => array.reduce(max)
+    const both = (f, g, x) => [f(x), g(x)]
+
+    const setting = property => (object, value) => {
+      object[property] = value
+      return object
+    }
+
+    const load_time = this.load_time = +new Date()
+    const relative_time = this.relative_time = time => {
+      const relative = humanizeDuration(
+        trunc_timestamp(load_time)
+        - Date.parse(time)
+      )
+      return `${to_timestamp(time)} UTC (${relative} ago)`
+    }
+
+    const q = selector => jQuery(selector, this.root)
+
+    const route_on_click = (selector, target) => (
+      q(selector).on('click', event =>
+        route(target(event).join('/'))
+      )
+    )
+
+    const on_collapse = action => (
+      ({
+        klass,
+        collection,
+        predicate = () => true,
+        selector_prefix = '',
+        body,
+      }) => (
+        q(`${selector_prefix}.${klass}.collapse`)
+        .on(
+          action + '.bs.collapse',
+          event => {
+            if (!(
+              event.target.classList.contains(klass)
+              && predicate(event.target.dataset)
+            )) {
+              return true
+            }
+            const target = collection.find(item =>
+              item.name === event.target.getAttribute('data-' + klass)
+            )
+            target['collapsed'] = action === 'hide'
+            body(target)
+            this.update()
+          },
+        )
+      )
+    )
+
+    const collapsible_handlers = options => {
+      on_collapse('hide')(Object.assign({}, options, { body: _ => {}}))
+      on_collapse('show')(options)
+    }
+
+    const get_subresources_once = ({
+      parent_resource,
+      key,
+      url,
+      body,
+      build_subresource = subresource => subresource,
+      build_subresources = subresources => subresources,
+    }) => {
+      if (parent_resource[key] === undefined) {
+        (
+          jQuery
+          .get(url)
+          .done(values => {
+            parent_resource[key] = (
+              build_subresources(values)
+              .map(build_subresource)
+            )
+            this.update()
+            body(parent_resource[key])
+          })
+          .fail(() => parent_resource[key] = null)
+          .always(() => this.update())
+        )
+      }
+    }
+
+    this.stored_clusters = undefined
+
+    this.on('mount', () =>
+      get_subresources_once({
+        parent_resource: this,
+        key: 'stored_clusters',
+        url: '/stored_clusters',
+        build_subresource: stored_cluster_name => ({
+          id: 'stored-cluster-' + stored_cluster_name,
+          name: stored_cluster_name,
+          collapsed: true,
+        }),
+        body: stored_clusters => collapsible_handlers({
+          klass: 'stored-clusters',
+          collection: stored_clusters,
+          body: stored_cluster => get_subresources_once({
+            parent_resource: stored_cluster,
+            key: 'versions',
+            url: '/stored_clusters/' + stored_cluster.name,
+            build_subresource: version_name => ({
+              id: stored_cluster.id + '-version-' + version_name,
+              name: version_name,
+              collapsed: true,
+              stored_cluster: stored_cluster,
+            }),
+            body: versions => collapsible_handlers({
+              klass: 'versions',
+              collection: versions,
+              selector_prefix: `#${stored_cluster.id}-collapse `,
+              predicate: data => stored_cluster.name === data.storedClusters,
+              body: version => get_subresources_once({
+                parent_resource: version,
+                key: 'basebackups',
+                url: (
+                  '/stored_clusters/' + stored_cluster.name
+                  + '/' + version.name
+                ),
+                build_subresource: basebackup => Object.assign(basebackup, {
+                    id: version.id + '-basebackup-' + basebackup.name,
+                }),
+                build_subresources: basebackups => (
+                  basebackups
+                  .sort(sort_by('last_modified'))
+                  .map(setting('index'))
+                ),
+                body: basebackups => {
+                  if (basebackups.length === 0) {
+                    return
+                  }
+
+                  const basebackup_age = basebackup => (
+                    +new Date(basebackup.last_modified)
+                  )
+
+                  const oldest = version.basebackups[0]
+                  const newest = version.basebackups[
+                    version.basebackups.length - 1
+                  ]
+                  const [start, end] = both(
+                    maximum,
+                    minimum,
+                    [
+                      load_time,
+                      ...[oldest, newest].map(basebackup_age),
+                    ],
+                  )
+                  const span = end - start
+                  const padding_time = 0.1 * span
+
+                  basebackups.forEach(basebackup => {
+                    route_on_click(
+                      '#' + basebackup.id + '-restore',
+                      () => [
+                        '/clone',
+                        encodeURI(stored_cluster.name),
+                        encodeURI(version.name),
+                        // TODO: Ideally, this should use the basebackup's end
+                        // LSN, not the S3 last modification timestamp. However,
+                        // the current implementation of the clone feature does
+                        // not allow specifying `recovery_target_lsn`.
+                        encodeURI(basebackup.last_modified),
+                      ],
+                    )
+                  })
+
+                  version.timeline = new vis.Timeline(
+                    q('#' + version.id + '-timeline')[0],
+                    new vis.DataSet([
+                      ...version.basebackups.map(
+                        basebackup => ({
+                          id: basebackup.index,
+                          content: (
+                            to_timestamp(basebackup.last_modified)
+                            .replace(' ', '<br>')
+                            + ' (UTC)'
+                          ),
+                          start: basebackup.last_modified,
+                        })
+                      ),
+                      {
+                        id: version.basebackups.length,
+                        content: 'now',
+                        start: load_time,
+                        type: 'point',
+                      }
+                    ]),
+                    {
+                      min: min - padding_time,
+                      max: max + 5 * padding_time,
+                      moment: time => vis.moment(time).utc(),
+                      clickToUse: true,
+                      moveable: true,
+                      zoomable: true,
+                      showCurrentTime: true,
+                    }
+                  )
+
+                  version.clone_time = trunc_timestamp(end - span / 3)
+                  version.timeline.addCustomTime(
+                    version.clone_time,
+                    'clone_time',
+                  )
+
+                  version.timeline.on('timechange', properties => {
+                    version.clone_time = +properties.time
+                    this.update()
+                  })
+
+                  version.timeline.on('select', selection =>
+                    version.basebackups.forEach(basebackup =>
+                      q('#' + basebackup.id + '-collapse').collapse(
+                        selection.items.includes(basebackup.index)
+                        ? 'show'
+                        : 'hide'
+                      )
+                    )
+                  )
+
+                  route_on_click(
+                    '#' + version.id + '-clone',
+                    () => [
+                      '/clone',
+                      encodeURI(stored_cluster.name),
+                      encodeURI(version.name),
+                      encodeURI(to_clone_time(load_time)),
+                    ],
+                  )
+
+                  route_on_click(
+                    '#' + version.id + '-pitr',
+                    () => [
+                      '/clone',
+                      encodeURI(stored_cluster.name),
+                      encodeURI(version.name),
+                      encodeURI(to_clone_time(version.clone_time)),
+                    ],
+                  )
+                },
+              }),
+            }),
+          }),
+        }),
+      })
+    )
