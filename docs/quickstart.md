@@ -54,9 +54,13 @@ kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and p
 kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
-When using kubectl 1.14 or newer the mentioned manifests could be also be
-bundled in one [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest.
+There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
+manifest that [combines the mentioned resources](../manifests/kustomization.yaml) - 
+it can be used with kubectl 1.14 or newer as easy as:
+
+```bash
+kubectl apply -k github.com/zalando/postgres-operator/manifests
+```
 
 For convenience, we have automated starting the operator with minikube using the
 `run_operator_locally` script. It applies the [`acid-minimal-cluster`](../manifests/minimal-postgres-manifest).
