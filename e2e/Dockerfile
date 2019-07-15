@@ -1,13 +1,11 @@
 FROM ubuntu:18.04
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
-WORKDIR /e2e
-
 COPY manifests ./manifests
-COPY e2e/requirements.txt e2e/tests ./
+COPY requirements.txt tests ./
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y \ 
+    && apt-get install --no-install-recommends -y \
            python3 \
            python3-setuptools \
            python3-pip \
@@ -18,5 +16,8 @@ RUN apt-get update \
     && mv ./kubectl /usr/local/bin/kubectl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+ARG VERSION=dev
+RUN sed -i "s/__version__ = .*/__version__ = '${VERSION}'/" ./__init__.py
 
 CMD ["python3", "-m", "unittest", "discover", "--start-directory", ".", "-v"]

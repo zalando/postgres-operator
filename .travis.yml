@@ -15,9 +15,9 @@ before_install:
   - go get github.com/mattn/goveralls
 
 install:
-  - make deps e2e-tools e2e-build
+  - make deps
 
 script:
   - hack/verify-codegen.sh
   - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -v
-  - make e2e-run
+  - make e2e

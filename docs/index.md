@@ -46,7 +46,7 @@ used to complement it.
 Here is a diagram, that summarizes what would be created by the operator, when a
 new Postgres cluster CRD is submitted:
 
-![postgresql-operator](diagrams/operator.png "K8S resources, created by operator")
+![postgresql-operator](diagrams/operator.png "K8s resources, created by operator")
 
 This picture is not complete without an overview of what is inside a single
 cluster pod, so let's zoom in:

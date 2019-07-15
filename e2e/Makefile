@@ -1,6 +1,6 @@
-.PHONY: clean test appjs docker push mock
+.PHONY: clean copy docker push tools test
 
-BINARY ?= postgres-operator-ui
+BINARY ?= postgres-operator-e2e-tests
 BUILD_FLAGS ?= -v
 CGO_ENABLED ?= 0
 ifeq ($(RACE),1)
@@ -19,24 +19,34 @@ GITURL           = $(shell git config --get remote.origin.url)
 GITSTATU         = $(shell git status --porcelain || echo 'no changes')
 TTYFLAGS         = $(shell test -t 0 && echo '-it')
 
-default: docker
+ifndef GOPATH
+	GOPATH := $(HOME)/go
+endif
+
+KIND_PATH := $(GOPATH)/bin
+PATH := $(GOPATH)/bin:$(PATH)
+
+default: tools
 
 clean:
-	rm -fr operator_ui/static/build
+	rm -fr manifests
 
-test:
-	tox
+copy: clean
+	mkdir manifests
+	cp ../manifests -r .
 
-appjs:
-	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:10.1.0-alpine npm install
-	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:10.1.0-alpine npm run build
-
-docker: appjs
+docker: copy
 	docker build --build-arg "VERSION=$(VERSION)" -t "$(IMAGE):$(TAG)" .
-	@echo 'Docker image $(IMAGE):$(TAG) can now be used.'
 
 push: docker
 	docker push "$(IMAGE):$(TAG)"
 
-mock:
-	docker run -it -p 8080:8080 "$(IMAGE):$(TAG)" --mock
+tools: docker
+	# install pinned version of 'kind'
+	# leave the name as is to avoid overwriting official binary named `kind`
+	wget https://github.com/kubernetes-sigs/kind/releases/download/v0.4.0/kind-linux-amd64
+	chmod +x kind-linux-amd64
+	mv kind-linux-amd64 $(KIND_PATH)
+
+test:
+	./run.sh
