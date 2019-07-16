@@ -307,8 +307,7 @@ class K8s:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_logical_backup_job(self, namespace='default'):
-        return self.api.batch_v1_beta1.list_namespaced_cron_job(
-            namespace, label_selector="application=spilo-logical-backup")
+        return self.api.batch_v1_beta1.list_namespaced_cron_job(namespace, label_selector="application=spilo")
 
     def wait_for_logical_backup_job(self, expected_num_of_jobs):
         while (len(self.get_logical_backup_job().items) != expected_num_of_jobs):
