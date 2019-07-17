@@ -1528,6 +1528,15 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Name:  "SCOPE",
 			Value: c.Name,
 		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
 		// Bucket env vars
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET",
