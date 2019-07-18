@@ -48,14 +48,14 @@ function aws_upload {
 function get_pods {
     declare -r SELECTOR="$1"
 
-    curl "${K8S_API_URL}/pods?$SELECTOR"        \
+    curl "${K8S_API_URL}/namespaces/${POD_NAMESPACE}/pods?$SELECTOR"        \
         --cacert $CERT                          \
         -H "Authorization: Bearer ${TOKEN}" | jq .items[].status.podIP -r
 }
 
 function get_current_pod {
-    curl "${K8S_API_URL}/pods?fieldSelector=metadata.name%3D${HOSTNAME}" \
-        --cacert $CERT                                                   \
+    curl "${K8S_API_URL}/namespaces/${POD_NAMESPACE}/pods?fieldSelector=metadata.name%3D${HOSTNAME}" \
+        --cacert $CERT   \
         -H "Authorization: Bearer ${TOKEN}"
 }
 

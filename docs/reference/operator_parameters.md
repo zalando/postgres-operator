@@ -277,7 +277,7 @@ configuration they are grouped under the `kubernetes` key.
   the same topology , e.g. node. The default is `false`.
 
 * **pod_antiaffinity_topology_key**
-  override [topology key](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels)
+  override [topology key](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#built-in-node-labels)
   for pod anti affinity. The default is `kubernetes.io/hostname`.
 
 * **pod_management_policy**
