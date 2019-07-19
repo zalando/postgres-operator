@@ -1,4 +1,4 @@
-# Administrator Guide
+<h1>Administrator Guide</h1>
 
 Learn how to configure and manage the Postgres Operator in your Kubernetes (K8s)
 environment.

@@ -1,4 +1,4 @@
-# Postgres Operator UI
+<h1>Postgres Operator UI</h1>
 
 The Postgres Operator UI provides a graphical interface for a convenient
 database-as-a-service user experience. Once the operator is set up by database
