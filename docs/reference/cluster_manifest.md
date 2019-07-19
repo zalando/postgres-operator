@@ -1,4 +1,4 @@
-# Cluster manifest reference
+<h1>Cluster manifest reference</h1>
 
 Individual Postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgresql` CRD (custom resource

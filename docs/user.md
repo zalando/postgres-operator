@@ -1,4 +1,4 @@
-# User Guide
+<h1>User Guide</h1>
 
 Learn how to work with the Postgres Operator in a Kubernetes (K8s) environment.
 

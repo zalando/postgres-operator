@@ -1,4 +1,4 @@
-# Developer Guide
+<h1>Developer Guide</h1>
 
 Read this guide if you want to debug the operator, fix bugs or contribute new
 features and tests.

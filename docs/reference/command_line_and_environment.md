@@ -28,7 +28,7 @@ flags](https://godoc.org/github.com/golang/glog) are also supported. For
 instance, one may want to add `-alsologtostderr` and `-v=8` to debug the
 operator REST calls.
 
-## Environment variables
+# Environment variables
 
 The following environment variables are accepted by the operator:
 

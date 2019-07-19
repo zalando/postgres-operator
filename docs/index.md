@@ -1,4 +1,4 @@
-# Concepts
+<h1>Concepts</h1>
 
 The Postgres [operator](https://coreos.com/blog/introducing-operators.html)
 manages PostgreSQL clusters on Kubernetes (K8s):
