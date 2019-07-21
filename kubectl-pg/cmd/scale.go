@@ -61,10 +61,6 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if numberOfInstances == 0 {
-		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter this serves to confirm the action\n", namespace, clusterName)
-		confirmAction(clusterName, namespace)
-	}
 	minInstances, maxInstances := allowedMinMaxInstances(config)
 	if minInstances == -1 && maxInstances == -1 {
 		postgresql.Spec.NumberOfInstances = numberOfInstances
@@ -74,7 +70,11 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		 maxInstances == -1 && numberOfInstances > postgresql.Spec.NumberOfInstances{
 		postgresql.Spec.NumberOfInstances = numberOfInstances
 	} else {
-		log.Fatal("cannot scale to the provided instances as they don't adhere to MIN_INSTANCES and MAX_INSTANCES provided in configmap or operatorconfiguration")
+		log.Fatalf("cannot scale to the provided instances as they don't adhere to MIN_INSTANCES: %v and MAX_INSTANCES: %v provided in configmap or operatorconfiguration",maxInstances,minInstances)
+	}
+	if numberOfInstances == 0 {
+		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter this serves to confirm the action\n", namespace, clusterName)
+		confirmAction(clusterName, namespace)
 	}
 	postgresql.Kind = "postgresql"
 	postgresql.APIVersion = "acid.zalan.do/v1"

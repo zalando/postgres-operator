@@ -48,9 +48,9 @@ func check() *v1beta1.CustomResourceDefinition {
 		log.Fatal(err)
 	}
 	if crdInfo.Name == postgresConstants.PostgresCRDResouceName {
-		fmt.Printf("postgres operator is installed in the k8s cluster.\n")
+		fmt.Printf("Postgres Operator is installed in the k8s cluster.\n")
 	} else {
-		fmt.Printf("postgres operator is not installed in the k8s cluster.\n")
+		fmt.Printf("Postgres Operator is not installed in the k8s cluster.\n")
 	}
 	return crdInfo
 }

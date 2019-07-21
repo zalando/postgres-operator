@@ -36,7 +36,10 @@ func getConfig() *restclient.Config {
 }
 
 func getCurrentNamespace() string {
-	namespace, _ := exec.Command("kubectl", "config", "view", "--minify", "--output", "jsonpath={..namespace}").CombinedOutput()
+	namespace, err := exec.Command("kubectl", "config", "view", "--minify", "--output", "jsonpath={..namespace}").CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
+	}
 	currentNamespace := string(namespace)
 	if currentNamespace == "" {
 		currentNamespace = "default"

@@ -16,10 +16,7 @@ package cmd
 
 import (
 	"fmt"
-	//v1 "github.com/VineethReddy02/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/spf13/cobra"
-	//"github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	//"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
