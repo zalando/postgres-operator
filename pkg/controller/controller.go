@@ -13,16 +13,16 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/apiserver"
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/constants"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/ringlog"
+	"github.com/zalando/postgres-operator/pkg/apiserver"
+	"github.com/zalando/postgres-operator/pkg/cluster"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/ringlog"
 
-	acidv1informer "github.com/zalando-incubator/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
+	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
 )
 
 // Controller represents operator controller
@@ -197,25 +197,25 @@ func (c *Controller) initRoleBinding() {
 	// operator binds it to the cluster role with sufficient privileges
 	// we assume the role is created by the k8s administrator
 	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
-		c.opConfig.PodServiceAccountRoleBindingDefinition = `
+		c.opConfig.PodServiceAccountRoleBindingDefinition = fmt.Sprintf(`
 		{
 			"apiVersion": "rbac.authorization.k8s.io/v1beta1",
 			"kind": "RoleBinding",
 			"metadata": {
-				   "name": "zalando-postgres-operator"
+				   "name": "%s"
 			},
 			"roleRef": {
 				"apiGroup": "rbac.authorization.k8s.io",
 				"kind": "ClusterRole",
-				"name": "zalando-postgres-operator"
+				"name": "%s"
 			},
 			"subjects": [
 				{
 					"kind": "ServiceAccount",
-					"name": "operator"
+					"name": "%s"
 				}
 			]
-		}`
+		}`, c.PodServiceAccount.Name, c.PodServiceAccount.Name, c.PodServiceAccount.Name)
 	}
 	c.logger.Info("Parse role bindings")
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
@@ -230,7 +230,6 @@ func (c *Controller) initRoleBinding() {
 	default:
 		c.PodServiceAccountRoleBinding = obj.(*rbacv1beta1.RoleBinding)
 		c.PodServiceAccountRoleBinding.Namespace = ""
-		c.PodServiceAccountRoleBinding.Subjects[0].Name = c.PodServiceAccount.Name
 		c.logger.Info("successfully parsed")
 
 	}

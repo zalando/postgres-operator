@@ -1,4 +1,4 @@
-## Command-line options
+# Command-line options
 
 The following command-line options are supported for the operator:
 
@@ -28,7 +28,7 @@ flags](https://godoc.org/github.com/golang/glog) are also supported. For
 instance, one may want to add `-alsologtostderr` and `-v=8` to debug the
 operator REST calls.
 
-## Environment variables
+# Environment variables
 
 The following environment variables are accepted by the operator:
 
@@ -50,9 +50,9 @@ The following environment variables are accepted by the operator:
   `scalyr_api_key` operator parameter.
 
 * **CRD_READY_WAIT_TIMEOUT**
-  defines the timeout for the complete postgres CRD creation. When not set
+  defines the timeout for the complete `postgresql` CRD creation. When not set
   default is 30s.
 
 * **CRD_READY_WAIT_INTERVAL**
-  defines the  interval between consecutive attempts waiting for the postgres
-  CRD to be created. The default is 5s.
+  defines the  interval between consecutive attempts waiting for the
+  `postgresql` CRD to be created. The default is 5s.

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 Compose, Zalando SE
+Copyright 2019 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ SOFTWARE.
 package versioned
 
 import (
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"

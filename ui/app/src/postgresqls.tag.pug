@@ -1,0 +1,247 @@
+postgresqls
+  .container-fluid
+
+    h1.page-header
+      nav(aria-label='breadcrumb')
+        ol.breadcrumb
+
+          li.breadcrumb-item
+            a(href='/#/list')
+              | PostgreSQL clusters
+
+    .sk-spinner-pulse(
+      if='{ my_clusters !== null && other_clusters !== null && (my_clusters === undefined || other_clusters === undefined) }'
+    )
+
+    p(if='{ my_clusters === null || other_clusters === null }')
+      | Error loading clusters.  Please
+      |
+      a(onclick='window.location.reload(true)') try again
+      |
+      | or
+      |
+      a(href='/') start over
+      | .
+
+    div(
+      if='{ my_clusters && other_clusters }'
+    )
+
+      p
+        | Search:
+        |
+        input(
+          type='text'
+          onchange='{ filter.edit }'
+          onkeyup='{ filter.edit }'
+          value='{ filter.state }'
+        )
+
+      .page-header
+        h1 My team's clusters ({ my_clusters.length })
+
+      table.table.table-hover(if='{ my_clusters.length > 0 }')
+
+        thead
+          tr
+            th(style='width: 120px') Team
+            th(style='width: 50px') Pods
+            th(style='width: 140px') CPU
+            th(style='width: 130px') Memory
+            th(style='width: 100px') Size
+            th(style='width: 130px') Namespace
+            th Name
+
+        tbody
+          tr(
+            each='{ my_clusters }'
+            hidden='{ !namespaced_name.toLowerCase().includes(filter.state.toLowerCase()) }'
+          )
+            td { team }
+            td { nodes }
+            td { cpu } / { cpu_limit }
+            td { memory } / { memory_limit }
+            td { volume_size }
+
+            td(style='white-space: pre')
+              | { namespace }
+
+            td
+              a(
+                href='/#/status/{ cluster_path(this) }'
+              )
+                | { name }
+
+              .btn-group.pull-right(
+                aria-label='Cluster { qname } actions'
+                role='group'
+                style='display: flex'
+              )
+
+                a.btn.btn-info(
+                  href='/#/status/{ cluster_path(this) }'
+                )
+                  i.fa.fa-check-circle.regular
+                  | Status
+
+                a.btn.btn-info(
+                  if='{ opts.config.pgview_link }'
+                  href='{ opts.config.pgview_link }{ cluster_path(this) }'
+                )
+                  i.fa.fa-chart-line
+                  | Pgview
+
+                a.btn.btn-info(
+                  href='/#/logs/{ cluster_path(this) }'
+                )
+                  i.fa.fa-align-justify
+                  | Logs
+
+                a.btn(
+                  class='btn-{ opts.read_write ? "primary" : "info" }'
+                  href='/#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
+                )
+                  i.fa.fa-clone.regular
+                  | Clone
+
+                a.btn(
+                  class='btn-{ opts.read_write ? "warning" : "info" }'
+                  href='/#/edit/{ cluster_path(this) }'
+                )
+                  | Edit
+
+                button.btn.btn-danger(
+                  if='{ opts.read_write }'
+                  onclick='{ delete_cluster }'
+                )
+                  | Delete
+
+      .page-header
+        h1 Other clusters ({ other_clusters.length})
+
+      table.table.table-hover(if='{ other_clusters.length > 0 }')
+
+        thead
+          tr
+            th(style='width: 120px') Team
+            th(style='width: 50px') Pods
+            th(style='width: 140px') CPU
+            th(style='width: 130px') Memory
+            th(style='width: 100px') Size
+            th(style='width: 130px') Namespace
+            th Name
+
+        tbody
+          tr(
+            each='{ other_clusters }'
+            hidden='{ !namespaced_name.toLowerCase().includes(filter.state.toLowerCase()) }'
+          )
+            td { team }
+            td { nodes }
+            td { cpu } / { cpu_limit }
+            td { memory } / { memory_limit }
+            td { volume_size }
+
+            td(style='white-space: pre')
+              | { namespace }
+
+            td
+
+              a(
+                href='/#/status/{ cluster_path(this) }'
+              )
+                | { name }
+
+              .btn-group.pull-right(
+                aria-label='Cluster { qname } actions'
+                role='group'
+                style='display: flex'
+              )
+
+                a.btn.btn-info(
+                  href='/#/status/{ cluster_path(this) }'
+                )
+                  i.fa.fa-check-circle.regular
+                  | Status
+
+                a.btn.btn-info(
+                  if='{ opts.config.pgview_link }'
+                  href='{ opts.config.pgview_link }{ cluster_path(this) }'
+                  target='_blank'
+                )
+                  i.fa.fa-chart-line
+                  | Pgview
+
+                a.btn.btn-info(
+                  href='/#/logs/{ cluster_path(this) }'
+                )
+                  i.fa.fa-align-justify
+                  | Logs
+
+                a.btn(
+                  class='btn-{ opts.read_write ? "primary" : "info" }'
+                  href='/#/clone/{ encodeURI(name) }/{ encodeURI(uid) }/{ encodeURI(new Date().toISOString()) }'
+                )
+                  i.fa.fa-clone.regular
+                  | Clone
+
+                a.btn(
+                  class='btn-{ opts.read_write ? "warning" : "info" }'
+                  href='/#/edit/{ cluster_path(this) }'
+                )
+                  | Edit
+
+                button.btn.btn-danger(
+                  if='{ opts.read_write }'
+                  onclick='{ delete_cluster }'
+                )
+                  | Delete
+
+  script.
+
+    // Pass a refresh callback for this tag to the options constructor argument
+    // used for all Dynamic objects built in this tag:
+    const add_refresh = object => Object.assign(
+      {},
+      object,
+      { refresh: () => this.update() }
+    )
+    const Dynamic = options => this.parent.opts.Dynamic(add_refresh(options))
+
+    this.filter = Dynamic()
+
+    this.my_clusters = undefined
+    this.other_clusters = undefined
+
+    this.delete_cluster = event => this.parent.opts.delete_cluster(
+      event.item.namespace,
+      event.item.name,
+    )
+
+    const cluster_path = this.cluster_path = cluster => (
+      encodeURI(cluster.namespace)
+      + '/' + encodeURI(cluster.name)
+    )
+
+    this.on('mount', () =>
+      jQuery
+      .get('/postgresqls')
+      .done(clusters => {
+        this.my_clusters = []
+        this.other_clusters = []
+        clusters.forEach(cluster =>
+          (
+            this.opts.teams.includes(
+              cluster.team.toLowerCase()
+            )
+            ? this.my_clusters
+            : this.other_clusters
+          ).push(cluster)
+        )
+      })
+      .fail(() => {
+        this.my_clusters = null
+        this.other_clusters = null
+      })
+      .always(() => this.update())
+    )

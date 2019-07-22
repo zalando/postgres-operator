@@ -1,0 +1,81 @@
+logs
+
+  h1.page-header(if='{ cluster_path }')
+    nav(aria-label="breadcrumb")
+      ol.breadcrumb
+
+        li.breadcrumb-item
+          a(href='/#/list')
+            | PostgreSQL clusters
+
+        li.breadcrumb-item
+          a(href='/#/status/{ cluster_path }')
+            | { qname }
+
+        li.breadcrumb-item
+          a(href='/#/logs/{ cluster_path }')
+            | Logs
+
+  .sk-spinner-pulse(if='{ logs === undefined }')
+
+  .container-fluid(if='{ logs === null }')
+    p
+      | Error loading logs.  Please
+      |
+      a(onclick="window.location.reload(true)") try again
+      |
+      | or
+      |
+      a(href="/") start over
+      | .
+
+  .container-fluid(if='{ logs }')
+
+    table.table.table-hover
+
+      tr(each='{ logs }')
+
+        td(each='{ [levels[Level]] }')
+          span.label.label-font-size(class='label-{ color_class }')
+            | { label }
+
+        td(style='white-space: pre')
+          | { Time }
+
+        td(style='font-family: monospace')
+          | { Message }
+
+  script.
+
+    this.levels = {
+      "panic": { label: "Panic"  , color_class: "danger" },
+      "fatal": { label: "Fatal"  , color_class: "danger" },
+      "error": { label: "Error"  , color_class: "danger" },
+      "warning": { label: "Warning", color_class: "warning" },
+      "info": { label: "Info"   , color_class: "primary" },
+      "debug": { label: "Debug"  , color_class: "warning" },
+    }
+
+    this.logs = undefined
+
+    this.on('mount', () => {
+      if (
+        this.namespace !== this.opts.namespace
+        || this.clustername !== this.opts.clustername
+      ) {
+        const namespace = this.namespace = this.opts.namespace
+        const clustername = this.clustername = this.opts.clustername
+        const qname = this.qname = namespace + '/' + clustername
+        const cluster_path = this.cluster_path = (
+          encodeURI(namespace)
+          + '/' + encodeURI(clustername)
+        )
+        ;(
+          jQuery
+          .get(`/operator/clusters/${cluster_path}/logs`)
+          .done(logs => this.logs = logs.reverse())
+          .fail(() => this.logs = null)
+          .always(() => this.update())
+        )
+      }
+    })

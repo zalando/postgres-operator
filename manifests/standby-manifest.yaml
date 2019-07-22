@@ -1,0 +1,20 @@
+
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-standby-cluster
+  namespace: default
+spec:
+  teamId: "ACID"
+  volume:
+    size: 1Gi
+  numberOfInstances: 1
+  postgresql:
+    version: "10"
+# Make this a standby cluster and provide the s3 bucket path of source cluster for continuous streaming.
+  standby:
+    s3_wal_path: "s3://path/to/bucket/containing/wal/of/source/cluster/"
+
+  maintenanceWindows:
+  - 01:00-06:00 #UTC
+  - Sat:00:00-04:00

@@ -7,8 +7,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"k8s.io/api/apps/v1beta1"
 )
 
@@ -27,7 +27,7 @@ func (c *Cluster) listPods() ([]v1.Pod, error) {
 
 func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	listOptions := metav1.ListOptions{
-		LabelSelector: c.roleLabelsSet(role).String(),
+		LabelSelector: c.roleLabelsSet(false, role).String(),
 	}
 
 	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)

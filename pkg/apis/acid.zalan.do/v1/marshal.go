@@ -8,6 +8,7 @@ import (
 )
 
 type postgresqlCopy Postgresql
+type postgresStatusCopy PostgresStatus
 
 // MarshalJSON converts a maintenance window definition to JSON.
 func (m *MaintenanceWindow) MarshalJSON() ([]byte, error) {
@@ -69,6 +70,26 @@ func (m *MaintenanceWindow) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// UnmarshalJSON converts a JSON to the status subresource definition.
+func (ps *PostgresStatus) UnmarshalJSON(data []byte) error {
+	var (
+		tmp    postgresStatusCopy
+		status string
+	)
+
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		metaErr := json.Unmarshal(data, &status)
+		if metaErr != nil {
+			return fmt.Errorf("Could not parse status: %v; err %v", string(data), metaErr)
+		}
+		tmp.PostgresClusterStatus = status
+	}
+	*ps = PostgresStatus(tmp)
+
+	return nil
+}
+
 // UnmarshalJSON converts a JSON into the PostgreSQL object.
 func (p *Postgresql) UnmarshalJSON(data []byte) error {
 	var tmp postgresqlCopy
@@ -81,7 +102,7 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 		}
 
 		tmp.Error = err.Error()
-		tmp.Status = ClusterStatusInvalid
+		tmp.Status = PostgresStatus{PostgresClusterStatus: ClusterStatusInvalid}
 
 		*p = Postgresql(tmp)
 
@@ -91,10 +112,10 @@ func (p *Postgresql) UnmarshalJSON(data []byte) error {
 
 	if clusterName, err := extractClusterName(tmp2.ObjectMeta.Name, tmp2.Spec.TeamID); err != nil {
 		tmp2.Error = err.Error()
-		tmp2.Status = ClusterStatusInvalid
+		tmp2.Status = PostgresStatus{PostgresClusterStatus: ClusterStatusInvalid}
 	} else if err := validateCloneClusterDescription(&tmp2.Spec.Clone); err != nil {
 		tmp2.Error = err.Error()
-		tmp2.Status = ClusterStatusInvalid
+		tmp2.Status = PostgresStatus{PostgresClusterStatus: ClusterStatusInvalid}
 	} else {
 		tmp2.Spec.ClusterName = clusterName
 	}

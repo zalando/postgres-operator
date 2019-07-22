@@ -4,18 +4,18 @@ pipeline:
       type: script
       env:
         GOPATH: /root/go
-        OPERATOR_TOP_DIR: /root/go/src/github.com/zalando-incubator
+        OPERATOR_TOP_DIR: /root/go/src/github.com/zalando
       commands:
         - desc: 'Update'
           cmd: |
             apt-get update
         - desc: 'Install required build software'
           cmd: |
-            apt-get install -y make git apt-transport-https ca-certificates curl
+            apt-get install -y make git apt-transport-https ca-certificates curl build-essential python3 python3-pip
         - desc: 'Install go'
           cmd: |
             cd /tmp
-            wget -q https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz -O go.tar.gz
+            wget -q https://storage.googleapis.com/golang/go1.12.linux-amd64.tar.gz -O go.tar.gz
             tar -xf go.tar.gz
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
@@ -41,6 +41,10 @@ pipeline:
             export PATH=$PATH:$HOME/go/bin
             cd $OPERATOR_TOP_DIR/postgres-operator
             go test ./...
+        - desc: 'Run e2e tests'
+          cmd: |
+            cd $OPERATOR_TOP_DIR/postgres-operator
+            make e2e-tools e2e-build e2e-run
         - desc: 'Push docker image'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
@@ -53,3 +57,38 @@ pipeline:
             fi
             export IMAGE
             make push
+
+    - id: build-operator-ui
+      type: script
+
+      commands:
+        - desc: 'Prepare environment'
+          cmd: |
+            apt-get update
+            apt-get install -y build-essential
+
+        - desc: 'Compile JavaScript app'
+          cmd: |
+            cd ui
+            make appjs
+
+        - desc: 'Build and push Docker image'
+          cmd: |
+            cd ui
+            image_base='registry-write.opensource.zalan.do/acid/postgres-operator-ui'
+            if [[ "${CDP_TARGET_BRANCH}" == 'master' && -z "${CDP_PULL_REQUEST_NUMBER}" ]]
+            then
+              image="${image_base}"
+            else
+              image="${image_base}-test"
+            fi
+            image_with_tag="${image}:c${CDP_BUILD_VERSION}"
+
+            if docker pull "${image}"
+            then
+              docker build --cache-from="${image}" -t "${image_with_tag}" .
+            else
+              docker build -t "${image_with_tag}" .
+            fi
+
+            docker push "${image_with_tag}"

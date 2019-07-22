@@ -1,18 +1,20 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	acidv1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando-incubator/postgres-operator/pkg/cluster"
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/config"
-	"github.com/zalando-incubator/postgres-operator/pkg/util/k8sutil"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/cluster"
+	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"gopkg.in/yaml.v2"
 )
 
@@ -49,10 +51,19 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 
 func (c *Controller) createOperatorCRD(crd *apiextv1beta1.CustomResourceDefinition) error {
 	if _, err := c.KubeClient.CustomResourceDefinitions().Create(crd); err != nil {
-		if !k8sutil.ResourceAlreadyExists(err) {
-			return fmt.Errorf("could not create customResourceDefinition: %v", err)
+		if k8sutil.ResourceAlreadyExists(err) {
+			c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
+
+			patch, err := json.Marshal(crd)
+			if err != nil {
+				return fmt.Errorf("could not marshal new customResourceDefintion: %v", err)
+			}
+			if _, err := c.KubeClient.CustomResourceDefinitions().Patch(crd.Name, types.MergePatchType, patch); err != nil {
+				return fmt.Errorf("could not update customResourceDefinition: %v", err)
+			}
+		} else {
+			c.logger.Errorf("could not create customResourceDefinition %q: %v", crd.Name, err)
 		}
-		c.logger.Infof("customResourceDefinition %q is already registered", crd.Name)
 	} else {
 		c.logger.Infof("customResourceDefinition %q has been registered", crd.Name)
 	}

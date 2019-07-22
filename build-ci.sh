@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e -x
 
-team_repo="$GOPATH/src/github.com/zalando-incubator/"
+team_repo="$GOPATH/src/github.com/zalando/"
 project_dir="$team_repo/postgres-operator"
 
 mkdir -p "$team_repo"

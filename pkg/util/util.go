@@ -13,7 +13,7 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/zalando-incubator/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/spec"
 )
 
 const (
@@ -24,6 +24,17 @@ var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
 
 func init() {
 	rand.Seed(time.Now().Unix())
+}
+
+// helper function to get bool pointers
+func True() *bool {
+	b := true
+	return &b
+}
+
+func False() *bool {
+	b := false
+	return &b
 }
 
 // RandomPassword generates random alphanumeric password of a given length.
@@ -130,7 +141,7 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
-// RequestIsSmallerThanLimit
+// RequestIsSmallerThanLimit : ...
 func RequestIsSmallerThanLimit(requestStr, limitStr string) (bool, error) {
 
 	request, err := resource.ParseQuantity(requestStr)

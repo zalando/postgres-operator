@@ -1,0 +1,937 @@
+new
+
+  style.
+
+    .input-units {
+      width: 2em;
+    }
+
+    .resource-type {
+      text-align: left;
+      width: 7em;
+    }
+
+  .container-fluid
+
+    h1.page-header
+      nav(aria-label='breadcrumb')
+        ol.breadcrumb
+
+          li.breadcrumb-item
+            a(href='/#/new')
+              | New PostgreSQL cluster
+
+    .row.text-center(if='{ !creating }')
+
+    .row
+
+      .col-lg-3
+        h2 Cluster YAML definition
+        div
+          pre
+            code.language-yaml(ref='yamlNice')
+
+      .col-lg-6
+
+        form(
+          if='{ !creating }'
+          action='javascript:void(0);'
+          id='form'
+        )
+
+          .btn-toolbar.pull-right
+            .btn-group(
+              aria-label='Actions'
+              role='group'
+            )
+
+              input.btn.btn-primary(
+                type='submit'
+                form='form'
+                value='Validate'
+              )
+
+              button.btn.btn-info.btn-copy
+                | Copy definiton
+
+              button.btn.btn-success(
+                if='{ !clusterExists && parent.read_write }'
+                ref='submitbutton'
+                onclick='{ requestCreate }'
+                disabled='{ !allValid() }'
+              )
+                | Create cluster
+
+              a.btn.btn-small.btn-warning(
+                if='{ clusterExists }'
+                href='/#/status/{ namespace.state }/{ team }-{ name }'
+              )
+                | Cluster exists (show status)
+
+          h2 New cluster configuration
+
+          table.table
+
+            tr(
+              each='{ backup.state.type.state === "empty" ? [] : [backup] }'
+            )
+              td(colspan='2')
+                h3.text-center Source data
+
+            tr(
+              each='{ backup.state.type.state === "empty" ? [] : [backup] }'
+            )
+              td Backup name
+              td
+                input.form-control(
+                  each='{ !["restore", "pitr"].includes(state.type.state) ? [] : [state.name] }'
+                  ref='backup_name'
+                  type='text'
+                  placeholder='Source backup name'
+                  required
+                  value='{ state }'
+                  onchange='{ edit }'
+                  onkeyup='{ edit }'
+                )
+
+            tr(
+              each='{ backup.state.type.state === "empty" ? [] : [backup] }'
+            )
+              td Backup UID
+              td
+                input.form-control(
+                  each='{ !["restore", "pitr"].includes(state.type.state) ? [] : [state.uid] }'
+                  ref='backup_uid'
+                  type='text'
+                  placeholder='Source backup ID'
+                  value='{ state }'
+                  onchange='{ edit }'
+                  onkeyup='{ edit }'
+                )
+
+            tr(
+              each='{ backup.state.type.state === "empty" ? [] : [backup] }'
+            )
+              td Target timestamp
+              td
+                input.timestamp.form-control(
+                  each='{ !["pitr"].includes(state.type.state) ? [] : [state.timestamp] }'
+                  ref='backup_timestamp'
+                  type='text'
+                  placeholder='Restore to state at timestamp'
+                  value='{ state }'
+                  onchange='{ edit }'
+                  onkeyup='{ edit }'
+                )
+
+            tr(
+              each='{ backup.state.type.state === "empty" ? [] : [backup] }'
+            )
+              td(colspan='2')
+                h3.text-center New cluster settings
+
+            tr
+              td
+                | Name
+              td
+                input.form-control(
+                  ref='name'
+                  type='text'
+                  placeholder='new-cluster (can be { 53 - team.length - 1 } characters long)'
+                  title='Database cluster name, must be a valid hostname component'
+                  pattern='[a-z0-9]+[a-z0-9\-]+[a-z0-9]+'
+                  maxlength='{ 53 - team.length - 1 }'
+                  required
+                  value='{ name }'
+                  onchange='{ nameChange }'
+                  onkeyup='{ nameChange }'
+                  style='width: 100%'
+                )
+
+            tr(
+              each='{ !["", "*"].includes(config.target_namespace) ? [] : [namespace] }'
+            )
+              td
+                | Namespace
+              td
+                select.form-control(
+                  ref='namespace'
+                  title='Database cluster Kubernetes namespace'
+                  onchange='{ edit }'
+                  onkeyup='{ edit }'
+                  style='width: 100%'
+                )
+                  option(
+                    each='{ namespace in parent.config.namespaces }'
+                    selected='{ state === namespace }'
+                    value='{ namespace }'
+                  )
+                    | { namespace }
+
+            tr
+              td Owning team
+              td
+                select.form-control(
+                  name='team'
+                  onchange='{ teamChange }'
+                  onkeyup='{ teamChange }'
+                )
+                  option(
+                    each='{ team in teams }'
+                    value='{ team }'
+                  )
+                    | { team }
+
+            tr
+              td PostgreSQL version
+              td
+                select.form-control(
+                  name='postgresqlVersion'
+                  onchange='{ versionChange }'
+                  onkeyup='{ versionChange }'
+                )
+                  option(
+                    each='{ version in opts.config.postgresql_versions }'
+                    value='{ version }'
+                  )
+                    | { version }
+
+            tr
+              td DNS name:
+              td
+                | { dnsName }
+
+            tr
+              td Number of instances
+              td
+                input.form-control(
+                  ref='instanceCount'
+                  type='number'
+                  min='1'
+                  required
+                  value='{ instanceCount }'
+                  onchange='{ instanceCountChange }'
+                  onkeyup='{ instanceCountChange }'
+                  style='width: 100%'
+                )
+
+            tr(if='{ [undefined, true].includes(config.master_load_balancer_visible) }')
+              td Master load balancer
+              td
+                label
+                  input(
+                    type='checkbox'
+                    value='{ enableMasterLoadBalancer }'
+                    onchange='{ toggleEnableMasterLoadBalancer }'
+                  )
+                  |
+                  | Enable master ELB
+
+            tr(if='{ [undefined, true].includes(config.replica_load_balancer_visible) }')
+              td Replica load balancer
+              td
+                label
+                  input(
+                    type='checkbox'
+                    value='{ enableReplicaLoadBalancer }'
+                    onchange='{ toggleEnableReplicaLoadBalancer }'
+                  )
+                  |
+                  | Enable replica ELB
+
+            tr
+              td Volume size
+              td
+                .input-group
+                  input.form-control(
+                    ref='volumeSize'
+                    type='number'
+                    min='1'
+                    required
+                    value='{ volumeSize }'
+                    onchange='{ volumeChange }'
+                    onkeyup='{ volumeChange }'
+                  )
+                  .input-group-addon
+                    .input-units Gi
+
+            tr(if='{ config.users_visible }')
+              td
+                button.btn.btn-success.btn-xs(onclick='{ users.add }')
+                  span.glyphicon.glyphicon-plus
+                |
+                | Users
+              td
+                .input-group(each='{ users.state }')
+                  .input-group-btn
+                    button.btn.btn-danger(onclick='{ users.remove }')
+                      span.glyphicon.glyphicon-trash
+                  input.username.form-control(
+                    type='text'
+                    placeholder='Username'
+                    title='^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$'
+                    pattern='^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$'
+                    required
+                    value='{ state }'
+                    onchange='{ edit }'
+                    onkeyup='{ edit }'
+                    style='width: 100%'
+                  )
+
+            tr(if='{ config.databases_visible }')
+              td
+                button.btn.btn-success.btn-xs(onclick='{ databases.add }')
+                  span.glyphicon.glyphicon-plus
+                |
+                | Databases
+              td
+                .input-group(each='{ databases.state }')
+                  .input-group-btn
+                    button.btn.btn-danger(
+                      onclick='{ databases.remove }'
+                      style='float: right'
+                    )
+                      span.glyphicon.glyphicon-trash
+                  input.databasename.form-control(
+                    type='text'
+                    placeholder='Database name'
+                    title='Alphanumerics or underscore; may not start on a digit'
+                    pattern='^[a-zA-Z_][a-zA-Z0-9_]*$'
+                    required
+                    value='{ state }'
+                    onchange='{ edit }'
+                    onkeyup='{ edit }'
+                    style='width: 50%'
+                  )
+                  select.owner.form-control(
+                    onchange='{ owner.edit }'
+                    onkeyup='{ owner.edit }'
+                    disabled='{ users.valids.length === 0 }'
+                    style='width: 50%'
+                  )
+                    option(
+                      selected='{ owner.state.length === 0 }'
+                      value=''
+                      disabled
+                      hidden
+                    )
+                      | Select owner…
+                    option(
+                      each='{ users.valids }'
+                      selected='{ state === parent.owner.state }'
+                      value='{ state }'
+                    )
+                      | { state }
+
+            tr(if='{ !jQuery.isEmptyObject(config.static_network_whitelist) }')
+              td Allowed IP ranges
+              td
+                ul.ips
+                  li(each='{ value, name in config.static_network_whitelist }')
+                    label
+                      input(
+                        type='checkbox'
+                        value='{ name }'
+                        onchange='{ toggleIPRange }'
+                        checked='{ name in ranges }'
+                      )
+                      |
+                      | { name }
+
+            tr(if='{ config.nat_gateways_visible }')
+              td
+                button.btn.btn-success.btn-xs(onclick='{ nats.add }')
+                  span.glyphicon.glyphicon-plus
+                |
+                | AWS NAT IPs
+              td
+                div(
+                  each='{ nats.state }'
+                )
+                  .input-group
+                    .input-group-btn
+                      button.btn.btn-danger(onclick='{ nats.remove }')
+                        span.glyphicon.glyphicon-trash
+                    input.form-control(
+                      type='text'
+                      required
+                      value='{ state }'
+                      onchange='{ edit }'
+                      onkeyup='{ edit }'
+                    )
+                    .input-group-addon
+                      .input-units / 32
+
+            tr(if='{ config.odd_host_visible }')
+              td Odd host
+              td
+                .input-group
+                  input.form-control(
+                    ref='odd'
+                    type='text'
+                    name='odd'
+                    placeholder='IP'
+                    onchange='{ oddChanges }'
+                    onkeyup='{ oddChanges }'
+                    value='{ odd }'
+                  )
+                  .input-group-addon
+                    .input-units / 32
+
+            tr(if='{ config.resources_visible }')
+              td Resources
+              td
+                table(width='100%')
+
+                  tr
+                    td CPU
+                    td
+
+                      .input-group
+                        .input-group-addon.resource-type Request
+                        input.form-control(
+                          ref='cpuRequest'
+                          type='number'
+                          placeholder='{ cpu.state.request.initialValue }'
+                          min='1'
+                          required
+                          value='{ cpu.state.request.state }'
+                          onchange='{ cpu.state.request.edit }'
+                          onkeyup='{ cpu.state.request.edit }'
+                        )
+                        .input-group-addon
+                          .input-units m
+
+                      .input-group
+                        .input-group-addon.resource-type Limit
+                        input.form-control(
+                          ref='cpuLimit'
+                          type='number'
+                          placeholder='{ cpu.state.limit.initialValue }'
+                          min='1'
+                          required
+                          value='{ cpu.state.limit.state }'
+                          onchange='{ cpu.state.limit.edit }'
+                          onkeyup='{ cpu.state.limit.edit }'
+                        )
+                        .input-group-addon
+                          .input-units m
+
+                  tr
+                    td Memory
+                    td
+
+                      .input-group
+                        .input-group-addon.resource-type Request
+                        input.form-control(
+                          ref='memoryRequest'
+                          type='number'
+                          placeholder='{ memory.state.request.initialValue }'
+                          min='1'
+                          required
+                          value='{ memory.state.request.state }'
+                          onchange='{ memory.state.request.edit }'
+                          onkeyup='{ memory.state.request.edit }'
+                        )
+                        .input-group-addon
+                          .input-units Gi
+
+                      .input-group
+                        .input-group-addon.resource-type Limit
+                        input.form-control(
+                          ref='memoryLimit'
+                          type='number'
+                          placeholder='{ memory.state.limit.initialValue }'
+                          min='1'
+                          required
+                          value='{ memory.state.limit.state }'
+                          onchange='{ memory.state.limit.edit }'
+                          onkeyup='{ memory.state.limit.edit }'
+                        )
+                        .input-group-addon
+                          .input-units Gi
+
+      .col-lg-3
+        help-general(config='{ opts.config }')
+
+  script.
+
+    // Pass a refresh callback for this tag to the options constructor argument
+    // used for all Dynamic objects built in this tag:
+    const add_refresh = object => Object.assign(
+      {},
+      object,
+      { refresh: () => this.update() }
+    )
+    const Dynamic = options => this.opts.opts.Dynamic(add_refresh(options))
+    const Dynamics = options => this.opts.opts.Dynamics(add_refresh(options))
+    const DynamicSet = (items, options) => (
+      this.opts.opts.DynamicSet(items, add_refresh(options))
+    )
+
+    const dedent = require('dedent-js')
+
+    // Dedent twice because pug adds tabs:
+    this.yamlTemplate = dedent`
+      kind: "postgresql"
+      apiVersion: "acid.zalan.do/v1"
+
+      metadata:
+        name: "{{ team }}-{{ name }}"
+        namespace: "{{ namespace.state }}"
+        labels:
+          team: {{ team }}
+
+      spec:
+        teamId: "{{ team }}"
+        postgresql:
+          version: "{{ postgresqlVersion }}"
+        numberOfInstances: {{ instanceCount }}
+        {{#if enableMasterLoadBalancer}}
+        enableMasterLoadBalancer: true
+        {{/if}}
+        {{#if enableReplicaLoadBalancer}}
+        enableReplicaLoadBalancer: true
+        {{/if}}
+        volume:
+          size: "{{ volumeSize }}Gi"
+        {{#if users}}
+        users:{{#each users}}
+          {{ state }}: []{{/each}}{{/if}}
+        {{#if databases}}
+        databases:{{#each databases}}
+          {{ state }}: {{ owner.state }}{{/each}}{{/if}}
+        allowedSourceRanges:
+          # IP ranges to access your cluster go here
+        {{#each ranges}}  # {{ @key }}
+        {{#each this }}
+          - {{ this }}
+        {{/each}}
+        {{/each}}{{#if nats}}
+          # NAT instances
+        {{#each nats}}
+          - {{ state }}/32
+      {{/each}}{{/if}}{{#if odd}}
+          # Your odd host IP
+          - {{ odd }}/32
+        {{/if}}
+
+        resources:
+          requests:
+            cpu: {{ cpu.state.request.state }}m
+            memory: {{ memory.state.request.state }}Gi
+          limits:
+            cpu: {{ cpu.state.limit.state }}m
+            memory: {{ memory.state.limit.state }}Gi{{#if restoring}}
+
+        clone:
+          cluster: "{{ backup.state.name.state }}"
+          uid: "{{ backup.state.uid.state }}"{{#if pitr}}
+          timestamp: "{{ backup.state.timestamp.state }}"{{/if}}{{/if}}
+    `
+
+    const yamlParser = require('js-yaml')
+    this.teams = this.opts.teams
+    this.config = this.opts.config
+
+    this.getContext = () => {
+      return {
+        name: this.name.toLowerCase(),
+        team: this.team.toLowerCase(),
+        postgresqlVersion: this.postgresqlVersion,
+        instanceCount: this.instanceCount,
+        enableMasterLoadBalancer: this.enableMasterLoadBalancer,
+        enableReplicaLoadBalancer: this.enableReplicaLoadBalancer,
+        volumeSize: this.volumeSize,
+        users: this.users.valids,
+        databases: this.databases.valids,
+        ranges: this.ranges,
+        nats: this.nats.valids,
+        odd: this.odd,
+        cpu: this.cpu,
+        memory: this.memory,
+        backup: this.backup,
+        namespace: this.namespace,
+        restoring: this.backup.state.type.state !== 'empty',
+        pitr: this.backup.state.type.state === 'pitr',
+      }
+    }
+
+    this.getYAML = () => {
+      yaml = Handlebars.compile(this.yamlTemplate)
+      yaml = yaml(this.getContext())
+      return yaml
+    }
+
+    this.on('update', () => {
+      this.teams = this.opts.teams
+      this.config = this.opts.config
+
+      yaml = Handlebars.compile(this.yamlTemplate)
+      yaml = yaml(this.getContext())
+
+      this.refs.yamlNice.innerHTML = yaml
+
+      Prism.highlightAll()
+    })
+
+    this.oddChanges = e => {
+      this.odd = e.target.value
+    }
+
+    this.ranges = {}
+
+    this.toggleIPRange = e => {
+      if (e.target.checked) {
+        this.ranges[e.target.value] = this.config.static_network_whitelist[e.target.value]
+      } else {
+        delete this.ranges[e.target.value]
+      }
+      this.update()
+    }
+
+    this.toggleEnableMasterLoadBalancer = e => {
+      this.enableMasterLoadBalancer = !this.enableMasterLoadBalancer
+    }
+
+    this.toggleEnableReplicaLoadBalancer = e => {
+      this.enableReplicaLoadBalancer = !this.enableReplicaLoadBalancer
+    }
+
+    this.volumeChange = e => {
+      this.volumeSize = +e.target.value
+    }
+
+    this.updateDNSName = () => {
+      this.dnsName = this.config.dns_format_string.format(
+        this.name,
+        this.team,
+        this.namespace.state,
+      )
+    }
+
+    this.updateClusterName = () => {
+      this.clusterName = (this.team + '-' + this.name).toLowerCase()
+      this.checkClusterExists()
+      this.updateDNSName()
+    }
+
+    this.nameChange = e => {
+      this.name = e.target.value.toLowerCase()
+      this.updateClusterName()
+    }
+
+    this.teamChange = e => {
+      this.team = e.target.value.toLowerCase()
+      this.updateClusterName()
+    }
+
+    this.instanceCountChange = e => {
+      this.instanceCount = +e.target.value
+    }
+
+    this.checkClusterExists = () => (
+      jQuery
+      .get(
+        '/postgresqls/'
+        + this.namespace.state
+        + '/'
+        + this.clusterName
+      )
+      .done(() => this.clusterExists = true)
+      .fail(() => this.clusterExists = false)
+      .always(() => this.update())
+    )
+
+    this.versionChange = e => {
+      this.postgresqlVersion = e.target.value
+    }
+
+    this.requestCreate = e => {
+      jsonPayload = JSON.stringify(yamlParser.safeLoad(this.getYAML()))
+
+      this.creating = true
+      this.update()
+
+      jQuery.ajax({
+        type: 'POST',
+        url: '/create-cluster',
+        contentType:'application/json',
+        data: jsonPayload,
+        processData: false,
+        success: () => {
+          route(
+            '/status/'
+            + encodeURI(this.namespace.state)
+            + '/'
+            + encodeURI(this.clusterName)
+          )
+        },
+        error: (r, status, error) => {
+          console.log('Create request failed')
+        },
+        dataType: 'json'
+      })
+    }
+
+    const clipboard = new Clipboard('.btn-copy', {
+      text: () => { return this.getYAML() }
+    })
+
+    this.namespace = Dynamic({
+      init: () => (
+        !this.config.target_namespace
+          || ['', '*'].includes(this.config.target_namespace)
+        ? 'default'
+        : this.config.target_namespace
+      ),
+    })
+    ;{
+      const update_namespace = this.namespace.update
+      this.namespace.update = value => {
+        update_namespace(value)
+        this.updateClusterName()
+        this.update()
+      }
+    }
+
+    this.nats = Dynamics()
+
+    this.users = Dynamics()
+    this.users.itemInit = () => Dynamic({
+      update: (value, instance, event) => {
+        if (value === '' || instance.state.length > 0) {
+          this.databases.state.forEach(database => {
+            if (database.owner.state === instance.state) {
+              database.owner.update(value, database.owner, event)
+            }
+          })
+        }
+        instance.state = value
+        this.update()
+        // Note: there is a bug here somewhere.
+        //
+        // To reproduce it:
+        // 1. Add user user1
+        // 2. Add user user2
+        // 3. Add user user22
+        // 4. Add database 1
+        // 5. Add database 2
+        // 6. Set database 1 owner to user2
+        // 7. Set database 2 owner to user22
+        // 8. Type another 2 at the end of the username for user2, so that it becomes a repeated copy of user22.  It should automatically set the database 1 owner to user22.
+        // 9. Delete the character you just typed, so that the first user22, which used to be user2 before the last step, becomes user2 again.
+        //
+        // In principle, that last step should set the owners for both database 1 and database 2 to user2, as both databases had owner user22 which was edited.  Instead, the owner for database 1 becomes user1 (WTF???) and the owner for database 2 becomes user2 (which is correct).  Note that the tag states are updated correctly, and the HTML shown in the Chrome element inspector has the selected attribute in the correct option elements — yet the wrong owner option is selected in the rendered select control on the page for the owner of database 1.
+        //
+        // Solution attempted that failed because riotjs does weird things with the DOM:
+        //
+        // $('select.owner', this.root).each(select => {
+        //   var options = $(select).children()
+        //   for (var i = 0; i < options.length; i++) {
+        //     const option = options[i]
+        //     const selected = $(option).attr('selected')
+        //     if (selected === 'true' || selected === 'selected') {
+        //       select.selectedIndex = i
+        //       child.selected = true
+        //     } else {
+        //       child.selected = false
+        //     }
+        //   }
+        // })
+        //
+        // Hours wasted on this stupid bug: 3
+        // Please keep this counter updated.
+      }
+    })
+
+    {
+      const baseRemoveUser = this.users.remove
+      this.users.remove = event => {
+        this.databases.state.forEach(database => {
+          if (database.owner.state === event.item.state) {
+            database.owner.update('', database.owner, event)
+          }
+        })
+        baseRemoveUser(event)
+        this.update()
+      }
+    }
+
+    this.databases = Dynamics({
+      itemInit: () => {
+        const item = Dynamic()
+        const baseItemUpdate = item.update
+        item.update = (value, instance, event) => {
+          this.check()
+          baseItemUpdate(value, instance, event)
+        }
+        item.owner = Dynamic({
+          validState: username => (
+            this.users.valids.find(user => user.state === username) !== undefined
+          )
+        })
+        return item
+      },
+      itemValid: item => item.valid() && item.owner.valid(),
+    })
+
+    const DynamicResource = options => {
+      const instance = DynamicSet({
+        request: () => options.request,
+        limit: () => options.limit,
+      })
+      instance.state.request.initialValue = options.request
+      instance.state.limit.initialValue = options.limit
+      return instance
+    }
+
+    this.cpu = DynamicResource({ request: 100, limit: 1000 })
+    this.memory = DynamicResource({ request: 1, limit: 1 })
+
+    this.backup = DynamicSet({
+      type: () => 'empty',
+      name: () => '',
+      uid: () => '',
+      timestamp: () => '',
+    })
+
+    const pitr_timestamp_format = 'YYYY-MM-DDTHH:mm:ss.SSSZ'
+    this.backup.state.timestamp.validState = (
+      base => (
+        state => {
+          if (!base(state)) {
+            return false
+          }
+          const parsed = moment.utc(state, pitr_timestamp_format, true)
+          return moment.isMoment(parsed) && !isNaN(parsed.utcOffset())
+        }
+      )
+    )(this.backup.state.timestamp.validState)
+
+    this.allValid = () => (
+      !this.creating &&
+      this.refs.name && this.refs.name.validity.valid &&
+      this.refs.instanceCount && this.refs.instanceCount.validity.valid && Number.isInteger(+this.instanceCount) &&
+      this.refs.volumeSize && this.refs.volumeSize.validity.valid && Number.isInteger(+this.volumeSize) &&
+      this.refs.cpuRequest && this.refs.cpuRequest.validity.valid && Number.isInteger(+this.cpu.state.request.state) &&
+      this.refs.cpuLimit && this.refs.cpuLimit.validity.valid && Number.isInteger(+this.cpu.state.limit.state) &&
+      this.refs.memoryRequest && this.refs.memoryRequest.validity.valid && Number.isInteger(+this.memory.state.request.state) &&
+      this.refs.memoryLimit && this.refs.memoryLimit.validity.valid && Number.isInteger(+this.memory.state.limit.state) &&
+      [
+        this.users,
+        this.databases,
+        this.backup,
+      ].every(x => x.valid())
+    )
+
+    this.check = () => {
+      const setValidity = validity => (_, element) => (
+        element.setCustomValidity(
+          validity(element)
+        )
+      )
+
+      $('select.owner', this.root).each(setValidity(owner =>
+        owner.value ? '' : 'Must select an owner for this database'
+      ))
+
+      const counts = (values, key=x => x) => values.map(key).reduce(
+        (o, item) => {
+          if (item in o) { o[item] += 1 }
+          else { o[item] = 1 }
+          return o
+        },
+        {}
+      )
+
+      $('input.timestamp', this.root).each(setValidity(timestamp =>
+        this.backup.state.timestamp.valid() ? '' :
+        'Timestamp must be formatted as ISO-8601 with milliseconds; note that a UTC offset as ±HH:mm is required: YYYY-MM-DDTHH:mm:ss.SSSZ e.g. 2018-12-31T23:59:59.999+14:00'
+      ))
+
+      const userCounts = counts(this.users.state, item => item.state)
+      $('input.username', this.root).each(setValidity(name =>
+        !name.value || userCounts[name.value] === 1 ? '' :
+        'Usernames must not repeat'
+      ))
+
+      const databaseCounts = counts(this.databases.state, item => item.state)
+      $('input.databasename', this.root).each(setValidity(name =>
+        !name.value || databaseCounts[name.value] === 1 ? '' :
+        'Database names must not repeat'
+      ))
+
+      if (this.refs.submitbutton) {
+        this.refs.submitbutton.disabled = (
+          $(document.querySelectorAll(':invalid')).length !== 0
+        ) || $('select.owner:disabled').length !== 0
+      }
+    }
+
+    this.on('updated', this.check)
+
+    this.reset_form = () => {
+      if (this.pollProgressTimer) {
+        clearInterval(this.pollProgressTimer)
+      }
+
+      this.creating = false
+      this.name = ''
+
+      if (this.teams && this.teams.length > 0) {
+        this.team = this.teams[0]
+      } else {
+        this.team = ''
+      }
+
+      this.clusterName = (this.name + '-' + this.team).toLowerCase()
+      this.volumeSize = 10
+      this.instanceCount = 1
+      this.ranges = {}
+      this.odd = ''
+      this.enableMasterLoadBalancer = false
+      this.enableReplicaLoadBalancer = false
+
+      this.postgresqlVersion = this.postgresqlVersion = (
+        this.config.postgresql_versions[0]
+      )
+
+      this.updateDNSName();
+
+      this.check()
+
+      this.backup.state.type.update(
+        this.opts.backup_name === undefined
+        ? 'empty'
+        : this.opts.backup_timestamp === undefined
+          ? 'restore'
+          : 'pitr'
+      )
+
+      this.backup.state.name.update(
+        decodeURI(this.opts.backup_name || '')
+      )
+
+      this.backup.state.uid.update(
+        !this.opts.backup_uid || this.opts.backup_uid === 'base'
+        ? ''
+        : this.opts.backup_uid
+      )
+
+      this.backup.state.timestamp.update(
+        !this.opts.backup_timestamp
+        ? ''
+        : moment.utc(
+            decodeURI(this.opts.backup_timestamp)
+          ).format(pitr_timestamp_format)
+      )
+
+      this.opts && this.opts.backup_name && delete this.opts.backup_name
+      this.opts && this.opts.backup_uid && delete this.opts.backup_uid
+      this.opts && this.opts.backup_timestamp && delete this.opts.backup_timestamp
+
+      this.update()
+    }
+
+    this.on('mount', this.reset_form)

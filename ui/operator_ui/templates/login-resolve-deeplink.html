@@ -1,0 +1,18 @@
+<html>
+    <head>
+        <title>Restoring client location ...</title>
+    </head>
+    <body>
+        <script language="javascript">
+            // /login/authorized
+            hash = localStorage.getItem("login-url-hash")
+            if (null != hash) {
+                localStorage.removeItem("login-url-hash")
+                location.href = "/" + hash
+            }
+            else {
+                location.href = "/"
+            }
+        </script>
+    </body>
+</html>

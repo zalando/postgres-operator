@@ -1,5 +1,5 @@
 /*
-Copyright 2018 Compose, Zalando SE
+Copyright 2019 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,8 +25,8 @@ SOFTWARE.
 package acid
 
 import (
-	v1 "github.com/zalando-incubator/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
-	internalinterfaces "github.com/zalando-incubator/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
+	internalinterfaces "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

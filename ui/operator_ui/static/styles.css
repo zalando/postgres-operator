@@ -1,0 +1,66 @@
+body {
+  padding-top: 70px;
+}
+
+h1, h2, h3 {
+  font-family: 'Open Sans', sans-serif;
+}
+
+.font-robot {
+  font-family: 'Roboto 300', sans-serif;
+}
+
+input:invalid {
+  color: red;
+  font-weight: 600;
+}
+
+ul.ips { list-style-type: none; margin: 0; padding: 0; overflow-x: hidden; }
+ul.ips li { margin: 0; padding: 0; }
+ul.ips label { margin: 0; padding: 0; }
+
+.panel-heading.collapsible {
+  cursor: pointer;
+}
+
+.timeline {
+  cursor: pointer;
+}
+
+.panel-heading .collapsible:after {
+  color: grey;
+  content: "\e113";
+  float: right;
+  font-family: 'Glyphicons Halflings';
+  transition: all 0.5s;
+}
+
+.panel-heading.collapsed .collapsible:after {
+  transform: rotate(-180deg);
+}
+
+:not(form):invalid,select.owner:disabled {
+  border: 1px solid red;
+  box-shadow: 0 0 10px red;
+}
+
+.page-header {
+  margin-top: 0px;
+}
+
+.page-header h1 {
+  margin-top: 0px;
+}
+
+label {
+  font-weight: normal;
+  margin-top: 0;
+}
+
+.sk-spinner-pulse {
+  background-color: darkblue;
+}
+
+td {
+  vertical-align: middle !important;
+}
