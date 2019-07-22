@@ -1,4 +1,4 @@
-# Quickstart
+<h1>Quickstart</h1>
 
 This guide aims to give you a quick look and feel for using the Postgres
 Operator on a local Kubernetes environment.
@@ -55,7 +55,7 @@ kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
 There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest that [combines the mentioned resources](../manifests/kustomization.yaml) - 
+manifest that [combines the mentioned resources](../manifests/kustomization.yaml) -
 it can be used with kubectl 1.14 or newer as easy as:
 
 ```bash

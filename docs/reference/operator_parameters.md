@@ -1,4 +1,4 @@
-# Configuration parameters
+<h1>Configuration parameters</h1>
 
 There are two mutually-exclusive methods to set the Postgres Operator
 configuration.

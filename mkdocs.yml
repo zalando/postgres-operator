@@ -3,13 +3,14 @@ repo_url: https://github.com/zalando/postgres-operator
 theme: readthedocs
 
 nav:
-  - index.md
-  - quickstart.md
-  - operator-ui.md
-  - administrator.md
-  - user.md
-  - developer.md
+  - Concepts: 'index.md'
+  - Quickstart: 'quickstart.md'
+  - Postgres Operator UI: 'operator-ui.md'
+  - Admin guide: 'administrator.md'
+  - User guide: 'user.md'
+  - Developer guide: 'developer.md'
   - Reference:
-    - reference/operator_parameters.md
-    - reference/cluster_manifest.md
-    - reference/command_line_and_environment.md
+    - Config parameters: 'reference/operator_parameters.md'
+    - Manifest parameters: 'reference/cluster_manifest.md'
+    - CLI options and environment: 'reference/command_line_and_environment.md'
+  - Google Summer of Code 2019: 'gsoc-2019/ideas.md'
