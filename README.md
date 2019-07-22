@@ -13,6 +13,39 @@ clusters on Kubernetes (K8s) powered by [Patroni](https://github.com/zalando/spi
 It is configured only through manifests to ease integration into automated CI/CD
 pipelines with no access to Kubernetes directly.
 
+### Operator features
+
+* Rolling updates on cluster changes
+* Volume resize without Pod restarts
+* Cloning Postgres clusters
+* Logical Backups to S3 Bucket
+* Standby cluster from S3 WAL archive
+* Configurable for non-cloud environments
+* UI to create and edit cluster manifests
+
+### PostgreSQL features
+
+* Supports PostgreSQL 9.3 to 12
+* Streaming replication cluster via Patroni
+* Point-In-Time-Recovery with
+[pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
+[WAL-E](https://github.com/wal-e/wal-e) via [Spilo](https://github.com/zalando/spilo)
+* Preload libraries: [bg_mon](https://github.com/CyberDem0n/bg_mon),
+[pg_stat_statements](https://www.postgresql.org/docs/9.4/pgstatstatements.html),
+[pgextwlist](https://github.com/dimitri/pgextwlist),
+[pg_auth_mon](https://github.com/RafiaSabih/pg_auth_mon)
+* Incl. popular Postgres extensions such as
+[decoderbufs](https://github.com/debezium/postgres-decoderbufs),
+[hypopg](https://github.com/HypoPG/hypopg),
+[pg_cron](https://github.com/citusdata/pg_cron),
+[pg_partman](https://github.com/pgpartman/pg_partman),
+[pg_stat_kcache](https://github.com/powa-team/pg_stat_kcache),
+[pgq](https://github.com/pgq/pgq),
+[plpgsql_check](https://github.com/okbob/plpgsql_check),
+[postgis](https://postgis.net/),
+[set_user](https://github.com/pgaudit/set_user) and
+[timescaledb](https://github.com/timescale/timescaledb)
+
 The Postgres Operator has been developed at Zalando and is being used in
 production for over two years.
 
