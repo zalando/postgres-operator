@@ -184,7 +184,10 @@ type OperatorConfigurationUsers struct {
 type Duration time.Duration
 
 type OperatorLogicalBackupConfiguration struct {
-	Schedule    string `json:"logical_backup_schedule,omitempty"`
-	DockerImage string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
+	Schedule          string `json:"logical_backup_schedule,omitempty"`
+	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
+	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
+	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
+	S3SecretAccessKey string `json:"logical_backup_s3_,omitempty"`
 }
