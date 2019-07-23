@@ -15,17 +15,17 @@ pipelines with no access to Kubernetes directly.
 
 ### Operator features
 
-* Rolling updates on cluster changes
+* Rolling updates on Postgres cluster changes
 * Volume resize without Pod restarts
 * Cloning Postgres clusters
 * Logical Backups to S3 Bucket
 * Standby cluster from S3 WAL archive
 * Configurable for non-cloud environments
-* UI to create and edit cluster manifests
+* UI to create and edit Postgres cluster manifests
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 9.3 to 12
+* Supports PostgreSQL 9.6+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
@@ -60,6 +60,7 @@ There is a browser-friendly version of this documentation at
 [postgres-operator.readthedocs.io](https://postgres-operator.readthedocs.io)
 
 * [How it works](docs/index.md)
+* [Installation](docs/quickstart.md#deployment-options)
 * [The Postgres experience on K8s](docs/user.md)
 * [The Postgres Operator UI](docs/operator-ui.md)
 * [DBA options - from RBAC to backup](docs/administrator.md)
@@ -78,4 +79,4 @@ and start discussions in [the issue tracker](https://github.com/zalando/postgres
 
 There are two places to get in touch with the community:
 1. The [GitHub issue tracker](https://github.com/zalando/postgres-operator/issues)
-2. The #postgres-operator slack channel under [Postgres Slack](https://postgres-slack.herokuapp.com)
+2. The **#postgres-operator** [slack channel](https://postgres-slack.herokuapp.com)
