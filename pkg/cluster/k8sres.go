@@ -1465,7 +1465,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
-		c.labelsSet(true),
+		labels,
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},
