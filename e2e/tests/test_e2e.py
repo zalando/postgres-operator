@@ -11,7 +11,7 @@ from kubernetes import client, config
 
 class EndToEndTestCase(unittest.TestCase):
     '''
-    Test interaction of the operator with multiple k8s components.
+    Test interaction of the operator with multiple K8s components.
     '''
 
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
@@ -21,15 +21,15 @@ class EndToEndTestCase(unittest.TestCase):
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
         '''
-        Deploy operator to a "kind" cluster created by /e2e/run.sh using examples from /manifests.
+        Deploy operator to a "kind" cluster created by run.sh using examples from /manifests.
         This operator deployment is to be shared among all tests.
 
-        /e2e/run.sh deletes the 'kind' cluster after successful run along with all operator-related entities.
+        run.sh deletes the 'kind' cluster after successful run along with all operator-related entities.
         In the case of test failure the cluster will stay to enable manual examination;
-        next invocation of "make e2e-run" will re-create it.
+        next invocation of "make test" will re-create it.
         '''
 
-        # set a single k8s wrapper for all tests
+        # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
 
         # operator deploys pod service account there on start up

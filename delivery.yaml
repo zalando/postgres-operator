@@ -44,7 +44,7 @@ pipeline:
         - desc: 'Run e2e tests'
           cmd: |
             cd $OPERATOR_TOP_DIR/postgres-operator
-            make e2e-tools e2e-build e2e-run
+            make e2e
         - desc: 'Push docker image'
           cmd: |
             export PATH=$PATH:$HOME/go/bin

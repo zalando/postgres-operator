@@ -96,7 +96,7 @@ kubectl get pod -l name=postgres-operator
 The operator employs K8s-provided code generation to obtain deep copy methods
 and K8s-like APIs for its custom resource definitions, namely the
 Postgres CRD and the operator CRD. The usage of the code generation follows
-conventions from the k8s community. Relevant scripts live in the `hack`
+conventions from the K8s community. Relevant scripts live in the `hack`
 directory:
 * `update-codegen.sh` triggers code generation for the APIs defined in `pkg/apis/acid.zalan.do/`,
 * `verify-codegen.sh` checks if the generated code is up-to-date (to be used within CI).
@@ -247,23 +247,20 @@ kubectl logs acid-minimal-cluster-0
 
 ## End-to-end tests
 
-The operator provides reference e2e (end-to-end) tests to ensure various infra
-parts work smoothly together. Each e2e execution tests a Postgres Operator image
-built from the current git branch. The test runner starts a [kind](https://kind.sigs.k8s.io/)
-(local k8s) cluster and Docker container with tests. The k8s API client from
-within the container connects to the `kind` cluster using the standard Docker
-`bridge` network. The tests utilize examples from `/manifests` (ConfigMap is
-used for the operator configuration) to avoid maintaining yet another set of
-configuration files. The kind cluster is deleted if tests complete successfully.
+The operator provides reference end-to-end tests (e2e) (as Docker image) to
+ensure various infrastructure parts work smoothly together. Each e2e execution
+tests a Postgres Operator image built from the current git branch. The test
+runner creates a new local K8s cluster using [kind](https://kind.sigs.k8s.io/),
+utilizes provided manifest examples, and runs e2e tests contained in the `tests`
+folder. The K8s API client in the container connects to the `kind` cluster via
+the standard Docker `bridge` network. The kind cluster is deleted if tests
+finish successfully or on each new run in case it still exists.
 
-End-to-end tests are executed automatically during builds:
+End-to-end tests are executed automatically during builds (for more details,
+see the [README](../e2e/README.md) in the `e2e` folder):
 
 ```bash
-# invoke them from the project's top directory
-make e2e-run
-
-# install kind and build test image before first run
-make e2e-tools e2e-build
+make e2e
 ```
 
 End-to-end tests are written in Python and use `flake8` for code quality.

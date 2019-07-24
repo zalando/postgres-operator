@@ -135,7 +135,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   to S3. Default: false. Optional.
 
 * **logicalBackupSchedule**
-  Schedule for the logical backup k8s cron job. Please take
+  Schedule for the logical backup K8s cron job. Please take
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Optional. Default is: "30 00 \* \* \*"
 

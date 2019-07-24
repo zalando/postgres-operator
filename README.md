@@ -64,7 +64,7 @@ There is a browser-friendly version of this documentation at
 * [The Postgres experience on K8s](docs/user.md)
 * [The Postgres Operator UI](docs/operator-ui.md)
 * [DBA options - from RBAC to backup](docs/administrator.md)
-* [Debug and extend the operator](docs/developer.md)
+* [Build, debug and extend the operator](docs/developer.md)
 * [Configuration options](docs/reference/operator_parameters.md)
 * [Postgres manifest reference](docs/reference/cluster_manifest.md)
 * [Command-line options and environment variables](docs/reference/command_line_and_environment.md)

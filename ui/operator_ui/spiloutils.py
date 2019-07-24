@@ -206,7 +206,7 @@ def create_postgresql(cluster, namespace, definition):
         r.raise_for_status()
         return True
     except Exception as ex:
-        logger.exception("K8S create request failed")
+        logger.exception("K8s create request failed")
         return False
 
 
@@ -221,7 +221,7 @@ def apply_postgresql(cluster, namespace, resource_name, definition):
         r.raise_for_status()
         return True
     except Exception as ex:
-        logger.exception("K8S create request failed")
+        logger.exception("K8s create request failed")
         return False
 
 
@@ -236,7 +236,7 @@ def remove_postgresql(cluster, namespace, resource_name):
         r.raise_for_status()
         return True
     except Exception as ex:
-        logger.exception("K8S delete request failed")
+        logger.exception("K8s delete request failed")
         return False
 
 

@@ -158,8 +158,8 @@ configuration they are grouped under the `kubernetes` key.
 
 * **pod_service_account_role_binding_definition**
   This definition must bind pod service account to a role with permission
-  sufficient for the pods to start and for Patroni to access k8s endpoints;
-  service account on its own lacks any such rights starting with k8s v1.8. If
+  sufficient for the pods to start and for Patroni to access K8s endpoints;
+  service account on its own lacks any such rights starting with K8s v1.8. If
   not explicitly defined by the user, a simple definition that binds the
   account to the operator's own 'zalando-postgres-operator' cluster role will
   be used. The default is empty.
@@ -416,7 +416,7 @@ yet officially supported.
 
 ## Logical backup
 
-These parameters configure a k8s cron job managed by the operator to produce
+These parameters configure a K8s cron job managed by the operator to produce
 Postgres logical backups. In the CRD-based configuration those parameters are
 grouped under the `logical_backup` key.
 

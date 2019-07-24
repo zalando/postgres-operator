@@ -6,11 +6,26 @@ set -o nounset
 set -o pipefail
 IFS=$'\n\t'
 
+cd $(dirname "$0");
+
 readonly cluster_name="postgres-operator-e2e-tests"
-readonly operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}"  | head -1)
-readonly e2e_test_image=${cluster_name}
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 
+function pull_images(){
+
+  operator_tag=$(git describe --tags --always --dirty)
+  if [[ -z $(docker images -q registry.opensource.zalan.do/acid/postgres-operator:${operator_tag}) ]]
+  then
+    docker pull registry.opensource.zalan.do/acid/postgres-operator:latest
+  fi
+  if [[ -z $(docker images -q registry.opensource.zalan.do/acid/postgres-operator-e2e-tests:${operator_tag}) ]]
+  then
+    docker pull registry.opensource.zalan.do/acid/postgres-operator-e2e-tests:latest
+  fi
+
+  operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
+  e2e_test_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests" --format "{{.Repository}}:{{.Tag}}" | head -1)
+}
 
 function start_kind(){
 
@@ -20,8 +35,9 @@ function start_kind(){
     kind-linux-amd64 delete cluster --name ${cluster_name}
   fi
 
-  kind-linux-amd64 create cluster --name ${cluster_name} --config ./e2e/kind-cluster-postgres-operator-e2e-tests.yaml
+  kind-linux-amd64 create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
   kind-linux-amd64 load docker-image "${operator_image}" --name ${cluster_name}
+  kind-linux-amd64 load docker-image "${e2e_test_image}" --name ${cluster_name}
   KUBECONFIG="$(kind-linux-amd64 get kubeconfig-path --name=${cluster_name})"
   export KUBECONFIG
 }
@@ -36,11 +52,12 @@ function set_kind_api_server_ip(){
 }
 
 function run_tests(){
+
   docker run --rm --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_image}"
 }
 
 function clean_up(){
-  unset KUBECONFIG 
+  unset KUBECONFIG
   kind-linux-amd64 delete cluster --name ${cluster_name}
   rm -rf ${kubeconfig_path}
 }
@@ -49,6 +66,7 @@ function main(){
 
   trap "clean_up" QUIT TERM EXIT
 
+  pull_images
   start_kind
   set_kind_api_server_ip
   run_tests
