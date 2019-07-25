@@ -9,11 +9,11 @@ spec:
     size: 1Gi
   numberOfInstances: 2
   users:
-    zalando: # database owner
+    zalando:  # database owner
     - superuser
     - createdb
-    foo_user: [] # role for application foo
+    foo_user: []  # role for application foo
   databases:
-    foo: zalando # dbname: owner
+    foo: zalando  # dbname: owner
   postgresql:
     version: "10"

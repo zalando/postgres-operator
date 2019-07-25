@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.1.0-54-g3a914f9
+  tag: v1.2.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -94,7 +94,7 @@ configKubernetes:
   # whether the Spilo container should run in privileged mode
   spilo_privileged: "false"
   # operator watches for postgres objects in the given namespace
-  watched_namespace: "*" # listen to all namespaces
+  watched_namespace: "*"  # listen to all namespaces
 
 # configure resource requests for the Postgres pods
 configPostgresPodResources:
