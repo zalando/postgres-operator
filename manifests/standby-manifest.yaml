@@ -1,4 +1,3 @@
-
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
@@ -16,5 +15,5 @@ spec:
     s3_wal_path: "s3://path/to/bucket/containing/wal/of/source/cluster/"
 
   maintenanceWindows:
-  - 01:00-06:00 #UTC
+  - 01:00-06:00  #UTC
   - Sat:00:00-04:00

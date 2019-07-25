@@ -43,7 +43,7 @@ rules:
   - get
   - list
   - patch
-  - watch # needed if zalando-postgres-operator account is used for pods as well
+  - watch  # needed if zalando-postgres-operator account is used for pods as well
 - apiGroups:
   - ""
   resources:
@@ -76,7 +76,7 @@ rules:
   verbs:
   - get
   - list
-  - update # only for resizing AWS volumes
+  - update  # only for resizing AWS volumes
 - apiGroups:
   - ""
   resources:
@@ -145,7 +145,7 @@ rules:
 - apiGroups:
   - batch
   resources:
-  - cronjobs # enables logical backups
+  - cronjobs  # enables logical backups
   verbs:
   - create
   - delete

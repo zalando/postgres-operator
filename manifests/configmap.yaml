@@ -76,5 +76,5 @@ data:
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
   # toleration: ""
   # wal_s3_bucket: ""
-  watched_namespace: "*" # listen to all namespaces
+  watched_namespace: "*"  # listen to all namespaces
   workers: "4"
