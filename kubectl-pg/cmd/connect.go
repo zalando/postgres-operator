@@ -31,18 +31,24 @@ import (
 // connectCmd represents the kubectl pg connect command
 var connectCmd = &cobra.Command{
 	Use:   "connect",
-	Short: "A ",
-	Long: `A .`,
+	Short: "Connects to the shell prompt, psql prompt of postgres cluster",
+	Long: `Connects to the shell prompt, psql prompt of postgres cluster and also to specified replica or master.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName,_ := cmd.Flags().GetString("clusterName")
 		master,_ := cmd.Flags().GetBool("master")
 		replica,_ := cmd.Flags().GetString("replica")
 		psql,_ := cmd.Flags().GetBool("psql")
-		connect(clusterName,master,replica,psql)
+		user,_ := cmd.Flags().GetString("user")
+		if psql {
+			if user == "" {
+				log.Fatal("please provide user for psql prompt")
+			}
+		}
+		connect(clusterName,master,replica,psql,user)
 	},
 }
 
-func connect(clusterName string,master bool,replica string,psql bool) {
+func connect(clusterName string,master bool,replica string,psql bool,user string) {
 	config := getConfig()
 	client,er := kubernetes.NewForConfig(config)
 	if er != nil {
@@ -81,7 +87,7 @@ func connect(clusterName string,master bool,replica string,psql bool) {
 			Param("container", "postgres").
 			Param("command", "psql").
 			Param("command", "-U").
-			Param("command", "postgres").
+			Param("command", user).
 			Param("stdin", "true").
 			Param("stdout", "true").
 			Param("stderr", "true").
@@ -92,7 +98,8 @@ func connect(clusterName string,master bool,replica string,psql bool) {
 			Namespace("default").
 			SubResource("exec").
 			Param("container", "postgres").
-			Param("command", "bash").
+			Param("command", "su").
+			Param("command", "postgres").
 			Param("stdin", "true").
 			Param("stdout", "true").
 			Param("stderr", "true").
@@ -117,6 +124,7 @@ func init() {
 	connectCmd.Flags().StringP("clusterName", "c", "", "provide the cluster name.")
 	connectCmd.Flags().BoolP("master", "m", false, "connect to master.")
 	connectCmd.Flags().StringP("replica", "r","", "connect to replica.")
-	connectCmd.Flags().BoolP("psql","p",false,"connect to psql prompt")
+	connectCmd.Flags().BoolP("psql","p",false,"connect to psql prompt.")
+	connectCmd.Flags().StringP("user","u","","provide user.")
 	rootCmd.AddCommand(connectCmd)
 }

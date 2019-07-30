@@ -77,8 +77,6 @@ func deleteByFile(file string) {
 	}
 	fmt.Printf("-> Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", postgresSql.Namespace, postgresSql.Name)
 	confirmAction(postgresSql.Name, postgresSql.Namespace)
-	postgresSql.APIVersion = "acid.zalan.do/v1"
-	postgresSql.Kind ="postgresql"
 	err = postgresConfig.Postgresqls(postgresSql.Namespace).Delete(postgresSql.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		log.Fatal(err)

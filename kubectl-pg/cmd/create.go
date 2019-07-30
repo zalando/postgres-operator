@@ -21,7 +21,7 @@ import (
 	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	"log"
-	v1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
 
 // createCmd kubectl pg create.

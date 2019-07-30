@@ -2,6 +2,13 @@
 
 ### Installtion of kubectl pg plugin
 
+This project uses Go Modules for dependency management to build locally
+Install go and enable go modules ```export GO111MODULE=on```
+
+As this project doesn't contain vendor directory. 
+
+Generate vendor directory using ```go mod vendor```
+
 Clone the kubectl pg plugin and build from the source using ```go install``` this will generate kubectl pg plugin's executable in ```go/bin/kubectl-pg.exe```
 
 ### To list all commands avaialble in kubectl pg

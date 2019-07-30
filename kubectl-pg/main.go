@@ -14,7 +14,9 @@
 
 package main
 
-import "github.com/zalando/postgres-operator/kubectl-pg/cmd"
+import (
+	"kubectl-pg/cmd"
+)
 
 func main() {
 	cmd.Execute()

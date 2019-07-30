@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"io/ioutil"
-	v1 "github.com/zalando-incubator/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
@@ -61,8 +61,6 @@ func updatePgResources(fileName string) {
 		log.Fatal(err)
 	}
 	newPostgresObj.ResourceVersion = oldPostgresObj.ResourceVersion
-	newPostgresObj.APIVersion = "acid.zalan.do/v1"
-	newPostgresObj.Kind ="postgresql"
 	response, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(newPostgresObj)
 	if err != nil {
 		log.Fatal(err)
