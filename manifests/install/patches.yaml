@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-operator
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: CONFIG_MAP_NAME
+          value: $(CONFIG_MAP_NAME)
+        name: postgres-operator

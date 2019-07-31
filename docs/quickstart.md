@@ -59,7 +59,7 @@ manifest that [combines the mentioned resources](../manifests/kustomization.yaml
 it can be used with kubectl 1.14 or newer as easy as:
 
 ```bash
-kubectl apply -k github.com/zalando/postgres-operator/manifests
+kubectl apply -k github.com/zalando/postgres-operator/manifests/install
 ```
 
 For convenience, we have automated starting the operator with minikube using the
