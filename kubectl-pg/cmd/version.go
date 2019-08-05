@@ -25,6 +25,7 @@ import (
 )
 
 const kubectlPgVersion = "0.1-beta"
+const defaultNamespace = "default"
 
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
@@ -32,18 +33,25 @@ var versionCmd = &cobra.Command{
 	Short: "version of kubectl-pg & postgres-operator",
 	Long: `version of kubectl-pg and current running postgres-operator`,
 	Run: func(cmd *cobra.Command, args []string) {
-			version()
+		    namespace, err := cmd.Flags().GetString("namespace")
+		    if err != nil {
+		    	log.Fatal(err)
+			}
+				version(namespace)
 	},
 }
 
-func version() {
+func version(namespace string) {
 	fmt.Printf("kubectl-pg: %s\n",kubectlPgVersion)
 	config := getConfig()
 	client,err := kubernetes.NewForConfig(config)
 	if err!= nil {
 		log.Fatal(err)
 	}
-	res,err:=client.AppsV1().Deployments(getCurrentNamespace()).Get("postgres-operator",metav1.GetOptions{})
+	res,err:=client.AppsV1().Deployments(namespace).Get("postgres-operator",metav1.GetOptions{})
+	if err != nil {
+		log.Fatalf("couldn't find the postgres operator in namespace: %v",namespace)
+	}
 	operatorImage := res.Spec.Template.Spec.Containers[0].Image
 	imageDetails := strings.Split(operatorImage, ":")
 	imageSplit := len(imageDetails)
@@ -53,4 +61,5 @@ func version() {
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	versionCmd.Flags().StringP("namespace", "n", "default", "provide the namespace.")
 }

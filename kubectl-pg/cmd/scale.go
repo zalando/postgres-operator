@@ -32,17 +32,17 @@ var scaleCmd = &cobra.Command{
 	Long: `Scales the postgres objects using cluster-name.
 Scaling to 0 leads to down time.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		clusterName, err := cmd.Flags().GetString("clusterName")
+		clusterName, err := cmd.Flags().GetString("cluster")
 		namespace, err := cmd.Flags().GetString("namespace")
 		if err != nil {
 			log.Fatal(err)
 		}
 		if len(args) > 0 {
-			numberofInstances, err := strconv.Atoi(args[0])
+			numberOfInstances, err := strconv.Atoi(args[0])
 			if err != nil {
 				log.Fatal(err)
 			}
-			scale(int32(numberofInstances), clusterName, namespace)
+			scale(int32(numberOfInstances), clusterName, namespace)
 		} else {
 			fmt.Println("Please enter number of instances to scale.")
 		}
@@ -76,8 +76,6 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter this serves to confirm the action\n", namespace, clusterName)
 		confirmAction(clusterName, namespace)
 	}
-	postgresql.Kind = "postgresql"
-	postgresql.APIVersion = "acid.zalan.do/v1"
 	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		log.Fatal(err)
@@ -118,10 +116,16 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 		configMapData := configMap.Data
 		for key, value := range configMapData {
 			if key == "min_instances" {
-				minInstances,_ = strconv.Atoi(value)
+				minInstances,err = strconv.Atoi(value)
+				if err != nil {
+					log.Fatalf("invalid min instances in configmap %v",err)
+				}
 			}
 			if key == "max_instances" {
-				maxInstances,_ = strconv.Atoi(value)
+				maxInstances,err = strconv.Atoi(value)
+				if err != nil {
+					log.Fatalf("invalid max instances in configmap %v",err)
+				}
 			}
 		}
 	} else if configMapName == "" {
@@ -129,7 +133,10 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 		if err != nil {
 			log.Fatal(err)
 		}
-		operatorConfig,_ := pgClient.OperatorConfigurations("s").Get(operatorConfigName,metav1.GetOptions{})
+		operatorConfig,err := pgClient.OperatorConfigurations("s").Get(operatorConfigName,metav1.GetOptions{})
+		if err != nil {
+			log.Fatalf("unable to read operator configuration %v",err)
+		}
 		minInstances = int(operatorConfig.Configuration.MinInstances)
 		maxInstances = int(operatorConfig.Configuration.MaxInstances)
 	}
@@ -138,7 +145,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 
 func init() {
 	namespace := getCurrentNamespace()
-	scaleCmd.Flags().StringP("namespace", "n", namespace, "provide the namespace.")
-	scaleCmd.Flags().StringP("clusterName", "c", "", "provide the cluster name.")
+	scaleCmd.Flags().StringP("namespace", "n", namespace, "namespace of the cluster to be scaled")
+	scaleCmd.Flags().StringP("cluster", "c", "", "provide the cluster name.")
 	rootCmd.AddCommand(scaleCmd)
 }

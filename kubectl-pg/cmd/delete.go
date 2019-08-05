@@ -29,7 +29,7 @@ import (
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Deletes postgresql object by cluster-name/manifest file",
-	Long: `Deletes the postgres objects specific to a manifest file or cluster-name.
+	Long: `Deletes the postgres objects identified by a manifest file or cluster-name.
 Deleting the manifest is sufficient to delete the cluster.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		namespace, _ := cmd.Flags().GetString("namespace")
@@ -50,16 +50,12 @@ Deleting the manifest is sufficient to delete the cluster.`,
 	Example: "kubectl pg delete -f [FILE-NAME]\nkubectl pg delete [CLUSTER-NAME] -n [NAMESPACE]",
 }
 
-func init() {
-	namespace := getCurrentNamespace()
-	deleteCmd.Flags().StringP("namespace", "n", namespace, "Delete postgresql resource by it's name.")
-	deleteCmd.Flags().StringP("file", "f", "", "using file.")
-	rootCmd.AddCommand(deleteCmd)
-}
-
 func deleteByFile(file string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ymlFile, err := ioutil.ReadFile(file)
 	if err != nil {
 		log.Fatal(err)
@@ -72,16 +68,16 @@ func deleteByFile(file string) {
 	postgresSql := obj.(*v1.Postgresql)
 	_, err = postgresConfig.Postgresqls(postgresSql.Namespace).Get(postgresSql.Name, metav1.GetOptions{})
 	if err != nil {
-		fmt.Printf("-> postgresql %s not found with the provided namespace %s : %s \n", postgresSql.Name, postgresSql.Namespace, err)
+		fmt.Printf("Postgresql %s not found with the provided namespace %s : %s \n", postgresSql.Name, postgresSql.Namespace, err)
 		return
 	}
-	fmt.Printf("-> Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", postgresSql.Namespace, postgresSql.Name)
+	fmt.Printf("Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", postgresSql.Namespace, postgresSql.Name)
 	confirmAction(postgresSql.Name, postgresSql.Namespace)
 	err = postgresConfig.Postgresqls(postgresSql.Namespace).Delete(postgresSql.Name, &metav1.DeleteOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("-> postgresql %s deleted from %s.\n", postgresSql.Name, postgresSql.Namespace)
+	fmt.Printf("Postgresql %s deleted from %s.\n", postgresSql.Name, postgresSql.Namespace)
 }
 
 func deleteByName(clusterName string, namespace string) {
@@ -92,14 +88,21 @@ func deleteByName(clusterName string, namespace string) {
 	}
 	_, err = postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
-		fmt.Printf("-> postgresql %s not found with the provided namespace %s : %s \n", clusterName, namespace, err)
+		fmt.Printf("Postgresql %s not found with the provided namespace %s : %s \n", clusterName, namespace, err)
 		return
 	}
-	fmt.Printf("-> Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", namespace, clusterName)
+	fmt.Printf("Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", namespace, clusterName)
 	confirmAction(clusterName, namespace)
 	err = postgresConfig.Postgresqls(namespace).Delete(clusterName, &metav1.DeleteOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("-> postgresql %s deleted from %s.\n", clusterName, namespace)
+	fmt.Printf("Postgresql %s deleted from %s.\n", clusterName, namespace)
+}
+
+func init() {
+	namespace := getCurrentNamespace()
+	deleteCmd.Flags().StringP("namespace", "n", namespace, "namespace of the cluster to be deleted.")
+	deleteCmd.Flags().StringP("file", "f", "", "manifest file with the cluster definition.")
+	rootCmd.AddCommand(deleteCmd)
 }

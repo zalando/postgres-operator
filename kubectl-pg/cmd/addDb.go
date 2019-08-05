@@ -32,7 +32,7 @@ var addDbCmd = &cobra.Command{
 		if len(args) > 0 {
 			dbName := args[0]
 			dbOwner, _ := cmd.Flags().GetString("owner")
-			clusterName, _ := cmd.Flags().GetString("clusterName")
+			clusterName, _ := cmd.Flags().GetString("cluster")
 			addDb(dbName, dbOwner, clusterName)
 		} else {
 			fmt.Println("database name can't be empty.")
@@ -59,21 +59,19 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 	} else {
 		log.Fatal("The provided db-name is reserved by postgres")
 	}
-	postgresql.APIVersion = "acid.zalan.do/v1"
-	postgresql.Kind ="postgresql"
-	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
+	updatedPostgres, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if updatedPostgresql.ResourceVersion != postgresql.ResourceVersion {
-		fmt.Printf("postgresql %s is updated with new database: %s and as owner: %s.\n", updatedPostgresql.Name, dbName, dbOwner)
+	if updatedPostgres.ResourceVersion != postgresql.ResourceVersion {
+		fmt.Printf("postgresql %s is updated with new database: %s and as owner: %s.\n", updatedPostgres.Name, dbName, dbOwner)
 	} else {
-		fmt.Printf("postgresql %s is unchanged.\n", updatedPostgresql.Name)
+		fmt.Printf("postgresql %s is unchanged.\n", updatedPostgres.Name)
 	}
 }
 
 func init() {
 	addDbCmd.Flags().StringP("owner", "o", "", "provide owner of the database.")
-	addDbCmd.Flags().StringP("clusterName", "c", "", "provide a postgres cluster name.")
+	addDbCmd.Flags().StringP("cluster", "c", "", "provide a postgres cluster name.")
 	rootCmd.AddCommand(addDbCmd)
 }

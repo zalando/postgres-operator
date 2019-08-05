@@ -4,14 +4,18 @@
 
 This project uses Go Modules for dependency management to build locally
 Install go and enable go modules ```export GO111MODULE=on```
+From Go >=1.13 Go modules will be enabled by default
+```
+# Assumes you have a working KUBECONFIG
+$ GO111MODULE="on" 
+# As of now go by default doesn't support Go mods. So explicit enabling is required.
+$ GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go mod vendor 
+# This generate a vendor directory with all dependencies needed by the plugin.
+$ $GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go install
+# This will place the kubectl-pg binary in your $GOPATH/bin
+```
 
-As this project doesn't contain vendor directory. 
-
-Generate vendor directory using ```go mod vendor```
-
-Clone the kubectl pg plugin and build from the source using ```go install``` this will generate kubectl pg plugin's executable in ```go/bin/kubectl-pg.exe```
-
-### To list all commands avaialble in kubectl pg
+### To list all commands available in kubectl pg
 
 ```kubectl pg --help``` (or) ```kubectl pg```
 
@@ -62,3 +66,31 @@ Note: A login user is created by default unless NOLOGIN is specified, in which c
 ### To extend volume for an existing pg cluster
 
 ```kubectl pg ext-volume 2Gi -c acid-minimal-cluster```
+
+### To find the version of postgres operator and kubectl plugin
+
+```kubectl pg version (optional -n NAMESPACE allows to know specific to a namespace)```
+
+### To connect to the shell of a postgres pod
+
+```kubectl pg connect -c CLUSTER``` #This connects to a random pod
+```kubectl pg connect -c CLUSTER -m``` #This connects the master
+```kubectl pg connect -c CLUSTER -r 0``` #This connects to the desired replica
+
+### To connect to the psql prompt
+
+```kubectl pg connect -c CLUSTER -p -u username``` #This connects to a random pod. Not master
+```kubectl pg connect -c CLUSTER -m -p -u username``` #This connects the master
+```kubectl pg connect -c CLUSTER -r 0 -p -u username``` #This connects to the desired replica
+
+Note: -p represents psql prompt
+
+### To get the logs of postgres operator
+
+```kubectl pg logs -o```
+
+### To get the logs of the postgres cluster
+
+```kubectl pg logs -c CLUSTER``` #Fetches the logs of a random pod. Not master
+```kubectl pg logs -c CLUSTER -m``` #Fetches the logs of master
+```kubectl pg logs -c CLUSTER -r 2``` #Fecthes the logs of specified replica

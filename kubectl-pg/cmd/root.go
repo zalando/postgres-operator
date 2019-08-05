@@ -23,7 +23,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "kubectl-pg",
-	Short: "A kubectl pg plugin",
+	Short: "kubectl plugin for the Zalando Postgres operator.",
 	Long:  `kubectl pg plugin for interaction with Zalando postgres operator.`,
 }
 

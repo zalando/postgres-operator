@@ -58,6 +58,6 @@ func create(fileName string) {
 }
 
 func init() {
-	createCmd.Flags().StringP("file", "f", "", "using file.")
+	createCmd.Flags().StringP("file", "f", "", "manifest file with the cluster definition.")
 	rootCmd.AddCommand(createCmd)
 }

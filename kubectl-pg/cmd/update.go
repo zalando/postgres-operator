@@ -37,10 +37,6 @@ var updateCmd = &cobra.Command{
 	Example: "kubectl pg update -f [File-NAME]",
 }
 
-func init() {
-	updateCmd.Flags().StringP("file", "f", "", "using file")
-	rootCmd.AddCommand(updateCmd)
-}
 
 // Update postgresql resources.
 func updatePgResources(fileName string) {
@@ -70,4 +66,9 @@ func updatePgResources(fileName string) {
 	} else {
 		fmt.Printf("postgresql %s is unchanged.\n", response.Name)
 	}
+}
+
+func init() {
+	updateCmd.Flags().StringP("file", "f", "", "manifest file with the cluster definition.")
+	rootCmd.AddCommand(updateCmd)
 }

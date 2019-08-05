@@ -16,16 +16,12 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
 	"log"
 	"os"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/remotecommand"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	"strconv"
-	"k8s.io/client-go/rest"
 )
 
 // connectCmd represents the kubectl pg connect command
@@ -54,30 +50,7 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 	if er != nil {
 		log.Fatal(er)
 	}
-	postgresConfig, err := PostgresqlLister.NewForConfig(config)
-	postgresCluster, err := postgresConfig.Postgresqls(getCurrentNamespace()).Get(clusterName, metav1.GetOptions{})
-	if err != nil {
-		log.Fatal(err)
-	}
-	numOfInstances := postgresCluster.Spec.NumberOfInstances
-	var podName string
-	var podRole string
-	for ins:=0;ins < int(numOfInstances);ins++ {
-		pod,err := client.CoreV1().Pods(getCurrentNamespace()).Get(clusterName+"-"+strconv.Itoa(ins),metav1.GetOptions{})
-		if err != nil {
-			log.Fatal(err)
-		}
-		podRole = pod.Labels["spilo-role"]
-		if podRole == "master" && master {
-			podName = pod.Name
-			fmt.Printf("connected to %s with name %s\n",podRole, podName)
-			break
-		} else if podRole == "replica" &&  !master  && (pod.Name == replica || replica == "") {
-			podName = pod.Name
-			fmt.Printf("connected to %s with pod name as %s\n",podRole, podName)
-			break
-		}
-	}
+	podName := getPodName(clusterName,master,replica)
 	execRequest := &rest.Request{}
 	if psql {
 		execRequest = client.CoreV1().RESTClient().Post().Resource("pods").
@@ -121,7 +94,7 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 }
 
 func init() {
-	connectCmd.Flags().StringP("clusterName", "c", "", "provide the cluster name.")
+	connectCmd.Flags().StringP("cluster", "c", "", "provide the cluster name.")
 	connectCmd.Flags().BoolP("master", "m", false, "connect to master.")
 	connectCmd.Flags().StringP("replica", "r","", "connect to replica.")
 	connectCmd.Flags().BoolP("psql","p",false,"connect to psql prompt.")

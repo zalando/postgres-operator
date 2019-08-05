@@ -24,34 +24,34 @@ import (
 	"strings"
 )
 
-var Allowed_Privileges  = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
+var allowedPrivileges  = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
 // addUserCmd represents the addUser command
 var addUserCmd = &cobra.Command{
 	Use:   "add-user",
 	Short: "Adds a user to the postgres cluster with given privileges",
 	Long:  `Adds a user to the postgres cluster you can add privileges as well with -p flag.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		clusterName, _ := cmd.Flags().GetString("clusterName")
+		clusterName, _ := cmd.Flags().GetString("cluster")
 		privileges, _ := cmd.Flags().GetString("privileges")
 		if len(args) > 0 {
 			user := args[0]
-			permissions := []string{}
-			perms := []string{}
+			var permissions []string
+			var perms []string
 
 			if privileges != "" {
 				parsedRoles := strings.Replace(privileges, ",", " ", -1)
 				permissions = strings.Fields(parsedRoles)
 				invalidPerms := []string{}
-				for _, userPrivilge := range permissions {
+				for _, userPrivilege := range permissions {
 					validPerm := false
-					for _, privilge := range Allowed_Privileges {
-						if privilge == userPrivilge {
-							perms = append(perms, userPrivilge)
+					for _, privilege := range allowedPrivileges {
+						if privilege == userPrivilege {
+							perms = append(perms, userPrivilege)
 							validPerm = true
 						}
 					}
 					if !validPerm {
-						invalidPerms = append(invalidPerms, userPrivilge)
+						invalidPerms = append(invalidPerms, userPrivilege)
 					}
 				}
 				if len(invalidPerms) > 0 {
@@ -107,7 +107,7 @@ func addUser(user string, clusterName string, permissions []string) {
 }
 
 func init() {
-	addUserCmd.Flags().StringP("clusterName", "c", "", "add user to the provided cluster.")
+	addUserCmd.Flags().StringP("cluster", "c", "", "add user to the provided cluster.")
 	addUserCmd.Flags().StringP("privileges", "p", "", "add privileges to the provided cluster.")
 	rootCmd.AddCommand(addUserCmd)
 }
