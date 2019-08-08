@@ -98,7 +98,7 @@ on `configmaps` resources). This is also done intentionally to avoid breaking
 things if someone decides to configure the same service account in the
 operator's ConfigMap to run Postgres clusters.
 
-### Give K8S users access to create/list `postgresqls`
+### Give K8s users access to create/list `postgresqls`
 
 By default `postgresql` custom resources can only be listed and changed by
 cluster admins. To allow read and/or write access to other human users apply
@@ -363,7 +363,7 @@ used internally in K8s.
 
 ## Logical backups
 
-The operator can manage k8s cron jobs to run logical backups of Postgres
+The operator can manage K8s cron jobs to run logical backups of Postgres
 clusters. The cron job periodically spawns a batch job that runs a single pod.
 The backup script within this pod's container can connect to a DB for a logical
 backup. The operator updates cron jobs during Sync if the job schedule changes;

@@ -4,7 +4,7 @@
 # Optionally re-build the operator binary beforehand to test local changes
 
 # Known limitations:
-# 1) minikube provides a single node k8s cluster. That is, you will not be able test functions like pod
+# 1) minikube provides a single node K8s cluster. That is, you will not be able test functions like pod
 #    migration between multiple nodes locally
 # 2) this script configures the operator via configmap, not the operator CRD
 

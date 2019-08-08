@@ -38,7 +38,7 @@
       node[k8s-label] (app-label) {App}
       node[k8s-label, right=.25cm of app-label] (role-label) {Role}
       node[k8s-label, right=.25cm of role-label] (custom-label) {Custom}
-      node[label, below of=role-label] (k8s-label-label) {K8S Labels}
+      node[label, below of=role-label] (k8s-label-label) {K8s Labels}
       node[border, behind path,
            fit=(app-label)(role-label)(custom-label)(k8s-label-label)
       ] (k8s-labels) {};  \& \&
