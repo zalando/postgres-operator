@@ -30,7 +30,7 @@ var connectCmd = &cobra.Command{
 	Short: "Connects to the shell prompt, psql prompt of postgres cluster",
 	Long: `Connects to the shell prompt, psql prompt of postgres cluster and also to specified replica or master.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		clusterName,_ := cmd.Flags().GetString("clusterName")
+		clusterName,_ := cmd.Flags().GetString("cluster")
 		master,_ := cmd.Flags().GetBool("master")
 		replica,_ := cmd.Flags().GetString("replica")
 		psql,_ := cmd.Flags().GetBool("psql")

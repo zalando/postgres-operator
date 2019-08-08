@@ -16,22 +16,12 @@ limitations under the License.
 package cmd
 
 import (
-	//"flag"
-	"fmt"
 	"github.com/spf13/cobra"
 	"io"
-	"os"
-	//"strconv"
-
-	//"io"
-	"k8s.io/client-go/kubernetes"
-	//"k8s.io/client-go/tools/remotecommand"
-	"log"
-	//"os"
-
-	//"k8s.io/client-go/kubernetes"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//"log"
+	"k8s.io/client-go/kubernetes"
+	"log"
+	"os"
 )
 
 // logsCmd represents the logs command
@@ -71,7 +61,6 @@ func logs(operatorLogs bool, clusterName string, master bool, replica string) {
 		podName := pod.Labels
 		if val, ok := podName["name"]; ok && val == lookFor {
 			operatorPodName = pod.Name
-			fmt.Println(operatorPodName)
 			break
 		}
 	}

@@ -67,7 +67,7 @@ func confirmAction(clusterName string, namespace string) {
 	}
 }
 
-func getPodName(clusterName string, master bool, replica string) string {
+func getPodName(clusterName string, master bool, replicaNumber string) string {
 	config := getConfig()
 	client,er := kubernetes.NewForConfig(config)
 	if er != nil {
@@ -81,7 +81,7 @@ func getPodName(clusterName string, master bool, replica string) string {
 	numOfInstances := postgresCluster.Spec.NumberOfInstances
 	var podName string
 	var podRole string
-	replica = clusterName+"-"+replica
+	replica := clusterName+"-"+replicaNumber
 	for ins:=0;ins < int(numOfInstances);ins++ {
 		pod,err := client.CoreV1().Pods(getCurrentNamespace()).Get(clusterName+"-"+strconv.Itoa(ins),metav1.GetOptions{})
 		if err != nil {
@@ -90,9 +90,9 @@ func getPodName(clusterName string, master bool, replica string) string {
 		podRole = pod.Labels["spilo-role"]
 		if podRole == "master" && master {
 			podName = pod.Name
-			fmt.Printf("connected to %s with name %s\n",podRole, podName)
+			fmt.Printf("connected to %s with pod name as %s\n",podRole, podName)
 			break
-		} else if podRole == "replica" &&  !master  && (pod.Name == replica || replica == "") {
+		} else if podRole == "replica" &&  !master  && (pod.Name == replica || replicaNumber == "") {
 			podName = pod.Name
 			fmt.Printf("connected to %s with pod name as %s\n",podRole, podName)
 			break

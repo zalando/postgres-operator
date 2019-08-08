@@ -76,6 +76,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		fmt.Printf("Scaling to zero leads to down time. please type %s/%s and hit Enter this serves to confirm the action\n", namespace, clusterName)
 		confirmAction(clusterName, namespace)
 	}
+	postgresql.Labels = map[string]string{"spilo-role": "replica"}
 	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		log.Fatal(err)
@@ -133,7 +134,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 		if err != nil {
 			log.Fatal(err)
 		}
-		operatorConfig,err := pgClient.OperatorConfigurations("s").Get(operatorConfigName,metav1.GetOptions{})
+		operatorConfig,err := pgClient.OperatorConfigurations(getCurrentNamespace()).Get(operatorConfigName,metav1.GetOptions{})
 		if err != nil {
 			log.Fatalf("unable to read operator configuration %v",err)
 		}
