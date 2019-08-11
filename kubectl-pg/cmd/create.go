@@ -44,16 +44,19 @@ func create(fileName string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, _, err := decode([]byte(ymlFile), nil, &v1.Postgresql{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	postgresSql := obj.(*v1.Postgresql)
 	_, err = postgresConfig.Postgresqls(postgresSql.Namespace).Create(postgresSql)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	fmt.Printf("postgresql %s created.\n", postgresSql.Name)
 }
 

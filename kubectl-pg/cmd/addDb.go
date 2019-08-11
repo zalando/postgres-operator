@@ -26,8 +26,8 @@ import (
 // addDbCmd represents the addDb command
 var addDbCmd = &cobra.Command{
 	Use:   "add-db",
-	Short: "Adds a DB and its owner to a Postgres cluster. The owner role is created if it does not already exist",
-	Long:  `Adds a DB and its owner to the cluster owner needs to be added with -o flag.`,
+	Short: "Adds a DB and its owner to a Postgres cluster. The owner role is created if it does not exist",
+	Long:  `Adds a DB and its owner to the cluster owner needs to be added with -o flag, cluster with -c flag.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 {
 			dbName := args[0]
@@ -35,7 +35,7 @@ var addDbCmd = &cobra.Command{
 			clusterName, _ := cmd.Flags().GetString("cluster")
 			addDb(dbName, dbOwner, clusterName)
 		} else {
-			fmt.Println("database name can't be empty.")
+			fmt.Println("database name can't be empty. Use kubectl pg add-db [-h | --help] for more info")
 		}
 
 	},
@@ -49,20 +49,28 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	namespace := getCurrentNamespace()
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	if postgresql.Spec.Databases == nil {
+		postgresql.Spec.Databases = make(map[string]string)
+	}
+
 	if dbName != "postgres" && dbName != "template0" && dbName != "template1" {
 		postgresql.Spec.Databases[dbName] = dbOwner
 	} else {
 		log.Fatal("The provided db-name is reserved by postgres")
 	}
+
 	updatedPostgres, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if updatedPostgres.ResourceVersion != postgresql.ResourceVersion {
 		fmt.Printf("postgresql %s is updated with new database: %s and as owner: %s.\n", updatedPostgres.Name, dbName, dbOwner)
 	} else {

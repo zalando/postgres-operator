@@ -35,11 +35,13 @@ var connectCmd = &cobra.Command{
 		replica,_ := cmd.Flags().GetString("replica")
 		psql,_ := cmd.Flags().GetBool("psql")
 		user,_ := cmd.Flags().GetString("user")
+
 		if psql {
 			if user == "" {
 				log.Fatal("please provide user for psql prompt")
 			}
 		}
+
 		connect(clusterName,master,replica,psql,user)
 	},
 }
@@ -50,8 +52,10 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 	if er != nil {
 		log.Fatal(er)
 	}
+
 	podName := getPodName(clusterName,master,replica)
 	execRequest := &rest.Request{}
+
 	if psql {
 		execRequest = client.CoreV1().RESTClient().Post().Resource("pods").
 			Name(podName).
@@ -78,10 +82,12 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 			Param("stderr", "true").
 			Param("tty", "true")
 	}
+
 	exec,err := remotecommand.NewSPDYExecutor(config,"POST",execRequest.URL())
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = exec.Stream(remotecommand.StreamOptions{
 		Stdin: os.Stdin,
 		Stdout: os.Stdout,

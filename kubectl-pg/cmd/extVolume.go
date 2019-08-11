@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
+	"strconv"
 )
 
 // extVolumeCmd represents the extVolume command
@@ -48,19 +49,29 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	namespace := getCurrentNamespace()
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatalf("hii %v",err)
 	}
+
 	oldSize, err := resource.ParseQuantity(postgresql.Spec.Volume.Size)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	newSize, err := resource.ParseQuantity(increasedVolumeSize)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	_, err = strconv.Atoi(newSize.String())
+	if err == nil {
+		fmt.Println("provide the valid volume size with respective units i.e Ki, Mi, Gi")
+		return
+	}
+
 	if newSize.Value() > oldSize.Value() {
 		postgresql.Spec.Volume.Size = increasedVolumeSize
 		response, err := postgresConfig.Postgresqls(namespace).Update(postgresql)

@@ -73,20 +73,24 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 	if er != nil {
 		log.Fatal(er)
 	}
+
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
 	postgresCluster, err := postgresConfig.Postgresqls(getCurrentNamespace()).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	numOfInstances := postgresCluster.Spec.NumberOfInstances
 	var podName string
 	var podRole string
 	replica := clusterName+"-"+replicaNumber
+
 	for ins:=0;ins < int(numOfInstances);ins++ {
 		pod,err := client.CoreV1().Pods(getCurrentNamespace()).Get(clusterName+"-"+strconv.Itoa(ins),metav1.GetOptions{})
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		podRole = pod.Labels["spilo-role"]
 		if podRole == "master" && master {
 			podName = pod.Name

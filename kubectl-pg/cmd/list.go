@@ -16,15 +16,18 @@ package cmd
 
 import (
 	"fmt"
-	//v1 "github.com/VineethReddy02/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/spf13/cobra"
+	"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"strconv"
 	"time"
-	"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	)
+)
+
+const (
+	trimCreateTimestamp = 6000000000
+)
 
 // listCmd represents kubectl pg list.
 var listCmd = &cobra.Command{
@@ -41,7 +44,10 @@ var listCmd = &cobra.Command{
 		}
 
 	},
-	Example: "kubectl pg list\nkubectl pg list -A",
+	Example: "#Lists postgres cluster in current namespace\n" +
+		"kubectl pg list\n\n" +
+		"#Lists postgres clusters in all namespaces\n" +
+		"kubectl pg list -A",
 }
 
 // list command to list postgres.
@@ -51,11 +57,13 @@ func list(allNamespaces bool, namespace string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	var listPostgres *v1.PostgresqlList
 	listPostgres, err = postgresConfig.Postgresqls(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if len(listPostgres.Items) == 0 {
 		if namespace != "" {
 			fmt.Printf("No Postgresql clusters found in namespace: %v\n", namespace)
@@ -64,6 +72,7 @@ func list(allNamespaces bool, namespace string) {
 		}
 		return
 	}
+
 	if allNamespaces {
 		listAll(listPostgres)
 	} else {
@@ -77,7 +86,7 @@ func listAll(listPostgres *v1.PostgresqlList) {
 	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME", "NAMESPACE")
 	for _, pgObjs := range listPostgres.Items {
 		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000), pgObjs.Spec.Size, pgObjs.Namespace)
+			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(trimCreateTimestamp), pgObjs.Spec.Size, pgObjs.Namespace)
 	}
 }
 

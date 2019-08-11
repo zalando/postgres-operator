@@ -33,6 +33,7 @@ var addUserCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, _ := cmd.Flags().GetString("cluster")
 		privileges, _ := cmd.Flags().GetString("privileges")
+
 		if len(args) > 0 {
 			user := args[0]
 			var permissions []string
@@ -42,6 +43,7 @@ var addUserCmd = &cobra.Command{
 				parsedRoles := strings.Replace(privileges, ",", " ", -1)
 				permissions = strings.Fields(parsedRoles)
 				invalidPerms := []string{}
+
 				for _, userPrivilege := range permissions {
 					validPerm := false
 					for _, privilege := range allowedPrivileges {
@@ -54,6 +56,7 @@ var addUserCmd = &cobra.Command{
 						invalidPerms = append(invalidPerms, userPrivilege)
 					}
 				}
+
 				if len(invalidPerms) > 0 {
 					fmt.Printf("Invalid privileges %s\n", invalidPerms)
 					return
@@ -72,33 +75,37 @@ func addUser(user string, clusterName string, permissions []string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	namespace := getCurrentNamespace()
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	setUsers := make(map[string]bool)
 	for _, k := range permissions {
 		setUsers[k] = true
 	}
+
 	if existingRoles, key := postgresql.Spec.Users[user]; key {
 		for _, k := range existingRoles {
 			setUsers[k] = true
 		}
 	}
-	finalUsers := []string{}
+
+	var finalUsers []string
 	for keys, values := range setUsers {
 		if values {
 			finalUsers = append(finalUsers, keys)
 		}
 	}
+
 	postgresql.Spec.Users[user] = finalUsers
-	postgresql.APIVersion = "acid.zalan.do/v1"
-	postgresql.Kind ="postgresql"
 	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if updatedPostgresql.ResourceVersion != postgresql.ResourceVersion {
 		fmt.Printf("postgresql %s is updated with new user %s and with privileges %s.\n", updatedPostgresql.Name, user, permissions)
 	} else {

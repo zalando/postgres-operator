@@ -46,21 +46,25 @@ func updatePgResources(fileName string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, _, err := decode([]byte(ymlFile), nil, &v1.Postgresql{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	newPostgresObj := obj.(*v1.Postgresql)
 	oldPostgresObj, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Get(newPostgresObj.Name, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	newPostgresObj.ResourceVersion = oldPostgresObj.ResourceVersion
 	response, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(newPostgresObj)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if newPostgresObj.ResourceVersion != response.ResourceVersion {
 		fmt.Printf("postgresql %s updated.\n", response.Name)
 	} else {

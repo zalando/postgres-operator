@@ -43,10 +43,12 @@ func check() *v1beta1.CustomResourceDefinition {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	crdInfo, err := apiExtClient.CustomResourceDefinitions().Get(postgresConstants.PostgresCRDResouceName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if crdInfo.Name == postgresConstants.PostgresCRDResouceName {
 		fmt.Printf("Postgres Operator is installed in the k8s cluster.\n")
 	} else {

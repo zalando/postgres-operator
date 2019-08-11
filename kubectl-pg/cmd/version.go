@@ -43,15 +43,18 @@ var versionCmd = &cobra.Command{
 
 func version(namespace string) {
 	fmt.Printf("kubectl-pg: %s\n",kubectlPgVersion)
+
 	config := getConfig()
 	client,err := kubernetes.NewForConfig(config)
 	if err!= nil {
 		log.Fatal(err)
 	}
+
 	res,err:=client.AppsV1().Deployments(namespace).Get("postgres-operator",metav1.GetOptions{})
 	if err != nil {
 		log.Fatalf("couldn't find the postgres operator in namespace: %v",namespace)
 	}
+
 	operatorImage := res.Spec.Template.Spec.Containers[0].Image
 	imageDetails := strings.Split(operatorImage, ":")
 	imageSplit := len(imageDetails)

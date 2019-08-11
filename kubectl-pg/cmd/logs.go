@@ -34,6 +34,7 @@ var logsCmd = &cobra.Command{
 		clusterName,_ := cmd.Flags().GetString("cluster")
 		master,_:=cmd.Flags().GetBool("master")
 		replica,_:= cmd.Flags().GetString("replica")
+
 		if operatorLogs {
 			logs(operatorLogs,clusterName,master,replica)
 		} else {
@@ -48,15 +49,18 @@ func logs(operatorLogs bool, clusterName string, master bool, replica string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	allPods, err := client.CoreV1().Pods(getCurrentNamespace()).List(metav1.ListOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	operatorPodName := ""
 	var lookFor string
 	if operatorLogs {
 		lookFor = "postgres-operator"
 	}
+
 	for _, pod := range allPods.Items {
 		podName := pod.Labels
 		if val, ok := podName["name"]; ok && val == lookFor {
@@ -71,10 +75,12 @@ func logs(operatorLogs bool, clusterName string, master bool, replica string) {
 		SubResource("log").
 		Param("follow", "--follow").
 		Param("container", "postgres-operator")
+
 	readCloser, err := execRequest.Stream()
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer readCloser.Close()
 	_, err = io.Copy(os.Stdout, readCloser)
 	if err != nil {
@@ -89,6 +95,7 @@ func clusterLogs(clusterName string, master bool,replica string){
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	podName := getPodName(clusterName,master,replica)
 	execRequest := client.CoreV1().RESTClient().Get().Namespace("default").
 		Name(podName).
@@ -96,10 +103,12 @@ func clusterLogs(clusterName string, master bool,replica string){
 		SubResource("log").
 		Param("follow", "--follow").
 		Param("container", "postgres")
+
 	readCloser, err := execRequest.Stream()
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer readCloser.Close()
 	_, err = io.Copy(os.Stdout, readCloser)
 	if err != nil {
