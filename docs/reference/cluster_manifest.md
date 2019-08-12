@@ -172,7 +172,7 @@ explanation of `ttl` and `loop_wait` parameters.
   ones include
 
   ```
-  hostsll all +pamrole all pam
+  hostssl all +pamrole all pam
   ```
   , where pamrole is the name of the role for the pam authentication; any
     custom `pg_hba` should include the pam line to avoid breaking pam
