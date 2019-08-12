@@ -84,12 +84,13 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		confirmAction(clusterName, namespace)
 	}
 
-	postgresJson, err := json.Marshal(postgresql)
+	instances := map[string]map[string]int32	{"spec": {"numberOfInstances": numberOfInstances}}
+	patchInstances, err := json.Marshal(instances)
 	if err != nil {
-		log.Fatal(err,"unable to parse json")
+		log.Fatal(err,"unable to parse number of instances json")
 	}
 
-	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, []byte(postgresJson),"")
+	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, patchInstances,"")
 	if err != nil {
 		log.Fatal(err)
 	}
