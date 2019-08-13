@@ -16,11 +16,13 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"log"
 	"strconv"
 )
@@ -73,8 +75,8 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	}
 
 	if newSize.Value() > oldSize.Value() {
-		postgresql.Spec.Volume.Size = increasedVolumeSize
-		response, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
+		patchInstances := volumePatch(newSize)
+		response, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, patchInstances,"")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -88,6 +90,17 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	} else {
 		fmt.Printf("volume %s size cannot be shrinked.\n",postgresql.Spec.Volume.Size)
 	}
+}
+
+
+func volumePatch(volume resource.Quantity) []byte{
+	fmt.Printf(volume.String())
+	patchData := map[string]map[string]map[string]resource.Quantity{"spec": {"volume": {"size": volume}}}
+	patch, err := json.Marshal(patchData)
+	if err != nil {
+		log.Fatal(err, "unable to parse number of instances json")
+	}
+	return patch
 }
 
 func init() {

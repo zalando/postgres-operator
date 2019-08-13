@@ -16,10 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"log"
 )
 
@@ -56,17 +58,15 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 		log.Fatal(err)
 	}
 
-	if postgresql.Spec.Databases == nil {
-		postgresql.Spec.Databases = make(map[string]string)
-	}
-
+	var patch []byte
+	// validating reserved DB names
 	if dbName != "postgres" && dbName != "template0" && dbName != "template1" {
-		postgresql.Spec.Databases[dbName] = dbOwner
+		patch = dbPatch(dbName,dbOwner)
 	} else {
 		log.Fatal("The provided db-name is reserved by postgres")
 	}
 
-	updatedPostgres, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
+	updatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, patch,"")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -76,6 +76,15 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 	} else {
 		fmt.Printf("postgresql %s is unchanged.\n", updatedPostgres.Name)
 	}
+}
+
+func dbPatch(dbname string, owner string) []byte {
+	ins := map[string]map[string]map[string]string{"spec": {"databases": {dbname: owner}}}
+	patchInstances, err := json.Marshal(ins)
+	if err != nil {
+		log.Fatal(err, "unable to parse number of instances json")
+	}
+	return patchInstances
 }
 
 func init() {

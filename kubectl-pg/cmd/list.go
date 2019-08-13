@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	trimCreateTimestamp = 6000000000
+	TrimCreateTimestamp = 6000000000
 )
 
 // listCmd represents kubectl pg list.
@@ -86,7 +86,7 @@ func listAll(listPostgres *v1.PostgresqlList) {
 	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME", "NAMESPACE")
 	for _, pgObjs := range listPostgres.Items {
 		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(trimCreateTimestamp), pgObjs.Spec.Size, pgObjs.Namespace)
+			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp), pgObjs.Spec.Size, pgObjs.Namespace)
 	}
 }
 
@@ -95,7 +95,7 @@ func listWithNamespace(listPostgres *v1.PostgresqlList) {
 	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME")
 	for _, pgObjs := range listPostgres.Items {
 		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(6000000000), pgObjs.Spec.Size)
+			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp), pgObjs.Spec.Size)
 	}
 }
 

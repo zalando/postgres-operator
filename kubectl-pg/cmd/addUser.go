@@ -16,10 +16,12 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"log"
 	"strings"
 )
@@ -93,15 +95,15 @@ func addUser(user string, clusterName string, permissions []string) {
 		}
 	}
 
-	var finalUsers []string
+	var Privileges []string
 	for keys, values := range setUsers {
 		if values {
-			finalUsers = append(finalUsers, keys)
+			Privileges = append(Privileges, keys)
 		}
 	}
 
-	postgresql.Spec.Users[user] = finalUsers
-	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Update(postgresql)
+	patch := applyUserPatch(user, Privileges)
+	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, patch,"")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,6 +114,16 @@ func addUser(user string, clusterName string, permissions []string) {
 		fmt.Printf("postgresql %s is unchanged.\n", updatedPostgresql.Name)
 	}
 }
+
+func applyUserPatch(user string, value []string) []byte {
+	ins := map[string]map[string]map[string][]string{"spec": {"users": {user: value}}}
+	patchInstances, err := json.Marshal(ins)
+	if err != nil {
+		log.Fatal(err, "unable to parse number of instances json")
+	}
+	return patchInstances
+}
+
 
 func init() {
 	addUserCmd.Flags().StringP("cluster", "c", "", "add user to the provided cluster.")

@@ -3,6 +3,9 @@ package cmd
 import (
 	"flag"
 	"fmt"
+	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	v1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -13,8 +16,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+const (
+	OperatorName = "postgres-operator"
+	DefaultNamespace = "default"
 )
 
 func getConfig() *restclient.Config {
@@ -46,7 +51,7 @@ func getCurrentNamespace() string {
 	}
 	currentNamespace := string(namespace)
 	if currentNamespace == "" {
-		currentNamespace = "default"
+		currentNamespace = DefaultNamespace
 	}
 	return currentNamespace
 }
@@ -75,6 +80,10 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 	}
 
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	postgresCluster, err := postgresConfig.Postgresqls(getCurrentNamespace()).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
@@ -107,3 +116,26 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 	}
 	return podName
 }
+
+func getOperatorFromOtherNamespace(k8sClient *kubernetes.Clientset) *v1.Deployment {
+	var operator *v1.Deployment
+	operator,err := k8sClient.AppsV1().Deployments(getCurrentNamespace()).Get(OperatorName,metav1.GetOptions{})
+	if err == nil {
+		return operator
+	}
+
+	allDeployments := k8sClient.AppsV1().Deployments("")
+	listDeployments, err := allDeployments.List(metav1.ListOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, deployment := range listDeployments.Items {
+		if deployment.Name == OperatorName {
+			operator = deployment.DeepCopy()
+			break
+		}
+	}
+	return operator
+}
+
