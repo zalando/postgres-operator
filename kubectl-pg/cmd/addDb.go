@@ -72,7 +72,7 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 	}
 
 	if updatedPostgres.ResourceVersion != postgresql.ResourceVersion {
-		fmt.Printf("postgresql %s is updated with new database: %s and as owner: %s.\n", updatedPostgres.Name, dbName, dbOwner)
+		fmt.Printf("Created new database %s with owner %s in PostgreSQL cluster %s.\n", dbName, dbOwner, updatedPostgres.Name)
 	} else {
 		fmt.Printf("postgresql %s is unchanged.\n", updatedPostgres.Name)
 	}

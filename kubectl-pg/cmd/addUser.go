@@ -127,6 +127,6 @@ func applyUserPatch(user string, value []string) []byte {
 
 func init() {
 	addUserCmd.Flags().StringP("cluster", "c", "", "add user to the provided cluster.")
-	addUserCmd.Flags().StringP("privileges", "p", "", "add privileges to the provided cluster.")
+	addUserCmd.Flags().StringP("privileges", "p", "", "add privileges separated by commas without spaces")
 	rootCmd.AddCommand(addUserCmd)
 }
