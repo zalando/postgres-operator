@@ -58,10 +58,19 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 		log.Fatal(err)
 	}
 
+	var dbOwnerExists bool
+	dbUsers := postgresql.Spec.Users
+	for key, _ := range dbUsers {
+		if key == dbOwner {
+			dbOwnerExists = true
+		}
+	}
 	var patch []byte
 	// validating reserved DB names
-	if dbName != "postgres" && dbName != "template0" && dbName != "template1" {
+	if dbOwnerExists && dbName != "postgres" && dbName != "template0" && dbName != "template1" {
 		patch = dbPatch(dbName,dbOwner)
+	} else if !dbOwnerExists {
+		log.Fatal("The provided db-owner doesn't exist")
 	} else {
 		log.Fatal("The provided db-name is reserved by postgres")
 	}
