@@ -117,7 +117,7 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 	return podName
 }
 
-func getOperatorFromOtherNamespace(k8sClient *kubernetes.Clientset) *v1.Deployment {
+func getPostgresOperator(k8sClient *kubernetes.Clientset) *v1.Deployment {
 	var operator *v1.Deployment
 	operator,err := k8sClient.AppsV1().Deployments(getCurrentNamespace()).Get(OperatorName,metav1.GetOptions{})
 	if err == nil {

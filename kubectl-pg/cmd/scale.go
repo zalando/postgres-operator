@@ -102,7 +102,7 @@ func scalePatch(value int32) []byte {
 	instances := map[string]map[string]int32{"spec":{"numberOfInstances": value }}
 	patchInstances, err := json.Marshal(instances)
 	if err != nil {
-		log.Fatal(err, "unable to parse number of instances json")
+		log.Fatal(err, "unable to parse patch for scale")
 	}
 	return patchInstances
 }
@@ -114,7 +114,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 	}
 
 	var operator *v1.Deployment
-	operator = getOperatorFromOtherNamespace(k8sClient)
+	operator = getPostgresOperator(k8sClient)
 
 	operatorContainer := operator.Spec.Template.Spec.Containers
 	var configMapName, operatorConfigName string

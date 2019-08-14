@@ -31,14 +31,14 @@ var logsCmd = &cobra.Command{
 	Long:  `Fetches the logs of the postgres cluster (i.e master( with -m flag) & replica with (-r 1 pod number) and without -m or -r connects to random replica`,
 	Run: func(cmd *cobra.Command, args []string) {
 		opLogs, _ := cmd.Flags().GetBool("operator")
-		clusterName,_ := cmd.Flags().GetString("cluster")
-		master,_:=cmd.Flags().GetBool("master")
-		replica,_:= cmd.Flags().GetString("replica")
+		clusterName, _ := cmd.Flags().GetString("cluster")
+		master, _ := cmd.Flags().GetBool("master")
+		replica, _ := cmd.Flags().GetString("replica")
 
 		if opLogs {
 			operatorLogs()
 		} else {
-			clusterLogs(clusterName,master,replica)
+			clusterLogs(clusterName, master, replica)
 		}
 	},
 }
@@ -50,7 +50,7 @@ func operatorLogs() {
 		log.Fatal(err)
 	}
 
-	operator := getOperatorFromOtherNamespace(client)
+	operator := getPostgresOperator(client)
 	allPods, err := client.CoreV1().Pods(operator.Namespace).List(metav1.ListOptions{})
 	if err != nil {
 		log.Fatal(err)
@@ -58,10 +58,11 @@ func operatorLogs() {
 
 	var operatorPodName string
 	for _, pod := range allPods.Items {
-		podName := pod.Labels
-		if val, ok := podName["name"]; ok && val == OperatorName {
-			operatorPodName = pod.Name
-			break
+		for key, value := range pod.Labels {
+			if (key == "name" && value == OperatorName) || (key == "app.kubernetes.io/name" && value == OperatorName) {
+				operatorPodName = pod.Name
+				break
+			}
 		}
 	}
 
@@ -84,15 +85,14 @@ func operatorLogs() {
 	}
 }
 
-
-func clusterLogs(clusterName string, master bool,replica string){
+func clusterLogs(clusterName string, master bool, replica string) {
 	config := getConfig()
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	podName := getPodName(clusterName,master,replica)
+	podName := getPodName(clusterName, master, replica)
 	execRequest := client.CoreV1().RESTClient().Get().Namespace(getCurrentNamespace()).
 		Name(podName).
 		Resource("pods").
@@ -115,7 +115,7 @@ func clusterLogs(clusterName string, master bool,replica string){
 func init() {
 	rootCmd.AddCommand(logsCmd)
 	logsCmd.Flags().BoolP("operator", "o", false, "logs of operator")
-	logsCmd.Flags().StringP("cluster","c","","logs for the provided cluster")
-	logsCmd.Flags().BoolP("master","m",false,"specify -m for master")
-	logsCmd.Flags().StringP("replica","r","","specify replica name")
+	logsCmd.Flags().StringP("cluster", "c", "", "logs for the provided cluster")
+	logsCmd.Flags().BoolP("master", "m", false, "specify -m for master")
+	logsCmd.Flags().StringP("replica", "r", "", "specify replica name")
 }

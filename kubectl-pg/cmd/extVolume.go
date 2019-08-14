@@ -94,11 +94,10 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 
 
 func volumePatch(volume resource.Quantity) []byte{
-	fmt.Printf(volume.String())
 	patchData := map[string]map[string]map[string]resource.Quantity{"spec": {"volume": {"size": volume}}}
 	patch, err := json.Marshal(patchData)
 	if err != nil {
-		log.Fatal(err, "unable to parse number of instances json")
+		log.Fatal(err, "unable to parse patch to extend volume")
 	}
 	return patch
 }

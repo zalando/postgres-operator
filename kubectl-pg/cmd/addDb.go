@@ -82,7 +82,7 @@ func dbPatch(dbname string, owner string) []byte {
 	ins := map[string]map[string]map[string]string{"spec": {"databases": {dbname: owner}}}
 	patchInstances, err := json.Marshal(ins)
 	if err != nil {
-		log.Fatal(err, "unable to parse number of instances json")
+		log.Fatal(err, "unable to parse patch for add-db")
 	}
 	return patchInstances
 }

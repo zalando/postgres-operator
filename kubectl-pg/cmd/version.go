@@ -17,10 +17,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"log"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/spf13/cobra"
 	"strings"
 )
 
@@ -50,12 +49,8 @@ func version(namespace string) {
 		log.Fatal(err)
 	}
 
-	res,err:=client.AppsV1().Deployments(namespace).Get(OperatorName,metav1.GetOptions{})
-	if err != nil {
-		log.Fatalf("couldn't find the postgres operator in namespace: %v",namespace)
-	}
-
-	operatorImage := res.Spec.Template.Spec.Containers[0].Image
+	operatorDeployment := getPostgresOperator(client)
+	operatorImage := operatorDeployment.Spec.Template.Spec.Containers[0].Image
 	imageDetails := strings.Split(operatorImage, ":")
 	imageSplit := len(imageDetails)
 	imageVersion := imageDetails[imageSplit-1]
