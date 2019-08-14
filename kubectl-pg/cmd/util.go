@@ -133,6 +133,7 @@ func getOperatorFromOtherNamespace(k8sClient *kubernetes.Clientset) *v1.Deployme
 	for _, deployment := range listDeployments.Items {
 		if deployment.Name == OperatorName {
 				operator = deployment.DeepCopy()
+				break
 		} else {
 			for key, value := range deployment.Labels {
 				if key == "app.kubernetes.io/name" && value == OperatorName {
