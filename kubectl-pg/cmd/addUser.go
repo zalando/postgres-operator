@@ -43,8 +43,10 @@ var addUserCmd = &cobra.Command{
 
 			if privileges != "" {
 				parsedRoles := strings.Replace(privileges, ",", " ", -1)
+				parsedRoles  = strings.ToUpper(parsedRoles)
+				fmt.Println(parsedRoles)
 				permissions = strings.Fields(parsedRoles)
-				invalidPerms := []string{}
+				var invalidPerms []string
 
 				for _, userPrivilege := range permissions {
 					validPerm := false
