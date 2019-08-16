@@ -18,6 +18,38 @@ spec:
     singular: postgresql
     shortNames:
     - pg
+  additionalPrinterColumns:
+  - name: Team
+    type: string
+    description: Team responsible for Postgres CLuster
+    JSONPath: .spec.teamId
+  - name: Version
+    type: string
+    description: PostgreSQL version
+    JSONPath: .spec.postgresql.version
+  - name: Pods
+    type: integer
+    description: Number of Pods per Postgres cluster
+    JSONPath: .spec.numberOfInstances
+  - name: Volume
+    type: string
+    description: Size of the bound volume
+    JSONPath: .spec.volume.size
+  - name: CPU-Request
+    type: string
+    description: Requested CPU for Postgres containers
+    JSONPath: .spec.resources.requests.cpu
+  - name: Memory-Request
+    type: string
+    description: Requested memory for Postgres containers
+    JSONPath: .spec.resources.requests.memory
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
+  - name: Status
+    type: string
+    description: Current sync status of postgresql resource
+    JSONPath: .status.PostgresClusterStatus
   scope: Namespaced
   subresources:
     status: {}
@@ -42,7 +74,27 @@ spec:
     plural: operatorconfigurations
     singular: operatorconfiguration
     shortNames:
-    - pgc
+    - opconfig
+  additionalPrinterColumns:
+  - name: Image
+    type: string
+    description: Spilo image to be used for Pods
+    JSONPath: .configuration.docker_image
+  - name: Cluster-Label
+    type: string
+    description: Label for K8s resources created by operator
+    JSONPath: .configuration.kubernetes.cluster_name_label
+  - name: Service-Account
+    type: string
+    description: Name of service account to be used
+    JSONPath: .configuration.kubernetes.pod_service_account_name
+  - name: Min-Instances
+    type: integer
+    description: Minimum number of instances per Postgres cluster
+    JSONPath: .configuration.min_instances
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
   scope: Namespaced
   subresources:
     status: {}
