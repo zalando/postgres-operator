@@ -108,7 +108,7 @@ func listWithNamespace(listPostgres *v1.PostgresqlList) {
 	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME")
 	for _, pgObjs := range listPostgres.Items {
 		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp), pgObjs.Spec.Size, pgObjs.Spec.co)
+			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp), pgObjs.Spec.Size)
 	}
 }
 
