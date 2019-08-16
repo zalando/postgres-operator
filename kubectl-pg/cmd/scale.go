@@ -60,7 +60,13 @@ Scaling to 0 leads to down time.`,
 		}
 
 	},
-	Example: "kubectl pg scale [NUMBER-OF-INSTANCES] -c [CLUSTER-NAME] -n [NAMESPACE]",
+	Example: `
+#Usage
+kubectl pg scale [NUMBER-OF-INSTANCES] -c [CLUSTER-NAME] -n [NAMESPACE]
+
+#Scales the number of instances of the provided cluster
+kubectl pg scale 5 -c cluster01
+`,
 }
 
 func scale(numberOfInstances int32, clusterName string, namespace string) {

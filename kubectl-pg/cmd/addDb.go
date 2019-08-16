@@ -48,7 +48,9 @@ var addDbCmd = &cobra.Command{
 		}
 
 	},
-	Example: "kubectl pg add-db [DB-NAME] -o [OWNER-NAME] -c [CLUSTER-NAME]",
+	Example: `
+kubectl pg add-db db01 -o owner01 -c cluster01
+`,
 }
 
 // add db and it's owner to the cluster

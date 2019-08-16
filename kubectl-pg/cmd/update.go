@@ -42,7 +42,13 @@ var updateCmd = &cobra.Command{
 		fileName, _ := cmd.Flags().GetString("file")
 		updatePgResources(fileName)
 	},
-	Example: "kubectl pg update -f [File-NAME]",
+	Example: `
+#usage
+kubectl pg update -f [File-NAME]
+
+#update the postgres cluster with updated manifest file
+kubectl pg update -f cluster-manifest.yaml
+`,
 }
 
 

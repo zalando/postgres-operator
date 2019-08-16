@@ -56,7 +56,16 @@ Deleting the manifest is sufficient to delete the cluster.`,
 			fmt.Println("use the flag either -n or -f to delete a resource.")
 		}
 	},
-	Example: "kubectl pg delete -f [FILE-NAME]\nkubectl pg delete [CLUSTER-NAME] -n [NAMESPACE]",
+	Example: `
+#Deleting the postgres cluster using manifest file
+kubectl pg delete -f cluster-manifest.yaml
+
+#Deleting the postgres cluster using cluster name in current namespace.
+kubectl pg delete cluster01
+
+#Deleting the postgres cluster using cluster name in provided namespace
+kubectl pg delete cluster01 -n namespace01
+`,
 }
 
 func deleteByFile(file string) {

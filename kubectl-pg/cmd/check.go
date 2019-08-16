@@ -41,7 +41,9 @@ This means that the operator pod was able to start normally.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		check()
 	},
-	Example: "kubectl pg check",
+	Example: `
+kubectl pg check
+`,
 }
 
 // check validates postgresql CRD registered or not.

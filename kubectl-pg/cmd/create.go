@@ -41,7 +41,9 @@ var createCmd = &cobra.Command{
 		fileName, _ := cmd.Flags().GetString("file")
 		create(fileName)
 	},
-	Example: "kubectl pg create -f [FILE-NAME]",
+	Example: `
+kubectl pg create -f cluster-manifest.yaml
+`,
 }
 
 // Create postgresql resources.

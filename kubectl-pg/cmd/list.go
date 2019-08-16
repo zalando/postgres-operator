@@ -52,10 +52,16 @@ var listCmd = &cobra.Command{
 		}
 
 	},
-	Example: "#Lists postgres cluster in current namespace\n" +
-		"kubectl pg list\n\n" +
-		"#Lists postgres clusters in all namespaces\n" +
-		"kubectl pg list -A",
+	Example: `
+#Usage
+kubectl pg list [FLAG]
+
+#Lists postgres cluster in current namespace
+kubectl pg list
+
+#Lists postgres clusters in all namespaces
+kubectl pg list -A
+`,
 }
 
 // list command to list postgres.
@@ -103,7 +109,7 @@ func listWithNamespace(listPostgres *v1.PostgresqlList) {
 	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME")
 	for _, pgObjs := range listPostgres.Items {
 		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp), pgObjs.Spec.Size)
+			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp), pgObjs.Spec.Size, pgObjs.Spec.co)
 	}
 }
 

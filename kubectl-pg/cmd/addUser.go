@@ -51,7 +51,6 @@ var addUserCmd = &cobra.Command{
 			if privileges != "" {
 				parsedRoles := strings.Replace(privileges, ",", " ", -1)
 				parsedRoles  = strings.ToUpper(parsedRoles)
-				fmt.Println(parsedRoles)
 				permissions = strings.Fields(parsedRoles)
 				var invalidPerms []string
 
@@ -76,7 +75,9 @@ var addUserCmd = &cobra.Command{
 			addUser(user, clusterName, perms)
 		}
 	},
-	Example: "kubectl pg add-user [USER] -p [PRIVILEGES] -c [CLUSTER-NAME]",
+	Example: `
+kubectl pg add-user user01 -p login,createdb -c cluster01
+`,
 }
 
 // add user to the cluster with provided permissions

@@ -48,7 +48,14 @@ var extVolumeCmd = &cobra.Command{
 			fmt.Println("please enter the cluster name with -c flag & volume in desired units")
 		}
 	},
-	Example: "kubectl pg ext-volume [VOLUME] -c [CLUSTER-NAME]",
+	Example: `
+#Usage
+kubectl pg ext-volume [VOLUME] -c [CLUSTER-NAME]
+
+#Extending the volume size of provided cluster 
+kubectl pg ext-volume 2Gi -c cluster01
+`,
+
 }
 
 // extend volume with provided size & cluster name
@@ -88,7 +95,7 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 			log.Fatal(err)
 		}
 		if postgresql.ResourceVersion != response.ResourceVersion {
-			fmt.Printf("%s volume is extended with %s.\n", response.Name, increasedVolumeSize)
+			fmt.Printf("%s volume is extended to %s.\n", response.Name, increasedVolumeSize)
 		} else {
 			fmt.Printf("%s volume %s is unchanged.\n", response.Name, postgresql.Spec.Volume.Size)
 		}

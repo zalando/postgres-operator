@@ -45,6 +45,13 @@ var versionCmd = &cobra.Command{
 			}
 				version(namespace)
 	},
+	Example:`
+#Lists the version of kubectl pg plugin and postgres operator in current namespace
+kubectl pg version
+
+#Lists the version of kubectl pg plugin and postgres operator in provided namespace
+kubectl pg version -n namespace01
+`,
 }
 
 func version(namespace string) {
@@ -57,6 +64,10 @@ func version(namespace string) {
 	}
 
 	operatorDeployment := getPostgresOperator(client)
+	if operatorDeployment.Name == "" {
+		log.Fatal("make sure zalando's postgres operator is running")
+	}
+	fmt.Println(operatorDeployment.Name)
 	operatorImage := operatorDeployment.Spec.Template.Spec.Containers[0].Image
 	imageDetails := strings.Split(operatorImage, ":")
 	imageSplit := len(imageDetails)

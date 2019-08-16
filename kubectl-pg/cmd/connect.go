@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"log"
 	"os"
+	user "os/user"
 )
 
 // connectCmd represents the kubectl pg connect command
@@ -41,19 +42,43 @@ var connectCmd = &cobra.Command{
 		master,_ := cmd.Flags().GetBool("master")
 		replica,_ := cmd.Flags().GetString("replica")
 		psql,_ := cmd.Flags().GetBool("psql")
-		user,_ := cmd.Flags().GetString("user")
+		userName,_ := cmd.Flags().GetString("user")
+		dbName,_ := cmd.Flags().GetString("database")
 
 		if psql {
-			if user == "" {
-				log.Fatal("please provide user for psql prompt")
+			if userName == "" {
+				userInfo, err := user.Current()
+				if err != nil {
+					log.Fatal(err)
+				}
+				userName = userInfo.Username
 			}
 		}
+		if dbName == "" {
+			dbName = userName
+		}
 
-		connect(clusterName,master,replica,psql,user)
+		connect(clusterName,master,replica,psql,userName,dbName)
 	},
+	Example: `
+	#connects to the master of postgres cluster
+	kubectl pg connect -c cluster -m
+
+	#connects to the random replica of postgres cluster
+	kubectl pg connect -c cluster
+
+	#connects to the provided replica number of postgres cluster
+	kubectl pg connect -c cluster -r 2
+
+	#connects to psql prompt of master for provided postgres cluster with current shell user
+	kubectl pg connect -c cluster -p
+
+	#connects to psql prompt of master for provided postgres cluster with provided user and db
+	kubectl pg connect -c cluster -p -u user01 -d db01
+`,
 }
 
-func connect(clusterName string,master bool,replica string,psql bool,user string) {
+func connect(clusterName string,master bool,replica string,psql bool,user string, dbName string) {
 	config := getConfig()
 	client,er := kubernetes.NewForConfig(config)
 	if er != nil {
@@ -66,11 +91,11 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 	if psql {
 		execRequest = client.CoreV1().RESTClient().Post().Resource("pods").
 			Name(podName).
-			Namespace("default").
+			Namespace(getCurrentNamespace()).
 			SubResource("exec").
 			Param("container", "postgres").
 			Param("command", "psql").
-			Param("command", "-U").
+			Param("command", dbName).
 			Param("command", user).
 			Param("stdin", "true").
 			Param("stdout", "true").
@@ -79,7 +104,7 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 	} else {
 		execRequest = client.CoreV1().RESTClient().Post().Resource("pods").
 			Name(podName).
-			Namespace("default").
+			Namespace(getCurrentNamespace()).
 			SubResource("exec").
 			Param("container", "postgres").
 			Param("command", "su").
@@ -109,8 +134,9 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 func init() {
 	connectCmd.Flags().StringP("cluster", "c", "", "provide the cluster name.")
 	connectCmd.Flags().BoolP("master", "m", false, "connect to master.")
-	connectCmd.Flags().StringP("replica", "r","", "connect to replica.")
+	connectCmd.Flags().StringP("replica", "r","", "connect to replica. Specify replica number.")
 	connectCmd.Flags().BoolP("psql","p",false,"connect to psql prompt.")
 	connectCmd.Flags().StringP("user","u","","provide user.")
+	connectCmd.Flags().StringP("database","d","","provide database name.")
 	rootCmd.AddCommand(connectCmd)
 }
