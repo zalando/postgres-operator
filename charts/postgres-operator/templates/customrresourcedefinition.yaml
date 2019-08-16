@@ -27,9 +27,9 @@ spec:
     type: string
     description: PostgreSQL version
     JSONPath: .spec.postgresql.version
-  - name: Instances
+  - name: Pods
     type: integer
-    description: Number of instances per Postgres cluster
+    description: Number of Pods per Postgres cluster
     JSONPath: .spec.numberOfInstances
   - name: Volume
     type: string

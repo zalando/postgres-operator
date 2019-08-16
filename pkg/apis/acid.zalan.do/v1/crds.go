@@ -34,9 +34,9 @@ var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
 		JSONPath:    ".spec.postgresql.version",
 	},
 	apiextv1beta1.CustomResourceColumnDefinition{
-		Name:        "Instances",
+		Name:        "Pods",
 		Type:        "integer",
-		Description: "Number of instances per Postgres cluster",
+		Description: "Number of Pods per Postgres cluster",
 		JSONPath:    ".spec.numberOfInstances",
 	},
 	apiextv1beta1.CustomResourceColumnDefinition{
