@@ -85,13 +85,13 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 
 	if minInstances == -1 && maxInstances == -1 {
 		postgresql.Spec.NumberOfInstances = numberOfInstances
-	} else if numberOfInstances <= maxInstances && numberOfInstances>= minInstances {
+	} else if numberOfInstances <= maxInstances && numberOfInstances >= minInstances {
 		postgresql.Spec.NumberOfInstances = numberOfInstances
 	} else if minInstances == -1 && numberOfInstances < postgresql.Spec.NumberOfInstances ||
-		 maxInstances == -1 && numberOfInstances > postgresql.Spec.NumberOfInstances{
+		maxInstances == -1 && numberOfInstances > postgresql.Spec.NumberOfInstances {
 		postgresql.Spec.NumberOfInstances = numberOfInstances
 	} else {
-		log.Fatalf("cannot scale to the provided instances as they don't adhere to MIN_INSTANCES: %v and MAX_INSTANCES: %v provided in configmap or operatorconfiguration",maxInstances,minInstances)
+		log.Fatalf("cannot scale to the provided instances as they don't adhere to MIN_INSTANCES: %v and MAX_INSTANCES: %v provided in configmap or operatorconfiguration", maxInstances, minInstances)
 	}
 
 	if numberOfInstances == 0 {
@@ -100,7 +100,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 	}
 
 	patchInstances := scalePatch(numberOfInstances)
-	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, patchInstances,"")
+	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patchInstances, "")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 }
 
 func scalePatch(value int32) []byte {
-	instances := map[string]map[string]int32{"spec":{"numberOfInstances": value }}
+	instances := map[string]map[string]int32{"spec": {"numberOfInstances": value}}
 	patchInstances, err := json.Marshal(instances)
 	if err != nil {
 		log.Fatal(err, "unable to parse patch for scale")
@@ -121,8 +121,8 @@ func scalePatch(value int32) []byte {
 	return patchInstances
 }
 
-func allowedMinMaxInstances(config *rest.Config) (int32, int32){
-	k8sClient,err := kubernetes.NewForConfig(config)
+func allowedMinMaxInstances(config *rest.Config) (int32, int32) {
+	k8sClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -135,8 +135,8 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 	// -1 indicates no limitations for min/max instances
 	minInstances := -1
 	maxInstances := -1
-	for _,envData := range operatorContainer[0].Env {
-		if envData.Name == "CONFIG_MAP_NAME"  {
+	for _, envData := range operatorContainer[0].Env {
+		if envData.Name == "CONFIG_MAP_NAME" {
 			configMapName = envData.Value
 		}
 		if envData.Name == "POSTGRES_OPERATOR_CONFIGURATION_OBJECT" {
@@ -153,28 +153,28 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 		configMapData := configMap.Data
 		for key, value := range configMapData {
 			if key == "min_instances" {
-				minInstances,err = strconv.Atoi(value)
+				minInstances, err = strconv.Atoi(value)
 				if err != nil {
-					log.Fatalf("invalid min instances in configmap %v",err)
+					log.Fatalf("invalid min instances in configmap %v", err)
 				}
 			}
 
 			if key == "max_instances" {
-				maxInstances,err = strconv.Atoi(value)
+				maxInstances, err = strconv.Atoi(value)
 				if err != nil {
-					log.Fatalf("invalid max instances in configmap %v",err)
+					log.Fatalf("invalid max instances in configmap %v", err)
 				}
 			}
 		}
 	} else if configMapName == "" {
-		pgClient,err :=	PostgresqlLister.NewForConfig(config)
+		pgClient, err := PostgresqlLister.NewForConfig(config)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		operatorConfig,err := pgClient.OperatorConfigurations(operator.Namespace).Get(operatorConfigName,metav1.GetOptions{})
+		operatorConfig, err := pgClient.OperatorConfigurations(operator.Namespace).Get(operatorConfigName, metav1.GetOptions{})
 		if err != nil {
-			log.Fatalf("unable to read operator configuration %v",err)
+			log.Fatalf("unable to read operator configuration %v", err)
 		}
 
 		minInstances = int(operatorConfig.Configuration.MinInstances)
@@ -182,7 +182,6 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32){
 	}
 	return int32(minInstances), int32(maxInstances)
 }
-
 
 func init() {
 	namespace := getCurrentNamespace()

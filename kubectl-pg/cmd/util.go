@@ -39,8 +39,9 @@ import (
 	"strconv"
 	"strings"
 )
+
 const (
-	OperatorName = "postgres-operator"
+	OperatorName     = "postgres-operator"
 	DefaultNamespace = "default"
 )
 
@@ -48,7 +49,7 @@ func getConfig() *restclient.Config {
 	var kubeconfig *string
 	var config *restclient.Config
 	envKube := os.Getenv("KUBECONFIG")
-	if  envKube != ""{
+	if envKube != "" {
 		kubeconfig = &envKube
 	} else {
 		if home := homedir.HomeDir(); home != "" {
@@ -57,13 +58,13 @@ func getConfig() *restclient.Config {
 			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 		}
 	}
-		flag.Parse()
-		var err error
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return config
+	flag.Parse()
+	var err error
+	config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return config
 }
 
 func getCurrentNamespace() string {
@@ -83,7 +84,7 @@ func confirmAction(clusterName string, namespace string) {
 		confirmClusterDetails := ""
 		_, err := fmt.Scan(&confirmClusterDetails)
 		if err != nil {
-			log.Fatalf("couldn't get confirmation from the user %v",err)
+			log.Fatalf("couldn't get confirmation from the user %v", err)
 		}
 		clusterDetails := strings.Split(confirmClusterDetails, "/")
 		if clusterDetails[0] != namespace || clusterDetails[1] != clusterName {
@@ -96,7 +97,7 @@ func confirmAction(clusterName string, namespace string) {
 
 func getPodName(clusterName string, master bool, replicaNumber string) string {
 	config := getConfig()
-	client,er := kubernetes.NewForConfig(config)
+	client, er := kubernetes.NewForConfig(config)
 	if er != nil {
 		log.Fatal(er)
 	}
@@ -114,10 +115,10 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 	numOfInstances := postgresCluster.Spec.NumberOfInstances
 	var podName string
 	var podRole string
-	replica := clusterName+"-"+replicaNumber
+	replica := clusterName + "-" + replicaNumber
 
-	for ins:=0;ins < int(numOfInstances);ins++ {
-		pod,err := client.CoreV1().Pods(getCurrentNamespace()).Get(clusterName+"-"+strconv.Itoa(ins),metav1.GetOptions{})
+	for ins := 0; ins < int(numOfInstances); ins++ {
+		pod, err := client.CoreV1().Pods(getCurrentNamespace()).Get(clusterName+"-"+strconv.Itoa(ins), metav1.GetOptions{})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -125,11 +126,11 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 		podRole = pod.Labels["spilo-role"]
 		if podRole == "master" && master {
 			podName = pod.Name
-			fmt.Printf("connected to %s with pod name as %s\n",podRole, podName)
+			fmt.Printf("connected to %s with pod name as %s\n", podRole, podName)
 			break
-		} else if podRole == "replica" &&  !master  && (pod.Name == replica || replicaNumber == "") {
+		} else if podRole == "replica" && !master && (pod.Name == replica || replicaNumber == "") {
 			podName = pod.Name
-			fmt.Printf("connected to %s with pod name as %s\n",podRole, podName)
+			fmt.Printf("connected to %s with pod name as %s\n", podRole, podName)
 			break
 		}
 	}
@@ -141,7 +142,7 @@ func getPodName(clusterName string, master bool, replicaNumber string) string {
 
 func getPostgresOperator(k8sClient *kubernetes.Clientset) *v1.Deployment {
 	var operator *v1.Deployment
-	operator,err := k8sClient.AppsV1().Deployments(getCurrentNamespace()).Get(OperatorName,metav1.GetOptions{})
+	operator, err := k8sClient.AppsV1().Deployments(getCurrentNamespace()).Get(OperatorName, metav1.GetOptions{})
 	if err == nil {
 		return operator
 	}
@@ -154,8 +155,8 @@ func getPostgresOperator(k8sClient *kubernetes.Clientset) *v1.Deployment {
 
 	for _, deployment := range listDeployments.Items {
 		if deployment.Name == OperatorName {
-				operator = deployment.DeepCopy()
-				break
+			operator = deployment.DeepCopy()
+			break
 		} else {
 			for key, value := range deployment.Labels {
 				if key == "app.kubernetes.io/name" && value == OperatorName {
@@ -167,4 +168,3 @@ func getPostgresOperator(k8sClient *kubernetes.Clientset) *v1.Deployment {
 	}
 	return operator
 }
-

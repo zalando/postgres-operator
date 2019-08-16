@@ -25,9 +25,9 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"io/ioutil"
-	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
@@ -50,7 +50,6 @@ kubectl pg update -f [File-NAME]
 kubectl pg update -f cluster-manifest.yaml
 `,
 }
-
 
 // Update postgresql resources.
 func updatePgResources(fileName string) {

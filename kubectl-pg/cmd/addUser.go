@@ -33,7 +33,8 @@ import (
 	"strings"
 )
 
-var allowedPrivileges  = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
+var allowedPrivileges = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN", "NOLOGIN", "CREATEROLE", "CREATEDB", "BYPASSURL"}
+
 // addUserCmd represents the addUser command
 var addUserCmd = &cobra.Command{
 	Use:   "add-user",
@@ -50,7 +51,7 @@ var addUserCmd = &cobra.Command{
 
 			if privileges != "" {
 				parsedRoles := strings.Replace(privileges, ",", " ", -1)
-				parsedRoles  = strings.ToUpper(parsedRoles)
+				parsedRoles = strings.ToUpper(parsedRoles)
 				permissions = strings.Fields(parsedRoles)
 				var invalidPerms []string
 
@@ -113,7 +114,7 @@ func addUser(user string, clusterName string, permissions []string) {
 	}
 
 	patch := applyUserPatch(user, Privileges)
-	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, patch,"")
+	updatedPostgresql, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patch, "")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -133,7 +134,6 @@ func applyUserPatch(user string, value []string) []byte {
 	}
 	return patchInstances
 }
-
 
 func init() {
 	addUserCmd.Flags().StringP("cluster", "c", "", "add user to the provided cluster.")

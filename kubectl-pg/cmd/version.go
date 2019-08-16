@@ -32,20 +32,19 @@ import (
 
 const KubectlPgVersion = "0.1-beta"
 
-
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "version of kubectl-pg & postgres-operator",
-	Long: `version of kubectl-pg and current running postgres-operator`,
+	Long:  `version of kubectl-pg and current running postgres-operator`,
 	Run: func(cmd *cobra.Command, args []string) {
-		    namespace, err := cmd.Flags().GetString("namespace")
-		    if err != nil {
-		    	log.Fatal(err)
-			}
-				version(namespace)
+		namespace, err := cmd.Flags().GetString("namespace")
+		if err != nil {
+			log.Fatal(err)
+		}
+		version(namespace)
 	},
-	Example:`
+	Example: `
 #Lists the version of kubectl pg plugin and postgres operator in current namespace
 kubectl pg version
 
@@ -55,11 +54,11 @@ kubectl pg version -n namespace01
 }
 
 func version(namespace string) {
-	fmt.Printf("kubectl-pg: %s\n",KubectlPgVersion)
+	fmt.Printf("kubectl-pg: %s\n", KubectlPgVersion)
 
 	config := getConfig()
-	client,err := kubernetes.NewForConfig(config)
-	if err!= nil {
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
 		log.Fatal(err)
 	}
 
@@ -67,12 +66,11 @@ func version(namespace string) {
 	if operatorDeployment.Name == "" {
 		log.Fatal("make sure zalando's postgres operator is running")
 	}
-	fmt.Println(operatorDeployment.Name)
 	operatorImage := operatorDeployment.Spec.Template.Spec.Containers[0].Image
 	imageDetails := strings.Split(operatorImage, ":")
 	imageSplit := len(imageDetails)
 	imageVersion := imageDetails[imageSplit-1]
-	fmt.Printf("Postgres-Operator: %s\n",imageVersion)
+	fmt.Printf("Postgres-Operator: %s\n", imageVersion)
 }
 
 func init() {

@@ -24,9 +24,9 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
-	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
@@ -48,4 +48,3 @@ func init() {
 	viper.SetDefault("author", "Vineeth Pothulapati <vineethpothulapati@outlook.com>")
 	viper.SetDefault("license", "mit")
 }
-

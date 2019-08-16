@@ -77,14 +77,14 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 	var patch []byte
 	// validating reserved DB names
 	if dbOwnerExists && dbName != "postgres" && dbName != "template0" && dbName != "template1" {
-		patch = dbPatch(dbName,dbOwner)
+		patch = dbPatch(dbName, dbOwner)
 	} else if !dbOwnerExists {
 		log.Fatal("The provided db-owner doesn't exist")
 	} else {
 		log.Fatal("The provided db-name is reserved by postgres")
 	}
 
-	updatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, patch,"")
+	updatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patch, "")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -25,11 +25,11 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	"log"
-	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )
 
 // createCmd kubectl pg create.

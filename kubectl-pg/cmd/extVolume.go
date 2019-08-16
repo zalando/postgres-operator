@@ -55,7 +55,6 @@ kubectl pg ext-volume [VOLUME] -c [CLUSTER-NAME]
 #Extending the volume size of provided cluster 
 kubectl pg ext-volume 2Gi -c cluster01
 `,
-
 }
 
 // extend volume with provided size & cluster name
@@ -69,7 +68,7 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	namespace := getCurrentNamespace()
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
-		log.Fatalf("hii %v",err)
+		log.Fatalf("hii %v", err)
 	}
 
 	oldSize, err := resource.ParseQuantity(postgresql.Spec.Volume.Size)
@@ -90,7 +89,7 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 
 	if newSize.Value() > oldSize.Value() {
 		patchInstances := volumePatch(newSize)
-		response, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name,types.MergePatchType, patchInstances,"")
+		response, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patchInstances, "")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -102,12 +101,11 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	} else if newSize.Value() == oldSize.Value() {
 		fmt.Println("volume already has the desired size.")
 	} else {
-		fmt.Printf("volume %s size cannot be shrinked.\n",postgresql.Spec.Volume.Size)
+		fmt.Printf("volume %s size cannot be shrinked.\n", postgresql.Spec.Volume.Size)
 	}
 }
 
-
-func volumePatch(volume resource.Quantity) []byte{
+func volumePatch(volume resource.Quantity) []byte {
 	patchData := map[string]map[string]map[string]resource.Quantity{"spec": {"volume": {"size": volume}}}
 	patch, err := json.Marshal(patchData)
 	if err != nil {

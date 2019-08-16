@@ -36,14 +36,14 @@ import (
 var connectCmd = &cobra.Command{
 	Use:   "connect",
 	Short: "Connects to the shell prompt, psql prompt of postgres cluster",
-	Long: `Connects to the shell prompt, psql prompt of postgres cluster and also to specified replica or master.`,
+	Long:  `Connects to the shell prompt, psql prompt of postgres cluster and also to specified replica or master.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		clusterName,_ := cmd.Flags().GetString("cluster")
-		master,_ := cmd.Flags().GetBool("master")
-		replica,_ := cmd.Flags().GetString("replica")
-		psql,_ := cmd.Flags().GetBool("psql")
-		userName,_ := cmd.Flags().GetString("user")
-		dbName,_ := cmd.Flags().GetString("database")
+		clusterName, _ := cmd.Flags().GetString("cluster")
+		master, _ := cmd.Flags().GetBool("master")
+		replica, _ := cmd.Flags().GetString("replica")
+		psql, _ := cmd.Flags().GetBool("psql")
+		userName, _ := cmd.Flags().GetString("user")
+		dbName, _ := cmd.Flags().GetString("database")
 
 		if psql {
 			if userName == "" {
@@ -58,7 +58,7 @@ var connectCmd = &cobra.Command{
 			dbName = userName
 		}
 
-		connect(clusterName,master,replica,psql,userName,dbName)
+		connect(clusterName, master, replica, psql, userName, dbName)
 	},
 	Example: `
 	#connects to the master of postgres cluster
@@ -78,14 +78,14 @@ var connectCmd = &cobra.Command{
 `,
 }
 
-func connect(clusterName string,master bool,replica string,psql bool,user string, dbName string) {
+func connect(clusterName string, master bool, replica string, psql bool, user string, dbName string) {
 	config := getConfig()
-	client,er := kubernetes.NewForConfig(config)
+	client, er := kubernetes.NewForConfig(config)
 	if er != nil {
 		log.Fatal(er)
 	}
 
-	podName := getPodName(clusterName,master,replica)
+	podName := getPodName(clusterName, master, replica)
 	execRequest := &rest.Request{}
 
 	if psql {
@@ -115,16 +115,16 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 			Param("tty", "true")
 	}
 
-	exec,err := remotecommand.NewSPDYExecutor(config,"POST",execRequest.URL())
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", execRequest.URL())
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin: os.Stdin,
+		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
-		Tty: true,
+		Tty:    true,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -134,9 +134,9 @@ func connect(clusterName string,master bool,replica string,psql bool,user string
 func init() {
 	connectCmd.Flags().StringP("cluster", "c", "", "provide the cluster name.")
 	connectCmd.Flags().BoolP("master", "m", false, "connect to master.")
-	connectCmd.Flags().StringP("replica", "r","", "connect to replica. Specify replica number.")
-	connectCmd.Flags().BoolP("psql","p",false,"connect to psql prompt.")
-	connectCmd.Flags().StringP("user","u","","provide user.")
-	connectCmd.Flags().StringP("database","d","","provide database name.")
+	connectCmd.Flags().StringP("replica", "r", "", "connect to replica. Specify replica number.")
+	connectCmd.Flags().BoolP("psql", "p", false, "connect to psql prompt.")
+	connectCmd.Flags().StringP("user", "u", "", "provide user.")
+	connectCmd.Flags().StringP("database", "d", "", "provide database name.")
 	rootCmd.AddCommand(connectCmd)
 }

@@ -48,7 +48,7 @@ var logsCmd = &cobra.Command{
 			clusterLogs(clusterName, master, replica)
 		}
 	},
-	Example:`
+	Example: `
 	#Fetch the logs of the postgres operator
 	kubectl pg logs -o
 
@@ -137,5 +137,5 @@ func init() {
 	logsCmd.Flags().BoolP("operator", "o", false, "logs of operator")
 	logsCmd.Flags().StringP("cluster", "c", "", "logs for the provided cluster")
 	logsCmd.Flags().BoolP("master", "m", false, "Patroni logs of master")
-	logsCmd.Flags().StringP("replica", "r","", "connect to replica. Specify replica number.")
+	logsCmd.Flags().StringP("replica", "r", "", "connect to replica. Specify replica number.")
 }

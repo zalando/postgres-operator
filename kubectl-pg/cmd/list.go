@@ -44,11 +44,11 @@ var listCmd = &cobra.Command{
 	Long:  `Lists all the info specific to postgresql objects.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		allNamespaces, _ := cmd.Flags().GetBool("all-namespaces")
-		namespace,_ := cmd.Flags().GetString("namespace")
+		namespace, _ := cmd.Flags().GetString("namespace")
 		if allNamespaces {
-			list(allNamespaces,"")
+			list(allNamespaces, "")
 		} else {
-			list(allNamespaces,namespace)
+			list(allNamespaces, namespace)
 		}
 
 	},
@@ -94,7 +94,6 @@ func list(allNamespaces bool, namespace string) {
 	}
 }
 
-
 func listAll(listPostgres *v1.PostgresqlList) {
 	template := "%-32s%-16s%-12s%-12s%-12s%-12s%-12s\n"
 	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME", "NAMESPACE")
@@ -113,9 +112,8 @@ func listWithNamespace(listPostgres *v1.PostgresqlList) {
 	}
 }
 
-
 func init() {
 	listCmd.Flags().BoolP("all-namespaces", "A", false, "list pg resources across all namespaces.")
-	listCmd.Flags().StringP("namespace","n",getCurrentNamespace(),"provide the namespace")
+	listCmd.Flags().StringP("namespace", "n", getCurrentNamespace(), "provide the namespace")
 	rootCmd.AddCommand(listCmd)
 }
