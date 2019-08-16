@@ -28,10 +28,10 @@ var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
 		JSONPath:    ".spec.teamId",
 	},
 	apiextv1beta1.CustomResourceColumnDefinition{
-		Name:        "Status",
+		Name:        "Version",
 		Type:        "string",
-		Description: "Current status of Postgres cluster",
-		JSONPath:    ".status.PostgresClusterStatus",
+		Description: "PostgreSQL version",
+		JSONPath:    ".spec.postgresql.version",
 	},
 	apiextv1beta1.CustomResourceColumnDefinition{
 		Name:        "Instances",
@@ -46,9 +46,27 @@ var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
 		JSONPath:    ".spec.volume.size",
 	},
 	apiextv1beta1.CustomResourceColumnDefinition{
+		Name:        "CPU-Request",
+		Type:        "string",
+		Description: "Requested CPU for Postgres containers",
+		JSONPath:    ".spec.resources.requests.cpu",
+	},
+	apiextv1beta1.CustomResourceColumnDefinition{
+		Name:        "Memory-Request",
+		Type:        "string",
+		Description: "Requested memory for Postgres containers",
+		JSONPath:    ".spec.resources.requests.memory",
+	},
+	apiextv1beta1.CustomResourceColumnDefinition{
 		Name:     "Age",
 		Type:     "date",
 		JSONPath: ".metadata.creationTimestamp",
+	},
+	apiextv1beta1.CustomResourceColumnDefinition{
+		Name:        "Status",
+		Type:        "string",
+		Description: "Current sync status of postgresql resource",
+		JSONPath:    ".status.PostgresClusterStatus",
 	},
 }
 
