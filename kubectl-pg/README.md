@@ -15,6 +15,12 @@ $ $GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go install
 # This will place the kubectl-pg binary in your $GOPATH/bin
 ```
 
+### Befoore using the kubectl pg plugin make sure to set KUBECONFIG env varibale
+
+Ideally KUBECONFIG is found in $HOME/.kube/config else specify the KUBECONFIG path here.
+
+```export KUBECONFIG=$HOME/.kube/config``` 
+
 ### To list all commands available in kubectl pg
 
 ```kubectl pg --help``` (or) ```kubectl pg```
@@ -94,3 +100,8 @@ Note: -p represents psql prompt
 ```kubectl pg logs -c CLUSTER``` #Fetches the logs of a random pod. Not master
 ```kubectl pg logs -c CLUSTER -m``` #Fetches the logs of master
 ```kubectl pg logs -c CLUSTER -r 2``` #Fecthes the logs of specified replica
+
+## Development
+
+- When making changes to plugin make sure to change the major or patch version
+of plugin in ```build.sh``` and run ```./build.sh``` 

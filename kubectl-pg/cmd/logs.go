@@ -49,17 +49,17 @@ var logsCmd = &cobra.Command{
 		}
 	},
 	Example: `
-	#Fetch the logs of the postgres operator
-	kubectl pg logs -o
+#Fetch the logs of the postgres operator
+kubectl pg logs -o
 
-	#Fetch the logs of the master for provided cluster
-	kubectl pg logs -c cluster01 -m
+#Fetch the logs of the master for provided cluster
+kubectl pg logs -c cluster01 -m
 
-	#Fetch the logs of the random replica for provided cluster
-	kubectl pg logs -c cluster01
+#Fetch the logs of the random replica for provided cluster
+kubectl pg logs -c cluster01
 
-	#Fetch the logs of the provided replica number of the cluster
-	kubectl pg logs -c cluster01 -r 3
+#Fetch the logs of the provided replica number of the cluster
+kubectl pg logs -c cluster01 -r 3
 `,
 }
 
@@ -137,5 +137,5 @@ func init() {
 	logsCmd.Flags().BoolP("operator", "o", false, "logs of operator")
 	logsCmd.Flags().StringP("cluster", "c", "", "logs for the provided cluster")
 	logsCmd.Flags().BoolP("master", "m", false, "Patroni logs of master")
-	logsCmd.Flags().StringP("replica", "r", "", "connect to replica. Specify replica number.")
+	logsCmd.Flags().StringP("replica", "r", "", "Patroni logs of replica. Specify replica number.")
 }

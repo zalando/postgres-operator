@@ -39,7 +39,7 @@ var allowedPrivileges = []string{"SUPERUSER", "REPLICATION", "INHERIT", "LOGIN",
 var addUserCmd = &cobra.Command{
 	Use:   "add-user",
 	Short: "Adds a user to the postgres cluster with given privileges",
-	Long:  `Adds a user to the postgres cluster you can add privileges as well with -p flag.`,
+	Long:  `Adds a user to the postgres cluster. You can add privileges as well with -p flag.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, _ := cmd.Flags().GetString("cluster")
 		privileges, _ := cmd.Flags().GetString("privileges")
@@ -106,7 +106,7 @@ func addUser(user string, clusterName string, permissions []string) {
 		}
 	}
 
-	var Privileges []string
+	Privileges := []string{}
 	for keys, values := range setUsers {
 		if values {
 			Privileges = append(Privileges, keys)

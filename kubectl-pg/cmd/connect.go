@@ -61,20 +61,20 @@ var connectCmd = &cobra.Command{
 		connect(clusterName, master, replica, psql, userName, dbName)
 	},
 	Example: `
-	#connects to the master of postgres cluster
-	kubectl pg connect -c cluster -m
+#connects to the master of postgres cluster
+kubectl pg connect -c cluster -m
 
-	#connects to the random replica of postgres cluster
-	kubectl pg connect -c cluster
+#connects to the random replica of postgres cluster
+kubectl pg connect -c cluster
 
-	#connects to the provided replica number of postgres cluster
-	kubectl pg connect -c cluster -r 2
+#connects to the provided replica number of postgres cluster
+kubectl pg connect -c cluster -r 2
 
-	#connects to psql prompt of master for provided postgres cluster with current shell user
-	kubectl pg connect -c cluster -p
+#connects to psql prompt of master for provided postgres cluster with current shell user
+kubectl pg connect -c cluster -p -m
 
-	#connects to psql prompt of master for provided postgres cluster with provided user and db
-	kubectl pg connect -c cluster -p -u user01 -d db01
+#connects to psql prompt of random replica for provided postgres cluster with provided user and db
+kubectl pg connect -c cluster -p -u user01 -d db01
 `,
 }
 

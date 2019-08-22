@@ -30,7 +30,7 @@ import (
 	"strings"
 )
 
-const KubectlPgVersion = "0.1-beta"
+var KubectlPgVersion string = "1.0"
 
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{

@@ -49,9 +49,6 @@ var extVolumeCmd = &cobra.Command{
 		}
 	},
 	Example: `
-#Usage
-kubectl pg ext-volume [VOLUME] -c [CLUSTER-NAME]
-
 #Extending the volume size of provided cluster 
 kubectl pg ext-volume 2Gi -c cluster01
 `,

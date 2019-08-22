@@ -53,9 +53,6 @@ var listCmd = &cobra.Command{
 
 	},
 	Example: `
-#Usage
-kubectl pg list [FLAG]
-
 #Lists postgres cluster in current namespace
 kubectl pg list
 
