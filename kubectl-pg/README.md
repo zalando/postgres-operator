@@ -1,4 +1,22 @@
-# kubectl-pg
+# Kubectl Plugin for Zalando's Postgres Operator
+
+## Google Summer of Code 2019
+
+This plugin is a prototype developed as a part of GSoC 2019 under the organisation
+**The Postgres Operator**
+
+### GSoC Proposal
+
+[kubectl pg proposal](https://docs.google.com/document/d/1-WMy9HkfZ1XnnMbzplMe9rCzKrRMGaMz4owLVXXPb7w/edit)
+
+### Weekly Reports
+
+https://github.com/VineethReddy02/GSoC-Kubectl-Plugin-for-Postgres-Operator-tracker
+
+ ### Final Project Report
+ 
+ https://gist.github.com/VineethReddy02/159283bd368a710379eaf0f6bd60a40a
+ 
 
 ### Installtion of kubectl pg plugin
 
