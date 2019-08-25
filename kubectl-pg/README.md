@@ -33,7 +33,7 @@ $ $GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go install
 # This will place the kubectl-pg binary in your $GOPATH/bin
 ```
 
-### Befoore using the kubectl pg plugin make sure to set KUBECONFIG env varibale
+### Before using the kubectl pg plugin make sure to set KUBECONFIG env varibale
 
 Ideally KUBECONFIG is found in $HOME/.kube/config else specify the KUBECONFIG path here.
 
