@@ -82,7 +82,7 @@ func ResourceNotFound(err error) bool {
 	return apierrors.IsNotFound(err)
 }
 
-// NewFromConfig create Kubernets Interface using REST config
+// NewFromConfig create Kubernetes Interface using REST config
 func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient := KubernetesClient{}
 

@@ -258,14 +258,6 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		}
 		lg.Infoln("deletion of the cluster started")
 
-		// HACK if a delete happens too soon, cl fields are empty
-		// thus, pods, logical backup jobs and headless service will not get deleted
-		// see issues 551, 218
-		if cl.Name == "" {
-			cl.Name = clusterName.Name
-			cl.Namespace = clusterName.Namespace
-		}
-
 		teamName := strings.ToLower(cl.Spec.TeamID)
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)

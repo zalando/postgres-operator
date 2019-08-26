@@ -164,11 +164,13 @@ func (c *Cluster) setStatus(status string) {
 	}
 
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
-	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
 	// we should take advantage of it.
 	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch, "status")
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
+		// return as newspec is empty, see PR654
+		return
 	}
 	// update the spec, maintaining the new resourceVersion.
 	c.setSpec(newspec)
