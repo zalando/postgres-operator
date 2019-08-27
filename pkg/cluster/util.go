@@ -365,7 +365,7 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 	c.setProcessName("waiting for the pods of the statefulset")
 	// TODO: wait for the first Pod only
 	if err := c.waitStatefulsetReady(); err != nil {
-		return fmt.Errorf("statuful set error: %v", err)
+		return fmt.Errorf("stateful set error: %v", err)
 	}
 
 	// TODO: wait only for master
