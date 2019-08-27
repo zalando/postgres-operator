@@ -238,6 +238,10 @@ rbac:
   # Specifies whether RBAC resources should be created
   create: true
 
+crd:
+  # Specifies whether custom resource definitions should be created
+  create: true
+
 serviceAccount:
   # Specifies whether a ServiceAccount should be created
   create: true
