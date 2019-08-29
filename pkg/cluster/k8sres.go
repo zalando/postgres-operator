@@ -918,11 +918,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
-	c.logger.Errorf("Expected Pod Annotations:")
-	for k, v := range podTemplate.Annotations {
-		c.logger.Errorf("%v -> %v", k, v)
-	}
-
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
