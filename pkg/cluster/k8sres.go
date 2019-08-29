@@ -430,6 +430,7 @@ func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) *
 func generatePodTemplate(
 	namespace string,
 	labels labels.Set,
+	annotations map[string]string,
 	spiloContainer *v1.Container,
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
@@ -485,13 +486,14 @@ func generatePodTemplate(
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    labels,
-			Namespace: namespace,
+			Labels:      labels,
+			Namespace:   namespace,
+			Annotations: annotations,
 		},
 		Spec: podSpec,
 	}
 	if kubeIAMRole != "" {
-		template.Annotations = map[string]string{constants.KubeIAmAnnotation: kubeIAMRole}
+		template.Annotations[constants.KubeIAmAnnotation] = kubeIAMRole
 	}
 
 	return &template, nil
@@ -881,10 +883,23 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveFSGroup = spec.SpiloFSGroup
 	}
 
+	annotations := make(map[string]string)
+	for k, v := range c.OpConfig.CustomPodAnnotations {
+		annotations[k] = v
+	}
+	for k, v := range spec.PodAnnotations {
+		annotations[k] = v
+	}
+	c.logger.Infof("Looking add the following annotations to pods:")
+	for k, v := range annotations {
+		c.logger.Warningf("%v -> %v", k, v)
+	}
+
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
+		annotations,
 		spiloContainer,
 		spec.InitContainers,
 		sidecarContainers,
@@ -901,6 +916,11 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
+	}
+
+	c.logger.Errorf("Expected Pod Annotations:")
+	for k, v := range podTemplate.Annotations {
+		c.logger.Errorf("%v -> %v", k, v)
 	}
 
 	if err != nil {
@@ -1466,6 +1486,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		labels,
+		make(map[string]string),
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},

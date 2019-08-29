@@ -80,7 +80,7 @@ is prepended to the operator resource's names.
 
 Use `--name zalando` to match with the default service account name as older
 operator versions do not support custom names for service accounts. To use
-CRD-based configuration you need to specify the [values-crd yaml file](../charts/values-crd.yaml).
+CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
 
 ```bash
 # 1) initialize helm

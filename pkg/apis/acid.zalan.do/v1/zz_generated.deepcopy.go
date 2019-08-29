@@ -232,6 +232,13 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 	out.LoggingRESTAPI = in.LoggingRESTAPI
 	out.Scalyr = in.Scalyr
 	out.LogicalBackup = in.LogicalBackup
+	if in.PodAnnotations != nil {
+		in, out := &in.PodAnnotations, &out.PodAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
@@ -512,6 +519,13 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		in, out := &in.StandbyCluster, &out.StandbyCluster
 		*out = new(StandbyDescription)
 		**out = **in
+	}
+	if in.PodAnnotations != nil {
+		in, out := &in.PodAnnotations, &out.PodAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	if in.InitContainersOld != nil {
 		in, out := &in.InitContainersOld, &out.InitContainersOld

@@ -59,6 +59,7 @@ type PostgresSpec struct {
 	EnableLogicalBackup   bool                 `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
 	StandbyCluster        *StandbyDescription  `json:"standby"`
+	PodAnnotations        map[string]string    `json:"podAnnotations"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
