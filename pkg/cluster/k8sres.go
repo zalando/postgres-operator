@@ -890,10 +890,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	for k, v := range spec.PodAnnotations {
 		annotations[k] = v
 	}
-	c.logger.Infof("Looking add the following annotations to pods:")
-	for k, v := range annotations {
-		c.logger.Warningf("%v -> %v", k, v)
-	}
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
@@ -1477,11 +1473,16 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			},
 		}}
 
+	annotations := make(map[string]string)
+	for k, v := range c.OpConfig.CustomPodAnnotations {
+		annotations[k] = v
+	}
+
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		labels,
-		make(map[string]string),
+		annotations,
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},
