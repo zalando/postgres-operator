@@ -14,7 +14,7 @@ before_install:
   - go get github.com/mattn/goveralls
 
 install:
-  - make GO111MODULE=on deps
+  - make deps
 
 script:
   - hack/verify-codegen.sh

@@ -28,7 +28,6 @@ pipeline:
               IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
             fi
             export IMAGE
-            export GO111MODULE=on
             make tools deps docker
         - desc: 'Run unit tests'
           cmd: |

@@ -2,4 +2,4 @@
 
 service:
   prepare:
-    - make GO111MODULE=on deps
+    - make deps

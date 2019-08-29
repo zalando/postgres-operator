@@ -1,43 +1,17 @@
 module github.com/zalando/postgres-operator
 
+go 1.12
+
 require (
-	github.com/aws/aws-sdk-go v1.17.4
-	github.com/davecgh/go-spew v1.1.1
-	github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
-	github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680
-	github.com/gogo/protobuf v0.0.0-20170330071051-c0656edd0d9e
-	github.com/golang/glog v0.0.0-20141105023935-44145f04b68c
-	github.com/golang/protobuf v1.1.0
-	github.com/google/btree v0.0.0-20160524151835-7d79101e329e
-	github.com/google/gofuzz v0.0.0-20161122191042-44d81051d367
-	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
-	github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7
-	github.com/hashicorp/golang-lru v0.0.0-20160207214719-a0d98a5f2880
-	github.com/imdario/mergo v0.0.0-20141206190957-6633656539c1
-	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
-	github.com/json-iterator/go v0.0.0-20180612202835-f2b4162afba3
-	github.com/konsorten/go-windows-terminal-sequences v1.0.1
-	github.com/kr/text v0.1.0
-	github.com/lib/pq v0.0.0-20180523175426-90697d60dd84
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
-	github.com/modern-go/reflect2 v0.0.0-20180320133207-05fbef0ca5da
-	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
+	github.com/aws/aws-sdk-go v1.25.1
+	github.com/imdario/mergo v0.3.7 // indirect
+	github.com/lib/pq v1.2.0
 	github.com/motomux/pretty v0.0.0-20161209205251-b2aad2c9a95d
-	github.com/peterbourgon/diskv v2.0.1+incompatible
-	github.com/sirupsen/logrus v1.3.0
-	github.com/spf13/pflag v1.0.1
-	golang.org/x/crypto v0.0.0-20180904163835-0709b304e793
-	golang.org/x/net v0.0.0-20170809000501-1c05540f6879
-	golang.org/x/sys v0.0.0-20180905080454-ebe1bf3edb33
-	golang.org/x/text v0.0.0-20170810154203-b19bf474d317
-	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
-	gopkg.in/inf.v0 v0.9.0
-	gopkg.in/yaml.v2 v2.2.1
-	k8s.io/api v0.0.0-20180712090710-2d6f90ab1293
-	k8s.io/apiextensions-apiserver v0.0.0-20180808065822-cc9cd5d998df
-	k8s.io/apimachinery v0.0.0-20180621070125-103fd098999d
-	k8s.io/client-go v0.0.0-20180806134042-1f13a808da65
-	k8s.io/code-generator v0.0.0-20180621065459-6702109cc68e
-	k8s.io/gengo v0.0.0-20180718083919-906d99f89cd6
-	k8s.io/kube-openapi v0.0.0-20180620173706-91cfa479c814
+	github.com/sirupsen/logrus v1.4.2
+	gopkg.in/yaml.v2 v2.2.2
+	k8s.io/api v0.0.0-20190927115716-5d581ce610b0
+	k8s.io/apiextensions-apiserver v0.0.0-20190927042040-728319705b32
+	k8s.io/apimachinery v0.0.0-20190927035529-0104e33c351d
+	k8s.io/client-go v0.0.0-20190926235751-95884bf844a9
+	k8s.io/code-generator v0.0.0-20190927075303-016f2b3d74d0
 )
