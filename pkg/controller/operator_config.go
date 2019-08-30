@@ -41,6 +41,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ReplicationUsername = fromCRD.PostgresUsersConfiguration.ReplicationUsername
 
 	// kubernetes config
+	result.CustomPodAnnotations = fromCRD.Kubernetes.CustomPodAnnotations
 	result.PodServiceAccountName = fromCRD.Kubernetes.PodServiceAccountName
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
