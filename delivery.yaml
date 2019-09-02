@@ -40,7 +40,7 @@ pipeline:
           cmd: |
             export PATH=$PATH:$HOME/go/bin
             cd $OPERATOR_TOP_DIR/postgres-operator
-            go test ./...
+            go test ./pkg/...
         - desc: 'Run e2e tests'
           cmd: |
             cd $OPERATOR_TOP_DIR/postgres-operator
