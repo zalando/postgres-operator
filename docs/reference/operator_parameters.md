@@ -168,6 +168,11 @@ configuration they are grouped under the `kubernetes` key.
   Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
   after this timeout. The default is `5m`.
 
+* **custom_pod_annotations**
+  This key/value map provides a list of annotations that get attached to each pod
+  of a database created by the operator. If the annotation key is also provided
+  by the database definition, the database definition value is used.
+
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not
   specified, the value is taken from the operator namespace. A special `*`

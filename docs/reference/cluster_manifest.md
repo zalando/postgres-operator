@@ -118,6 +118,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
    then the default priority class is taken. The priority class itself must be
    defined in advance. Optional.
 
+* **podAnnotations**
+  This map of strings gets attached as an annotation to each pod created for the database.
+
+
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default docker
   limit `/dev/shm` to `64M` (see e.g. the [docker

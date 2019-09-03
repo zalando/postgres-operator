@@ -883,13 +883,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveFSGroup = spec.SpiloFSGroup
 	}
 
-	annotations := make(map[string]string)
-	for k, v := range c.OpConfig.CustomPodAnnotations {
-		annotations[k] = v
-	}
-	for k, v := range spec.PodAnnotations {
-		annotations[k] = v
-	}
+	annotations := c.generatePodAnnotations(spec)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
@@ -958,6 +952,20 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	return statefulSet, nil
+}
+
+func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]string {
+	annotations := make(map[string]string)
+	for k, v := range c.OpConfig.CustomPodAnnotations {
+		annotations[k] = v
+	}
+	if spec == nil {
+		return annotations
+	}
+	for k, v := range spec.PodAnnotations {
+		annotations[k] = v
+	}
+	return annotations
 }
 
 func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
@@ -1473,10 +1481,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			},
 		}}
 
-	annotations := make(map[string]string)
-	for k, v := range c.OpConfig.CustomPodAnnotations {
-		annotations[k] = v
-	}
+	annotations := c.generatePodAnnotations(nil)
 
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = generatePodTemplate(
