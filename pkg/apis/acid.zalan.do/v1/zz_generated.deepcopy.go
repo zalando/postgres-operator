@@ -102,6 +102,13 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 			(*out)[key] = val
 		}
 	}
+	if in.CustomPodAnnotations != nil {
+		in, out := &in.CustomPodAnnotations, &out.CustomPodAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.PodToleration != nil {
 		in, out := &in.PodToleration, &out.PodToleration
 		*out = make(map[string]string, len(*in))
