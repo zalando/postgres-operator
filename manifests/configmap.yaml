@@ -13,6 +13,7 @@ data:
   cluster_name_label: version
   # custom_service_annotations:
   #   "keyx:valuez,keya:valuea"
+  custom_pod_annotations: global:foobar
   db_hosted_zone: db.example.com
   debug_logging: "true"
   # default_cpu_limit: "3"
@@ -37,7 +38,7 @@ data:
   # logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
   # logical_backup_s3_bucket: "my-bucket-url"
   # logical_backup_schedule: "30 00 * * *"
-  master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
+  master_dns_name_format: "{cluster}.{team}.staging.{hostedzone}"
   # master_pod_move_timeout: 10m
   # max_instances: "-1"
   # min_instances: "-1"
@@ -60,13 +61,13 @@ data:
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
   repair_period: 5m
-  replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
+  replica_dns_name_format: "{cluster}-repl.{team}.staging.{hostedzone}"
   replication_username: standby
   resource_check_interval: 3s
   resource_check_timeout: 10m
   resync_period: 5m
   ring_log_lines: "100"
-  secret_name_template: '{username}.{cluster}.credentials'
+  secret_name_template: "{username}.{cluster}.credentials"
   # sidecar_docker_images: ""
   # set_memory_request_to_limit: "false"
   spilo_privileged: "false"
@@ -76,5 +77,5 @@ data:
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
   # toleration: ""
   # wal_s3_bucket: ""
-  watched_namespace: "*"  # listen to all namespaces
+  watched_namespace: "*" # listen to all namespaces
   workers: "4"
