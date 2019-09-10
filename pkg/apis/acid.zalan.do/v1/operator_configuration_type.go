@@ -171,7 +171,6 @@ type OperatorConfigurationData struct {
 	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
-	PodAnnotations             map[string]string                  `json:"podAnnotations"`
 }
 
 // OperatorConfigurationUsers defines configration for super user
