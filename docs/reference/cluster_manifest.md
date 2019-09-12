@@ -119,7 +119,8 @@ These parameters are grouped directly under  the `spec` key in the manifest.
    defined in advance. Optional.
 
 * **podAnnotations**
-  This map of strings gets attached as an annotation to each pod created for the database.
+  A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+  to each pod created for the database.
 
 
 * **enableShmVolume**
