@@ -1547,14 +1547,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
 		},
 		{
-			Name:  "AWS_ACCESS_KEY_ID",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID,
-		},
-		{
-			Name:  "AWS_SECRET_ACCESS_KEY",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey,
-		},
-		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
 			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
 		},
@@ -1592,7 +1584,16 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 	}
 
+	if len(c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID) > 0 {
+		envVars = append(envVars, EnvVar{Name: "AWS_ACCESS_KEY_ID", Value:c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID)
+	}
+
+	if len(c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey) > 0 {
+		envVars = append(envVars, EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value:c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey)
+	}
+
 	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+	c.logger.Debugf("Generated env vars the new way")
 
 	return envVars
 }
