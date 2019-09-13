@@ -1481,7 +1481,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			},
 		}}
 
-	annotations := c.generatePodAnnotations(nil)
+	annotations := c.generatePodAnnotations(&c.Spec)
 
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = generatePodTemplate(
