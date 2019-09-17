@@ -103,6 +103,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3Endpoint = fromCRD.LogicalBackup.S3Endpoint
 	result.LogicalBackupS3AccessKeyID = fromCRD.LogicalBackup.S3AccessKeyID
 	result.LogicalBackupS3SecretAccessKey = fromCRD.LogicalBackup.S3SecretAccessKey
+	result.LogicalBackupS3SSE = fromCRD.LogicalBackup.S3SSE
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
