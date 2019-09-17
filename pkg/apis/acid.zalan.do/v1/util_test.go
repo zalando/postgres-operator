@@ -437,6 +437,16 @@ var postgresqlList = []struct {
 		PostgresqlList{},
 		errors.New("unexpected end of JSON input")}}
 
+var annotations = []struct {
+	in          []byte
+	annotations map[string]string
+	err         error
+}{{
+	in:          []byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "acid-testcluster1"}, "spec": {"podAnnotations": {"foo": "bar"},"teamId": "acid", "clone": {"cluster": "team-batman"}}}`),
+	annotations: map[string]string{"foo": "bar"},
+	err:         nil},
+}
+
 func mustParseTime(s string) metav1.Time {
 	v, err := time.Parse("15:04", s)
 	if err != nil {
@@ -478,6 +488,25 @@ func TestWeekdayTime(t *testing.T) {
 
 		if aTime != tt.out {
 			t.Errorf("Expected weekday: %v, got: %v", tt.out, aTime)
+		}
+	}
+}
+
+func TestClusterAnnotations(t *testing.T) {
+	for _, tt := range annotations {
+		var cluster Postgresql
+		err := cluster.UnmarshalJSON(tt.in)
+		if err != nil {
+			if tt.err == nil || err.Error() != tt.err.Error() {
+				t.Errorf("Unable to marshal cluster with annotations: expected %v got %v", tt.err, err)
+			}
+			continue
+		}
+		for k, v := range cluster.Spec.PodAnnotations {
+			found, expected := v, tt.annotations[k]
+			if found != expected {
+				t.Errorf("Didn't find correct value for key %v in for podAnnotations:  Expected %v found %v", k, expected, found)
+			}
 		}
 	}
 }
