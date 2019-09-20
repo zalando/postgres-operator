@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -49,18 +50,14 @@ func apiURL(masterPod *v1.Pod) (string, error) {
 	if ip == nil {
 		return "", fmt.Errorf("%s is not a valid IP", masterPod.Status.PodIP)
 	}
-	var ipString string
-	// If IPv6, add braces
+	// Sanity check PodIP
 	if ip.To4() == nil {
 		if ip.To16() == nil {
 			// Shouldn't ever get here, but library states it's possible.
 			return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", ip.String())
 		}
-		ipString = fmt.Sprintf("[%s]", ip.String())
-	} else {
-		ipString = ip.String()
 	}
-	return fmt.Sprintf("http://%s:%d", ipString, apiPort), nil
+	return fmt.Sprintf("http://%s", net.JoinHostPort(ip.String(), strconv.Itoa(apiPort))), nil
 }
 
 func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer) (err error) {
