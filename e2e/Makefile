@@ -29,7 +29,7 @@ PATH := $(GOPATH)/bin:$(PATH)
 default: tools
 
 clean:
-	rm -fr manifests
+	rm -rf manifests
 
 copy: clean
 	mkdir manifests
@@ -44,7 +44,7 @@ push: docker
 tools: docker
 	# install pinned version of 'kind'
 	# leave the name as is to avoid overwriting official binary named `kind`
-	wget https://github.com/kubernetes-sigs/kind/releases/download/v0.4.0/kind-linux-amd64
+	wget https://github.com/kubernetes-sigs/kind/releases/download/v0.5.1/kind-linux-amd64
 	chmod +x kind-linux-amd64
 	mv kind-linux-amd64 $(KIND_PATH)
 

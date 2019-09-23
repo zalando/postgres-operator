@@ -3,7 +3,7 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
+  dockerImage: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   initContainers:
   - name: date
     image: busybox
@@ -29,7 +29,7 @@ spec:
   enableShmVolume: true
 # spiloFSGroup: 103
   postgresql:
-    version: "10"
+    version: "11"
     parameters:
       shared_buffers: "32MB"
       max_connections: "10"

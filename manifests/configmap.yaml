@@ -19,7 +19,7 @@ data:
   # default_cpu_request: 100m
   # default_memory_limit: 1Gi
   # default_memory_request: 100Mi
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # enable_admin_role_for_users: "true"
   # enable_database_access: "true"
   enable_master_load_balancer: "true"

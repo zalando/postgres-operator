@@ -95,5 +95,5 @@ test:
 	hack/verify-codegen.sh
 	@go test ./...
 
-e2e:
-	cd e2e; make tools test
+e2e: docker # build operator image to be tested
+	cd e2e; make tools test clean
