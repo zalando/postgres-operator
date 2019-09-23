@@ -4,7 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   etcd_host: ""
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # enable_shm_volume: true
   max_instances: -1
   min_instances: -1
