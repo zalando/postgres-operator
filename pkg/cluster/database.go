@@ -25,16 +25,22 @@ const (
 	 WHERE a.rolname = ANY($1)
 	 ORDER BY 1;`
 
-	getDatabasesSQL       = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
-	createDatabaseSQL     = `CREATE DATABASE "%s" OWNER "%s";`
-	alterDatabaseOwnerSQL = `ALTER DATABASE "%s" OWNER TO "%s";`
+	getDatabasesSQL = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
+	getSchemasSQL   = `SELECT n.nspname AS dbschema FROM pg_catalog.pg_namespace n
+			WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' ORDER BY 1`
+
+	createDatabaseSQL       = `CREATE DATABASE "%s" OWNER "%s";`
+	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA "%s" AUTHORIZATION "%s"`
+	alterDatabaseOwnerSQL   = `ALTER DATABASE "%s" OWNER TO "%s";`
+	defaultPrivilegesSQL    = `SET ROLE TO "%s"; ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT INSERT, UPDATE, DELETE ON TABLES TO "%s"; ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT SELECT ON TABLES TO "%s";`
 )
 
-func (c *Cluster) pgConnectionString() string {
+func (c *Cluster) pgConnectionString(dbname string) string {
 	password := c.systemUsers[constants.SuperuserKeyName].Password
 
-	return fmt.Sprintf("host='%s' dbname=postgres sslmode=require user='%s' password='%s' connect_timeout='%d'",
+	return fmt.Sprintf("host='%s' dbname='%s' sslmode=require user='%s' password='%s' connect_timeout='%d'",
 		fmt.Sprintf("%s.%s.svc.%s", c.Name, c.Namespace, c.OpConfig.ClusterDomain),
+		dbname,
 		c.systemUsers[constants.SuperuserKeyName].Name,
 		strings.Replace(password, "$", "\\$", -1),
 		constants.PostgresConnectTimeout/time.Second)
@@ -48,14 +54,14 @@ func (c *Cluster) databaseAccessDisabled() bool {
 	return !c.OpConfig.EnableDBAccess
 }
 
-func (c *Cluster) initDbConn() error {
+func (c *Cluster) initDbConn(dbname string) error {
 	c.setProcessName("initializing db connection")
 	if c.pgDb != nil {
 		return nil
 	}
 
 	var conn *sql.DB
-	connstring := c.pgConnectionString()
+	connstring := c.pgConnectionString(dbname)
 
 	finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
@@ -100,9 +106,9 @@ func (c *Cluster) closeDbConn() (err error) {
 		c.logger.Debug("closing database connection")
 		if err = c.pgDb.Close(); err != nil {
 			c.logger.Errorf("could not close database connection: %v", err)
+		} else {
+			c.pgDb = nil
 		}
-		c.pgDb = nil
-
 		return nil
 	}
 	c.logger.Warning("attempted to close an empty db connection object")
@@ -187,14 +193,14 @@ func (c *Cluster) getDatabases() (dbs map[string]string, err error) {
 }
 
 // executeCreateDatabase creates new database with the given owner.
-// The caller is responsible for openinging and closing the database connection.
+// The caller is responsible for opening and closing the database connection.
 func (c *Cluster) executeCreateDatabase(datname, owner string) error {
 	return c.execCreateOrAlterDatabase(datname, owner, createDatabaseSQL,
 		"creating database", "create database")
 }
 
-// executeCreateDatabase changes the owner of the given database.
-// The caller is responsible for openinging and closing the database connection.
+// executeAlterDatabaseOwner changes the owner of the given database.
+// The caller is responsible for opening and closing the database connection.
 func (c *Cluster) executeAlterDatabaseOwner(datname string, owner string) error {
 	return c.execCreateOrAlterDatabase(datname, owner, alterDatabaseOwnerSQL,
 		"changing owner for database", "alter database owner")
@@ -219,6 +225,77 @@ func (c *Cluster) databaseNameOwnerValid(datname, owner string) bool {
 
 	if !databaseNameRegexp.MatchString(datname) {
 		c.logger.Infof("database %q has invalid name", datname)
+		return false
+	}
+	return true
+}
+
+// getSchemas returns the list of current database schemas
+// The caller is responsible for opening and closing the database connection
+func (c *Cluster) getSchemas() (schemas []string, err error) {
+	var (
+		rows      *sql.Rows
+		dbschemas []string
+	)
+
+	if rows, err = c.pgDb.Query(getSchemasSQL); err != nil {
+		return nil, fmt.Errorf("could not query database schemas: %v", err)
+	}
+
+	defer func() {
+		if err2 := rows.Close(); err2 != nil {
+			if err != nil {
+				err = fmt.Errorf("error when closing query cursor: %v, previous error: %v", err2, err)
+			} else {
+				err = fmt.Errorf("error when closing query cursor: %v", err2)
+			}
+		}
+	}()
+
+	for rows.Next() {
+		var dbschema string
+
+		if err = rows.Scan(&dbschema); err != nil {
+			return nil, fmt.Errorf("error when processing row: %v", err)
+		}
+		dbschemas = append(dbschemas, dbschema)
+	}
+
+	return dbschemas, err
+}
+
+// executeCreateDatabaseSchema creates new database schema with the given owner.
+// The caller is responsible for opening and closing the database connection.
+func (c *Cluster) executeCreateDatabaseSchema(datname, schemaName, dbOwner string, schemaOwner string) error {
+	return c.execCreateDatabaseSchema(datname, schemaName, dbOwner, schemaOwner, createDatabaseSchemaSQL,
+		"creating database schema", "create database schema")
+}
+
+func (c *Cluster) execCreateDatabaseSchema(datname, schemaName, dbOwner, schemaOwner, statement, doing, operation string) error {
+	if !c.databaseSchemaNameValid(schemaName) {
+		return nil
+	}
+	c.logger.Infof("%s %q owner %q", doing, schemaName, schemaOwner)
+	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, dbOwner, schemaName, schemaOwner)); err != nil {
+		return fmt.Errorf("could not execute %s: %v", operation, err)
+	}
+	c.execAlterDefaultPrivileges(schemaName, schemaOwner, datname)
+	c.execAlterDefaultPrivileges(schemaName, schemaOwner, datname+"_"+schemaName)
+
+	return nil
+}
+
+func (c *Cluster) execAlterDefaultPrivileges(schemaName, owner, rolePrefix string) error {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(defaultPrivilegesSQL, owner, schemaName, rolePrefix+"_writer", schemaName, rolePrefix+"_reader")); err != nil {
+		return fmt.Errorf("could not alter default privileges for database schema: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) databaseSchemaNameValid(schemaName string) bool {
+	if !databaseNameRegexp.MatchString(schemaName) {
+		c.logger.Infof("database schema %q has invalid name", schemaName)
 		return false
 	}
 	return true

@@ -74,25 +74,43 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
 func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserRequest, db *sql.DB) error {
+	var rr []spec.PgSyncUserRequest
+	var errors []string
 	for _, r := range reqs {
 		switch r.Kind {
 		case spec.PGSyncUserAdd:
 			if err := strategy.createPgUser(r.User, db); err != nil {
-				return fmt.Errorf("could not create user %q: %v", r.User.Name, err)
+				rr = append(rr, r)
+				errors = append(errors, fmt.Sprintf("could not create user %q: %v", r.User.Name, err))
 			}
 		case spec.PGsyncUserAlter:
 			if err := strategy.alterPgUser(r.User, db); err != nil {
-				return fmt.Errorf("could not alter user %q: %v", r.User.Name, err)
+				rr = append(rr, r)
+				errors = append(errors, fmt.Sprintf("could not alter user %q: %v", r.User.Name, err))
 			}
 		case spec.PGSyncAlterSet:
 			if err := strategy.alterPgUserSet(r.User, db); err != nil {
-				return fmt.Errorf("could not set custom user %q parameters: %v", r.User.Name, err)
+				rr = append(rr, r)
+				errors = append(errors, fmt.Sprintf("could not set custom user %q parameters: %v", r.User.Name, err))
 			}
 		default:
 			return fmt.Errorf("unrecognized operation: %v", r.Kind)
 		}
 
 	}
+
+	// creating roles might fail if group role members are created before the parent role
+	// retry adding roles as long as the number of failed attempts is shrinking
+	if len(rr) > 0 {
+		if len(rr) < len(reqs) {
+			if err := strategy.ExecuteSyncRequests(rr, db); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("could not execute sync requests for users: %v", errors)
+		}
+	}
+
 	return nil
 }
 func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql.DB) (err error) {

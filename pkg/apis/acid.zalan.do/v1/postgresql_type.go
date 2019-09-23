@@ -45,20 +45,21 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	NumberOfInstances     int32                `json:"numberOfInstances"`
-	Users                 map[string]UserFlags `json:"users"`
-	MaintenanceWindows    []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone                 CloneDescription     `json:"clone"`
-	ClusterName           string               `json:"-"`
-	Databases             map[string]string    `json:"databases,omitempty"`
-	Tolerations           []v1.Toleration      `json:"tolerations,omitempty"`
-	Sidecars              []Sidecar            `json:"sidecars,omitempty"`
-	InitContainers        []v1.Container       `json:"initContainers,omitempty"`
-	PodPriorityClassName  string               `json:"podPriorityClassName,omitempty"`
-	ShmVolume             *bool                `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup   bool                 `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription  `json:"standby"`
+	NumberOfInstances     int32                       `json:"numberOfInstances"`
+	Users                 map[string]UserFlags        `json:"users"`
+	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
+	Clone                 CloneDescription            `json:"clone"`
+	ClusterName           string                      `json:"-"`
+	Databases             map[string]string           `json:"databases,omitempty"`
+	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
+	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
+	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
+	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
+	PodPriorityClassName  string                      `json:"podPriorityClassName,omitempty"`
+	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster        *StandbyDescription         `json:"standby"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -73,6 +74,17 @@ type PostgresqlList struct {
 	metav1.ListMeta `json:"metadata"`
 
 	Items []Postgresql `json:"items"`
+}
+
+// PreparedDatabase describes elements to be bootstrapped (schemas, prod-prefix)
+type PreparedDatabase struct {
+	PreparedSchemas map[string]PreparedSchema `json:"schemas,omitempty"`
+	Prod            bool                      `json:"prod,omitempty"`
+}
+
+// PreparedSchema describes elements to be bootstrapped in the schema
+type PreparedSchema struct {
+	DefaultRoles *bool `json:"defaultRoles,omitempty" defaults:"true"`
 }
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.

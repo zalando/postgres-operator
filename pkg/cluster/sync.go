@@ -101,6 +101,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			err = fmt.Errorf("could not sync databases: %v", err)
 			return err
 		}
+		c.logger.Debugf("syncing database schemas")
+		if err = c.syncPreparedDatabases(); err != nil {
+			err = fmt.Errorf("could not sync database schemas: %v", err)
+			return err
+		}
 	}
 
 	return err
@@ -433,7 +438,7 @@ func (c *Cluster) syncRoles() (err error) {
 		userNames []string
 	)
 
-	err = c.initDbConn()
+	err = c.initDbConn("postgres")
 	if err != nil {
 		return fmt.Errorf("could not init db connection: %v", err)
 	}
@@ -490,7 +495,7 @@ func (c *Cluster) syncDatabases() error {
 	createDatabases := make(map[string]string)
 	alterOwnerDatabases := make(map[string]string)
 
-	if err := c.initDbConn(); err != nil {
+	if err := c.initDbConn("postgres"); err != nil {
 		return fmt.Errorf("could not init database connection")
 	}
 	defer func() {
@@ -502,6 +507,13 @@ func (c *Cluster) syncDatabases() error {
 	currentDatabases, err := c.getDatabases()
 	if err != nil {
 		return fmt.Errorf("could not get current databases: %v", err)
+	}
+
+	for preparedDatname := range c.Spec.PreparedDatabases {
+		_, exists := currentDatabases[preparedDatname]
+		if !exists {
+			createDatabases[preparedDatname] = preparedDatname + "_owner"
+		}
 	}
 
 	for datname, newOwner := range c.Spec.Databases {
@@ -525,6 +537,62 @@ func (c *Cluster) syncDatabases() error {
 	for datname, owner := range alterOwnerDatabases {
 		if err = c.executeAlterDatabaseOwner(datname, owner); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPreparedDatabases() error {
+	c.setProcessName("syncing prepared databases")
+	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
+		preparedSchemas := preparedDB.PreparedSchemas
+		if len(preparedDB.PreparedSchemas) == 0 {
+			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
+		}
+		if err := c.syncPreparedSchemas(preparedDbName, preparedSchemas); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPreparedSchemas(datname string, preparedSchemas map[string]acidv1.PreparedSchema) error {
+	c.setProcessName("syncing prepared schemas")
+
+	if err := c.initDbConn(datname); err != nil {
+		return fmt.Errorf("could not init connection to database %s: %v", datname, err)
+	}
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}()
+
+	currentSchemas, err := c.getSchemas()
+	if err != nil {
+		return fmt.Errorf("could not get current schemas: %v", err)
+	}
+
+	var schemas []string
+
+	for schema := range preparedSchemas {
+		schemas = append(schemas, schema)
+	}
+
+	if createPreparedSchemas, equal := util.SubstractStringSlices(schemas, currentSchemas); !equal {
+		for _, schemaName := range createPreparedSchemas {
+			owner := "_owner"
+			dbOwner := datname + owner
+			if preparedSchemas[schemaName].DefaultRoles == nil || *preparedSchemas[schemaName].DefaultRoles {
+				owner = datname + "_" + schemaName + owner
+			} else {
+				owner = dbOwner
+			}
+			if err = c.executeCreateDatabaseSchema(datname, schemaName, dbOwner, owner); err != nil {
+				return err
+			}
 		}
 	}
 
