@@ -54,7 +54,7 @@ func apiURL(masterPod *v1.Pod) (string, error) {
 	if ip.To4() == nil {
 		if ip.To16() == nil {
 			// Shouldn't ever get here, but library states it's possible.
-			return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", ip.String())
+			return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", masterPod.Status.PodIP)
 		}
 	}
 	return fmt.Sprintf("http://%s", net.JoinHostPort(ip.String(), strconv.Itoa(apiPort))), nil
