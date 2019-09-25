@@ -641,7 +641,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.logger.Errorf("could not sync roles: %v", err)
 			updateFailed = true
 		}
-		if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
+		if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) ||
+			!reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases) {
 			c.logger.Infof("syncing databases")
 			if err := c.syncDatabases(); err != nil {
 				c.logger.Errorf("could not sync databases: %v", err)
