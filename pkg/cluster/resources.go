@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -64,7 +64,7 @@ func (c *Cluster) listResources() error {
 	return nil
 }
 
-func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
+func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 	c.setProcessName("creating statefulset")
 	statefulSetSpec, err := c.generateStatefulSet(&c.Spec)
 	if err != nil {
@@ -95,7 +95,7 @@ func getPodIndex(podName string) (int32, error) {
 	return int32(res), nil
 }
 
-func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
+func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 	masterPod, err := c.getRolePods(Master)
 	if err != nil {
 		return fmt.Errorf("could not get master pod: %v", err)
@@ -135,7 +135,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 
 // setRollingUpdateFlagForStatefulSet sets the indicator or the rolling update requirement
 // in the StatefulSet annotation.
-func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *v1beta1.StatefulSet, val bool) {
+func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool) {
 	anno := sset.GetAnnotations()
 	if anno == nil {
 		anno = make(map[string]string)
@@ -160,7 +160,7 @@ func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
 
 // getRollingUpdateFlagFromStatefulSet returns the value of the rollingUpdate flag from the passed
 // StatefulSet, reverting to the default value in case of errors
-func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet, defaultValue bool) (flag bool) {
+func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *appsv1.StatefulSet, defaultValue bool) (flag bool) {
 	anno := sset.GetAnnotations()
 	flag = defaultValue
 
@@ -181,7 +181,7 @@ func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet,
 // mergeRollingUpdateFlagUsingCache returns the value of the rollingUpdate flag from the passed
 // statefulset, however, the value can be cleared if there is a cached flag in the cluster that
 // is set to false (the discrepancy could be a result of a failed StatefulSet update)
-func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *v1beta1.StatefulSet) bool {
+func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *appsv1.StatefulSet) bool {
 	var (
 		cachedStatefulsetExists, clearRollingUpdateFromCache, podsRollingUpdateRequired bool
 	)
@@ -207,7 +207,7 @@ func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *v1beta1.S
 	return podsRollingUpdateRequired
 }
 
-func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*v1beta1.StatefulSet, error) {
+func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
 	c.logger.Debugf("updating statefulset annotations")
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
@@ -223,7 +223,7 @@ func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*
 	return result, nil
 
 }
-func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
@@ -264,7 +264,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 }
 
 // replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL CRD.
-func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("replacing statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
@@ -676,7 +676,7 @@ func (c *Cluster) GetEndpointReplica() *v1.Endpoints {
 }
 
 // GetStatefulSet returns cluster's kubernetes StatefulSet
-func (c *Cluster) GetStatefulSet() *v1beta1.StatefulSet {
+func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 	return c.Statefulset
 }
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -711,7 +711,7 @@ func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) acid
 	}
 }
 
-func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.StatefulSet, error) {
+func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
 		err                 error
@@ -917,25 +917,25 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*v1beta1.State
 	// the operator has domain-specific logic on how to do rolling updates of PG clusters
 	// so we do not use default rolling updates implemented by stateful sets
 	// that leaves the legacy "OnDelete" update strategy as the only option
-	updateStrategy := v1beta1.StatefulSetUpdateStrategy{Type: v1beta1.OnDeleteStatefulSetStrategyType}
+	updateStrategy := appsv1.StatefulSetUpdateStrategy{Type: appsv1.OnDeleteStatefulSetStrategyType}
 
-	var podManagementPolicy v1beta1.PodManagementPolicyType
+	var podManagementPolicy appsv1.PodManagementPolicyType
 	if c.OpConfig.PodManagementPolicy == "ordered_ready" {
-		podManagementPolicy = v1beta1.OrderedReadyPodManagement
+		podManagementPolicy = appsv1.OrderedReadyPodManagement
 	} else if c.OpConfig.PodManagementPolicy == "parallel" {
-		podManagementPolicy = v1beta1.ParallelPodManagement
+		podManagementPolicy = appsv1.ParallelPodManagement
 	} else {
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	statefulSet := &v1beta1.StatefulSet{
+	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
 			Annotations: map[string]string{rollingUpdateStatefulsetAnnotationKey: "false"},
 		},
-		Spec: v1beta1.StatefulSetSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
 			Selector:             c.labelsSelector(),
 			ServiceName:          c.serviceName(Master),

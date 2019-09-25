@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -168,7 +168,7 @@ func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpd
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 }
 
-func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
+func (c *Cluster) logStatefulSetChanges(old, new *appsv1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
 		c.logger.Infof("statefulset %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
