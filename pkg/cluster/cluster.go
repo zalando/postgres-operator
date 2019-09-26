@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -779,10 +780,19 @@ func (c *Cluster) initSystemUsers() {
 
 func (c *Cluster) initPreparedDatabaseRoles() error {
 
-	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
+	preparedDatabases := c.Spec.PreparedDatabases
+	if preparedDatabases == nil || len(preparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
+		preparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
+		c.Spec.PreparedDatabases = preparedDatabases
+	}
+
+	for preparedDbName, preparedDB := range preparedDatabases {
+		// default roles per database
 		if err := c.initDefaultRoles("admin", preparedDbName); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
+
+		// default roles per database schema
 		preparedSchemas := preparedDB.PreparedSchemas
 		if len(preparedDB.PreparedSchemas) == 0 {
 			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}

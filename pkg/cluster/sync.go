@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"strings"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -509,6 +510,12 @@ func (c *Cluster) syncDatabases() error {
 		return fmt.Errorf("could not get current databases: %v", err)
 	}
 
+	// if no prepared databases are specified create a database named like the cluster
+	preparedDatabases := c.Spec.PreparedDatabases
+	if preparedDatabases == nil || len(preparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
+		preparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
+		c.Spec.PreparedDatabases = preparedDatabases
+	}
 	for preparedDatname := range c.Spec.PreparedDatabases {
 		_, exists := currentDatabases[preparedDatname]
 		if !exists {
