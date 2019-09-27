@@ -26,7 +26,7 @@ spec:
   preparedDatabases:
     ab_db:
       schemas:
-        data:
+        data: {}
         history:
           defaultRoles: false
 
