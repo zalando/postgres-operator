@@ -32,7 +32,14 @@ const (
 	createDatabaseSQL       = `CREATE DATABASE "%s" OWNER "%s";`
 	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA "%s" AUTHORIZATION "%s"`
 	alterDatabaseOwnerSQL   = `ALTER DATABASE "%s" OWNER TO "%s";`
-	defaultPrivilegesSQL    = `SET ROLE TO "%s"; ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT INSERT, UPDATE, DELETE ON TABLES TO "%s"; ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT SELECT ON TABLES TO "%s";`
+	defaultPrivilegesSQL    = `SET ROLE TO "%s";
+			GRANT USAGE ON SCHEMA "%s" TO "%s","%s";
+			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT SELECT ON TABLES TO "%s";
+			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT SELECT ON SEQUENCES TO "%s";
+			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT INSERT, UPDATE, DELETE ON TABLES TO "%s";
+			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT USAGE, UPDATE ON SEQUENCES TO "%s";
+			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT EXECUTE ON FUNCTIONS TO "%s","%s";
+			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT USAGE ON TYPES TO "%s","%s";`
 )
 
 func (c *Cluster) pgConnectionString(dbname string) string {
@@ -286,7 +293,14 @@ func (c *Cluster) execCreateDatabaseSchema(datname, schemaName, dbOwner, schemaO
 }
 
 func (c *Cluster) execAlterDefaultPrivileges(schemaName, owner, rolePrefix string) error {
-	if _, err := c.pgDb.Exec(fmt.Sprintf(defaultPrivilegesSQL, owner, schemaName, rolePrefix+"_writer", schemaName, rolePrefix+"_reader")); err != nil {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(defaultPrivilegesSQL, owner,
+		schemaName, rolePrefix+"_writer", rolePrefix+"_reader", // schema
+		schemaName, rolePrefix+"_reader", // tables
+		schemaName, rolePrefix+"_reader", // sequences
+		schemaName, rolePrefix+"_writer", // tables
+		schemaName, rolePrefix+"_writer", // sequences
+		schemaName, rolePrefix+"_reader", rolePrefix+"_writer", // types
+		schemaName, rolePrefix+"_reader", rolePrefix+"_writer")); err != nil { // functions
 		return fmt.Errorf("could not alter default privileges for database schema: %v", err)
 	}
 
