@@ -32,7 +32,16 @@ const (
 	createDatabaseSQL       = `CREATE DATABASE "%s" OWNER "%s";`
 	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA "%s" AUTHORIZATION "%s"`
 	alterDatabaseOwnerSQL   = `ALTER DATABASE "%s" OWNER TO "%s";`
-	defaultPrivilegesSQL    = `SET ROLE TO "%s";
+
+	globalDefaultPrivilegesSQL = `SET ROLE TO "%s";
+			ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO "%s","%s";
+			ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO "%s";
+			ALTER DEFAULT PRIVILEGES GRANT SELECT ON SEQUENCES TO "%s";
+			ALTER DEFAULT PRIVILEGES GRANT INSERT, UPDATE, DELETE ON TABLES TO "%s";
+			ALTER DEFAULT PRIVILEGES GRANT USAGE, UPDATE ON SEQUENCES TO "%s";
+			ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO "%s","%s";
+			ALTER DEFAULT PRIVILEGES GRANT USAGE ON TYPES TO "%s","%s";`
+	schemaDefaultPrivilegesSQL = `SET ROLE TO "%s";
 			GRANT USAGE ON SCHEMA "%s" TO "%s","%s";
 			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT SELECT ON TABLES TO "%s";
 			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT SELECT ON SEQUENCES TO "%s";
@@ -286,23 +295,11 @@ func (c *Cluster) execCreateDatabaseSchema(datname, schemaName, dbOwner, schemaO
 	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, dbOwner, schemaName, schemaOwner)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
-	c.execAlterDefaultPrivileges(schemaName, schemaOwner, datname)
-	c.execAlterDefaultPrivileges(schemaName, schemaOwner, datname+"_"+schemaName)
 
-	return nil
-}
-
-func (c *Cluster) execAlterDefaultPrivileges(schemaName, owner, rolePrefix string) error {
-	if _, err := c.pgDb.Exec(fmt.Sprintf(defaultPrivilegesSQL, owner,
-		schemaName, rolePrefix+"_writer", rolePrefix+"_reader", // schema
-		schemaName, rolePrefix+"_reader", // tables
-		schemaName, rolePrefix+"_reader", // sequences
-		schemaName, rolePrefix+"_writer", // tables
-		schemaName, rolePrefix+"_writer", // sequences
-		schemaName, rolePrefix+"_reader", rolePrefix+"_writer", // types
-		schemaName, rolePrefix+"_reader", rolePrefix+"_writer")); err != nil { // functions
-		return fmt.Errorf("could not alter default privileges for database schema: %v", err)
-	}
+	// set default privileges for schema
+	c.execAlterSchemaDefaultPrivileges(schemaName, dbOwner, datname+"_"+schemaName)
+	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, datname)
+	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, datname+"_"+schemaName)
 
 	return nil
 }
@@ -313,6 +310,36 @@ func (c *Cluster) databaseSchemaNameValid(schemaName string) bool {
 		return false
 	}
 	return true
+}
+
+func (c *Cluster) execAlterSchemaDefaultPrivileges(schemaName, owner, rolePrefix string) error {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(schemaDefaultPrivilegesSQL, owner,
+		schemaName, rolePrefix+"_writer", rolePrefix+"_reader", // schema
+		schemaName, rolePrefix+"_reader", // tables
+		schemaName, rolePrefix+"_reader", // sequences
+		schemaName, rolePrefix+"_writer", // tables
+		schemaName, rolePrefix+"_writer", // sequences
+		schemaName, rolePrefix+"_reader", rolePrefix+"_writer", // types
+		schemaName, rolePrefix+"_reader", rolePrefix+"_writer")); err != nil { // functions
+		return fmt.Errorf("could not alter default privileges for database schema %s: %v", schemaName, err)
+	}
+
+	return nil
+}
+
+func (c *Cluster) execAlterGlobalDefaultPrivileges(owner, rolePrefix string) error {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(globalDefaultPrivilegesSQL, owner,
+		rolePrefix+"_writer", rolePrefix+"_reader", // schemas
+		rolePrefix+"_reader",                       // tables
+		rolePrefix+"_reader",                       // sequences
+		rolePrefix+"_writer",                       // tables
+		rolePrefix+"_writer",                       // sequences
+		rolePrefix+"_reader", rolePrefix+"_writer", // types
+		rolePrefix+"_reader", rolePrefix+"_writer")); err != nil { // functions
+		return fmt.Errorf("could not alter default privileges for database %s: %v", rolePrefix, err)
+	}
+
+	return nil
 }
 
 func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool) (result []string) {

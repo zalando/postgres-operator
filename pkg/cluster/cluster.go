@@ -816,20 +816,22 @@ func (c *Cluster) initDefaultRoles(admin, prefix string) error {
 	for defaultRole, inherits := range defaultRoles {
 
 		roleName := prefix + defaultRole
+
 		flags := []string{constants.RoleFlagNoLogin}
-		memberOf := make([]string, 0)
-		adminRole := ""
 		if defaultRole[len(defaultRole)-5:] == "_user" {
 			flags = []string{constants.RoleFlagLogin}
-		} else {
-			if defaultRole == "_owner" {
-				adminRole = admin
-			} else {
-				adminRole = prefix + "_owner"
-			}
 		}
+
+		memberOf := make([]string, 0)
 		if inherits != "" {
 			memberOf = append(memberOf, prefix+inherits)
+		}
+
+		adminRole := ""
+		if strings.Contains(defaultRole, "_owner") {
+			adminRole = admin
+		} else {
+			adminRole = prefix + "_owner"
 		}
 
 		newRole := spec.PgUser{

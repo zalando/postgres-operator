@@ -553,6 +553,19 @@ func (c *Cluster) syncDatabases() error {
 func (c *Cluster) syncPreparedDatabases() error {
 	c.setProcessName("syncing prepared databases")
 	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
+		if err := c.initDbConn(preparedDbName); err != nil {
+			return fmt.Errorf("could not init connection to database %s: %v", preparedDbName, err)
+		}
+		defer func() {
+			if err := c.closeDbConn(); err != nil {
+				c.logger.Errorf("could not close database connection: %v", err)
+			}
+		}()
+
+		// first, set default privileges for prepared database
+		c.execAlterGlobalDefaultPrivileges(preparedDbName+"_owner", preparedDbName)
+
+		// now, prepare defined schemas
 		preparedSchemas := preparedDB.PreparedSchemas
 		if len(preparedDB.PreparedSchemas) == 0 {
 			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
@@ -567,15 +580,6 @@ func (c *Cluster) syncPreparedDatabases() error {
 
 func (c *Cluster) syncPreparedSchemas(datname string, preparedSchemas map[string]acidv1.PreparedSchema) error {
 	c.setProcessName("syncing prepared schemas")
-
-	if err := c.initDbConn(datname); err != nil {
-		return fmt.Errorf("could not init connection to database %s: %v", datname, err)
-	}
-	defer func() {
-		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection: %v", err)
-		}
-	}()
 
 	currentSchemas, err := c.getSchemas()
 	if err != nil {
