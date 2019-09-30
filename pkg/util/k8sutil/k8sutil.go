@@ -16,8 +16,8 @@ import (
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/typed/apps/v1beta1"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	"k8s.io/client-go/rest"
@@ -29,17 +29,17 @@ import (
 
 // KubernetesClient describes getters for Kubernetes objects
 type KubernetesClient struct {
-	v1core.SecretsGetter
-	v1core.ServicesGetter
-	v1core.EndpointsGetter
-	v1core.PodsGetter
-	v1core.PersistentVolumesGetter
-	v1core.PersistentVolumeClaimsGetter
-	v1core.ConfigMapsGetter
-	v1core.NodesGetter
-	v1core.NamespacesGetter
-	v1core.ServiceAccountsGetter
-	v1beta1.StatefulSetsGetter
+	corev1.SecretsGetter
+	corev1.ServicesGetter
+	corev1.EndpointsGetter
+	corev1.PodsGetter
+	corev1.PersistentVolumesGetter
+	corev1.PersistentVolumeClaimsGetter
+	corev1.ConfigMapsGetter
+	corev1.NodesGetter
+	corev1.NamespacesGetter
+	corev1.ServiceAccountsGetter
+	appsv1.StatefulSetsGetter
 	rbacv1beta1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
@@ -50,14 +50,14 @@ type KubernetesClient struct {
 }
 
 type mockSecret struct {
-	v1core.SecretInterface
+	corev1.SecretInterface
 }
 
 type MockSecretGetter struct {
 }
 
 type mockConfigMap struct {
-	v1core.ConfigMapInterface
+	corev1.ConfigMapInterface
 }
 
 type MockConfigMapsGetter struct {
@@ -101,7 +101,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.PersistentVolumesGetter = client.CoreV1()
 	kubeClient.NodesGetter = client.CoreV1()
 	kubeClient.NamespacesGetter = client.CoreV1()
-	kubeClient.StatefulSetsGetter = client.AppsV1beta1()
+	kubeClient.StatefulSetsGetter = client.AppsV1()
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
@@ -215,12 +215,12 @@ func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigM
 }
 
 // Secrets to be mocked
-func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
+func (c *MockSecretGetter) Secrets(namespace string) corev1.SecretInterface {
 	return &mockSecret{}
 }
 
 // ConfigMaps to be mocked
-func (c *MockConfigMapsGetter) ConfigMaps(namespace string) v1core.ConfigMapInterface {
+func (c *MockConfigMapsGetter) ConfigMaps(namespace string) corev1.ConfigMapInterface {
 	return &mockConfigMap{}
 }
 

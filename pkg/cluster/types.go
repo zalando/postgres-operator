@@ -4,7 +4,7 @@ import (
 	"time"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
@@ -60,7 +60,7 @@ type ClusterStatus struct {
 	ReplicaService      *v1.Service
 	MasterEndpoint      *v1.Endpoints
 	ReplicaEndpoint     *v1.Endpoints
-	StatefulSet         *v1beta1.StatefulSet
+	StatefulSet         *appsv1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 
 	CurrentProcess Process
