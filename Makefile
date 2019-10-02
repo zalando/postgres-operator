@@ -85,7 +85,7 @@ tools:
 fmt:
 	@gofmt -l -w -s $(DIRS)
 
-vet: fmt
+vet:
 	@go vet $(PKG)
 	@ineffassign kubectl-pg pkg
 	@staticcheck $(PKG)
