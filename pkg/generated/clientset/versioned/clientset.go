@@ -25,6 +25,8 @@ SOFTWARE.
 package versioned
 
 import (
+	"fmt"
+
 	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -34,8 +36,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	AcidV1() acidv1.AcidV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Acid() acidv1.AcidV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -50,12 +50,6 @@ func (c *Clientset) AcidV1() acidv1.AcidV1Interface {
 	return c.acidV1
 }
 
-// Deprecated: Acid retrieves the default version of AcidClient.
-// Please explicitly pick a version.
-func (c *Clientset) Acid() acidv1.AcidV1Interface {
-	return c.acidV1
-}
-
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	if c == nil {
@@ -65,9 +59,14 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 }
 
 // NewForConfig creates a new Clientset for the given config.
+// If config's RateLimiter is not set and QPS and Burst are acceptable,
+// NewForConfig will generate a rate-limiter in configShallowCopy.
 func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		if configShallowCopy.Burst <= 0 {
+			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 	var cs Clientset

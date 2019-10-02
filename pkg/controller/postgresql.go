@@ -312,7 +312,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	for {
 		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}) error { return nil }))
 		if err != nil {
-			if err == cache.FIFOClosedError {
+			if err == cache.ErrFIFOClosed {
 				return
 			}
 			c.logger.Errorf("error when processing cluster events queue: %v", err)

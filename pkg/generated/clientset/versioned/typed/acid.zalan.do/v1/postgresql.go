@@ -25,6 +25,8 @@ SOFTWARE.
 package v1
 
 import (
+	"time"
+
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,11 +84,16 @@ func (c *postgresqls) Get(name string, options metav1.GetOptions) (result *v1.Po
 
 // List takes label and field selectors, and returns the list of Postgresqls that match those selectors.
 func (c *postgresqls) List(opts metav1.ListOptions) (result *v1.PostgresqlList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.PostgresqlList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("postgresqls").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -94,11 +101,16 @@ func (c *postgresqls) List(opts metav1.ListOptions) (result *v1.PostgresqlList, 
 
 // Watch returns a watch.Interface that watches the requested postgresqls.
 func (c *postgresqls) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("postgresqls").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -156,10 +168,15 @@ func (c *postgresqls) Delete(name string, options *metav1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *postgresqls) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("postgresqls").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

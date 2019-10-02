@@ -249,7 +249,7 @@ func (in *OperatorConfigurationData) DeepCopy() *OperatorConfigurationData {
 func (in *OperatorConfigurationList) DeepCopyInto(out *OperatorConfigurationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]OperatorConfiguration, len(*in))
@@ -597,7 +597,7 @@ func (in *Postgresql) DeepCopyObject() runtime.Object {
 func (in *PostgresqlList) DeepCopyInto(out *PostgresqlList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Postgresql, len(*in))

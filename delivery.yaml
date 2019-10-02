@@ -2,9 +2,6 @@ version: "2017-09-20"
 pipeline:
     - id: build-postgres-operator
       type: script
-      env:
-        GOPATH: /root/go
-        OPERATOR_TOP_DIR: /root/go/src/github.com/zalando
       commands:
         - desc: 'Update'
           cmd: |
@@ -20,10 +17,6 @@ pipeline:
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
             go version
-        - desc: 'Symlink sources into the GOPATH'
-          cmd: |
-            mkdir -p $OPERATOR_TOP_DIR
-            ln -s $(pwd) $OPERATOR_TOP_DIR/postgres-operator
         - desc: 'Build docker image'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
@@ -39,11 +32,9 @@ pipeline:
         - desc: 'Run unit tests'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
-            cd $OPERATOR_TOP_DIR/postgres-operator
             go test ./pkg/...
         - desc: 'Run e2e tests'
           cmd: |
-            cd $OPERATOR_TOP_DIR/postgres-operator
             make e2e
         - desc: 'Push docker image'
           cmd: |
