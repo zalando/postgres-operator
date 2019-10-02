@@ -76,15 +76,15 @@ type PostgresqlList struct {
 	Items []Postgresql `json:"items"`
 }
 
-// PreparedDatabase describes elements to be bootstrapped (schemas, prod-prefix)
+// PreparedDatabase describes elements to be bootstrapped
 type PreparedDatabase struct {
 	PreparedSchemas map[string]PreparedSchema `json:"schemas,omitempty"`
-	Prod            bool                      `json:"prod,omitempty"`
 }
 
 // PreparedSchema describes elements to be bootstrapped in the schema
 type PreparedSchema struct {
 	DefaultRoles *bool `json:"defaultRoles,omitempty" defaults:"true"`
+	DefaultUsers bool  `json:"defaultUsers,omitempty" defaults:"false"`
 }
 
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.

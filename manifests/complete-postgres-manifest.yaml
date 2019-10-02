@@ -24,11 +24,12 @@ spec:
   databases:
     foo: zalando
   preparedDatabases:
-    ab_db:
+    bar:
       schemas:
         data: {}
         history:
-          defaultRoles: false
+          defaultRoles: true
+          defaultUsers: false
 
 # Expert section
 

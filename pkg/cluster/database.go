@@ -297,9 +297,11 @@ func (c *Cluster) execCreateDatabaseSchema(datname, schemaName, dbOwner, schemaO
 	}
 
 	// set default privileges for schema
-	c.execAlterSchemaDefaultPrivileges(schemaName, dbOwner, datname+"_"+schemaName)
 	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, datname)
-	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, datname+"_"+schemaName)
+	if schemaOwner != dbOwner {
+		c.execAlterSchemaDefaultPrivileges(schemaName, dbOwner, datname+"_"+schemaName)
+		c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, datname+"_"+schemaName)
+	}
 
 	return nil
 }

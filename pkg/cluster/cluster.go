@@ -786,9 +786,15 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		c.Spec.PreparedDatabases = preparedDatabases
 	}
 
+	defaultRoles := map[string]string{"_owner": "", "_reader": "", "_writer": "_reader"}
+	defaultUsers := map[string]string{"_owner_user": "_owner", "_reader_user": "_reader", "_writer_user": "_writer"}
+
 	for preparedDbName, preparedDB := range preparedDatabases {
 		// default roles per database
-		if err := c.initDefaultRoles("admin", preparedDbName); err != nil {
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName); err != nil {
+			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
+		}
+		if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
 
@@ -799,8 +805,13 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		}
 		for preparedSchemaName, preparedSchema := range preparedSchemas {
 			if preparedSchema.DefaultRoles == nil || *preparedSchema.DefaultRoles {
-				if err := c.initDefaultRoles(preparedDbName+"_owner", preparedDbName+"_"+preparedSchemaName); err != nil {
+				if err := c.initDefaultRoles(defaultRoles, preparedDbName+"_owner", preparedDbName+"_"+preparedSchemaName); err != nil {
 					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
+				}
+				if preparedSchema.DefaultUsers {
+					if err := c.initDefaultRoles(defaultUsers, preparedDbName+"_owner", preparedDbName+"_"+preparedSchemaName); err != nil {
+						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
+					}
 				}
 			}
 		}
@@ -808,10 +819,7 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 	return nil
 }
 
-func (c *Cluster) initDefaultRoles(admin, prefix string) error {
-	defaultRoles := map[string]string{
-		"_owner": "", "_reader": "", "_writer": "_reader",
-		"_owner_user": "_owner", "_reader_user": "_reader", "_writer_user": "_writer"}
+func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string) error {
 
 	for defaultRole, inherits := range defaultRoles {
 
