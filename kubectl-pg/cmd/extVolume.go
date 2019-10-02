@@ -25,20 +25,21 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"log"
-	"strconv"
 )
 
 // extVolumeCmd represents the extVolume command
 var extVolumeCmd = &cobra.Command{
 	Use:   "ext-volume",
 	Short: "Increases the volume size of a given Postgres cluster",
-	Long:  `Extends the volume of the postgres cluster. But volume cannot be shrinked.`,
+	Long:  `Extends the volume of the postgres cluster. But volume cannot be shrunk.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, _ := cmd.Flags().GetString("cluster")
 		if len(args) > 0 {
@@ -98,7 +99,7 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	} else if newSize.Value() == oldSize.Value() {
 		fmt.Println("volume already has the desired size.")
 	} else {
-		fmt.Printf("volume %s size cannot be shrinked.\n", postgresql.Spec.Volume.Size)
+		fmt.Printf("volume %s size cannot be shrunk.\n", postgresql.Spec.Volume.Size)
 	}
 }
 

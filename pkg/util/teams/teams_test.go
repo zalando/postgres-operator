@@ -133,6 +133,7 @@ var requestsURLtc = []struct {
 }{
 	{
 		"coffee://localhost/",
+		//lint:ignore ST1005 formatting matches the value returned by Teams API
 		fmt.Errorf(`Get coffee://localhost/teams/acid: unsupported protocol scheme "coffee"`),
 	},
 	{

@@ -24,12 +24,13 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
+
 	"github.com/spf13/cobra"
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	"io/ioutil"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
-	"log"
 )
 
 // createCmd kubectl pg create.
@@ -50,6 +51,9 @@ kubectl pg create -f cluster-manifest.yaml
 func create(fileName string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ymlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatal(err)

@@ -25,6 +25,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	v1 "k8s.io/api/apps/v1"
@@ -32,8 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"log"
-	"strconv"
 )
 
 // scaleCmd represents the scale command
@@ -44,6 +45,9 @@ var scaleCmd = &cobra.Command{
 Scaling to 0 leads to down time.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, err := cmd.Flags().GetString("cluster")
+		if err != nil {
+			log.Fatal(err)
+		}
 		namespace, err := cmd.Flags().GetString("namespace")
 		if err != nil {
 			log.Fatal(err)

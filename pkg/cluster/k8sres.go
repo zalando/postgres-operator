@@ -174,6 +174,7 @@ PatroniInitDBParams:
 	for _, k := range initdbOptionNames {
 		v := patroni.InitDB[k]
 		for i, defaultParam := range config.Bootstrap.Initdb {
+			//lint:ignore S1034 looks like false positive: defaultParam.(type) cannot be used outside of type switch
 			switch defaultParam.(type) {
 			case map[string]string:
 				{
@@ -1308,11 +1309,11 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			c.logger.Info(msg, description.S3WalPath)
 
 			envs := []v1.EnvVar{
-				v1.EnvVar{
+				{
 					Name:  "CLONE_WAL_S3_BUCKET",
 					Value: c.OpConfig.WALES3Bucket,
 				},
-				v1.EnvVar{
+				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 					Value: getBucketScopeSuffix(description.UID),
 				},

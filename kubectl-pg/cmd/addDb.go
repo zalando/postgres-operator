@@ -25,11 +25,12 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"log"
 )
 
 // addDbCmd represents the addDb command
@@ -69,7 +70,7 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 
 	var dbOwnerExists bool
 	dbUsers := postgresql.Spec.Users
-	for key, _ := range dbUsers {
+	for key := range dbUsers {
 		if key == dbOwner {
 			dbOwnerExists = true
 		}

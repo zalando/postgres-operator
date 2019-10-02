@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -176,7 +176,7 @@ func (c *Controller) initPodServiceAccount() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse pod service account definition from the operator config map: %v", err))
+		panic(fmt.Errorf("unable to parse pod service account definition from the operator config map: %v", err))
 	case groupVersionKind.Kind != "ServiceAccount":
 		panic(fmt.Errorf("pod service account definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
 	default:
@@ -224,7 +224,7 @@ func (c *Controller) initRoleBinding() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse the definition of the role binding for the pod service account definition from the operator config map: %v", err))
+		panic(fmt.Errorf("unable to parse the definition of the role binding for the pod service account definition from the operator config map: %v", err))
 	case groupVersionKind.Kind != "RoleBinding":
 		panic(fmt.Errorf("role binding definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
 	default:
