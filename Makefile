@@ -20,7 +20,7 @@ GITSTATUS = $(shell git status --porcelain || echo "no changes")
 SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
 DIRS := cmd pkg
-PKG := `go list ./... | grep --invert-match -e /vendor/ -e /kubectl-pg -e workspace`
+PKG := `go list ./... | grep --invert-match -e /vendor/ -e /kubectl-pg`
 
 ifeq ($(DEBUG),1)
 	DOCKERFILE = DebugDockerfile
@@ -85,7 +85,7 @@ tools:
 fmt:
 	@gofmt -l -w -s $(DIRS)
 
-vet:
+vet: fmt
 	@go vet $(PKG)
 	@ineffassign kubectl-pg pkg
 	@staticcheck $(PKG)
@@ -93,9 +93,9 @@ vet:
 deps:
 	@glide install --strip-vendor
 
-test: vet
+test:
 	hack/verify-codegen.sh
-	@go test $(PKG)
+	@go test ./...
 
 e2e: docker # build operator image to be tested
 	cd e2e; make tools test clean
