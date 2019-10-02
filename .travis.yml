@@ -14,7 +14,7 @@ before_install:
   - go get github.com/Masterminds/glide
   - go get github.com/mattn/goveralls
   - go get -u github.com/gordonklaus/ineffassign
-	- go get -u honnef.co/go/tools/cmd/staticcheck
+  - go get -u honnef.co/go/tools/cmd/staticcheck
 
 install:
   - make deps
