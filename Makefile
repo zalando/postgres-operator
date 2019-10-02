@@ -46,7 +46,7 @@ default: local
 clean:
 	rm -rf build scm-source.json
 
-local: test ${SOURCES}
+local: ${SOURCES}
 	hack/verify-codegen.sh
 	CGO_ENABLED=${CGO_ENABLED} go build -o build/${BINARY} $(LOCAL_BUILD_FLAGS) -ldflags "$(LDFLAGS)" $^
 
@@ -60,7 +60,7 @@ docker-context: scm-source.json linux
 	mkdir -p docker/build/
 	cp build/linux/${BINARY} scm-source.json docker/build/
 
-docker: test ${DOCKERDIR}/${DOCKERFILE} docker-context
+docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
 	echo `(env)`
 	echo "Tag ${TAG}"
 	echo "Version ${VERSION}"
