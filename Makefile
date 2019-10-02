@@ -20,7 +20,7 @@ GITSTATUS = $(shell git status --porcelain || echo "no changes")
 SOURCES = cmd/main.go
 VERSION ?= $(shell git describe --tags --always --dirty)
 DIRS := cmd pkg
-PKG := `go list ./... | grep --invert-match /vendor/ | grep --invert-match /kubectl-pg`
+PKG := `go list ./... | grep --invert-match -e /vendor/ -e /kubectl-pg -e workspace`
 
 ifeq ($(DEBUG),1)
 	DOCKERFILE = DebugDockerfile
