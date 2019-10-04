@@ -27,20 +27,17 @@ git clone https://github.com/zalando/postgres-operator.git
 
 ## Building the operator
 
-You need Glide to fetch all dependencies. Install it with:
+We use [Go Modules](https://github.com/golang/go/wiki/Modules) for handling
+dependencies. When using Go below v1.13 you need to explicitly enable Go modules
+by setting the `GO111MODULE` environment variable to `on`. The make targets do
+this for you, so simply run
 
 ```bash
-make tools
-```
-
-Next, install dependencies with glide by issuing:
-
-```bash
-make deps
+make tools deps
 ```
 
 This would take a while to complete. You have to redo `make deps` every time
-you dependencies list changes, i.e. after adding a new library dependency.
+your dependencies list changes, i.e. after adding a new library dependency.
 
 Build the operator with the `make docker` command. You may define the TAG
 variable to assign an explicit tag to your docker image and the IMAGE to set
@@ -214,14 +211,7 @@ dlv connect 127.0.0.1:DLV_PORT
 To run all unit tests, you can simply do:
 
 ```bash
-go test ./...
-```
-
-For go 1.9 `vendor` directory would be excluded automatically. For previous
-versions you can exclude it manually:
-
-```bash
-go test $(glide novendor)
+go test ./pkg/...
 ```
 
 In case if you need to debug your unit test, it's possible to use delve:
