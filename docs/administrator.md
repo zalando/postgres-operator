@@ -200,6 +200,18 @@ Postgres cluster, in order to identify its child objects. The typical use case
 is to add labels that identifies the `Pods` created by the operator, in order
 to implement fine-controlled `NetworkPolicies`.
 
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  inherited_labels: application,environment
+  ...
+```
+
 **OperatorConfiguration**
 
 ```yaml
