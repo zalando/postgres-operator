@@ -3,7 +3,6 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 #  labels:
-#    application: acid-test-app
 #    environment: demo
 spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
