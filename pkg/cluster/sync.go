@@ -573,6 +573,11 @@ func (c *Cluster) syncPreparedDatabases() error {
 		if err := c.syncPreparedSchemas(preparedDbName, preparedSchemas); err != nil {
 			return err
 		}
+
+		// install extensions
+		if err := c.syncExtensions(preparedDB.Extensions); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -604,6 +609,44 @@ func (c *Cluster) syncPreparedSchemas(datname string, preparedSchemas map[string
 			if err = c.executeCreateDatabaseSchema(datname, schemaName, dbOwner, owner); err != nil {
 				return err
 			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncExtensions(extensions map[string]string) error {
+	c.setProcessName("syncing extensions")
+
+	createExtensions := make(map[string]string)
+	alterExtensions := make(map[string]string)
+
+	currentExtensions, err := c.getExtensions()
+	if err != nil {
+		return fmt.Errorf("could not get current extensions: %v", err)
+	}
+
+	for extName, newSchema := range extensions {
+		currentSchema, exists := currentExtensions[extName]
+		if !exists {
+			createExtensions[extName] = newSchema
+		} else if currentSchema != newSchema {
+			alterExtensions[extName] = newSchema
+		}
+	}
+
+	if len(createExtensions)+len(alterExtensions) == 0 {
+		return nil
+	}
+
+	for extName, schema := range createExtensions {
+		if err = c.executeCreateExtension(extName, schema); err != nil {
+			return err
+		}
+	}
+	for extName, schema := range alterExtensions {
+		if err = c.executeAlterExtension(extName, schema); err != nil {
+			return err
 		}
 	}
 

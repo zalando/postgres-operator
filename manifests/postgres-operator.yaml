@@ -15,7 +15,7 @@ spec:
       serviceAccountName: zalando-postgres-operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:v1.2.0
+        image: registry.opensource.zalan.do/acid/postgres-operator:v1.2.0-21-g7d9cfe9f-dirty
         imagePullPolicy: IfNotPresent
         resources:
           requests:

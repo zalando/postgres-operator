@@ -794,8 +794,10 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
-		if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName); err != nil {
-			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
+		if preparedDB.DefaultUsers {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName); err != nil {
+				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
+			}
 		}
 
 		// default roles per database schema

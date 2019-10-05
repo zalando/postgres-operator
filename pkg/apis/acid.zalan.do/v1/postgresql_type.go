@@ -79,6 +79,8 @@ type PostgresqlList struct {
 // PreparedDatabase describes elements to be bootstrapped
 type PreparedDatabase struct {
 	PreparedSchemas map[string]PreparedSchema `json:"schemas,omitempty"`
+	DefaultUsers    bool                      `json:"defaultUsers,omitempty" defaults:"false"`
+	Extensions      map[string]string         `json:"extensions,omitempty"`
 }
 
 // PreparedSchema describes elements to be bootstrapped in the schema

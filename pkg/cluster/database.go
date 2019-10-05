@@ -28,10 +28,14 @@ const (
 	getDatabasesSQL = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
 	getSchemasSQL   = `SELECT n.nspname AS dbschema FROM pg_catalog.pg_namespace n
 			WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' ORDER BY 1`
+	getExtensionsSQL = `SELECT e.extname, n.nspname FROM pg_catalog.pg_extension e
+	        LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace ORDER BY 1;`
 
 	createDatabaseSQL       = `CREATE DATABASE "%s" OWNER "%s";`
 	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA "%s" AUTHORIZATION "%s"`
 	alterDatabaseOwnerSQL   = `ALTER DATABASE "%s" OWNER TO "%s";`
+	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
+	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
 
 	globalDefaultPrivilegesSQL = `SET ROLE TO "%s";
 			ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO "%s","%s";
@@ -362,4 +366,63 @@ func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin
 	}
 
 	return result
+}
+
+// getExtension returns the list of current database extensions
+// The caller is responsible for opening and closing the database connection
+func (c *Cluster) getExtensions() (dbExtensions map[string]string, err error) {
+	var (
+		rows *sql.Rows
+	)
+
+	if rows, err = c.pgDb.Query(getExtensionsSQL); err != nil {
+		return nil, fmt.Errorf("could not query database extensions: %v", err)
+	}
+
+	defer func() {
+		if err2 := rows.Close(); err2 != nil {
+			if err != nil {
+				err = fmt.Errorf("error when closing query cursor: %v, previous error: %v", err2, err)
+			} else {
+				err = fmt.Errorf("error when closing query cursor: %v", err2)
+			}
+		}
+	}()
+
+	dbExtensions = make(map[string]string)
+
+	for rows.Next() {
+		var extension, schema string
+
+		if err = rows.Scan(&extension, &schema); err != nil {
+			return nil, fmt.Errorf("error when processing row: %v", err)
+		}
+		dbExtensions[extension] = schema
+	}
+
+	return dbExtensions, err
+}
+
+// executeCreateExtension creates new extension in the given schema.
+// The caller is responsible for opening and closing the database connection.
+func (c *Cluster) executeCreateExtension(extName, schemaName string) error {
+	return c.execCreateOrAlterExtension(extName, schemaName, createExtensionSQL,
+		"creating extension", "create extension")
+}
+
+// executeAlterExtension changes the schema of the given extension.
+// The caller is responsible for opening and closing the database connection.
+func (c *Cluster) executeAlterExtension(extName, schemaName string) error {
+	return c.execCreateOrAlterExtension(extName, schemaName, alterExtensionSQL,
+		"changing schema for extension", "alter extension schema")
+}
+
+func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doing, operation string) error {
+
+	c.logger.Infof("%s %q schema %q", doing, extName, schemaName)
+	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, extName, schemaName)); err != nil {
+		return fmt.Errorf("could not execute %s: %v", operation, err)
+	}
+
+	return nil
 }
