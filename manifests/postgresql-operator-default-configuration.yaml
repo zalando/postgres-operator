@@ -27,7 +27,7 @@ configuration:
     # infrastructure_roles_secret_name: ""
     # inherited_labels:
     # - application
-    # - app
+    # - environment
     # node_readiness_label: ""
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
