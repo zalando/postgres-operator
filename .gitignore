@@ -24,7 +24,6 @@ _testmain.go
 *.test
 *.prof
 /vendor/
-/.glide/
 /build/
 /docker/build/
 .idea

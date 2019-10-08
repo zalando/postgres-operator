@@ -137,7 +137,7 @@ func (c *FakePostgresqls) DeleteCollection(options *v1.DeleteOptions, listOption
 // Patch applies the patch and returns the patched postgresql.
 func (c *FakePostgresqls) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(postgresqlsResource, c.ns, name, data, subresources...), &acidzalandov1.Postgresql{})
+		Invokes(testing.NewPatchSubresourceAction(postgresqlsResource, c.ns, name, pt, data, subresources...), &acidzalandov1.Postgresql{})
 
 	if obj == nil {
 		return nil, err

@@ -4,9 +4,9 @@ Individual Postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgresql` CRD (custom resource
 definition). The following section describes the structure of the manifest and
 the purpose of individual keys. You can take a look at the examples of the
-[minimal](../manifests/minimal-postgres-manifest.yaml)
+[minimal](../../manifests/minimal-postgres-manifest.yaml)
 and the
-[complete](../manifests/complete-postgres-manifest.yaml)
+[complete](../../manifests/complete-postgres-manifest.yaml)
 cluster manifests.
 
 When Kubernetes resources, such as memory, CPU or volumes, are configured,
@@ -172,7 +172,7 @@ explanation of `ttl` and `loop_wait` parameters.
   ones include
 
   ```
-  hostsll all +pamrole all pam
+  hostssl all +pamrole all pam
   ```
   , where pamrole is the name of the role for the pam authentication; any
     custom `pg_hba` should include the pam line to avoid breaking pam

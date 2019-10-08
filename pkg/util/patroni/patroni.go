@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -43,8 +45,19 @@ func New(logger *logrus.Entry) *Patroni {
 	}
 }
 
-func apiURL(masterPod *v1.Pod) string {
-	return fmt.Sprintf("http://%s:%d", masterPod.Status.PodIP, apiPort)
+func apiURL(masterPod *v1.Pod) (string, error) {
+	ip := net.ParseIP(masterPod.Status.PodIP)
+	if ip == nil {
+		return "", fmt.Errorf("%s is not a valid IP", masterPod.Status.PodIP)
+	}
+	// Sanity check PodIP
+	if ip.To4() == nil {
+		if ip.To16() == nil {
+			// Shouldn't ever get here, but library states it's possible.
+			return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", masterPod.Status.PodIP)
+		}
+	}
+	return fmt.Sprintf("http://%s", net.JoinHostPort(ip.String(), strconv.Itoa(apiPort))), nil
 }
 
 func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer) (err error) {
@@ -88,7 +101,11 @@ func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 	if err != nil {
 		return fmt.Errorf("could not encode json: %v", err)
 	}
-	return p.httpPostOrPatch(http.MethodPost, apiURL(master)+failoverPath, buf)
+	apiURLString, err := apiURL(master)
+	if err != nil {
+		return err
+	}
+	return p.httpPostOrPatch(http.MethodPost, apiURLString+failoverPath, buf)
 }
 
 //TODO: add an option call /patroni to check if it is necessary to restart the server
@@ -100,5 +117,9 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 	if err != nil {
 		return fmt.Errorf("could not encode json: %v", err)
 	}
-	return p.httpPostOrPatch(http.MethodPatch, apiURL(server)+configPath, buf)
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return err
+	}
+	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
 }

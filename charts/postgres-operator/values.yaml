@@ -22,7 +22,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: "-1"
   # min number of instances in Postgres cluster. -1 = no limit
@@ -62,7 +62,7 @@ configKubernetes:
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
   # list of labels that can be inherited from the cluster manifest
-  # inherited_labels: ""
+  # inherited_labels: application,environment
 
   # timeout for successful migration of master pods from unschedulable node
   # master_pod_move_timeout: 20m
@@ -225,6 +225,10 @@ configTeamsApi:
 
 rbac:
   # Specifies whether RBAC resources should be created
+  create: true
+
+crd:
+  # Specifies whether custom resource definitions should be created
   create: true
 
 serviceAccount:

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"math/rand"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
-	"k8s.io/api/apps/v1beta1"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
@@ -205,7 +205,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 	// we must have a statefulset in the cluster for the migration to work
 	if c.Statefulset == nil {
-		var sset *v1beta1.StatefulSet
+		var sset *appsv1.StatefulSet
 		if sset, err = c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(),
 			metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not retrieve cluster statefulset: %v", err)

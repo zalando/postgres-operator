@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -168,7 +168,7 @@ func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpd
 	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 }
 
-func (c *Cluster) logStatefulSetChanges(old, new *v1beta1.StatefulSet, isUpdate bool, reasons []string) {
+func (c *Cluster) logStatefulSetChanges(old, new *appsv1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
 		c.logger.Infof("statefulset %q has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
@@ -365,7 +365,7 @@ func (c *Cluster) waitStatefulsetPodsReady() error {
 	c.setProcessName("waiting for the pods of the statefulset")
 	// TODO: wait for the first Pod only
 	if err := c.waitStatefulsetReady(); err != nil {
-		return fmt.Errorf("statuful set error: %v", err)
+		return fmt.Errorf("stateful set error: %v", err)
 	}
 
 	// TODO: wait only for master

@@ -4,7 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   etcd_host: ""
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
+  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # enable_shm_volume: true
   max_instances: -1
   min_instances: -1
@@ -27,7 +27,7 @@ configuration:
     # infrastructure_roles_secret_name: ""
     # inherited_labels:
     # - application
-    # - app
+    # - environment
     # node_readiness_label: ""
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
