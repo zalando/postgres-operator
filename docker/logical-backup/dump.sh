@@ -40,11 +40,11 @@ function aws_upload {
 
     args=()
 
-    [[ ! -z "$EXPECTED_SIZE" ]] && args+=("$EXPECTED_SIZE")
-    [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]] && args+=("--endpoint-url $LOGICAL_BACKUP_S3_ENDPOINT")
+    [[ ! -z "$EXPECTED_SIZE" ]] && args+=("--expected-size=$EXPECTED_SIZE")
+    [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]] && args+=("--endpoint-url=\"$LOGICAL_BACKUP_S3_ENDPOINT\"")
     [[ ! "$LOGICAL_BACKUP_S3_SSE" == "" ]] && args+=("--sse=\"$LOGICAL_BACKUP_S3_SSE\"")
 
-    aws s3 cp - "$PATH_TO_BACKUP" --debug ${args[@]}
+    aws s3 cp - "$PATH_TO_BACKUP" "${args[@]//\'/}" --debug
 }
 
 function get_pods {
