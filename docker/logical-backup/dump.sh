@@ -38,7 +38,7 @@ function aws_upload {
     # NB: $LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX already contains the leading "/" when set by the Postgres Operator
     PATH_TO_BACKUP=s3://$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
-    if [ -z "$AWS_ENDPOINT" ]; then
+    if [ -z "${AWS_ENDPOINT-}" ]; then
         ENDPOINT_OPTION=""
     else
         ENDPOINT_OPTION="--endpoint-url=$AWS_ENDPOINT"
