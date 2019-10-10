@@ -38,11 +38,19 @@ function aws_upload {
     # NB: $LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX already contains the leading "/" when set by the Postgres Operator
     PATH_TO_BACKUP=s3://$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
-    if [ -z "$EXPECTED_SIZE" ]; then
-        aws s3 cp - "$PATH_TO_BACKUP" --debug --sse="AES256"
+    if [ -z "$AWS_ENDPOINT" ]; then
+        ENDPOINT_OPTION=""
     else
-        aws s3 cp - "$PATH_TO_BACKUP" --debug --expected-size "$EXPECTED_SIZE" --sse="AES256"
-    fi;
+        ENDPOINT_OPTION="--endpoint-url=$AWS_ENDPOINT"
+    fi
+
+    if [ -z "$EXPECTED_SIZE" ]; then
+        EXPECTED_SIZE_OPTION=""
+    else
+        EXPECTED_SIZE_OPTION=(--expected-size $EXPECTED_SIZE)
+    fi
+
+    aws $ENDPOINT_OPTION s3 cp - "$PATH_TO_BACKUP" --debug ${EXPECTED_SIZE_OPTION[@]} --sse="AES256"
 }
 
 function get_pods {
