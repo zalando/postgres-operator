@@ -41,7 +41,7 @@ function aws_upload {
     if [ -z "${AWS_ENDPOINT-}" ]; then
         ENDPOINT_OPTION=""
     else
-        ENDPOINT_OPTION="--endpoint-url=$AWS_ENDPOINT"
+        ENDPOINT_OPTION=(--endpoint-url $AWS_ENDPOINT)
     fi
 
     if [ -z "$EXPECTED_SIZE" ]; then
@@ -50,7 +50,7 @@ function aws_upload {
         EXPECTED_SIZE_OPTION=(--expected-size $EXPECTED_SIZE)
     fi
 
-    aws $ENDPOINT_OPTION s3 cp - "$PATH_TO_BACKUP" --debug ${EXPECTED_SIZE_OPTION[@]} --sse="AES256"
+    aws ${ENDPOINT_OPTION[@]} s3 cp - "$PATH_TO_BACKUP" --debug ${EXPECTED_SIZE_OPTION[@]} --sse="AES256"
 }
 
 function get_pods {
