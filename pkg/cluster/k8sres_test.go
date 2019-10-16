@@ -451,3 +451,50 @@ func TestSecretVolume(t *testing.T) {
 		}
 	}
 }
+
+
+func TestNodeSelector(t *testing.T) {
+
+	testName := "TestNodeSelector"
+	tests := []struct {
+		subtest  string
+		spec     *acidv1.PostgresSpec
+		podValues map[string]string
+		expected string
+	}{
+		{
+			subtest:  "node selector value when pod values nil",
+			spec:     &acidv1.PostgresSpec{NodeSelector:   map[string]string{"environment":"pci-2"},},
+			podValues: nil,
+			expected: "pci-2",
+		},
+		{
+			subtest:  "node selector value when pod values empty",
+			spec:     &acidv1.PostgresSpec{NodeSelector:   map[string]string{"environment":"pci-2"},},
+			podValues: map[string]string{},
+			expected: "pci-2",
+		},
+		{
+			subtest:  "node selector value when pod values pci-2",
+			spec:     &acidv1.PostgresSpec{NodeSelector:   map[string]string{"environment":"pci-2"},},
+			podValues: map[string]string{"environment":"pci-3"},
+			expected: "pci-2",
+		},
+	}
+	for _, tt := range tests {
+		found := nodeSelector(tt.spec.NodeSelector, tt.podValues)["environment"]
+
+		if found != tt.expected {
+			t.Errorf("%s %s: Found node selector [%s], expect [%s]",
+				testName, tt.subtest, found, tt.expected)
+		}
+	}
+}
+
+
+
+
+
+
+
+

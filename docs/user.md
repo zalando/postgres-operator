@@ -182,7 +182,7 @@ See [infrastructure roles secret](../manifests/infrastructure-roles.yaml)
 and [infrastructure roles configmap](../manifests/infrastructure-roles-configmap.yaml)
 for the examples.
 
-## Use taints and tolerations for dedicated PostgreSQL nodes
+## Use taints, tolerations and node selectors for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,
 you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
@@ -199,6 +199,22 @@ spec:
   - key: postgres
     operator: Exists
     effect: NoSchedule
+```
+
+If you need the pods to be scheduled on specific nodes you may use [node selectors](https://v1-12.docs.kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+to specify a set of label(s), of which a prospective host node must have at least one. This could be used to
+place nodes with certain hardware capabilities (e.g. SSD drives) in certain environments or network segments, 
+e.g. for PCI compliance.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-minimal-cluster
+spec:
+  teamId: "ACID"
+  nodeSelector:
+    environment: pci
 ```
 
 ## How to clone an existing PostgreSQL cluster

@@ -58,16 +58,17 @@ type KubernetesMetaConfiguration struct {
 	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
-	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
+	NodeReadinessLabel        			   map[string]string	 `json:"node_readiness_label,omitempty"`
 	// TODO: use a proper toleration structure?
-	PodToleration map[string]string `json:"toleration,omitempty"`
+	PodToleration						   map[string]string 	 `json:"toleration,omitempty"`
 	// TODO: use namespacedname
-	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       time.Duration `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
+	PodEnvironmentConfigMap    			   string            	 `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName      			   string             	 `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout    		       time.Duration     	 `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity    			   bool              	 `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey			   string         	     `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy      			   string         	     `json:"pod_management_policy,omitempty"`
+	NodeSelector           				   map[string]string 	 `json:"node_selector,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources

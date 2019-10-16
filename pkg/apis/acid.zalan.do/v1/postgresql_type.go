@@ -52,6 +52,7 @@ type PostgresSpec struct {
 	ClusterName           string               `json:"-"`
 	Databases             map[string]string    `json:"databases,omitempty"`
 	Tolerations           []v1.Toleration      `json:"tolerations,omitempty"`
+	NodeSelector          map[string]string    `json:"nodeSelector,omitempty"`
 	Sidecars              []Sidecar            `json:"sidecars,omitempty"`
 	InitContainers        []v1.Container       `json:"initContainers,omitempty"`
 	PodPriorityClassName  string               `json:"podPriorityClassName,omitempty"`

@@ -43,6 +43,7 @@ type Resources struct {
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
 	MinInstances            int32             `name:"min_instances" default:"-1"`
 	ShmVolume               *bool             `name:"enable_shm_volume" default:"true"`
+	NodeSelector            map[string]string `name:"node_selector" default:""`
 }
 
 // Auth describes authentication specific configuration parameters

@@ -329,6 +329,20 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 	return []v1.Toleration{}
 }
 
+func nodeSelector(clusterManifestSelector map[string]string, operatorSelectorConfig map[string]string) map[string]string {
+	// allow to specify a node selector by postgresql manifest
+	if len(clusterManifestSelector) > 0 {
+		return clusterManifestSelector
+	}
+
+	if len(operatorSelectorConfig) > 0 {
+		return operatorSelectorConfig
+	}
+
+	return nil
+}
+
+
 // isBootstrapOnlyParameter checks against special Patroni bootstrap parameters.
 // Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
 // See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
@@ -445,6 +459,8 @@ func generatePodTemplate(
 	podAntiAffinityTopologyKey string,
 	additionalSecretMount string,
 	additionalSecretMountPath string,
+	nodeSelector map[string]string,
+
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -463,6 +479,7 @@ func generatePodTemplate(
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
 		SecurityContext:               &securityContext,
+		NodeSelector:				   nodeSelector,
 	}
 
 	if shmVolume != nil && *shmVolume {
@@ -873,6 +890,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	nodeSelector := nodeSelector(spec.NodeSelector, c.OpConfig.NodeSelector)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
 	// determine the FSGroup for the spilo pod
@@ -899,7 +917,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.EnablePodAntiAffinity,
 		c.OpConfig.PodAntiAffinityTopologyKey,
 		c.OpConfig.AdditionalSecretMount,
-		c.OpConfig.AdditionalSecretMountPath); err != nil {
+		c.OpConfig.AdditionalSecretMountPath,
+		nodeSelector); err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
@@ -1462,6 +1481,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			},
 		}}
 
+ 	noNodeSelector := map[string]string{}
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
@@ -1480,7 +1500,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		false,
 		"",
 		"",
-		""); err != nil {
+		"",
+		noNodeSelector); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
