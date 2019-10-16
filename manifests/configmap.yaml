@@ -31,7 +31,7 @@ data:
   enable_teams_api: "false"
   # etcd_host: ""
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
-  # inherited_labels: ""
+  # inherited_labels: application,environment
   # kube_iam_role: ""
   # log_s3_bucket: ""
   # logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
