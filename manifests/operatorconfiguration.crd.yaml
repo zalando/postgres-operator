@@ -43,7 +43,6 @@ spec:
                 type: string
             name:
               type: string
-                # Note: the cluster name specified here must begin with the team name.
             namespace:
               type: string
         configuration:
@@ -96,11 +95,7 @@ spec:
                 enable_pod_disruption_budget:
                   type: boolean
                 infrastructure_roles_secret_name:
-                  type: object
-                  additionalProperties:
-                    type: array
-                    items:
-                      type: string
+                  type: string
                 inherited_labels:
                   type: array
                   items:

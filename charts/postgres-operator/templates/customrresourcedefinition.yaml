@@ -307,17 +307,37 @@ spec:
               additionalProperties:
                 type: array
                 nullable: true
+                description: "Role flags specified here must not contradict each other"
                 items:
-                  enum: [
-                    bypassrls, nobypassrls,
-                    createdb, nocreatedb,
-                    createrole, nocreaterole,
-                    inherit, noinherit,
-                    login, nologin,
-                    replication, noreplication,
-                    superuser, nosuperuser,
-                  ]
-                  # Note: role flags specified here must not contradict each other.
+                  enum:
+                  - bypassrls
+                  - BYPASSRLS
+                  - nobypassrls
+                  - NOBYPASSRLS
+                  - createdb
+                  - CREATEDB
+                  - nocreatedb
+                  - NOCREATEDB
+                  - createrole
+                  - CREATEROLE
+                  - nocreaterole
+                  - NOCREATEROLE
+                  - inherit
+                  - INHERIT
+                  - noinherit
+                  - NOINHERIT
+                  - login
+                  - LOGIN
+                  - nologin
+                  - NOLOGIN
+                  - replication
+                  - REPLICATION
+                  - noreplication
+                  - NOREPLICATION
+                  - superuser
+                  - SUPERUSER
+                  - nosuperuser
+                  - NOSUPERUSER
             volume:
               type: object
               required:
@@ -405,7 +425,6 @@ spec:
                 type: string
             name:
               type: string
-                # Note: the cluster name specified here must begin with the team name.
             namespace:
               type: string
         configuration:
@@ -458,11 +477,7 @@ spec:
                 enable_pod_disruption_budget:
                   type: boolean
                 infrastructure_roles_secret_name:
-                  type: object
-                  additionalProperties:
-                    type: array
-                    items:
-                      type: string
+                  type: string
                 inherited_labels:
                   type: array
                   items:

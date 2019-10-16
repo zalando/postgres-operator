@@ -27,11 +27,12 @@ configuration:
     #   keyb: valueb
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
-    # infrastructure_roles_secret_name: ""
+    # infrastructure_roles_secret_name: postgresql-operator
     # inherited_labels:
     # - application
     # - environment
-    # node_readiness_label: ""
+    # node_readiness_label:
+    # - status:ready
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
@@ -44,7 +45,7 @@ configuration:
     # spilo_fsgroup: 103
     spilo_privileged: false
     # toleration: {}
-    # watched_namespace:""
+    # watched_namespace: ""
   postgres_pod_resources:
     default_cpu_limit: "3"
     default_cpu_request: 100m
@@ -91,7 +92,8 @@ configuration:
     enable_teams_api: false
     # pam_configuration: ""
     pam_role_name: zalandos
-    # postgres_superuser_teams: "postgres_superusers"
+    # postgres_superuser_teams:
+    #   - postgres_superusers
     protected_role_names:
       - admin
     team_admin_role: admin
