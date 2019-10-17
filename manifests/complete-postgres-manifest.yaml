@@ -100,3 +100,10 @@ spec:
 #      env:
 #        - name: "USEFUL_VAR"
 #          value: "perhaps-true"
+
+# Custom TLS certificate. Disabled unless tls.secretName has a value.
+  tls:
+    secretName: ""  # should correspond to a Kubernetes Secret resource to load
+    certificateFile: "tls.crt"
+    privateKeyFile: "tls.key"
+    caFile: ""  # optionally configure Postgres with a CA certificate

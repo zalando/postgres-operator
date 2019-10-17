@@ -417,6 +417,24 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"teamId": {
 						Type: "string",
 					},
+					"tls": {
+						Type: "object",
+						Required: []string{"secretName"},
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"secretName": {
+								Type: "string",
+							},
+							"certificateFile": {
+								Type: "string",
+							},
+							"privateKeyFile": {
+								Type: "string",
+							},
+							"caFile": {
+								Type: "string",
+							},
+						},
+					},
 					"tolerations": {
 						Type: "array",
 						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
