@@ -454,3 +454,41 @@ monitoring is outside the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and
 [administrator documentation](administrator.md) for details on how backups are
 executed.
+
+## TLS configuration
+
+By default self-signed certificates are generated when the postgres container
+starts up. But it's also possible to provide your own secrets like so:
+
+Upload the cert as a kubernetes secret:
+```sh
+kubectl create secret tls pg-tls \
+  --key pg-tls.key \
+  --cert pg-tls.crt
+```
+
+Or with a CA:
+```sh
+kubectl create secret generic pg-tls \
+  --from-file=tls.crt=server.crt \
+  --from-file=tls.key=server.key \
+  --from-file=ca.crt=ca.crt
+```
+
+Configure the postgres resource with the TLS secret:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  tls:
+    secretName: "pg-tls"
+```
+
+Before applying these changes, the operator must also be configured with the
+`spilo_fsgroup` set to the GID matching the postgres user group. If the value
+is not provided, the cluster will default to `103` which is the GID from the
+default spilo image.

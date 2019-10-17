@@ -98,3 +98,9 @@ spec:
 #      env:
 #        - name: "USEFUL_VAR"
 #          value: "perhaps-true"
+
+# TLS configuration. Uses self-generated certs if tls.secretName is empty.
+  tls:
+    secretName: ""
+    certificateFile: "tls.crt"
+    privateKeyFile: "tls.key"
