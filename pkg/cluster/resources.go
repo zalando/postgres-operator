@@ -329,7 +329,7 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("could not delete pods: %v", err)
 	}
 
-	if err := c.deletePersistenVolumeClaims(); err != nil {
+	if err := c.deletePersistentVolumeClaims(); err != nil {
 		return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
 	}
 
