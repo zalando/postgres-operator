@@ -16,6 +16,7 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
 )
 
 func toIntStr(val int) *intstr.IntOrString {
@@ -488,6 +489,22 @@ func TestNodeSelector(t *testing.T) {
 			t.Errorf("%s %s: Found node selector [%s], expect [%s]",
 				testName, tt.subtest, found, tt.expected)
 		}
+	}
+}
+
+func TestNodeSelectorDeepCopy(t *testing.T) {
+
+	env := "pci-2"
+
+	in := acidv1.PostgresSpec{
+			NodeSelector: map[string]string{"env" : env},
+	}
+
+	out := acidv1.PostgresSpec{}
+	in.DeepCopyInto(&out)
+
+	if out.NodeSelector["env"] != env {
+		t.Errorf("TestNodeSelectorDeepCopy: NodeSelector deep copy env value [%s] did not match expected [%s]", out.NodeSelector["env"],  env)
 	}
 }
 
