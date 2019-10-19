@@ -70,7 +70,7 @@ declare -a search_strategy=(
 function get_config_resource() {
     curl "${K8S_API_URL}/apis/apps/v1/namespaces/default/deployments/postgres-operator" \
         --cacert $CERT   \
-        -H "Authorization: Bearer ${TOKEN}" | jq '.spec.template.spec.containers[0].env[] | select(.name == "$1") | .value'
+        -H "Authorization: Bearer ${TOKEN}" | jq '.spec.template.spec.containers[0].env[] | select(.name == "'"$1"'") | .value'
 }
 
 function get_cluster_name_label {
