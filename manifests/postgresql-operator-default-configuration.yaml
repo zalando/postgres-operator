@@ -35,7 +35,7 @@ configuration:
     # pod_environment_configmap: ""
     pod_management_policy: "ordered_ready"
     pod_role_label: spilo-role
-    pod_service_account_name: operator
+    pod_service_account_name: zalando-postgres-operator
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     # spilo_fsgroup: 103
