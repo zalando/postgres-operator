@@ -965,6 +965,10 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 	for k, v := range spec.PodAnnotations {
 		annotations[k] = v
 	}
+	if len(annotations) == 0 {
+		return nil
+	}
+
 	return annotations
 }
 
