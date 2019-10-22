@@ -493,6 +493,9 @@ func generatePodTemplate(
 		Spec: podSpec,
 	}
 	if kubeIAMRole != "" {
+		if template.Annotations == nil{
+			template.Annotations = make(map[string]string)
+		}
 		template.Annotations[constants.KubeIAmAnnotation] = kubeIAMRole
 	}
 
