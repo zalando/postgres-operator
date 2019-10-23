@@ -32,7 +32,7 @@ By default, the operator watches the namespace it is deployed to. You can
 change this by setting the `WATCHED_NAMESPACE` var in the `env` section of the
 [operator deployment](../manifests/postgres-operator.yaml) manifest or by
 altering the `watched_namespace` field in the operator
-[ConfigMap](../manifests/configmap.yaml#L79).
+[configuration](../manifests/postgresql-operator-default-configuration.yaml#L45).
 In the case both are set, the env var takes the precedence. To make the
 operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
@@ -79,7 +79,8 @@ to function under access control restrictions. To deploy the operator with this
 RBAC policy use:
 
 ```bash
-kubectl create -f manifests/configmap.yaml
+kubectl create -f manifests/operatorconfiguration.crd.yaml
+kubectl create -f manifests/postgresql-operator-default-configuration
 kubectl create -f manifests/operator-service-account-rbac.yaml
 kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
@@ -115,7 +116,7 @@ that are aggregated into the K8s [default roles](https://kubernetes.io/docs/refe
 
 To ensure Postgres pods are running on nodes without any other application pods,
 you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
-and configure the required toleration in the operator ConfigMap.
+and configure the required toleration in the operator configuration.
 
 As an example you can set following node taint:
 
@@ -136,6 +137,21 @@ data:
   ...
 ```
 
+For an OperatorConfiguration resource the toleration should be defined like
+this:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-configuration
+configuration:
+  kubernetes:
+    toleration:
+      postgres: "key:postgres,operator:Exists,effect:NoSchedule"
+  ...
+```
+
 Note that the K8s version 1.13 brings [taint-based eviction](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/#taint-based-evictions)
 to the beta stage and enables it by default. Postgres pods by default receive
 tolerations for `unreachable` and `noExecute` taints with the timeout of `5m`.
@@ -148,7 +164,7 @@ completely, specify the toleration by leaving out the `tolerationSeconds` value
 
 To ensure Postgres pods are running on different topologies, you can use
 [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
-and configure the required topology in the operator ConfigMap.
+and configure the required topology in the operator configuration.
 
 Enable pod anti affinity by adding following line to the operator ConfigMap:
 
@@ -161,20 +177,21 @@ data:
   enable_pod_antiaffinity: "true"
 ```
 
-By default the topology key for the pod anti affinity is set to
-`kubernetes.io/hostname`, you can set another topology key e.g.
-`failure-domain.beta.kubernetes.io/zone` by adding following line to the
-operator ConfigMap, see [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys:
+Likewise, when using an OperatorConfiguration resource add:
 
 ```yaml
-apiVersion: v1
-kind: ConfigMap
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
 metadata:
-  name: postgres-operator
-data:
-  enable_pod_antiaffinity: "true"
-  pod_antiaffinity_topology_key: "failure-domain.beta.kubernetes.io/zone"
+  name: postgresql-configuration
+configuration:
+  kubernetes:
+    enable_pod_antiaffinity: true
 ```
+
+By default the topology key for the pod anti affinity is set to
+`kubernetes.io/hostname`, you can set another topology key e.g.
+`failure-domain.beta.kubernetes.io/zone`. See [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys.
 
 ## Pod Disruption Budget
 
@@ -280,6 +297,20 @@ data:
   ...
 ```
 
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    # referencing config map with custom settings
+    pod_environment_configmap: postgres-pod-config
+    ...
+```
+
 **referenced ConfigMap `postgres-pod-config`**
 
 ```yaml
@@ -312,7 +343,7 @@ services: one for the master pod and one for replica pods. To expose these
 services to an outer network, one can attach load balancers to them by setting
 `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the
 cluster manifest. In the case any of these variables are omitted from the
-manifest, the operator configmap's settings `enable_master_load_balancer` and
+manifest, the operator configuration settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
 

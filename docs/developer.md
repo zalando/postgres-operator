@@ -80,7 +80,8 @@ manifest but replace the version and tag. Don't forget to also apply
 configuration and RBAC manifests first, e.g.:
 
 ```bash
-kubectl create -f manifests/configmap.yaml
+kubectl create -f manifests/operatorconfiguration.crd.yaml
+kubectl create -f manifests/postgresql-operator-default-configuration
 kubectl create -f manifests/operator-service-account-rbac.yaml
 sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml | kubectl create  -f -
 
