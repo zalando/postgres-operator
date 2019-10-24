@@ -33,7 +33,7 @@ by setting the `GO111MODULE` environment variable to `on`. The make targets do
 this for you, so simply run
 
 ```bash
-make tools deps
+make deps
 ```
 
 This would take a while to complete. You have to redo `make deps` every time
