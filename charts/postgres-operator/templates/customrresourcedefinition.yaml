@@ -162,8 +162,8 @@ spec:
                   items:
                     type: string
                 slots:
-                  type: array
-                  items:
+                  type: object
+                  additionalProperties:
                     type: object
                     additionalProperties:
                       type: string

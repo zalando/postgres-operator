@@ -263,8 +263,8 @@ var postgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 							},
 						},
 						"slots": {
-							Type: "array",
-							Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Type: "object",
+							AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 								Schema: &apiextv1beta1.JSONSchemaProps{
 									Type: "object",
 									AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
