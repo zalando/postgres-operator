@@ -962,12 +962,12 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 	for k, v := range c.OpConfig.CustomPodAnnotations {
 		annotations[k] = v
 	}
-	if spec == nil {
-		return annotations
+	if spec != nil || spec.PodAnnotations != nil {
+		for k, v := range spec.PodAnnotations {
+			annotations[k] = v
+		}
 	}
-	for k, v := range spec.PodAnnotations {
-		annotations[k] = v
-	}
+	
 	if len(annotations) == 0 {
 		return nil
 	}
