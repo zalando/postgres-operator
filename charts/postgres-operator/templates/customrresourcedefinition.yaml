@@ -63,9 +63,11 @@ spec:
         - spec
       properties:
         kind:
+          type: string
           enum:
             - postgresql
         apiVersion:
+          type: string
           enum:
             - acid.zalan.do/v1
         metadata:
@@ -183,6 +185,7 @@ spec:
                 - version
               properties:
                 version:
+                  type: string
                   enum:
                     - "9.3"
                     - "9.4"
@@ -288,12 +291,14 @@ spec:
                   key:
                     type: string
                   operator:
+                    type: string
                     enum:
                       - Equal
                       - Exists
                   value:
                     type: string
                   effect:
+                    type: string
                     enum:
                       - NoExecute
                       - NoSchedule
@@ -309,6 +314,7 @@ spec:
                 nullable: true
                 description: "Role flags specified here must not contradict each other"
                 items:
+                  type: string
                   enum:
                   - bypassrls
                   - BYPASSRLS
@@ -405,9 +411,11 @@ spec:
         - configuration
       properties:
         kind:
+          type: string
           enum:
             - OperatorConfiguration
         apiVersion:
+          type: string
           enum:
             - acid.zalan.do/v1
         metadata:

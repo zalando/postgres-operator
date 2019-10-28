@@ -79,8 +79,7 @@ to function under access control restrictions. To deploy the operator with this
 RBAC policy use:
 
 ```bash
-kubectl create -f manifests/operatorconfiguration.crd.yaml
-kubectl create -f manifests/postgresql-operator-default-configuration
+kubectl create -f manifests/configmap.yaml
 kubectl create -f manifests/operator-service-account-rbac.yaml
 kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
