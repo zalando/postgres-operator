@@ -184,6 +184,7 @@ parameter of the PDB is set to `1` which prevents killing masters in single-node
 clusters and/or the last remaining running instance in a multi-node cluster.
 
 The PDB is only relaxed in two scenarios:
+
 * If a cluster is scaled down to `0` instances (e.g. for draining nodes)
 * If the PDB is disabled in the configuration (`enable_pod_disruption_budget`)
 
@@ -387,7 +388,7 @@ manifest. Notes:
 backup via `pg_dumpall` and upload of compressed and encrypted results to an S3
 bucket; the default image ``registry.opensource.zalan.do/acid/logical-backup``
 is the same image built with the Zalando-internal CI pipeline. `pg_dumpall`
-requires a `superuser` access to a DB and runs on the replica when possible.  
+requires a `superuser` access to a DB and runs on the replica when possible.
 
 2. Due to the [limitation of K8s cron jobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#cron-job-limitations)
 it is highly advisable to set up additional monitoring for this feature; such
