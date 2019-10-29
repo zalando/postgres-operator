@@ -17,37 +17,8 @@ spec:
   validation:
     openAPIV3Schema:
       required:
-        - kind
-        - apiVersion
-        - metadata
         - spec
       properties:
-        kind:
-          type: string
-          enum:
-            - postgresql
-        apiVersion:
-          type: string
-          enum:
-            - acid.zalan.do/v1
-        metadata:
-          type: object
-          required:
-            - name
-          properties:
-            annotations:
-              type: object
-              additionalProperties:
-                type: string
-            labels:
-              type: object
-              additionalProperties:
-                type: string
-            name:
-              type: string
-                # Note: the cluster name specified here must begin with the team name.
-            namespace:
-              type: string
         spec:
           type: object
           required:

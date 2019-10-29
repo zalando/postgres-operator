@@ -109,53 +109,8 @@ var minDisable = -1.0
 
 var postgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 	Type:     "object",
-	Required: []string{"kind", "apiVersion", "metadata", "spec"},
+	Required: []string{"spec"},
 	Properties: map[string]apiextv1beta1.JSONSchemaProps{
-		"kind": {
-			Type: "string",
-			Enum: []apiextv1beta1.JSON{
-				{
-					Raw: []byte(`"postgresql"`),
-				},
-			},
-		},
-		"apiVersion": {
-			Type: "string",
-			Enum: []apiextv1beta1.JSON{
-				{
-					Raw: []byte(`"acid.zalan.do/v1"`),
-				},
-			},
-		},
-		"metadata": {
-			Type:     "object",
-			Required: []string{"name"},
-			Properties: map[string]apiextv1beta1.JSONSchemaProps{
-				"annotations": {
-					Type: "object",
-					AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
-						Schema: &apiextv1beta1.JSONSchemaProps{
-							Type: "string",
-						},
-					},
-				},
-				"labels": {
-					Type: "object",
-					AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
-						Schema: &apiextv1beta1.JSONSchemaProps{
-							Type: "string",
-						},
-					},
-				},
-				"name": {
-					Type:        "string",
-					Description: "The cluster name specified here must begin with the team name",
-				},
-				"namespace": {
-					Type: "string",
-				},
-			},
-		},
 		"spec": {
 			Type:     "object",
 			Required: []string{"numberOfInstances", "teamId", "postgresql"},
@@ -567,52 +522,8 @@ var postgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 
 var operatorConfigCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 	Type:     "object",
-	Required: []string{"kind", "apiVersion", "metadata", "configuration"},
+	Required: []string{"configuration"},
 	Properties: map[string]apiextv1beta1.JSONSchemaProps{
-		"kind": {
-			Type: "string",
-			Enum: []apiextv1beta1.JSON{
-				{
-					Raw: []byte(`"OperatorConfiguration"`),
-				},
-			},
-		},
-		"apiVersion": {
-			Type: "string",
-			Enum: []apiextv1beta1.JSON{
-				{
-					Raw: []byte(`"acid.zalan.do/v1"`),
-				},
-			},
-		},
-		"metadata": {
-			Type:     "object",
-			Required: []string{"name"},
-			Properties: map[string]apiextv1beta1.JSONSchemaProps{
-				"annotations": {
-					Type: "object",
-					AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
-						Schema: &apiextv1beta1.JSONSchemaProps{
-							Type: "string",
-						},
-					},
-				},
-				"labels": {
-					Type: "object",
-					AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
-						Schema: &apiextv1beta1.JSONSchemaProps{
-							Type: "string",
-						},
-					},
-				},
-				"name": {
-					Type: "string",
-				},
-				"namespace": {
-					Type: "string",
-				},
-			},
-		},
 		"configuration": {
 			Type: "object",
 			Properties: map[string]apiextv1beta1.JSONSchemaProps{
