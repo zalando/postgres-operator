@@ -107,7 +107,8 @@ var min0 = 0.0
 var min1 = 1.0
 var minDisable = -1.0
 
-var postgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
+// PostgresCRDResourceValidation to check applied manifest parameters
+var PostgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 	Type:     "object",
 	Required: []string{"spec"},
 	Properties: map[string]apiextv1beta1.JSONSchemaProps{
@@ -520,7 +521,8 @@ var postgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 	},
 }
 
-var operatorConfigCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
+// OperatorConfigCRDResourceValidation to check applied manifest parameters
+var OperatorConfigCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 	Type:     "object",
 	Required: []string{"configuration"},
 	Properties: map[string]apiextv1beta1.JSONSchemaProps{
@@ -920,7 +922,7 @@ func PostgresCRD() *apiextv1beta1.CustomResourceDefinition {
 		PostgresCRDResourcePlural,
 		PostgresCRDResourceShort,
 		PostgresCRDResourceColumns,
-		postgresCRDResourceValidation)
+		PostgresCRDResourceValidation)
 }
 
 // ConfigurationCRD returns CustomResourceDefinition built from OperatorConfigCRDResource
@@ -930,5 +932,5 @@ func ConfigurationCRD() *apiextv1beta1.CustomResourceDefinition {
 		OperatorConfigCRDResourcePlural,
 		OperatorConfigCRDResourceShort,
 		OperatorConfigCRDResourceColumns,
-		operatorConfigCRDResourceValidation)
+		OperatorConfigCRDResourceValidation)
 }
