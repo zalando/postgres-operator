@@ -2,6 +2,8 @@ apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
   name: acid-test-cluster
+#  labels:
+#    environment: demo
 spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   initContainers:

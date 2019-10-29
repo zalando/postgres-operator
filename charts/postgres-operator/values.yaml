@@ -62,7 +62,7 @@ configKubernetes:
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
   # list of labels that can be inherited from the cluster manifest
-  # inherited_labels: ""
+  # inherited_labels: application,environment
 
   # timeout for successful migration of master pods from unschedulable node
   # master_pod_move_timeout: 20m
