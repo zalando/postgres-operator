@@ -199,6 +199,29 @@ var PostgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 				"enableShmVolume": {
 					Type: "boolean",
 				},
+				"init_containers": {
+					Type:        "array",
+					Description: "Deprecated",
+					Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+						Schema: &apiextv1beta1.JSONSchemaProps{
+							Type: "object",
+							AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+								Allows: true,
+							},
+						},
+					},
+				},
+				"initContainers": {
+					Type: "array",
+					Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+						Schema: &apiextv1beta1.JSONSchemaProps{
+							Type: "object",
+							AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+								Allows: true,
+							},
+						},
+					},
+				},
 				"logicalBackupSchedule": {
 					Type:    "string",
 					Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
@@ -347,6 +370,17 @@ var PostgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 									Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
 									Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 								},
+							},
+						},
+					},
+				},
+				"sidecars": {
+					Type: "array",
+					Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+						Schema: &apiextv1beta1.JSONSchemaProps{
+							Type: "object",
+							AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+								Allows: true,
 							},
 						},
 					},

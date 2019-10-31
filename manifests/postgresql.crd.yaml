@@ -36,7 +36,6 @@ spec:
             - numberOfInstances
             - teamId
             - postgresql
-          additionalProperties: true
           properties:
             allowedSourceRanges:
               type: array
@@ -85,6 +84,18 @@ spec:
               type: boolean
             enableShmVolume:
               type: boolean
+            init_containers:  # deprecated
+              type: array
+              nullable: true
+              items:
+                type: object
+                additionalProperties: true
+            initContainers:
+              type: array
+              nullable: true
+              items:
+                type: object
+                additionalProperties: true
             logicalBackupSchedule:
               type: string
               pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
@@ -214,6 +225,12 @@ spec:
                       pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                       # Note: the value specified here must not be zero or be higher
                       # than the corresponding limit.
+            sidecars:
+              type: array
+              nullable: true
+              items:
+                type: object
+                additionalProperties: true
             spiloFSGroup:
               type: integer
             standby:
