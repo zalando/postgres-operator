@@ -56,9 +56,20 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
+      type: object
       required:
+        - kind
+        - apiVersion
         - spec
       properties:
+        kind:
+          type: string
+          enum:
+            - postgresql
+        apiVersion:
+          type: string
+          enum:
+            - acid.zalan.do/v1
         spec:
           type: object
           required:
@@ -68,6 +79,7 @@ spec:
           properties:
             allowedSourceRanges:
               type: array
+              nullable: true
               items:
                 type: string
                 pattern: '^(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])$'
@@ -148,6 +160,8 @@ spec:
                   type: integer
                 maximum_lag_on_failover:
                   type: integer
+            pod_priority_class_name:  # deprecated
+              type: string
             podPriorityClassName:
               type: string
             postgresql:
@@ -375,15 +389,25 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
+      type: object
       required:
+        - kind
+        - apiVersion
         - configuration
       properties:
+        kind:
+          type: string
+          enum:
+            - OperatorConfiguration
+        apiVersion:
+          type: string
+          enum:
+            - acid.zalan.do/v1
         configuration:
           type: object
           properties:
             etcd_host:
               type: string
-              nullable: true
             docker_image:
               type: string
             max_instances:
@@ -466,7 +490,6 @@ spec:
                     type: string
                 watched_namespace:
                   type: string
-                  nullable: true
             postgres_pod_resources:
               type: object
               properties:

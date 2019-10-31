@@ -16,15 +16,25 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
+      type: object
       required:
+        - kind
+        - apiVersion
         - configuration
       properties:
+        kind:
+          type: string
+          enum:
+            - OperatorConfiguration
+        apiVersion:
+          type: string
+          enum:
+            - acid.zalan.do/v1
         configuration:
           type: object
           properties:
             etcd_host:
               type: string
-              nullable: true
             docker_image:
               type: string
             max_instances:
@@ -107,7 +117,6 @@ spec:
                     type: string
                 watched_namespace:
                   type: string
-                  nullable: true
             postgres_pod_resources:
               type: object
               properties:

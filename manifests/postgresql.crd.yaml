@@ -16,18 +16,31 @@ spec:
     status: {}
   validation:
     openAPIV3Schema:
+      type: object
       required:
+        - kind
+        - apiVersion
         - spec
       properties:
+        kind:
+          type: string
+          enum:
+            - postgresql
+        apiVersion:
+          type: string
+          enum:
+            - acid.zalan.do/v1
         spec:
           type: object
           required:
             - numberOfInstances
             - teamId
             - postgresql
+          additionalProperties: true
           properties:
             allowedSourceRanges:
               type: array
+              nullable: true
               items:
                 type: string
                 pattern: '^(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\.(\d|[1-9]\d|1\d\d|2[0-4]\d|25[0-5])\/(\d|[1-2]\d|3[0-2])$'
@@ -108,6 +121,8 @@ spec:
                   type: integer
                 maximum_lag_on_failover:
                   type: integer
+            pod_priority_class_name:  # deprecated
+              type: string
             podPriorityClassName:
               type: string
             postgresql:
