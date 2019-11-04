@@ -217,23 +217,6 @@ configTeamsApi:
   # URL of the Teams API service
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
 
-# Scalyr is a log management tool that Zalando uses as a sidecar
-scalyr:
-  # API key for the Scalyr sidecar
-  # scalyr_api_key: ""
-
-  # Docker image for the Scalyr sidecar
-  # scalyr_image: ""
-
-  # CPU limit value for the Scalyr sidecar
-  scalyr_cpu_limit: "1"
-  # CPU rquest value for the Scalyr sidecar
-  scalyr_cpu_request: 100m
-  # Memory limit value for the Scalyr sidecar
-  scalyr_memory_limit: 1Gi
-  # Memory request value for the Scalyr sidecar
-  scalyr_memory_request: 50Mi
-
 rbac:
   # Specifies whether RBAC resources should be created
   create: true

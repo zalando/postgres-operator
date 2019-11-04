@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,15 +120,6 @@ func (c *Controller) initOperatorConfig() {
 			c.opConfig.DefaultMemoryRequest = c.opConfig.DefaultMemoryLimit
 		}
 
-		isSmaller, err = util.RequestIsSmallerThanLimit(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
-		if err != nil {
-			panic(err)
-		}
-		if isSmaller {
-			c.logger.Warningf("The memory request of %v for the Scalyr sidecar container is increased to match the memory limit of %v.", c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
-			c.opConfig.ScalyrMemoryRequest = c.opConfig.ScalyrMemoryLimit
-		}
-
 		// generateStatefulSet adjusts values for individual Postgres clusters
 	}
 
@@ -142,10 +133,6 @@ func (c *Controller) modifyConfigFromEnvironment() {
 	}
 	if c.config.NoTeamsAPI {
 		c.opConfig.EnableTeamsAPI = false
-	}
-	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
-	if scalyrAPIKey != "" {
-		c.opConfig.ScalyrAPIKey = scalyrAPIKey
 	}
 }
 

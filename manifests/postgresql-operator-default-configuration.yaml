@@ -94,11 +94,3 @@ configuration:
     api_port: 8008
     cluster_history_entries: 1000
     ring_log_lines: 100
-  scalyr:
-    # scalyr_api_key: ""
-    scalyr_cpu_limit: "1"
-    scalyr_cpu_request: 100m
-    # scalyr_image: ""
-    scalyr_memory_limit: 1Gi
-    scalyr_memory_request: 50Mi
-    # scalyr_server_url: ""

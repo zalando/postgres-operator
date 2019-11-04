@@ -24,6 +24,7 @@
   component/.style={draw,solid,thick,rounded corners,fill=yellow!20,inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
   border/.style={draw,dashed,rounded corners,fill=gray!20,inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
   volume/.style={draw,solid,thick,rounded corners,fill=blue!20, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
+  initcontainer/.style={draw,solid,thick,rounded corners,fill=blue!20, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
   sidecar/.style={draw,solid,thick,rounded corners,fill=blue!20, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
   k8s-label/.style={draw,solid,thick,rounded corners,fill=blue!20, minimum width=1.5cm, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
   affinity/.style={draw,solid,thick,rounded corners,fill=blue!20, minimum width=2cm, inner sep=.3cm, blur shadow={shadow blur steps=5,shadow blur extra rounding=1.3pt}},
@@ -60,7 +61,14 @@
            fit=(data-volume)(shm-volume)(tokens-volume)(volumes-label)
       ] (volumes) {}; \&
     \node[component] (spilo) {Spilo}; \&
-    \node[sidecar] (scalyr) {Scalyr}; \& \\ \&
+    \path
+      node[initcontainer] (custom-initcontainer1) {User defined}
+      node[label, right=.25cm of custom-initcontainer1] (initcontainers-middle) {}
+      node[initcontainer, right=.25cm of initcontainers-middle] (custom-initcontainer2) {User defined}
+      node[label, below of=initcontainers-middle] (initcontainers-label) {Custom initcontainers}
+      node[border, behind path,
+           fit=(custom-initcontainer1)(custom-initcontainer2)(initcontainers-label)
+      ] (initcontainers) {}; \&
     \path
       node[component] (patroni) {Patroni}
       node[component, below=.25cm of patroni] (postgres) {PostgreSQL}
@@ -82,7 +90,7 @@
   \draw[to] (pod) to [bend left=25] (volumes);
   \draw[to] (pod) to [bend left=25] (k8s-labels);
   \draw[to] (pod) to [bend right=25] (affinity);
-  \draw[to] (pod) to [bend right=25] (scalyr);
+  \draw[to] (pod) to [bend right=25] (initcontainers);
   \draw[to] (pod) to [bend right=25] (sidecars);
   \draw[to] (pod) -- node[midway,above] {} node[midway,below] {} (spilo);
   \draw[to] (spilo) -- node[midway,above] {} node[midway,below] {} (spilo-components);

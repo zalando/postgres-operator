@@ -120,9 +120,9 @@ Those are top-level keys, containing both leaf keys and groups.
   value is also increased). This prevents certain cases of memory overcommitment
   at the cost of overprovisioning memory and potential scheduling problems for
   containers with high memory limits due to the lack of memory on Kubernetes
-  cluster nodes. This affects all containers created by the operator (Postgres,
-  Scalyr sidecar, and other sidecars); to set resources for the operator's own
-  container, change the [operator deployment manually](../manifests/postgres-operator.yaml#L20).
+  cluster nodes. This affects all containers created by the operator incl.
+  sidecars); to set resources for the operator's own container, change the
+  [operator deployment manually](../manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
 ## Postgres users
@@ -523,30 +523,3 @@ configuration they are grouped under the `logging_rest_api` key.
 
 * **cluster_history_entries**
   number of entries in the cluster history ring buffer. The default is `1000`.
-
-## Scalyr options
-
-Those parameters define the resource requests/limits and properties of the
-scalyr sidecar. In the CRD-based configuration they are grouped under the
-`scalyr` key.
-
-* **scalyr_api_key**
-  API key for the Scalyr sidecar. The default is empty.
-
-* **scalyr_image**
-  Docker image for the Scalyr sidecar. The default is empty.
-
-* **scalyr_server_url**
-  server URL for the Scalyr sidecar. The default is `https://upload.eu.scalyr.com`.
-
-* **scalyr_cpu_request**
-  CPU request value for the Scalyr sidecar. The default is `100m`.
-
-* **scalyr_memory_request**
-  Memory request value for the Scalyr sidecar. The default is `50Mi`.
-
-* **scalyr_cpu_limit**
-  CPU limit value for the Scalyr sidecar. The default is `1`.
-
-* **scalyr_memory_limit**
-  Memory limit value for the Scalyr sidecar. The default is `1Gi`.

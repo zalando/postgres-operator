@@ -41,13 +41,9 @@ The following environment variables are accepted by the operator:
   operator itself.
 
 * **WATCHED_NAMESPACE**
-  the name of the namespace the operator watches. Special '*' character denotes
-  all namespaces. Empty value defaults to the operator namespace. Overrides the
-  `watched_namespace` operator parameter.
-
-* **SCALYR_API_KEY**
-  the value of the Scalyr API key to supply to the pods. Overrides the
-  `scalyr_api_key` operator parameter.
+  the name of the namespace the operator watches. Special **'*'** character
+  denotes all namespaces. Empty value defaults to the operator namespace.
+  Overrides the `watched_namespace` operator parameter.
 
 * **CRD_READY_WAIT_TIMEOUT**
   defines the timeout for the complete `postgresql` CRD creation. When not set

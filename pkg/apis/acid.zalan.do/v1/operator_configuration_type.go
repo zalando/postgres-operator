@@ -136,17 +136,6 @@ type LoggingRESTAPIConfiguration struct {
 	ClusterHistoryEntries int `json:"cluster_history_entries,omitempty"`
 }
 
-// ScalyrConfiguration defines the configuration for ScalyrAPI
-type ScalyrConfiguration struct {
-	ScalyrAPIKey        string `json:"scalyr_api_key,omitempty"`
-	ScalyrImage         string `json:"scalyr_image,omitempty"`
-	ScalyrServerURL     string `json:"scalyr_server_url,omitempty"`
-	ScalyrCPURequest    string `json:"scalyr_cpu_request,omitempty"`
-	ScalyrMemoryRequest string `json:"scalyr_memory_request,omitempty"`
-	ScalyrCPULimit      string `json:"scalyr_cpu_limit,omitempty"`
-	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
-}
-
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
@@ -168,7 +157,6 @@ type OperatorConfigurationData struct {
 	OperatorDebug              OperatorDebugConfiguration         `json:"debug"`
 	TeamsAPI                   TeamsAPIConfiguration              `json:"teams_api"`
 	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
-	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
 }
 

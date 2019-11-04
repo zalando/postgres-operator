@@ -122,14 +122,5 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.RingLogLines = fromCRD.LoggingRESTAPI.RingLogLines
 	result.ClusterHistoryEntries = fromCRD.LoggingRESTAPI.ClusterHistoryEntries
 
-	// Scalyr config
-	result.ScalyrAPIKey = fromCRD.Scalyr.ScalyrAPIKey
-	result.ScalyrImage = fromCRD.Scalyr.ScalyrImage
-	result.ScalyrServerURL = fromCRD.Scalyr.ScalyrServerURL
-	result.ScalyrCPURequest = fromCRD.Scalyr.ScalyrCPURequest
-	result.ScalyrMemoryRequest = fromCRD.Scalyr.ScalyrMemoryRequest
-	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
-	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
-
 	return result
 }

@@ -745,9 +745,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 		}
 
-		// controller adjusts the Scalyr sidecar request at operator startup
-		// as this sidecar is managed separately
-
 		// adjust sidecar containers defined for that particular cluster
 		for _, sidecar := range spec.Sidecars {
 
@@ -849,23 +846,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	// resolve conflicts between operator-global and per-cluster sidecars
 	sideCars := c.mergeSidecars(spec.Sidecars)
 
-	resourceRequirementsScalyrSidecar := makeResources(
-		c.OpConfig.ScalyrCPURequest,
-		c.OpConfig.ScalyrMemoryRequest,
-		c.OpConfig.ScalyrCPULimit,
-		c.OpConfig.ScalyrMemoryLimit,
-	)
-
-	// generate scalyr sidecar container
-	if scalyrSidecar :=
-		generateScalyrSidecarSpec(c.Name,
-			c.OpConfig.ScalyrAPIKey,
-			c.OpConfig.ScalyrServerURL,
-			c.OpConfig.ScalyrImage,
-			&resourceRequirementsScalyrSidecar, c.logger); scalyrSidecar != nil {
-		sideCars = append(sideCars, *scalyrSidecar)
-	}
-
 	// generate sidecar containers
 	if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
 		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
@@ -947,35 +927,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	return statefulSet, nil
-}
-
-func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
-	containerResources *acidv1.Resources, logger *logrus.Entry) *acidv1.Sidecar {
-	if APIKey == "" || dockerImage == "" {
-		if APIKey == "" && dockerImage != "" {
-			logger.Warning("Not running Scalyr sidecar: SCALYR_API_KEY must be defined")
-		}
-		return nil
-	}
-	scalarSpec := &acidv1.Sidecar{
-		Name:        "scalyr-sidecar",
-		DockerImage: dockerImage,
-		Env: []v1.EnvVar{
-			{
-				Name:  "SCALYR_API_KEY",
-				Value: APIKey,
-			},
-			{
-				Name:  "SCALYR_SERVER_HOST",
-				Value: clusterName,
-			},
-		},
-		Resources: *containerResources,
-	}
-	if serverURL != "" {
-		scalarSpec.Env = append(scalarSpec.Env, v1.EnvVar{Name: "SCALYR_SERVER_URL", Value: serverURL})
-	}
-	return scalarSpec
 }
 
 // mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
