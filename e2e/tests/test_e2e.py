@@ -8,7 +8,6 @@ import yaml
 
 from kubernetes import client, config
 
-
 class EndToEndTestCase(unittest.TestCase):
     '''
     Test interaction of the operator with multiple K8s components.
@@ -28,7 +27,6 @@ class EndToEndTestCase(unittest.TestCase):
         In the case of test failure the cluster will stay to enable manual examination;
         next invocation of "make test" will re-create it.
         '''
-
         # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
 
@@ -99,49 +97,59 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         cluster_label = 'version=acid-minimal-cluster'
 
-        # get nodes of master and replica(s) (expected target of new master)
-        current_master_node, failover_targets = k8s.get_pg_nodes(cluster_label)
-        num_replicas = len(failover_targets)
+        try:
+            # get nodes of master and replica(s) (expected target of new master)
+            current_master_node, failover_targets = k8s.get_pg_nodes(cluster_label)
+            num_replicas = len(failover_targets)
 
-        # if all pods live on the same node, failover will happen to other worker(s)
-        failover_targets = [x for x in failover_targets if x != current_master_node]
-        if len(failover_targets) == 0:
-            nodes = k8s.api.core_v1.list_node()
-            for n in nodes.items:
-                if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != current_master_node:
-                    failover_targets.append(n.metadata.name)
+            # if all pods live on the same node, failover will happen to other worker(s)
+            failover_targets = [x for x in failover_targets if x != current_master_node]
+            if len(failover_targets) == 0:
+                nodes = k8s.api.core_v1.list_node()
+                for n in nodes.items:
+                    if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != current_master_node:
+                        failover_targets.append(n.metadata.name)
 
-        # taint node with postgres=:NoExecute to force failover
-        body = {
-            "spec": {
-                "taints": [
-                    {
-                        "effect": "NoExecute",
-                        "key": "postgres"
+            # taint node with postgres=:NoExecute to force failover
+            body = {
+                "spec": {
+                    "taints": [
+                        {
+                            "effect": "NoExecute",
+                            "key": "postgres"
+                        }
+                    ]
+                }
+            }
+
+            # patch node and test if master is failing over to one of the expected nodes
+            print ("Tainting master node %s" % (current_master_node))
+            k8s.api.core_v1.patch_node(current_master_node, body)
+            k8s.wait_for_master_failover(failover_targets)
+            k8s.wait_for_pod_start('spilo-role=replica')
+
+            new_master_node, new_replica_nodes = k8s.get_pg_nodes(cluster_label)
+            print ("New master node %s" % (new_master_node))
+            self.assertNotEqual(current_master_node, new_master_node,
+                                "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
+            self.assertEqual(num_replicas, len(new_replica_nodes),
+                             "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
+            self.assert_master_is_unique()
+        finally:
+            try:
+                # undo the tainting
+                print("Undoing tainting")
+                body = {
+                    "spec": {
+                        "taints": []
                     }
-                ]
-            }
-        }
-
-        # patch node and test if master is failing over to one of the expected nodes
-        k8s.api.core_v1.patch_node(current_master_node, body)
-        k8s.wait_for_master_failover(failover_targets)
-        k8s.wait_for_pod_start('spilo-role=replica')
-
-        new_master_node, new_replica_nodes = k8s.get_pg_nodes(cluster_label)
-        self.assertNotEqual(current_master_node, new_master_node,
-                            "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
-        self.assertEqual(num_replicas, len(new_replica_nodes),
-                         "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
-        self.assert_master_is_unique()
-
-        # undo the tainting
-        body = {
-            "spec": {
-                "taints": []
-            }
-        }
-        k8s.api.core_v1.patch_node(new_master_node, body)
+                }
+                for node in k8s.api.core_v1.list_node().items:
+                    print("Processing %s" % (node.metadata.name))
+                    if node.metadata.name != 'postgres-operator-e2e-tests-control-plane':
+                        k8s.api.core_v1.patch_node(node.metadata.name, body)
+            except Exception as exc:
+                print("Error undoing taints %s" % (exc))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_logical_backup_cron_job(self):
@@ -211,6 +219,90 @@ class EndToEndTestCase(unittest.TestCase):
         jobs = k8s.get_logical_backup_job().items
         self.assertEqual(0, len(jobs),
                          "Expected 0 logical backup jobs, found {}".format(len(jobs)))
+
+    # zz --> Other tests depend on the state of the regular acid-minimal-cluster, which this test deletes, so run last.
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_zz_node_selector(self):
+        k8s = self.k8s
+
+        # Delete the default cluster, but pause first so delete works properly
+        time.sleep(60)
+        default_cluster_label = 'version=acid-minimal-cluster'
+        print ("Deleting default test cluster")
+        k8s.delete_clusters("acid-minimal-cluster")
+        k8s.wait_for_pods_deleted(default_cluster_label)
+
+        # 1. Add a label to a node
+        target_node = k8s.api.core_v1.read_node(name='postgres-operator-e2e-tests-worker2')
+        pg_patch_env_special = {
+            "metadata": {
+                "labels": {
+                    "environment": "special"
+                }
+            }
+        }
+        target_node_name = target_node.metadata.name
+        print ("Patching node [%s] with 'environment:special' label" %(target_node_name))
+        k8s.api.core_v1.patch_node(target_node_name, pg_patch_env_special)
+
+        # Create a cluster manifest with a nodeselector label
+        nodeselector_cluster_name = "acid-nodeselector-test-cluster"
+        nodeselector_manifest_file = open("nodeselector-manifest.yaml", 'w+')
+        with open("manifests/minimal-postgres-manifest.yaml", 'r+') as f:
+            cluster_spec = yaml.safe_load(f)
+            cluster_spec["spec"]["nodeSelector"] = {"environment": "special"}
+            cluster_spec["metadata"]["name"] = nodeselector_cluster_name
+            yaml.dump(cluster_spec, nodeselector_manifest_file, Dumper=yaml.Dumper)
+
+        print ("Creating pods with nodeSelector environment=special")
+        k8s.create_with_kubectl("nodeselector-manifest.yaml")
+        k8s.wait_for_pod_start('spilo-role=master')
+
+        # Assertions:
+        # Sanity check, we expected 2 pods to be deployed
+        pods_list = k8s.api.core_v1.list_namespaced_pod('default', label_selector='application=spilo')
+        self.assertEqual(2, len(pods_list.items),
+                         "Sanity check: expected {} replicas, found {}".format(2, len(pods_list.items)))
+
+        # Core test: both pods should now be deployed in target_node (since anti-affinity defaults to off)
+        for pod in pods_list.items:
+            print ("Found a pod on node [%s]" % (pod.spec.node_name))
+            self.assertEqual(target_node_name, pod.spec.node_name,
+                             "Expected {} replicas, found {}".format(2, pod.spec.node_name))
+        self.cleanup_nodeselector_cluster(k8s, nodeselector_cluster_name, pods_list)
+
+
+        print ('Test: test_node_selector complete')
+
+    def cleanup_nodeselector_cluster(self, k8s, nodeselector_cluster_name, pods_list):
+        # Cleanup
+        k8s.delete_clusters(nodeselector_cluster_name)
+        # Pods are somehow getting left behind, despite statefulset delete
+        delete_options = client.V1DeleteOptions()
+        delete_options.grace_period_seconds = 0
+        delete_options.propagation_policy = 'Foreground'
+        print ("Deleting statefulset")
+        try:
+            k8s.api.apps_v1.delete_namespaced_stateful_set(
+                name="acid-nodeselector-test-cluster",
+                namespace="default",
+                body=delete_options,
+                grace_period_seconds=0
+            )
+        except Exception as exc:
+            print ("Exception deleting statefulset" % (exc))
+            pass
+        for pod in pods_list.items:
+            try:
+                print ("Deleting pod %s" % (pod.metadata.name))
+                k8s.api.core_v1.delete_namespaced_pod(
+                    name=pod.metadata.name,
+                    body=delete_options,
+                    grace_period_seconds=0,
+                    namespace="default")
+            except Exception as exc:
+                print ("Exception deleting pods %s" % (exc))
+                pass
 
     def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
         """
@@ -321,6 +413,22 @@ class K8s:
 
     def create_with_kubectl(self, path):
         subprocess.run(["kubectl", "create", "-f", path])
+
+    def delete_clusters(self, cluster_name):
+        opts = client.V1DeleteOptions()
+        self.api.custom_objects_api.delete_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", cluster_name, opts)
+
+    def wait_for_pods_deleted(self, pod_labels, namespace='default'):
+        print ("Wait for delete pods with label: [%s] "  %(pod_labels) )
+        num_running_pods = len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels).items)
+        print ("Number running pods: %d" % (num_running_pods))
+        while (num_running_pods > 0):
+            print ("Waiting for %d pods to die..." % (num_running_pods))
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+            num_running_pods = len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels).items)
+
+
 
 
 if __name__ == '__main__':
