@@ -25,6 +25,13 @@ spec:
   - 127.0.0.1/32
   databases:
     foo: zalando
+#  nodeSelector:
+#    environment: pci-secure
+#  tolerations:
+#  - effect: NoSchedule
+#    key: pci
+#    operator: Equal
+#    value: secure
 
 # Expert section
 
