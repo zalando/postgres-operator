@@ -405,6 +405,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
+	if !reflect.DeepEqual( c.Statefulset.Spec.Template.Spec.NodeSelector, statefulSet.Spec.Template.Spec.NodeSelector) {
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's nodeSelector doesn't match the current one")
+	}
+
 	if needsRollUpdate || needsReplace {
 		match = false
 	}

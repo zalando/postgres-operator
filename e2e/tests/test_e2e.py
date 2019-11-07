@@ -220,17 +220,9 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(0, len(jobs),
                          "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
-    # zz --> Other tests depend on the state of the regular acid-minimal-cluster, which this test deletes, so run last.
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_zz_node_selector(self):
+    def test_node_selector(self):
         k8s = self.k8s
-
-        # Delete the default cluster, but pause first so delete works properly
-        time.sleep(60)
-        default_cluster_label = 'version=acid-minimal-cluster'
-        print ("Deleting default test cluster")
-        k8s.delete_clusters("acid-minimal-cluster")
-        k8s.wait_for_pods_deleted(default_cluster_label)
 
         # 1. Add a label to a node
         target_node = k8s.api.core_v1.read_node(name='postgres-operator-e2e-tests-worker2')
@@ -242,21 +234,28 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         target_node_name = target_node.metadata.name
-        print ("Patching node [%s] with 'environment:special' label" %(target_node_name))
+        print ("Patching node [%s] with 'environment:special' label" % (target_node_name))
         k8s.api.core_v1.patch_node(target_node_name, pg_patch_env_special)
 
-        # Create a cluster manifest with a nodeselector label
-        nodeselector_cluster_name = "acid-nodeselector-test-cluster"
-        nodeselector_manifest_file = open("nodeselector-manifest.yaml", 'w+')
-        with open("manifests/minimal-postgres-manifest.yaml", 'r+') as f:
-            cluster_spec = yaml.safe_load(f)
-            cluster_spec["spec"]["nodeSelector"] = {"environment": "special"}
-            cluster_spec["metadata"]["name"] = nodeselector_cluster_name
-            yaml.dump(cluster_spec, nodeselector_manifest_file, Dumper=yaml.Dumper)
+        pg_patch_custom_resource = {
+            "spec": {
+                "nodeSelector": {
+                    "environment": "special"
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            group="acid.zalan.do",
+            version="v1",
+            namespace="default",
+            plural="postgresqls",
+            name="acid-minimal-cluster",
+            body=pg_patch_custom_resource)
 
-        print ("Creating pods with nodeSelector environment=special")
-        k8s.create_with_kubectl("nodeselector-manifest.yaml")
-        k8s.wait_for_pod_start('spilo-role=master')
+        k8s.api.core_v1.delete_namespaced_pod("acid-minimal-cluster-0", "default")
+        k8s.api.core_v1.delete_namespaced_pod("acid-minimal-cluster-1", "default")
+        # Unfortunately necessary to allow time for sync to take place
+        time.sleep(90)
 
         # Assertions:
         # Sanity check, we expected 2 pods to be deployed
@@ -269,40 +268,12 @@ class EndToEndTestCase(unittest.TestCase):
             print ("Found a pod on node [%s]" % (pod.spec.node_name))
             self.assertEqual(target_node_name, pod.spec.node_name,
                              "Expected {} replicas, found {}".format(2, pod.spec.node_name))
-        self.cleanup_nodeselector_cluster(k8s, nodeselector_cluster_name, pods_list)
 
+        # Add label to the other nodes so other tests can run normally
+        k8s.api.core_v1.patch_node('postgres-operator-e2e-tests-worker', pg_patch_env_special)
 
         print ('Test: test_node_selector complete')
 
-    def cleanup_nodeselector_cluster(self, k8s, nodeselector_cluster_name, pods_list):
-        # Cleanup
-        k8s.delete_clusters(nodeselector_cluster_name)
-        # Pods are somehow getting left behind, despite statefulset delete
-        delete_options = client.V1DeleteOptions()
-        delete_options.grace_period_seconds = 0
-        delete_options.propagation_policy = 'Foreground'
-        print ("Deleting statefulset")
-        try:
-            k8s.api.apps_v1.delete_namespaced_stateful_set(
-                name="acid-nodeselector-test-cluster",
-                namespace="default",
-                body=delete_options,
-                grace_period_seconds=0
-            )
-        except Exception as exc:
-            print ("Exception deleting statefulset" % (exc))
-            pass
-        for pod in pods_list.items:
-            try:
-                print ("Deleting pod %s" % (pod.metadata.name))
-                k8s.api.core_v1.delete_namespaced_pod(
-                    name=pod.metadata.name,
-                    body=delete_options,
-                    grace_period_seconds=0,
-                    namespace="default")
-            except Exception as exc:
-                print ("Exception deleting pods %s" % (exc))
-                pass
 
     def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
         """
