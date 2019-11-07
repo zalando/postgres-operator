@@ -10,12 +10,12 @@ configuration.
   maps. String values containing ':' should be enclosed in quotes. The
   configuration is flat, parameter group names below are not reflected in the
   configuration structure. There is an
-  [example](../manifests/configmap.yaml)
+  [example](../../manifests/configmap.yaml)
 
 * CRD-based configuration. The configuration is stored in a custom YAML
   manifest. The manifest is an instance of the custom resource definition (CRD)
   called `OperatorConfiguration`. The operator registers this CRD during the
-  start and uses it for configuration if the [operator deployment manifest](../manifests/postgres-operator.yaml#L36)
+  start and uses it for configuration if the [operator deployment manifest](../../manifests/postgres-operator.yaml#L36)
   sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty
   value. The variable should point to the `postgresql-operator-configuration`
   object in the operator's namespace.
@@ -24,7 +24,7 @@ configuration.
   simply represented in the usual YAML way. There are no default values built-in
   in the operator, each parameter that is not supplied in the configuration
   receives an empty value. In order to create your own configuration just copy
-  the [default one](../manifests/postgresql-operator-default-configuration.yaml)
+  the [default one](../../manifests/postgresql-operator-default-configuration.yaml)
   and change it.
 
   To test the CRD-based configuration locally, use the following
@@ -58,11 +58,11 @@ parameters, those parameters have no effect and are replaced by the
 `CRD_READY_WAIT_INTERVAL` and `CRD_READY_WAIT_TIMEOUT` environment variables.
 They will be deprecated and removed in the future.
 
-For the configmap configuration, the [default parameter values](../pkg/util/config/config.go#L14)
+For the configmap configuration, the [default parameter values](../../pkg/util/config/config.go#L14)
 mentioned here are likely to be overwritten in your local operator installation
 via your local version of the operator configmap. In the case you use the
 operator CRD, all the CRD defaults are provided in the
-[operator's default configuration manifest](../manifests/postgresql-operator-default-configuration.yaml)
+[operator's default configuration manifest](../../manifests/postgresql-operator-default-configuration.yaml)
 
 Variable names are underscore-separated words.
 
@@ -122,7 +122,7 @@ Those are top-level keys, containing both leaf keys and groups.
   containers with high memory limits due to the lack of memory on Kubernetes
   cluster nodes. This affects all containers created by the operator (Postgres,
   Scalyr sidecar, and other sidecars); to set resources for the operator's own
-  container, change the [operator deployment manually](../manifests/postgres-operator.yaml#L20).
+  container, change the [operator deployment manually](../../manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
 ## Postgres users
