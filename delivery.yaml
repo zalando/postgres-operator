@@ -32,7 +32,7 @@ pipeline:
         - desc: 'Run unit tests'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
-            go test ./pkg/...
+            go test ./...
         - desc: 'Run e2e tests'
           cmd: |
             make e2e
