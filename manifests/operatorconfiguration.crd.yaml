@@ -74,6 +74,10 @@ spec:
                     type: string
                 cluster_name_label:
                   type: string
+                custom_pod_annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
                 enable_pod_antiaffinity:
                   type: boolean
                 enable_pod_disruption_budget:

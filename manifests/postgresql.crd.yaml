@@ -132,6 +132,10 @@ spec:
                   type: integer
                 maximum_lag_on_failover:
                   type: integer
+            podAnnotations:
+              type: object
+              additionalProperties:
+                type: string
             pod_priority_class_name:  # deprecated
               type: string
             podPriorityClassName:

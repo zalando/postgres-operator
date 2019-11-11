@@ -285,6 +285,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 						},
 					},
 				},
+				"podAnnotations": {
+					Type: "object",
+					AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+						Schema: &apiextv1beta1.JSONSchemaProps{
+							Type: "string",
+						},
+					},
+				},
 				"pod_priority_class_name": {
 					Type:        "string",
 					Description: "Deprecated",
@@ -660,6 +668,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 						},
 						"cluster_name_label": {
 							Type: "string",
+						},
+						"custom_pod_annotations": {
+							Type: "object",
+							AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+								Schema: &apiextv1beta1.JSONSchemaProps{
+									Type: "string",
+								},
+							},
 						},
 						"enable_pod_antiaffinity": {
 							Type: "boolean",
