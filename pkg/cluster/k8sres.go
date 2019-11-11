@@ -493,7 +493,7 @@ func generatePodTemplate(
 		Spec: podSpec,
 	}
 	if kubeIAMRole != "" {
-		if template.Annotations == nil{
+		if template.Annotations == nil {
 			template.Annotations = make(map[string]string)
 		}
 		template.Annotations[constants.KubeIAmAnnotation] = kubeIAMRole
@@ -967,7 +967,7 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 			annotations[k] = v
 		}
 	}
-	
+
 	if len(annotations) == 0 {
 		return nil
 	}
@@ -1508,8 +1508,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		util.False(),
 		false,
 		"",
-		"",
-		""); err != nil {
+		c.OpConfig.AdditionalSecretMount,
+		c.OpConfig.AdditionalSecretMountPath); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
