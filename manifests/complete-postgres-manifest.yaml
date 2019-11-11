@@ -25,7 +25,8 @@ spec:
   - 127.0.0.1/32
   databases:
     foo: zalando
-
+# podAnnotations:
+#   annotation.key: value
 # Expert section
 
   enableShmVolume: true

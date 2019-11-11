@@ -22,6 +22,9 @@ configuration:
     cluster_labels:
         application: spilo
     cluster_name_label: cluster-name
+    # custom_pod_annotations:
+    #   keya: valuea
+    #   keyb: valueb
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
     # infrastructure_roles_secret_name: ""

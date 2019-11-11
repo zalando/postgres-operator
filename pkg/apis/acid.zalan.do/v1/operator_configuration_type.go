@@ -59,6 +59,7 @@ type KubernetesMetaConfiguration struct {
 	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
+	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname

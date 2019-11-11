@@ -118,6 +118,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
    then the default priority class is taken. The priority class itself must be
    defined in advance. Optional.
 
+* **podAnnotations**
+  A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+  to each pod created for the database.
+
+
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default docker
   limit `/dev/shm` to `64M` (see e.g. the [docker
