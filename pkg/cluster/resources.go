@@ -286,7 +286,7 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	// wait until the statefulset is truly deleted
 	c.logger.Debugf("waiting for the statefulset to be deleted")
 
-	err := retryutil.Retry(constants.StatefulsetDeletionInterval, constants.StatefulsetDeletionTimeout,
+	err := retryutil.Retry(constants.ResourceDeletionInterval, constants.ResourceDeletionTimeout,
 		func() (bool, error) {
 			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name, metav1.GetOptions{})
 
@@ -380,13 +380,23 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 
-		c.Endpoints[role] = nil
-		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
+		// make sure we clear the stored service status if the subsequent create fails.
+		c.Services[role] = nil
+		// wait until the service is truly deleted
+		c.logger.Debugf("waiting for service to be deleted")
+
+		err = retryutil.Retry(constants.ResourceDeletionInterval, constants.ResourceDeletionTimeout,
+			func() (bool, error) {
+				_, err := c.KubeClient.Services(serviceName.Namespace).Get(serviceName.Name, metav1.GetOptions{})
+
+				return err != nil, nil
+			})
 		if err != nil {
-			return fmt.Errorf("could not create service %q: %v", serviceName, err)
+			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 
-		c.Services[role] = svc
+		// make sure we clear the stored endpoint status if the subsequent create fails.
+		c.Endpoints[role] = nil
 		if role == Master {
 			// create the new endpoint using the addresses obtained from the previous one
 			endpointSpec := c.generateEndpoint(role, currentEndpoint.Subsets)
@@ -397,6 +407,13 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 			c.Endpoints[role] = ep
 		}
+
+		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
+		if err != nil {
+			return fmt.Errorf("could not create service %q: %v", serviceName, err)
+		}
+
+		c.Services[role] = svc
 
 		return nil
 	}
