@@ -380,8 +380,6 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 
-		// make sure we clear the stored service status if the subsequent create fails.
-		c.Services[role] = nil
 		// wait until the service is truly deleted
 		c.logger.Debugf("waiting for service to be deleted")
 
@@ -395,7 +393,8 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 
-		// make sure we clear the stored endpoint status if the subsequent create fails.
+		// make sure we clear the stored service and endpoint status if the subsequent create fails.
+		c.Services[role] = nil
 		c.Endpoints[role] = nil
 		if role == Master {
 			// create the new endpoint using the addresses obtained from the previous one
