@@ -138,7 +138,7 @@ configLoadBalancer:
   #   keya: valuea
 
   # toggles service type load balancer pointing to the master pod of the cluster
-  enable_master_load_balancer: true
+  enable_master_load_balancer: false
   # toggles service type load balancer pointing to the replica pod of the cluster
   enable_replica_load_balancer: false
   # defines the DNS name string template for the master load balancer cluster

@@ -19,8 +19,8 @@ spec:
     zalando:
     - superuser
     - createdb
-  enableMasterLoadBalancer: true
-  enableReplicaLoadBalancer: true
+  enableMasterLoadBalancer: false
+  enableReplicaLoadBalancer: false
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
