@@ -22,7 +22,7 @@ data:
   docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # enable_admin_role_for_users: "true"
   # enable_database_access: "true"
-  enable_master_load_balancer: "true"
+  enable_master_load_balancer: "false"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
   enable_replica_load_balancer: "false"
