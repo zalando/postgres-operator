@@ -717,6 +717,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.JSONSchemaProps{
 						},
 						"pod_management_policy": {
 							Type: "string",
+							Enum: []apiextv1beta1.JSON{
+								{
+									Raw: []byte(`"ordered_ready"`),
+								},
+								{
+									Raw: []byte(`"parallel"`),
+								},
+							},
 						},
 						"pod_role_label": {
 							Type: "string",

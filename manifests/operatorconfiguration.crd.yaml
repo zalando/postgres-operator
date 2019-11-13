@@ -103,6 +103,9 @@ spec:
                   type: string
                 pod_management_policy:
                   type: string
+                  enum:
+                    - "ordered_ready"
+                    - "parallel"
                 pod_role_label:
                   type: string
                 pod_service_account_name:
