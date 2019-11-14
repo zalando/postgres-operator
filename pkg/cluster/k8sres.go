@@ -1569,7 +1569,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		// Controller namespace to use for k8s API calls
 		{
 			Name: "CONTROLLER_NAMESPACE",
-			Value: c.ControllerConfig.Namespace,
+			Value: c.ControllerNamespace,
 		},
 		// Bucket env vars
 		{
