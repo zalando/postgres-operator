@@ -25,6 +25,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 	}
 
 	return cluster.Config{
+		ControllerConfig:    c.config,
 		RestConfig:          c.config.RestConfig,
 		OpConfig:            config.Copy(c.opConfig),
 		InfrastructureRoles: infrastructureRoles,

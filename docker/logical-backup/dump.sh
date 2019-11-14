@@ -68,7 +68,7 @@ declare -a search_strategy=(
 )
 
 function get_config_resource() {
-    curl "${K8S_API_URL}/apis/apps/v1/namespaces/default/deployments/postgres-operator" \
+    curl "${K8S_API_URL}/apis/apps/v1/namespaces/${CONTROLLER_NAMESPACE}/deployments/postgres-operator" \
         --cacert $CERT   \
         -H "Authorization: Bearer ${TOKEN}" | jq '.spec.template.spec.containers[0].env[] | select(.name == "$1") | .value'
 }
@@ -79,13 +79,13 @@ function get_cluster_name_label {
 
     config=$(get_config_resource "CONFIG_MAP_NAME")
     if [ -n "$config" ]; then
-        clustername=$(curl "${K8S_API_URL}/api/v1/namespaces/default/configmaps/${config}" \
+        clustername=$(curl "${K8S_API_URL}/api/v1/namespaces/${CONTROLLER_NAMESPACE}/configmaps/${config}" \
                             --cacert $CERT   \
                             -H "Authorization: Bearer ${TOKEN}" | jq '.data.cluster_name_label')
     else
         config=$(get_config_resource "POSTGRES_OPERATOR_CONFIGURATION_OBJECT")
         if [ -n "$config" ]; then
-            clustername=$(curl "${K8S_API_URL}/apis/acid.zalan.do/v1/namespaces/default/operatorconfigurations/${config}" \
+            clustername=$(curl "${K8S_API_URL}/apis/acid.zalan.do/v1/namespaces/${CONTROLLER_NAMESPACE}/operatorconfigurations/${config}" \
                                 --cacert $CERT   \
                                 -H "Authorization: Bearer ${TOKEN}" | jq '.configuration.kubernetes.cluster_name_label')
         fi

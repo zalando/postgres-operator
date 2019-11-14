@@ -43,6 +43,7 @@ var (
 type Config struct {
 	OpConfig                     config.Config
 	RestConfig                   *rest.Config
+	ControllerConfig             *spec.ControllerConfig
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
