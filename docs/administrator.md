@@ -406,6 +406,12 @@ of the backup cron job.
 `cronjobs` resource from the `batch` API group for the operator service account.
 See [example RBAC](../manifests/operator-service-account-rbac.yaml)
 
+6. Resources of the backup pod are only determined by the configured
+[default values](reference/operator_parameters.md#kubernetes-resource-requests)
+not by the values specified in the Postgres cluster manifest. This allows for
+choosing lower values for CPU and memory requests/limits than for the database
+pods.
+
 ## Access to cloud resources from clusters in non-cloud environment
 
 To access cloud resources like S3 from a cluster on bare metal you can use
