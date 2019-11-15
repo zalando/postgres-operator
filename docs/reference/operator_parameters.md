@@ -69,6 +69,11 @@ Variable names are underscore-separated words.
 
 Those are top-level keys, containing both leaf keys and groups.
 
+* **enable_crd_validation**
+  toggles if the operator will create or update CRDs with
+  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
+  The default is `true`.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use

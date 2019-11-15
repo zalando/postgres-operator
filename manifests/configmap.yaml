@@ -21,6 +21,7 @@ data:
   # default_memory_request: 100Mi
   docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # enable_admin_role_for_users: "true"
+  # enable_crd_validation: "true"
   # enable_database_access: "true"
   enable_master_load_balancer: "false"
   # enable_pod_antiaffinity: "false"

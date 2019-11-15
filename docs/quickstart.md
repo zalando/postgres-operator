@@ -119,15 +119,15 @@ kubectl get pod -l app.kubernetes.io/name=postgres-operator
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-After the cluster manifest is submitted the operator will create Service and
-Endpoint resources and a StatefulSet which spins up new Pod(s) given the number
-of instances specified in the manifest. All resources are named like the
-cluster. The database pods can be identified by their number suffix, starting
-from `-0`. They run the [Spilo](https://github.com/zalando/spilo) container
-image by Zalando. As for the services and endpoints, there will be one for the
-master pod and another one for all the replicas (`-repl` suffix). Check if all
-components are coming up. Use the label `application=spilo` to filter and list
-the label `spilo-role` to see who is currently the master.
+After the cluster manifest is submitted and passed the validation the operator
+will create Service and Endpoint resources and a StatefulSet which spins up new
+Pod(s) given the number of instances specified in the manifest. All resources
+are named like the cluster. The database pods can be identified by their number
+suffix, starting from `-0`. They run the [Spilo](https://github.com/zalando/spilo)
+container image by Zalando. As for the services and endpoints, there will be one
+for the master pod and another one for all the replicas (`-repl` suffix). Check
+if all components are coming up. Use the label `application=spilo` to filter and
+list the label `spilo-role` to see who is currently the master.
 
 ```bash
 # check the deployed cluster

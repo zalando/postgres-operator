@@ -17,6 +17,8 @@ configTarget: "ConfigMap"
 
 # general configuration parameters
 configGeneral:
+  # choose if deployment creates/updates CRDs with OpenAPIV3Validation
+  enable_crd_validation: "true"
   # start any new database pod without limitations on shm memory
   enable_shm_volume: "true"
   # etcd connection string for Patroni. Empty uses K8s-native DCS.

@@ -3,6 +3,30 @@
 Learn how to configure and manage the Postgres Operator in your Kubernetes (K8s)
 environment.
 
+## CRD Validation
+
+[CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
+will be registered with schema validation by default when the operator is
+deployed. The `OperatorConfiguration` CRD will only get created if the
+`POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](../manifests/postgres-operator.yaml#L36)
+in the deployment yaml is set and not empty.
+
+When submitting manifests of [`postgresql`](../manifests/postgresql.crd.yaml) or
+[`OperatorConfiguration`](../manifests/operatorconfiguration.crd.yaml) custom
+resources with kubectl, validation can be bypassed with `--validate=false`. The
+operator can also be configured to not register CRDs with validation on `ADD` or
+`UPDATE` events. Running instances are not affected when enabling the validation
+afterwards unless the manifests is not changed then. Note, that the provided CRD
+manifests contain the validation for users to understand what schema is
+enforced.
+
+Once the validation is enabled it can only be disabled manually by editing or
+patching the CRD manifest:
+
+```bash
+zk8 patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
+```
+
 ## Namespaces
 
 ### Select the namespace to deploy to
