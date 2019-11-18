@@ -493,7 +493,7 @@ func generatePodTemplate(
 		Spec: podSpec,
 	}
 	if kubeIAMRole != "" {
-		if template.Annotations == nil{
+		if template.Annotations == nil {
 			template.Annotations = make(map[string]string)
 		}
 		template.Annotations[constants.KubeIAmAnnotation] = kubeIAMRole
@@ -967,7 +967,7 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 			annotations[k] = v
 		}
 	}
-	
+
 	if len(annotations) == 0 {
 		return nil
 	}
@@ -1556,6 +1556,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		{
 			Name:  "SCOPE",
 			Value: c.Name,
+		},
+		{
+			Name:  "CLUSTER_NAME_LABEL",
+			Value: c.OpConfig.ClusterNameLabel,
 		},
 		{
 			Name: "POD_NAMESPACE",
