@@ -53,9 +53,11 @@ configKubernetes:
   cluster_domain: cluster.local
   # additional labels assigned to the cluster objects
   cluster_labels:
-      application: spilo
+    application: spilo
   # label assigned to Kubernetes objects created by the operator
   cluster_name_label: cluster-name
+  # additional annotations to add to every database pod
+  custom_pod_annotations:
   # toggles pod anti affinity on the Postgres pods
   enable_pod_antiaffinity: false
   # toggles PDB to set to MinAvailabe 0 or 1
@@ -136,7 +138,7 @@ configLoadBalancer:
   #   keya: valuea
 
   # toggles service type load balancer pointing to the master pod of the cluster
-  enable_master_load_balancer: true
+  enable_master_load_balancer: false
   # toggles service type load balancer pointing to the replica pod of the cluster
   enable_replica_load_balancer: false
   # defines the DNS name string template for the master load balancer cluster
