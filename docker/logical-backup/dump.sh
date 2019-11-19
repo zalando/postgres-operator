@@ -14,7 +14,7 @@ PG_BIN=$PG_DIR/$PG_VERSION/bin
 DUMP_SIZE_COEFF=5
 
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT
+K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/api/v1
 CERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
 function estimate_size {
@@ -48,14 +48,14 @@ function aws_upload {
 function get_pods {
     declare -r SELECTOR="$1"
 
-    curl "${K8S_API_URL}/api/v1/namespaces/${POD_NAMESPACE}/pods?$SELECTOR"        \
-        --cacert $CERT                          \
+    curl "${K8S_API_URL}/namespaces/${POD_NAMESPACE}/pods?$SELECTOR" \
+        --cacert $CERT \
         -H "Authorization: Bearer ${TOKEN}" | jq .items[].status.podIP -r
 }
 
 function get_current_pod {
-    curl "${K8S_API_URL}/api/v1/namespaces/${POD_NAMESPACE}/pods?fieldSelector=metadata.name%3D${HOSTNAME}" \
-        --cacert $CERT   \
+    curl "${K8S_API_URL}/namespaces/${POD_NAMESPACE}/pods?fieldSelector=metadata.name%3D${HOSTNAME}" \
+        --cacert $CERT \
         -H "Authorization: Bearer ${TOKEN}"
 }
 
