@@ -440,6 +440,17 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
+  
+* **logical_backup_az_account_name**
+  This only applies if using Azure. This is the storage account name with the container
+  to store backup results. The storage account has to be present. There has to be a secret
+  set as instructed in logical backup section to grab the key and allow the pod to access
+  the container inside the storage account.
+* **logical_backup_az_container_name**
+  This only applies if using Azure. This is the container name inside the storage account name.
+  This container is used to store backup results. The container has to be present. There has to
+  be a secret set as instructed in logical backup section to grab the key and allow the 
+  pod to access the container inside the storage account.
 
 ## Debugging the operator
 

@@ -45,6 +45,21 @@ function aws_upload {
     fi;
 }
 
+function azure_upload {
+
+    # mimic bucket setup from Spilo
+    # to keep logical backups at the same path as WAL
+    # NB: $LOGICAL_BACKUP_SCOPE_SUFFIX already contains the leading "/" when set by the Postgres Operator
+    PATH_TO_BACKUP="spilo/"$SCOPE$LOGICAL_BACKUP_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
+    LOGICAL_BACKUP_AZURE_CONT_KEY=$(cat $SECRET_MOUNT_PATH/azkey)
+    az storage blob upload --file /dev/stdin \
+      --account-name $LOGICAL_BACKUP_AZURE_ACC_NAME \
+      --container-name $LOGICAL_BACKUP_AZURE_CONT_NAME \
+      --account-key $LOGICAL_BACKUP_AZURE_CONT_KEY \
+      --auth-mode key \
+      --name $PATH_TO_BACKUP
+}
+
 function get_pods {
     declare -r SELECTOR="$1"
 
@@ -91,4 +106,10 @@ for search in "${search_strategy[@]}"; do
 
 done
 
+if [ ! -z "$LOGICAL_BACKUP_S3_BUCKET" ]; then
 dump | compress | aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
+fi
+
+if [ ! -z "$LOGICAL_BACKUP_AZURE_ACC_NAME" ]; then
+dump | compress | azure_upload
+fi

@@ -185,7 +185,9 @@ type OperatorConfigurationUsers struct {
 type Duration time.Duration
 
 type OperatorLogicalBackupConfiguration struct {
-	Schedule    string `json:"logical_backup_schedule,omitempty"`
-	DockerImage string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
+	Schedule      string `json:"logical_backup_schedule,omitempty"`
+	DockerImage   string `json:"logical_backup_docker_image,omitempty"`
+	S3Bucket      string `json:"logical_backup_s3_bucket,omitempty"`
+	AzureAccName  string `json:"logical_backup_az_account_name,omitempty"`
+	AzureContName string `json:"logical_backup_az_container_name,omitempty"`
 }

@@ -423,6 +423,17 @@ A secret can be pre-provisioned in different ways:
 * Automatically provisioned via a custom K8s controller like
   [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)
 
+## Setting Logical Backups for Azure
+To set logical backups in Azure, you need to set the following parameters either in
+the crd definition or configmap:
+
+* `logical_backup_az_account_name` - This is the storage account name with the container
+                                     to store backup results.
+* `logical_backup_az_container_name` - This is the container to store backup results.
+
+For this to work, you have to mount the additional secret as instructed previously. The
+data key containing the access key for the storage account must be named `azkey`.
+
 ## Setting up the Postgres Operator UI
 
 With the v1.2 release the Postgres Operator is shipped with a browser-based

@@ -70,9 +70,11 @@ type Scalyr struct {
 
 // LogicalBackup
 type LogicalBackup struct {
-	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
-	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupSchedule      string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage   string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupS3Bucket      string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupAzureAccName  string `name:"logical_backup_az_account_name" default:""`
+	LogicalBackupAzureContName string `name:"logical_backup_az_container_name" default:""`
 }
 
 // Config describes operator config

@@ -14,6 +14,9 @@ RUN apt-get update     \
         jq \
         gnupg \
     && pip3 install --no-cache-dir awscli --upgrade \
+    && curl -sL -o azureInstall.sh https://aka.ms/InstallAzureCLIDeb \
+    && chmod +x azureInstall.sh \
+    && ./azureInstall.sh \
     && echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
     && cat /etc/apt/sources.list.d/pgdg.list \
     && curl --silent https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \

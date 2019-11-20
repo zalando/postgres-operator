@@ -1576,7 +1576,23 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
 		},
 		{
+			Name:  "LOGICAL_BACKUP_AZURE_ACC_NAME",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureAccName,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_AZURE_CONT_NAME",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupAzureContName,
+		},
+		{
+			Name:  "SECRET_MOUNT_PATH",
+			Value: c.OpConfig.AdditionalSecretMountPath,
+		},
+		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
+			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
+		{
+			Name:  "LOGICAL_BACKUP_SCOPE_SUFFIX",
 			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
 		},
 		// Postgres env vars

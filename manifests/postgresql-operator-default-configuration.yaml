@@ -77,6 +77,8 @@ configuration:
     logical_backup_schedule: "30 00 * * *"
     logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
     logical_backup_s3_bucket: "my-bucket-url"
+    logical_backup_az_account_name: "platopspostgresbackups"
+    logical_backup_az_container_name: "backups"
   debug:
     debug_logging: true
     enable_database_access: true

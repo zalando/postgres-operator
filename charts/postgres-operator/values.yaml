@@ -184,6 +184,9 @@ configLogicalBackup:
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
+  # Azure blob to store backup results
+  # logical_backup_az_account_name: "acc_name"
+  # logical_backup_az_container_name: "container_name"
 
 # automate creation of human users with teams API service
 configTeamsApi:

@@ -101,6 +101,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupSchedule = fromCRD.LogicalBackup.Schedule
 	result.LogicalBackupDockerImage = fromCRD.LogicalBackup.DockerImage
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
+	result.LogicalBackupAzureAccName = fromCRD.LogicalBackup.AzureAccName
+	result.LogicalBackupAzureContName = fromCRD.LogicalBackup.AzureContName
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
