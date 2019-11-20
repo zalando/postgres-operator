@@ -1558,6 +1558,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: c.Name,
 		},
 		{
+			Name:  "CLUSTER_NAME_LABEL",
+			Value: c.OpConfig.ClusterNameLabel,
+		},
+		{
 			Name: "POD_NAMESPACE",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
