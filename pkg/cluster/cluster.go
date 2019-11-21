@@ -227,6 +227,10 @@ func (c *Cluster) Create() error {
 
 	c.setStatus(acidv1.ClusterStatusCreating)
 
+	if err = c.validateResources(&c.Spec); err != nil {
+		return fmt.Errorf("unsufficient ressources: %v", err)
+	}
+
 	for _, role := range []PostgresRole{Master, Replica} {
 
 		if c.Endpoints[role] != nil {
@@ -489,6 +493,53 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 	}
 	return true
 
+}
+
+func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
+
+	const (
+		cpuMinimum     = "256m"
+		memoryMinimum  = "256Mi"
+		storageMinimum = "1Gi"
+	)
+
+	var (
+		isSmaller bool
+		err       error
+	)
+
+	cpuLimit := spec.Resources.ResourceLimits.CPU
+	if cpuLimit != "" {
+		isSmaller, err = util.IsSmallerQuantity(cpuLimit, cpuMinimum)
+		if err != nil {
+			return fmt.Errorf("error validating CPU limit: %v", err)
+		}
+		if isSmaller {
+			return fmt.Errorf("defined CPU limit %s is below required minimum %s to properly run postgresql resource", cpuLimit, cpuMinimum)
+		}
+	}
+
+	memoryLimit := spec.Resources.ResourceLimits.Memory
+	if memoryLimit != "" {
+		isSmaller, err = util.IsSmallerQuantity(memoryLimit, memoryMinimum)
+		if err != nil {
+			return fmt.Errorf("error validating memory limit: %v", err)
+		}
+		if isSmaller {
+			return fmt.Errorf("defined memory limit %s is below required minimum %s to properly run postgresql resource", memoryLimit, memoryMinimum)
+		}
+	}
+
+	storageSize := spec.Volume.Size
+	isSmaller, err = util.IsSmallerQuantity(storageSize, storageMinimum)
+	if err != nil {
+		return fmt.Errorf("error validating volume size: %v", err)
+	}
+	if isSmaller {
+		return fmt.Errorf("defined volume size %s is below required minimum %s to properly run postgresql resource", storageSize, storageMinimum)
+	}
+
+	return nil
 }
 
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object

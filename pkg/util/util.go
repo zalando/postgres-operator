@@ -141,17 +141,17 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
-// RequestIsSmallerThanLimit : ...
-func RequestIsSmallerThanLimit(requestStr, limitStr string) (bool, error) {
+// IsSmallerQuantity : checks if first resource is of a smaller quantity than the second
+func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 
 	request, err := resource.ParseQuantity(requestStr)
 	if err != nil {
-		return false, fmt.Errorf("could not parse memory request %v : %v", requestStr, err)
+		return false, fmt.Errorf("could not parse request %v : %v", requestStr, err)
 	}
 
 	limit, err2 := resource.ParseQuantity(limitStr)
 	if err2 != nil {
-		return false, fmt.Errorf("could not parse memory limit %v : %v", limitStr, err2)
+		return false, fmt.Errorf("could not parse limit %v : %v", limitStr, err2)
 	}
 
 	return request.Cmp(limit) == -1, nil
