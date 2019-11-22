@@ -23,6 +23,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	oldStatus := c.Status
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -36,7 +37,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 
 	if err = c.validateResources(&c.Spec); err != nil {
 		err = fmt.Errorf("insufficient resources specified: %v", err)
-		return err
+		if oldStatus.Running() {
+			c.logger.Warning(err)
+			err = nil
+		} else {
+			return err
+		}
 	}
 
 	if err = c.initUsers(); err != nil {
