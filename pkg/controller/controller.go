@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -111,7 +111,7 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.opConfig.SetMemoryRequestToLimit {
 
-		isSmaller, err := util.RequestIsSmallerThanLimit(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
+		isSmaller, err := util.IsSmallerQuantity(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
 		if err != nil {
 			panic(err)
 		}
@@ -120,7 +120,7 @@ func (c *Controller) initOperatorConfig() {
 			c.opConfig.DefaultMemoryRequest = c.opConfig.DefaultMemoryLimit
 		}
 
-		isSmaller, err = util.RequestIsSmallerThanLimit(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
+		isSmaller, err = util.IsSmallerQuantity(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
 		if err != nil {
 			panic(err)
 		}

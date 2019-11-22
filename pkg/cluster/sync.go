@@ -34,6 +34,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	if err = c.validateResources(&c.Spec); err != nil {
+		err = fmt.Errorf("insufficient resources specified: %v", err)
+		return err
+	}
+
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
 		return err

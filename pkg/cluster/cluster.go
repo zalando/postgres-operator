@@ -228,7 +228,7 @@ func (c *Cluster) Create() error {
 	c.setStatus(acidv1.ClusterStatusCreating)
 
 	if err = c.validateResources(&c.Spec); err != nil {
-		return fmt.Errorf("unsufficient ressources: %v", err)
+		return fmt.Errorf("insufficient resources specified: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -593,6 +593,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.logger.Errorf("could not sync secrets: %v", err)
 			updateFailed = true
 		}
+	}
+
+	// check pod resources and volume size and cancel update if they are too low
+	if err := c.validateResources(&c.Spec); err != nil {
+		updateFailed = true
+		return fmt.Errorf("insufficient resources specified: %v", err)
 	}
 
 	// Volume

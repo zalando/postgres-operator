@@ -159,10 +159,10 @@ func TestIsSmallerQuantity(t *testing.T) {
 	for _, tt := range requestIsSmallerQuantityTests {
 		res, err := IsSmallerQuantity(tt.request, tt.limit)
 		if err != nil {
-			t.Errorf("RequestIsSmallerThanLimit returned unexpected error: %#v", err)
+			t.Errorf("IsSmallerQuantity returned unexpected error: %#v", err)
 		}
 		if res != tt.out {
-			t.Errorf("RequestIsSmallerThanLimit expected: %#v, got: %#v", tt.out, res)
+			t.Errorf("IsSmallerQuantity expected: %#v, got: %#v", tt.out, res)
 		}
 	}
 }
