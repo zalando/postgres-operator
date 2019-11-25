@@ -3,10 +3,8 @@ kind: CustomResourceDefinition
 metadata:
   name: postgresqls.acid.zalan.do
   labels:
-    app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
-    helm.sh/chart: {{ template "postgres-operator.chart" . }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    #app.kubernetes.io/managed-by: {{ .Release.Service }}
+    #app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   group: acid.zalan.do
   names:
