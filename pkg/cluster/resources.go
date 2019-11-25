@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
@@ -278,7 +277,8 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	oldStatefulset := c.Statefulset
 
 	options := metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy}
-	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
+	err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options)
+	if err != nil {
 		return fmt.Errorf("could not delete statefulset %q: %v", statefulSetName, err)
 	}
 	// make sure we clear the stored statefulset status if the subsequent create fails.
@@ -286,11 +286,16 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	// wait until the statefulset is truly deleted
 	c.logger.Debugf("waiting for the statefulset to be deleted")
 
-	err := retryutil.Retry(constants.ResourceDeletionInterval, constants.ResourceDeletionTimeout,
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
-			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name, metav1.GetOptions{})
-
-			return err != nil, nil
+			_, err2 := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name, metav1.GetOptions{})
+			if err2 == nil {
+				return false, nil
+			}
+			if k8sutil.ResourceNotFound(err2) {
+				return true, nil
+			}
+			return false, err2
 		})
 	if err != nil {
 		return fmt.Errorf("could not delete statefulset: %v", err)
@@ -383,11 +388,16 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		// wait until the service is truly deleted
 		c.logger.Debugf("waiting for service to be deleted")
 
-		err = retryutil.Retry(constants.ResourceDeletionInterval, constants.ResourceDeletionTimeout,
+		err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 			func() (bool, error) {
-				_, err := c.KubeClient.Services(serviceName.Namespace).Get(serviceName.Name, metav1.GetOptions{})
-
-				return err != nil, nil
+				_, err2 := c.KubeClient.Services(serviceName.Namespace).Get(serviceName.Name, metav1.GetOptions{})
+				if err2 == nil {
+					return false, nil
+				}
+				if k8sutil.ResourceNotFound(err2) {
+					return true, nil
+				}
+				return false, err2
 			})
 		if err != nil {
 			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
