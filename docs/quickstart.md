@@ -56,8 +56,8 @@ kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
 There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest that [combines the mentioned resources](../manifests/kustomization.yaml)
-(except for the CRD) - it can be used with kubectl 1.14 or newer as easy as:
+manifest that [combines the mentioned resources](../manifests/kustomization.yaml).
+It can be used with kubectl 1.14 or newer as easy as:
 
 ```bash
 kubectl apply -k github.com/zalando/postgres-operator/manifests
