@@ -493,7 +493,7 @@ func generatePodTemplate(
 		Spec: podSpec,
 	}
 	if kubeIAMRole != "" {
-		if template.Annotations == nil{
+		if template.Annotations == nil {
 			template.Annotations = make(map[string]string)
 		}
 		template.Annotations[constants.KubeIAmAnnotation] = kubeIAMRole
@@ -967,7 +967,7 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 			annotations[k] = v
 		}
 	}
-	
+
 	if len(annotations) == 0 {
 		return nil
 	}
@@ -1576,7 +1576,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
 		},
 		{
-			Name:  "AWS_SSE",
+			Name:  "LOGICAL_BACKUP_S3_SSE",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
 		},
 		{
