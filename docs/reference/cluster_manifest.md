@@ -327,7 +327,6 @@ defined in the sidecar dictionary:
   (https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/)
   for environment variables. Optional.
 
-<<<<<<< HEAD
 * **resources**
   [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container)
   for each sidecar container. Optional.
@@ -355,8 +354,3 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
-=======
-  **Note**: The operator will not launch a cluster if sidecar containers are specified
-  but globally disabled in the configuration. The `enable_sidecars` option
-  must be set to `true`.
->>>>>>> efce5a5f... updated docs

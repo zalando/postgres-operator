@@ -49,15 +49,14 @@ git clone https://github.com/zalando/postgres-operator.git
 cd postgres-operator
 
 # apply the manifests in the following order
-kubectl create -f manifests/operatorconfiguration.crd.yaml  # registers the CRD
-kubectl create -f manifests/postgresql-operator-default-configuration.yaml  # configuration
+kubectl create -f manifests/configmap.yaml  # configuration
 kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
 kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
 There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest that [combines the mentioned resources](../manifests/kustomization.yaml).
-It can be used with kubectl 1.14 or newer as easy as:
+manifest that [combines the mentioned resources](../manifests/kustomization.yaml) -
+it can be used with kubectl 1.14 or newer as easy as:
 
 ```bash
 kubectl apply -k github.com/zalando/postgres-operator/manifests
@@ -120,15 +119,15 @@ kubectl get pod -l app.kubernetes.io/name=postgres-operator
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-After the cluster manifest is submitted and passed the validation the operator
-will create Service and Endpoint resources and a StatefulSet which spins up new
-Pod(s) given the number of instances specified in the manifest. All resources
-are named like the cluster. The database pods can be identified by their number
-suffix, starting from `-0`. They run the [Spilo](https://github.com/zalando/spilo)
-container image by Zalando. As for the services and endpoints, there will be one
-for the master pod and another one for all the replicas (`-repl` suffix). Check
-if all components are coming up. Use the label `application=spilo` to filter and
-list the label `spilo-role` to see who is currently the master.
+After the cluster manifest is submitted the operator will create Service and
+Endpoint resources and a StatefulSet which spins up new Pod(s) given the number
+of instances specified in the manifest. All resources are named like the
+cluster. The database pods can be identified by their number suffix, starting
+from `-0`. They run the [Spilo](https://github.com/zalando/spilo) container
+image by Zalando. As for the services and endpoints, there will be one for the
+master pod and another one for all the replicas (`-repl` suffix). Check if all
+components are coming up. Use the label `application=spilo` to filter and list
+the label `spilo-role` to see who is currently the master.
 
 ```bash
 # check the deployed cluster
