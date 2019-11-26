@@ -178,12 +178,20 @@ configAwsOrGcp:
 
 # configure K8s cron job managed by the operator
 configLogicalBackup:
-  # backup schedule in the cron format
-  logical_backup_schedule: "30 00 * * *"
   # image for pods of the logical backup job (example runs pg_dumpall)
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  # S3 Access Key ID  
+  logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
+  # S3 endpoint url when not using AWS
+  logical_backup_s3_endpoint: ""
+  # S3 Secret Access Key
+  logical_backup_s3_secret_access_key: ""
+  # S3 server side encription 
+  logical_backup_s3_sse: "AES256"
+  # backup schedule in the cron format
+  logical_backup_schedule: "30 00 * * *"
 
 # automate creation of human users with teams API service
 configTeamsApi:

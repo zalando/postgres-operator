@@ -441,6 +441,19 @@ grouped under the `logical_backup` key.
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
 
+* **logical_backup_s3_endpoint**
+  When using non-AWS S3 storage, endpoint can be set as a ENV variable.
+
+* **logical_backup_s3_sse**
+  Specify server side encription that S3 storage is using. If empty string
+  is specified, no argument will be passed to `aws s3` command. Default: "AES256".
+
+* **logical_backup_s3_access_key_id**
+  When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
+
+* **logical_backup_s3_secret_access_key**
+  When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
+
 ## Debugging the operator
 
 Options to aid debugging of the operator itself. Grouped under the `debug` key.

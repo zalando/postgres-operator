@@ -184,8 +184,13 @@ type OperatorConfigurationUsers struct {
 //Duration shortens this frequently used name
 type Duration time.Duration
 
+// OperatorLogicalBackupConfiguration defines configration for logical backup
 type OperatorLogicalBackupConfiguration struct {
-	Schedule    string `json:"logical_backup_schedule,omitempty"`
-	DockerImage string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
+	Schedule          string `json:"logical_backup_schedule,omitempty"`
+	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
+	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
+	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
+	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`
+	S3SSE             string `json:"logical_backup_s3_sse,omitempty"`
 }
