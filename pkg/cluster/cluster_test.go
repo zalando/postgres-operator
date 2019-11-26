@@ -11,7 +11,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -325,6 +325,60 @@ func TestShouldDeleteSecret(t *testing.T) {
 		if outcome, username := cl.shouldDeleteSecret(tt.secret); outcome != tt.outcome {
 			t.Errorf("%s expects the check for deletion of the username %q secret to return %t, got %t",
 				testName, username, tt.outcome, outcome)
+		}
+	}
+}
+
+func TestPodAnnotations(t *testing.T) {
+	testName := "TestPodAnnotations"
+	tests := []struct {
+		subTest  string
+		operator map[string]string
+		database map[string]string
+		merged   map[string]string
+	}{
+		{
+			subTest:  "No Annotations",
+			operator: make(map[string]string),
+			database: make(map[string]string),
+			merged:   make(map[string]string),
+		},
+		{
+			subTest:  "Operator Config Annotations",
+			operator: map[string]string{"foo": "bar"},
+			database: make(map[string]string),
+			merged:   map[string]string{"foo": "bar"},
+		},
+		{
+			subTest:  "Database Config Annotations",
+			operator: make(map[string]string),
+			database: map[string]string{"foo": "bar"},
+			merged:   map[string]string{"foo": "bar"},
+		},
+		{
+			subTest:  "Database Config overrides Operator Config Annotations",
+			operator: map[string]string{"foo": "bar", "global": "foo"},
+			database: map[string]string{"foo": "baz", "local": "foo"},
+			merged:   map[string]string{"foo": "baz", "global": "foo", "local": "foo"},
+		},
+	}
+
+	for _, tt := range tests {
+		cl.OpConfig.CustomPodAnnotations = tt.operator
+		cl.Postgresql.Spec.PodAnnotations = tt.database
+
+		annotations := cl.generatePodAnnotations(&cl.Postgresql.Spec)
+		for k, v := range annotations {
+			if observed, expected := v, tt.merged[k]; observed != expected {
+				t.Errorf("%v expects annotation value %v for key %v, but found %v",
+					testName+"/"+tt.subTest, expected, observed, k)
+			}
+		}
+		for k, v := range tt.merged {
+			if observed, expected := annotations[k], v; observed != expected {
+				t.Errorf("%v expects annotation value %v for key %v, but found %v",
+					testName+"/"+tt.subTest, expected, observed, k)
+			}
 		}
 	}
 }

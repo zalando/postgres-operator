@@ -41,6 +41,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ReplicationUsername = fromCRD.PostgresUsersConfiguration.ReplicationUsername
 
 	// kubernetes config
+	result.CustomPodAnnotations = fromCRD.Kubernetes.CustomPodAnnotations
 	result.PodServiceAccountName = fromCRD.Kubernetes.PodServiceAccountName
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
@@ -100,6 +101,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupSchedule = fromCRD.LogicalBackup.Schedule
 	result.LogicalBackupDockerImage = fromCRD.LogicalBackup.DockerImage
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
+	result.LogicalBackupS3Endpoint = fromCRD.LogicalBackup.S3Endpoint
+	result.LogicalBackupS3AccessKeyID = fromCRD.LogicalBackup.S3AccessKeyID
+	result.LogicalBackupS3SecretAccessKey = fromCRD.LogicalBackup.S3SecretAccessKey
+	result.LogicalBackupS3SSE = fromCRD.LogicalBackup.S3SSE
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging

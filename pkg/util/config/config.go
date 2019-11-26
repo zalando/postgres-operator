@@ -68,11 +68,15 @@ type Scalyr struct {
 	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
 }
 
-// LogicalBackup
+// LogicalBackup defines configration for logical backup
 type LogicalBackup struct {
-	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
-	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupS3Bucket          string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
+	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
+	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
+	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:"AES256"`
 }
 
 // Config describes operator config
@@ -109,6 +113,7 @@ type Config struct {
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
+	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility

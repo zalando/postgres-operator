@@ -45,7 +45,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountDefinition            string                `json:"pod_service_account_definition,omitempty"`
 	PodServiceAccountRoleBindingDefinition string                `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration              `json:"pod_terminate_grace_period,omitempty"`
-	SpiloPrivileged                        bool                  `json:"spilo_privileged,omitemty"`
+	SpiloPrivileged                        bool                  `json:"spilo_privileged,omitempty"`
 	SpiloFSGroup                           *int64                `json:"spilo_fsgroup,omitempty"`
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
@@ -59,6 +59,7 @@ type KubernetesMetaConfiguration struct {
 	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
+	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
@@ -183,8 +184,13 @@ type OperatorConfigurationUsers struct {
 //Duration shortens this frequently used name
 type Duration time.Duration
 
+// OperatorLogicalBackupConfiguration defines configration for logical backup
 type OperatorLogicalBackupConfiguration struct {
-	Schedule    string `json:"logical_backup_schedule,omitempty"`
-	DockerImage string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
+	Schedule          string `json:"logical_backup_schedule,omitempty"`
+	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
+	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
+	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
+	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`
+	S3SSE             string `json:"logical_backup_s3_sse,omitempty"`
 }

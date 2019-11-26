@@ -430,6 +430,7 @@ func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) *
 func generatePodTemplate(
 	namespace string,
 	labels labels.Set,
+	annotations map[string]string,
 	spiloContainer *v1.Container,
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
@@ -485,13 +486,17 @@ func generatePodTemplate(
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    labels,
-			Namespace: namespace,
+			Labels:      labels,
+			Namespace:   namespace,
+			Annotations: annotations,
 		},
 		Spec: podSpec,
 	}
 	if kubeIAMRole != "" {
-		template.Annotations = map[string]string{constants.KubeIAmAnnotation: kubeIAMRole}
+		if template.Annotations == nil {
+			template.Annotations = make(map[string]string)
+		}
+		template.Annotations[constants.KubeIAmAnnotation] = kubeIAMRole
 	}
 
 	return &template, nil
@@ -881,10 +886,13 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveFSGroup = spec.SpiloFSGroup
 	}
 
+	annotations := c.generatePodAnnotations(spec)
+
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
+		annotations,
 		spiloContainer,
 		spec.InitContainers,
 		sidecarContainers,
@@ -947,6 +955,24 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	return statefulSet, nil
+}
+
+func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]string {
+	annotations := make(map[string]string)
+	for k, v := range c.OpConfig.CustomPodAnnotations {
+		annotations[k] = v
+	}
+	if spec != nil || spec.PodAnnotations != nil {
+		for k, v := range spec.PodAnnotations {
+			annotations[k] = v
+		}
+	}
+
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	return annotations
 }
 
 func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
@@ -1461,10 +1487,13 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			},
 		}}
 
+	annotations := c.generatePodAnnotations(&c.Spec)
+
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		labels,
+		annotations,
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},
@@ -1478,8 +1507,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		util.False(),
 		false,
 		"",
-		"",
-		""); err != nil {
+		c.OpConfig.AdditionalSecretMount,
+		c.OpConfig.AdditionalSecretMountPath); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
@@ -1528,6 +1557,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: c.Name,
 		},
 		{
+			Name:  "CLUSTER_NAME_LABEL",
+			Value: c.OpConfig.ClusterNameLabel,
+		},
+		{
 			Name: "POD_NAMESPACE",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
@@ -1540,6 +1573,14 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_ENDPOINT",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_SSE",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
 		},
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
@@ -1579,8 +1620,15 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 	}
 
-	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+	if c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AWS_ACCESS_KEY_ID", Value: c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID})
+	}
 
+	if c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
+	}
+
+	c.logger.Debugf("Generated logical backup env vars %v", envVars)
 	return envVars
 }
 
