@@ -49,6 +49,8 @@ type KubernetesMetaConfiguration struct {
 	SpiloFSGroup                           *int64                `json:"spilo_fsgroup,omitempty"`
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
+	EnableSidecars                         bool                  `json:"enable_sidecars,omitempty"`
+	EnableInitContainers                   bool                  `json:"enable_init_containers,omitempty"`
 	EnablePodDisruptionBudget              *bool                 `json:"enable_pod_disruption_budget,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
 	ClusterDomain                          string                `json:"cluster_domain"`
@@ -160,8 +162,6 @@ type OperatorConfigurationData struct {
 	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
 	Sidecars                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
-	EnableSidecars             bool                               `json:"enable_sidecars,omitempty"`
-	EnableInitContainers       bool                               `json:"enable_init_containers,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`

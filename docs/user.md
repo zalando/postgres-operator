@@ -378,9 +378,9 @@ spec:
 
 `initContainers` accepts full `v1.Container` definition.
 
-**Note**: The operator will not launch a cluster if init containers are specified
-but globally disabled in the configuration. The `enable_init_containers` option
-must be set to `true`.
+**Note**: The operator will not launch a cluster if `initContainers` are
+specified but globally disabled in the configuration. The
+`enable_init_containers` option must be set to `true`.
 
 ## Increase volume size
 

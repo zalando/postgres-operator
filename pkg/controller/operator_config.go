@@ -35,8 +35,6 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.ShmVolume = fromCRD.ShmVolume
 	result.Sidecars = fromCRD.Sidecars
-	result.EnableSidecars = fromCRD.EnableSidecars
-	result.EnableInitContainers = fromCRD.EnableInitContainers
 
 	// user config
 	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername
@@ -55,6 +53,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
 	result.EnablePodDisruptionBudget = fromCRD.Kubernetes.EnablePodDisruptionBudget
+	result.EnableSidecars = fromCRD.Kubernetes.EnableSidecars
+	result.EnableInitContainers = fromCRD.Kubernetes.EnableInitContainers
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName

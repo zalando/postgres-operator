@@ -22,11 +22,13 @@ data:
   docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # enable_admin_role_for_users: "true"
   # enable_database_access: "true"
+  enable_init_containers: "false"
   enable_master_load_balancer: "false"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
   enable_replica_load_balancer: "false"
   # enable_shm_volume: "true"
+  enable_sidecars: "false"
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
