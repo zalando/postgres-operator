@@ -868,6 +868,18 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"logical_backup_s3_bucket": {
 								Type: "string",
 							},
+							"logical_backup_s3_endpoint": {
+								Type: "string",
+							},
+							"logical_backup_s3_sse": {
+								Type: "string",
+							},
+							"logical_backup_s3_access_key_id": {
+								Type: "string",
+							},
+							"logical_backup_s3_secret_access_key": {
+								Type: "string",
+							},
 						},
 					},
 					"debug": {

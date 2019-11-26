@@ -197,6 +197,14 @@ spec:
                   type: string
                 logical_backup_s3_bucket:
                   type: string
+                logical_backup_s3_endpoint:
+                  type: string
+                logical_backup_s3_sse:
+                  type: string
+                logical_backup_s3_access_key_id:
+                  type: string
+                logical_backup_s3_secret_access_key:
+                  type: string
             debug:
               type: object
               properties:
