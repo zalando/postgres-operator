@@ -57,7 +57,8 @@ configKubernetes:
   # label assigned to Kubernetes objects created by the operator
   cluster_name_label: version
   # annotations attached to each database pod
-  # custom_pod_annotations: keya:valuea
+  # custom_pod_annotations: keya:valuea,keyb:valueb
+
   # toggles pod anti affinity on the Postgres pods
   enable_pod_antiaffinity: "false"
   # toggles PDB to set to MinAvailabe 0 or 1

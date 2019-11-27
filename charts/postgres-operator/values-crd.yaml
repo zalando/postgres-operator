@@ -59,7 +59,10 @@ configKubernetes:
   # label assigned to Kubernetes objects created by the operator
   cluster_name_label: cluster-name
   # additional annotations to add to every database pod
-  custom_pod_annotations:
+  # custom_pod_annotations:
+  #   keya: valuea
+  #   keyb: valueb
+
   # toggles pod anti affinity on the Postgres pods
   enable_pod_antiaffinity: false
   # toggles PDB to set to MinAvailabe 0 or 1
@@ -230,7 +233,7 @@ configTeamsApi:
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
 
 # Scalyr is a log management tool that Zalando uses as a sidecar
-scalyr:
+configScalyr:
   # API key for the Scalyr sidecar
   # scalyr_api_key: ""
 

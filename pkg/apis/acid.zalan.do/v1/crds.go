@@ -607,10 +607,16 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 			"configuration": {
 				Type: "object",
 				Properties: map[string]apiextv1beta1.JSONSchemaProps{
-					"etcd_host": {
+					"docker_image": {
 						Type: "string",
 					},
-					"docker_image": {
+					"enable_crd_validation": {
+						Type: "boolean",
+					},
+					"enable_shm_volume": {
+						Type: "boolean",
+					},
+					"etcd_host": {
 						Type: "string",
 					},
 					"max_instances": {

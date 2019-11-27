@@ -58,9 +58,13 @@ spec:
         configuration:
           type: object
           properties:
-            etcd_host:
-              type: string
             docker_image:
+              type: string
+            enable_crd_validation:
+              type: boolean
+            enable_shm_volume:
+              type: boolean
+            etcd_host:
               type: string
             max_instances:
               type: integer
