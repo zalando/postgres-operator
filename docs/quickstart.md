@@ -73,21 +73,33 @@ manifest.
 ### Helm chart
 
 Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
-chart which saves you the manual steps. Therefore, install the helm CLI on your
-machine. After initializing helm (and its server component Tiller) in your local
-cluster you can install the operator chart. You can define a release name that
-is prepended to the operator resource's names.
-
-Use `--name zalando` to match with the default service account name as older
-operator versions do not support custom names for service accounts. To use
-CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
+chart which saves you the manual steps. Clone this repo and change directory to
+the repo root. With helm3 installed you should be able to run
 
 ```bash
-# 1) initialize helm
-helm init
-# 2) install postgres-operator chart
-helm install --name zalando ./charts/postgres-operator
+bash-3.2$ helm install postgres-operator ./charts/postgres-operator
+manifest_sorter.go:175: info: skipping unknown hook: "crd-install"  # helm v2/v3 compatibility fix, dont worry
+manifest_sorter.go:175: info: skipping unknown hook: "crd-install"  # helm v2/v3 compatibility fix, dont worry
+NAME: postgres-operator
+LAST DEPLOYED: Wed Nov 27 13:14:37 2019
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+
+# Verify that the operator is running
+bash-3.2$ kubectl get pods -l "app.kubernetes.io/name=postgres-operator" --all-namespaces
+NAMESPACE   NAME                                READY   STATUS    RESTARTS   AGE
+default     postgres-operator-dbdd565d6-6l9hl   1/1     Running   0          104s
 ```
+
+To use CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
+
+```bash
+helm install postgres-operator ./charts/postgres-operator --values ./charts/postgres-operator/values-crd.yaml
+```
+
+The chart works with both helm2 and helm3. Documentation for installing
+applications with helm2 can be found in the [helm2 docs](https://v2.helm.sh/docs/).
 
 ### Operator Lifecycle Manager (OLM)
 
