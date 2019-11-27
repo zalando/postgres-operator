@@ -78,7 +78,7 @@ the repo root. With Helm v3 installed you should be able to run:
 
 ```bash
 bash-3.2$ helm install postgres-operator ./charts/postgres-operator
-manifest_sorter.go:175: info: skipping unknown hook: "crd-install"  # helm v2/v3 compatibility fix, dont worry
+manifest_sorter.go:175: info: skipping unknown hook: "crd-install"  # helm v2 compatibility
 manifest_sorter.go:175: info: skipping unknown hook: "crd-install"  # helm v2/v3 compatibility fix, dont worry
 NAME: postgres-operator
 LAST DEPLOYED: Wed Nov 27 13:14:37 2019
