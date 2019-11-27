@@ -73,21 +73,21 @@ manifest.
 ### Helm chart
 
 Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
-chart which saves you the manual steps. Therefore, install the helm CLI on your
-machine. After initializing helm (and its server component Tiller) in your local
-cluster you can install the operator chart. You can define a release name that
-is prepended to the operator resource's names.
-
-Use `--name zalando` to match with the default service account name as older
-operator versions do not support custom names for service accounts. To use
-CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
+chart which saves you the manual steps. Clone this repo and change directory to
+the repo root. With Helm v3 installed you should be able to run:
 
 ```bash
-# 1) initialize helm
-helm init
-# 2) install postgres-operator chart
-helm install --name zalando ./charts/postgres-operator
+helm install postgres-operator ./charts/postgres-operator
 ```
+
+To use CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
+
+```bash
+helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-crd.yaml
+```
+
+The chart works with both Helm 2 and Helm 3. Documentation for installing
+applications with helm2 can be found in the [helm2 docs](https://v2.helm.sh/docs/).
 
 ### Operator Lifecycle Manager (OLM)
 

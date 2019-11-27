@@ -1,0 +1,41 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: operatorconfigurations.acid.zalan.do
+  labels:
+    app.kubernetes.io/name: postgres-operator
+  annotations:
+    "helm.sh/hook": crd-install
+spec:
+  group: acid.zalan.do
+  names:
+    kind: OperatorConfiguration
+    listKind: OperatorConfigurationList
+    plural: operatorconfigurations
+    singular: operatorconfiguration
+    shortNames:
+    - opconfig
+  additionalPrinterColumns:
+  - name: Image
+    type: string
+    description: Spilo image to be used for Pods
+    JSONPath: .configuration.docker_image
+  - name: Cluster-Label
+    type: string
+    description: Label for K8s resources created by operator
+    JSONPath: .configuration.kubernetes.cluster_name_label
+  - name: Service-Account
+    type: string
+    description: Name of service account to be used
+    JSONPath: .configuration.kubernetes.pod_service_account_name
+  - name: Min-Instances
+    type: integer
+    description: Minimum number of instances per Postgres cluster
+    JSONPath: .configuration.min_instances
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
+  scope: Namespaced
+  subresources:
+    status: {}
+  version: v1
