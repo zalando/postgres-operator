@@ -56,7 +56,7 @@ By default, the operator watches the namespace it is deployed to. You can
 change this by setting the `WATCHED_NAMESPACE` var in the `env` section of the
 [operator deployment](../manifests/postgres-operator.yaml) manifest or by
 altering the `watched_namespace` field in the operator
-[configuration](../manifests/postgresql-operator-default-configuration.yaml#L45).
+[configuration](../manifests/postgresql-operator-default-configuration.yaml#L49).
 In the case both are set, the env var takes the precedence. To make the
 operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
