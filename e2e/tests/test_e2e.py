@@ -68,6 +68,7 @@ class EndToEndTestCase(unittest.TestCase):
         # enable sidecars in cluster
         toggle_sidecar_creation = {
             "data": {
+               "enable_init_containers": "true",
                "enable_sidecars": "true",
             }
         }
@@ -323,13 +324,12 @@ class K8s:
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
     def update_config(self, config_map_patch):
+        self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
 
-        k8s.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
-
-        operator_pod = k8s.api.core_v1.list_namespaced_pod(
+        operator_pod = self.api.core_v1.list_namespaced_pod(
             'default', label_selector="name=postgres-operator").items[0].metadata.name
-        k8s.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf
-        k8s.wait_for_operator_pod_start()
+        self.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf
+        self.wait_for_operator_pod_start()
 
     def create_with_kubectl(self, path):
         subprocess.run(["kubectl", "create", "-f", path])
