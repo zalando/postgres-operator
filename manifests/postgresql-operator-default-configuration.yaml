@@ -28,25 +28,25 @@ configuration:
     #   keyb: valueb
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
-    # infrastructure_roles_secret_name: postgresql-operator
+    # infrastructure_roles_secret_name: postgresql-infrastructure-roles
     # inherited_labels:
     # - application
     # - environment
-    # node_readiness_label:
-    # - status:ready
+    node_readiness_label:
+      status: ready
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-    pod_environment_configmap: ""
+    # pod_environment_configmap: ""
     pod_management_policy: "ordered_ready"
     pod_role_label: spilo-role
-    pod_service_account_name: operator
+    pod_service_account_name: zalando-postgres-operator
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     # spilo_fsgroup: 103
     spilo_privileged: false
-    toleration: {}
-    watched_namespace: ""
+    # toleration: {}
+    # watched_namespace: ""
   postgres_pod_resources:
     default_cpu_limit: "3"
     default_cpu_request: 100m
@@ -60,7 +60,7 @@ configuration:
     resource_check_interval: 3s
     resource_check_timeout: 10m
   load_balancer:
-    db_hosted_zone: ""
+    # db_hosted_zone: ""
     enable_master_load_balancer: false
     enable_replica_load_balancer: false
     # custom_service_annotations:
@@ -72,9 +72,9 @@ configuration:
     # additional_secret_mount: "some-secret-name"
     # additional_secret_mount_path: "/some/dir"
     aws_region: eu-central-1
-    kube_iam_role: ""
-    log_s3_bucket: ""
-    wal_s3_bucket: ""
+    # kube_iam_role: ""
+    # log_s3_bucket: ""
+    # wal_s3_bucket: ""
   logical_backup:
     logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
     logical_backup_s3_access_key_id: ""
@@ -90,12 +90,12 @@ configuration:
     # enable_admin_role_for_users: true
     enable_team_superuser: false
     enable_teams_api: false
-    pam_configuration: ""
+    # pam_configuration: ""
     pam_role_name: zalandos
     # postgres_superuser_teams:
-    #   - postgres_superusers
+    # - postgres_superusers
     protected_role_names:
-      - admin
+    - admin
     team_admin_role: admin
     team_api_role_configuration:
       log_statement: all

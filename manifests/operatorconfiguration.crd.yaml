@@ -94,10 +94,9 @@ spec:
                   items:
                     type: string
                 node_readiness_label:
-                  type: array
-                  items:
+                  type: object
+                  additionalProperties:
                     type: string
-                  nullable: true
                 oauth_token_secret_name:
                   type: string
                 pdb_name_format:

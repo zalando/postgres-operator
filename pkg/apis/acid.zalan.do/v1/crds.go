@@ -704,9 +704,8 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								},
 							},
 							"node_readiness_label": {
-								Type:     "array",
-								Nullable: true,
-								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+								Type: "object",
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 									Schema: &apiextv1beta1.JSONSchemaProps{
 										Type: "string",
 									},
