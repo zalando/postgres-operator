@@ -74,7 +74,7 @@ manifest.
 
 Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
 chart which saves you the manual steps. Clone this repo and change directory to
-the repo root. With helm3 installed you should be able to run
+the repo root. With Helm v3 installed you should be able to run:
 
 ```bash
 bash-3.2$ helm install postgres-operator ./charts/postgres-operator
