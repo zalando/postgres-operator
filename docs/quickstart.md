@@ -98,7 +98,7 @@ To use CRD-based configuration you need to specify the [values-crd yaml file](..
 helm install postgres-operator ./charts/postgres-operator --values ./charts/postgres-operator/values-crd.yaml
 ```
 
-The chart works with both helm2 and helm3. Documentation for installing
+The chart works with both Helm 2 and Helm 3. Documentation for installing
 applications with helm2 can be found in the [helm2 docs](https://v2.helm.sh/docs/).
 
 ### Operator Lifecycle Manager (OLM)
