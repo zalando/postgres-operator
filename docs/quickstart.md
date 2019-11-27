@@ -77,25 +77,13 @@ chart which saves you the manual steps. Clone this repo and change directory to
 the repo root. With Helm v3 installed you should be able to run:
 
 ```bash
-bash-3.2$ helm install postgres-operator ./charts/postgres-operator
-manifest_sorter.go:175: info: skipping unknown hook: "crd-install"  # helm v2 compatibility
-manifest_sorter.go:175: info: skipping unknown hook: "crd-install"  # helm v2/v3 compatibility fix, dont worry
-NAME: postgres-operator
-LAST DEPLOYED: Wed Nov 27 13:14:37 2019
-NAMESPACE: default
-STATUS: deployed
-REVISION: 1
-
-# Verify that the operator is running
-bash-3.2$ kubectl get pods -l "app.kubernetes.io/name=postgres-operator" --all-namespaces
-NAMESPACE   NAME                                READY   STATUS    RESTARTS   AGE
-default     postgres-operator-dbdd565d6-6l9hl   1/1     Running   0          104s
+helm install postgres-operator ./charts/postgres-operator
 ```
 
 To use CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
 
 ```bash
-helm install postgres-operator ./charts/postgres-operator --values ./charts/postgres-operator/values-crd.yaml
+helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-crd.yaml
 ```
 
 The chart works with both Helm 2 and Helm 3. Documentation for installing
