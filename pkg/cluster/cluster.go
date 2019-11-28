@@ -500,7 +500,6 @@ func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
 	const (
 		cpuMinLimit    = "256m"
 		memoryMinLimit = "256Mi"
-		volumeMinSize  = "1Gi"
 	)
 
 	var (
@@ -530,15 +529,6 @@ func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
 		}
 	}
 
-	volumeSize := spec.Volume.Size
-	isSmaller, err = util.IsSmallerQuantity(volumeSize, volumeMinSize)
-	if err != nil {
-		return fmt.Errorf("error validating volume size: %v", err)
-	}
-	if isSmaller {
-		return fmt.Errorf("defined volume size %s is below required minimum %s to properly run postgresql resource", volumeSize, volumeMinSize)
-	}
-
 	return nil
 }
 
@@ -552,6 +542,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	oldStatus := c.Status
 	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
@@ -562,6 +553,21 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
+
+	// check if pod resources were edited below the enforced minimum limits
+	if err := c.validateResources(&newSpec.Spec); err != nil {
+		err = fmt.Errorf("insufficient resource limits specified: %v", err)
+
+		isCPULimitSmaller, err2 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.CPU, oldSpec.Spec.Resources.ResourceLimits.CPU)
+		isMemoryLimitSmaller, err3 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.Memory, oldSpec.Spec.Resources.ResourceLimits.Memory)
+
+		if oldStatus.Running() && !isCPULimitSmaller && !isMemoryLimitSmaller && err2 == nil && err3 == nil {
+			c.logger.Warning(err)
+		} else {
+			updateFailed = true
+			return err
+		}
+	}
 
 	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", oldSpec.Spec.PgVersion, newSpec.Spec.PgVersion)
@@ -593,12 +599,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.logger.Errorf("could not sync secrets: %v", err)
 			updateFailed = true
 		}
-	}
-
-	// check pod resources and volume size and cancel update if they are too low
-	if err := c.validateResources(&c.Spec); err != nil {
-		updateFailed = true
-		return fmt.Errorf("insufficient resource limits specified: %v", err)
 	}
 
 	// Volume

@@ -40,9 +40,8 @@ you can find this example also in the manifests folder:
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-Note, that the minimum volume size to properly run the `postgresql` resource is
-`1Gi`. If a lower value is set in the manifest the operator will cancel ADD or
-UPDATE events on this resource with an error.
+Note, that the minimum volume size to run the `postgresql` resource on Elastic
+Block Storage (EBS) is `1Gi`.
 
 ## Watch pods being created
 
