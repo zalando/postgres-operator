@@ -150,6 +150,7 @@ type ScalyrConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
+	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`
@@ -184,8 +185,13 @@ type OperatorConfigurationUsers struct {
 //Duration shortens this frequently used name
 type Duration time.Duration
 
+// OperatorLogicalBackupConfiguration defines configration for logical backup
 type OperatorLogicalBackupConfiguration struct {
-	Schedule    string `json:"logical_backup_schedule,omitempty"`
-	DockerImage string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
+	Schedule          string `json:"logical_backup_schedule,omitempty"`
+	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
+	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
+	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
+	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`
+	S3SSE             string `json:"logical_backup_s3_sse,omitempty"`
 }

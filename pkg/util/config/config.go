@@ -12,10 +12,11 @@ import (
 
 // CRD describes CustomResourceDefinition specific configuration parameters
 type CRD struct {
-	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
-	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod      time.Duration `name:"resync_period" default:"30m"`
-	RepairPeriod      time.Duration `name:"repair_period" default:"5m"`
+	ReadyWaitInterval   time.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout    time.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod        time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod        time.Duration `name:"repair_period" default:"5m"`
+	EnableCRDValidation *bool         `name:"enable_crd_validation" default:"true"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
@@ -68,11 +69,15 @@ type Scalyr struct {
 	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
 }
 
-// LogicalBackup
+// LogicalBackup defines configration for logical backup
 type LogicalBackup struct {
-	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
-	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupS3Bucket          string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
+	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
+	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
+	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:"AES256"`
 }
 
 // Config describes operator config
