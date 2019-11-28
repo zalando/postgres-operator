@@ -4,29 +4,22 @@ go 1.12
 
 require (
 	github.com/aws/aws-sdk-go v1.25.1
-	github.com/coreos/bbolt v1.3.1-coreos.6 // indirect
-	github.com/coreos/etcd v3.3.15+incompatible // indirect
-	github.com/creack/pty v1.1.9 // indirect
-	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 // indirect
+	github.com/emicklei/go-restful v2.9.6+incompatible // indirect
+	github.com/evanphx/json-patch v4.5.0+incompatible // indirect
+	github.com/googleapis/gnostic v0.3.0 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
-	github.com/kr/pty v1.1.8 // indirect
 	github.com/lib/pq v1.2.0
 	github.com/motomux/pretty v0.0.0-20161209205251-b2aad2c9a95d
-	github.com/rogpeppe/go-internal v1.5.0 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c // indirect
-	golang.org/x/mod v0.1.0 // indirect
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	golang.org/x/sys v0.0.0-20191128015809-6d18c012aee9 // indirect
 	golang.org/x/tools v0.0.0-20191127201027-ecd32218bd7f // indirect
-	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	gopkg.in/yaml.v2 v2.2.4
-	honnef.co/go/tools v0.0.1-2019.2.3 // indirect
+	gopkg.in/yaml.v2 v2.2.5
 	k8s.io/api v0.0.0-20191121015604-11707872ac1c
 	k8s.io/apiextensions-apiserver v0.0.0-20191121021419-88daf26ec3b8
 	k8s.io/apimachinery v0.0.0-20191121015412-41065c7a8c2a
-	k8s.io/client-go v0.0.0-20191121015835-571c0ef67034
+	k8s.io/client-go v11.0.0+incompatible
 	k8s.io/code-generator v0.0.0-20191121015212-c4c8f8345c7e
 )

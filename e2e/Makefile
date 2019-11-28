@@ -42,7 +42,7 @@ push: docker
 
 tools: docker
 	# install pinned version of 'kind'
-	GO111MODULE=on go get sigs.k8s.io/kind@v0.6.0
+	GO111MODULE=on go get sigs.k8s.io/kind@v0.5.1
 
 test:
 	./run.sh
