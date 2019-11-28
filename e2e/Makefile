@@ -23,7 +23,6 @@ ifndef GOPATH
 	GOPATH := $(HOME)/go
 endif
 
-KIND_PATH := $(GOPATH)/bin
 PATH := $(GOPATH)/bin:$(PATH)
 
 default: tools
