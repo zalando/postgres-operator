@@ -228,7 +228,7 @@ func (c *Cluster) Create() error {
 	c.setStatus(acidv1.ClusterStatusCreating)
 
 	if err = c.validateResources(&c.Spec); err != nil {
-		return fmt.Errorf("insufficient resources specified: %v", err)
+		return fmt.Errorf("insufficient resource limits specified: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -498,9 +498,9 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
 
 	const (
-		cpuMinimum     = "256m"
-		memoryMinimum  = "256Mi"
-		storageMinimum = "1Gi"
+		cpuMinLimit    = "256m"
+		memoryMinLimit = "256Mi"
+		volumeMinSize  = "1Gi"
 	)
 
 	var (
@@ -510,33 +510,33 @@ func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
 
 	cpuLimit := spec.Resources.ResourceLimits.CPU
 	if cpuLimit != "" {
-		isSmaller, err = util.IsSmallerQuantity(cpuLimit, cpuMinimum)
+		isSmaller, err = util.IsSmallerQuantity(cpuLimit, cpuMinLimit)
 		if err != nil {
 			return fmt.Errorf("error validating CPU limit: %v", err)
 		}
 		if isSmaller {
-			return fmt.Errorf("defined CPU limit %s is below required minimum %s to properly run postgresql resource", cpuLimit, cpuMinimum)
+			return fmt.Errorf("defined CPU limit %s is below required minimum %s to properly run postgresql resource", cpuLimit, cpuMinLimit)
 		}
 	}
 
 	memoryLimit := spec.Resources.ResourceLimits.Memory
 	if memoryLimit != "" {
-		isSmaller, err = util.IsSmallerQuantity(memoryLimit, memoryMinimum)
+		isSmaller, err = util.IsSmallerQuantity(memoryLimit, memoryMinLimit)
 		if err != nil {
 			return fmt.Errorf("error validating memory limit: %v", err)
 		}
 		if isSmaller {
-			return fmt.Errorf("defined memory limit %s is below required minimum %s to properly run postgresql resource", memoryLimit, memoryMinimum)
+			return fmt.Errorf("defined memory limit %s is below required minimum %s to properly run postgresql resource", memoryLimit, memoryMinLimit)
 		}
 	}
 
-	storageSize := spec.Volume.Size
-	isSmaller, err = util.IsSmallerQuantity(storageSize, storageMinimum)
+	volumeSize := spec.Volume.Size
+	isSmaller, err = util.IsSmallerQuantity(volumeSize, volumeMinSize)
 	if err != nil {
 		return fmt.Errorf("error validating volume size: %v", err)
 	}
 	if isSmaller {
-		return fmt.Errorf("defined volume size %s is below required minimum %s to properly run postgresql resource", storageSize, storageMinimum)
+		return fmt.Errorf("defined volume size %s is below required minimum %s to properly run postgresql resource", volumeSize, volumeMinSize)
 	}
 
 	return nil
@@ -598,7 +598,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// check pod resources and volume size and cancel update if they are too low
 	if err := c.validateResources(&c.Spec); err != nil {
 		updateFailed = true
-		return fmt.Errorf("insufficient resources specified: %v", err)
+		return fmt.Errorf("insufficient resource limits specified: %v", err)
 	}
 
 	// Volume

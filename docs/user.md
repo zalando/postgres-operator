@@ -41,8 +41,8 @@ kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
 Note, that the minimum volume size to properly run the `postgresql` resource is
-`1Gi`. If a lower value is set in the manifest the operator will cancel ADD,
-UPDATE or SYNC events on this resource with an error.
+`1Gi`. If a lower value is set in the manifest the operator will cancel ADD or
+UPDATE events on this resource with an error.
 
 ## Watch pods being created
 
@@ -208,7 +208,7 @@ spec:
 
 The minimum limit to properly run the `postgresql` resource is `256m` for `cpu`
 and `256Mi` for `memory`. If a lower value is set in the manifest the operator
-will cancel ADD, UPDATE or SYNC events on this resource with an error. If no
+will cancel ADD or UPDATE events on this resource with an error. If no
 resources are defined in the manifest the operator will obtain the configured
 [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
 

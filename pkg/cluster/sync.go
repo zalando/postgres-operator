@@ -36,7 +36,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}()
 
 	if err = c.validateResources(&c.Spec); err != nil {
-		err = fmt.Errorf("insufficient resources specified: %v", err)
+		err = fmt.Errorf("insufficient resource limits specified: %v", err)
 		if oldStatus.Running() {
 			c.logger.Warning(err)
 			err = nil
