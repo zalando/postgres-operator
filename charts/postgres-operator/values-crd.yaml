@@ -17,6 +17,8 @@ configTarget: "OperatorConfigurationCRD"
 
 # general top-level configuration parameters
 configGeneral:
+  # choose if deployment creates/updates CRDs with OpenAPIV3Validation
+  enable_crd_validation: true
   # start any new database pod without limitations on shm memory
   enable_shm_volume: true
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
@@ -57,7 +59,10 @@ configKubernetes:
   # label assigned to Kubernetes objects created by the operator
   cluster_name_label: cluster-name
   # additional annotations to add to every database pod
-  custom_pod_annotations:
+  # custom_pod_annotations:
+  #   keya: valuea
+  #   keyb: valueb
+
   # toggles pod anti affinity on the Postgres pods
   enable_pod_antiaffinity: false
   # toggles PDB to set to MinAvailabe 0 or 1
@@ -74,7 +79,8 @@ configKubernetes:
   # master_pod_move_timeout: 20m
 
   # set of labels that a running and active node should possess to be considered ready
-  # node_readiness_label: ""
+  # node_readiness_label:
+  #   status: ready
 
   # name of the secret containing the OAuth2 token to pass to the teams API
   # oauth_token_secret_name: postgresql-operator
@@ -186,7 +192,7 @@ configAwsOrGcp:
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
-  # S3 Access Key ID  
+  # S3 Access Key ID
   logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
@@ -194,7 +200,7 @@ configLogicalBackup:
   logical_backup_s3_endpoint: ""
   # S3 Secret Access Key
   logical_backup_s3_secret_access_key: ""
-  # S3 server side encription 
+  # S3 server side encription
   logical_backup_s3_sse: "AES256"
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
@@ -214,7 +220,8 @@ configTeamsApi:
   # operator will add all team member roles to this group and add a pg_hba line
   pam_role_name: zalandos
   # List of teams which members need the superuser role in each Postgres cluster
-  # postgres_superuser_teams: "postgres_superusers"
+  # postgres_superuser_teams:
+  # - postgres_superusers
 
   # List of roles that cannot be overwritten by an application, team or infrastructure role
   protected_role_names:
@@ -228,7 +235,7 @@ configTeamsApi:
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
 
 # Scalyr is a log management tool that Zalando uses as a sidecar
-scalyr:
+configScalyr:
   # API key for the Scalyr sidecar
   # scalyr_api_key: ""
 
@@ -257,9 +264,7 @@ serviceAccount:
   create: true
   # The name of the ServiceAccount to use.
   # If not set and create is true, a name is generated using the fullname template
-  # When relying solely on the OperatorConfiguration CRD, this value has to be "operator"
-  # Otherwise, the operator tries to use the "default" service account which is forbidden
-  name: operator
+  name:
 
 priorityClassName: ""
 

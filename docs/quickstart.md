@@ -55,8 +55,8 @@ kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
 There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest that [combines the mentioned resources](../manifests/kustomization.yaml) -
-it can be used with kubectl 1.14 or newer as easy as:
+manifest that [combines the mentioned resources](../manifests/kustomization.yaml)
+(except for the CRD) - it can be used with kubectl 1.14 or newer as easy as:
 
 ```bash
 kubectl apply -k github.com/zalando/postgres-operator/manifests
@@ -86,8 +86,9 @@ To use CRD-based configuration you need to specify the [values-crd yaml file](..
 helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-crd.yaml
 ```
 
-The chart works with both Helm 2 and Helm 3. Documentation for installing
-applications with helm2 can be found in the [helm2 docs](https://v2.helm.sh/docs/).
+The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
+be skipped with warning when using v3. Documentation for installing applications
+with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
 
 ### Operator Lifecycle Manager (OLM)
 
@@ -119,15 +120,15 @@ kubectl get pod -l app.kubernetes.io/name=postgres-operator
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-After the cluster manifest is submitted the operator will create Service and
-Endpoint resources and a StatefulSet which spins up new Pod(s) given the number
-of instances specified in the manifest. All resources are named like the
-cluster. The database pods can be identified by their number suffix, starting
-from `-0`. They run the [Spilo](https://github.com/zalando/spilo) container
-image by Zalando. As for the services and endpoints, there will be one for the
-master pod and another one for all the replicas (`-repl` suffix). Check if all
-components are coming up. Use the label `application=spilo` to filter and list
-the label `spilo-role` to see who is currently the master.
+After the cluster manifest is submitted and passed the validation the operator
+will create Service and Endpoint resources and a StatefulSet which spins up new
+Pod(s) given the number of instances specified in the manifest. All resources
+are named like the cluster. The database pods can be identified by their number
+suffix, starting from `-0`. They run the [Spilo](https://github.com/zalando/spilo)
+container image by Zalando. As for the services and endpoints, there will be one
+for the master pod and another one for all the replicas (`-repl` suffix). Check
+if all components are coming up. Use the label `application=spilo` to filter and
+list the label `spilo-role` to see who is currently the master.
 
 ```bash
 # check the deployed cluster

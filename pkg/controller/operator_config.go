@@ -25,6 +25,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result := &config.Config{}
 
 	// general config
+	result.EnableCRDValidation = fromCRD.EnableCRDValidation
 	result.EtcdHost = fromCRD.EtcdHost
 	result.DockerImage = fromCRD.DockerImage
 	result.Workers = fromCRD.Workers

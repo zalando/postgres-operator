@@ -12,7 +12,7 @@ data:
   cluster_labels: application:spilo
   cluster_name_label: version
   # custom_service_annotations: "keyx:valuez,keya:valuea"
-  # custom_pod_annotations: "keya:valuea"
+  # custom_pod_annotations: "keya:valuea,keyb:valueb"
   db_hosted_zone: db.example.com
   debug_logging: "true"
   # default_cpu_limit: "3"
@@ -21,6 +21,7 @@ data:
   # default_memory_request: 100Mi
   docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # enable_admin_role_for_users: "true"
+  # enable_crd_validation: "true"
   # enable_database_access: "true"
   enable_master_load_balancer: "false"
   # enable_pod_antiaffinity: "false"
@@ -41,7 +42,7 @@ data:
   # logical_backup_s3_secret_access_key: ""
   # logical_backup_s3_sse: "AES256"
   # logical_backup_schedule: "30 00 * * *"
-  master_dns_name_format: "{cluster}.{team}.staging.{hostedzone}"
+  master_dns_name_format: "{cluster}.{team}.{hostedzone}"
   # master_pod_move_timeout: 10m
   # max_instances: "-1"
   # min_instances: "-1"
@@ -64,11 +65,11 @@ data:
   ready_wait_interval: 3s
   ready_wait_timeout: 30s
   repair_period: 5m
-  replica_dns_name_format: "{cluster}-repl.{team}.staging.{hostedzone}"
+  replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
   replication_username: standby
   resource_check_interval: 3s
   resource_check_timeout: 10m
-  resync_period: 5m
+  resync_period: 30m
   ring_log_lines: "100"
   secret_name_template: "{username}.{cluster}.credentials"
   # sidecar_docker_images: ""

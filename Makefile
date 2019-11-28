@@ -88,7 +88,7 @@ vet:
 	@go vet $(PKG)
 	@staticcheck $(PKG)
 
-deps:
+deps: tools
 	GO111MODULE=on go mod vendor
 
 test:

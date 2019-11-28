@@ -150,6 +150,7 @@ type ScalyrConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
+	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`

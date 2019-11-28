@@ -17,6 +17,8 @@ configTarget: "ConfigMap"
 
 # general configuration parameters
 configGeneral:
+  # choose if deployment creates/updates CRDs with OpenAPIV3Validation
+  enable_crd_validation: "true"
   # start any new database pod without limitations on shm memory
   enable_shm_volume: "true"
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
@@ -55,7 +57,8 @@ configKubernetes:
   # label assigned to Kubernetes objects created by the operator
   cluster_name_label: version
   # annotations attached to each database pod
-  # custom_pod_annotations: keya:valuea
+  # custom_pod_annotations: keya:valuea,keyb:valueb
+
   # toggles pod anti affinity on the Postgres pods
   enable_pod_antiaffinity: "false"
   # toggles PDB to set to MinAvailabe 0 or 1
@@ -136,9 +139,9 @@ configLoadBalancer:
   # toggles service type load balancer pointing to the replica pod of the cluster
   enable_replica_load_balancer: "false"
   # defines the DNS name string template for the master load balancer cluster
-  master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
+  master_dns_name_format: '{cluster}.{team}.{hostedzone}'
   # defines the DNS name string template for the replica load balancer cluster
-  replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
+  replica_dns_name_format: '{cluster}-repl.{team}.{hostedzone}'
 
 # options to aid debugging of the operator itself
 configDebug:
@@ -180,7 +183,7 @@ configAwsOrGcp:
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
-  # S3 Access Key ID  
+  # S3 Access Key ID
   logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
@@ -188,7 +191,7 @@ configLogicalBackup:
   logical_backup_s3_endpoint: ""
   # S3 Secret Access Key
   logical_backup_s3_secret_access_key: ""
-  # S3 server side encription 
+  # S3 server side encription
   logical_backup_s3_sse: "AES256"
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"

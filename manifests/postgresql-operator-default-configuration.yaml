@@ -3,6 +3,7 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
+  # enable_crd_validation: true
   etcd_host: ""
   docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
   # enable_shm_volume: true
@@ -27,24 +28,25 @@ configuration:
     #   keyb: valueb
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
-    # infrastructure_roles_secret_name: ""
+    # infrastructure_roles_secret_name: postgresql-infrastructure-roles
     # inherited_labels:
     # - application
     # - environment
-    # node_readiness_label: ""
+    # node_readiness_label:
+    #  status: ready
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
     # pod_environment_configmap: ""
     pod_management_policy: "ordered_ready"
     pod_role_label: spilo-role
-    pod_service_account_name: operator
+    pod_service_account_name: zalando-postgres-operator
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     # spilo_fsgroup: 103
     spilo_privileged: false
     # toleration: {}
-    # watched_namespace:""
+    # watched_namespace: ""
   postgres_pod_resources:
     default_cpu_limit: "3"
     default_cpu_request: 100m
@@ -74,7 +76,6 @@ configuration:
     # log_s3_bucket: ""
     # wal_s3_bucket: ""
   logical_backup:
-    log_s3_bucket: ""
     logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
     logical_backup_s3_access_key_id: ""
     logical_backup_s3_bucket: "my-bucket-url"
@@ -91,9 +92,10 @@ configuration:
     enable_teams_api: false
     # pam_configuration: ""
     pam_role_name: zalandos
-    # postgres_superuser_teams: "postgres_superusers"
+    # postgres_superuser_teams:
+    # - postgres_superusers
     protected_role_names:
-      - admin
+    - admin
     team_admin_role: admin
     team_api_role_configuration:
       log_statement: all

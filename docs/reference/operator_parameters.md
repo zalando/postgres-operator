@@ -29,21 +29,20 @@ configuration.
 
   To test the CRD-based configuration locally, use the following
   ```bash
+  kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
+  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+
   kubectl create -f manifests/operator-service-account-rbac.yaml
   kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
-  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+
   kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
   ```
-  Note that the operator first attempts to register the CRD of the
-  `OperatorConfiguration` and then waits for an instance to be created. In
-  between these two event the operator pod may be failing since it cannot fetch
-  the not-yet-existing `OperatorConfiguration` instance.
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
 and should be used unless there is a compatibility requirement to use an already
 existing configuration. Even in that case, it should be rather straightforward
-to convert the configmap based configuration into the CRD-based one and restart
-the operator. The ConfigMaps-based configuration will be deprecated and
+to convert the ConfigMap-based configuration into the CRD-based one and restart
+the operator. The ConfigMap-based configuration will be deprecated and
 subsequently removed in future releases.
 
 Note that for the CRD-based configuration groups of configuration options below
@@ -70,6 +69,11 @@ Variable names are underscore-separated words.
 ## General
 
 Those are top-level keys, containing both leaf keys and groups.
+
+* **enable_crd_validation**
+  toggles if the operator will create or update CRDs with
+  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
+  The default is `true`.
 
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
