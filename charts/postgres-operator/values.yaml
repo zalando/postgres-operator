@@ -57,7 +57,7 @@ configKubernetes:
   # label assigned to Kubernetes objects created by the operator
   cluster_name_label: version
   # annotations attached to each database pod
-  # custom_pod_annotations: keya:valuea,keyb:valueb
+  # custom_pod_annotations: "keya:valuea,keyb:valueb"
 
   # enables initContainers to run actions before Spilo is started
   enable_init_containers: "true"

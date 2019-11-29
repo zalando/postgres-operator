@@ -35,7 +35,7 @@ configuration:
     # - application
     # - environment
     # node_readiness_label:
-    #  status: ready
+    #   status: ready
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"

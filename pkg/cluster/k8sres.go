@@ -788,11 +788,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
-		if c.OpConfig.EnableInitContainers != nil && *c.OpConfig.EnableInitContainers {
-			initContainers = spec.InitContainers
-		} else {
-			return nil, fmt.Errorf("initContainers specified but globally disabled")
+		if c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
+			c.logger.Warningf("initContainers in use but globally disabled - next statefulSet creation would fail")
 		}
+		initContainers = spec.InitContainers
 	}
 
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
@@ -882,13 +881,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// generate sidecar containers
 	if sideCars != nil && len(sideCars) > 0 {
-		if c.OpConfig.EnableSidecars != nil && *c.OpConfig.EnableSidecars {
-			if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
-				c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
-				return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
-			}
-		} else {
-			return nil, fmt.Errorf("sidecar containers specified but globally disabled")
+		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
+			c.logger.Warningf("sidecars in use but globally disabled - next stateful set creation would fail")
+		}
+		if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
+			c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
+			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 		}
 	}
 
@@ -1427,7 +1425,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 
 	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
-	if (pdbEnabled != nil && !*pdbEnabled) || c.Spec.NumberOfInstances <= 0 {
+	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
 		minAvailable = intstr.FromInt(0)
 	}
 
