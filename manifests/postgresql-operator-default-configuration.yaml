@@ -22,7 +22,7 @@ configuration:
     cluster_domain: cluster.local
     cluster_labels:
       application: spilo
-    cluster_name_label: cluster-name
+    cluster_name_label: version
     # custom_pod_annotations:
     #   keya: valuea
     #   keyb: valueb
