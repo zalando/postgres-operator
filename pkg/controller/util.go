@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -91,12 +91,12 @@ func (c *Controller) createOperatorCRD(crd *apiextv1beta1.CustomResourceDefiniti
 	})
 }
 
-func (c *Controller) createPostgresCRD() error {
-	return c.createOperatorCRD(acidv1.PostgresCRD())
+func (c *Controller) createPostgresCRD(enableValidation *bool) error {
+	return c.createOperatorCRD(acidv1.PostgresCRD(enableValidation))
 }
 
-func (c *Controller) createConfigurationCRD() error {
-	return c.createOperatorCRD(acidv1.ConfigurationCRD())
+func (c *Controller) createConfigurationCRD(enableValidation *bool) error {
+	return c.createOperatorCRD(acidv1.ConfigurationCRD(enableValidation))
 }
 
 func readDecodedRole(s string) (*spec.PgUser, error) {

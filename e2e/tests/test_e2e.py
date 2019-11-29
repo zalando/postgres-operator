@@ -65,15 +65,6 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
 
-        # enable sidecars in cluster
-        toggle_sidecar_creation = {
-            "data": {
-               "enable_init_containers": "true",
-               "enable_sidecars": "true",
-            }
-        }
-        k8s.update_config(toggle_sidecar_creation)
-
         with open("manifests/complete-postgres-manifest.yaml", 'r+') as f:
             pg_manifest = yaml.safe_load(f)
             pg_manifest["metadata"]["namespace"] = self.namespace

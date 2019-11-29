@@ -12,10 +12,11 @@ import (
 
 // CRD describes CustomResourceDefinition specific configuration parameters
 type CRD struct {
-	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
-	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod      time.Duration `name:"resync_period" default:"30m"`
-	RepairPeriod      time.Duration `name:"repair_period" default:"5m"`
+	ReadyWaitInterval   time.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout    time.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod        time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod        time.Duration `name:"repair_period" default:"5m"`
+	EnableCRDValidation *bool         `name:"enable_crd_validation" default:"true"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
@@ -87,12 +88,10 @@ type Config struct {
 	Scalyr
 	LogicalBackup
 
-	WatchedNamespace     string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	EtcdHost             string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage          string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-11:1.6-p1"`
-	Sidecars             map[string]string `name:"sidecar_docker_images"`
-	EnableSidecars       bool              `name:"enable_sidecars" default:"false"`
-	EnableInitContainers bool              `name:"enable_init_containers" default:"false"`
+	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
+	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-11:1.6-p1"`
+	Sidecars         map[string]string `name:"sidecar_docker_images"`
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
 	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
@@ -124,6 +123,8 @@ type Config struct {
 	ReplicaDNSNameFormat      StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat             StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	EnablePodDisruptionBudget *bool             `name:"enable_pod_disruption_budget" default:"true"`
+	EnableSidecars            *bool             `name:"enable_sidecars" default:"true"`
+	EnableInitContainers      *bool             `name:"enable_init_containers" default:"true"`
 	Workers                   uint32            `name:"workers" default:"4"`
 	APIPort                   int               `name:"api_port" default:"8080"`
 	RingLogLines              int               `name:"ring_log_lines" default:"100"`

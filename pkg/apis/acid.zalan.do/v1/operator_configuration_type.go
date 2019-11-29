@@ -49,9 +49,9 @@ type KubernetesMetaConfiguration struct {
 	SpiloFSGroup                           *int64                `json:"spilo_fsgroup,omitempty"`
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
-	EnableSidecars                         bool                  `json:"enable_sidecars,omitempty"`
-	EnableInitContainers                   bool                  `json:"enable_init_containers,omitempty"`
 	EnablePodDisruptionBudget              *bool                 `json:"enable_pod_disruption_budget,omitempty"`
+	EnableInitContainers                   *bool                 `json:"enable_init_containers,omitempty"`
+	EnableSidecars                         *bool                 `json:"enable_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
 	ClusterDomain                          string                `json:"cluster_domain"`
 	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
@@ -152,6 +152,7 @@ type ScalyrConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
+	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`

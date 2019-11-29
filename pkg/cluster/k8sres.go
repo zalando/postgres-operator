@@ -788,7 +788,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
-		if c.OpConfig.EnableInitContainers {
+		if c.OpConfig.EnableInitContainers != nil && *c.OpConfig.EnableInitContainers {
 			initContainers = spec.InitContainers
 		} else {
 			return nil, fmt.Errorf("initContainers specified but globally disabled")
@@ -882,7 +882,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// generate sidecar containers
 	if sideCars != nil && len(sideCars) > 0 {
-		if c.OpConfig.EnableSidecars {
+		if c.OpConfig.EnableSidecars != nil && *c.OpConfig.EnableSidecars {
 			if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
 				c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
 				return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
