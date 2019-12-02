@@ -306,6 +306,9 @@ properties of the persistent storage that stores Postgres data.
   documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
   for the details on storage classes. Optional.
 
+* **useExistingClaim**
+  whether to use existing preprovisioned persistent volume claim. Optional.
+
 * **subPath**
   Subpath to use when mounting volume into Spilo container. Optional.
 

@@ -323,6 +323,8 @@ spec:
                   # Note: the value specified here must not be zero.
                 storageClass:
                   type: string
+                useExistingClaim:
+                  type: boolean
                 subPath:
                   type: string
         status:

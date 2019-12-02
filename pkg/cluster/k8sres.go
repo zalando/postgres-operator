@@ -916,7 +916,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
-		spec.Volume.StorageClass); err != nil {
+		spec.Volume.StorageClass, spec.Volume.UseExistingClaim); err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
@@ -1101,20 +1101,23 @@ func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, addition
 	podSpec.Volumes = volumes
 }
 
-func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
+func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string, useExistingClaim bool) (*v1.PersistentVolumeClaim, error) {
 
 	var storageClassName *string
 
 	metadata := metav1.ObjectMeta{
 		Name: constants.DataVolumeName,
 	}
-	if volumeStorageClass != "" {
-		// TODO: remove the old annotation, switching completely to the StorageClassName field.
-		metadata.Annotations = map[string]string{"volume.beta.kubernetes.io/storage-class": volumeStorageClass}
-		storageClassName = &volumeStorageClass
-	} else {
-		metadata.Annotations = map[string]string{"volume.alpha.kubernetes.io/storage-class": "default"}
-		storageClassName = nil
+
+	if !useExistingClaim {
+		if volumeStorageClass != "" {
+			// TODO: remove the old annotation, switching completely to the StorageClassName field.
+			metadata.Annotations = map[string]string{"volume.beta.kubernetes.io/storage-class": volumeStorageClass}
+			storageClassName = &volumeStorageClass
+		} else {
+			metadata.Annotations = map[string]string{"volume.alpha.kubernetes.io/storage-class": "default"}
+			storageClassName = nil
+		}
 	}
 
 	quantity, err := resource.ParseQuantity(volumeSize)
