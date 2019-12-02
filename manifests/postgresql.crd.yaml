@@ -325,3 +325,7 @@ spec:
                   type: string
                 subPath:
                   type: string
+        status:
+          type: object
+          additionalProperties:
+            type: string
