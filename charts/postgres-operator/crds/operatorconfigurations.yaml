@@ -298,3 +298,7 @@ spec:
                   pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                 scalyr_server_url:
                   type: string
+        status:
+          type: object
+          additionalProperties:
+            type: string

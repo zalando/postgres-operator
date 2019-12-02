@@ -578,6 +578,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					},
 				},
 			},
+			"status": {
+				Type: "object",
+				AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+					Schema: &apiextv1beta1.JSONSchemaProps{
+						Type: "string",
+					},
+				},
+			},
 		},
 	},
 }
@@ -991,6 +999,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type: "string",
 							},
 						},
+					},
+				},
+			},
+			"status": {
+				Type: "object",
+				AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+					Schema: &apiextv1beta1.JSONSchemaProps{
+						Type: "string",
 					},
 				},
 			},
