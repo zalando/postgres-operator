@@ -67,12 +67,12 @@ func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 	c.setProcessName("creating statefulset")
 	// check if it's allowed that spec contains initContainers
 	if c.Spec.InitContainers != nil && len(c.Spec.InitContainers) > 0 &&
-		c.OpConfig.EnableInitContainers != nil && !*c.OpConfig.EnableInitContainers {
+		c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
 		return nil, fmt.Errorf("initContainers specified but globally disabled")
 	}
 	// check if it's allowed that spec contains sidecars
 	if c.Spec.Sidecars != nil && len(c.Spec.Sidecars) > 0 &&
-		c.OpConfig.EnableSidecars != nil && !*c.OpConfig.EnableSidecars {
+		c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
 		return nil, fmt.Errorf("sidecar containers specified but globally disabled")
 	}
 
