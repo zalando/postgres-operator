@@ -12,6 +12,23 @@ spec:
   volume:
     size: 1Gi
 #    storageClass: my-sc
+  additionalVolumes:
+    - name: data
+      mountPath: /var/lib/postgresql
+      volumeSource:
+        PersistentVolumeClaim:
+          claimName: pvc-postgresql-data
+          readyOnly: false
+    - name: tmp
+      mountPath: /tmp
+      subPath: foo.txt
+      volumeSource:
+        configMap:
+          name: my-config-map
+    - name: empty
+      mountPath: /opt/empty
+      volumeSource:
+        emptyDir: {}
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:

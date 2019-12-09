@@ -154,6 +154,14 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Optional. Default is: "30 00 \* \* \*"
 
+* **additionalVolumes**
+  List of additional volumes to mount in each container of the statefulset pod.
+  Each item must contain a `name`, `mountPath` and `volumeSource` which is a
+  [kubernetes volumeSource](https://godoc.org/k8s.io/api/core/v1#VolumeSource).
+  It allows you to mount existing PersistentVolumeClaims, ConfigMaps and Secrets inside the StatefulSet.
+  Also an `emptyDir` volume can be shared between initContainer and statefulSet.
+  Additionaly, you can provide a `SubPath` for volume mount.
+  
 ## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key, which is
