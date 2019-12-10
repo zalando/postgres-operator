@@ -81,6 +81,16 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableInitContainers != nil {
+		in, out := &in.EnableInitContainers, &out.EnableInitContainers
+		*out = new(bool)
+		**out = **in
+	}
+	if in.EnableSidecars != nil {
+		in, out := &in.EnableSidecars, &out.EnableSidecars
+		*out = new(bool)
+		**out = **in
+	}
 	out.OAuthTokenSecretName = in.OAuthTokenSecretName
 	out.InfrastructureRolesSecretName = in.InfrastructureRolesSecretName
 	if in.ClusterLabels != nil {

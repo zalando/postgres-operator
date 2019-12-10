@@ -26,14 +26,16 @@ configuration:
     # custom_pod_annotations:
     #   keya: valuea
     #   keyb: valueb
+    enable_init_containers: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
-    # infrastructure_roles_secret_name: postgresql-infrastructure-roles
+    enable_sidecars: true
+    # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
     # inherited_labels:
     # - application
     # - environment
     # node_readiness_label:
-    #  status: ready
+    #   status: ready
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
