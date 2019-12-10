@@ -720,6 +720,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	var (
 		err                 error
+		initContainers      []v1.Container
 		sidecarContainers   []v1.Container
 		podTemplate         *v1.PodTemplateSpec
 		volumeClaimTemplate *v1.PersistentVolumeClaim
@@ -784,6 +785,13 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+
+	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
+		if c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
+			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
+		}
+		initContainers = spec.InitContainers
 	}
 
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
@@ -872,9 +880,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate sidecar containers
-	if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
-		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
-		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+	if sideCars != nil && len(sideCars) > 0 {
+		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
+			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
+		}
+		if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
+			c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
+			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+		}
 	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
@@ -894,7 +907,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.labelsSet(true),
 		annotations,
 		spiloContainer,
-		spec.InitContainers,
+		initContainers,
 		sidecarContainers,
 		&tolerationSpec,
 		effectiveFSGroup,
@@ -1412,7 +1425,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 
 	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
-	if (pdbEnabled != nil && !*pdbEnabled) || c.Spec.NumberOfInstances <= 0 {
+	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
 		minAvailable = intstr.FromInt(0)
 	}
 

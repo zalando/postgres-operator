@@ -83,9 +83,13 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+                enable_init_containers:
+                  type: boolean
                 enable_pod_antiaffinity:
                   type: boolean
                 enable_pod_disruption_budget:
+                  type: boolean
+                enable_sidecars:
                   type: boolean
                 infrastructure_roles_secret_name:
                   type: string

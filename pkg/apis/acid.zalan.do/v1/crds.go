@@ -694,10 +694,16 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 								},
 							},
+							"enable_init_containers": {
+								Type: "boolean",
+							},
 							"enable_pod_antiaffinity": {
 								Type: "boolean",
 							},
 							"enable_pod_disruption_budget": {
+								Type: "boolean",
+							},
+							"enable_sidecars": {
 								Type: "boolean",
 							},
 							"infrastructure_roles_secret_name": {
