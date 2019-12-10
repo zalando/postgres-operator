@@ -356,7 +356,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 									"cpu": {
 										Type:        "string",
 										Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
-										Pattern:     "^(\\d+m|\\d+\\.\\d{1,3})$",
+										Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 									},
 									"memory": {
 										Type:        "string",
@@ -372,7 +372,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 									"cpu": {
 										Type:        "string",
 										Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
-										Pattern:     "^(\\d+m|\\d+\\.\\d{1,3})$",
+										Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 									},
 									"memory": {
 										Type:        "string",
