@@ -789,7 +789,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
 		if c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
-			c.logger.Warningf("initContainers in use but globally disabled - next statefulSet creation would fail")
+			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
 		}
 		initContainers = spec.InitContainers
 	}
@@ -882,7 +882,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	// generate sidecar containers
 	if sideCars != nil && len(sideCars) > 0 {
 		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
-			c.logger.Warningf("sidecars in use but globally disabled - next stateful set creation would fail")
+			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
 		}
 		if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
 			c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
