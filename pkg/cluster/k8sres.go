@@ -555,7 +555,10 @@ func generatePodTemplate(
 	}
 
 	if additionalVolumes != nil {
-		addAdditionalVolumes(&podSpec, additionalVolumes)
+		err := addAdditionalVolumes(&podSpec, additionalVolumes)
+		if err != nil {
+			return nil, fmt.Errorf("Could not add additionnal volume : %v", err)
+		}
 	}
 
 	template := v1.PodTemplateSpec{
@@ -1294,9 +1297,12 @@ func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, addition
 	podSpec.Volumes = volumes
 }
 
-func addAdditionalVolumes(podSpec *v1.PodSpec, additionalVolumes []acidv1.AdditionalVolume) {
+func addAdditionalVolumes(podSpec *v1.PodSpec, additionalVolumes []acidv1.AdditionalVolume) error {
 	volumes := podSpec.Volumes
 	for _, v := range additionalVolumes {
+		if v.MountPath == constants.PostgresDataMount {
+			return fmt.Errorf("Additional Volumes can't be mounted on postgresql data directory")
+		}
 		volumes = append(volumes,
 			v1.Volume{
 				Name:         v.Name,
@@ -1308,16 +1314,25 @@ func addAdditionalVolumes(podSpec *v1.PodSpec, additionalVolumes []acidv1.Additi
 	for i := range podSpec.Containers {
 		mounts := podSpec.Containers[i].VolumeMounts
 		for _, v := range additionalVolumes {
-			mounts = append(mounts, v1.VolumeMount{
-				Name:      v.Name,
-				MountPath: v.MountPath,
-				SubPath:   v.SubPath,
-			})
+			if v.TargetContainers == nil {
+				v.TargetContainers = []string{"all"}
+			}
+			for _, target := range v.TargetContainers {
+				if podSpec.Containers[i].Name == target || target == "all" {
+					mounts = append(mounts, v1.VolumeMount{
+						Name:      v.Name,
+						MountPath: v.MountPath,
+						SubPath:   v.SubPath,
+					})
+				}
+			}
 		}
 		podSpec.Containers[i].VolumeMounts = mounts
 	}
 
 	podSpec.Volumes = volumes
+
+	return nil
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {

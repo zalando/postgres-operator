@@ -1040,6 +1040,36 @@ func TestAdditionalVolume(t *testing.T) {
 				Volumes: []v1.Volume{{}},
 				Containers: []v1.Container{
 					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			volumePos: 1,
+		},
+		{
+			subTest: "non empty PodSpec with sidecar",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+					{
+						Name: "sidecar",
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      "data",
@@ -1054,10 +1084,12 @@ func TestAdditionalVolume(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		// Test with additional volume mounted in all containers
 		additionalVolumeMount := []acidv1.AdditionalVolume{
 			{
-				Name:      "test",
-				MountPath: "/test",
+				Name:             "test",
+				MountPath:        "/test",
+				TargetContainers: []string{"all"},
 				VolumeSource: v1.VolumeSource{
 					EmptyDir: &v1.EmptyDirVolumeSource{},
 				},
@@ -1066,12 +1098,15 @@ func TestAdditionalVolume(t *testing.T) {
 
 		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
 
-		addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		err := addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		if err != nil {
+			t.Errorf("Unable to add additional volume %v", err)
+		}
 
 		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
 
 		if volumeName != additionalVolumeMount[0].Name {
-			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
+			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
 				testName, tt.subTest, additionalVolumeMount, volumeName)
 		}
 
@@ -1079,9 +1114,10 @@ func TestAdditionalVolume(t *testing.T) {
 			volumeMountName := tt.podSpec.Containers[i].VolumeMounts[tt.volumePos].Name
 
 			if volumeMountName != additionalVolumeMount[0].Name {
-				t.Errorf("%s %s: Expected mount %s was not created, have %s instead",
+				t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
 					testName, tt.subTest, additionalVolumeMount, volumeMountName)
 			}
+
 		}
 
 		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
@@ -1089,6 +1125,57 @@ func TestAdditionalVolume(t *testing.T) {
 		if numMountsCheck != numMounts+1 {
 			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
 				numMountsCheck, numMounts+1)
+		}
+	}
+
+	for _, tt := range tests {
+		// Test with additional volume mounted only in first container
+		additionalVolumeMount := []acidv1.AdditionalVolume{
+			{
+				Name:             "test",
+				MountPath:        "/test",
+				TargetContainers: []string{"postgres"},
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		err := addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		if err != nil {
+			t.Errorf("Unable to add additional volume %v", err)
+		}
+
+		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
+
+		if volumeName != additionalVolumeMount[0].Name {
+			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
+				testName, tt.subTest, additionalVolumeMount, volumeName)
+		}
+
+		for _, container := range tt.podSpec.Containers {
+			if container.Name == "postgres" {
+				volumeMountName := container.VolumeMounts[tt.volumePos].Name
+
+				if volumeMountName != additionalVolumeMount[0].Name {
+					t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
+						testName, tt.subTest, additionalVolumeMount, volumeMountName)
+				}
+
+				numMountsCheck := len(container.VolumeMounts)
+				if numMountsCheck != numMounts+1 {
+					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+						numMountsCheck, numMounts+1)
+				}
+			} else {
+				numMountsCheck := len(container.VolumeMounts)
+				if numMountsCheck == numMounts+1 {
+					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+						numMountsCheck, numMounts)
+				}
+			}
 		}
 	}
 }
