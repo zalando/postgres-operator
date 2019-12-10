@@ -12,10 +12,11 @@ import (
 
 // CRD describes CustomResourceDefinition specific configuration parameters
 type CRD struct {
-	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
-	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod      time.Duration `name:"resync_period" default:"30m"`
-	RepairPeriod      time.Duration `name:"repair_period" default:"5m"`
+	ReadyWaitInterval   time.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout    time.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod        time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod        time.Duration `name:"repair_period" default:"5m"`
+	EnableCRDValidation *bool         `name:"enable_crd_validation" default:"true"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
@@ -122,6 +123,8 @@ type Config struct {
 	ReplicaDNSNameFormat      StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat             StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	EnablePodDisruptionBudget *bool             `name:"enable_pod_disruption_budget" default:"true"`
+	EnableInitContainers      *bool             `name:"enable_init_containers" default:"true"`
+	EnableSidecars            *bool             `name:"enable_sidecars" default:"true"`
 	Workers                   uint32            `name:"workers" default:"4"`
 	APIPort                   int               `name:"api_port" default:"8080"`
 	RingLogLines              int               `name:"ring_log_lines" default:"100"`

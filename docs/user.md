@@ -350,6 +350,10 @@ variables are always passed to sidecars:
 The PostgreSQL volume is shared with sidecars and is mounted at
 `/home/postgres/pgdata`.
 
+**Note**: The operator will not create a cluster if sidecar containers are
+specified but globally disabled in the configuration. The `enable_sidecars`
+option must be set to `true`.
+
 ## InitContainers Support
 
 Each cluster can specify arbitrary init containers to run. These containers can
@@ -373,6 +377,10 @@ spec:
 ```
 
 `initContainers` accepts full `v1.Container` definition.
+
+**Note**: The operator will not create a cluster if `initContainers` are
+specified but globally disabled in the configuration. The
+`enable_init_containers` option must be set to `true`.
 
 ## Increase volume size
 
