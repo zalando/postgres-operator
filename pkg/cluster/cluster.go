@@ -497,6 +497,7 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 
 func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
 
+	// setting limits too low can cause unnecessary evictions / OOM kills
 	const (
 		cpuMinLimit    = "256m"
 		memoryMinLimit = "256Mi"
@@ -554,10 +555,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
-	// check if pod resources were edited below the enforced minimum limits
 	if err := c.validateResources(&newSpec.Spec); err != nil {
 		err = fmt.Errorf("insufficient resource limits specified: %v", err)
 
+		// cancel update only when (already too low) pod resources were edited
+		// if cluster was successfully running before the update, continue but log a warning
 		isCPULimitSmaller, err2 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.CPU, oldSpec.Spec.Resources.ResourceLimits.CPU)
 		isMemoryLimitSmaller, err3 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.Memory, oldSpec.Spec.Resources.ResourceLimits.Memory)
 
