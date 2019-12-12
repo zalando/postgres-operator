@@ -180,7 +180,7 @@ var unmarshalCluster = []struct {
 	    "name": "acid-testcluster1"
 	  },
 	  "spec": {
-	    "teamId": "ACID",
+	    "teamId": "acid",
 		"pod_priority_class_name": "spilo-pod-priority",
 	    "volume": {
 	      "size": "5Gi",
@@ -290,7 +290,7 @@ var unmarshalCluster = []struct {
 					ResourceLimits:   ResourceDescription{CPU: "300m", Memory: "3000Mi"},
 				},
 
-				TeamID:              "ACID",
+				TeamID:              "acid",
 				AllowedSourceRanges: []string{"127.0.0.1/32"},
 				NumberOfInstances:   2,
 				Users:               map[string]UserFlags{"zalando": {"superuser", "createdb"}},
@@ -319,7 +319,7 @@ var unmarshalCluster = []struct {
 			},
 			Error: "",
 		},
-		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"pod_priority_class_name":"spilo-pod-priority","volume":{"size":"5Gi","storageClass":"SSD", "subPath": "subdir"},"enableShmVolume":false,"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"ACID","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00","05:00-05:15"],"clone":{"cluster":"acid-batman"}},"status":{"PostgresClusterStatus":""}}`),
+		marshal: []byte(`{"kind":"Postgresql","apiVersion":"acid.zalan.do/v1","metadata":{"name":"acid-testcluster1","creationTimestamp":null},"spec":{"postgresql":{"version":"9.6","parameters":{"log_statement":"all","max_connections":"10","shared_buffers":"32MB"}},"pod_priority_class_name":"spilo-pod-priority","volume":{"size":"5Gi","storageClass":"SSD", "subPath": "subdir"},"enableShmVolume":false,"patroni":{"initdb":{"data-checksums":"true","encoding":"UTF8","locale":"en_US.UTF-8"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"],"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}},"resources":{"requests":{"cpu":"10m","memory":"50Mi"},"limits":{"cpu":"300m","memory":"3000Mi"}},"teamId":"acid","allowedSourceRanges":["127.0.0.1/32"],"numberOfInstances":2,"users":{"zalando":["superuser","createdb"]},"maintenanceWindows":["Mon:01:00-06:00","Sat:00:00-04:00","05:00-05:15"],"clone":{"cluster":"acid-batman"}},"status":{"PostgresClusterStatus":""}}`),
 		err:     nil},
 	// example with teamId set in input
 	{
