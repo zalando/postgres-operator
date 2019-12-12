@@ -155,9 +155,12 @@ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
 ```
 
 Retrieve the password from the K8s Secret that is created in your cluster.
+Non-encrypted connections are rejected by default, so set the SSL mode to
+require:
 
 ```bash
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+export PGSSLMODE=require
 psql -U postgres
 ```
 

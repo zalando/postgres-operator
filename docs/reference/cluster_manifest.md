@@ -62,7 +62,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   field.
 
 * **dockerImage**
-  custom docker image that overrides the **docker_image** operator parameter.
+  custom Docker image that overrides the **docker_image** operator parameter.
   It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
 * **spiloFSGroup**
@@ -124,7 +124,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 
 
 * **enableShmVolume**
-  Start a database pod without limitations on shm memory. By default docker
+  Start a database pod without limitations on shm memory. By default Docker
   limit `/dev/shm` to `64M` (see e.g. the [docker
   issue](https://github.com/docker-library/postgres/issues/416), which could be
   not enough if PostgreSQL uses parallel workers heavily. If this option is
@@ -185,19 +185,19 @@ explanation of `ttl` and `loop_wait` parameters.
 
 * **ttl**
   Patroni `ttl` parameter value, optional. The default is set by the Spilo
-  docker image. Optional.
+  Docker image. Optional.
 
 * **loop_wait**
   Patroni `loop_wait` parameter value, optional. The default is set by the
-  Spilo docker image. Optional.
+  Spilo Docker image. Optional.
 
 * **retry_timeout**
   Patroni `retry_timeout` parameter value, optional. The default is set by the
-  Spilo docker image. Optional.
+  Spilo Docker image. Optional.
 
 * **maximum_lag_on_failover**
   Patroni `maximum_lag_on_failover` parameter value, optional. The default is
-  set by the Spilo docker image. Optional.
+  set by the Spilo Docker image. Optional.
 
 * **slots**
   permanent replication slots that Patroni preserves after failover by
@@ -320,7 +320,7 @@ defined in the sidecar dictionary:
   name of the sidecar. Required.
 
 * **image**
-  docker image of the sidecar. Required.
+  Docker image of the sidecar. Required.
 
 * **env**
   a dictionary of environment variables. Use usual Kubernetes definition

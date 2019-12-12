@@ -40,7 +40,7 @@ This would take a while to complete. You have to redo `make deps` every time
 your dependencies list changes, i.e. after adding a new library dependency.
 
 Build the operator with the `make docker` command. You may define the TAG
-variable to assign an explicit tag to your docker image and the IMAGE to set
+variable to assign an explicit tag to your Docker image and the IMAGE to set
 the image name. By default, the tag is computed with
 `git describe --tags --always --dirty` and the image is
 `registry.opensource.zalan.do/acid/postgres-operator`
@@ -60,10 +60,10 @@ The binary will be placed into the build directory.
 
 ## Deploying self build image
 
-The fastest way to run and test your docker image locally is to reuse the docker
-from [minikube](https://github.com/kubernetes/minikube/releases) or use the
-`load docker-image` from [kind](https://kind.sigs.k8s.io/). The following steps
-will get you the docker image built and deployed.
+The fastest way to run and test your Docker image locally is to reuse the Docker
+environment from [minikube](https://github.com/kubernetes/minikube/releases)
+or use the `load docker-image` from [kind](https://kind.sigs.k8s.io/). The
+following steps will get you the Docker image built and deployed.
 
 ```bash
 # minikube
@@ -162,7 +162,7 @@ The operator also supports pprof endpoints listed at the
 * /debug/pprof/trace
 
 It's possible to attach a debugger to troubleshoot postgres-operator inside a
-docker container. It's possible with [gdb](https://www.gnu.org/software/gdb/)
+Docker container. It's possible with [gdb](https://www.gnu.org/software/gdb/)
 and [delve](https://github.com/derekparker/delve). Since the latter one is a
 specialized debugger for Go, we will use it as an example. To use it you need:
 

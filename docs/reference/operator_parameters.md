@@ -81,13 +81,13 @@ Those are top-level keys, containing both leaf keys and groups.
   Kubernetes-native DCS).
 
 * **docker_image**
-  Spilo docker image for Postgres instances. For production, don't rely on the
+  Spilo Docker image for Postgres instances. For production, don't rely on the
   default image, as it might be not the most up-to-date one. Instead, build
   your own Spilo image from the [github
   repository](https://github.com/zalando/spilo).
 
 * **sidecar_docker_images**
-  a map of sidecar names to docker images to run with Spilo. In case of the name
+  a map of sidecar names to Docker images to run with Spilo. In case of the name
   conflict with the definition in the cluster manifest the cluster-specific one
   is preferred.
 

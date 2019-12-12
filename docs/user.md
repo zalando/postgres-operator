@@ -13,7 +13,7 @@ kind: postgresql
 metadata:
   name: acid-minimal-cluster
 spec:
-  teamId: "ACID"
+  teamId: "acid"
   volume:
     size: 1Gi
   numberOfInstances: 2
@@ -40,6 +40,15 @@ you can find this example also in the manifests folder:
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
+Make sure, the `spec` section of the manifest contains at least a `teamId`, the
+`numberOfInstances` and the `postgresql` object with the `version` specified.
+
+Note, that the name of the cluster must start with the `teamId` and `-`. At
+Zalando we use team IDs (nicknames) to lower the chance of duplicate cluster
+names and colliding entities. The team ID would also be used to query an API to
+get all members of a team and create [database roles](#teams-api-roles) for
+them.
+
 ## Watch pods being created
 
 ```bash
@@ -62,10 +71,12 @@ kubectl port-forward $PGMASTER 6432:5432
 
 Open another CLI and connect to the database. Use the generated secret of the
 `postgres` robot user to connect to our `acid-minimal-cluster` master running
-in Minikube:
+in Minikube. As non-encrypted connections are rejected by default set the SSL
+mode to require:
 
 ```bash
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+export PGSSLMODE=require
 psql -U postgres -p 6432
 ```
 
@@ -77,8 +88,7 @@ cluster. It covers three use-cases:
 * `manifest roles`: create application roles specific to the cluster described
 in the manifest.
 * `infrastructure roles`: create application roles that should be automatically
-created on every
-  cluster managed by the operator.
+created on every cluster managed by the operator.
 * `teams API roles`: automatically create users for every member of the team
 owning the database cluster.
 
@@ -128,9 +138,9 @@ The infrastructure roles secret is specified by the `infrastructure_roles_secret
 parameter. The role definition looks like this (values are base64 encoded):
 
 ```yaml
-    user1: ZGJ1c2Vy
-    password1: c2VjcmV0
-    inrole1: b3BlcmF0b3I=
+user1: ZGJ1c2Vy
+password1: c2VjcmV0
+inrole1: b3BlcmF0b3I=
 ```
 
 The block above describes the infrastructure role 'dbuser' with password
@@ -151,19 +161,19 @@ secret and a ConfigMap. The ConfigMap must have the same name as the secret.
 The secret should contain an entry with 'rolename:rolepassword' for each role.
 
 ```yaml
-    dbuser: c2VjcmV0
+dbuser: c2VjcmV0
 ```
 
 And the role description for that user should be specified in the ConfigMap.
 
 ```yaml
-    data:
-      dbuser: |
-        inrole: [operator, admin]  # following roles will be assigned to the new user
-        user_flags:
-          - createdb
-        db_parameters:  # db parameters, applied for this particular user
-          log_statement: all
+data:
+  dbuser: |
+    inrole: [operator, admin]  # following roles will be assigned to the new user
+    user_flags:
+    - createdb
+    db_parameters:  # db parameters, applied for this particular user
+      log_statement: all
 ```
 
 One can allow membership in multiple roles via the `inrole` array parameter,
@@ -182,6 +192,28 @@ See [infrastructure roles secret](../manifests/infrastructure-roles.yaml)
 and [infrastructure roles configmap](../manifests/infrastructure-roles-configmap.yaml)
 for the examples.
 
+### Teams API roles
+
+These roles are meant for database activity of human users. It's possible to
+configure the operator to automatically create database roles for lets say all
+employees of one team. They are not listed in the manifest and there are no K8s
+secrets created for them. Instead they would use an OAuth2 token to connect. To
+get all members of the team the operator queries a defined API endpoint that
+returns usernames. A minimal Teams API should work like this:
+
+```
+/.../<teamname> -> ["name","anothername"]
+```
+
+A ["fake" Teams API](../manifests/fake-teams-api.yaml) deployment is provided
+in the manifests folder to set up a basic API around whatever services is used
+for user management. The Teams API's URL is set in the operator's
+[configuration](reference/operator_parameters.md#automatic-creation-of-human-users-in-the-database)
+and `enable_teams_api` must be set to `true`. There are more settings available
+to choose superusers, group roles, [PAM configuration](https://github.com/CyberDem0n/pam-oauth2)
+etc. An OAuth2 token can be passed to the Teams API via a secret. The name for
+this secret is configurable with the `oauth_token_secret_name` parameter.
+
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,
@@ -189,12 +221,7 @@ you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configu
 and configure the required toleration in the manifest.
 
 ```yaml
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-metadata:
-  name: acid-minimal-cluster
 spec:
-  teamId: "ACID"
   tolerations:
   - key: postgres
     operator: Exists
@@ -212,11 +239,6 @@ section in the spec. There are two options here:
 ### Clone directly
 
 ```yaml
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-
-metadata:
-  name: acid-test-cluster
 spec:
   clone:
     cluster: "acid-batman"
@@ -232,11 +254,6 @@ means that you can clone only from clusters within the same namespace.
 ### Clone from S3
 
 ```yaml
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-
-metadata:
-  name: acid-test-cluster
 spec:
   clone:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
@@ -265,10 +282,6 @@ For non AWS S3 following settings can be set to support cloning from other S3
 implementations:
 
 ```yaml
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-metadata:
-  name: acid-test-cluster
 spec:
   clone:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
@@ -317,13 +330,7 @@ used for log aggregation, monitoring, backups or other tasks. A sidecar can be
 specified like this:
 
 ```yaml
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-
-metadata:
-  name: acid-minimal-cluster
 spec:
-  ...
   sidecars:
     - name: "container-name"
       image: "company/image:tag"
@@ -361,13 +368,7 @@ be used to run custom actions before any normal and sidecar containers start.
 An init container can be specified like this:
 
 ```yaml
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-
-metadata:
-  name: acid-minimal-cluster
 spec:
-  ...
   initContainers:
     - name: "container-name"
       image: "company/image:tag"
@@ -388,12 +389,7 @@ PostgreSQL operator supports statefulset volume resize if you're using the
 operator on top of AWS. For that you need to change the size field of the
 volume description in the cluster manifest and apply the change:
 
-```
-apiVersion: "acid.zalan.do/v1"
-kind: postgresql
-
-metadata:
-  name: acid-test-cluster
+```yaml
 spec:
   volume:
     size: 5Gi # new volume size
@@ -422,7 +418,8 @@ size of volumes that correspond to the previously running pods is not changed.
 You can enable logical backups from the cluster manifest by adding the following
 parameter in the spec section:
 
-```
+```yaml
+spec:
   enableLogicalBackup: true
 ```
 
