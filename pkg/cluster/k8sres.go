@@ -741,7 +741,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			limit = c.OpConfig.DefaultMemoryLimit
 		}
 
-		isSmaller, err := util.RequestIsSmallerThanLimit(request, limit)
+		isSmaller, err := util.IsSmallerQuantity(request, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -768,7 +768,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 				limit = c.OpConfig.DefaultMemoryLimit
 			}
 
-			isSmaller, err := util.RequestIsSmallerThanLimit(sidecarRequest, sidecarLimit)
+			isSmaller, err := util.IsSmallerQuantity(sidecarRequest, sidecarLimit)
 			if err != nil {
 				return nil, err
 			}

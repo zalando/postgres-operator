@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "10"
+    version: "11"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -42,6 +42,8 @@ kubectl create -f manifests/minimal-postgres-manifest.yaml
 
 Make sure, the `spec` section of the manifest contains at least a `teamId`, the
 `numberOfInstances` and the `postgresql` object with the `version` specified.
+The minimum volume size to run the `postgresql` resource on Elastic Block
+Storage (EBS) is `1Gi`.
 
 Note, that the name of the cluster must start with the `teamId` and `-`. At
 Zalando we use team IDs (nicknames) to lower the chance of duplicate cluster
@@ -214,6 +216,28 @@ to choose superusers, group roles, [PAM configuration](https://github.com/CyberD
 etc. An OAuth2 token can be passed to the Teams API via a secret. The name for
 this secret is configurable with the `oauth_token_secret_name` parameter.
 
+## Resource definition
+
+The compute resources to be used for the Postgres containers in the pods can be
+specified in the postgresql cluster manifest.
+
+```yaml
+spec:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+    limits:
+      cpu: 300m
+      memory: 300Mi
+```
+
+The minimum limit to properly run the `postgresql` resource is `256m` for `cpu`
+and `256Mi` for `memory`. If a lower value is set in the manifest the operator
+will cancel ADD or UPDATE events on this resource with an error. If no
+resources are defined in the manifest the operator will obtain the configured
+[default requests](reference/operator_parameters.md#kubernetes-resource-requests).
+
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,
@@ -318,7 +342,7 @@ Things to note:
 - There is no way to transform a non-standby cluster to a standby cluster
   through the operator. Adding the standby section to the manifest of a running
   Postgres cluster will have no effect. However, it can be done through Patroni
-  by adding the [standby_cluster] (https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster)
+  by adding the [standby_cluster](https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster)
   section using `patronictl edit-config`. Note that the transformed standby
   cluster will not be doing any streaming. It will be in standby mode and allow
   read-only transactions only.
@@ -385,7 +409,7 @@ specified but globally disabled in the configuration. The
 
 ## Increase volume size
 
-PostgreSQL operator supports statefulset volume resize if you're using the
+Postgres operator supports statefulset volume resize if you're using the
 operator on top of AWS. For that you need to change the size field of the
 volume description in the cluster manifest and apply the change:
 
