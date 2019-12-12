@@ -111,7 +111,7 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.opConfig.SetMemoryRequestToLimit {
 
-		isSmaller, err := util.RequestIsSmallerThanLimit(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
+		isSmaller, err := util.IsSmallerQuantity(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
 		if err != nil {
 			panic(err)
 		}
@@ -120,7 +120,7 @@ func (c *Controller) initOperatorConfig() {
 			c.opConfig.DefaultMemoryRequest = c.opConfig.DefaultMemoryLimit
 		}
 
-		isSmaller, err = util.RequestIsSmallerThanLimit(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
+		isSmaller, err = util.IsSmallerQuantity(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
 		if err != nil {
 			panic(err)
 		}

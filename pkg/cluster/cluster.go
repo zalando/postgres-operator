@@ -227,6 +227,10 @@ func (c *Cluster) Create() error {
 
 	c.setStatus(acidv1.ClusterStatusCreating)
 
+	if err = c.validateResources(&c.Spec); err != nil {
+		return fmt.Errorf("insufficient resource limits specified: %v", err)
+	}
+
 	for _, role := range []PostgresRole{Master, Replica} {
 
 		if c.Endpoints[role] != nil {
@@ -491,6 +495,44 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 
 }
 
+func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
+
+	// setting limits too low can cause unnecessary evictions / OOM kills
+	const (
+		cpuMinLimit    = "256m"
+		memoryMinLimit = "256Mi"
+	)
+
+	var (
+		isSmaller bool
+		err       error
+	)
+
+	cpuLimit := spec.Resources.ResourceLimits.CPU
+	if cpuLimit != "" {
+		isSmaller, err = util.IsSmallerQuantity(cpuLimit, cpuMinLimit)
+		if err != nil {
+			return fmt.Errorf("error validating CPU limit: %v", err)
+		}
+		if isSmaller {
+			return fmt.Errorf("defined CPU limit %s is below required minimum %s to properly run postgresql resource", cpuLimit, cpuMinLimit)
+		}
+	}
+
+	memoryLimit := spec.Resources.ResourceLimits.Memory
+	if memoryLimit != "" {
+		isSmaller, err = util.IsSmallerQuantity(memoryLimit, memoryMinLimit)
+		if err != nil {
+			return fmt.Errorf("error validating memory limit: %v", err)
+		}
+		if isSmaller {
+			return fmt.Errorf("defined memory limit %s is below required minimum %s to properly run postgresql resource", memoryLimit, memoryMinLimit)
+		}
+	}
+
+	return nil
+}
+
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
 // (i.e. service) is treated as an error
 // logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
@@ -501,6 +543,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	oldStatus := c.Status
 	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
@@ -511,6 +554,22 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
+
+	if err := c.validateResources(&newSpec.Spec); err != nil {
+		err = fmt.Errorf("insufficient resource limits specified: %v", err)
+
+		// cancel update only when (already too low) pod resources were edited
+		// if cluster was successfully running before the update, continue but log a warning
+		isCPULimitSmaller, err2 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.CPU, oldSpec.Spec.Resources.ResourceLimits.CPU)
+		isMemoryLimitSmaller, err3 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.Memory, oldSpec.Spec.Resources.ResourceLimits.Memory)
+
+		if oldStatus.Running() && !isCPULimitSmaller && !isMemoryLimitSmaller && err2 == nil && err3 == nil {
+			c.logger.Warning(err)
+		} else {
+			updateFailed = true
+			return err
+		}
+	}
 
 	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", oldSpec.Spec.PgVersion, newSpec.Spec.PgVersion)

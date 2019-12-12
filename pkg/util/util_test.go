@@ -69,7 +69,7 @@ var substringMatch = []struct {
 	{regexp.MustCompile(`aaaa (\d+) bbbb`), "aaaa 123 bbbb", nil},
 }
 
-var requestIsSmallerThanLimitTests = []struct {
+var requestIsSmallerQuantityTests = []struct {
 	request string
 	limit   string
 	out     bool
@@ -155,14 +155,14 @@ func TestMapContains(t *testing.T) {
 	}
 }
 
-func TestRequestIsSmallerThanLimit(t *testing.T) {
-	for _, tt := range requestIsSmallerThanLimitTests {
-		res, err := RequestIsSmallerThanLimit(tt.request, tt.limit)
+func TestIsSmallerQuantity(t *testing.T) {
+	for _, tt := range requestIsSmallerQuantityTests {
+		res, err := IsSmallerQuantity(tt.request, tt.limit)
 		if err != nil {
-			t.Errorf("RequestIsSmallerThanLimit returned unexpected error: %#v", err)
+			t.Errorf("IsSmallerQuantity returned unexpected error: %#v", err)
 		}
 		if res != tt.out {
-			t.Errorf("RequestIsSmallerThanLimit expected: %#v, got: %#v", tt.out, res)
+			t.Errorf("IsSmallerQuantity expected: %#v, got: %#v", tt.out, res)
 		}
 	}
 }
