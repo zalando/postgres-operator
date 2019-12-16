@@ -97,6 +97,8 @@ spec:
                   type: array
                   items:
                     type: string
+                master_pod_move_timeout:
+                  type: string
                 node_readiness_label:
                   type: object
                   additionalProperties:
@@ -114,9 +116,15 @@ spec:
                   enum:
                     - "ordered_ready"
                     - "parallel"
+                pod_priority_class_name:
+                  type: string
                 pod_role_label:
                   type: string
+                pod_service_account_definition:
+                  type: string
                 pod_service_account_name:
+                  type: string
+                pod_service_account_role_binding_definition:
                   type: string
                 pod_terminate_grace_period:
                   type: string
@@ -165,16 +173,16 @@ spec:
             load_balancer:
               type: object
               properties:
+                custom_service_annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
                 db_hosted_zone:
                   type: string
                 enable_master_load_balancer:
                   type: boolean
                 enable_replica_load_balancer:
                   type: boolean
-                custom_service_annotations:
-                  type: object
-                  additionalProperties:
-                    type: string
                 master_dns_name_format:
                   type: string
                 replica_dns_name_format:
@@ -197,21 +205,21 @@ spec:
             logical_backup:
               type: object
               properties:
-                logical_backup_schedule:
-                  type: string
-                  pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
                 logical_backup_docker_image:
+                  type: string
+                logical_backup_s3_access_key_id:
                   type: string
                 logical_backup_s3_bucket:
                   type: string
                 logical_backup_s3_endpoint:
                   type: string
-                logical_backup_s3_sse:
-                  type: string
-                logical_backup_s3_access_key_id:
-                  type: string
                 logical_backup_s3_secret_access_key:
                   type: string
+                logical_backup_s3_sse:
+                  type: string
+                logical_backup_schedule:
+                  type: string
+                  pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
             debug:
               type: object
               properties:

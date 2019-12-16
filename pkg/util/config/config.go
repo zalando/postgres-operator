@@ -69,7 +69,7 @@ type Scalyr struct {
 	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
 }
 
-// LogicalBackup defines configration for logical backup
+// LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
 	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
