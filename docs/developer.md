@@ -80,7 +80,8 @@ manifest but replace the version and tag. Don't forget to also apply
 configuration and RBAC manifests first, e.g.:
 
 ```bash
-kubectl create -f manifests/configmap.yaml
+kubectl create -f manifests/operatorconfiguration.crd.yaml
+kubectl create -f manifests/postgresql-operator-default-configuration.yaml
 kubectl create -f manifests/operator-service-account-rbac.yaml
 sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/postgres-operator.yaml | kubectl create  -f -
 
@@ -294,13 +295,13 @@ Please, reflect your changes in tests, for example in:
 
 For the CRD-based configuration, please update the following files:
 * the default [OperatorConfiguration](../manifests/postgresql-operator-default-configuration.yaml)
-* the Helm chart's [values-crd file](../charts/postgres-operator/values.yaml)
+* the Helm chart's [values file](../charts/postgres-operator/values.yaml)
 * the CRD's [validation](../manifests/operatorconfiguration.crd.yaml)
 
 Reflect the changes in the ConfigMap configuration as well (note that numeric
 and boolean parameters have to use double quotes here):
 * [ConfigMap](../manifests/configmap.yaml) manifest
-* the Helm chart's default [values file](../charts/postgres-operator/values.yaml)
+* the Helm chart's default [values-configmap file](../charts/postgres-operator/values-configmap.yaml)
 
 ### Updating documentation
 

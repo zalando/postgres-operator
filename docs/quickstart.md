@@ -49,14 +49,15 @@ git clone https://github.com/zalando/postgres-operator.git
 cd postgres-operator
 
 # apply the manifests in the following order
-kubectl create -f manifests/configmap.yaml  # configuration
+kubectl create -f manifests/operatorconfiguration.crd.yaml  # registers the CRD
+kubectl create -f manifests/postgresql-operator-default-configuration.yaml  # configuration
 kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
 kubectl create -f manifests/postgres-operator.yaml  # deployment
 ```
 
 There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest that [combines the mentioned resources](../manifests/kustomization.yaml)
-(except for the CRD) - it can be used with kubectl 1.14 or newer as easy as:
+manifest that [combines the mentioned resources](../manifests/kustomization.yaml).
+It can be used with kubectl 1.14 or newer as easy as:
 
 ```bash
 kubectl apply -k github.com/zalando/postgres-operator/manifests
@@ -80,10 +81,11 @@ the repo root. With Helm v3 installed you should be able to run:
 helm install postgres-operator ./charts/postgres-operator
 ```
 
-To use CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
+To use ConfigMap-based configuration you need to specify the
+[values-configmap yaml file](../charts/postgres-operator/values-configmap.yaml).
 
 ```bash
-helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-crd.yaml
+helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-configmap.yaml
 ```
 
 The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will

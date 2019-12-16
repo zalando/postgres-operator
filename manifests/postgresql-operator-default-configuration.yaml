@@ -51,8 +51,9 @@ configuration:
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     # spilo_fsgroup: 103
     spilo_privileged: false
-    # toleration: {}
-    # watched_namespace: ""
+    # toleration:
+    #   postgres: "key:postgres,operator:Exists,effect:NoSchedule"
+    watched_namespace: "*"
   postgres_pod_resources:
     default_cpu_limit: "3"
     default_cpu_request: 100m
@@ -66,7 +67,7 @@ configuration:
     resource_check_interval: 3s
     resource_check_timeout: 10m
   load_balancer:
-    # db_hosted_zone: ""
+    # db_hosted_zone: db.example.com
     enable_master_load_balancer: false
     enable_replica_load_balancer: false
     # custom_service_annotations:

@@ -10,9 +10,9 @@ from kubernetes import client, config
 
 
 class EndToEndTestCase(unittest.TestCase):
-    '''
+    """
     Test interaction of the operator with multiple K8s components.
-    '''
+    """
 
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
@@ -20,14 +20,14 @@ class EndToEndTestCase(unittest.TestCase):
     @classmethod
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
-        '''
+        """
         Deploy operator to a "kind" cluster created by run.sh using examples from /manifests.
         This operator deployment is to be shared among all tests.
 
         run.sh deletes the 'kind' cluster after successful run along with all operator-related entities.
         In the case of test failure the cluster will stay to enable manual examination;
         next invocation of "make test" will re-create it.
-        '''
+        """
 
         # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
@@ -44,11 +44,8 @@ class EndToEndTestCase(unittest.TestCase):
             operator_deployment["spec"]["template"]["spec"]["containers"][0]["image"] = os.environ['OPERATOR_IMAGE']
             yaml.dump(operator_deployment, f, Dumper=yaml.Dumper)
 
-        for filename in ["operator-service-account-rbac.yaml",
-                         "configmap.yaml",
-                         "postgres-operator.yaml"]:
-            k8s.create_with_kubectl("manifests/" + filename)
-
+        k8s.create_with_kubectl("manifests/operatorconfiguration.crd.yaml")
+        k8s.apply_kustomization("manifests")
         k8s.wait_for_operator_pod_start()
 
         actual_operator_image = k8s.api.core_v1.list_namespaced_pod(
@@ -60,9 +57,9 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
-        '''
+        """
         Create a customized Postgres cluster in a non-default namespace.
-        '''
+        """
         k8s = self.k8s
 
         with open("manifests/complete-postgres-manifest.yaml", 'r+') as f:
@@ -72,16 +69,16 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
         k8s.wait_for_pod_start("spilo-role=master", self.namespace)
-        self.assert_master_is_unique(self.namespace, version="acid-test-cluster")
+        self.assert_master_is_unique(self.namespace, clusterName="acid-test-cluster")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
         """
-           Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
+        Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         """
 
         k8s = self.k8s
-        labels = "version=acid-minimal-cluster"
+        labels = "cluster-name=acid-minimal-cluster"
 
         k8s.wait_for_pg_to_scale(3)
         self.assertEqual(3, k8s.count_pods_with_label(labels))
@@ -94,10 +91,10 @@ class EndToEndTestCase(unittest.TestCase):
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
         """
-           Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
+        Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
         """
         k8s = self.k8s
-        cluster_label = 'version=acid-minimal-cluster'
+        cluster_label = 'cluster-name=acid-minimal-cluster'
 
         # get nodes of master and replica(s) (expected target of new master)
         current_master_node, failover_targets = k8s.get_pg_nodes(cluster_label)
@@ -183,8 +180,10 @@ class EndToEndTestCase(unittest.TestCase):
         # update the cluster-wide image of the logical backup pod
         image = "test-image-name"
         patch_logical_backup_image = {
-            "data": {
-               "logical_backup_docker_image": image,
+            "configuration": {
+                "logical_backup": {
+                    "logical_backup_docker_image": image,
+                }
             }
         }
         k8s.update_config(patch_logical_backup_image)
@@ -207,14 +206,14 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(0, len(jobs),
                          "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
-    def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
+    def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         """
-           Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
-           To be called manually after operations that affect pods
+        Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
+        To be called manually after operations that affect pods
         """
 
         k8s = self.k8s
-        labels = 'spilo-role=master,version=' + version
+        labels = 'spilo-role=master,cluster-name=' + clusterName
 
         num_of_master_pods = k8s.count_pods_with_label(labels, namespace)
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
@@ -237,9 +236,9 @@ class K8sApi:
 
 
 class K8s:
-    '''
+    """
     Wraps around K8 api client and helper methods.
-    '''
+    """
 
     RETRY_TIMEOUT_SEC = 5
 
@@ -282,7 +281,7 @@ class K8s:
         _ = self.api.custom_objects_api.patch_namespaced_custom_object(
                     "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
 
-        labels = 'version=acid-minimal-cluster'
+        labels = 'cluster-name=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
@@ -292,7 +291,7 @@ class K8s:
     def wait_for_master_failover(self, expected_master_nodes, namespace='default'):
         pod_phase = 'Failing over'
         new_master_node = ''
-        labels = 'spilo-role=master,version=acid-minimal-cluster'
+        labels = 'spilo-role=master,cluster-name=acid-minimal-cluster'
 
         while (pod_phase != 'Running') or (new_master_node not in expected_master_nodes):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
@@ -314,8 +313,9 @@ class K8s:
     def wait_for_logical_backup_job_creation(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
-    def update_config(self, config_map_patch):
-        self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
+    def update_config(self, patch):
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "operatorconfigurations", "postgresql-operator-default-configuration", patch)
 
         operator_pod = self.api.core_v1.list_namespaced_pod(
             'default', label_selector="name=postgres-operator").items[0].metadata.name
@@ -324,6 +324,9 @@ class K8s:
 
     def create_with_kubectl(self, path):
         subprocess.run(["kubectl", "create", "-f", path])
+
+    def apply_kustomization(self, path):
+        subprocess.run(["kubectl", "apply", "-k", path])
 
 
 if __name__ == '__main__':
