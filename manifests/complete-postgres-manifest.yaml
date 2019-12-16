@@ -10,7 +10,7 @@ spec:
   - name: date
     image: busybox
     command: [ "/bin/date" ]
-  teamId: "ACID"
+  teamId: "acid"
   volume:
     size: 1Gi
 #    storageClass: my-sc

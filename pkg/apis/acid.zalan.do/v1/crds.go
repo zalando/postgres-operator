@@ -356,7 +356,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 									"cpu": {
 										Type:        "string",
 										Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
-										Pattern:     "^(\\d+m|\\d+\\.\\d{1,3})$",
+										Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 									},
 									"memory": {
 										Type:        "string",
@@ -372,7 +372,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 									"cpu": {
 										Type:        "string",
 										Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
-										Pattern:     "^(\\d+m|\\d+\\.\\d{1,3})$",
+										Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 									},
 									"memory": {
 										Type:        "string",
@@ -578,6 +578,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					},
 				},
 			},
+			"status": {
+				Type: "object",
+				AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+					Schema: &apiextv1beta1.JSONSchemaProps{
+						Type: "string",
+					},
+				},
+			},
 		},
 	},
 }
@@ -686,10 +694,16 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 								},
 							},
+							"enable_init_containers": {
+								Type: "boolean",
+							},
 							"enable_pod_antiaffinity": {
 								Type: "boolean",
 							},
 							"enable_pod_disruption_budget": {
+								Type: "boolean",
+							},
+							"enable_sidecars": {
 								Type: "boolean",
 							},
 							"infrastructure_roles_secret_name": {
@@ -991,6 +1005,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type: "string",
 							},
 						},
+					},
+				},
+			},
+			"status": {
+				Type: "object",
+				AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+					Schema: &apiextv1beta1.JSONSchemaProps{
+						Type: "string",
 					},
 				},
 			},

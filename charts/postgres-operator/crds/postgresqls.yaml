@@ -222,7 +222,7 @@ spec:
                       # only the format of the given number.
                       #
                       # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
-                      pattern: '^(\d+m|\d+\.\d{1,3})$'
+                      pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                       # Note: the value specified here must not be zero or be lower
                       # than the corresponding request.
                     memory:
@@ -253,7 +253,7 @@ spec:
                       # only the format of the given number.
                       #
                       # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
-                      pattern: '^(\d+m|\d+\.\d{1,3})$'
+                      pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
                       # Note: the value specified here must not be zero or be higher
                       # than the corresponding limit.
                     memory:
