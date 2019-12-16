@@ -21,7 +21,7 @@ configuration:
   kubernetes:
     cluster_domain: cluster.local
     cluster_labels:
-        application: spilo
+      application: spilo
     cluster_name_label: cluster-name
     # custom_pod_annotations:
     #   keya: valuea
@@ -34,6 +34,7 @@ configuration:
     # inherited_labels:
     # - application
     # - environment
+    master_pod_move_timeout: 20m
     # node_readiness_label:
     #   status: ready
     oauth_token_secret_name: postgresql-operator
@@ -41,8 +42,11 @@ configuration:
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
     # pod_environment_configmap: ""
     pod_management_policy: "ordered_ready"
+    # pod_priority_class_name: ""
     pod_role_label: spilo-role
+    # pod_service_account_definition: ""
     pod_service_account_name: zalando-postgres-operator
+    # pod_service_account_role_binding_definition: ""
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     # spilo_fsgroup: 103
@@ -79,10 +83,10 @@ configuration:
     # wal_s3_bucket: ""
   logical_backup:
     logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
-    logical_backup_s3_access_key_id: ""
+    # logical_backup_s3_access_key_id: ""
     logical_backup_s3_bucket: "my-bucket-url"
-    logical_backup_s3_endpoint: ""
-    logical_backup_s3_secret_access_key: ""
+    # logical_backup_s3_endpoint: ""
+    # logical_backup_s3_secret_access_key: ""
     logical_backup_s3_sse: "AES256"
     logical_backup_schedule: "30 00 * * *"
   debug:

@@ -6,10 +6,6 @@ metadata:
 #    environment: demo
 spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
-  initContainers:
-  - name: date
-    image: busybox
-    command: [ "/bin/date" ]
   teamId: "acid"
   volume:
     size: 1Gi
@@ -25,18 +21,22 @@ spec:
   - 127.0.0.1/32
   databases:
     foo: zalando
-# podAnnotations:
-#   annotation.key: value
-# Expert section
-
-  enableShmVolume: true
-#  spiloFSGroup: 103
   postgresql:
     version: "11"
-    parameters:
+    parameters: # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
+
+  enableShmVolume: true
+#  spiloFSGroup: 103
+#  podAnnotations:
+#    annotation.key: value
+#  podPriorityClassName: "spilo-pod-priority"
+#  tolerations:
+#  - key: postgres
+#    operator: Exists
+#    effect: NoSchedule
   resources:
     requests:
       cpu: 10m
@@ -63,6 +63,7 @@ spec:
     loop_wait: &loop_wait 10
     retry_timeout: 10
     maximum_lag_on_failover: 33554432
+
 # restore a Postgres DB with point-in-time-recovery
 # with a non-empty timestamp, clone from an S3 bucket using the latest backup before the timestamp
 # with an empty/absent timestamp, clone from an existing alive cluster using pg_basebackup
@@ -75,9 +76,15 @@ spec:
 # run periodic backups with k8s cron jobs
 #  enableLogicalBackup: true
 #  logicalBackupSchedule: "30 00 * * *"
-  maintenanceWindows:
-  - 01:00-06:00  #UTC
-  - Sat:00:00-04:00
+
+#  maintenanceWindows:
+#  - 01:00-06:00  #UTC
+#  - Sat:00:00-04:00
+
+  initContainers:
+  - name: date
+    image: busybox
+    command: [ "/bin/date" ]
 #  sidecars:
 #    - name: "telegraf-sidecar"
 #      image: "telegraf:latest"
