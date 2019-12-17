@@ -24,7 +24,6 @@ _testmain.go
 *.test
 *.prof
 /vendor/
-/.glide/
 /build/
 /docker/build/
 .idea
@@ -86,6 +85,9 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+
+# e2e tests
+e2e/manifests
 
 # Translations
 *.mo

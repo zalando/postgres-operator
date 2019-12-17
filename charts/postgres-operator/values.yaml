@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.2.0
+  tag: v1.3.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -17,12 +17,14 @@ configTarget: "ConfigMap"
 
 # general configuration parameters
 configGeneral:
+  # choose if deployment creates/updates CRDs with OpenAPIV3Validation
+  enable_crd_validation: "true"
   # start any new database pod without limitations on shm memory
   enable_shm_volume: "true"
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.5-p9
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: "-1"
   # min number of instances in Postgres cluster. -1 = no limit
@@ -54,15 +56,22 @@ configKubernetes:
   cluster_labels: application:spilo
   # label assigned to Kubernetes objects created by the operator
   cluster_name_label: version
+  # annotations attached to each database pod
+  # custom_pod_annotations: "keya:valuea,keyb:valueb"
+
+  # enables initContainers to run actions before Spilo is started
+  enable_init_containers: "true"
   # toggles pod anti affinity on the Postgres pods
   enable_pod_antiaffinity: "false"
   # toggles PDB to set to MinAvailabe 0 or 1
   enable_pod_disruption_budget: "true"
+  # enables sidecar containers to run alongside Spilo in the same pod
+  enable_sidecars: "true"
   # name of the secret containing infrastructure roles names and passwords
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
   # list of labels that can be inherited from the cluster manifest
-  # inherited_labels: ""
+  # inherited_labels: application,environment
 
   # timeout for successful migration of master pods from unschedulable node
   # master_pod_move_timeout: 20m
@@ -127,17 +136,16 @@ configLoadBalancer:
   # DNS zone for cluster DNS name when load balancer is configured for cluster
   db_hosted_zone: db.example.com
   # annotations to apply to service when load balancing is enabled
-  # custom_service_annotations:
-  #   "keyx:valuez,keya:valuea"
+  # custom_service_annotations: "keyx:valuez,keya:valuea"
 
   # toggles service type load balancer pointing to the master pod of the cluster
-  enable_master_load_balancer: "true"
+  enable_master_load_balancer: "false"
   # toggles service type load balancer pointing to the replica pod of the cluster
   enable_replica_load_balancer: "false"
   # defines the DNS name string template for the master load balancer cluster
-  master_dns_name_format: '{cluster}.{team}.staging.{hostedzone}'
+  master_dns_name_format: '{cluster}.{team}.{hostedzone}'
   # defines the DNS name string template for the replica load balancer cluster
-  replica_dns_name_format: '{cluster}-repl.{team}.staging.{hostedzone}'
+  replica_dns_name_format: '{cluster}-repl.{team}.{hostedzone}'
 
 # options to aid debugging of the operator itself
 configDebug:
@@ -177,12 +185,20 @@ configAwsOrGcp:
 
 # configure K8s cron job managed by the operator
 configLogicalBackup:
-  # backup schedule in the cron format
-  logical_backup_schedule: "30 00 * * *"
   # image for pods of the logical backup job (example runs pg_dumpall)
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  # S3 Access Key ID
+  logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
+  # S3 endpoint url when not using AWS
+  logical_backup_s3_endpoint: ""
+  # S3 Secret Access Key
+  logical_backup_s3_secret_access_key: ""
+  # S3 server side encription
+  logical_backup_s3_sse: "AES256"
+  # backup schedule in the cron format
+  logical_backup_schedule: "30 00 * * *"
 
 # automate creation of human users with teams API service
 configTeamsApi:
@@ -217,6 +233,10 @@ configTeamsApi:
 
 rbac:
   # Specifies whether RBAC resources should be created
+  create: true
+
+crd:
+  # Specifies whether custom resource definitions should be created
   create: true
 
 serviceAccount:

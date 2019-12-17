@@ -78,8 +78,9 @@ scm-source.json: .git
 	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
 tools:
-	@go get -u honnef.co/go/tools/cmd/staticcheck
-	@go get -u github.com/Masterminds/glide
+	GO111MODULE=on go get -u honnef.co/go/tools/cmd/staticcheck
+	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.16.3
+	GO111MODULE=on go mod tidy
 
 fmt:
 	@gofmt -l -w -s $(DIRS)
@@ -88,12 +89,12 @@ vet:
 	@go vet $(PKG)
 	@staticcheck $(PKG)
 
-deps:
-	@glide install --strip-vendor
+deps: tools
+	GO111MODULE=on go mod vendor
 
 test:
 	hack/verify-codegen.sh
-	@go test ./...
+	GO111MODULE=on go test ./...
 
-e2e:
-	cd e2e; make tools test
+e2e: docker # build operator image to be tested
+	cd e2e; make tools test clean

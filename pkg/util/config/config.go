@@ -12,10 +12,11 @@ import (
 
 // CRD describes CustomResourceDefinition specific configuration parameters
 type CRD struct {
-	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
-	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod      time.Duration `name:"resync_period" default:"30m"`
-	RepairPeriod      time.Duration `name:"repair_period" default:"5m"`
+	ReadyWaitInterval   time.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout    time.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod        time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod        time.Duration `name:"repair_period" default:"5m"`
+	EnableCRDValidation *bool         `name:"enable_crd_validation" default:"true"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
@@ -68,11 +69,15 @@ type Scalyr struct {
 	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
 }
 
-// LogicalBackup
+// LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
-	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
-	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupS3Bucket          string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
+	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
+	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
+	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:"AES256"`
 }
 
 // Config describes operator config
@@ -85,7 +90,7 @@ type Config struct {
 
 	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-11:1.5-p9"`
+	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16"`
 	Sidecars         map[string]string `name:"sidecar_docker_images"`
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
 	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
@@ -109,6 +114,7 @@ type Config struct {
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
+	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility
@@ -117,6 +123,8 @@ type Config struct {
 	ReplicaDNSNameFormat      StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat             StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	EnablePodDisruptionBudget *bool             `name:"enable_pod_disruption_budget" default:"true"`
+	EnableInitContainers      *bool             `name:"enable_init_containers" default:"true"`
+	EnableSidecars            *bool             `name:"enable_sidecars" default:"true"`
 	Workers                   uint32            `name:"workers" default:"4"`
 	APIPort                   int               `name:"api_port" default:"8080"`
 	RingLogLines              int               `name:"ring_log_lines" default:"100"`

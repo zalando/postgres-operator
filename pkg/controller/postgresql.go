@@ -312,7 +312,7 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 	for {
 		obj, err := c.clusterEventQueues[idx].Pop(cache.PopProcessFunc(func(interface{}) error { return nil }))
 		if err != nil {
-			if err == cache.FIFOClosedError {
+			if err == cache.ErrFIFOClosed {
 				return
 			}
 			c.logger.Errorf("error when processing cluster events queue: %v", err)
@@ -493,17 +493,16 @@ func (c *Controller) postgresqlDelete(obj interface{}) {
 }
 
 /*
-  Ensures the pod service account and role bindings exists in a namespace before a PG cluster is created there so that a user does not have to deploy these credentials manually.
-  StatefulSets require the service account to create pods; Patroni requires relevant RBAC bindings to access endpoints.
+  Ensures the pod service account and role bindings exists in a namespace
+  before a PG cluster is created there so that a user does not have to deploy
+  these credentials manually.  StatefulSets require the service account to
+  create pods; Patroni requires relevant RBAC bindings to access endpoints.
 
   The operator does not sync accounts/role bindings after creation.
 */
 func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 
 	namespace := event.NewSpec.GetNamespace()
-	if _, ok := c.namespacesWithDefinedRBAC.Load(namespace); ok {
-		return nil
-	}
 
 	if err := c.createPodServiceAccount(namespace); err != nil {
 		return fmt.Errorf("could not create pod service account %v : %v", c.opConfig.PodServiceAccountName, err)
@@ -512,7 +511,6 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 	if err := c.createRoleBindings(namespace); err != nil {
 		return fmt.Errorf("could not create role binding %v : %v", c.PodServiceAccountRoleBinding.Name, err)
 	}
-	c.namespacesWithDefinedRBAC.Store(namespace, true)
 	return nil
 }
 

@@ -30,7 +30,7 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 	return pvcs.Items, nil
 }
 
-func (c *Cluster) deletePersistenVolumeClaims() error {
+func (c *Cluster) deletePersistentVolumeClaims() error {
 	c.logger.Debugln("deleting PVCs")
 	pvcs, err := c.listPersistentVolumeClaims()
 	if err != nil {

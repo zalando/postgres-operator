@@ -10,12 +10,12 @@ configuration.
   maps. String values containing ':' should be enclosed in quotes. The
   configuration is flat, parameter group names below are not reflected in the
   configuration structure. There is an
-  [example](../manifests/configmap.yaml)
+  [example](../../manifests/configmap.yaml)
 
 * CRD-based configuration. The configuration is stored in a custom YAML
   manifest. The manifest is an instance of the custom resource definition (CRD)
   called `OperatorConfiguration`. The operator registers this CRD during the
-  start and uses it for configuration if the [operator deployment manifest](../manifests/postgres-operator.yaml#L36)
+  start and uses it for configuration if the [operator deployment manifest](../../manifests/postgres-operator.yaml#L36)
   sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty
   value. The variable should point to the `postgresql-operator-configuration`
   object in the operator's namespace.
@@ -24,26 +24,25 @@ configuration.
   simply represented in the usual YAML way. There are no default values built-in
   in the operator, each parameter that is not supplied in the configuration
   receives an empty value. In order to create your own configuration just copy
-  the [default one](../manifests/postgresql-operator-default-configuration.yaml)
+  the [default one](../../manifests/postgresql-operator-default-configuration.yaml)
   and change it.
 
   To test the CRD-based configuration locally, use the following
   ```bash
+  kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
+  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+
   kubectl create -f manifests/operator-service-account-rbac.yaml
   kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
-  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+
   kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
   ```
-  Note that the operator first attempts to register the CRD of the
-  `OperatorConfiguration` and then waits for an instance to be created. In
-  between these two event the operator pod may be failing since it cannot fetch
-  the not-yet-existing `OperatorConfiguration` instance.
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
 and should be used unless there is a compatibility requirement to use an already
 existing configuration. Even in that case, it should be rather straightforward
-to convert the configmap based configuration into the CRD-based one and restart
-the operator. The ConfigMaps-based configuration will be deprecated and
+to convert the ConfigMap-based configuration into the CRD-based one and restart
+the operator. The ConfigMap-based configuration will be deprecated and
 subsequently removed in future releases.
 
 Note that for the CRD-based configuration groups of configuration options below
@@ -58,11 +57,11 @@ parameters, those parameters have no effect and are replaced by the
 `CRD_READY_WAIT_INTERVAL` and `CRD_READY_WAIT_TIMEOUT` environment variables.
 They will be deprecated and removed in the future.
 
-For the configmap configuration, the [default parameter values](../pkg/util/config/config.go#L14)
+For the configmap configuration, the [default parameter values](../../pkg/util/config/config.go#L14)
 mentioned here are likely to be overwritten in your local operator installation
 via your local version of the operator configmap. In the case you use the
 operator CRD, all the CRD defaults are provided in the
-[operator's default configuration manifest](../manifests/postgresql-operator-default-configuration.yaml)
+[operator's default configuration manifest](../../manifests/postgresql-operator-default-configuration.yaml)
 
 Variable names are underscore-separated words.
 
@@ -71,21 +70,26 @@ Variable names are underscore-separated words.
 
 Those are top-level keys, containing both leaf keys and groups.
 
+* **enable_crd_validation**
+  toggles if the operator will create or update CRDs with
+  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
+  The default is `true`.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use
   Kubernetes-native DCS).
 
 * **docker_image**
-  Spilo docker image for Postgres instances. For production, don't rely on the
+  Spilo Docker image for Postgres instances. For production, don't rely on the
   default image, as it might be not the most up-to-date one. Instead, build
   your own Spilo image from the [github
   repository](https://github.com/zalando/spilo).
 
 * **sidecar_docker_images**
-  a map of sidecar names to docker images for the containers to run alongside
-  Spilo. In case of the name conflict with the definition in the cluster
-  manifest the cluster-specific one is preferred.
+  a map of sidecar names to Docker images to run with Spilo. In case of the name
+  conflict with the definition in the cluster manifest the cluster-specific one
+  is preferred.
 
 * **enable_shm_volume**
   Instruct operator to start any new database pod without limitations on shm
@@ -122,7 +126,7 @@ Those are top-level keys, containing both leaf keys and groups.
   containers with high memory limits due to the lack of memory on Kubernetes
   cluster nodes. This affects all containers created by the operator (Postgres,
   Scalyr sidecar, and other sidecars); to set resources for the operator's own
-  container, change the [operator deployment manually](../manifests/postgres-operator.yaml#L20).
+  container, change the [operator deployment manually](../../manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
 ## Postgres users
@@ -168,6 +172,11 @@ configuration they are grouped under the `kubernetes` key.
   Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
   after this timeout. The default is `5m`.
 
+* **custom_pod_annotations**
+  This key/value map provides a list of annotations that get attached to each pod
+  of a database created by the operator. If the annotation key is also provided
+  by the database definition, the database definition value is used.
+
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not
   specified, the value is taken from the operator namespace. A special `*`
@@ -186,6 +195,14 @@ configuration they are grouped under the `kubernetes` key.
   necessary to temporarily disabled it, e.g. for node updates. See
   [admin docs](../administrator.md#pod-disruption-budget) for more information.
   Default is true.
+
+* **enable_init_containers**
+  global option to allow for creating init containers to run actions before
+  Spilo is started. Default is true.
+
+* **enable_sidecars**
+  global option to allow for creating sidecar containers to run alongside Spilo
+  on the same pod. Default is true.
 
 * **secret_name_template**
   a template for the name of the database user secrets generated by the
@@ -435,6 +452,19 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
+
+* **logical_backup_s3_endpoint**
+  When using non-AWS S3 storage, endpoint can be set as a ENV variable.
+
+* **logical_backup_s3_sse**
+  Specify server side encription that S3 storage is using. If empty string
+  is specified, no argument will be passed to `aws s3` command. Default: "AES256".
+
+* **logical_backup_s3_access_key_id**
+  When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
+
+* **logical_backup_s3_secret_access_key**
+  When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
 
 ## Debugging the operator
 

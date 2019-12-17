@@ -4,9 +4,9 @@ Individual Postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgresql` CRD (custom resource
 definition). The following section describes the structure of the manifest and
 the purpose of individual keys. You can take a look at the examples of the
-[minimal](../manifests/minimal-postgres-manifest.yaml)
+[minimal](../../manifests/minimal-postgres-manifest.yaml)
 and the
-[complete](../manifests/complete-postgres-manifest.yaml)
+[complete](../../manifests/complete-postgres-manifest.yaml)
 cluster manifests.
 
 When Kubernetes resources, such as memory, CPU or volumes, are configured,
@@ -62,7 +62,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   field.
 
 * **dockerImage**
-  custom docker image that overrides the **docker_image** operator parameter.
+  custom Docker image that overrides the **docker_image** operator parameter.
   It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
 * **spiloFSGroup**
@@ -118,8 +118,13 @@ These parameters are grouped directly under  the `spec` key in the manifest.
    then the default priority class is taken. The priority class itself must be
    defined in advance. Optional.
 
+* **podAnnotations**
+  A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+  to each pod created for the database.
+
+
 * **enableShmVolume**
-  Start a database pod without limitations on shm memory. By default docker
+  Start a database pod without limitations on shm memory. By default Docker
   limit `/dev/shm` to `64M` (see e.g. the [docker
   issue](https://github.com/docker-library/postgres/issues/416), which could be
   not enough if PostgreSQL uses parallel workers heavily. If this option is
@@ -180,19 +185,19 @@ explanation of `ttl` and `loop_wait` parameters.
 
 * **ttl**
   Patroni `ttl` parameter value, optional. The default is set by the Spilo
-  docker image. Optional.
+  Docker image. Optional.
 
 * **loop_wait**
   Patroni `loop_wait` parameter value, optional. The default is set by the
-  Spilo docker image. Optional.
+  Spilo Docker image. Optional.
 
 * **retry_timeout**
   Patroni `retry_timeout` parameter value, optional. The default is set by the
-  Spilo docker image. Optional.
+  Spilo Docker image. Optional.
 
 * **maximum_lag_on_failover**
   Patroni `maximum_lag_on_failover` parameter value, optional. The default is
-  set by the Spilo docker image. Optional.
+  set by the Spilo Docker image. Optional.
 
 * **slots**
   permanent replication slots that Patroni preserves after failover by
@@ -315,7 +320,7 @@ defined in the sidecar dictionary:
   name of the sidecar. Required.
 
 * **image**
-  docker image of the sidecar. Required.
+  Docker image of the sidecar. Required.
 
 * **env**
   a dictionary of environment variables. Use usual Kubernetes definition

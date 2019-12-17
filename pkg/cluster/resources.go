@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
@@ -64,8 +63,19 @@ func (c *Cluster) listResources() error {
 	return nil
 }
 
-func (c *Cluster) createStatefulSet() (*v1beta1.StatefulSet, error) {
+func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 	c.setProcessName("creating statefulset")
+	// check if it's allowed that spec contains initContainers
+	if c.Spec.InitContainers != nil && len(c.Spec.InitContainers) > 0 &&
+		c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
+		return nil, fmt.Errorf("initContainers specified but disabled in configuration")
+	}
+	// check if it's allowed that spec contains sidecars
+	if c.Spec.Sidecars != nil && len(c.Spec.Sidecars) > 0 &&
+		c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
+		return nil, fmt.Errorf("sidecar containers specified but disabled in configuration")
+	}
+
 	statefulSetSpec, err := c.generateStatefulSet(&c.Spec)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate statefulset: %v", err)
@@ -95,7 +105,7 @@ func getPodIndex(podName string) (int32, error) {
 	return int32(res), nil
 }
 
-func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
+func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 	masterPod, err := c.getRolePods(Master)
 	if err != nil {
 		return fmt.Errorf("could not get master pod: %v", err)
@@ -135,7 +145,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *v1beta1.StatefulSet) error {
 
 // setRollingUpdateFlagForStatefulSet sets the indicator or the rolling update requirement
 // in the StatefulSet annotation.
-func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *v1beta1.StatefulSet, val bool) {
+func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool) {
 	anno := sset.GetAnnotations()
 	if anno == nil {
 		anno = make(map[string]string)
@@ -160,7 +170,7 @@ func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
 
 // getRollingUpdateFlagFromStatefulSet returns the value of the rollingUpdate flag from the passed
 // StatefulSet, reverting to the default value in case of errors
-func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet, defaultValue bool) (flag bool) {
+func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *appsv1.StatefulSet, defaultValue bool) (flag bool) {
 	anno := sset.GetAnnotations()
 	flag = defaultValue
 
@@ -181,7 +191,7 @@ func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *v1beta1.StatefulSet,
 // mergeRollingUpdateFlagUsingCache returns the value of the rollingUpdate flag from the passed
 // statefulset, however, the value can be cleared if there is a cached flag in the cluster that
 // is set to false (the discrepancy could be a result of a failed StatefulSet update)
-func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *v1beta1.StatefulSet) bool {
+func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *appsv1.StatefulSet) bool {
 	var (
 		cachedStatefulsetExists, clearRollingUpdateFromCache, podsRollingUpdateRequired bool
 	)
@@ -207,7 +217,7 @@ func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *v1beta1.S
 	return podsRollingUpdateRequired
 }
 
-func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*v1beta1.StatefulSet, error) {
+func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
 	c.logger.Debugf("updating statefulset annotations")
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
@@ -223,7 +233,7 @@ func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*
 	return result, nil
 
 }
-func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
@@ -264,7 +274,7 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
 }
 
 // replaceStatefulSet deletes an old StatefulSet and creates the new using spec in the PostgreSQL CRD.
-func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error {
+func (c *Cluster) replaceStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("replacing statefulset")
 	if c.Statefulset == nil {
 		return fmt.Errorf("there is no statefulset in the cluster")
@@ -278,7 +288,8 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	oldStatefulset := c.Statefulset
 
 	options := metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy}
-	if err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options); err != nil {
+	err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Delete(oldStatefulset.Name, &options)
+	if err != nil {
 		return fmt.Errorf("could not delete statefulset %q: %v", statefulSetName, err)
 	}
 	// make sure we clear the stored statefulset status if the subsequent create fails.
@@ -286,11 +297,16 @@ func (c *Cluster) replaceStatefulSet(newStatefulSet *v1beta1.StatefulSet) error 
 	// wait until the statefulset is truly deleted
 	c.logger.Debugf("waiting for the statefulset to be deleted")
 
-	err := retryutil.Retry(constants.StatefulsetDeletionInterval, constants.StatefulsetDeletionTimeout,
+	err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 		func() (bool, error) {
-			_, err := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name, metav1.GetOptions{})
-
-			return err != nil, nil
+			_, err2 := c.KubeClient.StatefulSets(oldStatefulset.Namespace).Get(oldStatefulset.Name, metav1.GetOptions{})
+			if err2 == nil {
+				return false, nil
+			}
+			if k8sutil.ResourceNotFound(err2) {
+				return true, nil
+			}
+			return false, err2
 		})
 	if err != nil {
 		return fmt.Errorf("could not delete statefulset: %v", err)
@@ -329,7 +345,7 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("could not delete pods: %v", err)
 	}
 
-	if err := c.deletePersistenVolumeClaims(); err != nil {
+	if err := c.deletePersistentVolumeClaims(); err != nil {
 		return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
 	}
 
@@ -380,13 +396,27 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 
-		c.Endpoints[role] = nil
-		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
+		// wait until the service is truly deleted
+		c.logger.Debugf("waiting for service to be deleted")
+
+		err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+			func() (bool, error) {
+				_, err2 := c.KubeClient.Services(serviceName.Namespace).Get(serviceName.Name, metav1.GetOptions{})
+				if err2 == nil {
+					return false, nil
+				}
+				if k8sutil.ResourceNotFound(err2) {
+					return true, nil
+				}
+				return false, err2
+			})
 		if err != nil {
-			return fmt.Errorf("could not create service %q: %v", serviceName, err)
+			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 
-		c.Services[role] = svc
+		// make sure we clear the stored service and endpoint status if the subsequent create fails.
+		c.Services[role] = nil
+		c.Endpoints[role] = nil
 		if role == Master {
 			// create the new endpoint using the addresses obtained from the previous one
 			endpointSpec := c.generateEndpoint(role, currentEndpoint.Subsets)
@@ -397,6 +427,13 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 			c.Endpoints[role] = ep
 		}
+
+		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
+		if err != nil {
+			return fmt.Errorf("could not create service %q: %v", serviceName, err)
+		}
+
+		c.Services[role] = svc
 
 		return nil
 	}
@@ -676,7 +713,7 @@ func (c *Cluster) GetEndpointReplica() *v1.Endpoints {
 }
 
 // GetStatefulSet returns cluster's kubernetes StatefulSet
-func (c *Cluster) GetStatefulSet() *v1beta1.StatefulSet {
+func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 	return c.Statefulset
 }
 

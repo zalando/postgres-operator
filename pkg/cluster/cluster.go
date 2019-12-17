@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +52,7 @@ type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
-	Statefulset         *v1beta1.StatefulSet
+	Statefulset         *appsv1.StatefulSet
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
@@ -164,11 +164,13 @@ func (c *Cluster) setStatus(status string) {
 	}
 
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
-	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernets 1.11)
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
 	// we should take advantage of it.
 	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch, "status")
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
+		// return as newspec is empty, see PR654
+		return
 	}
 	// update the spec, maintaining the new resourceVersion.
 	c.setSpec(newspec)
@@ -212,7 +214,7 @@ func (c *Cluster) Create() error {
 
 		service *v1.Service
 		ep      *v1.Endpoints
-		ss      *v1beta1.StatefulSet
+		ss      *appsv1.StatefulSet
 	)
 
 	defer func() {
@@ -224,6 +226,10 @@ func (c *Cluster) Create() error {
 	}()
 
 	c.setStatus(acidv1.ClusterStatusCreating)
+
+	if err = c.validateResources(&c.Spec); err != nil {
+		return fmt.Errorf("insufficient resource limits specified: %v", err)
+	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
@@ -313,7 +319,7 @@ func (c *Cluster) Create() error {
 	return nil
 }
 
-func (c *Cluster) compareStatefulSetWith(statefulSet *v1beta1.StatefulSet) *compareStatefulsetResult {
+func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compareStatefulsetResult {
 	reasons := make([]string, 0)
 	var match, needsRollUpdate, needsReplace bool
 
@@ -489,6 +495,44 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 
 }
 
+func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
+
+	// setting limits too low can cause unnecessary evictions / OOM kills
+	const (
+		cpuMinLimit    = "256m"
+		memoryMinLimit = "256Mi"
+	)
+
+	var (
+		isSmaller bool
+		err       error
+	)
+
+	cpuLimit := spec.Resources.ResourceLimits.CPU
+	if cpuLimit != "" {
+		isSmaller, err = util.IsSmallerQuantity(cpuLimit, cpuMinLimit)
+		if err != nil {
+			return fmt.Errorf("error validating CPU limit: %v", err)
+		}
+		if isSmaller {
+			return fmt.Errorf("defined CPU limit %s is below required minimum %s to properly run postgresql resource", cpuLimit, cpuMinLimit)
+		}
+	}
+
+	memoryLimit := spec.Resources.ResourceLimits.Memory
+	if memoryLimit != "" {
+		isSmaller, err = util.IsSmallerQuantity(memoryLimit, memoryMinLimit)
+		if err != nil {
+			return fmt.Errorf("error validating memory limit: %v", err)
+		}
+		if isSmaller {
+			return fmt.Errorf("defined memory limit %s is below required minimum %s to properly run postgresql resource", memoryLimit, memoryMinLimit)
+		}
+	}
+
+	return nil
+}
+
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
 // (i.e. service) is treated as an error
 // logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
@@ -499,6 +543,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	oldStatus := c.Status
 	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
@@ -509,6 +554,22 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
+
+	if err := c.validateResources(&newSpec.Spec); err != nil {
+		err = fmt.Errorf("insufficient resource limits specified: %v", err)
+
+		// cancel update only when (already too low) pod resources were edited
+		// if cluster was successfully running before the update, continue but log a warning
+		isCPULimitSmaller, err2 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.CPU, oldSpec.Spec.Resources.ResourceLimits.CPU)
+		isMemoryLimitSmaller, err3 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.Memory, oldSpec.Spec.Resources.ResourceLimits.Memory)
+
+		if oldStatus.Running() && !isCPULimitSmaller && !isMemoryLimitSmaller && err2 == nil && err3 == nil {
+			c.logger.Warning(err)
+		} else {
+			updateFailed = true
+			return err
+		}
+	}
 
 	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", oldSpec.Spec.PgVersion, newSpec.Spec.PgVersion)

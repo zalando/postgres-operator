@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -58,7 +58,6 @@ type Controller struct {
 
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
-	namespacesWithDefinedRBAC    sync.Map
 }
 
 // NewController creates a new controller
@@ -112,7 +111,7 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.opConfig.SetMemoryRequestToLimit {
 
-		isSmaller, err := util.RequestIsSmallerThanLimit(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
+		isSmaller, err := util.IsSmallerQuantity(c.opConfig.DefaultMemoryRequest, c.opConfig.DefaultMemoryLimit)
 		if err != nil {
 			panic(err)
 		}
@@ -121,7 +120,7 @@ func (c *Controller) initOperatorConfig() {
 			c.opConfig.DefaultMemoryRequest = c.opConfig.DefaultMemoryLimit
 		}
 
-		isSmaller, err = util.RequestIsSmallerThanLimit(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
+		isSmaller, err = util.IsSmallerQuantity(c.opConfig.ScalyrMemoryRequest, c.opConfig.ScalyrMemoryLimit)
 		if err != nil {
 			panic(err)
 		}
@@ -241,7 +240,7 @@ func (c *Controller) initController() {
 	c.initClients()
 
 	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
-		if err := c.createConfigurationCRD(); err != nil {
+		if err := c.createConfigurationCRD(c.opConfig.EnableCRDValidation); err != nil {
 			c.logger.Fatalf("could not register Operator Configuration CustomResourceDefinition: %v", err)
 		}
 		if cfg, err := c.readOperatorConfigurationFromCRD(spec.GetOperatorNamespace(), configObjectName); err != nil {
@@ -257,7 +256,7 @@ func (c *Controller) initController() {
 
 	c.modifyConfigFromEnvironment()
 
-	if err := c.createPostgresCRD(); err != nil {
+	if err := c.createPostgresCRD(c.opConfig.EnableCRDValidation); err != nil {
 		c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
 	}
 
