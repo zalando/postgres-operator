@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.2.0
+  tag: v1.3.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -24,7 +24,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # min number of instances in Postgres cluster. -1 = no limit
