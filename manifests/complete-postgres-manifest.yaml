@@ -14,10 +14,12 @@ spec:
 #    storageClass: my-sc
   additionalVolumes:
     - name: data
-      mountPath: /var/lib/postgresql
+      mountPath: /home/postgres/pgdata/partitions
+      targetContainers:
+        - postgres
       volumeSource:
         PersistentVolumeClaim:
-          claimName: pvc-postgresql-data
+          claimName: pvc-postgresql-data-partitions
           readyOnly: false
     - name: tmp
       mountPath: /tmp
