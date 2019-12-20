@@ -1,0 +1,316 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: operatorconfigurations.acid.zalan.do
+  labels:
+    app.kubernetes.io/name: postgres-operator
+  annotations:
+    "helm.sh/hook": crd-install
+spec:
+  group: acid.zalan.do
+  names:
+    kind: OperatorConfiguration
+    listKind: OperatorConfigurationList
+    plural: operatorconfigurations
+    singular: operatorconfiguration
+    shortNames:
+    - opconfig
+  additionalPrinterColumns:
+  - name: Image
+    type: string
+    description: Spilo image to be used for Pods
+    JSONPath: .configuration.docker_image
+  - name: Cluster-Label
+    type: string
+    description: Label for K8s resources created by operator
+    JSONPath: .configuration.kubernetes.cluster_name_label
+  - name: Service-Account
+    type: string
+    description: Name of service account to be used
+    JSONPath: .configuration.kubernetes.pod_service_account_name
+  - name: Min-Instances
+    type: integer
+    description: Minimum number of instances per Postgres cluster
+    JSONPath: .configuration.min_instances
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
+  scope: Namespaced
+  subresources:
+    status: {}
+  version: v1
+  validation:
+    openAPIV3Schema:
+      type: object
+      required:
+        - kind
+        - apiVersion
+        - configuration
+      properties:
+        kind:
+          type: string
+          enum:
+            - OperatorConfiguration
+        apiVersion:
+          type: string
+          enum:
+            - acid.zalan.do/v1
+        configuration:
+          type: object
+          properties:
+            docker_image:
+              type: string
+            enable_crd_validation:
+              type: boolean
+            enable_shm_volume:
+              type: boolean
+            etcd_host:
+              type: string
+            max_instances:
+              type: integer
+              minimum: -1  # -1 = disabled
+            min_instances:
+              type: integer
+              minimum: -1  # -1 = disabled
+            resync_period:
+              type: string
+            repair_period:
+              type: string
+            set_memory_request_to_limit:
+              type: boolean
+            sidecar_docker_images:
+              type: object
+              additionalProperties:
+                type: string
+            workers:
+              type: integer
+              minimum: 1
+            users:
+              type: object
+              properties:
+                replication_username:
+                   type: string
+                super_username:
+                   type: string
+            kubernetes:
+              type: object
+              properties:
+                cluster_domain:
+                  type: string
+                cluster_labels:
+                  type: object
+                  additionalProperties:
+                    type: string
+                cluster_name_label:
+                  type: string
+                custom_pod_annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                enable_init_containers:
+                  type: boolean
+                enable_pod_antiaffinity:
+                  type: boolean
+                enable_pod_disruption_budget:
+                  type: boolean
+                enable_sidecars:
+                  type: boolean
+                infrastructure_roles_secret_name:
+                  type: string
+                inherited_labels:
+                  type: array
+                  items:
+                    type: string
+                master_pod_move_timeout:
+                  type: string
+                node_readiness_label:
+                  type: object
+                  additionalProperties:
+                    type: string
+                oauth_token_secret_name:
+                  type: string
+                pdb_name_format:
+                  type: string
+                pod_antiaffinity_topology_key:
+                  type: string
+                pod_environment_configmap:
+                  type: string
+                pod_management_policy:
+                  type: string
+                  enum:
+                    - "ordered_ready"
+                    - "parallel"
+                pod_priority_class_name:
+                  type: string
+                pod_role_label:
+                  type: string
+                pod_service_account_definition:
+                  type: string
+                pod_service_account_name:
+                  type: string
+                pod_service_account_role_binding_definition:
+                  type: string
+                pod_terminate_grace_period:
+                  type: string
+                secret_name_template:
+                  type: string
+                spilo_fsgroup:
+                  type: integer
+                spilo_privileged:
+                  type: boolean
+                toleration:
+                  type: object
+                  additionalProperties:
+                    type: string
+                watched_namespace:
+                  type: string
+            postgres_pod_resources:
+              type: object
+              properties:
+                default_cpu_limit:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                default_cpu_request:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                default_memory_limit:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                default_memory_request:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+            timeouts:
+              type: object
+              properties:
+                pod_label_wait_timeout:
+                  type: string
+                pod_deletion_wait_timeout:
+                  type: string
+                ready_wait_interval:
+                  type: string
+                ready_wait_timeout:
+                  type: string
+                resource_check_interval:
+                  type: string
+                resource_check_timeout:
+                  type: string
+            load_balancer:
+              type: object
+              properties:
+                custom_service_annotations:
+                  type: object
+                  additionalProperties:
+                    type: string
+                db_hosted_zone:
+                  type: string
+                enable_master_load_balancer:
+                  type: boolean
+                enable_replica_load_balancer:
+                  type: boolean
+                master_dns_name_format:
+                  type: string
+                replica_dns_name_format:
+                  type: string
+            aws_or_gcp:
+              type: object
+              properties:
+                additional_secret_mount:
+                  type: string
+                additional_secret_mount_path:
+                  type: string
+                aws_region:
+                  type: string
+                kube_iam_role:
+                  type: string
+                log_s3_bucket:
+                  type: string
+                wal_s3_bucket:
+                  type: string
+            logical_backup:
+              type: object
+              properties:
+                logical_backup_docker_image:
+                  type: string
+                logical_backup_s3_access_key_id:
+                  type: string
+                logical_backup_s3_bucket:
+                  type: string
+                logical_backup_s3_endpoint:
+                  type: string
+                logical_backup_s3_secret_access_key:
+                  type: string
+                logical_backup_s3_sse:
+                  type: string
+                logical_backup_schedule:
+                  type: string
+                  pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
+            debug:
+              type: object
+              properties:
+                debug_logging:
+                  type: boolean
+                enable_database_access:
+                  type: boolean
+            teams_api:
+              type: object
+              properties:
+                enable_admin_role_for_users:
+                  type: boolean
+                enable_team_superuser:
+                  type: boolean
+                enable_teams_api:
+                  type: boolean
+                pam_configuration:
+                  type: string
+                pam_role_name:
+                  type: string
+                postgres_superuser_teams:
+                  type: array
+                  items:
+                    type: string
+                protected_role_names:
+                  type: array
+                  items:
+                    type: string
+                team_admin_role:
+                  type: string
+                team_api_role_configuration:
+                  type: object
+                  additionalProperties:
+                    type: string
+                teams_api_url:
+                  type: string
+            logging_rest_api:
+              type: object
+              properties:
+                api_port:
+                  type: integer
+                cluster_history_entries:
+                  type: integer
+                ring_log_lines:
+                  type: integer
+            scalyr:
+              type: object
+              properties:
+                scalyr_api_key:
+                  type: string
+                scalyr_cpu_limit:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                scalyr_cpu_request:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                scalyr_image:
+                  type: string
+                scalyr_memory_limit:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                scalyr_memory_request:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                scalyr_server_url:
+                  type: string
+        status:
+          type: object
+          additionalProperties:
+            type: string

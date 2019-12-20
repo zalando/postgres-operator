@@ -25,6 +25,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result := &config.Config{}
 
 	// general config
+	result.EnableCRDValidation = fromCRD.EnableCRDValidation
 	result.EtcdHost = fromCRD.EtcdHost
 	result.DockerImage = fromCRD.DockerImage
 	result.Workers = fromCRD.Workers
@@ -41,6 +42,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ReplicationUsername = fromCRD.PostgresUsersConfiguration.ReplicationUsername
 
 	// kubernetes config
+	result.CustomPodAnnotations = fromCRD.Kubernetes.CustomPodAnnotations
 	result.PodServiceAccountName = fromCRD.Kubernetes.PodServiceAccountName
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
@@ -52,6 +54,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
 	result.EnablePodDisruptionBudget = fromCRD.Kubernetes.EnablePodDisruptionBudget
+	result.EnableInitContainers = fromCRD.Kubernetes.EnableInitContainers
+	result.EnableSidecars = fromCRD.Kubernetes.EnableSidecars
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
@@ -100,6 +104,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupSchedule = fromCRD.LogicalBackup.Schedule
 	result.LogicalBackupDockerImage = fromCRD.LogicalBackup.DockerImage
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
+	result.LogicalBackupS3Endpoint = fromCRD.LogicalBackup.S3Endpoint
+	result.LogicalBackupS3AccessKeyID = fromCRD.LogicalBackup.S3AccessKeyID
+	result.LogicalBackupS3SecretAccessKey = fromCRD.LogicalBackup.S3SecretAccessKey
+	result.LogicalBackupS3SSE = fromCRD.LogicalBackup.S3SSE
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging

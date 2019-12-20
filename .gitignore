@@ -86,6 +86,9 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# e2e tests
+e2e/manifests
+
 # Translations
 *.mo
 *.pot

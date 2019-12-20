@@ -50,6 +50,8 @@ type KubernetesMetaConfiguration struct {
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
 	EnablePodDisruptionBudget              *bool                 `json:"enable_pod_disruption_budget,omitempty"`
+	EnableInitContainers                   *bool                 `json:"enable_init_containers,omitempty"`
+	EnableSidecars                         *bool                 `json:"enable_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
 	ClusterDomain                          string                `json:"cluster_domain"`
 	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
@@ -59,6 +61,7 @@ type KubernetesMetaConfiguration struct {
 	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
+	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
@@ -115,7 +118,7 @@ type OperatorDebugConfiguration struct {
 	EnableDBAccess bool `json:"enable_database_access,omitempty"`
 }
 
-// TeamsAPIConfiguration defines the configration of TeamsAPI
+// TeamsAPIConfiguration defines the configuration of TeamsAPI
 type TeamsAPIConfiguration struct {
 	EnableTeamsAPI           bool              `json:"enable_teams_api,omitempty"`
 	TeamsAPIUrl              string            `json:"teams_api_url,omitempty"`
@@ -147,8 +150,20 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
+// OperatorLogicalBackupConfiguration defines configuration for logical backup
+type OperatorLogicalBackupConfiguration struct {
+	Schedule          string `json:"logical_backup_schedule,omitempty"`
+	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
+	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
+	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
+	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`
+	S3SSE             string `json:"logical_backup_s3_sse,omitempty"`
+}
+
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
+	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`
@@ -172,19 +187,5 @@ type OperatorConfigurationData struct {
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
 }
 
-// OperatorConfigurationUsers defines configration for super user
-type OperatorConfigurationUsers struct {
-	SuperUserName            string            `json:"superuser_name,omitempty"`
-	Replication              string            `json:"replication_user_name,omitempty"`
-	ProtectedRoles           []string          `json:"protected_roles,omitempty"`
-	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
-}
-
 //Duration shortens this frequently used name
 type Duration time.Duration
-
-type OperatorLogicalBackupConfiguration struct {
-	Schedule    string `json:"logical_backup_schedule,omitempty"`
-	DockerImage string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket    string `json:"logical_backup_s3_bucket,omitempty"`
-}

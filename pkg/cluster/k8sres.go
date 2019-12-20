@@ -430,6 +430,7 @@ func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) *
 func generatePodTemplate(
 	namespace string,
 	labels labels.Set,
+	annotations map[string]string,
 	spiloContainer *v1.Container,
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
@@ -485,13 +486,17 @@ func generatePodTemplate(
 
 	template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    labels,
-			Namespace: namespace,
+			Labels:      labels,
+			Namespace:   namespace,
+			Annotations: annotations,
 		},
 		Spec: podSpec,
 	}
 	if kubeIAMRole != "" {
-		template.Annotations = map[string]string{constants.KubeIAmAnnotation: kubeIAMRole}
+		if template.Annotations == nil {
+			template.Annotations = make(map[string]string)
+		}
+		template.Annotations[constants.KubeIAmAnnotation] = kubeIAMRole
 	}
 
 	return &template, nil
@@ -715,6 +720,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	var (
 		err                 error
+		initContainers      []v1.Container
 		sidecarContainers   []v1.Container
 		podTemplate         *v1.PodTemplateSpec
 		volumeClaimTemplate *v1.PersistentVolumeClaim
@@ -735,7 +741,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			limit = c.OpConfig.DefaultMemoryLimit
 		}
 
-		isSmaller, err := util.RequestIsSmallerThanLimit(request, limit)
+		isSmaller, err := util.IsSmallerQuantity(request, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -762,7 +768,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 				limit = c.OpConfig.DefaultMemoryLimit
 			}
 
-			isSmaller, err := util.RequestIsSmallerThanLimit(sidecarRequest, sidecarLimit)
+			isSmaller, err := util.IsSmallerQuantity(sidecarRequest, sidecarLimit)
 			if err != nil {
 				return nil, err
 			}
@@ -779,6 +785,13 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+
+	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
+		if c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
+			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
+		}
+		initContainers = spec.InitContainers
 	}
 
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
@@ -867,9 +880,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate sidecar containers
-	if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
-		c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
-		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+	if sideCars != nil && len(sideCars) > 0 {
+		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
+			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
+		}
+		if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
+			c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
+			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+		}
 	}
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
@@ -881,12 +899,15 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveFSGroup = spec.SpiloFSGroup
 	}
 
+	annotations := c.generatePodAnnotations(spec)
+
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
+		annotations,
 		spiloContainer,
-		spec.InitContainers,
+		initContainers,
 		sidecarContainers,
 		&tolerationSpec,
 		effectiveFSGroup,
@@ -947,6 +968,24 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	return statefulSet, nil
+}
+
+func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]string {
+	annotations := make(map[string]string)
+	for k, v := range c.OpConfig.CustomPodAnnotations {
+		annotations[k] = v
+	}
+	if spec != nil || spec.PodAnnotations != nil {
+		for k, v := range spec.PodAnnotations {
+			annotations[k] = v
+		}
+	}
+
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	return annotations
 }
 
 func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
@@ -1393,7 +1432,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 	pdbEnabled := c.OpConfig.EnablePodDisruptionBudget
 
 	// if PodDisruptionBudget is disabled or if there are no DB pods, set the budget to 0.
-	if (pdbEnabled != nil && !*pdbEnabled) || c.Spec.NumberOfInstances <= 0 {
+	if (pdbEnabled != nil && !(*pdbEnabled)) || c.Spec.NumberOfInstances <= 0 {
 		minAvailable = intstr.FromInt(0)
 	}
 
@@ -1469,10 +1508,13 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			},
 		}}
 
+	annotations := c.generatePodAnnotations(&c.Spec)
+
 	// re-use the method that generates DB pod templates
 	if podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		labels,
+		annotations,
 		logicalBackupContainer,
 		[]v1.Container{},
 		[]v1.Container{},
@@ -1486,8 +1528,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		util.False(),
 		false,
 		"",
-		"",
-		""); err != nil {
+		c.OpConfig.AdditionalSecretMount,
+		c.OpConfig.AdditionalSecretMountPath); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
@@ -1536,6 +1578,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: c.Name,
 		},
 		{
+			Name:  "CLUSTER_NAME_LABEL",
+			Value: c.OpConfig.ClusterNameLabel,
+		},
+		{
 			Name: "POD_NAMESPACE",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
@@ -1548,6 +1594,14 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_ENDPOINT",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
+		},
+		{
+			Name:  "LOGICAL_BACKUP_S3_SSE",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3SSE,
 		},
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
@@ -1587,8 +1641,15 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 	}
 
-	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+	if c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AWS_ACCESS_KEY_ID", Value: c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID})
+	}
 
+	if c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
+	}
+
+	c.logger.Debugf("Generated logical backup env vars %v", envVars)
 	return envVars
 }
 

@@ -182,17 +182,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         # update the cluster-wide image of the logical backup pod
         image = "test-image-name"
-        config_map_patch = {
+        patch_logical_backup_image = {
             "data": {
                "logical_backup_docker_image": image,
             }
         }
-        k8s.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
-
-        operator_pod = k8s.api.core_v1.list_namespaced_pod(
-            'default', label_selector="name=postgres-operator").items[0].metadata.name
-        k8s.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf
-        k8s.wait_for_operator_pod_start()
+        k8s.update_config(patch_logical_backup_image)
 
         jobs = k8s.get_logical_backup_job().items
         actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
@@ -318,6 +313,14 @@ class K8s:
 
     def wait_for_logical_backup_job_creation(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
+
+    def update_config(self, config_map_patch):
+        self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
+
+        operator_pod = self.api.core_v1.list_namespaced_pod(
+            'default', label_selector="name=postgres-operator").items[0].metadata.name
+        self.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf
+        self.wait_for_operator_pod_start()
 
     def create_with_kubectl(self, path):
         subprocess.run(["kubectl", "create", "-f", path])

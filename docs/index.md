@@ -13,7 +13,7 @@ manages PostgreSQL clusters on Kubernetes (K8s):
 
 2. The operator also watches updates to [its own configuration](../manifests/configmap.yaml)
    and alters running Postgres clusters if necessary.  For instance, if the
-   docker image in a pod is changed, the operator carries out the rolling
+   Docker image in a pod is changed, the operator carries out the rolling
    update, which means it re-spawns pods of each managed StatefulSet one-by-one
    with the new Docker image.
 

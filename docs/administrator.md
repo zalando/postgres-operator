@@ -3,6 +3,50 @@
 Learn how to configure and manage the Postgres Operator in your Kubernetes (K8s)
 environment.
 
+## Minor and major version upgrade
+
+Minor version upgrades for PostgreSQL are handled via updating the Spilo Docker
+image. The operator will carry out a rolling update of Pods which includes a
+switchover (planned failover) of the master to the Pod with new minor version.
+The switch should usually take less than 5 seconds, still clients have to
+reconnect.
+
+Major version upgrades are supported via [cloning](user.md#clone-directly). The
+new cluster manifest must have a higher `version` string than the source cluster
+and will be created from a basebackup. Depending of the cluster size, downtime
+in this case can be significant as writes to the database should be stopped and
+all WAL files should be archived first before cloning is started.
+
+Note, that simply changing the version string in the `postgresql` manifest does
+not work at present and leads to errors. Neither Patroni nor Postgres Operator
+can do in place `pg_upgrade`. Still, it can be executed manually in the Postgres
+container, which is tricky (i.e. systems need to be stopped, replicas have to be
+synced) but of course faster than cloning.
+
+## CRD Validation
+
+[CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
+will be registered with schema validation by default when the operator is
+deployed. The `OperatorConfiguration` CRD will only get created if the
+`POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](../manifests/postgres-operator.yaml#L36)
+in the deployment yaml is set and not empty.
+
+When submitting manifests of [`postgresql`](../manifests/postgresql.crd.yaml) or
+[`OperatorConfiguration`](../manifests/operatorconfiguration.crd.yaml) custom
+resources with kubectl, validation can be bypassed with `--validate=false`. The
+operator can also be configured to not register CRDs with validation on `ADD` or
+`UPDATE` events. Running instances are not affected when enabling the validation
+afterwards unless the manifests is not changed then. Note, that the provided CRD
+manifests contain the validation for users to understand what schema is
+enforced.
+
+Once the validation is enabled it can only be disabled manually by editing or
+patching the CRD manifest:
+
+```bash
+zk8 patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
+```
+
 ## Namespaces
 
 ### Select the namespace to deploy to
@@ -32,7 +76,7 @@ By default, the operator watches the namespace it is deployed to. You can
 change this by setting the `WATCHED_NAMESPACE` var in the `env` section of the
 [operator deployment](../manifests/postgres-operator.yaml) manifest or by
 altering the `watched_namespace` field in the operator
-[ConfigMap](../manifests/configmap.yaml#L79).
+[configuration](../manifests/postgresql-operator-default-configuration.yaml#L49).
 In the case both are set, the env var takes the precedence. To make the
 operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
@@ -71,8 +115,6 @@ is used by the operator to connect to the clusters after creation.
 
 ## Role-based access control for the operator
 
-### Service account and cluster roles
-
 The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
 defines the service account, cluster roles and bindings needed for the operator
 to function under access control restrictions. To deploy the operator with this
@@ -85,18 +127,14 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
+### Service account and cluster roles
+
 Note that the service account is named `zalando-postgres-operator`. You may have
 to change the `service_account_name` in the operator ConfigMap and
 `serviceAccountName` in the `postgres-operator` deployment appropriately. This
 is done intentionally to avoid breaking those setups that already work with the
 default `operator` account. In the future the operator should ideally be run
 under the `zalando-postgres-operator` service account.
-
-The service account defined in `operator-service-account-rbac.yaml` acquires
-some privileges not used by the operator (i.e. we only need `list` and `watch`
-on `configmaps` resources). This is also done intentionally to avoid breaking
-things if someone decides to configure the same service account in the
-operator's ConfigMap to run Postgres clusters.
 
 ### Give K8s users access to create/list `postgresqls`
 
@@ -115,7 +153,7 @@ that are aggregated into the K8s [default roles](https://kubernetes.io/docs/refe
 
 To ensure Postgres pods are running on nodes without any other application pods,
 you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
-and configure the required toleration in the operator ConfigMap.
+and configure the required toleration in the operator configuration.
 
 As an example you can set following node taint:
 
@@ -133,7 +171,20 @@ metadata:
   name: postgres-operator
 data:
   toleration: "key:postgres,operator:Exists,effect:NoSchedule"
-  ...
+```
+
+For an OperatorConfiguration resource the toleration should be defined like
+this:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-configuration
+configuration:
+  kubernetes:
+    toleration:
+      postgres: "key:postgres,operator:Exists,effect:NoSchedule"
 ```
 
 Note that the K8s version 1.13 brings [taint-based eviction](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/#taint-based-evictions)
@@ -148,7 +199,7 @@ completely, specify the toleration by leaving out the `tolerationSeconds` value
 
 To ensure Postgres pods are running on different topologies, you can use
 [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
-and configure the required topology in the operator ConfigMap.
+and configure the required topology in the operator configuration.
 
 Enable pod anti affinity by adding following line to the operator ConfigMap:
 
@@ -161,20 +212,21 @@ data:
   enable_pod_antiaffinity: "true"
 ```
 
-By default the topology key for the pod anti affinity is set to
-`kubernetes.io/hostname`, you can set another topology key e.g.
-`failure-domain.beta.kubernetes.io/zone` by adding following line to the
-operator ConfigMap, see [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys:
+Likewise, when using an OperatorConfiguration resource add:
 
 ```yaml
-apiVersion: v1
-kind: ConfigMap
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
 metadata:
-  name: postgres-operator
-data:
-  enable_pod_antiaffinity: "true"
-  pod_antiaffinity_topology_key: "failure-domain.beta.kubernetes.io/zone"
+  name: postgresql-configuration
+configuration:
+  kubernetes:
+    enable_pod_antiaffinity: true
 ```
+
+By default the topology key for the pod anti affinity is set to
+`kubernetes.io/hostname`, you can set another topology key e.g.
+`failure-domain.beta.kubernetes.io/zone`. See [built-in node labels](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#interlude-built-in-node-labels) for available topology keys.
 
 ## Pod Disruption Budget
 
@@ -210,7 +262,6 @@ metadata:
   name: postgres-operator
 data:
   inherited_labels: application,environment
-  ...
 ```
 
 **OperatorConfiguration**
@@ -225,7 +276,6 @@ configuration:
     inherited_labels:
     - application
     - environment
-...
 ```
 
 **cluster manifest**
@@ -239,7 +289,7 @@ metadata:
     application: my-app
     environment: demo
 spec:
-...
+  ...
 ```
 
 **network policy**
@@ -254,7 +304,6 @@ spec:
     matchLabels:
       application: my-app
       environment: demo
-...
 ```
 
 
@@ -277,7 +326,19 @@ metadata:
 data:
   # referencing config map with custom settings
   pod_environment_configmap: postgres-pod-config
-  ...
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    # referencing config map with custom settings
+    pod_environment_configmap: postgres-pod-config
 ```
 
 **referenced ConfigMap `postgres-pod-config`**
@@ -312,7 +373,7 @@ services: one for the master pod and one for replica pods. To expose these
 services to an outer network, one can attach load balancers to them by setting
 `enableMasterLoadBalancer` and/or `enableReplicaLoadBalancer` to `true` in the
 cluster manifest. In the case any of these variables are omitted from the
-manifest, the operator configmap's settings `enable_master_load_balancer` and
+manifest, the operator configuration settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
 
@@ -358,12 +419,12 @@ external systems but defined for an individual Postgres cluster in its manifest.
 A typical example is a role for connections from an application that uses the
 database.
 
-* **Human users** originate from the Teams API that returns a list of the team
-members given a team id. The operator differentiates between (a) product teams
-that own a particular Postgres cluster and are granted admin rights to maintain
-it, and (b) Postgres superuser teams that get the superuser access to all
-Postgres databases running in a K8s cluster for the purposes of maintaining and
-troubleshooting.
+* **Human users** originate from the [Teams API](user.md#teams-api-roles) that
+returns a list of the team members given a team id. The operator differentiates
+between (a) product teams that own a particular Postgres cluster and are granted
+admin rights to maintain it, and (b) Postgres superuser teams that get the
+superuser access to all Postgres databases running in a K8s cluster for the
+purposes of maintaining and troubleshooting.
 
 ## Understanding rolling update of Spilo pods
 
@@ -427,7 +488,7 @@ A secret can be pre-provisioned in different ways:
 
 With the v1.2 release the Postgres Operator is shipped with a browser-based
 configuration user interface (UI) that simplifies managing Postgres clusters
-with the operator. The UI runs with Node.js and comes with it's own docker
+with the operator. The UI runs with Node.js and comes with it's own Docker
 image.
 
 Run NPM to continuously compile `tags/js` code. Basically, it creates an
@@ -439,14 +500,14 @@ Run NPM to continuously compile `tags/js` code. Basically, it creates an
 
 To build the Docker image open a shell and change to the `ui` folder. Then run:
 
-```
+```bash
 docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.2.0 .
 ```
 
 Apply all manifests for the `ui/manifests` folder to deploy the Postgres
 Operator UI on K8s. For local tests you don't need the Ingress resource.
 
-```
+```bash
 kubectl apply -f ui/manifests
 ```
 
@@ -456,6 +517,6 @@ to the K8s and Postgres Operator REST API. You can use the provided
 `run_local.sh` script for this. Make sure it uses the correct URL to your K8s
 API server, e.g. for minikube it would be `https://192.168.99.100:8443`.
 
-```
+```bash
 ./run_local.sh
 ```
