@@ -17,3 +17,10 @@ spec:
     foo: zalando  # dbname: owner
   postgresql:
     version: "11"
+    parameters:
+      shared_buffers: "32MB"
+      max_connections: "10"
+      log_checkpoints: "off"
+      log_connections: "off"
+      log_disconnections: "off"
+      log_statement: "off"

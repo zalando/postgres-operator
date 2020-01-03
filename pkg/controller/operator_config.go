@@ -97,6 +97,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
 	result.AdditionalSecretMountPath = fromCRD.AWSGCP.AdditionalSecretMountPath
 
+	// Azure config
+	result.WALEAccName = fromCRD.AzureConfig.WALEAccName
+	result.WALEWABSCont = fromCRD.AzureConfig.WALEWABSCont
+
 	// logical backup config
 	result.LogicalBackupSchedule = fromCRD.LogicalBackup.Schedule
 	result.LogicalBackupDockerImage = fromCRD.LogicalBackup.DockerImage

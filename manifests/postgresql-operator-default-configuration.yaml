@@ -73,6 +73,9 @@ configuration:
     # kube_iam_role: ""
     # log_s3_bucket: ""
     # wal_s3_bucket: ""
+  azure:
+    # wale_wabs_cont: ""
+    # wale_wabs_acc_name: ""
   logical_backup:
     logical_backup_schedule: "30 00 * * *"
     logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"

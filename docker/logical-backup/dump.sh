@@ -51,7 +51,7 @@ function azure_upload {
     # to keep logical backups at the same path as WAL
     # NB: $LOGICAL_BACKUP_SCOPE_SUFFIX already contains the leading "/" when set by the Postgres Operator
     PATH_TO_BACKUP="spilo/"$SCOPE$LOGICAL_BACKUP_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
-    LOGICAL_BACKUP_AZURE_CONT_KEY=$(cat $SECRET_MOUNT_PATH/azkey)
+    LOGICAL_BACKUP_AZURE_CONT_KEY=$(cat $SECRET_MOUNT_PATH/$SECRET_MOUNT)
     az storage blob upload --file /dev/stdin \
       --account-name $LOGICAL_BACKUP_AZURE_ACC_NAME \
       --container-name $LOGICAL_BACKUP_AZURE_CONT_NAME \

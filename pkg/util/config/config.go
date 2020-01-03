@@ -68,6 +68,12 @@ type Scalyr struct {
 	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
 }
 
+// Azure
+type AzureConfiguration struct {
+	WALEWABSCont string `json:wale_wabs_cont,omitempty`
+	WALEAccName  string `json:wale_wabs_acc_name,omitempty`
+}
+
 // LogicalBackup
 type LogicalBackup struct {
 	LogicalBackupSchedule      string `name:"logical_backup_schedule" default:"30 00 * * *"`
@@ -84,6 +90,7 @@ type Config struct {
 	Auth
 	Scalyr
 	LogicalBackup
+	AzureConfiguration
 
 	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS

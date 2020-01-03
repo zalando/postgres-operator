@@ -110,6 +110,12 @@ type AWSGCPConfiguration struct {
 	AdditionalSecretMountPath string `json:"additional_secret_mount_path" default:"/meta/credentials"`
 }
 
+// Azure
+type AzureConfiguration struct {
+	WALEWABSCont string `json:wale_wabs_cont,omitempty`
+	WALEAccName  string `json:wale_wabs_acc_name,omitempty`
+}
+
 // OperatorDebugConfiguration defines options for the debug mode
 type OperatorDebugConfiguration struct {
 	DebugLogging   bool `json:"debug_logging,omitempty"`
@@ -166,6 +172,7 @@ type OperatorConfigurationData struct {
 	Timeouts                   OperatorTimeouts                   `json:"timeouts"`
 	LoadBalancer               LoadBalancerConfiguration          `json:"load_balancer"`
 	AWSGCP                     AWSGCPConfiguration                `json:"aws_or_gcp"`
+	AzureConfig                AzureConfiguration                 `json:"azure"`
 	OperatorDebug              OperatorDebugConfiguration         `json:"debug"`
 	TeamsAPI                   TeamsAPIConfiguration              `json:"teams_api"`
 	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`

@@ -591,6 +591,15 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
+	if c.OpConfig.WALEAccName != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "WABS_ACCOUNT_NAME", Value: c.OpConfig.WALEAccName})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+		envVars = append(envVars, v1.EnvVar{Name: "WABS_CONT_NAME", Value: c.OpConfig.WALEWABSCont})
+		envVars = append(envVars, v1.EnvVar{Name: "SECRET_MOUNT_PATH", Value: c.OpConfig.AdditionalSecretMountPath})
+		envVars = append(envVars, v1.EnvVar{Name: "SECRET_MOUNT", Value: c.OpConfig.AdditionalSecretMount})
+	}
+
 	if c.OpConfig.LogS3Bucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
@@ -1586,6 +1595,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		{
 			Name:  "SECRET_MOUNT_PATH",
 			Value: c.OpConfig.AdditionalSecretMountPath,
+		},
+		{
+			Name:  "SECRET_MOUNT",
+			Value: c.OpConfig.AdditionalSecretMount,
 		},
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
