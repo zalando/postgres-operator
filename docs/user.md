@@ -65,7 +65,7 @@ our test cluster.
 
 ```bash
 # get name of master pod of acid-minimal-cluster
-export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,version=acid-minimal-cluster,spilo-role=master)
+export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,cluster-name=acid-minimal-cluster,spilo-role=master)
 
 # set up port forward
 kubectl port-forward $PGMASTER 6432:5432

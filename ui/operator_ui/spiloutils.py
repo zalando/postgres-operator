@@ -137,7 +137,7 @@ def read_pods(cluster, namespace, spilo_cluster):
         cluster=cluster,
         resource_type='pods',
         namespace=namespace,
-        label_selector={'version': spilo_cluster},
+        label_selector={'cluster-name': spilo_cluster},
     )
 
 
