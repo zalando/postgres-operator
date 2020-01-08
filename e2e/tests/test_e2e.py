@@ -72,7 +72,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
         k8s.wait_for_pod_start("spilo-role=master", self.namespace)
-        self.assert_master_is_unique(self.namespace, cluster-name="acid-test-cluster")
+        self.assert_master_is_unique(self.namespace, "acid-test-cluster")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
