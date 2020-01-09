@@ -45,6 +45,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.CustomPodAnnotations = fromCRD.Kubernetes.CustomPodAnnotations
 	result.PodServiceAccountName = fromCRD.Kubernetes.PodServiceAccountName
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
+	result.PodServiceAccountRoleDefinition = fromCRD.Kubernetes.PodServiceAccountRoleDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
 	result.PodEnvironmentConfigMap = fromCRD.Kubernetes.PodEnvironmentConfigMap
 	result.PodTerminateGracePeriod = time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod)

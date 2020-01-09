@@ -45,6 +45,7 @@ type Config struct {
 	RestConfig                   *rest.Config
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
+	PodServiceAccountRole        *rbacv1.Role
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 

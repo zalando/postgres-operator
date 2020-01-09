@@ -148,6 +148,8 @@ spec:
                   type: string
                 pod_service_account_name:
                   type: string
+                pod_service_account_role_definition:
+                  type: string
                 pod_service_account_role_binding_definition:
                   type: string
                 pod_terminate_grace_period:
