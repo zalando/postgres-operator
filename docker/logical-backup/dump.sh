@@ -6,12 +6,10 @@ set -o nounset
 set -o pipefail
 IFS=$'\n\t'
 
-# make script trace visible via `kubectl logs`
-set -o xtrace
-
 ALL_DB_SIZE_QUERY="select sum(pg_database_size(datname)::numeric) from pg_database;"
 PG_BIN=$PG_DIR/$PG_VERSION/bin
 DUMP_SIZE_COEFF=5
+ERRORCOUNT=0
 
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/api/v1
@@ -42,9 +40,9 @@ function aws_upload {
 
     [[ ! -z "$EXPECTED_SIZE" ]] && args+=("--expected-size=$EXPECTED_SIZE")
     [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]] && args+=("--endpoint-url=$LOGICAL_BACKUP_S3_ENDPOINT")
-    [[ ! "$LOGICAL_BACKUP_S3_SSE" == "" ]] && args+=("--sse=$LOGICAL_BACKUP_S3_SSE")
+    [[ ! -z "$LOGICAL_BACKUP_S3_SSE" ]] && args+=("--sse=$LOGICAL_BACKUP_S3_SSE")
 
-    aws s3 cp - "$PATH_TO_BACKUP" "${args[@]//\'/}" --debug
+    aws s3 cp - "$PATH_TO_BACKUP" "${args[@]//\'/}"
 }
 
 function get_pods {
@@ -93,4 +91,9 @@ for search in "${search_strategy[@]}"; do
 
 done
 
+set -x
 dump | compress | aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
+[[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
+set +x
+
+exit $ERRORCOUNT
