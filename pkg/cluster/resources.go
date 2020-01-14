@@ -90,6 +90,102 @@ func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 	return statefulSet, nil
 }
 
+// Prepare the database for connection pool to be used, i.e. install lookup
+// function (do it first, because it should be fast and if it didn't succeed,
+// it doesn't makes sense to create more K8S objects. At this moment we assume
+// that necessary connection pool user exists.
+//
+// After that create all the objects for connection pool, namely a deployment
+// with a chosen pooler and a service to expose it.
+func (c *Cluster) createConnectionPool() (*ConnectionPoolResources, error) {
+	var msg string
+	c.setProcessName("creating connection pool")
+
+	err := c.installLookupFunction(
+		c.OpConfig.ConnectionPool.Schema,
+		c.OpConfig.ConnectionPool.User)
+
+	if err != nil {
+		msg = "could not prepare database for connection pool: %v"
+		return nil, fmt.Errorf(msg, err)
+	}
+
+	deploymentSpec, err := c.generateConnPoolDeployment(&c.Spec)
+	if err != nil {
+		msg = "could not generate deployment for connection pool: %v"
+		return nil, fmt.Errorf(msg, err)
+	}
+
+	deployment, err := c.KubeClient.
+		Deployments(deploymentSpec.Namespace).
+		Create(deploymentSpec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	serviceSpec := c.generateConnPoolService(&c.Spec)
+	service, err := c.KubeClient.
+		Services(serviceSpec.Namespace).
+		Create(serviceSpec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	c.ConnectionPool = &ConnectionPoolResources{
+		Deployment: deployment,
+		Service:    service,
+	}
+	c.logger.Debugf("created new connection pool %q, uid: %q",
+		util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
+
+	return c.ConnectionPool, nil
+}
+
+func (c *Cluster) deleteConnectionPool() (err error) {
+	c.setProcessName("deleting connection pool")
+	c.logger.Debugln("deleting connection pool")
+
+	// Lack of connection pooler objects is not a fatal error, just log it if
+	// it was present before in the manifest
+	if c.needConnectionPool() && c.ConnectionPool == nil {
+		c.logger.Infof("No connection pool to delete")
+		return nil
+	}
+
+	deployment := c.ConnectionPool.Deployment
+	err = c.KubeClient.
+		Deployments(deployment.Namespace).
+		Delete(deployment.Name, c.deleteOptions)
+
+	if !k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("Connection pool deployment was already deleted")
+	} else if err != nil {
+		return fmt.Errorf("could not delete deployment: %v", err)
+	}
+
+	c.logger.Infof("Connection pool deployment %q has been deleted",
+		util.NameFromMeta(deployment.ObjectMeta))
+
+	service := c.ConnectionPool.Service
+	err = c.KubeClient.
+		Services(service.Namespace).
+		Delete(service.Name, c.deleteOptions)
+
+	if !k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("Connection pool service was already deleted")
+	} else if err != nil {
+		return fmt.Errorf("could not delete service: %v", err)
+	}
+
+	c.logger.Infof("Connection pool service %q has been deleted",
+		util.NameFromMeta(deployment.ObjectMeta))
+
+	c.ConnectionPool = nil
+	return nil
+}
+
 func getPodIndex(podName string) (int32, error) {
 	parts := strings.Split(podName, "-")
 	if len(parts) == 0 {

@@ -48,11 +48,17 @@ type Config struct {
 	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
 }
 
+type ConnectionPoolResources struct {
+	Deployment *appsv1.Deployment
+	Service    *v1.Service
+}
+
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
+	ConnectionPool      *ConnectionPoolResources
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
@@ -184,7 +190,8 @@ func (c *Cluster) isNewCluster() bool {
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
 
-	// clear our the previous state of the cluster users (in case we are running a sync).
+	// clear our the previous state of the cluster users (in case we are
+	// running a sync).
 	c.systemUsers = map[string]spec.PgUser{}
 	c.pgUsers = map[string]spec.PgUser{}
 
@@ -292,8 +299,10 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pods are ready")
 
-	// create database objects unless we are running without pods or disabled that feature explicitly
+	// create database objects unless we are running without pods or disabled
+	// that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+		c.logger.Infof("Create roles")
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
@@ -314,6 +323,26 @@ func (c *Cluster) Create() error {
 
 	if err := c.listResources(); err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
+	}
+
+	// Create connection pool deployment and services if necessary. Since we
+	// need to peform some operations with the database itself (e.g. install
+	// lookup function), do it as the last step, when everything is available.
+	//
+	// Do not consider connection pool as a strict requirement, and if
+	// something fails, report warning
+	if c.needConnectionPool() {
+		if c.ConnectionPool != nil {
+			c.logger.Warning("Connection pool already exists in the cluster")
+			return nil
+		}
+		connPool, err := c.createConnectionPool()
+		if err != nil {
+			c.logger.Warningf("could not create connection pool: %v", err)
+			return nil
+		}
+		c.logger.Infof("connection pool %q has been successfully created",
+			util.NameFromMeta(connPool.Deployment.ObjectMeta))
 	}
 
 	return nil
@@ -745,6 +774,12 @@ func (c *Cluster) Delete() {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
 	}
 
+	// Delete connection pool objects anyway, even if it's not mentioned in the
+	// manifest, just to not keep orphaned components in case if something went
+	// wrong
+	if err := c.deleteConnectionPool(); err != nil {
+		c.logger.Warningf("could not remove connection pool: %v", err)
+	}
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
@@ -810,6 +845,22 @@ func (c *Cluster) initSystemUsers() {
 		Origin:   spec.RoleOriginSystem,
 		Name:     c.OpConfig.ReplicationUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
+	}
+
+	// Connection pool user is an exception, if requested it's going to be
+	// created by operator as a normal pgUser
+	if c.needConnectionPool() {
+
+		username := c.Spec.ConnectionPool.User
+		if username == nil {
+			username = &c.OpConfig.ConnectionPool.User
+		}
+
+		c.systemUsers[constants.ConnectionPoolUserKeyName] = spec.PgUser{
+			Origin:   spec.RoleConnectionPool,
+			Name:     *username,
+			Password: util.RandomPassword(constants.PasswordLength),
+		}
 	}
 }
 

@@ -83,6 +83,16 @@ type LogicalBackup struct {
 	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:"AES256"`
 }
 
+// Operator options for connection pooler
+type ConnectionPool struct {
+	NumberOfInstances *int32 `name:"connection_pool_instances_number" default:"1"`
+	Schema            string `name:"connection_pool_schema" default:"pooler"`
+	User              string `name:"connection_pool_user" default:"pooler"`
+	Type              string `name:"connection_pool_type" default:"pgbouncer"`
+	Image             string `name:"connection_pool_image"  default:"pgbouncer:1.0"`
+	Mode              string `name:"connection_pool_mode"  default:"session"`
+}
+
 // Config describes operator config
 type Config struct {
 	CRD
@@ -90,6 +100,7 @@ type Config struct {
 	Auth
 	Scalyr
 	LogicalBackup
+	ConnectionPool
 
 	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS

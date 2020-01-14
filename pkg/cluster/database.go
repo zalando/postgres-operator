@@ -1,10 +1,12 @@
 package cluster
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"net"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/lib/pq"
@@ -28,6 +30,25 @@ const (
 	getDatabasesSQL       = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
 	createDatabaseSQL     = `CREATE DATABASE "%s" OWNER "%s";`
 	alterDatabaseOwnerSQL = `ALTER DATABASE "%s" OWNER TO "%s";`
+	connectionPoolLookup  = `
+		CREATE SCHEMA IF NOT EXISTS {{.pool_schema}};
+
+		CREATE OR REPLACE FUNCTION {{.pool_schema}}.user_lookup(
+			in i_username text, out uname text, out phash text)
+		RETURNS record AS $$
+		BEGIN
+			SELECT usename, passwd FROM pg_catalog.pg_shadow
+			WHERE usename = i_username INTO uname, phash;
+			RETURN;
+		END;
+		$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+		REVOKE ALL ON FUNCTION {{.pool_schema}}.user_lookup(text)
+			FROM public, {{.pool_schema}};
+		GRANT EXECUTE ON FUNCTION {{.pool_schema}}.user_lookup(text)
+			TO {{.pool_user}};
+		GRANT USAGE ON SCHEMA {{.pool_schema}} TO {{.pool_user}};
+	`
 )
 
 func (c *Cluster) pgConnectionString() string {
@@ -242,4 +263,50 @@ func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin
 	}
 
 	return result
+}
+
+// Creates a connection pool credentials lookup function in every database to
+// perform remote authentification.
+func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
+	var stmtBytes bytes.Buffer
+
+	if err := c.initDbConn(); err != nil {
+		return fmt.Errorf("could not init database connection")
+	}
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}()
+
+	currentDatabases, err := c.getDatabases()
+	if err != nil {
+		msg := "could not get databases to install pool lookup function: %v"
+		return fmt.Errorf(msg, err)
+	}
+
+	templater := template.Must(template.New("sql").Parse(connectionPoolLookup))
+
+	for dbname, _ := range currentDatabases {
+		c.logger.Infof("Install pool lookup function into %s", dbname)
+
+		params := TemplateParams{
+			"pool_schema": poolSchema,
+			"pool_user":   poolUser,
+		}
+
+		if err := templater.Execute(&stmtBytes, params); err != nil {
+			return fmt.Errorf("could not prepare sql statement %+v: %v",
+				params, err)
+		}
+
+		if _, err := c.pgDb.Exec(stmtBytes.String()); err != nil {
+			return fmt.Errorf("could not execute sql statement %s: %v",
+				stmtBytes.String(), err)
+		}
+
+		c.logger.Infof("Pool lookup function installed into %s", dbname)
+	}
+
+	return nil
 }

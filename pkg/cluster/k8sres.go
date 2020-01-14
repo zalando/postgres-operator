@@ -31,6 +31,8 @@ const (
 	patroniPGParametersParameterName = "parameters"
 	patroniPGHBAConfParameterName    = "pg_hba"
 	localHost                        = "127.0.0.1/32"
+	connectionPoolContainer          = "connection-pool"
+	pgPort                           = 5432
 )
 
 type pgUser struct {
@@ -66,6 +68,10 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
+func (c *Cluster) connPoolName() string {
+	return c.Name + "-pooler"
+}
+
 func (c *Cluster) endpointName(role PostgresRole) string {
 	name := c.Name
 	if role == Replica {
@@ -82,6 +88,28 @@ func (c *Cluster) serviceName(role PostgresRole) string {
 	}
 
 	return name
+}
+
+func (c *Cluster) serviceAddress(role PostgresRole) string {
+	service, exist := c.Services[role]
+
+	if exist {
+		return service.ObjectMeta.Name
+	}
+
+	c.logger.Warningf("No service for role %s", role)
+	return ""
+}
+
+func (c *Cluster) servicePort(role PostgresRole) string {
+	service, exist := c.Services[role]
+
+	if exist {
+		return fmt.Sprint(service.Spec.Ports[0].Port)
+	}
+
+	c.logger.Warningf("No service for role %s", role)
+	return ""
 }
 
 func (c *Cluster) podDisruptionBudgetName() string {
@@ -315,7 +343,11 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 		return *tolerationsSpec
 	}
 
-	if len(podToleration["key"]) > 0 || len(podToleration["operator"]) > 0 || len(podToleration["value"]) > 0 || len(podToleration["effect"]) > 0 {
+	if len(podToleration["key"]) > 0 ||
+		len(podToleration["operator"]) > 0 ||
+		len(podToleration["value"]) > 0 ||
+		len(podToleration["effect"]) > 0 {
+
 		return []v1.Toleration{
 			{
 				Key:      podToleration["key"],
@@ -1668,4 +1700,186 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return "logical-backup-" + c.clusterName().Name
+}
+
+func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
+	*v1.PodTemplateSpec, error) {
+
+	podTemplate := spec.ConnectionPool.PodTemplate
+
+	if podTemplate == nil {
+		gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
+		resources, err := generateResourceRequirements(
+			c.Spec.Resources,
+			c.makeDefaultResources())
+
+		effectiveMode := spec.ConnectionPool.Mode
+		if effectiveMode == nil {
+			effectiveMode = &c.OpConfig.ConnectionPool.Mode
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+		}
+
+		secretSelector := func(key string) *v1.SecretKeySelector {
+			return &v1.SecretKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: c.credentialSecretName(c.OpConfig.SuperUsername),
+				},
+				Key: key,
+			}
+		}
+
+		envVars := []v1.EnvVar{
+			{
+				Name:  "PGHOST",
+				Value: c.serviceAddress(Master),
+			},
+			{
+				Name:  "PGPORT",
+				Value: c.servicePort(Master),
+			},
+			{
+				Name: "PGUSER",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: secretSelector("username"),
+				},
+			},
+			// the convention is to use the same schema name as
+			// connection pool username
+			{
+				Name: "PGSCHEMA",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: secretSelector("username"),
+				},
+			},
+			{
+				Name: "PGPASSWORD",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: secretSelector("password"),
+				},
+			},
+			{
+				Name:  "CONNECTION_POOL_MODE",
+				Value: *effectiveMode,
+			},
+			{
+				Name:  "CONNECTION_POOL_PORT",
+				Value: fmt.Sprint(pgPort),
+			},
+		}
+
+		poolerContainer := v1.Container{
+			Name:            connectionPoolContainer,
+			Image:           c.OpConfig.ConnectionPool.Image,
+			ImagePullPolicy: v1.PullIfNotPresent,
+			Resources:       *resources,
+			Ports: []v1.ContainerPort{
+				{
+					ContainerPort: pgPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+			Env: envVars,
+		}
+
+		podTemplate = &v1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:      c.connPoolLabelsSelector().MatchLabels,
+				Namespace:   c.Namespace,
+				Annotations: c.generatePodAnnotations(spec),
+			},
+			Spec: v1.PodSpec{
+				ServiceAccountName:            c.OpConfig.PodServiceAccountName,
+				TerminationGracePeriodSeconds: &gracePeriod,
+				Containers:                    []v1.Container{poolerContainer},
+				// TODO: add tolerations to scheduler pooler on the same node
+				// as database
+				//Tolerations:                   *tolerationsSpec,
+			},
+		}
+	}
+
+	return podTemplate, nil
+}
+
+func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
+	*appsv1.Deployment, error) {
+
+	podTemplate, err := c.generateConnPoolPodTemplate(spec)
+	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	if numberOfInstances == nil {
+		numberOfInstances = c.OpConfig.ConnectionPool.NumberOfInstances
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.connPoolName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: map[string]string{},
+			// make Postgresql CRD object its owner, so that if CRD object is
+			// deleted, this object will be deleted even if something went
+			// wrong and operator didn't deleted it.
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					UID:        c.Statefulset.ObjectMeta.UID,
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       c.Statefulset.ObjectMeta.Name,
+				},
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: numberOfInstances,
+			Selector: c.connPoolLabelsSelector(),
+			Template: *podTemplate,
+		},
+	}
+
+	return deployment, nil
+}
+
+func (c *Cluster) generateConnPoolService(spec *acidv1.PostgresSpec) *v1.Service {
+	serviceSpec := v1.ServiceSpec{
+		Ports: []v1.ServicePort{
+			{
+				Name:       c.connPoolName(),
+				Port:       pgPort,
+				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
+			},
+		},
+		Type: v1.ServiceTypeClusterIP,
+		Selector: map[string]string{
+			"connection-pool": c.connPoolName(),
+		},
+	}
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.connPoolName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: map[string]string{},
+			// make Postgresql CRD object its owner, so that if CRD object is
+			// deleted, this object will be deleted even if something went
+			// wrong and operator didn't deleted it.
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					UID:        c.Postgresql.ObjectMeta.UID,
+					APIVersion: acidv1.APIVersion,
+					Kind:       acidv1.PostgresqlKind,
+					Name:       c.Postgresql.ObjectMeta.Name,
+				},
+			},
+		},
+		Spec: serviceSpec,
+	}
+
+	return service
 }
