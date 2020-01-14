@@ -69,3 +69,5 @@ type ClusterStatus struct {
 	Spec           acidv1.PostgresSpec
 	Error          error
 }
+
+type TemplateParams map[string]interface{}

@@ -408,7 +408,19 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 }
 
 func (c *Cluster) labelsSelector() *metav1.LabelSelector {
-	return &metav1.LabelSelector{MatchLabels: c.labelsSet(false), MatchExpressions: nil}
+	return &metav1.LabelSelector{
+		MatchLabels:      c.labelsSet(false),
+		MatchExpressions: nil,
+	}
+}
+
+func (c *Cluster) connPoolLabelsSelector() *metav1.LabelSelector {
+	return &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"connection-pool": c.connPoolName(),
+		},
+		MatchExpressions: nil,
+	}
 }
 
 func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) labels.Set {
@@ -482,4 +494,8 @@ func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 
 func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
+}
+
+func (c *Cluster) needConnectionPool() bool {
+	return c.Spec.ConnectionPool != nil
 }

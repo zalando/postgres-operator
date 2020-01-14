@@ -456,6 +456,12 @@ func (c *Cluster) syncRoles() (err error) {
 	for _, u := range c.pgUsers {
 		userNames = append(userNames, u.Name)
 	}
+
+	// An exception from system users, connection pool user
+	connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
+	userNames = append(userNames, connPoolUser.Name)
+	c.pgUsers[connPoolUser.Name] = connPoolUser
+
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)

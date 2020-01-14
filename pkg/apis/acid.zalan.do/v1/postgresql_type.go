@@ -27,6 +27,8 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
+	ConnectionPool *ConnectionPool `json:"connectionPool,omitempty"`
+
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
 
@@ -153,4 +155,14 @@ type UserFlags []string
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus struct {
 	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+}
+
+// Options for connection pooler
+type ConnectionPool struct {
+	NumberOfInstances *int32              `json:"instancesNumber,omitempty"`
+	Schema            *string             `json:"schema,omitempty"`
+	User              *string             `json:"user,omitempty"`
+	Type              *string             `json:"type,omitempty"`
+	Mode              *string             `json:"mode,omitempty"`
+	PodTemplate       *v1.PodTemplateSpec `json:"podTemplate,omitempty"`
 }

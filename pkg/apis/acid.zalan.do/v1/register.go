@@ -10,7 +10,8 @@ import (
 
 // APIVersion of the `postgresql` and `operator` CRDs
 const (
-	APIVersion = "v1"
+	APIVersion     = "v1"
+	PostgresqlKind = "postgresql"
 )
 
 var (
@@ -42,7 +43,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// AddKnownType assumes derives the type kind from the type name, which is always uppercase.
 	// For our CRDs we use lowercase names historically, therefore we have to supply the name separately.
 	// TODO: User uppercase CRDResourceKind of our types in the next major API version
-	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresql"), &Postgresql{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind(PostgresqlKind), &Postgresql{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresqlList"), &PostgresqlList{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("OperatorConfiguration"),
 		&OperatorConfiguration{})

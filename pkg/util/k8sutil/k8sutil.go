@@ -40,6 +40,7 @@ type KubernetesClient struct {
 	corev1.NamespacesGetter
 	corev1.ServiceAccountsGetter
 	appsv1.StatefulSetsGetter
+	appsv1.DeploymentsGetter
 	rbacv1beta1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
@@ -102,6 +103,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.NodesGetter = client.CoreV1()
 	kubeClient.NamespacesGetter = client.CoreV1()
 	kubeClient.StatefulSetsGetter = client.AppsV1()
+	kubeClient.DeploymentsGetter = client.AppsV1()
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
