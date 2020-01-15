@@ -12,8 +12,8 @@ keywords:
 - patroni
 - spilo
 maintainers:
-- name: Zalando
-  email: opensource@zalando.de
+- name: siku4
+  email: sk@sik-net.de
 sources:
 - https://github.com/zalando/postgres-operator
 engine: gotpl
