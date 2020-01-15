@@ -1804,6 +1804,26 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 	return podTemplate, nil
 }
 
+// Return an array of ownerReferences to make an arbitraty object dependent on
+// the StatefulSet. Dependency is made on StatefulSet instead of PostgreSQL CRD
+// while the former is represent the actual state, and only it's deletion means
+// we delete the cluster (e.g. if CRD was deleted, StatefulSet somehow
+// survived, we can't delete an object because it will affect the functioning
+// cluster).
+func (c *Cluster) ownerReferences() []metav1.OwnerReference {
+	controller := true
+
+	return []metav1.OwnerReference{
+		{
+			UID:        c.Statefulset.ObjectMeta.UID,
+			APIVersion: "apps/v1",
+			Kind:       "StatefulSet",
+			Name:       c.Statefulset.ObjectMeta.Name,
+			Controller: &controller,
+		},
+	}
+}
+
 func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 	*appsv1.Deployment, error) {
 
@@ -1823,17 +1843,13 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
 			Annotations: map[string]string{},
-			// make Postgresql CRD object its owner, so that if CRD object is
-			// deleted, this object will be deleted even if something went
-			// wrong and operator didn't deleted it.
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        c.Statefulset.ObjectMeta.UID,
-					APIVersion: "apps/v1",
-					Kind:       "StatefulSet",
-					Name:       c.Statefulset.ObjectMeta.Name,
-				},
-			},
+			// make StatefulSet object its owner to represent the dependency.
+			// By itself StatefulSet is being deleted with "Ophaned"
+			// propagation policy, which means that it's deletion will not
+			// clean up this deployment, but there is a hope that this object
+			// will be garbage collected if something went wrong and operator
+			// didn't deleted it.
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: numberOfInstances,
@@ -1866,17 +1882,13 @@ func (c *Cluster) generateConnPoolService(spec *acidv1.PostgresSpec) *v1.Service
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
 			Annotations: map[string]string{},
-			// make Postgresql CRD object its owner, so that if CRD object is
-			// deleted, this object will be deleted even if something went
-			// wrong and operator didn't deleted it.
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					UID:        c.Postgresql.ObjectMeta.UID,
-					APIVersion: acidv1.APIVersion,
-					Kind:       acidv1.PostgresqlKind,
-					Name:       c.Postgresql.ObjectMeta.Name,
-				},
-			},
+			// make StatefulSet object its owner to represent the dependency.
+			// By itself StatefulSet is being deleted with "Ophaned"
+			// propagation policy, which means that it's deletion will not
+			// clean up this service, but there is a hope that this object will
+			// be garbage collected if something went wrong and operator didn't
+			// deleted it.
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: serviceSpec,
 	}
