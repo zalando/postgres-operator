@@ -154,10 +154,14 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 		return nil
 	}
 
+	// set delete propagation policy to foreground, so that replica set will be
+	// also deleted.
+	policy := metav1.DeletePropagationForeground
+	options := metav1.DeleteOptions{PropagationPolicy: &policy}
 	deployment := c.ConnectionPool.Deployment
 	err = c.KubeClient.
 		Deployments(deployment.Namespace).
-		Delete(deployment.Name, c.deleteOptions)
+		Delete(deployment.Name, &options)
 
 	if !k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("Connection pool deployment was already deleted")
@@ -168,10 +172,12 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 	c.logger.Infof("Connection pool deployment %q has been deleted",
 		util.NameFromMeta(deployment.ObjectMeta))
 
+	// set delete propagation policy to foreground, so that all the dependant
+	// will be deleted.
 	service := c.ConnectionPool.Service
 	err = c.KubeClient.
 		Services(service.Namespace).
-		Delete(service.Name, c.deleteOptions)
+		Delete(service.Name, &options)
 
 	if !k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("Connection pool service was already deleted")
