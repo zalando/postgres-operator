@@ -73,8 +73,7 @@ postgresqls
             td { volume_size }
             td { calcCosts(nodes, cpu, memory, volume_size) }$
 
-            td(style='white-space: pre')
-              | { namespace }
+            td
 
 
               .btn-group.pull-right(
@@ -146,9 +145,7 @@ postgresqls
             td { team }
             td(style='white-space: pre')
               | { namespace }
-
             td
-
               a(
                 href='/#/status/{ cluster_path(this) }'
               )
