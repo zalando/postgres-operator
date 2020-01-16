@@ -1083,6 +1083,18 @@ func TestAdditionalVolume(t *testing.T) {
 			volumePos: 1,
 		},
 	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
 	for _, tt := range tests {
 		// Test with additional volume mounted in all containers
 		additionalVolumeMount := []acidv1.AdditionalVolume{
@@ -1098,11 +1110,7 @@ func TestAdditionalVolume(t *testing.T) {
 
 		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
 
-		err := addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
-		if err != nil {
-			t.Errorf("Unable to add additional volume %v", err)
-		}
-
+		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
 		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
 
 		if volumeName != additionalVolumeMount[0].Name {
@@ -1143,11 +1151,7 @@ func TestAdditionalVolume(t *testing.T) {
 
 		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
 
-		err := addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
-		if err != nil {
-			t.Errorf("Unable to add additional volume %v", err)
-		}
-
+		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
 		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
 
 		if volumeName != additionalVolumeMount[0].Name {

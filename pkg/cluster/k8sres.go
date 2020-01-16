@@ -494,7 +494,7 @@ func mountShmVolumeNeeded(opConfig config.Config, spec *acidv1.PostgresSpec) *bo
 	return opConfig.ShmVolume
 }
 
-func generatePodTemplate(
+func (c *Cluster) generatePodTemplate(
 	namespace string,
 	labels labels.Set,
 	annotations map[string]string,
@@ -555,10 +555,7 @@ func generatePodTemplate(
 	}
 
 	if additionalVolumes != nil {
-		err := addAdditionalVolumes(&podSpec, additionalVolumes)
-		if err != nil {
-			return nil, fmt.Errorf("Could not add additionnal volume : %v", err)
-		}
+		c.addAdditionalVolumes(&podSpec, additionalVolumes)
 	}
 
 	template := v1.PodTemplateSpec{
@@ -1297,26 +1294,53 @@ func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, addition
 	podSpec.Volumes = volumes
 }
 
-func addAdditionalVolumes(podSpec *v1.PodSpec, additionalVolumes []acidv1.AdditionalVolume) error {
+func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
+	additionalVolumes []acidv1.AdditionalVolume) {
+
 	volumes := podSpec.Volumes
+	mountPaths := map[string]acidv1.AdditionalVolume{}
 	for _, v := range additionalVolumes {
-		if v.MountPath == constants.PostgresDataMount {
-			return fmt.Errorf("Additional Volumes can't be mounted on postgresql data directory")
+		if previousVolume, exist := mountPaths[v.MountPath]; exist {
+			msg := "Volume %+v cannot be mounted to the same path as %+v"
+			c.logger.Warningf(msg, v, previousVolume)
+			continue
 		}
+
+		if v.MountPath == constants.PostgresDataMount {
+			msg := "Cannot mount volume on postgresql data directory, %+v"
+			c.logger.Warningf(msg, v)
+			continue
+		}
+
+		if v.TargetContainers == nil {
+			spiloContainer := podSpec.Containers[0]
+			v.TargetContainers = []string{spiloContainer.Name}
+		}
+
+		for _, target := range v.TargetContainers {
+			if target == "all" && len(v.TargetContainers) != 1 {
+				msg := `Target containers could be either "all" or a list
+						of containers, mixing those is not allowed, %+v`
+				c.logger.Warningf(msg, v)
+				continue
+			}
+		}
+
 		volumes = append(volumes,
 			v1.Volume{
 				Name:         v.Name,
 				VolumeSource: v.VolumeSource,
 			},
 		)
+
+		mountPaths[v.MountPath] = v
 	}
+
+	c.logger.Infof("Mount additional volumes: %+v", additionalVolumes)
 
 	for i := range podSpec.Containers {
 		mounts := podSpec.Containers[i].VolumeMounts
 		for _, v := range additionalVolumes {
-			if v.TargetContainers == nil {
-				v.TargetContainers = []string{"all"}
-			}
 			for _, target := range v.TargetContainers {
 				if podSpec.Containers[i].Name == target || target == "all" {
 					mounts = append(mounts, v1.VolumeMount{
@@ -1331,8 +1355,6 @@ func addAdditionalVolumes(podSpec *v1.PodSpec, additionalVolumes []acidv1.Additi
 	}
 
 	podSpec.Volumes = volumes
-
-	return nil
 }
 
 func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
@@ -1739,7 +1761,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	annotations := c.generatePodAnnotations(&c.Spec)
 
 	// re-use the method that generates DB pod templates
-	if podTemplate, err = generatePodTemplate(
+	if podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
 		labels,
 		annotations,
