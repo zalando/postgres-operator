@@ -165,4 +165,6 @@ type ConnectionPool struct {
 	Type              *string             `json:"type,omitempty"`
 	Mode              *string             `json:"mode,omitempty"`
 	PodTemplate       *v1.PodTemplateSpec `json:"podTemplate,omitempty"`
+
+	Resources `json:"resources,omitempty"`
 }

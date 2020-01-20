@@ -142,5 +142,17 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
 	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
 
+	// connection pool
+	result.ConnectionPool.NumberOfInstances = fromCRD.ConnectionPool.NumberOfInstances
+	result.ConnectionPool.Schema = fromCRD.ConnectionPool.Schema
+	result.ConnectionPool.User = fromCRD.ConnectionPool.User
+	result.ConnectionPool.Type = fromCRD.ConnectionPool.Type
+	result.ConnectionPool.Image = fromCRD.ConnectionPool.Image
+	result.ConnectionPool.Mode = fromCRD.ConnectionPool.Mode
+	result.ConnectionPool.ConnPoolDefaultCPURequest = fromCRD.ConnectionPool.DefaultCPURequest
+	result.ConnectionPool.ConnPoolDefaultMemoryRequest = fromCRD.ConnectionPool.DefaultMemoryRequest
+	result.ConnectionPool.ConnPoolDefaultCPULimit = fromCRD.ConnectionPool.DefaultCPULimit
+	result.ConnectionPool.ConnPoolDefaultMemoryLimit = fromCRD.ConnectionPool.DefaultMemoryLimit
+
 	return result
 }

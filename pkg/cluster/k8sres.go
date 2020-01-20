@@ -120,10 +120,39 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 
 	config := c.OpConfig
 
-	defaultRequests := acidv1.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
-	defaultLimits := acidv1.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
+	defaultRequests := acidv1.ResourceDescription{
+		CPU:    config.Resources.DefaultCPURequest,
+		Memory: config.Resources.DefaultMemoryRequest,
+	}
+	defaultLimits := acidv1.ResourceDescription{
+		CPU:    config.Resources.DefaultCPULimit,
+		Memory: config.Resources.DefaultMemoryLimit,
+	}
 
-	return acidv1.Resources{ResourceRequests: defaultRequests, ResourceLimits: defaultLimits}
+	return acidv1.Resources{
+		ResourceRequests: defaultRequests,
+		ResourceLimits:   defaultLimits,
+	}
+}
+
+// Generate default resource section for connection pool deployment, to be used
+// if nothing custom is specified in the manifest
+func (c *Cluster) makeDefaultConnPoolResources() acidv1.Resources {
+	config := c.OpConfig
+
+	defaultRequests := acidv1.ResourceDescription{
+		CPU:    config.ConnectionPool.ConnPoolDefaultCPURequest,
+		Memory: config.ConnectionPool.ConnPoolDefaultMemoryRequest,
+	}
+	defaultLimits := acidv1.ResourceDescription{
+		CPU:    config.ConnectionPool.ConnPoolDefaultCPULimit,
+		Memory: config.ConnectionPool.ConnPoolDefaultMemoryLimit,
+	}
+
+	return acidv1.Resources{
+		ResourceRequests: defaultRequests,
+		ResourceLimits:   defaultLimits,
+	}
 }
 
 func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
@@ -765,12 +794,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 		request := spec.Resources.ResourceRequests.Memory
 		if request == "" {
-			request = c.OpConfig.DefaultMemoryRequest
+			request = c.OpConfig.Resources.DefaultMemoryRequest
 		}
 
 		limit := spec.Resources.ResourceLimits.Memory
 		if limit == "" {
-			limit = c.OpConfig.DefaultMemoryLimit
+			limit = c.OpConfig.Resources.DefaultMemoryLimit
 		}
 
 		isSmaller, err := util.IsSmallerQuantity(request, limit)
@@ -792,12 +821,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			// TODO #413
 			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
 			if request == "" {
-				request = c.OpConfig.DefaultMemoryRequest
+				request = c.OpConfig.Resources.DefaultMemoryRequest
 			}
 
 			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
 			if limit == "" {
-				limit = c.OpConfig.DefaultMemoryLimit
+				limit = c.OpConfig.Resources.DefaultMemoryLimit
 			}
 
 			isSmaller, err := util.IsSmallerQuantity(sidecarRequest, sidecarLimit)
@@ -1710,8 +1739,8 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 	if podTemplate == nil {
 		gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
 		resources, err := generateResourceRequirements(
-			c.Spec.Resources,
-			c.makeDefaultResources())
+			spec.ConnectionPool.Resources,
+			c.makeDefaultConnPoolResources())
 
 		effectiveMode := spec.ConnectionPool.Mode
 		if effectiveMode == nil {

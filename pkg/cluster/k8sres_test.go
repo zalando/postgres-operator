@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"reflect"
 
 	v1 "k8s.io/api/core/v1"
@@ -448,6 +449,70 @@ func TestSecretVolume(t *testing.T) {
 		if numMountsCheck != numMounts+1 {
 			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
 				numMountsCheck, numMounts+1)
+		}
+	}
+}
+
+func TestConnPoolPodTemplate(t *testing.T) {
+	testName := "Test connection pool pod template generation"
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPool: config.ConnectionPool{
+					ConnPoolDefaultCPURequest:    "100m",
+					ConnPoolDefaultCPULimit:      "100m",
+					ConnPoolDefaultMemoryRequest: "100M",
+					ConnPoolDefaultMemoryLimit:   "100M",
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	var clusterNoDefaultRes = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPool: config.ConnectionPool{},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	tests := []struct {
+		subTest  string
+		spec     *acidv1.PostgresSpec
+		expected error
+		cluster  *Cluster
+	}{
+		{
+			subTest: "empty pod template",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: nil,
+			cluster:  cluster,
+		},
+		{
+			subTest: "no default resources",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: errors.New(`could not generate resource requirements: could not fill resource requests: could not parse default CPU quantity: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`),
+			cluster:  clusterNoDefaultRes,
+		},
+	}
+	for _, tt := range tests {
+		_, err := tt.cluster.generateConnPoolPodTemplate(tt.spec)
+
+		if err != tt.expected && err.Error() != tt.expected.Error() {
+			t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
+				testName, tt.subTest, err, tt.expected)
 		}
 	}
 }
