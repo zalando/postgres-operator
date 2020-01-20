@@ -152,6 +152,20 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
+// Defines default configuration for connection pool
+type ConnectionPoolConfiguration struct {
+	NumberOfInstances    *int32 `json:"connection_pool_instances_number,omitempty"`
+	Schema               string `json:"connection_pool_schema,omitempty"`
+	User                 string `json:"connection_pool_user,omitempty"`
+	Type                 string `json:"connection_pool_type,omitempty"`
+	Image                string `json:"connection_pool_image,omitempty"`
+	Mode                 string `json:"connection_pool_mode,omitempty"`
+	DefaultCPURequest    string `name:"connection_pool_default_cpu_request,omitempty"`
+	DefaultMemoryRequest string `name:"connection_pool_default_memory_request,omitempty"`
+	DefaultCPULimit      string `name:"connection_pool_default_cpu_limit,omitempty"`
+	DefaultMemoryLimit   string `name:"connection_pool_default_memory_limit,omitempty"`
+}
+
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
 type OperatorLogicalBackupConfiguration struct {
 	Schedule          string `json:"logical_backup_schedule,omitempty"`
@@ -188,6 +202,7 @@ type OperatorConfigurationData struct {
 	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
+	ConnectionPool             ConnectionPoolConfiguration        `json:"connection_pool"`
 }
 
 //Duration shortens this frequently used name
