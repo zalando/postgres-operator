@@ -336,7 +336,7 @@ func (c *Cluster) Create() error {
 			c.logger.Warning("Connection pool already exists in the cluster")
 			return nil
 		}
-		connPool, err := c.createConnectionPool()
+		connPool, err := c.createConnectionPool(c.installLookupFunction)
 		if err != nil {
 			c.logger.Warningf("could not create connection pool: %v", err)
 			return nil

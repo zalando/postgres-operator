@@ -10,6 +10,7 @@ import (
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -55,6 +56,20 @@ type mockSecret struct {
 }
 
 type MockSecretGetter struct {
+}
+
+type mockDeployment struct {
+	appsv1.DeploymentInterface
+}
+
+type MockDeploymentGetter struct {
+}
+
+type mockService struct {
+	corev1.ServiceInterface
+}
+
+type MockServiceGetter struct {
 }
 
 type mockConfigMap struct {
@@ -217,19 +232,53 @@ func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigM
 }
 
 // Secrets to be mocked
-func (c *MockSecretGetter) Secrets(namespace string) corev1.SecretInterface {
+func (mock *MockSecretGetter) Secrets(namespace string) corev1.SecretInterface {
 	return &mockSecret{}
 }
 
 // ConfigMaps to be mocked
-func (c *MockConfigMapsGetter) ConfigMaps(namespace string) corev1.ConfigMapInterface {
+func (mock *MockConfigMapsGetter) ConfigMaps(namespace string) corev1.ConfigMapInterface {
 	return &mockConfigMap{}
+}
+
+func (mock *MockDeploymentGetter) Deployments(namespace string) appsv1.DeploymentInterface {
+	return &mockDeployment{}
+}
+
+func (mock *mockDeployment) Create(*apiappsv1.Deployment) (*apiappsv1.Deployment, error) {
+	return &apiappsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-deployment",
+		},
+	}, nil
+}
+
+func (mock *mockDeployment) Delete(name string, opts *metav1.DeleteOptions) error {
+	return nil
+}
+
+func (mock *MockServiceGetter) Services(namespace string) corev1.ServiceInterface {
+	return &mockService{}
+}
+
+func (mock *mockService) Create(*v1.Service) (*v1.Service, error) {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-service",
+		},
+	}, nil
+}
+
+func (mock *mockService) Delete(name string, opts *metav1.DeleteOptions) error {
+	return nil
 }
 
 // NewMockKubernetesClient for other tests
 func NewMockKubernetesClient() KubernetesClient {
 	return KubernetesClient{
-		SecretsGetter:    &MockSecretGetter{},
-		ConfigMapsGetter: &MockConfigMapsGetter{},
+		SecretsGetter:     &MockSecretGetter{},
+		ConfigMapsGetter:  &MockConfigMapsGetter{},
+		DeploymentsGetter: &MockDeploymentGetter{},
+		ServicesGetter:    &MockServiceGetter{},
 	}
 }
