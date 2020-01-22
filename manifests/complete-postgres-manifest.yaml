@@ -21,14 +21,18 @@ spec:
         PersistentVolumeClaim:
           claimName: pvc-postgresql-data-partitions
           readyOnly: false
-    - name: tmp
-      mountPath: /tmp
-      subPath: foo.txt
+    - name: conf
+      mountPath: /etc/telegraf
+      subPath: telegraf.conf
+      targetContainers:
+        - telegraf-sidecar
       volumeSource:
         configMap:
           name: my-config-map
     - name: empty
       mountPath: /opt/empty
+      targetContainers:
+        - all
       volumeSource:
         emptyDir: {}
   numberOfInstances: 2
