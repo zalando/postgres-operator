@@ -1842,6 +1842,11 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 func (c *Cluster) ownerReferences() []metav1.OwnerReference {
 	controller := true
 
+	if c.Statefulset == nil {
+		c.logger.Warning("Cannot get owner reference, no statefulset")
+		return []metav1.OwnerReference{}
+	}
+
 	return []metav1.OwnerReference{
 		{
 			UID:        c.Statefulset.ObjectMeta.UID,
