@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres-operator-two
+  name: postgres-operator
 spec:
   replicas: 1
   selector:
