@@ -32,6 +32,8 @@ spec:
 #  spiloFSGroup: 103
 #  podAnnotations:
 #    annotation.key: value
+#  serviceAnnotations:
+#    annotation.key: value
 #  podPriorityClassName: "spilo-pod-priority"
 #  tolerations:
 #  - key: postgres

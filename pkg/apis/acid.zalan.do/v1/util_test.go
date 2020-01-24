@@ -456,16 +456,82 @@ var postgresqlList = []struct {
 		PostgresqlList{},
 		errors.New("unexpected end of JSON input")}}
 
-var annotations = []struct {
+var podAnnotations = []struct {
 	about       string
 	in          []byte
 	annotations map[string]string
 	err         error
 }{{
-	about:       "common annotations",
-	in:          []byte(`{"kind": "Postgresql","apiVersion": "acid.zalan.do/v1","metadata": {"name": "acid-testcluster1"}, "spec": {"podAnnotations": {"foo": "bar"},"teamId": "acid", "clone": {"cluster": "team-batman"}}}`),
+	about: "common annotations",
+	in: []byte(`{
+		"kind": "Postgresql",
+		"apiVersion": "acid.zalan.do/v1",
+		"metadata": {
+			"name": "acid-testcluster1"
+		},
+		"spec": {
+			"podAnnotations": {
+				"foo": "bar"
+			},
+			"teamId": "acid",
+			"clone": {
+				"cluster": "team-batman"
+			}
+		}
+	}`),
 	annotations: map[string]string{"foo": "bar"},
 	err:         nil},
+}
+
+var serviceAnnotations = []struct {
+	about       string
+	in          []byte
+	annotations map[string]string
+	err         error
+}{
+	{
+		about: "common single annotation",
+		in: []byte(`{
+			"kind": "Postgresql",
+			"apiVersion": "acid.zalan.do/v1",
+			"metadata": {
+				"name": "acid-testcluster1"
+			},
+			"spec": {
+				"serviceAnnotations": {
+					"foo": "bar"
+				},
+				"teamId": "acid",
+				"clone": {
+					"cluster": "team-batman"
+				}
+			}
+		}`),
+		annotations: map[string]string{"foo": "bar"},
+		err:         nil,
+	},
+	{
+		about: "common two annotations",
+		in: []byte(`{
+			"kind": "Postgresql",
+			"apiVersion": "acid.zalan.do/v1",
+			"metadata": {
+				"name": "acid-testcluster1"
+			},
+			"spec": {
+				"serviceAnnotations": {
+					"foo": "bar",
+					"post": "gres"
+				},
+				"teamId": "acid",
+				"clone": {
+					"cluster": "team-batman"
+				}
+			}
+		}`),
+		annotations: map[string]string{"foo": "bar", "post": "gres"},
+		err:         nil,
+	},
 }
 
 func mustParseTime(s string) metav1.Time {
@@ -517,21 +583,42 @@ func TestWeekdayTime(t *testing.T) {
 	}
 }
 
-func TestClusterAnnotations(t *testing.T) {
-	for _, tt := range annotations {
+func TestPodAnnotations(t *testing.T) {
+	for _, tt := range podAnnotations {
 		t.Run(tt.about, func(t *testing.T) {
 			var cluster Postgresql
 			err := cluster.UnmarshalJSON(tt.in)
 			if err != nil {
 				if tt.err == nil || err.Error() != tt.err.Error() {
-					t.Errorf("Unable to marshal cluster with annotations: expected %v got %v", tt.err, err)
+					t.Errorf("Unable to marshal cluster with podAnnotations: expected %v got %v", tt.err, err)
 				}
 				return
 			}
 			for k, v := range cluster.Spec.PodAnnotations {
 				found, expected := v, tt.annotations[k]
 				if found != expected {
-					t.Errorf("Didn't find correct value for key %v in for podAnnotations:  Expected %v found %v", k, expected, found)
+					t.Errorf("Didn't find correct value for key %v in for podAnnotations: Expected %v found %v", k, expected, found)
+				}
+			}
+		})
+	}
+}
+
+func TestServiceAnnotations(t *testing.T) {
+	for _, tt := range serviceAnnotations {
+		t.Run(tt.about, func(t *testing.T) {
+			var cluster Postgresql
+			err := cluster.UnmarshalJSON(tt.in)
+			if err != nil {
+				if tt.err == nil || err.Error() != tt.err.Error() {
+					t.Errorf("Unable to marshal cluster with serviceAnnotations: expected %v got %v", tt.err, err)
+				}
+				return
+			}
+			for k, v := range cluster.Spec.ServiceAnnotations {
+				found, expected := v, tt.annotations[k]
+				if found != expected {
+					t.Errorf("Didn't find correct value for key %v in for serviceAnnotations: Expected %v found %v", k, expected, found)
 				}
 			}
 		})

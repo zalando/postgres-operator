@@ -514,6 +514,13 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.ServiceAnnotations != nil {
+		in, out := &in.ServiceAnnotations, &out.ServiceAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.InitContainersOld != nil {
 		in, out := &in.InitContainersOld, &out.InitContainersOld
 		*out = make([]corev1.Container, len(*in))
