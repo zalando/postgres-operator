@@ -1299,7 +1299,7 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 
 	volumes := podSpec.Volumes
 	mountPaths := map[string]acidv1.AdditionalVolume{}
-	for _, v := range additionalVolumes {
+	for i, v := range additionalVolumes {
 		if previousVolume, exist := mountPaths[v.MountPath]; exist {
 			msg := "Volume %+v cannot be mounted to the same path as %+v"
 			c.logger.Warningf(msg, v, previousVolume)
@@ -1314,7 +1314,7 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 
 		if v.TargetContainers == nil {
 			spiloContainer := podSpec.Containers[0]
-			v.TargetContainers = []string{spiloContainer.Name}
+			additionalVolumes[i].TargetContainers = []string{spiloContainer.Name}
 		}
 
 		for _, target := range v.TargetContainers {
