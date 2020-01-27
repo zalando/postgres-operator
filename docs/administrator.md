@@ -501,7 +501,7 @@ Run NPM to continuously compile `tags/js` code. Basically, it creates an
 To build the Docker image open a shell and change to the `ui` folder. Then run:
 
 ```bash
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.2.0 .
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.3.0 .
 ```
 
 Apply all manifests for the `ui/manifests` folder to deploy the Postgres
