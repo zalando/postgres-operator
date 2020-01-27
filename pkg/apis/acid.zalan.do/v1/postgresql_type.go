@@ -86,9 +86,10 @@ type MaintenanceWindow struct {
 
 // Volume describes a single volume in the manifest.
 type Volume struct {
-	Size         string `json:"size"`
-	StorageClass string `json:"storageClass"`
-	SubPath      string `json:"subPath,omitempty"`
+	Size             string `json:"size"`
+	StorageClass     string `json:"storageClass"`
+	UseExistingClaim bool   `json:"useExistingClaim,omitempty"`
+	SubPath          string `json:"subPath,omitempty"`
 }
 
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.

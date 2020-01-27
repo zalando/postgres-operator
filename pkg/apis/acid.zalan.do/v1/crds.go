@@ -571,6 +571,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"storageClass": {
 								Type: "string",
 							},
+							"useExistingClaim": {
+								Type: "boolean",
+							},
 							"subPath": {
 								Type: "string",
 							},
