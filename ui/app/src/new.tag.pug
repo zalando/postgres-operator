@@ -427,14 +427,14 @@ new
                           ref='memoryRequest'
                           type='number'
                           placeholder='{ memory.state.request.initialValue }'
-                          min='1'
+                          min='100'
                           required
                           value='{ memory.state.request.state }'
                           onchange='{ memory.state.request.edit }'
                           onkeyup='{ memory.state.request.edit }'
                         )
                         .input-group-addon
-                          .input-units Gi
+                          .input-units Mi
 
                       .input-group
                         .input-group-addon.resource-type Limit
@@ -442,14 +442,14 @@ new
                           ref='memoryLimit'
                           type='number'
                           placeholder='{ memory.state.limit.initialValue }'
-                          min='1'
+                          min='200'
                           required
                           value='{ memory.state.limit.state }'
                           onchange='{ memory.state.limit.edit }'
                           onkeyup='{ memory.state.limit.edit }'
                         )
                         .input-group-addon
-                          .input-units Gi
+                          .input-units Mi
 
       .col-lg-3
         help-general(config='{ opts.config }')
@@ -519,10 +519,10 @@ new
         resources:
           requests:
             cpu: {{ cpu.state.request.state }}m
-            memory: {{ memory.state.request.state }}Gi
+            memory: {{ memory.state.request.state }}Mi
           limits:
             cpu: {{ cpu.state.limit.state }}m
-            memory: {{ memory.state.limit.state }}Gi{{#if restoring}}
+            memory: {{ memory.state.limit.state }}Mi{{#if restoring}}
 
         clone:
           cluster: "{{ backup.state.name.state }}"
