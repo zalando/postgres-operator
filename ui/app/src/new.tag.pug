@@ -408,7 +408,7 @@ new
                           ref='cpuLimit'
                           type='number'
                           placeholder='{ cpu.state.limit.initialValue }'
-                          min='1'
+                          min='256'
                           required
                           value='{ cpu.state.limit.state }'
                           onchange='{ cpu.state.limit.edit }'
@@ -427,7 +427,7 @@ new
                           ref='memoryRequest'
                           type='number'
                           placeholder='{ memory.state.request.initialValue }'
-                          min='100'
+                          min='1'
                           required
                           value='{ memory.state.request.state }'
                           onchange='{ memory.state.request.edit }'
@@ -442,7 +442,7 @@ new
                           ref='memoryLimit'
                           type='number'
                           placeholder='{ memory.state.limit.initialValue }'
-                          min='200'
+                          min='256'
                           required
                           value='{ memory.state.limit.state }'
                           onchange='{ memory.state.limit.edit }'
@@ -786,8 +786,8 @@ new
       return instance
     }
 
-    this.cpu = DynamicResource({ request: 100, limit: 1000 })
-    this.memory = DynamicResource({ request: 1, limit: 1 })
+    this.cpu = DynamicResource({ request: 100, limit: 500 })
+    this.memory = DynamicResource({ request: 100, limit: 500 })
 
     this.backup = DynamicSet({
       type: () => 'empty',

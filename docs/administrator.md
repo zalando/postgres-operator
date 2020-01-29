@@ -514,8 +514,9 @@ kubectl apply -f ui/manifests
 Make sure the pods for the operator and the UI are both running. For local
 testing you need to apply proxying and port forwarding so that the UI can talk
 to the K8s and Postgres Operator REST API. You can use the provided
-`run_local.sh` script for this. Make sure it uses the correct URL to your K8s
-API server, e.g. for minikube it would be `https://192.168.99.100:8443`.
+`run_local.sh` script for this. Make sure Python dependencies are installed on
+you machine and the correct URL to your K8s API server is used, e.g. for
+minikube it would usually be `https://192.168.99.100:8443`.
 
 ```bash
 ./run_local.sh
