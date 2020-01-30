@@ -488,8 +488,12 @@ A secret can be pre-provisioned in different ways:
 
 With the v1.2 release the Postgres Operator is shipped with a browser-based
 configuration user interface (UI) that simplifies managing Postgres clusters
-with the operator. The UI runs with Node.js and comes with it's own Docker
-image.
+with the operator. It talks to the K8s API Server as well as the Postgres
+Operator [REST API](developer.md#debugging-the-operator). URLs as well as parts
+of the UI layout can be configured via environment variables in the
+[deployment manifest](../ui/manifests/deployment.yaml#L40).
+
+The UI runs with Node.js and comes with it's own Docker image.
 
 Run NPM to continuously compile `tags/js` code. Basically, it creates an
 `app.js` file in: `static/build/app.js`
@@ -498,26 +502,37 @@ Run NPM to continuously compile `tags/js` code. Basically, it creates an
 (cd ui/app && npm start)
 ```
 
-To build the Docker image open a shell and change to the `ui` folder. Then run:
+To build operator UI and Docker image open a shell, change to the `ui` folder
+and run:
 
 ```bash
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.3.0 .
+make docker
 ```
 
-Apply all manifests for the `ui/manifests` folder to deploy the Postgres
-Operator UI on K8s. For local tests you don't need the Ingress resource.
+Apply all manifests from the `ui/manifests` folder to deploy the Postgres
+Operator UI on K8s. Replace the image tag in the deployment manifest if you
+want to test the image you build with `make docker`. For local tests you also
+don't need the Ingress resource. Make sure the pods for the operator and the UI
+are both running.
 
 ```bash
-kubectl apply -f ui/manifests
+sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/deployment.yaml | kubectl apply -f manifests/
+kubectl get all -l application=postgres-operator-ui
 ```
 
-Make sure the pods for the operator and the UI are both running. For local
-testing you need to apply proxying and port forwarding so that the UI can talk
-to the K8s and Postgres Operator REST API. You can use the provided
+For local testing you need to apply proxying and port forwarding so that the UI
+can talk to the K8s and Postgres Operator REST API. You can use the provided
 `run_local.sh` script for this. Make sure Python dependencies are installed on
-you machine and the correct URL to your K8s API server is used, e.g. for
-minikube it would usually be `https://192.168.99.100:8443`.
+your machine and the correct K8s API server URL is used, e.g. for minikube it
+would usually be `https://192.168.99.100:8443`. When testing in minikube you
+have to build the image in its docker environment as `make docker` doesn't do it
+for you. From the `ui` directory execute:
 
 ```bash
+# minikube
+eval $(minikube docker-env)
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.3.0 .
+kubectl apply -f manifests/
+
 ./run_local.sh
 ```
