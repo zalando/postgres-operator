@@ -499,7 +499,7 @@ func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
 
 	// setting limits too low can cause unnecessary evictions / OOM kills
 	const (
-		cpuMinLimit    = "256m"
+		cpuMinLimit    = "99m"
 		memoryMinLimit = "256Mi"
 	)
 
