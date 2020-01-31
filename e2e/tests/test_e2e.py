@@ -102,10 +102,10 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_master_is_unique()
         masterPod = pods[0]
 
-        self.assertEqual(masterPod.spec.resources.limits.cpu, minCPULimit,
+        self.assertEqual(masterPod.spec.containers[0].resources.limits.cpu, minCPULimit,
                          "Expected CPU limit {}, found {}"
                          .format(minCPULimit, masterPod.spec.containers[0].resources.limits.cpu))
-        self.assertEqual(masterPod.spec.resources.limits.memory, minMemoryLimit,
+        self.assertEqual(masterPod.spec.containers[0].resources.limits.memory, minMemoryLimit,
                          "Expected memory limit {}, found {}"
                          .format(minMemoryLimit, masterPod.spec.containers[0].resources.limits.memory))
 
