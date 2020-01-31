@@ -15,9 +15,9 @@ data:
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
   db_hosted_zone: db.example.com
   debug_logging: "true"
-  # default_cpu_limit: "3"
+  # default_cpu_limit: "1"
   # default_cpu_request: 100m
-  # default_memory_limit: 1Gi
+  # default_memory_limit: 500Mi
   # default_memory_request: 100Mi
   docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16
   # enable_admin_role_for_users: "true"
@@ -48,6 +48,8 @@ data:
   # master_pod_move_timeout: 10m
   # max_instances: "-1"
   # min_instances: "-1"
+  # min_cpu_limit: 250m
+  # min_memory_limit: 250Mi
   # node_readiness_label: ""
   # oauth_token_secret_name: postgresql-operator
   # pam_configuration: |
