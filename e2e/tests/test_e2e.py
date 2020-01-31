@@ -87,7 +87,7 @@ class EndToEndTestCase(unittest.TestCase):
                         "memory": "50Mi"
                     },
                     "limits": {
-                        "cpu": "80m",
+                        "cpu": "200m",
                         "memory": "200Mi"
                     }
                 }
@@ -97,17 +97,17 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
         k8s.wait_for_master_failover(failover_targets)
 
-        pods = self.api.core_v1.list_namespaced_pod(
+        pods = k8s.api.core_v1.list_namespaced_pod(
             'default', label_selector='spilo-role=master,' + cluster_label).items
         self.assert_master_is_unique()
         masterPod = pods[0]
 
         self.assertEqual(masterPod.spec.resources.limits.cpu, minCPULimit,
                          "Expected CPU limit {}, found {}"
-                         .format(minCPULimit, masterPod.spec.resources.limits.cpu))
-        self.assertEqual(masterPod.spec.resources.limits.memory, "250Mi",
+                         .format(minCPULimit, masterPod.spec.containers[0].resources.limits.cpu))
+        self.assertEqual(masterPod.spec.resources.limits.memory, minMemoryLimit,
                          "Expected memory limit {}, found {}"
-                         .format(minMemoryLimit, masterPod.spec.resources.limits.memory))
+                         .format(minMemoryLimit, masterPod.spec.containers[0].resources.limits.memory))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
@@ -130,7 +130,6 @@ class EndToEndTestCase(unittest.TestCase):
         '''
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         '''
-
         k8s = self.k8s
         labels = "version=acid-minimal-cluster"
 

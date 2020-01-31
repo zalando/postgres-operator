@@ -281,8 +281,8 @@ resources:
     cpu: 500m
     memory: 500Mi
   requests:
-   cpu: 100m
-   memory: 250Mi
+    cpu: 100m
+    memory: 250Mi
 
 # Affinity for pod assignment
 # Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
