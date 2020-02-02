@@ -45,21 +45,23 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	NumberOfInstances     int32                `json:"numberOfInstances"`
-	Users                 map[string]UserFlags `json:"users"`
-	MaintenanceWindows    []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone                 CloneDescription     `json:"clone"`
-	ClusterName           string               `json:"-"`
-	Databases             map[string]string    `json:"databases,omitempty"`
-	Tolerations           []v1.Toleration      `json:"tolerations,omitempty"`
-	Sidecars              []Sidecar            `json:"sidecars,omitempty"`
-	InitContainers        []v1.Container       `json:"initContainers,omitempty"`
-	PodPriorityClassName  string               `json:"podPriorityClassName,omitempty"`
-	ShmVolume             *bool                `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup   bool                 `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription  `json:"standby"`
-	PodAnnotations        map[string]string    `json:"podAnnotations"`
+	NumberOfInstances         int32                `json:"numberOfInstances"`
+	Users                     map[string]UserFlags `json:"users"`
+	MaintenanceWindows        []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
+	Clone                     CloneDescription     `json:"clone"`
+	ClusterName               string               `json:"-"`
+	Databases                 map[string]string    `json:"databases,omitempty"`
+	Tolerations               []v1.Toleration      `json:"tolerations,omitempty"`
+	Sidecars                  []Sidecar            `json:"sidecars,omitempty"`
+	InitContainers            []v1.Container       `json:"initContainers,omitempty"`
+	PodPriorityClassName      string               `json:"podPriorityClassName,omitempty"`
+	ShmVolume                 *bool                `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup       bool                 `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupSchedule     string               `json:"logicalBackupSchedule,omitempty"`
+	AdditionalSecretMount     string               `json:"additionalSecretMount,omitempty"`
+	AdditionalSecretMountPath string               `json:"additionalSecretMountPath,omitempty"`
+	StandbyCluster            *StandbyDescription  `json:"standby"`
+	PodAnnotations            map[string]string    `json:"podAnnotations"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`

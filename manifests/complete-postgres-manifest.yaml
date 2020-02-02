@@ -77,6 +77,10 @@ spec:
 #  enableLogicalBackup: true
 #  logicalBackupSchedule: "30 00 * * *"
 
+# override the operator config for additional secret
+#  additionalSecretMount: "my-secret"
+#  additionalSecretMountPath: "/etc/othersecret"
+
 #  maintenanceWindows:
 #  - 01:00-06:00  #UTC
 #  - Sat:00:00-04:00
