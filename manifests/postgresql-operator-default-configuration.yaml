@@ -54,10 +54,12 @@ configuration:
     # toleration: {}
     # watched_namespace: ""
   postgres_pod_resources:
-    default_cpu_limit: "3"
+    default_cpu_limit: "1"
     default_cpu_request: 100m
-    default_memory_limit: 1Gi
+    default_memory_limit: 500Mi
     default_memory_request: 100Mi
+    # min_cpu_limit: 250m
+    # min_memory_limit: 250Mi
   timeouts:
     pod_label_wait_timeout: 10m
     pod_deletion_wait_timeout: 10m
@@ -115,6 +117,6 @@ configuration:
     scalyr_cpu_limit: "1"
     scalyr_cpu_request: 100m
     # scalyr_image: ""
-    scalyr_memory_limit: 1Gi
+    scalyr_memory_limit: 500Mi
     scalyr_memory_request: 50Mi
     # scalyr_server_url: ""

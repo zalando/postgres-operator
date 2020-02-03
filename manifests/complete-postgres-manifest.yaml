@@ -42,8 +42,8 @@ spec:
       cpu: 10m
       memory: 100Mi
     limits:
-      cpu: 300m
-      memory: 300Mi
+      cpu: 500m
+      memory: 500Mi
   patroni:
     initdb:
       encoding: "UTF8"

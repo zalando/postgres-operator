@@ -227,8 +227,8 @@ func (c *Cluster) Create() error {
 
 	c.setStatus(acidv1.ClusterStatusCreating)
 
-	if err = c.validateResources(&c.Spec); err != nil {
-		return fmt.Errorf("insufficient resource limits specified: %v", err)
+	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
+		return fmt.Errorf("could not enforce minimum resource limits: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -495,38 +495,38 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 
 }
 
-func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
-
-	// setting limits too low can cause unnecessary evictions / OOM kills
-	const (
-		cpuMinLimit    = "256m"
-		memoryMinLimit = "256Mi"
-	)
+func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 
 	var (
 		isSmaller bool
 		err       error
 	)
 
+	// setting limits too low can cause unnecessary evictions / OOM kills
+	minCPULimit := c.OpConfig.MinCPULimit
+	minMemoryLimit := c.OpConfig.MinMemoryLimit
+
 	cpuLimit := spec.Resources.ResourceLimits.CPU
 	if cpuLimit != "" {
-		isSmaller, err = util.IsSmallerQuantity(cpuLimit, cpuMinLimit)
+		isSmaller, err = util.IsSmallerQuantity(cpuLimit, minCPULimit)
 		if err != nil {
-			return fmt.Errorf("error validating CPU limit: %v", err)
+			return fmt.Errorf("could not compare defined CPU limit %s with configured minimum value %s: %v", cpuLimit, minCPULimit, err)
 		}
 		if isSmaller {
-			return fmt.Errorf("defined CPU limit %s is below required minimum %s to properly run postgresql resource", cpuLimit, cpuMinLimit)
+			c.logger.Warningf("defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
+			spec.Resources.ResourceLimits.CPU = minCPULimit
 		}
 	}
 
 	memoryLimit := spec.Resources.ResourceLimits.Memory
 	if memoryLimit != "" {
-		isSmaller, err = util.IsSmallerQuantity(memoryLimit, memoryMinLimit)
+		isSmaller, err = util.IsSmallerQuantity(memoryLimit, minMemoryLimit)
 		if err != nil {
-			return fmt.Errorf("error validating memory limit: %v", err)
+			return fmt.Errorf("could not compare defined memory limit %s with configured minimum value %s: %v", memoryLimit, minMemoryLimit, err)
 		}
 		if isSmaller {
-			return fmt.Errorf("defined memory limit %s is below required minimum %s to properly run postgresql resource", memoryLimit, memoryMinLimit)
+			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
+			spec.Resources.ResourceLimits.Memory = minMemoryLimit
 		}
 	}
 
@@ -543,7 +543,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	oldStatus := c.Status
 	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
@@ -554,22 +553,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
-
-	if err := c.validateResources(&newSpec.Spec); err != nil {
-		err = fmt.Errorf("insufficient resource limits specified: %v", err)
-
-		// cancel update only when (already too low) pod resources were edited
-		// if cluster was successfully running before the update, continue but log a warning
-		isCPULimitSmaller, err2 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.CPU, oldSpec.Spec.Resources.ResourceLimits.CPU)
-		isMemoryLimitSmaller, err3 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.Memory, oldSpec.Spec.Resources.ResourceLimits.Memory)
-
-		if oldStatus.Running() && !isCPULimitSmaller && !isMemoryLimitSmaller && err2 == nil && err3 == nil {
-			c.logger.Warning(err)
-		} else {
-			updateFailed = true
-			return err
-		}
-	}
 
 	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", oldSpec.Spec.PgVersion, newSpec.Spec.PgVersion)
@@ -616,12 +599,21 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Statefulset
 	func() {
+		if err := c.enforceMinResourceLimits(&c.Spec); err != nil {
+			c.logger.Errorf("could not sync resources: %v", err)
+			updateFailed = true
+			return
+		}
+
 		oldSs, err := c.generateStatefulSet(&oldSpec.Spec)
 		if err != nil {
 			c.logger.Errorf("could not generate old statefulset spec: %v", err)
 			updateFailed = true
 			return
 		}
+
+		// update newSpec to for latter comparison with oldSpec
+		c.enforceMinResourceLimits(&newSpec.Spec)
 
 		newSs, err := c.generateStatefulSet(&newSpec.Spec)
 		if err != nil {

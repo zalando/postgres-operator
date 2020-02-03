@@ -318,11 +318,19 @@ CRD-based configuration.
 
 * **default_cpu_limit**
   CPU limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `3`.
+  settings. The default is `1`.
 
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `1Gi`.
+  settings. The default is `500Mi`.
+
+* **min_cpu_limit**
+  hard CPU minimum what we consider to be required to properly run Postgres
+  clusters with Patroni on Kubernetes. The default is `250m`.
+
+* **min_memory_limit**
+  hard memory minimum what we consider to be required to properly run Postgres
+  clusters with Patroni on Kubernetes. The default is `250Mi`.
 
 ## Operator timeouts
 
@@ -579,4 +587,4 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   CPU limit value for the Scalyr sidecar. The default is `1`.
 
 * **scalyr_memory_limit**
-  Memory limit value for the Scalyr sidecar. The default is `1Gi`.
+  Memory limit value for the Scalyr sidecar. The default is `500Mi`.
