@@ -108,13 +108,17 @@ configKubernetes:
 # configure resource requests for the Postgres pods
 configPostgresPodResources:
   # CPU limits for the postgres containers
-  default_cpu_limit: "3"
-  # cpu request value for the postgres containers
+  default_cpu_limit: "1"
+  # CPU request value for the postgres containers
   default_cpu_request: 100m
   # memory limits for the postgres containers
-  default_memory_limit: 1Gi
+  default_memory_limit: 500Mi
   # memory request value for the postgres containers
   default_memory_request: 100Mi
+  # hard CPU minimum required to properly run a Postgres cluster
+  min_cpu_limit: 250m
+  # hard memory minimum required to properly run a Postgres cluster
+  min_memory_limit: 250Mi
 
 # timeouts related to some operator actions
 configTimeouts:
@@ -248,13 +252,13 @@ serviceAccount:
 
 priorityClassName: ""
 
-resources: {}
-  # limits:
-  #   cpu: 100m
-  #   memory: 300Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 300Mi
+resources:
+  limits:
+    cpu: 500m
+    memory: 500Mi
+  requests:
+    cpu: 100m
+    memory: 250Mi
 
 # Affinity for pod assignment
 # Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity

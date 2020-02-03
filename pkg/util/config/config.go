@@ -37,8 +37,10 @@ type Resources struct {
 	PodToleration           map[string]string `name:"toleration" default:""`
 	DefaultCPURequest       string            `name:"default_cpu_request" default:"100m"`
 	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
-	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
+	DefaultCPULimit         string            `name:"default_cpu_limit" default:"1"`
+	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"500Mi"`
+	MinCPULimit             string            `name:"min_cpu_limit" default:"250m"`
+	MinMemoryLimit          string            `name:"min_memory_limit" default:"250Mi"`
 	PodEnvironmentConfigMap string            `name:"pod_environment_configmap" default:""`
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
@@ -66,7 +68,7 @@ type Scalyr struct {
 	ScalyrCPURequest    string `name:"scalyr_cpu_request" default:"100m"`
 	ScalyrMemoryRequest string `name:"scalyr_memory_request" default:"50Mi"`
 	ScalyrCPULimit      string `name:"scalyr_cpu_limit" default:"1"`
-	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
+	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"500Mi"`
 }
 
 // LogicalBackup defines configuration for logical backup

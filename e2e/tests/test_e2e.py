@@ -59,6 +59,57 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master')
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_min_resource_limits(self):
+        '''
+        Lower resource limits below configured minimum and let operator fix it
+        '''
+        k8s = self.k8s
+        cluster_label = 'version=acid-minimal-cluster'
+        _, failover_targets = k8s.get_pg_nodes(cluster_label)
+
+        # configure minimum boundaries for CPU and memory limits
+        minCPULimit = '250m'
+        minMemoryLimit = '250Mi'
+        patch_min_resource_limits = {
+            "data": {
+                "min_cpu_limit": minCPULimit,
+                "min_memory_limit": minMemoryLimit
+            }
+        }
+        k8s.update_config(patch_min_resource_limits)
+
+        # lower resource limits below minimum
+        pg_patch_resources = {
+            "spec": {
+                "resources": {
+                    "requests": {
+                        "cpu": "10m",
+                        "memory": "50Mi"
+                    },
+                    "limits": {
+                        "cpu": "200m",
+                        "memory": "200Mi"
+                    }
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
+        k8s.wait_for_master_failover(failover_targets)
+
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector='spilo-role=master,' + cluster_label).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+
+        self.assertEqual(masterPod.spec.containers[0].resources.limits['cpu'], minCPULimit,
+                         "Expected CPU limit {}, found {}"
+                         .format(minCPULimit, masterPod.spec.containers[0].resources.limits['cpu']))
+        self.assertEqual(masterPod.spec.containers[0].resources.limits['memory'], minMemoryLimit,
+                         "Expected memory limit {}, found {}"
+                         .format(minMemoryLimit, masterPod.spec.containers[0].resources.limits['memory']))
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
         '''
         Create a customized Postgres cluster in a non-default namespace.
@@ -76,10 +127,9 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
-        """
+        '''
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
-        """
-
+        '''
         k8s = self.k8s
         labels = "version=acid-minimal-cluster"
 
@@ -93,9 +143,9 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
-        """
+        '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
-        """
+        '''
         k8s = self.k8s
         cluster_label = 'version=acid-minimal-cluster'
 
@@ -145,7 +195,7 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_logical_backup_cron_job(self):
-        """
+        '''
         Ensure we can (a) create the cron job at user request for a specific PG cluster
                       (b) update the cluster-wide image for the logical backup pod
                       (c) delete the job at user request
@@ -153,7 +203,7 @@ class EndToEndTestCase(unittest.TestCase):
         Limitations:
         (a) Does not run the actual batch job because there is no S3 mock to upload backups to
         (b) Assumes 'acid-minimal-cluster' exists as defined in setUp
-        """
+        '''
 
         k8s = self.k8s
 
@@ -208,10 +258,10 @@ class EndToEndTestCase(unittest.TestCase):
                          "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
     def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
-        """
+        '''
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
            To be called manually after operations that affect pods
-        """
+        '''
 
         k8s = self.k8s
         labels = 'spilo-role=master,version=' + version
