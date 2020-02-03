@@ -65,8 +65,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	if err = c.validateResources(&c.Spec); err != nil {
-		err = fmt.Errorf("could not validate postgresql resources: %v", err)
+	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
+		err = fmt.Errorf("could not enforce minimum resource limits: %v", err)
 		return err
 	}
 

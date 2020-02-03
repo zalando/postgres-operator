@@ -227,8 +227,8 @@ func (c *Cluster) Create() error {
 
 	c.setStatus(acidv1.ClusterStatusCreating)
 
-	if err = c.validateResources(&c.Spec); err != nil {
-		return fmt.Errorf("could not validate postgresql resources: %v", err)
+	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
+		return fmt.Errorf("could not enforce minimum resource limits: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -495,7 +495,7 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 
 }
 
-func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
+func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 
 	var (
 		isSmaller bool
@@ -510,7 +510,7 @@ func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
 	if cpuLimit != "" {
 		isSmaller, err = util.IsSmallerQuantity(cpuLimit, minCPULimit)
 		if err != nil {
-			return fmt.Errorf("error validating CPU limit: %v", err)
+			return fmt.Errorf("could not compare defined CPU limit %s with configured minimum value %s: %v", cpuLimit, minCPULimit, err)
 		}
 		if isSmaller {
 			c.logger.Warningf("defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
@@ -522,7 +522,7 @@ func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
 	if memoryLimit != "" {
 		isSmaller, err = util.IsSmallerQuantity(memoryLimit, minMemoryLimit)
 		if err != nil {
-			return fmt.Errorf("error validating memory limit: %v", err)
+			return fmt.Errorf("could not compare defined memory limit %s with configured minimum value %s: %v", memoryLimit, minMemoryLimit, err)
 		}
 		if isSmaller {
 			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
@@ -599,7 +599,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Statefulset
 	func() {
-		if err := c.validateResources(&c.Spec); err != nil {
+		if err := c.enforceMinResourceLimits(&c.Spec); err != nil {
 			c.logger.Errorf("could not sync resources: %v", err)
 			updateFailed = true
 			return
@@ -613,7 +613,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 
 		// update newSpec to for latter comparison with oldSpec
-		c.validateResources(&newSpec.Spec)
+		c.enforceMinResourceLimits(&newSpec.Spec)
 
 		newSs, err := c.generateStatefulSet(&newSpec.Spec)
 		if err != nil {
