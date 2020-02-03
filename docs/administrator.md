@@ -493,12 +493,11 @@ Operator [REST API](developer.md#debugging-the-operator). URLs as well as parts
 of the UI layout can be configured via environment variables in the
 [deployment manifest](../ui/manifests/deployment.yaml#L40).
 
-The UI runs with Node.js and comes with it's own Docker image.
+The UI runs with Node.js and comes with it's own Docker image. Run NPM to
+continuously compile `tags/js` code. Basically, it creates an `app.js` file in:
+`static/build/app.js`
 
-Run NPM to continuously compile `tags/js` code. Basically, it creates an
-`app.js` file in: `static/build/app.js`
-
-```
+```bash
 (cd ui/app && npm start)
 ```
 
@@ -511,9 +510,8 @@ make docker
 
 Apply all manifests from the `ui/manifests` folder to deploy the Postgres
 Operator UI on K8s. Replace the image tag in the deployment manifest if you
-want to test the image you build with `make docker`. For local tests you also
-don't need the Ingress resource. Make sure the pods for the operator and the UI
-are both running.
+want to test the image you've built with `make docker`. Make sure the pods for
+the operator and the UI are both running.
 
 ```bash
 sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/deployment.yaml | kubectl apply -f manifests/
@@ -521,18 +519,25 @@ kubectl get all -l application=postgres-operator-ui
 ```
 
 For local testing you need to apply proxying and port forwarding so that the UI
-can talk to the K8s and Postgres Operator REST API. You can use the provided
-`run_local.sh` script for this. Make sure Python dependencies are installed on
-your machine and the correct K8s API server URL is used, e.g. for minikube it
-would usually be `https://192.168.99.100:8443`. When testing in minikube you
-have to build the image in its docker environment as `make docker` doesn't do it
-for you. From the `ui` directory execute:
+can talk to the K8s and Postgres Operator REST API. The Ingress resource is not
+needed. You can use the provided `run_local.sh` script for this. Make sure
+Python dependencies are installed on your machine and the correct K8s API server
+URL is used, e.g. for minikube it would usually be `https://192.168.99.100:8443`.
+When testing with minikube you have to build the image in its docker environment
+(running `make docker` doesn't do it for you). From the `ui` directory execute:
 
 ```bash
-# minikube
+# compile and build operator UI
+make docker
+
+# build in image in minikube docker env
 eval $(minikube docker-env)
 docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.3.0 .
+
+# apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/
 
+# install python dependencies and run UI locally
+pip3 install -r requirements
 ./run_local.sh
 ```
