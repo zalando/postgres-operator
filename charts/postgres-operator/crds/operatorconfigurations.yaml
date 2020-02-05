@@ -243,6 +243,8 @@ spec:
                   type: string
                 logical_backup_s3_endpoint:
                   type: string
+                logical_backup_s3_region:
+                  type: string
                 logical_backup_s3_secret_access_key:
                   type: string
                 logical_backup_s3_sse:
