@@ -462,7 +462,7 @@ grouped under the `logical_backup` key.
   accessible by Postgres pods. Default: empty.
 
 * **logical_backup_s3_region**
-  Required with some non-AWS S3 storage services.
+  Specifies the regions of the bucket which is required with some non-AWS S3 storage services. The default is empty.
 
 * **logical_backup_s3_endpoint**
   When using non-AWS S3 storage, endpoint can be set as a ENV variable.
