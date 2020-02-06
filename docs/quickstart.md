@@ -104,7 +104,7 @@ kubectl create -f https://operatorhub.io/install/postgres-operator.yaml
 This installs the operator in the `operators` namespace. More information can be
 found on [operatorhub.io](https://operatorhub.io/operator/postgres-operator).
 
-## Create a Postgres cluster
+## Check if Postgres Operator is running
 
 Starting the operator may take a few seconds. Check if the operator pod is
 running before applying a Postgres cluster manifest.
@@ -115,7 +115,52 @@ kubectl get pod -l name=postgres-operator
 
 # if you've created the operator using helm chart
 kubectl get pod -l app.kubernetes.io/name=postgres-operator
+```
 
+If the operator doesn't get into `Running` state, either check the latest K8s
+events of the deployment or pod with `kubectl describe` or inspect the operator
+logs:
+
+```bash
+kubectl logs "$(kubectl get pod -l name=postgres-operator --output='name')"
+```
+
+## Deploy the operator UI
+
+In the following paragraphs we describe how to access and manage Postgres
+clusters from the command line with kubectl. But it can also be done from the
+browser-based [Postgres Operator UI](operator-ui.md). Before deploying the UI
+make sure the operator is running and its REST API is reachable through a
+[K8s service](../manifests/api-service.yaml). The URL to this API must be
+configured in the [deployment manifest](../ui/manifests/deployment.yaml#L43)
+of the UI.
+
+To deploy the UI simply apply all its manifests files or use the UI helm chart:
+
+```bash
+# manual deployment
+kubectl apply -f ui/manifests/
+
+# or helm chart
+helm install postgres-operator-ui ./charts/postgres-operator-ui
+```
+
+Like with the operator, check if the UI pod gets into Running state:
+
+```bash
+# if you've created the operator using yaml manifests
+kubectl get pod -l name=postgres-operator-ui
+
+# if you've created the operator using helm chart
+kubectl get pod -l app.kubernetes.io/name=postgres-operator-ui
+```
+
+
+
+## Create a Postgres cluster
+
+
+```bash
 # create a Postgres cluster
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```

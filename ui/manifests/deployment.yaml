@@ -4,17 +4,17 @@ metadata:
   name: "postgres-operator-ui"
   namespace: "default"
   labels:
-    application: "postgres-operator-ui"
+    name: "postgres-operator-ui"
     team: "acid"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      application: "postgres-operator-ui"
+      name: "postgres-operator-ui"
   template:
     metadata:
       labels:
-        application: "postgres-operator-ui"
+        name: "postgres-operator-ui"
         team: "acid"
     spec:
       serviceAccountName: postgres-operator-ui
