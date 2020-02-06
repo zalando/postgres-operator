@@ -76,6 +76,7 @@ ACCESS_TOKEN_URL = getenv('ACCESS_TOKEN_URL')
 TOKENINFO_URL = getenv('OAUTH2_TOKEN_INFO_URL')
 
 OPERATOR_API_URL = getenv('OPERATOR_API_URL', 'http://postgres-operator')
+OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
 OPERATOR_UI_CONFIG = getenv('OPERATOR_UI_CONFIG', '{}')
 OPERATOR_UI_MAINTENANCE_CHECK = getenv('OPERATOR_UI_MAINTENANCE_CHECK', '{}')
 READ_ONLY_MODE = getenv('READ_ONLY_MODE', False) in [True, 'true']
@@ -1013,6 +1014,7 @@ def main(port, secret_key, debug, clusters: list):
     logger.info(f'App URL: {APP_URL}')
     logger.info(f'Authorize URL: {AUTHORIZE_URL}')
     logger.info(f'Operator API URL: {OPERATOR_API_URL}')
+    logger.info(f'Operator cluster name label: {OPERATOR_CLUSTER_NAME_LABEL}')
     logger.info(f'Readonly mode: {"enabled" if READ_ONLY_MODE else "disabled"}')  # noqa
     logger.info(f'Spilo S3 backup bucket: {SPILO_S3_BACKUP_BUCKET}')
     logger.info(f'Spilo S3 backup prefix: {SPILO_S3_BACKUP_PREFIX}')
