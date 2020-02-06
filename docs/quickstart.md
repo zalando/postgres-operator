@@ -127,7 +127,7 @@ kubectl logs "$(kubectl get pod -l name=postgres-operator --output='name')"
 
 ## Deploy the operator UI
 
-In the following paragraphs we describe how to access and manage Postgres
+In the following paragraphs we describe how to access and manage PostgreSQL
 clusters from the command line with kubectl. But it can also be done from the
 browser-based [Postgres Operator UI](operator-ui.md). Before deploying the UI
 make sure the operator is running and its REST API is reachable through a
@@ -145,7 +145,7 @@ kubectl apply -f ui/manifests/
 helm install postgres-operator-ui ./charts/postgres-operator-ui
 ```
 
-Like with the operator, check if the UI pod gets into Running state:
+Like with the operator, check if the UI pod gets into `Running` state:
 
 ```bash
 # if you've created the operator using yaml manifests
@@ -155,10 +155,19 @@ kubectl get pod -l name=postgres-operator-ui
 kubectl get pod -l app.kubernetes.io/name=postgres-operator-ui
 ```
 
+You can now access the web interface by port forwarding the UI pod (mind the
+label selector) and enter `localhost:8081` in your browser:
 
+```bash
+kubectl port-forward "$(kubectl get pod -l name=postgres-operator-ui --output='name')" 8081
+```
+
+Available option are explained in detail in the [UI docs](operator-ui.md).
 
 ## Create a Postgres cluster
 
+If the operator pod is running it listens to new events regarding `postgresql`
+resources. Now, it's time to submit your first Postgres cluster manifest.
 
 ```bash
 # create a Postgres cluster
