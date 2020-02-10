@@ -909,6 +909,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"logical_backup_s3_endpoint": {
 								Type: "string",
 							},
+							"logical_backup_s3_region": {
+								Type: "string",
+							},
 							"logical_backup_s3_secret_access_key": {
 								Type: "string",
 							},

@@ -157,6 +157,7 @@ type OperatorLogicalBackupConfiguration struct {
 	Schedule          string `json:"logical_backup_schedule,omitempty"`
 	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
 	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Region          string `json:"logical_backup_s3_region,omitempty"`
 	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
 	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
 	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`

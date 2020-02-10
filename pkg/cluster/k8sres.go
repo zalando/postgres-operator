@@ -1590,6 +1590,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
 		},
 		{
+			Name:  "LOGICAL_BACKUP_S3_REGION",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region,
+		},
+		{
 			Name:  "LOGICAL_BACKUP_S3_ENDPOINT",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Endpoint,
 		},
