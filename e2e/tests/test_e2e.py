@@ -68,8 +68,8 @@ class EndToEndTestCase(unittest.TestCase):
         _, failover_targets = k8s.get_pg_nodes(cluster_label)
 
         # configure minimum boundaries for CPU and memory limits
-        minCPULimit = '250m'
-        minMemoryLimit = '250Mi'
+        minCPULimit = '500m'
+        minMemoryLimit = '500Mi'
         patch_min_resource_limits = {
             "data": {
                 "min_cpu_limit": minCPULimit,
@@ -176,7 +176,7 @@ class EndToEndTestCase(unittest.TestCase):
         # patch node and test if master is failing over to one of the expected nodes
         k8s.api.core_v1.patch_node(current_master_node, body)
         k8s.wait_for_master_failover(failover_targets)
-        k8s.wait_for_pod_start('spilo-role=replica')
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         new_master_node, new_replica_nodes = k8s.get_pg_nodes(cluster_label)
         self.assertNotEqual(current_master_node, new_master_node,
