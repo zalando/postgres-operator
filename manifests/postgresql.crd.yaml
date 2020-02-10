@@ -230,6 +230,10 @@ spec:
                       pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                       # Note: the value specified here must not be zero or be higher
                       # than the corresponding limit.
+            serviceAnnotations:
+              type: object
+              additionalProperties:
+                type: string
             sidecars:
               type: array
               nullable: true

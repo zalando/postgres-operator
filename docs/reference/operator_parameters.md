@@ -388,8 +388,9 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   `false`.
 
 * **custom_service_annotations**
-  when load balancing is enabled, LoadBalancer service is created and
-  this parameter takes service annotations that are applied to service.
+  This key/value map provides a list of annotations that get attached to each
+  service of a cluster created by the operator. If the annotation key is also
+  provided by the cluster definition, the manifest value is used.
   Optional.
 
 * **master_dns_name_format** defines the DNS name string template for the

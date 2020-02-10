@@ -1230,14 +1230,6 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 }
 
 func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {
-	var dnsName string
-
-	if role == Master {
-		dnsName = c.masterDNSName()
-	} else {
-		dnsName = c.replicaDNSName()
-	}
-
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 		Type:  v1.ServiceTypeClusterIP,
@@ -1246,8 +1238,6 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	if role == Replica {
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
-
-	var annotations map[string]string
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
 
@@ -1262,18 +1252,6 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 		c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
 		serviceSpec.Type = v1.ServiceTypeLoadBalancer
-
-		annotations = map[string]string{
-			constants.ZalandoDNSNameAnnotation: dnsName,
-			constants.ElbTimeoutAnnotationName: constants.ElbTimeoutAnnotationValue,
-		}
-
-		if len(c.OpConfig.CustomServiceAnnotations) != 0 {
-			c.logger.Debugf("There are custom annotations defined, creating them.")
-			for customAnnotationKey, customAnnotationValue := range c.OpConfig.CustomServiceAnnotations {
-				annotations[customAnnotationKey] = customAnnotationValue
-			}
-		}
 	} else if role == Replica {
 		// before PR #258, the replica service was only created if allocated a LB
 		// now we always create the service but warn if the LB is absent
@@ -1285,12 +1263,48 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
 			Labels:      c.roleLabelsSet(true, role),
-			Annotations: annotations,
+			Annotations: c.generateServiceAnnotations(role, spec),
 		},
 		Spec: serviceSpec,
 	}
 
 	return service
+}
+
+func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
+	annotations := make(map[string]string)
+
+	for k, v := range c.OpConfig.CustomServiceAnnotations {
+		annotations[k] = v
+	}
+	if spec != nil || spec.ServiceAnnotations != nil {
+		for k, v := range spec.ServiceAnnotations {
+			annotations[k] = v
+		}
+	}
+
+	if c.shouldCreateLoadBalancerForService(role, spec) {
+		var dnsName string
+		if role == Master {
+			dnsName = c.masterDNSName()
+		} else {
+			dnsName = c.replicaDNSName()
+		}
+
+		// Just set ELB Timeout annotation with default value, if it does not
+		// have a cutom value
+		if _, ok := annotations[constants.ElbTimeoutAnnotationName]; !ok {
+			annotations[constants.ElbTimeoutAnnotationName] = constants.ElbTimeoutAnnotationValue
+		}
+		// External DNS name annotation is not customizable
+		annotations[constants.ZalandoDNSNameAnnotation] = dnsName
+	}
+
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	return annotations
 }
 
 func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {

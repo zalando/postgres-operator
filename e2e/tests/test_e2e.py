@@ -211,8 +211,8 @@ class EndToEndTestCase(unittest.TestCase):
         schedule = "7 7 7 7 *"
         pg_patch_enable_backup = {
             "spec": {
-               "enableLogicalBackup": True,
-               "logicalBackupSchedule": schedule
+                "enableLogicalBackup": True,
+                "logicalBackupSchedule": schedule
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -234,7 +234,7 @@ class EndToEndTestCase(unittest.TestCase):
         image = "test-image-name"
         patch_logical_backup_image = {
             "data": {
-               "logical_backup_docker_image": image,
+                "logical_backup_docker_image": image,
             }
         }
         k8s.update_config(patch_logical_backup_image)
@@ -247,7 +247,7 @@ class EndToEndTestCase(unittest.TestCase):
         # delete the logical backup cron job
         pg_patch_disable_backup = {
             "spec": {
-               "enableLogicalBackup": False,
+                "enableLogicalBackup": False,
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -256,6 +256,37 @@ class EndToEndTestCase(unittest.TestCase):
         jobs = k8s.get_logical_backup_job().items
         self.assertEqual(0, len(jobs),
                          "Expected 0 logical backup jobs, found {}".format(len(jobs)))
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_service_annotations(self):
+        '''
+        Create a Postgres cluster with service annotations and check them.
+        '''
+        k8s = self.k8s
+        patch_custom_service_annotations = {
+            "data": {
+                "custom_service_annotations": "foo:bar",
+            }
+        }
+        k8s.update_config(patch_custom_service_annotations)
+
+        k8s.create_with_kubectl("manifests/postgres-manifest-with-service-annotations.yaml")
+        annotations = {
+            "annotation.key": "value",
+            "foo": "bar",
+        }
+        self.assertTrue(k8s.check_service_annotations(
+            "version=acid-service-annotations,spilo-role=master", annotations))
+        self.assertTrue(k8s.check_service_annotations(
+            "version=acid-service-annotations,spilo-role=replica", annotations))
+
+        # clean up
+        unpatch_custom_service_annotations = {
+            "data": {
+                "custom_service_annotations": "",
+            }
+        }
+        k8s.update_config(unpatch_custom_service_annotations)
 
     def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
         '''
@@ -322,6 +353,16 @@ class K8s:
                 pod_phase = pods[0].status.phase
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
+    def check_service_annotations(self, svc_labels, annotations, namespace='default'):
+        svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
+        for svc in svcs:
+            if len(svc.metadata.annotations) != len(annotations):
+                return False
+            for key in svc.metadata.annotations:
+                if svc.metadata.annotations[key] != annotations[key]:
+                    return False
+        return True
+
     def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
 
         body = {
@@ -330,7 +371,7 @@ class K8s:
             }
         }
         _ = self.api.custom_objects_api.patch_namespaced_custom_object(
-                    "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
+            "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
 
         labels = 'version=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
