@@ -417,6 +417,15 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		// make sure we clear the stored service and endpoint status if the subsequent create fails.
 		c.Services[role] = nil
 		c.Endpoints[role] = nil
+
+		// create new service
+		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
+		if err != nil {
+			return fmt.Errorf("could not create service %q: %v", serviceName, err)
+		}
+
+		c.Services[role] = svc
+
 		if role == Master {
 			// create the new endpoint using the addresses obtained from the previous one
 			endpointSpec := c.generateEndpoint(role, currentEndpoint.Subsets)
@@ -427,13 +436,6 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 			c.Endpoints[role] = ep
 		}
-
-		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
-		if err != nil {
-			return fmt.Errorf("could not create service %q: %v", serviceName, err)
-		}
-
-		c.Services[role] = svc
 
 		return nil
 	}
