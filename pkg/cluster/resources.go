@@ -414,6 +414,23 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 
+		if role == Master {
+			err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
+				func() (bool, error) {
+					_, err2 := c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
+					if err2 == nil {
+						return false, nil
+					}
+					if k8sutil.ResourceNotFound(err2) {
+						return true, nil
+					}
+					return false, err2
+				})
+			if err != nil {
+				return fmt.Errorf("could not delete endpoint %q: %v", currentEndpoint, err)
+			}
+		}
+
 		// make sure we clear the stored service and endpoint status if the subsequent create fails.
 		c.Services[role] = nil
 		c.Endpoints[role] = nil
