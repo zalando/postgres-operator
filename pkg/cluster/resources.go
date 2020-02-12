@@ -427,7 +427,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 						return true, nil
 					}
 					return false, err2
-				})return
+				})
 			if err != nil {
 				return fmt.Errorf("could not delete endpoint %q: %v", currentEndpoint, err)
 			}
