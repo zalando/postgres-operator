@@ -27,7 +27,8 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	ConnectionPool *ConnectionPool `json:"connectionPool,omitempty"`
+	EnableConnectionPool bool            `json:"enable_connection_pool,omitempty"`
+	ConnectionPool       *ConnectionPool `json:"connectionPool,omitempty"`
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
@@ -159,12 +160,15 @@ type PostgresStatus struct {
 
 // Options for connection pooler
 type ConnectionPool struct {
-	NumberOfInstances *int32              `json:"instancesNumber,omitempty"`
-	Schema            *string             `json:"schema,omitempty"`
-	User              *string             `json:"user,omitempty"`
-	Type              *string             `json:"type,omitempty"`
-	Mode              *string             `json:"mode,omitempty"`
-	PodTemplate       *v1.PodTemplateSpec `json:"podTemplate,omitempty"`
+	NumberOfInstances *int32 `json:"instancesNumber,omitempty"`
+	Schema            string `json:"schema,omitempty"`
+	User              string `json:"user,omitempty"`
+	Mode              string `json:"mode,omitempty"`
+	DockerImage       string `json:"dockerImage,omitempty"`
+	// TODO: prepared snippets of configuration, one can choose via type, e.g.
+	// pgbouncer-large (with higher resources) or odyssey-small (with smaller
+	// resources)
+	// Type              string `json:"type,omitempty"`
 
 	Resources `json:"resources,omitempty"`
 }

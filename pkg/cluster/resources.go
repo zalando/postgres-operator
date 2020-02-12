@@ -101,9 +101,17 @@ func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolR
 	var msg string
 	c.setProcessName("creating connection pool")
 
-	err := lookup(
-		c.OpConfig.ConnectionPool.Schema,
-		c.OpConfig.ConnectionPool.User)
+	schema := c.Spec.ConnectionPool.Schema
+	if schema == "" {
+		schema = c.OpConfig.ConnectionPool.Schema
+	}
+
+	user := c.Spec.ConnectionPool.User
+	if user == "" {
+		user = c.OpConfig.ConnectionPool.User
+	}
+
+	err := lookup(schema, user)
 
 	if err != nil {
 		msg = "could not prepare database for connection pool: %v"
@@ -116,6 +124,9 @@ func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolR
 		return nil, fmt.Errorf(msg, err)
 	}
 
+	// client-go does retry 10 times (with NoBackoff by default) when the API
+	// believe a request can be retried and returns Retry-After header. This
+	// should be good enough to not think about it here.
 	deployment, err := c.KubeClient.
 		Deployments(deploymentSpec.Namespace).
 		Create(deploymentSpec)
@@ -154,14 +165,22 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 		return nil
 	}
 
+	// Clean up the deployment object. If deployment resource we've remembered
+	// is somehow empty, try to delete based on what would we generate
+	deploymentName := c.connPoolName()
+	deployment := c.ConnectionPool.Deployment
+
+	if deployment != nil {
+		deploymentName = deployment.Name
+	}
+
 	// set delete propagation policy to foreground, so that replica set will be
 	// also deleted.
 	policy := metav1.DeletePropagationForeground
 	options := metav1.DeleteOptions{PropagationPolicy: &policy}
-	deployment := c.ConnectionPool.Deployment
 	err = c.KubeClient.
-		Deployments(deployment.Namespace).
-		Delete(deployment.Name, &options)
+		Deployments(c.Namespace).
+		Delete(deploymentName, &options)
 
 	if !k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("Connection pool deployment was already deleted")
@@ -172,12 +191,19 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 	c.logger.Infof("Connection pool deployment %q has been deleted",
 		util.NameFromMeta(deployment.ObjectMeta))
 
+	// Repeat the same for the service object
+	service := c.ConnectionPool.Service
+	serviceName := c.connPoolName()
+
+	if service != nil {
+		serviceName = service.Name
+	}
+
 	// set delete propagation policy to foreground, so that all the dependant
 	// will be deleted.
-	service := c.ConnectionPool.Service
 	err = c.KubeClient.
-		Services(service.Namespace).
-		Delete(service.Name, &options)
+		Services(c.Namespace).
+		Delete(serviceName, &options)
 
 	if !k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("Connection pool service was already deleted")
@@ -822,4 +848,35 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 // GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
 func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
+}
+
+// Perform actual patching of a connection pool deployment, assuming that all
+// the check were already done before.
+func (c *Cluster) updateConnPoolDeployment(oldDeploymentSpec, newDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+	c.setProcessName("updating connection pool")
+	if c.ConnectionPool == nil || c.ConnectionPool.Deployment == nil {
+		return nil, fmt.Errorf("there is no connection pool in the cluster")
+	}
+
+	patchData, err := specPatch(newDeployment.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("could not form patch for the deployment: %v", err)
+	}
+
+	// An update probably requires RetryOnConflict, but since only one operator
+	// worker at one time will try to update it changes of conflicts are
+	// minimal.
+	deployment, err := c.KubeClient.
+		Deployments(c.ConnectionPool.Deployment.Namespace).
+		Patch(
+			c.ConnectionPool.Deployment.Name,
+			types.MergePatchType,
+			patchData, "")
+	if err != nil {
+		return nil, fmt.Errorf("could not patch deployment: %v", err)
+	}
+
+	c.ConnectionPool.Deployment = deployment
+
+	return deployment, nil
 }

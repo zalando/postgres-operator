@@ -300,8 +300,26 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 				params, err)
 		}
 
-		if _, err := c.pgDb.Exec(stmtBytes.String()); err != nil {
-			return fmt.Errorf("could not execute sql statement %s: %v",
+		// golang sql will do retries couple of times if pq driver reports
+		// connections issues (driver.ErrBadConn), but since our query is
+		// idempotent, we can retry in a view of other errors (e.g. due to
+		// failover a db is temporary in a read-only mode or so) to make sure
+		// it was applied.
+		execErr := retryutil.Retry(
+			constants.PostgresConnectTimeout,
+			constants.PostgresConnectRetryTimeout,
+			func() (bool, error) {
+				if _, err := c.pgDb.Exec(stmtBytes.String()); err != nil {
+					msg := fmt.Errorf("could not execute sql statement %s: %v",
+						stmtBytes.String(), err)
+					return false, msg
+				}
+
+				return true, nil
+			})
+
+		if execErr != nil {
+			return fmt.Errorf("could not execute after retries %s: %v",
 				stmtBytes.String(), err)
 		}
 

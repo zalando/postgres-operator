@@ -16,6 +16,7 @@ import (
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -27,6 +28,10 @@ import (
 	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func int32ToPointer(value int32) *int32 {
+	return &value
+}
 
 // KubernetesClient describes getters for Kubernetes objects
 type KubernetesClient struct {
@@ -62,14 +67,28 @@ type mockDeployment struct {
 	appsv1.DeploymentInterface
 }
 
+type mockDeploymentNotExist struct {
+	appsv1.DeploymentInterface
+}
+
 type MockDeploymentGetter struct {
+}
+
+type MockDeploymentNotExistGetter struct {
 }
 
 type mockService struct {
 	corev1.ServiceInterface
 }
 
+type mockServiceNotExist struct {
+	corev1.ServiceInterface
+}
+
 type MockServiceGetter struct {
+}
+
+type MockServiceNotExistGetter struct {
 }
 
 type mockConfigMap struct {
@@ -245,6 +264,10 @@ func (mock *MockDeploymentGetter) Deployments(namespace string) appsv1.Deploymen
 	return &mockDeployment{}
 }
 
+func (mock *MockDeploymentNotExistGetter) Deployments(namespace string) appsv1.DeploymentInterface {
+	return &mockDeploymentNotExist{}
+}
+
 func (mock *mockDeployment) Create(*apiappsv1.Deployment) (*apiappsv1.Deployment, error) {
 	return &apiappsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -257,8 +280,47 @@ func (mock *mockDeployment) Delete(name string, opts *metav1.DeleteOptions) erro
 	return nil
 }
 
+func (mock *mockDeployment) Get(name string, opts metav1.GetOptions) (*apiappsv1.Deployment, error) {
+	return &apiappsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-deployment",
+		},
+	}, nil
+}
+
+func (mock *mockDeployment) Patch(name string, t types.PatchType, data []byte, subres ...string) (*apiappsv1.Deployment, error) {
+	return &apiappsv1.Deployment{
+		Spec: apiappsv1.DeploymentSpec{
+			Replicas: int32ToPointer(2),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-deployment",
+		},
+	}, nil
+}
+
+func (mock *mockDeploymentNotExist) Get(name string, opts metav1.GetOptions) (*apiappsv1.Deployment, error) {
+	return nil, &apierrors.StatusError{
+		ErrStatus: metav1.Status{
+			Reason: metav1.StatusReasonNotFound,
+		},
+	}
+}
+
+func (mock *mockDeploymentNotExist) Create(*apiappsv1.Deployment) (*apiappsv1.Deployment, error) {
+	return &apiappsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-deployment",
+		},
+	}, nil
+}
+
 func (mock *MockServiceGetter) Services(namespace string) corev1.ServiceInterface {
 	return &mockService{}
+}
+
+func (mock *MockServiceNotExistGetter) Services(namespace string) corev1.ServiceInterface {
+	return &mockServiceNotExist{}
 }
 
 func (mock *mockService) Create(*v1.Service) (*v1.Service, error) {
@@ -273,6 +335,30 @@ func (mock *mockService) Delete(name string, opts *metav1.DeleteOptions) error {
 	return nil
 }
 
+func (mock *mockService) Get(name string, opts metav1.GetOptions) (*v1.Service, error) {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-service",
+		},
+	}, nil
+}
+
+func (mock *mockServiceNotExist) Create(*v1.Service) (*v1.Service, error) {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-service",
+		},
+	}, nil
+}
+
+func (mock *mockServiceNotExist) Get(name string, opts metav1.GetOptions) (*v1.Service, error) {
+	return nil, &apierrors.StatusError{
+		ErrStatus: metav1.Status{
+			Reason: metav1.StatusReasonNotFound,
+		},
+	}
+}
+
 // NewMockKubernetesClient for other tests
 func NewMockKubernetesClient() KubernetesClient {
 	return KubernetesClient{
@@ -280,5 +366,12 @@ func NewMockKubernetesClient() KubernetesClient {
 		ConfigMapsGetter:  &MockConfigMapsGetter{},
 		DeploymentsGetter: &MockDeploymentGetter{},
 		ServicesGetter:    &MockServiceGetter{},
+	}
+}
+
+func ClientMissingObjects() KubernetesClient {
+	return KubernetesClient{
+		DeploymentsGetter: &MockDeploymentNotExistGetter{},
+		ServicesGetter:    &MockServiceNotExistGetter{},
 	}
 }
