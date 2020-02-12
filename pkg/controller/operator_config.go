@@ -6,7 +6,9 @@ import (
 	"time"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -142,17 +144,52 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
 	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
 
-	// connection pool
+	// Connection pool. Looks like we can't use defaulting in CRD before 1.17,
+	// so ensure default values here.
 	result.ConnectionPool.NumberOfInstances = fromCRD.ConnectionPool.NumberOfInstances
-	result.ConnectionPool.Schema = fromCRD.ConnectionPool.Schema
-	result.ConnectionPool.User = fromCRD.ConnectionPool.User
-	result.ConnectionPool.Type = fromCRD.ConnectionPool.Type
-	result.ConnectionPool.Image = fromCRD.ConnectionPool.Image
-	result.ConnectionPool.Mode = fromCRD.ConnectionPool.Mode
-	result.ConnectionPool.ConnPoolDefaultCPURequest = fromCRD.ConnectionPool.DefaultCPURequest
-	result.ConnectionPool.ConnPoolDefaultMemoryRequest = fromCRD.ConnectionPool.DefaultMemoryRequest
-	result.ConnectionPool.ConnPoolDefaultCPULimit = fromCRD.ConnectionPool.DefaultCPULimit
-	result.ConnectionPool.ConnPoolDefaultMemoryLimit = fromCRD.ConnectionPool.DefaultMemoryLimit
+	if result.ConnectionPool.NumberOfInstances == nil ||
+		*result.ConnectionPool.NumberOfInstances < 1 {
+		var value int32
+
+		value = 1
+		result.ConnectionPool.NumberOfInstances = &value
+	}
+
+	result.ConnectionPool.Schema = util.Coalesce(
+		fromCRD.ConnectionPool.Schema,
+		constants.ConnectionPoolSchemaName)
+
+	result.ConnectionPool.User = util.Coalesce(
+		fromCRD.ConnectionPool.User,
+		constants.ConnectionPoolUserName)
+
+	result.ConnectionPool.Type = util.Coalesce(
+		fromCRD.ConnectionPool.Type,
+		constants.ConnectionPoolDefaultType)
+
+	result.ConnectionPool.Image = util.Coalesce(
+		fromCRD.ConnectionPool.Image,
+		"pgbouncer:0.0.1")
+
+	result.ConnectionPool.Mode = util.Coalesce(
+		fromCRD.ConnectionPool.Mode,
+		constants.ConnectionPoolDefaultMode)
+
+	result.ConnectionPool.ConnPoolDefaultCPURequest = util.Coalesce(
+		fromCRD.ConnectionPool.DefaultCPURequest,
+		constants.ConnectionPoolDefaultCpuRequest)
+
+	result.ConnectionPool.ConnPoolDefaultMemoryRequest = util.Coalesce(
+		fromCRD.ConnectionPool.DefaultMemoryRequest,
+		constants.ConnectionPoolDefaultMemoryRequest)
+
+	result.ConnectionPool.ConnPoolDefaultCPULimit = util.Coalesce(
+		fromCRD.ConnectionPool.DefaultCPULimit,
+		constants.ConnectionPoolDefaultCpuLimit)
+
+	result.ConnectionPool.ConnPoolDefaultMemoryLimit = util.Coalesce(
+		fromCRD.ConnectionPool.DefaultMemoryLimit,
+		constants.ConnectionPoolDefaultMemoryLimit)
 
 	return result
 }

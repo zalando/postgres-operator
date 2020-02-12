@@ -1734,100 +1734,99 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 	*v1.PodTemplateSpec, error) {
 
-	podTemplate := spec.ConnectionPool.PodTemplate
+	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
+	resources, err := generateResourceRequirements(
+		spec.ConnectionPool.Resources,
+		c.makeDefaultConnPoolResources())
 
-	if podTemplate == nil {
-		gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
-		resources, err := generateResourceRequirements(
-			spec.ConnectionPool.Resources,
-			c.makeDefaultConnPoolResources())
+	effectiveMode := util.Coalesce(
+		spec.ConnectionPool.Mode,
+		c.OpConfig.ConnectionPool.Mode)
 
-		effectiveMode := spec.ConnectionPool.Mode
-		if effectiveMode == nil {
-			effectiveMode = &c.OpConfig.ConnectionPool.Mode
+	effectiveDockerImage := util.Coalesce(
+		spec.ConnectionPool.DockerImage,
+		c.OpConfig.ConnectionPool.Image)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+
+	secretSelector := func(key string) *v1.SecretKeySelector {
+		return &v1.SecretKeySelector{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: c.credentialSecretName(c.OpConfig.SuperUsername),
+			},
+			Key: key,
 		}
+	}
 
-		if err != nil {
-			return nil, fmt.Errorf("could not generate resource requirements: %v", err)
-		}
+	envVars := []v1.EnvVar{
+		{
+			Name:  "PGHOST",
+			Value: c.serviceAddress(Master),
+		},
+		{
+			Name:  "PGPORT",
+			Value: c.servicePort(Master),
+		},
+		{
+			Name: "PGUSER",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: secretSelector("username"),
+			},
+		},
+		// the convention is to use the same schema name as
+		// connection pool username
+		{
+			Name: "PGSCHEMA",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: secretSelector("username"),
+			},
+		},
+		{
+			Name: "PGPASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: secretSelector("password"),
+			},
+		},
+		{
+			Name:  "CONNECTION_POOL_MODE",
+			Value: effectiveMode,
+		},
+		{
+			Name:  "CONNECTION_POOL_PORT",
+			Value: fmt.Sprint(pgPort),
+		},
+	}
 
-		secretSelector := func(key string) *v1.SecretKeySelector {
-			return &v1.SecretKeySelector{
-				LocalObjectReference: v1.LocalObjectReference{
-					Name: c.credentialSecretName(c.OpConfig.SuperUsername),
-				},
-				Key: key,
-			}
-		}
+	poolerContainer := v1.Container{
+		Name:            connectionPoolContainer,
+		Image:           effectiveDockerImage,
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Resources:       *resources,
+		Ports: []v1.ContainerPort{
+			{
+				ContainerPort: pgPort,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+		Env: envVars,
+	}
 
-		envVars := []v1.EnvVar{
-			{
-				Name:  "PGHOST",
-				Value: c.serviceAddress(Master),
-			},
-			{
-				Name:  "PGPORT",
-				Value: c.servicePort(Master),
-			},
-			{
-				Name: "PGUSER",
-				ValueFrom: &v1.EnvVarSource{
-					SecretKeyRef: secretSelector("username"),
-				},
-			},
-			// the convention is to use the same schema name as
-			// connection pool username
-			{
-				Name: "PGSCHEMA",
-				ValueFrom: &v1.EnvVarSource{
-					SecretKeyRef: secretSelector("username"),
-				},
-			},
-			{
-				Name: "PGPASSWORD",
-				ValueFrom: &v1.EnvVarSource{
-					SecretKeyRef: secretSelector("password"),
-				},
-			},
-			{
-				Name:  "CONNECTION_POOL_MODE",
-				Value: *effectiveMode,
-			},
-			{
-				Name:  "CONNECTION_POOL_PORT",
-				Value: fmt.Sprint(pgPort),
-			},
-		}
-
-		poolerContainer := v1.Container{
-			Name:            connectionPoolContainer,
-			Image:           c.OpConfig.ConnectionPool.Image,
-			ImagePullPolicy: v1.PullIfNotPresent,
-			Resources:       *resources,
-			Ports: []v1.ContainerPort{
-				{
-					ContainerPort: pgPort,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-			Env: envVars,
-		}
-
-		podTemplate = &v1.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels:      c.connPoolLabelsSelector().MatchLabels,
-				Namespace:   c.Namespace,
-				Annotations: c.generatePodAnnotations(spec),
-			},
-			Spec: v1.PodSpec{
-				ServiceAccountName:            c.OpConfig.PodServiceAccountName,
-				TerminationGracePeriodSeconds: &gracePeriod,
-				Containers:                    []v1.Container{poolerContainer},
-				// TODO: add tolerations to scheduler pooler on the same node
-				// as database
-				//Tolerations:                   *tolerationsSpec,
-			},
-		}
+	podTemplate := &v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Namespace:   c.Namespace,
+			Annotations: c.generatePodAnnotations(spec),
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
+			TerminationGracePeriodSeconds: &gracePeriod,
+			Containers:                    []v1.Container{poolerContainer},
+			// TODO: add tolerations to scheduler pooler on the same node
+			// as database
+			//Tolerations:                   *tolerationsSpec,
+		},
 	}
 
 	return podTemplate, nil

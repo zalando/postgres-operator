@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"reflect"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -23,6 +24,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	oldSpec := c.Postgresql
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -104,6 +106,20 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		c.logger.Debugf("syncing databases")
 		if err = c.syncDatabases(); err != nil {
 			err = fmt.Errorf("could not sync databases: %v", err)
+			return err
+		}
+	}
+
+	// connection pool
+	oldPool := oldSpec.Spec.ConnectionPool
+	newPool := newSpec.Spec.ConnectionPool
+	if c.needConnectionPool() &&
+		(c.ConnectionPool == nil || !reflect.DeepEqual(oldPool, newPool)) {
+
+		c.logger.Debug("syncing connection pool")
+
+		if err := c.syncConnectionPool(&oldSpec, newSpec); err != nil {
+			c.logger.Errorf("could not sync connection pool: %v", err)
 			return err
 		}
 	}
@@ -590,6 +606,101 @@ func (c *Cluster) syncLogicalBackupJob() error {
 		if _, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(jobName, metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing logical backup job: %v", err)
 		}
+	}
+
+	return nil
+}
+
+// Synchronize connection pool resources. Effectively we're interested only in
+// synchronizing the corresponding deployment, but in case of deployment or
+// service is missing, create it. After checking, also remember an object for
+// the future references.
+func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql) error {
+	if c.ConnectionPool == nil {
+		c.logger.Warning("Connection pool resources are empty")
+		c.ConnectionPool = &ConnectionPoolResources{}
+	}
+
+	deployment, err := c.KubeClient.
+		Deployments(c.Namespace).
+		Get(c.connPoolName(), metav1.GetOptions{})
+
+	if err != nil && k8sutil.ResourceNotFound(err) {
+		msg := "Deployment %s for connection pool synchronization is not found, create it"
+		c.logger.Warningf(msg, c.connPoolName())
+
+		deploymentSpec, err := c.generateConnPoolDeployment(&newSpec.Spec)
+		if err != nil {
+			msg = "could not generate deployment for connection pool: %v"
+			return fmt.Errorf(msg, err)
+		}
+
+		deployment, err := c.KubeClient.
+			Deployments(deploymentSpec.Namespace).
+			Create(deploymentSpec)
+
+		if err != nil {
+			return err
+		}
+
+		c.ConnectionPool.Deployment = deployment
+	} else if err != nil {
+		return fmt.Errorf("could not get connection pool deployment to sync: %v", err)
+	} else {
+		c.ConnectionPool.Deployment = deployment
+
+		// actual synchronization
+		oldConnPool := oldSpec.Spec.ConnectionPool
+		newConnPool := newSpec.Spec.ConnectionPool
+		sync, reason := c.needSyncConnPoolDeployments(oldConnPool, newConnPool)
+		if sync {
+			c.logger.Infof("Update connection pool deployment %s, reason: %s",
+				c.connPoolName(), reason)
+
+			newDeploymentSpec, err := c.generateConnPoolDeployment(&newSpec.Spec)
+			if err != nil {
+				msg := "could not generate deployment for connection pool: %v"
+				return fmt.Errorf(msg, err)
+			}
+
+			oldDeploymentSpec := c.ConnectionPool.Deployment
+
+			deployment, err := c.updateConnPoolDeployment(
+				oldDeploymentSpec,
+				newDeploymentSpec)
+
+			if err != nil {
+				return err
+			}
+
+			c.ConnectionPool.Deployment = deployment
+			return nil
+		}
+	}
+
+	service, err := c.KubeClient.
+		Services(c.Namespace).
+		Get(c.connPoolName(), metav1.GetOptions{})
+
+	if err != nil && k8sutil.ResourceNotFound(err) {
+		msg := "Service %s for connection pool synchronization is not found, create it"
+		c.logger.Warningf(msg, c.connPoolName())
+
+		serviceSpec := c.generateConnPoolService(&newSpec.Spec)
+		service, err := c.KubeClient.
+			Services(serviceSpec.Namespace).
+			Create(serviceSpec)
+
+		if err != nil {
+			return err
+		}
+
+		c.ConnectionPool.Service = service
+	} else if err != nil {
+		return fmt.Errorf("could not get connection pool service to sync: %v", err)
+	} else {
+		// Service updates are not supported and probably not that useful anyway
+		c.ConnectionPool.Service = service
 	}
 
 	return nil

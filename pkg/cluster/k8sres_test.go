@@ -613,21 +613,6 @@ func TestConnPoolPodSpec(t *testing.T) {
 			cluster:  cluster,
 			check:    testEnvs,
 		},
-		{
-			subTest: "custom pod template",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{
-					PodTemplate: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "test-pod-template",
-						},
-					},
-				},
-			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testCustomPodTemplate,
-		},
 	}
 	for _, tt := range tests {
 		podSpec, err := tt.cluster.generateConnPoolPodTemplate(tt.spec)

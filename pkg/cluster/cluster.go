@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -723,6 +724,17 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	// connection pool
+	if !reflect.DeepEqual(oldSpec.Spec.ConnectionPool,
+		newSpec.Spec.ConnectionPool) {
+		c.logger.Debug("syncing connection pool")
+
+		if err := c.syncConnectionPool(oldSpec, newSpec); err != nil {
+			c.logger.Errorf("could not sync connection pool: %v", err)
+			updateFailed = true
+		}
+	}
+
 	return nil
 }
 
@@ -852,13 +864,13 @@ func (c *Cluster) initSystemUsers() {
 	if c.needConnectionPool() {
 
 		username := c.Spec.ConnectionPool.User
-		if username == nil {
-			username = &c.OpConfig.ConnectionPool.User
+		if username == "" {
+			username = c.OpConfig.ConnectionPool.User
 		}
 
 		c.systemUsers[constants.ConnectionPoolUserKeyName] = spec.PgUser{
 			Origin:   spec.RoleConnectionPool,
-			Name:     *username,
+			Name:     username,
 			Password: util.RandomPassword(constants.PasswordLength),
 		}
 	}
@@ -1187,4 +1199,30 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	}
 
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
+}
+
+// Test if two connection pool configuration needs to be synced. For simplicity
+// compare not the actual K8S objects, but the configuration itself and request
+// sync if there is any difference.
+func (c *Cluster) needSyncConnPoolDeployments(oldSpec, newSpec *acidv1.ConnectionPool) (sync bool, reasons []string) {
+	reasons = []string{}
+	sync = false
+
+	changelog, err := diff.Diff(oldSpec, newSpec)
+	if err != nil {
+		c.logger.Infof("Cannot get diff, do not do anything, %+v", err)
+		return false, reasons
+	} else {
+		if len(changelog) > 0 {
+			sync = true
+		}
+
+		for _, change := range changelog {
+			msg := fmt.Sprintf("%s %+v from %s to %s",
+				change.Type, change.Path, change.From, change.To)
+			reasons = append(reasons, msg)
+		}
+	}
+
+	return sync, reasons
 }
