@@ -414,6 +414,8 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
 		}
 
+		// wait until the service is truly deleted
+		c.logger.Debugf("waiting for endpoint to be deleted")
 		if role == Master {
 			err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
 				func() (bool, error) {
@@ -425,7 +427,7 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 						return true, nil
 					}
 					return false, err2
-				})
+				})return
 			if err != nil {
 				return fmt.Errorf("could not delete endpoint %q: %v", currentEndpoint, err)
 			}
@@ -435,23 +437,27 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		c.Services[role] = nil
 		c.Endpoints[role] = nil
 
-		// create new service
-		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
-		if err != nil {
-			return fmt.Errorf("could not create service %q: %v", serviceName, err)
-		}
-
-		c.Services[role] = svc
-
 		if role == Master {
 			// create the new endpoint using the addresses obtained from the previous one
 			endpointSpec := c.generateEndpoint(role, currentEndpoint.Subsets)
 			ep, err := c.KubeClient.Endpoints(endpointSpec.Namespace).Create(endpointSpec)
 			if err != nil {
-				return fmt.Errorf("could not create endpoint %q: %v", endpointName, err)
+				c.logger.Errorf("could not create endpoint %q: %v", endpointName, err)
+			} else {
+				c.Endpoints[role] = ep
 			}
+		}
 
-			c.Endpoints[role] = ep
+		// create new service
+		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
+		if err != nil {
+			c.logger.Errorf("could not create service %q: %v", serviceName, err)
+		} else {
+			c.Services[role] = svc
+		}
+
+		if c.Services[role] == nil || c.Endpoints[role] == nil {
+			return fmt.Errorf("could not update service")
 		}
 
 		return nil
