@@ -366,6 +366,11 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 }
 
 func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error {
+	var (
+		svc *v1.Service
+		err error
+	)
+
 	c.setProcessName("updating %v service", role)
 
 	if c.Services[role] == nil {
@@ -390,18 +395,30 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		}
 	}
 
-	patchData, err := specPatch(newService.Spec)
-	if err != nil {
-		return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
-	}
+	// when disabling LoadBalancers patch does not work because of LoadBalancerSourceRanges field (even if nil)
+	oldServiceType := c.Services[role].Spec.Type
+	newServiceType := newService.Spec.Type
+	if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
+		newService.ResourceVersion = c.Services[role].ResourceVersion
+		newService.Spec.ClusterIP = c.Services[role].Spec.ClusterIP
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(newService)
+		if err != nil {
+			return fmt.Errorf("could not update service %q: %v", serviceName, err)
+		}
+	} else {
+		patchData, err := specPatch(newService.Spec)
+		if err != nil {
+			return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
+		}
 
-	// update the service spec
-	svc, err := c.KubeClient.Services(serviceName.Namespace).Patch(
-		serviceName.Name,
-		types.MergePatchType,
-		patchData, "")
-	if err != nil {
-		return fmt.Errorf("could not patch service %q: %v", serviceName, err)
+		// update the service spec
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(
+			serviceName.Name,
+			types.MergePatchType,
+			patchData, "")
+		if err != nil {
+			return fmt.Errorf("could not patch service %q: %v", serviceName, err)
+		}
 	}
 	c.Services[role] = svc
 
