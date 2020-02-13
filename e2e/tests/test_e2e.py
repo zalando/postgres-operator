@@ -47,7 +47,8 @@ class EndToEndTestCase(unittest.TestCase):
         for filename in ["operator-service-account-rbac.yaml",
                          "configmap.yaml",
                          "postgres-operator.yaml"]:
-            k8s.create_with_kubectl("manifests/" + filename)
+            result = k8s.create_with_kubectl("manifests/" + filename)
+            print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
 
         k8s.wait_for_operator_pod_start()
 
@@ -55,7 +56,8 @@ class EndToEndTestCase(unittest.TestCase):
             'default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image))  # shows up after tests finish
 
-        k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
+        result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
+        print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
         k8s.wait_for_pod_start('spilo-role=master')
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -423,7 +425,7 @@ class K8s:
         self.wait_for_operator_pod_start()
 
     def create_with_kubectl(self, path):
-        subprocess.run(
+        return subprocess.run(
             ["kubectl", "create", "-f", path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
