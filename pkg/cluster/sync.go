@@ -116,7 +116,7 @@ func (c *Cluster) syncServices() error {
 		c.logger.Debugf("syncing %s service", role)
 
 		if err := c.syncEndpoint(role); err != nil {
-			return fmt.Errorf("could not sync %s endpont: %v", role, err)
+			return fmt.Errorf("could not sync %s endpoint: %v", role, err)
 		}
 
 		if err := c.syncService(role); err != nil {

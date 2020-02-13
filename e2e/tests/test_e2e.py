@@ -59,6 +59,55 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master')
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_enable_load_balancer(self):
+        '''
+        Test if services are updated when enabling/disabling load balancers
+        '''
+
+        k8s = self.k8s
+        cluster_label = 'version=acid-minimal-cluster'
+
+        # enable load balancer services
+        pg_patch_enable_lbs = {
+            "spec": {
+                "enableMasterLoadBalancer": True,
+                "enableReplicaLoadBalancer": True
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_lbs)
+        # wait for service recreation
+        time.sleep(60)
+
+        master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
+        self.assertEqual(master_svc_type, 'LoadBalancer',
+                         "Expected LoadBalancer service type for master, found {}".format(master_svc_type))
+
+        repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
+        self.assertEqual(repl_svc_type, 'LoadBalancer',
+                         "Expected LoadBalancer service type for replica, found {}".format(repl_svc_type))
+
+        # disable load balancer services again
+        pg_patch_disable_lbs = {
+            "spec": {
+                "enableMasterLoadBalancer": False,
+                "enableReplicaLoadBalancer": False
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_lbs)
+        # wait for service recreation
+        time.sleep(60)
+
+        master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
+        self.assertEqual(master_svc_type, 'ClusterIP',
+                         "Expected ClusterIP service type for master, found {}".format(master_svc_type))
+
+        repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
+        self.assertEqual(repl_svc_type, 'ClusterIP',
+                         "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):
         '''
         Lower resource limits below configured minimum and let operator fix it
@@ -361,6 +410,13 @@ class K8s:
             if pods:
                 pod_phase = pods[0].status.phase
             time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def get_service_type(self, svc_labels, namespace='default'):
+        svc_type = ''
+        svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
+        for svc in svcs:
+            svc_type = svc.spec.type
+        return svc_type
 
     def check_service_annotations(self, svc_labels, annotations, namespace='default'):
         svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
