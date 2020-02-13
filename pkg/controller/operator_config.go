@@ -146,13 +146,13 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// Connection pool. Looks like we can't use defaulting in CRD before 1.17,
 	// so ensure default values here.
-	result.ConnectionPool.NumberOfInstances = fromCRD.ConnectionPool.NumberOfInstances
-	if result.ConnectionPool.NumberOfInstances == nil ||
-		*result.ConnectionPool.NumberOfInstances < 1 {
+	result.ConnectionPool.Replicas = fromCRD.ConnectionPool.Replicas
+	if result.ConnectionPool.Replicas == nil ||
+		*result.ConnectionPool.Replicas < 1 {
 		var value int32
 
 		value = 1
-		result.ConnectionPool.NumberOfInstances = &value
+		result.ConnectionPool.Replicas = &value
 	}
 
 	result.ConnectionPool.Schema = util.Coalesce(
@@ -162,10 +162,6 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ConnectionPool.User = util.Coalesce(
 		fromCRD.ConnectionPool.User,
 		constants.ConnectionPoolUserName)
-
-	result.ConnectionPool.Type = util.Coalesce(
-		fromCRD.ConnectionPool.Type,
-		constants.ConnectionPoolDefaultType)
 
 	result.ConnectionPool.Image = util.Coalesce(
 		fromCRD.ConnectionPool.Image,

@@ -592,3 +592,31 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
 
 * **scalyr_memory_limit**
   Memory limit value for the Scalyr sidecar. The default is `500Mi`.
+
+## Connection pool configuration
+
+Parameters are grouped under the `connection_pool` top-level key and specify
+default configuration for connection pool, if a postgres manifest requests it
+but do not specify some of the parameters. All of them are optional with the
+operator being able to provide some reasonable defaults.
+
+* **connection_pool_replicas**
+  How many instances of connection pool to create.
+
+* **connection_pool_schema**
+  Schema to create for credentials lookup function.
+
+* **connection_pool_user**
+  User to create for connection pool to be able to connect to a database.
+
+* **connection_pool_image**
+  Docker image to use for connection pool deployment.
+
+* **connection_pool_mode**
+  Default pool mode, sesssion or transaction.
+
+* **connection_pool_default_cpu_request**
+  **connection_pool_default_memory_reques**
+  **connection_pool_default_cpu_limit**
+  **connection_pool_default_memory_limit**
+  Default resource configuration for connection pool deployment.

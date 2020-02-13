@@ -1861,9 +1861,9 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 	*appsv1.Deployment, error) {
 
 	podTemplate, err := c.generateConnPoolPodTemplate(spec)
-	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	numberOfInstances := spec.ConnectionPool.Replicas
 	if numberOfInstances == nil {
-		numberOfInstances = c.OpConfig.ConnectionPool.NumberOfInstances
+		numberOfInstances = c.OpConfig.ConnectionPool.Replicas
 	}
 
 	if err != nil {
