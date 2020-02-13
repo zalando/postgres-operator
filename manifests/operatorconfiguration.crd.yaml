@@ -303,11 +303,7 @@ spec:
                 connection_pool_user:
                   type: string
                   #default: "pooler"
-<<<<<<< HEAD
                 connection_pool_replicas:
-=======
-                connection_pool_instances_number:
->>>>>>> 2384e1ec10638e1989c0295ffb7fbe96af2e2f1a
                   type: integer
                   #default: 1
                 connection_pool_image:
