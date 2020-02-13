@@ -395,7 +395,8 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		}
 	}
 
-	// when disabling LoadBalancers patch does not work because of LoadBalancerSourceRanges field (even if nil)
+	// now, patch the service spec, but when disabling LoadBalancers do update instead
+	// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
 	oldServiceType := c.Services[role].Spec.Type
 	newServiceType := newService.Spec.Type
 	if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
@@ -411,7 +412,6 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
 		}
 
-		// update the service spec
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(
 			serviceName.Name,
 			types.MergePatchType,
