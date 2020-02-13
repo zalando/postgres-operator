@@ -85,7 +85,7 @@ type LogicalBackup struct {
 
 // Operator options for connection pooler
 type ConnectionPool struct {
-	Replicas                     *int32 `name:"connection_pool_replicas" default:"1"`
+	NumberOfInstances            *int32 `name:"connection_pool_number_of_instances" default:"1"`
 	Schema                       string `name:"connection_pool_schema" default:"pooler"`
 	User                         string `name:"connection_pool_user" default:"pooler"`
 	Image                        string `name:"connection_pool_image"  default:"pgbouncer:1.0"`

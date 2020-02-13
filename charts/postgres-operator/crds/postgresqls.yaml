@@ -251,7 +251,7 @@ spec:
                   type: string
                 user:
                   type: string
-                replicas:
+                number_of_instances:
                   type: integer
                 dockerImage:
                   type: string

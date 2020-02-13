@@ -240,7 +240,7 @@ configTeamsApi:
 # configure connection pooler deployment created by the operator
 configConnectionPool:
   # number of pooler instances
-  connection_pool_replicas: 1
+  connection_pool_number_of_instances: 1
   # db schema to install lookup function into
   connection_pool_schema: "pooler"
   # db user for pooler to use

@@ -372,7 +372,7 @@ configuration for connection pool. If this section is not empty, a connection
 pool will be created for a database even if `enableConnectionPool` is not
 present.
 
-* **replicas**
+* **number_of_instances**
   How many instances of connection pool to create.
 
 * **mode**

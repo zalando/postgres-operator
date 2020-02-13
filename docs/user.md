@@ -478,7 +478,7 @@ To configure a new connection pool, specify:
 spec:
   connectionPool:
     # how many instances of connection pool to create
-    replicas: 1
+    number_of_instances: 1
 
     # in which mode to run, session or transaction
     mode: "transaction"

@@ -600,7 +600,7 @@ default configuration for connection pool, if a postgres manifest requests it
 but do not specify some of the parameters. All of them are optional with the
 operator being able to provide some reasonable defaults.
 
-* **connection_pool_replicas**
+* **connection_pool_number_of_instances**
   How many instances of connection pool to create.
 
 * **connection_pool_schema**

@@ -99,14 +99,14 @@ func TestConnPoolSynchronization(t *testing.T) {
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
 					ConnectionPool: &acidv1.ConnectionPool{
-						Replicas: int32ToPointer(1),
+						NumberOfInstances: int32ToPointer(1),
 					},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
 					ConnectionPool: &acidv1.ConnectionPool{
-						Replicas: int32ToPointer(2),
+						NumberOfInstances: int32ToPointer(2),
 					},
 				},
 			},

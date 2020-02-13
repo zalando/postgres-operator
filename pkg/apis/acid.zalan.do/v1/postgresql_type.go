@@ -169,11 +169,11 @@ type PostgresStatus struct {
 // makes sense to expose. E.g. pool size (min/max boundaries), max client
 // connections etc.
 type ConnectionPool struct {
-	Replicas    *int32 `json:"replicas,omitempty"`
-	Schema      string `json:"schema,omitempty"`
-	User        string `json:"user,omitempty"`
-	Mode        string `json:"mode,omitempty"`
-	DockerImage string `json:"dockerImage,omitempty"`
+	NumberOfInstances *int32 `json:"number_of_instances,omitempty"`
+	Schema            string `json:"schema,omitempty"`
+	User              string `json:"user,omitempty"`
+	Mode              string `json:"mode,omitempty"`
+	DockerImage       string `json:"dockerImage,omitempty"`
 
 	Resources `json:"resources,omitempty"`
 }

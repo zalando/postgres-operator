@@ -154,7 +154,7 @@ type ScalyrConfiguration struct {
 
 // Defines default configuration for connection pool
 type ConnectionPoolConfiguration struct {
-	Replicas             *int32 `json:"connection_pool_replicas,omitempty"`
+	NumberOfInstances    *int32 `json:"connection_pool_number_of_instances,omitempty"`
 	Schema               string `json:"connection_pool_schema,omitempty"`
 	User                 string `json:"connection_pool_user,omitempty"`
 	Image                string `json:"connection_pool_image,omitempty"`
