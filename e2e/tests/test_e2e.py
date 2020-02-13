@@ -423,7 +423,10 @@ class K8s:
         self.wait_for_operator_pod_start()
 
     def create_with_kubectl(self, path):
-        subprocess.run(["kubectl", "create", "-f", path])
+        subprocess.run(
+            ["kubectl", "create", "-f", path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
 
 
 if __name__ == '__main__':
