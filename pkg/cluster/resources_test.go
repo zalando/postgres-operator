@@ -63,3 +63,41 @@ func TestConnPoolCreationAndDeletion(t *testing.T) {
 		t.Errorf("%s: Cannot delete connection pool, %s", testName, err)
 	}
 }
+
+func TestNeedConnPool(t *testing.T) {
+	testName := "Test how connection pool can be enabled"
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPool: config.ConnectionPool{
+					ConnPoolDefaultCPURequest:    "100m",
+					ConnPoolDefaultCPULimit:      "100m",
+					ConnPoolDefaultMemoryRequest: "100M",
+					ConnPoolDefaultMemoryLimit:   "100M",
+				},
+			},
+		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger)
+
+	cluster.Spec = acidv1.PostgresSpec{
+		ConnectionPool: &acidv1.ConnectionPool{},
+	}
+
+	if !cluster.needConnectionPool() {
+		t.Errorf("%s: Connection pool is not enabled with full definition",
+			testName)
+	}
+
+	cluster.Spec = acidv1.PostgresSpec{
+		EnableConnectionPool: true,
+	}
+
+	if !cluster.needConnectionPool() {
+		t.Errorf("%s: Connection pool is not enabled with flag",
+			testName)
+	}
+}
