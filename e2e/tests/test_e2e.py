@@ -77,7 +77,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_lbs)
         # wait for service recreation
-        time.sleep(30)
+        time.sleep(60)
 
         master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
         self.assertEqual(master_svc_type, 'LoadBalancer',
@@ -97,7 +97,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_lbs)
         # wait for service recreation
-        time.sleep(30)
+        time.sleep(60)
 
         master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
         self.assertEqual(master_svc_type, 'ClusterIP',
