@@ -149,6 +149,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Optional. Default is: "30 00 \* \* \*"
 
+* enableConnectionPool
+  Tells the operator to create a connection pool with a database. If this
+  field is true, a connection pool deployment will be created even if
+  `connectionPool` section is empty.
+
 ## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key, which is
@@ -359,3 +364,25 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
+
+## Connection pool
+
+Parameters are grouped under the `connectionPool` top-level key and specify
+configuration for connection pool. If this section is not empty, a connection
+pool will be created for a database even if `enableConnectionPool` is not
+present.
+
+* **replicas**
+  How many instances of connection pool to create.
+
+* **mode**
+  In which mode to run connection pool, transaction or section.
+
+* **schema**
+  Schema to create for credentials lookup function.
+
+* **user**
+  User to create for connection pool to be able to connect to a database.
+
+* **resources**
+  Resource configuration for connection pool deployment.

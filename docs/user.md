@@ -454,3 +454,56 @@ monitoring is outside the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and
 [administrator documentation](administrator.md) for details on how backups are
 executed.
+
+## Connection pool
+
+The operator can create a database side connection pool for those applications,
+where an application side pool is not feasible, but a number of connections is
+high. To create a connection pool together with a database, modify the
+manifest:
+
+```yaml
+spec:
+  enableConnectionPool: true
+```
+
+This will tell the operator to create a connection pool with default
+configuration, though which one can access the master via a separate service
+`{cluster-name}-pooler`. In most of the cases provided default configuration
+should be good enough.
+
+To configure a new connection pool, specify:
+
+```
+spec:
+  connectionPool:
+    # how many instances of connection pool to create
+    replicas: 1
+
+    # in which mode to run, session or transaction
+    mode: "transaction"
+
+    # schema, which operator will create to install credentials lookup
+    # function
+    schema: "pooler"
+
+    # user, which operator will create for connection pool
+    user: "pooler"
+
+    # resources for each instance
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "100M"
+      limits:
+        cpu: "100m"
+        memory: "100M"
+```
+
+By default `pgbouncer` is used to create a connection pool. To find out about
+pool modes see [docs](https://www.pgbouncer.org/config.html#pool_mode) (but it
+should be general approach between different implementation).
+
+Note, that using `pgbouncer` means meaningful resource CPU limit should be less
+than 1 core (there is a way to utilize more than one, but in K8S it's easier
+just to spin up more instances).

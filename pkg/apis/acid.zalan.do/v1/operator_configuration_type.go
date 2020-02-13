@@ -65,12 +65,12 @@ type KubernetesMetaConfiguration struct {
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
-	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       Duration      `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
+	PodEnvironmentConfigMap    string   `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName       string   `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout       Duration `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity      bool     `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string   `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string   `json:"pod_management_policy,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -154,10 +154,9 @@ type ScalyrConfiguration struct {
 
 // Defines default configuration for connection pool
 type ConnectionPoolConfiguration struct {
-	NumberOfInstances    *int32 `json:"connection_pool_instances_number,omitempty"`
+	Replicas             *int32 `json:"connection_pool_replicas,omitempty"`
 	Schema               string `json:"connection_pool_schema,omitempty"`
 	User                 string `json:"connection_pool_user,omitempty"`
-	Type                 string `json:"connection_pool_type,omitempty"`
 	Image                string `json:"connection_pool_image,omitempty"`
 	Mode                 string `json:"connection_pool_mode,omitempty"`
 	DefaultCPURequest    string `name:"connection_pool_default_cpu_request,omitempty"`

@@ -27,7 +27,7 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	EnableConnectionPool bool            `json:"enable_connection_pool,omitempty"`
+	EnableConnectionPool bool            `json:"enableConnectionPool,omitempty"`
 	ConnectionPool       *ConnectionPool `json:"connectionPool,omitempty"`
 
 	TeamID      string `json:"teamId"`
@@ -159,16 +159,21 @@ type PostgresStatus struct {
 }
 
 // Options for connection pooler
+//
+// TODO: prepared snippets of configuration, one can choose via type, e.g.
+// pgbouncer-large (with higher resources) or odyssey-small (with smaller
+// resources)
+// Type              string `json:"type,omitempty"`
+//
+// TODO: figure out what other important parameters of the connection pool it
+// makes sense to expose. E.g. pool size (min/max boundaries), max client
+// connections etc.
 type ConnectionPool struct {
-	NumberOfInstances *int32 `json:"instancesNumber,omitempty"`
-	Schema            string `json:"schema,omitempty"`
-	User              string `json:"user,omitempty"`
-	Mode              string `json:"mode,omitempty"`
-	DockerImage       string `json:"dockerImage,omitempty"`
-	// TODO: prepared snippets of configuration, one can choose via type, e.g.
-	// pgbouncer-large (with higher resources) or odyssey-small (with smaller
-	// resources)
-	// Type              string `json:"type,omitempty"`
+	Replicas    *int32 `json:"replicas,omitempty"`
+	Schema      string `json:"schema,omitempty"`
+	User        string `json:"user,omitempty"`
+	Mode        string `json:"mode,omitempty"`
+	DockerImage string `json:"dockerImage,omitempty"`
 
 	Resources `json:"resources,omitempty"`
 }
