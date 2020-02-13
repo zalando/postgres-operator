@@ -327,7 +327,7 @@ spec:
                 connection_pool_user:
                   type: string
                   #default: "pooler"
-                connection_pool_instances_number:
+                connection_pool_replicas:
                   type: integer
                   #default: 1
                 connection_pool_image:
@@ -354,7 +354,7 @@ spec:
                 connection_pool_default_memory_request:
                   type: string
                   pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                  #default: "100m"
+                  #default: "100Mi"
         status:
           type: object
           additionalProperties:

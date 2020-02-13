@@ -494,10 +494,10 @@ spec:
     resources:
       requests:
         cpu: "100m"
-        memory: "100M"
+        memory: "100Mi"
       limits:
         cpu: "100m"
-        memory: "100M"
+        memory: "100Mi"
 ```
 
 By default `pgbouncer` is used to create a connection pool. To find out about

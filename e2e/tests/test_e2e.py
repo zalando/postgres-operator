@@ -270,7 +270,16 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_custom_service_annotations)
 
-        k8s.create_with_kubectl("manifests/postgres-manifest-with-service-annotations.yaml")
+        pg_patch_custom_annotations = {
+            "spec": {
+                "serviceAnnotations": {
+                    "annotation.key": "value"
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_custom_annotations)
+
         annotations = {
             "annotation.key": "value",
             "foo": "bar",

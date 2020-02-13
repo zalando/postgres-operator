@@ -17,5 +17,4 @@ spec:
     foo: zalando  # dbname: owner
   postgresql:
     version: "11"
-  connectionPool:
-    type: "pgbouncer"
+  enableConnectionPool: true

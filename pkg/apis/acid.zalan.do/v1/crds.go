@@ -247,6 +247,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"dockerImage": {
 						Type: "string",
 					},
+					"enableConnectionPool": {
+						Type: "boolean",
+					},
 					"enableLogicalBackup": {
 						Type: "boolean",
 					},
@@ -1118,7 +1121,7 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"connection_pool_image": {
 								Type: "string",
 							},
-							"connection_pool_instances_number": {
+							"connection_pool_replicas": {
 								Type:    "integer",
 								Minimum: &min1,
 							},
