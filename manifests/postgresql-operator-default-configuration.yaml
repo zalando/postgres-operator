@@ -121,3 +121,13 @@ configuration:
     scalyr_memory_limit: 500Mi
     scalyr_memory_request: 50Mi
     # scalyr_server_url: ""
+  connection_pool:
+    connection_pool_default_cpu_limit: "1"
+    connection_pool_default_cpu_request: "1"
+    connection_pool_default_memory_limit: 100m
+    connection_pool_default_memory_request: "100Mi"
+    # connection_pool_image: ""
+    connection_pool_instances_number: 1
+    connection_pool_mode: "transaction"
+    # connection_pool_schema: "pooler"
+    # connection_pool_user: "pooler"
