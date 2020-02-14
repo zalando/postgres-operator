@@ -388,8 +388,9 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   `false`.
 
 * **custom_service_annotations**
-  when load balancing is enabled, LoadBalancer service is created and
-  this parameter takes service annotations that are applied to service.
+  This key/value map provides a list of annotations that get attached to each
+  service of a cluster created by the operator. If the annotation key is also
+  provided by the cluster definition, the manifest value is used.
   Optional.
 
 * **master_dns_name_format** defines the DNS name string template for the
@@ -461,8 +462,11 @@ grouped under the `logical_backup` key.
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
 
+* **logical_backup_s3_region**
+  Specifies the region of the bucket which is required with some non-AWS S3 storage services. The default is empty.
+
 * **logical_backup_s3_endpoint**
-  When using non-AWS S3 storage, endpoint can be set as a ENV variable.
+  When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.
 
 * **logical_backup_s3_sse**
   Specify server side encription that S3 storage is using. If empty string

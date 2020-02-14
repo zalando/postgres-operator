@@ -9,7 +9,6 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
-	"github.com/zalando/postgres-operator/pkg/util/constants"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -136,21 +135,37 @@ func SameService(cur, new *v1.Service) (match bool, reason string) {
 		}
 	}
 
-	oldDNSAnnotation := cur.Annotations[constants.ZalandoDNSNameAnnotation]
-	newDNSAnnotation := new.Annotations[constants.ZalandoDNSNameAnnotation]
-	oldELBAnnotation := cur.Annotations[constants.ElbTimeoutAnnotationName]
-	newELBAnnotation := new.Annotations[constants.ElbTimeoutAnnotationName]
+	match = true
 
-	if oldDNSAnnotation != newDNSAnnotation {
-		return false, fmt.Sprintf("new service's %q annotation value %q doesn't match the current one %q",
-			constants.ZalandoDNSNameAnnotation, newDNSAnnotation, oldDNSAnnotation)
-	}
-	if oldELBAnnotation != newELBAnnotation {
-		return false, fmt.Sprintf("new service's %q annotation value %q doesn't match the current one %q",
-			constants.ElbTimeoutAnnotationName, oldELBAnnotation, newELBAnnotation)
+	reasonPrefix := "new service's annotations doesn't match the current one:"
+	for ann := range cur.Annotations {
+		if _, ok := new.Annotations[ann]; !ok {
+			match = false
+			if len(reason) == 0 {
+				reason = reasonPrefix
+			}
+			reason += fmt.Sprintf(" Removed '%s'.", ann)
+		}
 	}
 
-	return true, ""
+	for ann := range new.Annotations {
+		v, ok := cur.Annotations[ann]
+		if !ok {
+			if len(reason) == 0 {
+				reason = reasonPrefix
+			}
+			reason += fmt.Sprintf(" Added '%s' with value '%s'.", ann, new.Annotations[ann])
+			match = false
+		} else if v != new.Annotations[ann] {
+			if len(reason) == 0 {
+				reason = reasonPrefix
+			}
+			reason += fmt.Sprintf(" '%s' changed from '%s' to '%s'.", ann, v, new.Annotations[ann])
+			match = false
+		}
+	}
+
+	return match, reason
 }
 
 // SamePDB compares the PodDisruptionBudgets
