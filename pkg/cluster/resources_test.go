@@ -15,6 +15,10 @@ func mockInstallLookupFunction(schema string, user string) error {
 	return nil
 }
 
+func boolToPointer(value bool) *bool {
+	return &value
+}
+
 func TestConnPoolCreationAndDeletion(t *testing.T) {
 	testName := "Test connection pool creation"
 	var cluster = New(
@@ -28,8 +32,8 @@ func TestConnPoolCreationAndDeletion(t *testing.T) {
 				ConnectionPool: config.ConnectionPool{
 					ConnPoolDefaultCPURequest:    "100m",
 					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100M",
-					ConnPoolDefaultMemoryLimit:   "100M",
+					ConnPoolDefaultMemoryRequest: "100Mi",
+					ConnPoolDefaultMemoryLimit:   "100Mi",
 				},
 			},
 		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger)
@@ -77,8 +81,8 @@ func TestNeedConnPool(t *testing.T) {
 				ConnectionPool: config.ConnectionPool{
 					ConnPoolDefaultCPURequest:    "100m",
 					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100M",
-					ConnPoolDefaultMemoryLimit:   "100M",
+					ConnPoolDefaultMemoryRequest: "100Mi",
+					ConnPoolDefaultMemoryLimit:   "100Mi",
 				},
 			},
 		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger)
@@ -93,7 +97,7 @@ func TestNeedConnPool(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableConnectionPool: true,
+		EnableConnectionPool: boolToPointer(true),
 	}
 
 	if !cluster.needConnectionPool() {

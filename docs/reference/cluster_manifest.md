@@ -372,7 +372,7 @@ configuration for connection pool. If this section is not empty, a connection
 pool will be created for a database even if `enableConnectionPool` is not
 present.
 
-* **number_of_instances**
+* **numberOfInstances**
   How many instances of connection pool to create.
 
 * **mode**
@@ -383,6 +383,9 @@ present.
 
 * **user**
   User to create for connection pool to be able to connect to a database.
+
+* **dockerImage**
+  Which docker image to use for connection pool deployment.
 
 * **resources**
   Resource configuration for connection pool deployment.

@@ -49,7 +49,7 @@ type Config struct {
 	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
 }
 
-type ConnectionPoolResources struct {
+type ConnectionPoolObjects struct {
 	Deployment *appsv1.Deployment
 	Service    *v1.Service
 }
@@ -59,7 +59,7 @@ type kubeResources struct {
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
-	ConnectionPool      *ConnectionPoolResources
+	ConnectionPool      *ConnectionPoolObjects
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately

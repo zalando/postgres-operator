@@ -497,5 +497,9 @@ func (c *Cluster) patroniUsesKubernetes() bool {
 }
 
 func (c *Cluster) needConnectionPool() bool {
-	return c.Spec.ConnectionPool != nil || c.Spec.EnableConnectionPool == true
+	if c.Spec.EnableConnectionPool == nil {
+		return c.Spec.ConnectionPool != nil
+	} else {
+		return *c.Spec.EnableConnectionPool
+	}
 }

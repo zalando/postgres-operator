@@ -618,7 +618,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql) error {
 	if c.ConnectionPool == nil {
 		c.logger.Warning("Connection pool resources are empty")
-		c.ConnectionPool = &ConnectionPoolResources{}
+		c.ConnectionPool = &ConnectionPoolObjects{}
 	}
 
 	deployment, err := c.KubeClient.

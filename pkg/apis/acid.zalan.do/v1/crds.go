@@ -184,6 +184,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 							"mode": {
 								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"session"`),
+									},
+									{
+										Raw: []byte(`"transaction"`),
+									},
+								},
 							},
 							"numberOfInstances": {
 								Type:    "integer",

@@ -1,5 +1,7 @@
 package v1
 
+// Operator configuration CRD definition, please use snake_case for field names.
+
 import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 
@@ -159,10 +161,10 @@ type ConnectionPoolConfiguration struct {
 	User                 string `json:"connection_pool_user,omitempty"`
 	Image                string `json:"connection_pool_image,omitempty"`
 	Mode                 string `json:"connection_pool_mode,omitempty"`
-	DefaultCPURequest    string `name:"connection_pool_default_cpu_request,omitempty"`
-	DefaultMemoryRequest string `name:"connection_pool_default_memory_request,omitempty"`
-	DefaultCPULimit      string `name:"connection_pool_default_cpu_limit,omitempty"`
-	DefaultMemoryLimit   string `name:"connection_pool_default_memory_limit,omitempty"`
+	DefaultCPURequest    string `json:"connection_pool_default_cpu_request,omitempty"`
+	DefaultMemoryRequest string `json:"connection_pool_default_memory_request,omitempty"`
+	DefaultCPULimit      string `json:"connection_pool_default_cpu_limit,omitempty"`
+	DefaultMemoryLimit   string `json:"connection_pool_default_memory_limit,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup

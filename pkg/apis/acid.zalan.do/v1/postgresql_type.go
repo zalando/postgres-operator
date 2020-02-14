@@ -1,5 +1,7 @@
 package v1
 
+// Postgres CRD definition, please use CamelCase for field names.
+
 import (
 	"time"
 
@@ -27,7 +29,7 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	EnableConnectionPool bool            `json:"enableConnectionPool,omitempty"`
+	EnableConnectionPool *bool           `json:"enableConnectionPool,omitempty"`
 	ConnectionPool       *ConnectionPool `json:"connectionPool,omitempty"`
 
 	TeamID      string `json:"teamId"`
@@ -169,7 +171,7 @@ type PostgresStatus struct {
 // makes sense to expose. E.g. pool size (min/max boundaries), max client
 // connections etc.
 type ConnectionPool struct {
-	NumberOfInstances *int32 `json:"number_of_instances,omitempty"`
+	NumberOfInstances *int32 `json:"numberOfInstances,omitempty"`
 	Schema            string `json:"schema,omitempty"`
 	User              string `json:"user,omitempty"`
 	Mode              string `json:"mode,omitempty"`

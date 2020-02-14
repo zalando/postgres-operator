@@ -97,7 +97,7 @@ func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 //
 // After that create all the objects for connection pool, namely a deployment
 // with a chosen pooler and a service to expose it.
-func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolResources, error) {
+func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolObjects, error) {
 	var msg string
 	c.setProcessName("creating connection pool")
 
@@ -144,7 +144,7 @@ func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolR
 		return nil, err
 	}
 
-	c.ConnectionPool = &ConnectionPoolResources{
+	c.ConnectionPool = &ConnectionPoolObjects{
 		Deployment: deployment,
 		Service:    service,
 	}

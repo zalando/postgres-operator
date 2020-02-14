@@ -274,9 +274,9 @@ configConnectionPool:
   connection_pool_mode: "transaction"
   # default resources
   connection_pool_default_cpu_request: "100m"
-  connection_pool_default_memory_request: "100M"
+  connection_pool_default_memory_request: "100Mi"
   connection_pool_default_cpu_limit: "100m"
-  connection_pool_default_memory_limit: "100M"
+  connection_pool_default_memory_limit: "100Mi"
 
 rbac:
   # Specifies whether RBAC resources should be created
