@@ -56,9 +56,13 @@ class EndToEndTestCase(unittest.TestCase):
             'default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image))  # shows up after tests finish
 
-        result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
-        print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
-        k8s.wait_for_pod_start('spilo-role=master')
+        result = k8s.create_with_kubectl('manifests/minimal-postgres-manifest.yaml')
+        print('stdout: {}, stderr: {}'.format(result.stdout, result.stderr))
+        try:
+            k8s.wait_for_pod_start('spilo-role=master')
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):
@@ -356,12 +360,39 @@ class K8s:
         # for local execution ~ 10 seconds suffices
         time.sleep(60)
 
+    def get_operator_pod(self):
+        pods = self.api.core_v1.list_namespaced_pod(
+            'default', label_selector='name=postgres-operator'
+        ).items
+
+        if pods:
+            return pods[0]
+
+        return None
+
+    def get_operator_log(self):
+        operator_pod = self.get_operator_pod()
+        pod_name = operator_pod.metadata.name
+        return self.api.core_v1.read_namespaced_pod_log(
+            name=pod_name,
+            namespace='default'
+        )
+
     def wait_for_pod_start(self, pod_labels, namespace='default'):
         pod_phase = 'No pod running'
         while pod_phase != 'Running':
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
+
+            if pods and pod_phase != 'Running':
+                pod_name = pods[0].metadata.name
+                response = self.api.core_v1.read_namespaced_pod(
+                    name=pod_name,
+                    namespace=namespace
+                )
+                print("Pod description {}".format(response))
+
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def check_service_annotations(self, svc_labels, annotations, namespace='default'):
