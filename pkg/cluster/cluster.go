@@ -863,6 +863,11 @@ func (c *Cluster) initSystemUsers() {
 	// created by operator as a normal pgUser
 	if c.needConnectionPool() {
 
+		// initialize empty connection pool if not done yet
+		if c.Spec.ConnectionPool == nil {
+			c.Spec.ConnectionPool = &acidv1.ConnectionPool{}
+		}
+
 		username := c.Spec.ConnectionPool.User
 		if username == "" {
 			username = c.OpConfig.ConnectionPool.User
