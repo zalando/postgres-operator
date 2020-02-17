@@ -110,17 +110,35 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// connection pool
-	oldPool := oldSpec.Spec.ConnectionPool
-	newPool := newSpec.Spec.ConnectionPool
-	if c.needConnectionPool() &&
-		(c.ConnectionPool == nil || !reflect.DeepEqual(oldPool, newPool)) {
+	// sync connection pool
+	if c.needConnectionPool() {
+		oldPool := oldSpec.Spec.ConnectionPool
+		newPool := newSpec.Spec.ConnectionPool
 
-		c.logger.Debug("syncing connection pool")
+		// do sync in case if any resources were not remembered (it means they
+		// probably were not created, or if specification differs
+		if c.ConnectionPool == nil ||
+			c.ConnectionPool.Deployment == nil ||
+			c.ConnectionPool.Service == nil ||
+			!reflect.DeepEqual(oldPool, newPool) {
 
-		if err := c.syncConnectionPool(&oldSpec, newSpec); err != nil {
-			c.logger.Errorf("could not sync connection pool: %v", err)
-			return err
+			c.logger.Debug("syncing connection pool")
+
+			if err := c.syncConnectionPool(&oldSpec, newSpec); err != nil {
+				c.logger.Errorf("could not sync connection pool: %v", err)
+				return err
+			}
+		}
+	} else {
+		// check if we need to clean up connection pool resources after it was
+		// disabled
+		if c.ConnectionPool != nil &&
+			(c.ConnectionPool.Deployment != nil ||
+				c.ConnectionPool.Service != nil) {
+
+			if err := c.deleteConnectionPool(); err != nil {
+				c.logger.Warningf("could not remove connection pool: %v", err)
+			}
 		}
 	}
 
