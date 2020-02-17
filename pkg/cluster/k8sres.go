@@ -1041,7 +1041,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
 	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" && spec.StandbyCluster.GSWalPath == "" {
-		return nil, fmt.Errorf("s3_wal_path and s3_wal_path are empty for standby cluster")
+		return nil, fmt.Errorf("s3_wal_path and gs_wal_path are empty for standby cluster")
 	}
 
 	// backward compatible check for InitContainers
