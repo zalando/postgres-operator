@@ -18,7 +18,7 @@ import (
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
-	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
+	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -39,7 +39,7 @@ type KubernetesClient struct {
 	corev1.NamespacesGetter
 	corev1.ServiceAccountsGetter
 	appsv1.StatefulSetsGetter
-	rbacv1beta1.RoleBindingsGetter
+	rbacv1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
 	clientbatchv1beta1.CronJobsGetter
@@ -103,7 +103,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.StatefulSetsGetter = client.AppsV1()
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
-	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
+	kubeClient.RoleBindingsGetter = client.RbacV1()
 	kubeClient.CronJobsGetter = client.BatchV1beta1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)

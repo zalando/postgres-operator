@@ -29,7 +29,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	"github.com/zalando/postgres-operator/pkg/util/users"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 var (
@@ -45,7 +45,7 @@ type Config struct {
 	RestConfig                   *rest.Config
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
-	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
+	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 
 type kubeResources struct {
