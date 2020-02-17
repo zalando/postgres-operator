@@ -468,7 +468,7 @@ spec:
 ```
 
 This will tell the operator to create a connection pool with default
-configuration, though which one can access the master via a separate service
+configuration, through which one can access the master via a separate service
 `{cluster-name}-pooler`. In most of the cases provided default configuration
 should be good enough.
 

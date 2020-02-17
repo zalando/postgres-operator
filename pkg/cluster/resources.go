@@ -864,7 +864,7 @@ func (c *Cluster) updateConnPoolDeployment(oldDeploymentSpec, newDeployment *app
 	}
 
 	// An update probably requires RetryOnConflict, but since only one operator
-	// worker at one time will try to update it changes of conflicts are
+	// worker at one time will try to update it chances of conflicts are
 	// minimal.
 	deployment, err := c.KubeClient.
 		Deployments(c.ConnectionPool.Deployment.Namespace).

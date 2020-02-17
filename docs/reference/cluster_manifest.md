@@ -152,7 +152,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
 * enableConnectionPool
   Tells the operator to create a connection pool with a database. If this
   field is true, a connection pool deployment will be created even if
-  `connectionPool` section is empty.
+  `connectionPool` section is empty. Optional, not set by default.
 
 ## Postgres parameters
 
@@ -376,7 +376,7 @@ present.
   How many instances of connection pool to create.
 
 * **mode**
-  In which mode to run connection pool, transaction or section.
+  In which mode to run connection pool, transaction or session.
 
 * **schema**
   Schema to create for credentials lookup function.

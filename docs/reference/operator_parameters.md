@@ -613,7 +613,7 @@ operator being able to provide some reasonable defaults.
   Docker image to use for connection pool deployment.
 
 * **connection_pool_mode**
-  Default pool mode, sesssion or transaction.
+  Default pool mode, session or transaction.
 
 * **connection_pool_default_cpu_request**
   **connection_pool_default_memory_reques**

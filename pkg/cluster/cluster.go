@@ -1217,16 +1217,16 @@ func (c *Cluster) needSyncConnPoolDeployments(oldSpec, newSpec *acidv1.Connectio
 	if err != nil {
 		c.logger.Infof("Cannot get diff, do not do anything, %+v", err)
 		return false, reasons
-	} else {
-		if len(changelog) > 0 {
-			sync = true
-		}
+	}
 
-		for _, change := range changelog {
-			msg := fmt.Sprintf("%s %+v from %s to %s",
-				change.Type, change.Path, change.From, change.To)
-			reasons = append(reasons, msg)
-		}
+	if len(changelog) > 0 {
+		sync = true
+	}
+
+	for _, change := range changelog {
+		msg := fmt.Sprintf("%s %+v from %s to %s",
+			change.Type, change.Path, change.From, change.To)
+		reasons = append(reasons, msg)
 	}
 
 	return sync, reasons

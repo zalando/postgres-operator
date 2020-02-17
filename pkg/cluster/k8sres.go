@@ -1860,6 +1860,16 @@ func (c *Cluster) ownerReferences() []metav1.OwnerReference {
 func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 	*appsv1.Deployment, error) {
 
+	// there are two ways to enable connection pooler, either to specify a
+	// connectionPool section or enableConnectionPool. In the second case
+	// spec.connectionPool will be nil, so to make it easier to calculate
+	// default values, initialize it to an empty structure. It could be done
+	// anywhere, but here is the earliest common entry point between sync and
+	// create code, so init here.
+	if spec.ConnectionPool == nil {
+		spec.ConnectionPool = &acidv1.ConnectionPool{}
+	}
+
 	podTemplate, err := c.generateConnPoolPodTemplate(spec)
 	numberOfInstances := spec.ConnectionPool.NumberOfInstances
 	if numberOfInstances == nil {
@@ -1895,6 +1905,17 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 }
 
 func (c *Cluster) generateConnPoolService(spec *acidv1.PostgresSpec) *v1.Service {
+
+	// there are two ways to enable connection pooler, either to specify a
+	// connectionPool section or enableConnectionPool. In the second case
+	// spec.connectionPool will be nil, so to make it easier to calculate
+	// default values, initialize it to an empty structure. It could be done
+	// anywhere, but here is the earliest common entry point between sync and
+	// create code, so init here.
+	if spec.ConnectionPool == nil {
+		spec.ConnectionPool = &acidv1.ConnectionPool{}
+	}
+
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{
