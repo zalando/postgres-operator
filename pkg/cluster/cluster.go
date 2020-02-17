@@ -868,10 +868,9 @@ func (c *Cluster) initSystemUsers() {
 			c.Spec.ConnectionPool = &acidv1.ConnectionPool{}
 		}
 
-		username := c.Spec.ConnectionPool.User
-		if username == "" {
-			username = c.OpConfig.ConnectionPool.User
-		}
+		username := util.Coalesce(
+			c.Spec.ConnectionPool.User,
+			c.OpConfig.ConnectionPool.User)
 
 		c.systemUsers[constants.ConnectionPoolUserKeyName] = spec.PgUser{
 			Origin:   spec.RoleConnectionPool,

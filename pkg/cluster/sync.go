@@ -115,6 +115,14 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		oldPool := oldSpec.Spec.ConnectionPool
 		newPool := newSpec.Spec.ConnectionPool
 
+		if newPool == nil {
+			// previously specified connectionPool was removed, so delete
+			// connection pool
+			if err := c.deleteConnectionPool(); err != nil {
+				c.logger.Warningf("could not remove connection pool: %v", err)
+			}
+		}
+
 		// do sync in case if any resources were not remembered (it means they
 		// probably were not created, or if specification differs
 		if c.ConnectionPool == nil ||
