@@ -11,6 +11,17 @@ image:
   tag: v1.2.0
   pullPolicy: "IfNotPresent"
 
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+
+serviceAccount:
+  # Specifies whether a ServiceAccount should be created
+  create: true
+  # The name of the ServiceAccount to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
 # configure UI pod resources
 resources:
   limits:
@@ -22,7 +33,7 @@ resources:
 
 # configure UI ENVs
 envs:
-  # IMPORTANT: While operator chart and UI chart are idendependent, this is the interface between 
+  # IMPORTANT: While operator chart and UI chart are idendependent, this is the interface between
   # UI and operator API. Insert the service name of the operator API here!
   operatorApiUrl: "http://postgres-operator:8080"
   targetNamespace: "default"

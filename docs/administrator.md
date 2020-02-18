@@ -99,8 +99,9 @@ access rights.
 
 The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
 defines the service account, cluster roles and bindings needed for the operator
-to function under access control restrictions. To deploy the operator with this
-RBAC policy use:
+to function under access control restrictions. The file also includes a cluster
+role `postgres-pod` with privileges for Patroni to watch and manage pods and
+endpoints. To deploy the operator with this RBAC policies use:
 
 ```bash
 kubectl create -f manifests/configmap.yaml
@@ -109,13 +110,12 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-### Namespaced service account and roles
+### Namespaced service account and role binding
 
 For each namespace the operator watches it creates (or reads) a service account
-to be used by the Postgres Pods when a new cluster is deployed. This service
-account is bound to a ClusterRole via RoleBinding, which are also created (or
-read) by the operator. The name and definitions of these resources can be
-[configured](reference/operator_parameters.md#kubernetes-resources).
+and role binding to be used by the Postgres Pods. The service account is bound
+to the `postgres-pod` cluster role. The name and definitions of these resources
+can be [configured](reference/operator_parameters.md#kubernetes-resources).
 Note, that the operator performs **no** further syncing of namespaced service
 accounts and role bindings.
 

@@ -1,14 +1,13 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: postgres-operator-ui
-  namespace: default
-
----
+{{ if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: postgres-operator-ui
+  name: {{ include "postgres-operator-ui.serviceAccountName" . }}
+  labels:
+    app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
+    helm.sh/chart: {{ template "postgres-operator-ui.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 rules:
 - apiGroups:
   - acid.zalan.do
@@ -50,16 +49,4 @@ rules:
   verbs:
   - get
   - list
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: postgres-operator-ui
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: postgres-operator-ui
-subjects:
-- kind: ServiceAccount
-  name: postgres-operator-ui
-  namespace: default
+{{ end }}
