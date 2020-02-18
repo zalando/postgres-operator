@@ -20,7 +20,7 @@ func newsService(ann map[string]string, svcT v1.ServiceType, lbSr []string) *v1.
 	return svc
 }
 
-func TestServiceAnnotations(t *testing.T) {
+func TestSameService(t *testing.T) {
 	tests := []struct {
 		about   string
 		current *v1.Service
@@ -267,8 +267,9 @@ func TestServiceAnnotations(t *testing.T) {
 				},
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
-			match:  false,
-			reason: `new service's annotations doesn't match the current one: Removed 'foo'. Added 'bar' with value 'foo'. 'zalan' changed from 'do' to 'do.com'`,
+			match: false,
+			// Test just the prefix to avoid flakiness and map sorting
+			reason: `new service's annotations doesn't match the current one: Removed 'foo'.`,
 		},
 		{
 			about: "service add annotations",
@@ -301,7 +302,7 @@ func TestServiceAnnotations(t *testing.T) {
 			}
 			if !match && !tt.match {
 				if !strings.HasPrefix(reason, tt.reason) {
-					t.Errorf("expected reason '%s', found '%s'", tt.reason, reason)
+					t.Errorf("expected reason prefix '%s', found '%s'", tt.reason, reason)
 					return
 				}
 			}
