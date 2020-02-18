@@ -134,6 +134,18 @@ rules:
   - get
   - list
   - patch
+# to CRUD cron jobs for logical backups
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
 # to get namespaces operator resources can run in
 - apiGroups:
   - ""
@@ -166,16 +178,13 @@ rules:
   verbs:
   - get
   - create
-# to CRUD cron jobs for logical backups
+# to grant privilege to run privileged pods
 - apiGroups:
-  - batch
+  - extensions
   resources:
-  - cronjobs
+  - podsecuritypolicies
+  resourceNames:
+  - privileged
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
+  - use
 {{ end }}
