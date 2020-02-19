@@ -460,6 +460,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 	out.Volume = in.Volume
 	in.Patroni.DeepCopyInto(&out.Patroni)
 	out.Resources = in.Resources
+	if in.EnableConnectionPool != nil {
+		in, out := &in.EnableConnectionPool, &out.EnableConnectionPool
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ConnectionPool != nil {
 		in, out := &in.ConnectionPool, &out.ConnectionPool
 		*out = new(ConnectionPool)
