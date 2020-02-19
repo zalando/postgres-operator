@@ -63,7 +63,7 @@ data:
   pod_label_wait_timeout: 10m
   pod_management_policy: "ordered_ready"
   pod_role_label: spilo-role
-  pod_service_account_name: "zalando-postgres-operator"
+  pod_service_account_name: "postgres-pod"
   pod_terminate_grace_period: 5m
   # postgres_superuser_teams: "postgres_superusers"
   # protected_role_names: "admin"

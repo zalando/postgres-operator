@@ -12,7 +12,7 @@ spec:
       labels:
         name: postgres-operator
     spec:
-      serviceAccountName: zalando-postgres-operator
+      serviceAccountName: postgres-operator
       containers:
       - name: postgres-operator
         image: registry.opensource.zalan.do/acid/postgres-operator:v1.3.1

@@ -47,6 +47,12 @@ patching the CRD manifest:
 zk8 patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
 ```
 
+## Non-default cluster domain
+
+If your cluster uses a DNS domain other than the default `cluster.local`, this
+needs to be set in the operator configuration (`cluster_domain` variable). This
+is used by the operator to connect to the clusters after creation.
+
 ## Namespaces
 
 ### Select the namespace to deploy to
@@ -89,36 +95,13 @@ lacks access rights to any of them (except K8s system namespaces like
 'list pods' execute at the cluster scope and fail at the first violation of
 access rights.
 
-The watched namespace also needs to have a (possibly different) service account
-in the case database pods need to talk to the K8s API (e.g. when using
-K8s-native configuration of Patroni). The operator checks that the
-`pod_service_account_name` exists in the target namespace, and, if not, deploys
-there the `pod_service_account_definition` from the operator
-[`Config`](../pkg/util/config/config.go) with the default value of:
-
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
- name: operator
-```
-
-In this definition, the operator overwrites the account's name to match
-`pod_service_account_name` and the `default` namespace to match the target
-namespace. The operator performs **no** further syncing of this account.
-
-## Non-default cluster domain
-
-If your cluster uses a DNS domain other than the default `cluster.local`, this
-needs to be set in the operator configuration (`cluster_domain` variable). This
-is used by the operator to connect to the clusters after creation.
-
 ## Role-based access control for the operator
 
 The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
 defines the service account, cluster roles and bindings needed for the operator
-to function under access control restrictions. To deploy the operator with this
-RBAC policy use:
+to function under access control restrictions. The file also includes a cluster
+role `postgres-pod` with privileges for Patroni to watch and manage pods and
+endpoints. To deploy the operator with this RBAC policies use:
 
 ```bash
 kubectl create -f manifests/configmap.yaml
@@ -127,14 +110,14 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-### Service account and cluster roles
+### Namespaced service account and role binding
 
-Note that the service account is named `zalando-postgres-operator`. You may have
-to change the `service_account_name` in the operator ConfigMap and
-`serviceAccountName` in the `postgres-operator` deployment appropriately. This
-is done intentionally to avoid breaking those setups that already work with the
-default `operator` account. In the future the operator should ideally be run
-under the `zalando-postgres-operator` service account.
+For each namespace the operator watches it creates (or reads) a service account
+and role binding to be used by the Postgres Pods. The service account is bound
+to the `postgres-pod` cluster role. The name and definitions of these resources
+can be [configured](reference/operator_parameters.md#kubernetes-resources).
+Note, that the operator performs **no** further syncing of namespaced service
+accounts and role bindings.
 
 ### Give K8s users access to create/list `postgresqls`
 
