@@ -113,6 +113,33 @@ If your cluster uses a DNS domain other than the default `cluster.local`, this
 needs to be set in the operator configuration (`cluster_domain` variable). This
 is used by the operator to connect to the clusters after creation.
 
+## Operators with defined ownership on certain Postgres clusters
+
+By default, multiple operators can only run together in Kubernetes when isolated
+into their [own namespaces](administrator.md#specify-the-namespace-to-watch).
+But, it is also possible to define ownership between operator instances and
+Postgres clusters running all in the same namespace without interfering.
+
+First, define the [`CONTROLLER_ID`](../../manifests/postgres-operator.yaml#L38)
+environment variable in the operator deployment manifest. Then specify the ID
+in every Postgres cluster manifest you want this operator to watch using the
+`"acid.zalan.do/controller"` annotation:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: demo-cluster
+  annotations:
+    "acid.zalan.do/controller": "second-operator"
+spec:
+  ...
+```
+
+Every other Postgres cluster which lacks the annotation will be ignored by this
+operator. Conversely, operators without a defined `CONTROLLER_ID` will ignore
+clusters with a defined ownership of another cluster.
+
 ## Role-based access control for the operator
 
 The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
