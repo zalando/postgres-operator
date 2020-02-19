@@ -111,43 +111,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pool
-	if c.needConnectionPool() {
-		oldPool := oldSpec.Spec.ConnectionPool
-		newPool := newSpec.Spec.ConnectionPool
-
-		if newPool == nil {
-			// previously specified connectionPool was removed, so delete
-			// connection pool
-			if err := c.deleteConnectionPool(); err != nil {
-				c.logger.Warningf("could not remove connection pool: %v", err)
-			}
-		}
-
-		// do sync in case if any resources were not remembered (it means they
-		// probably were not created, or if specification differs
-		if c.ConnectionPool == nil ||
-			c.ConnectionPool.Deployment == nil ||
-			c.ConnectionPool.Service == nil ||
-			!reflect.DeepEqual(oldPool, newPool) {
-
-			c.logger.Debug("syncing connection pool")
-
-			if err := c.syncConnectionPool(&oldSpec, newSpec); err != nil {
-				c.logger.Errorf("could not sync connection pool: %v", err)
-				return err
-			}
-		}
-	} else {
-		// check if we need to clean up connection pool resources after it was
-		// disabled
-		if c.ConnectionPool != nil &&
-			(c.ConnectionPool.Deployment != nil ||
-				c.ConnectionPool.Service != nil) {
-
-			if err := c.deleteConnectionPool(); err != nil {
-				c.logger.Warningf("could not remove connection pool: %v", err)
-			}
-		}
+	if err = c.syncConnectionPool(&oldSpec, newSpec); err != nil {
+		return fmt.Errorf("could not sync connection pool: %v", err)
 	}
 
 	return err
@@ -499,10 +464,12 @@ func (c *Cluster) syncRoles() (err error) {
 		userNames = append(userNames, u.Name)
 	}
 
-	// An exception from system users, connection pool user
-	connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
-	userNames = append(userNames, connPoolUser.Name)
-	c.pgUsers[connPoolUser.Name] = connPoolUser
+	if c.needConnectionPool() {
+		// An exception from system users, connection pool user
+		connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
+		userNames = append(userNames, connPoolUser.Name)
+		c.pgUsers[connPoolUser.Name] = connPoolUser
+	}
 
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
 	if err != nil {
@@ -637,11 +604,68 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	return nil
 }
 
+func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql) error {
+	newNeedConnPool := c.needConnectionPoolWorker(&newSpec.Spec)
+	oldNeedConnPool := c.needConnectionPoolWorker(&oldSpec.Spec)
+
+	if oldNeedConnPool && newNeedConnPool {
+		// sync in case of differences, or if no resources present
+		oldPool := oldSpec.Spec.ConnectionPool
+		newPool := newSpec.Spec.ConnectionPool
+
+		if c.ConnectionPool == nil ||
+			c.ConnectionPool.Deployment == nil ||
+			c.ConnectionPool.Service == nil ||
+			!reflect.DeepEqual(oldPool, newPool) {
+
+			c.logger.Debug("syncing connection pool")
+
+			if err := c.syncConnectionPoolWorker(oldSpec, newSpec); err != nil {
+				c.logger.Errorf("could not sync connection pool: %v", err)
+				return err
+			}
+		} else {
+			c.logger.Debug("No connection pool sync")
+		}
+	}
+
+	if !oldNeedConnPool && newNeedConnPool {
+		// sync to create everything
+		c.logger.Debug("syncing connection pool")
+
+		if err := c.syncConnectionPoolWorker(oldSpec, newSpec); err != nil {
+			c.logger.Errorf("could not sync connection pool: %v", err)
+			return err
+		}
+	}
+
+	if oldNeedConnPool && !newNeedConnPool {
+		// delete and cleanup resources
+		if err := c.deleteConnectionPool(); err != nil {
+			c.logger.Warningf("could not remove connection pool: %v", err)
+		}
+	}
+
+	if !oldNeedConnPool && !newNeedConnPool {
+		// delete and cleanup resources if not empty
+		if c.ConnectionPool != nil &&
+			(c.ConnectionPool.Deployment != nil ||
+				c.ConnectionPool.Service != nil) {
+
+			if err := c.deleteConnectionPool(); err != nil {
+				c.logger.Warningf("could not remove connection pool: %v", err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // Synchronize connection pool resources. Effectively we're interested only in
 // synchronizing the corresponding deployment, but in case of deployment or
 // service is missing, create it. After checking, also remember an object for
 // the future references.
-func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql) error {
+func (c *Cluster) syncConnectionPoolWorker(oldSpec, newSpec *acidv1.Postgresql) error {
 	if c.ConnectionPool == nil {
 		c.logger.Warning("Connection pool resources are empty")
 		c.ConnectionPool = &ConnectionPoolObjects{}

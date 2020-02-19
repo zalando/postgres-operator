@@ -600,7 +600,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	if !reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) {
+	// connection pool needs one system user created, which is done in
+	// initUsers. Check if it needs to be called.
+	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users)
+	needConnPool := c.needConnectionPoolWorker(&newSpec.Spec)
+	if !sameUsers || needConnPool {
 		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
@@ -724,15 +728,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// connection pool
-	if !reflect.DeepEqual(oldSpec.Spec.ConnectionPool,
-		newSpec.Spec.ConnectionPool) {
-		c.logger.Debug("syncing connection pool")
-
-		if err := c.syncConnectionPool(oldSpec, newSpec); err != nil {
-			c.logger.Errorf("could not sync connection pool: %v", err)
-			updateFailed = true
-		}
+	// sync connection pool
+	if err := c.syncConnectionPool(oldSpec, newSpec); err != nil {
+		return fmt.Errorf("could not sync connection pool: %v", err)
 	}
 
 	return nil

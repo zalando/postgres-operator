@@ -160,7 +160,7 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 
 	// Lack of connection pooler objects is not a fatal error, just log it if
 	// it was present before in the manifest
-	if c.needConnectionPool() && c.ConnectionPool == nil {
+	if c.ConnectionPool == nil {
 		c.logger.Infof("No connection pool to delete")
 		return nil
 	}

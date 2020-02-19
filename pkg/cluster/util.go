@@ -496,10 +496,14 @@ func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
 }
 
-func (c *Cluster) needConnectionPool() bool {
-	if c.Spec.EnableConnectionPool == nil {
-		return c.Spec.ConnectionPool != nil
+func (c *Cluster) needConnectionPoolWorker(spec *acidv1.PostgresSpec) bool {
+	if spec.EnableConnectionPool == nil {
+		return spec.ConnectionPool != nil
 	} else {
-		return *c.Spec.EnableConnectionPool
+		return *spec.EnableConnectionPool
 	}
+}
+
+func (c *Cluster) needConnectionPool() bool {
+	return c.needConnectionPoolWorker(&c.Spec)
 }
