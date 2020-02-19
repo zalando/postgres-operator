@@ -1,17 +1,6 @@
 .PHONY: clean test appjs docker push mock
 
-BINARY ?= postgres-operator-ui
-BUILD_FLAGS ?= -v
-CGO_ENABLED ?= 0
-ifeq ($(RACE),1)
-	BUILD_FLAGS += -race -a
-    CGO_ENABLED=1
-endif
-
-LOCAL_BUILD_FLAGS ?= $(BUILD_FLAGS)
-LDFLAGS ?= -X=main.version=$(VERSION)
-
-IMAGE            ?= registry.opensource.zalan.do/acid/$(BINARY)
+IMAGE            ?= registry.opensource.zalan.do/acid/postgres-operator-ui
 VERSION          ?= $(shell git describe --tags --always --dirty)
 TAG              ?= $(VERSION)
 GITHEAD          = $(shell git rev-parse --short HEAD)
@@ -32,8 +21,11 @@ appjs:
 	docker run $(TTYFLAGS) -u $$(id -u) -v $$(pwd):/workdir -w /workdir/app node:10.1.0-alpine npm run build
 
 docker: appjs
-	docker build --build-arg "VERSION=$(VERSION)" -t "$(IMAGE):$(TAG)" .
-	@echo 'Docker image $(IMAGE):$(TAG) can now be used.'
+	echo `(env)`
+	echo "Tag ${TAG}"
+	echo "Version ${VERSION}"
+	echo "git describe $(shell git describe --tags --always --dirty)"
+	docker build --rm -t "$(IMAGE):$(TAG)" -f Dockerfile .
 
 push: docker
 	docker push "$(IMAGE):$(TAG)"
