@@ -196,6 +196,26 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+            preparedDatabases:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  defaultUsers:
+                    type: boolean
+                  extensions:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  schemas:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        defaultUsers:
+                          type: boolean
+                        defaultRoles:
+                          type: boolean
             replicaLoadBalancer:  # deprecated
               type: boolean
             resources:
@@ -266,6 +286,10 @@ spec:
                       pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                       # Note: the value specified here must not be zero or be higher
                       # than the corresponding limit.
+            serviceAnnotations:
+              type: object
+              additionalProperties:
+                type: string
             sidecars:
               type: array
               nullable: true
