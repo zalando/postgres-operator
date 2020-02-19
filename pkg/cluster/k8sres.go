@@ -1498,8 +1498,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	)
 
 	labels := map[string]string{
-		"version":     c.Name,
-		"application": "spilo-logical-backup",
+		c.OpConfig.ClusterNameLabel: c.Name,
+		"application":               "spilo-logical-backup",
 	}
 	podAffinityTerm := v1.PodAffinityTerm{
 		LabelSelector: &metav1.LabelSelector{

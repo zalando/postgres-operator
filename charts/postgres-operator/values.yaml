@@ -55,7 +55,7 @@ configKubernetes:
   # additional labels assigned to the cluster objects
   cluster_labels: application:spilo
   # label assigned to Kubernetes objects created by the operator
-  cluster_name_label: version
+  cluster_name_label: cluster-name
   # annotations attached to each database pod
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
 
