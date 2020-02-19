@@ -47,6 +47,12 @@ patching the CRD manifest:
 zk8 patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
 ```
 
+## Non-default cluster domain
+
+If your cluster uses a DNS domain other than the default `cluster.local`, this
+needs to be set in the operator configuration (`cluster_domain` variable). This
+is used by the operator to connect to the clusters after creation.
+
 ## Namespaces
 
 ### Select the namespace to deploy to
@@ -89,36 +95,13 @@ lacks access rights to any of them (except K8s system namespaces like
 'list pods' execute at the cluster scope and fail at the first violation of
 access rights.
 
-The watched namespace also needs to have a (possibly different) service account
-in the case database pods need to talk to the K8s API (e.g. when using
-K8s-native configuration of Patroni). The operator checks that the
-`pod_service_account_name` exists in the target namespace, and, if not, deploys
-there the `pod_service_account_definition` from the operator
-[`Config`](../pkg/util/config/config.go) with the default value of:
-
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
- name: operator
-```
-
-In this definition, the operator overwrites the account's name to match
-`pod_service_account_name` and the `default` namespace to match the target
-namespace. The operator performs **no** further syncing of this account.
-
-## Non-default cluster domain
-
-If your cluster uses a DNS domain other than the default `cluster.local`, this
-needs to be set in the operator configuration (`cluster_domain` variable). This
-is used by the operator to connect to the clusters after creation.
-
 ## Role-based access control for the operator
 
 The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
 defines the service account, cluster roles and bindings needed for the operator
-to function under access control restrictions. To deploy the operator with this
-RBAC policy use:
+to function under access control restrictions. The file also includes a cluster
+role `postgres-pod` with privileges for Patroni to watch and manage pods and
+endpoints. To deploy the operator with this RBAC policies use:
 
 ```bash
 kubectl create -f manifests/configmap.yaml
@@ -127,14 +110,14 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-### Service account and cluster roles
+### Namespaced service account and role binding
 
-Note that the service account is named `zalando-postgres-operator`. You may have
-to change the `service_account_name` in the operator ConfigMap and
-`serviceAccountName` in the `postgres-operator` deployment appropriately. This
-is done intentionally to avoid breaking those setups that already work with the
-default `operator` account. In the future the operator should ideally be run
-under the `zalando-postgres-operator` service account.
+For each namespace the operator watches it creates (or reads) a service account
+and role binding to be used by the Postgres Pods. The service account is bound
+to the `postgres-pod` cluster role. The name and definitions of these resources
+can be [configured](reference/operator_parameters.md#kubernetes-resources).
+Note, that the operator performs **no** further syncing of namespaced service
+accounts and role bindings.
 
 ### Give K8s users access to create/list `postgresqls`
 
@@ -376,6 +359,17 @@ cluster manifest. In the case any of these variables are omitted from the
 manifest, the operator configuration settings `enable_master_load_balancer` and
 `enable_replica_load_balancer` apply. Note that the operator settings affect
 all Postgresql services running in all namespaces watched by the operator.
+If load balancing is enabled two default annotations will be applied to its
+services:
+
+- `external-dns.alpha.kubernetes.io/hostname` with the value defined by the
+  operator configs `master_dns_name_format` and `replica_dns_name_format`.
+  This value can't be overwritten. If any changing in its value is needed, it
+  MUST be done changing the DNS format operator config parameters; and
+- `service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout` with
+  a default value of "3600". This value can be overwritten with the operator
+  config parameter `custom_service_annotations` or the  cluster parameter
+  `serviceAnnotations`.
 
 To limit the range of IP addresses that can reach a load balancer, specify the
 desired ranges in the `allowedSourceRanges` field (applies to both master and
@@ -486,37 +480,71 @@ A secret can be pre-provisioned in different ways:
 
 ## Setting up the Postgres Operator UI
 
-With the v1.2 release the Postgres Operator is shipped with a browser-based
+Since the v1.2 release the Postgres Operator is shipped with a browser-based
 configuration user interface (UI) that simplifies managing Postgres clusters
-with the operator. The UI runs with Node.js and comes with it's own Docker
-image.
+with the operator.
 
-Run NPM to continuously compile `tags/js` code. Basically, it creates an
-`app.js` file in: `static/build/app.js`
+### Building the UI image
 
-```
-(cd ui/app && npm start)
-```
-
-To build the Docker image open a shell and change to the `ui` folder. Then run:
+The UI runs with Node.js and comes with it's own Docker
+image. However, installing Node.js to build the operator UI is not required. It
+is handled via Docker containers when running:
 
 ```bash
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.2.0 .
+make docker
 ```
 
-Apply all manifests for the `ui/manifests` folder to deploy the Postgres
-Operator UI on K8s. For local tests you don't need the Ingress resource.
+### Configure endpoints and options
+
+The UI talks to the K8s API server as well as the Postgres Operator [REST API](developer.md#debugging-the-operator).
+K8s API server URLs are loaded from the machine's kubeconfig environment by
+default. Alternatively, a list can also be passed when starting the Python
+application with the `--cluster` option.
+
+The Operator API endpoint can be configured via the `OPERATOR_API_URL`
+environment variables in the [deployment manifest](../ui/manifests/deployment.yaml#L40).
+You can also expose the operator API through a [service](../manifests/api-service.yaml).
+Some displayed options can be disabled from UI using simple flags under the
+`OPERATOR_UI_CONFIG` field in the deployment.
+
+### Deploy the UI on K8s
+
+Now, apply all manifests from the `ui/manifests` folder to deploy the Postgres
+Operator UI on K8s. Replace the image tag in the deployment manifest if you
+want to test the image you've built with `make docker`. Make sure the pods for
+the operator and the UI are both running.
 
 ```bash
-kubectl apply -f ui/manifests
+sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/deployment.yaml | kubectl apply -f manifests/
+kubectl get all -l application=postgres-operator-ui
 ```
 
-Make sure the pods for the operator and the UI are both running. For local
-testing you need to apply proxying and port forwarding so that the UI can talk
-to the K8s and Postgres Operator REST API. You can use the provided
-`run_local.sh` script for this. Make sure it uses the correct URL to your K8s
-API server, e.g. for minikube it would be `https://192.168.99.100:8443`.
+### Local testing
+
+For local testing you need to apply K8s proxying and operator pod port
+forwarding so that the UI can talk to the K8s and Postgres Operator REST API.
+The Ingress resource is not needed. You can use the provided `run_local.sh`
+script for this. Make sure that:
+
+* Python dependencies are installed on your machine
+* the K8s API server URL is set for kubectl commands, e.g. for minikube it would usually be `https://192.168.99.100:8443`.
+* the pod label selectors for port forwarding are correct
+
+When testing with minikube you have to build the image in its docker environment
+(running `make docker` doesn't do it for you). From the `ui` directory execute:
 
 ```bash
+# compile and build operator UI
+make docker
+
+# build in image in minikube docker env
+eval $(minikube docker-env)
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.3.0 .
+
+# apply UI manifests next to a running Postgres Operator
+kubectl apply -f manifests/
+
+# install python dependencies to run UI locally
+pip3 install -r requirements
 ./run_local.sh
 ```

@@ -44,3 +44,4 @@ The current tests are all bundled in [`test_e2e.py`](tests/test_e2e.py):
 * taint-based eviction of Postgres pods
 * invoking logical backup cron job
 * uniqueness of master pod
+* custom service annotations

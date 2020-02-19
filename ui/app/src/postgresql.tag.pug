@@ -76,6 +76,9 @@ postgresql
         .alert.alert-danger(if='{ progress.requestStatus !== "OK" }') Create request failed
         .alert.alert-success(if='{ progress.requestStatus === "OK" }') Create request successful ({ new Date(progress.createdTimestamp).toLocaleString() })
 
+        .alert.alert-info(if='{ !progress.postgresql }') PostgreSQL cluster manifest pending
+        .alert.alert-success(if='{ progress.postgresql }') PostgreSQL cluster manifest created
+
         .alert.alert-info(if='{ !progress.statefulSet }') StatefulSet pending
         .alert.alert-success(if='{ progress.statefulSet }') StatefulSet created
 

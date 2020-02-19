@@ -59,6 +59,106 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master')
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_enable_load_balancer(self):
+        '''
+        Test if services are updated when enabling/disabling load balancers
+        '''
+
+        k8s = self.k8s
+        cluster_label = 'cluster-name=acid-minimal-cluster'
+
+        # enable load balancer services
+        pg_patch_enable_lbs = {
+            "spec": {
+                "enableMasterLoadBalancer": True,
+                "enableReplicaLoadBalancer": True
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_lbs)
+        # wait for service recreation
+        time.sleep(60)
+
+        master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
+        self.assertEqual(master_svc_type, 'LoadBalancer',
+                         "Expected LoadBalancer service type for master, found {}".format(master_svc_type))
+
+        repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
+        self.assertEqual(repl_svc_type, 'LoadBalancer',
+                         "Expected LoadBalancer service type for replica, found {}".format(repl_svc_type))
+
+        # disable load balancer services again
+        pg_patch_disable_lbs = {
+            "spec": {
+                "enableMasterLoadBalancer": False,
+                "enableReplicaLoadBalancer": False
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_lbs)
+        # wait for service recreation
+        time.sleep(60)
+
+        master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
+        self.assertEqual(master_svc_type, 'ClusterIP',
+                         "Expected ClusterIP service type for master, found {}".format(master_svc_type))
+
+        repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
+        self.assertEqual(repl_svc_type, 'ClusterIP',
+                         "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_min_resource_limits(self):
+        '''
+        Lower resource limits below configured minimum and let operator fix it
+        '''
+        k8s = self.k8s
+        cluster_label = 'cluster-name=acid-minimal-cluster'
+        _, failover_targets = k8s.get_pg_nodes(cluster_label)
+
+        # configure minimum boundaries for CPU and memory limits
+        minCPULimit = '500m'
+        minMemoryLimit = '500Mi'
+        patch_min_resource_limits = {
+            "data": {
+                "min_cpu_limit": minCPULimit,
+                "min_memory_limit": minMemoryLimit
+            }
+        }
+        k8s.update_config(patch_min_resource_limits)
+
+        # lower resource limits below minimum
+        pg_patch_resources = {
+            "spec": {
+                "resources": {
+                    "requests": {
+                        "cpu": "10m",
+                        "memory": "50Mi"
+                    },
+                    "limits": {
+                        "cpu": "200m",
+                        "memory": "200Mi"
+                    }
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
+        k8s.wait_for_master_failover(failover_targets)
+
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector='spilo-role=master,' + cluster_label).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+
+        self.assertEqual(masterPod.spec.containers[0].resources.limits['cpu'], minCPULimit,
+                         "Expected CPU limit {}, found {}"
+                         .format(minCPULimit, masterPod.spec.containers[0].resources.limits['cpu']))
+        self.assertEqual(masterPod.spec.containers[0].resources.limits['memory'], minMemoryLimit,
+                         "Expected memory limit {}, found {}"
+                         .format(minMemoryLimit, masterPod.spec.containers[0].resources.limits['memory']))
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
         '''
         Create a customized Postgres cluster in a non-default namespace.
@@ -76,10 +176,9 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
-        """
+        '''
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
-        """
-
+        '''
         k8s = self.k8s
         labels = "cluster-name=acid-minimal-cluster"
 
@@ -93,9 +192,9 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
-        """
+        '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
-        """
+        '''
         k8s = self.k8s
         cluster_label = 'cluster-name=acid-minimal-cluster'
 
@@ -126,7 +225,7 @@ class EndToEndTestCase(unittest.TestCase):
         # patch node and test if master is failing over to one of the expected nodes
         k8s.api.core_v1.patch_node(current_master_node, body)
         k8s.wait_for_master_failover(failover_targets)
-        k8s.wait_for_pod_start('spilo-role=replica')
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         new_master_node, new_replica_nodes = k8s.get_pg_nodes(cluster_label)
         self.assertNotEqual(current_master_node, new_master_node,
@@ -145,7 +244,7 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_logical_backup_cron_job(self):
-        """
+        '''
         Ensure we can (a) create the cron job at user request for a specific PG cluster
                       (b) update the cluster-wide image for the logical backup pod
                       (c) delete the job at user request
@@ -153,7 +252,7 @@ class EndToEndTestCase(unittest.TestCase):
         Limitations:
         (a) Does not run the actual batch job because there is no S3 mock to upload backups to
         (b) Assumes 'acid-minimal-cluster' exists as defined in setUp
-        """
+        '''
 
         k8s = self.k8s
 
@@ -161,8 +260,8 @@ class EndToEndTestCase(unittest.TestCase):
         schedule = "7 7 7 7 *"
         pg_patch_enable_backup = {
             "spec": {
-               "enableLogicalBackup": True,
-               "logicalBackupSchedule": schedule
+                "enableLogicalBackup": True,
+                "logicalBackupSchedule": schedule
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -184,7 +283,7 @@ class EndToEndTestCase(unittest.TestCase):
         image = "test-image-name"
         patch_logical_backup_image = {
             "data": {
-               "logical_backup_docker_image": image,
+                "logical_backup_docker_image": image,
             }
         }
         k8s.update_config(patch_logical_backup_image)
@@ -197,7 +296,7 @@ class EndToEndTestCase(unittest.TestCase):
         # delete the logical backup cron job
         pg_patch_disable_backup = {
             "spec": {
-               "enableLogicalBackup": False,
+                "enableLogicalBackup": False,
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -207,11 +306,51 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(0, len(jobs),
                          "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_service_annotations(self):
+        '''
+        Create a Postgres cluster with service annotations and check them.
+        '''
+        k8s = self.k8s
+        patch_custom_service_annotations = {
+            "data": {
+                "custom_service_annotations": "foo:bar",
+            }
+        }
+        k8s.update_config(patch_custom_service_annotations)
+
+        pg_patch_custom_annotations = {
+            "spec": {
+                "serviceAnnotations": {
+                    "annotation.key": "value"
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_custom_annotations)
+
+        annotations = {
+            "annotation.key": "value",
+            "foo": "bar",
+        }
+        self.assertTrue(k8s.check_service_annotations(
+            "cluster-name=acid-service-annotations,spilo-role=master", annotations))
+        self.assertTrue(k8s.check_service_annotations(
+            "cluster-name=acid-service-annotations,spilo-role=replica", annotations))
+
+        # clean up
+        unpatch_custom_service_annotations = {
+            "data": {
+                "custom_service_annotations": "",
+            }
+        }
+        k8s.update_config(unpatch_custom_service_annotations)
+
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
-        """
+        '''
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
            To be called manually after operations that affect pods
-        """
+        '''
 
         k8s = self.k8s
         labels = 'spilo-role=master,cluster-name=' + clusterName
@@ -272,6 +411,23 @@ class K8s:
                 pod_phase = pods[0].status.phase
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
+    def get_service_type(self, svc_labels, namespace='default'):
+        svc_type = ''
+        svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
+        for svc in svcs:
+            svc_type = svc.spec.type
+        return svc_type
+
+    def check_service_annotations(self, svc_labels, annotations, namespace='default'):
+        svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
+        for svc in svcs:
+            if len(svc.metadata.annotations) != len(annotations):
+                return False
+            for key in svc.metadata.annotations:
+                if svc.metadata.annotations[key] != annotations[key]:
+                    return False
+        return True
+
     def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
 
         body = {
@@ -280,7 +436,7 @@ class K8s:
             }
         }
         _ = self.api.custom_objects_api.patch_namespaced_custom_object(
-                    "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
+            "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
 
         labels = 'cluster-name=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
