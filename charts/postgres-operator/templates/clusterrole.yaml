@@ -122,6 +122,7 @@ rules:
   - delete
   - get
   - patch
+  - update
 # to CRUD the StatefulSet which controls the Postgres cluster instances
 - apiGroups:
   - apps
@@ -178,7 +179,7 @@ rules:
   verbs:
   - get
   - create
-# needed to grant to namespaced roles when pods run in privileged mode
+# to grant privilege to run privileged pods
 - apiGroups:
   - extensions
   resources:

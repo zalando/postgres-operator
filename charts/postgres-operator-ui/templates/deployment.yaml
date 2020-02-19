@@ -20,7 +20,7 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         team: "acid" # Parameterize?
     spec:
-      serviceAccountName: {{ template "postgres-operator-ui.name" . }}
+      serviceAccountName: {{ include "postgres-operator-ui.serviceAccountName" . }}
       containers:
         - name: "service"
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -45,8 +45,8 @@ spec:
               value: {{ .Values.envs.targetNamespace }}
             - name: "TEAMS"
               value: |-
-                [ 
-                  "acid" 
+                [
+                  "acid"
                 ]
             - name: "OPERATOR_UI_CONFIG"
               value: |-

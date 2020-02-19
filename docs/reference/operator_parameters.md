@@ -155,7 +155,7 @@ configuration they are grouped under the `kubernetes` key.
   The default is `postgres-pod`.
 
 * **pod_service_account_definition**
-  on Postgres cluster creation the operator tries to create the service account
+  On Postgres cluster creation the operator tries to create the service account
   for the Postgres pods if it does not exist in the namespace. The internal
   default service account definition (defines only the name) can be overwritten
   with this parameter. Make sure to provide a valid YAML or JSON string. The

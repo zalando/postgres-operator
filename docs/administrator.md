@@ -99,8 +99,9 @@ access rights.
 
 The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
 defines the service account, cluster roles and bindings needed for the operator
-to function under access control restrictions. To deploy the operator with this
-RBAC policy use:
+to function under access control restrictions. The file also includes a cluster
+role `postgres-pod` with privileges for Patroni to watch and manage pods and
+endpoints. To deploy the operator with this RBAC policies use:
 
 ```bash
 kubectl create -f manifests/configmap.yaml
@@ -109,19 +110,15 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-### Namespaced service account and roles
+### Namespaced service account, role and role binding
 
-For each namespace the operator watches it creates (or reads) a service account
-to be used by the Postgres Pods when a new cluster is deployed. This service
-account is bound to a namespaced Role via RoleBinding, which are also created
-(or read) by the operator. The name and definitions of these resources can be
-[configured](reference/operator_parameters.md#kubernetes-resources).
-Note, that the operator performs **no** further syncing of them.
-
-Until v1.3.1, RoleBindings pointed to the operator ClusterRole by default. This
-can still be configured but is not recommended as the Postgres Pods should only
-run with the least privileges required for Patroni to work. By default, the
-namespaced RBAC resources are named `postgres-pod`.
+For each namespace the operator watches it creates (or reads) a service account,
+a role and a role binding to be used by the Postgres pods. The name and RBAC
+definitions can be [configured](reference/operator_parameters.md#kubernetes-resources).
+Note, that the operator performs **no** further syncing of these namespaced
+resources. Therefore, to manage changes of the pod role it is currently easier
+to make `postgres-pod` a [cluster role](../manifests/postgres-pod-rbac.yaml) and
+overwrite the `pod_service_account_role_binding_definition` to reference it.
 
 ### Give K8s users access to create/list `postgresqls`
 
