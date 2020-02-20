@@ -24,7 +24,7 @@ configGeneral:
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16
+  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # min number of instances in Postgres cluster. -1 = no limit

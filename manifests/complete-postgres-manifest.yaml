@@ -5,7 +5,7 @@ metadata:
 #  labels:
 #    environment: demo
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16
+  dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
   teamId: "acid"
   volume:
     size: 1Gi
