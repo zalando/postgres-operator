@@ -17,4 +17,3 @@ spec:
     foo: zalando  # dbname: owner
   postgresql:
     version: "11"
-  enableConnectionPool: true

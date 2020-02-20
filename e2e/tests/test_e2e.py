@@ -9,6 +9,10 @@ import yaml
 from kubernetes import client, config
 
 
+def to_selector(labels):
+    return ",".join(["=".join(l) for l in labels.items()])
+
+
 class EndToEndTestCase(unittest.TestCase):
     '''
     Test interaction of the operator with multiple K8s components.
@@ -352,6 +356,91 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(unpatch_custom_service_annotations)
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_enable_disable_connection_pool(self):
+        '''
+        For a database without connection pool, then turns it on, scale up,
+        turn off and on again. Test with different ways of doing this (via
+        enableConnectionPool or connectionPool configuration section).
+        '''
+        k8s = self.k8s
+        service_labels = {
+            'cluster-name': 'acid-minimal-cluster',
+        }
+        pod_labels = dict({
+            'connection-pool': 'acid-minimal-cluster-pooler',
+        })
+
+        pod_selector = to_selector(pod_labels)
+        service_selector = to_selector(service_labels)
+
+        try:
+            # enable connection pool
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default',
+                'postgresqls', 'acid-minimal-cluster',
+                {
+                    'spec': {
+                        'enableConnectionPool': True,
+                    }
+                })
+            k8s.wait_for_pod_start(pod_selector)
+
+            pods = k8s.api.core_v1.list_namespaced_pod(
+                'default', label_selector=pod_selector
+            ).items
+
+            self.assertTrue(pods, 'No connection pool pods')
+
+            k8s.wait_for_service(service_selector)
+            services = k8s.api.core_v1.list_namespaced_service(
+                'default', label_selector=service_selector
+            ).items
+            services = [
+                s for s in services
+                if s.metadata.name.endswith('pooler')
+            ]
+
+            self.assertTrue(services, 'No connection pool service')
+
+            # scale up connection pool deployment
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default',
+                'postgresqls', 'acid-minimal-cluster',
+                {
+                    'spec': {
+                        'connectionPool': {
+                            'numberOfInstances': 2,
+                        },
+                    }
+                })
+
+            k8s.wait_for_running_pods(pod_selector, 2)
+
+            # turn it off, keeping configuration section
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default',
+                'postgresqls', 'acid-minimal-cluster',
+                {
+                    'spec': {
+                        'enableConnectionPool': False,
+                    }
+                })
+            k8s.wait_for_pods_to_stop(pod_selector)
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default',
+                'postgresqls', 'acid-minimal-cluster',
+                {
+                    'spec': {
+                        'enableConnectionPool': True,
+                    }
+                })
+            k8s.wait_for_pod_start(pod_selector)
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
@@ -473,6 +562,23 @@ class K8s:
 
         labels = 'cluster-name=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def wait_for_running_pods(self, labels, number, namespace=''):
+        while self.count_pods_with_label(labels) != number:
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def wait_for_pods_to_stop(self, labels, namespace=''):
+        while self.count_pods_with_label(labels) != 0:
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def wait_for_service(self, labels, namespace='default'):
+        def get_services():
+            return self.api.core_v1.list_namespaced_service(
+                namespace, label_selector=labels
+            ).items
+
+        while not get_services():
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def count_pods_with_label(self, labels, namespace='default'):
