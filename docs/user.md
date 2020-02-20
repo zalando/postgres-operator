@@ -65,7 +65,7 @@ our test cluster.
 
 ```bash
 # get name of master pod of acid-minimal-cluster
-export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,version=acid-minimal-cluster,spilo-role=master)
+export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,cluster-name=acid-minimal-cluster,spilo-role=master)
 
 # set up port forward
 kubectl port-forward $PGMASTER 6432:5432
@@ -232,11 +232,11 @@ spec:
       memory: 300Mi
 ```
 
-The minimum limit to properly run the `postgresql` resource is `256m` for `cpu`
-and `256Mi` for `memory`. If a lower value is set in the manifest the operator
-will cancel ADD or UPDATE events on this resource with an error. If no
-resources are defined in the manifest the operator will obtain the configured
-[default requests](reference/operator_parameters.md#kubernetes-resource-requests).
+The minimum limits to properly run the `postgresql` resource are configured to
+`250m` for `cpu` and `250Mi` for `memory`. If a lower value is set in the
+manifest the operator will raise the limits to the configured minimum values.
+If no resources are defined in the manifest they will be obtained from the
+configured [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 

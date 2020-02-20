@@ -37,8 +37,10 @@ type Resources struct {
 	PodToleration           map[string]string `name:"toleration" default:""`
 	DefaultCPURequest       string            `name:"default_cpu_request" default:"100m"`
 	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
-	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
+	DefaultCPULimit         string            `name:"default_cpu_limit" default:"1"`
+	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"500Mi"`
+	MinCPULimit             string            `name:"min_cpu_limit" default:"250m"`
+	MinMemoryLimit          string            `name:"min_memory_limit" default:"250Mi"`
 	PodEnvironmentConfigMap string            `name:"pod_environment_configmap" default:""`
 	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
 	MaxInstances            int32             `name:"max_instances" default:"-1"`
@@ -66,7 +68,7 @@ type Scalyr struct {
 	ScalyrCPURequest    string `name:"scalyr_cpu_request" default:"100m"`
 	ScalyrMemoryRequest string `name:"scalyr_memory_request" default:"50Mi"`
 	ScalyrCPULimit      string `name:"scalyr_cpu_limit" default:"1"`
-	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
+	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"500Mi"`
 }
 
 // LogicalBackup defines configuration for logical backup
@@ -74,6 +76,7 @@ type LogicalBackup struct {
 	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
 	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
 	LogicalBackupS3Bucket          string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3Region          string `name:"logical_backup_s3_region" default:""`
 	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
 	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
 	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
@@ -93,7 +96,7 @@ type Config struct {
 	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16"`
 	Sidecars         map[string]string `name:"sidecar_docker_images"`
 	// default name `operator` enables backward compatibility with the older ServiceAccountName field
-	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
+	PodServiceAccountName string `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`

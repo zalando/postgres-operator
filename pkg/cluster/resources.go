@@ -366,6 +366,11 @@ func (c *Cluster) createService(role PostgresRole) (*v1.Service, error) {
 }
 
 func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error {
+	var (
+		svc *v1.Service
+		err error
+	)
+
 	c.setProcessName("updating %v service", role)
 
 	if c.Services[role] == nil {
@@ -373,70 +378,6 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 	}
 
 	serviceName := util.NameFromMeta(c.Services[role].ObjectMeta)
-	endpointName := util.NameFromMeta(c.Endpoints[role].ObjectMeta)
-	// TODO: check if it possible to change the service type with a patch in future versions of Kubernetes
-	if newService.Spec.Type != c.Services[role].Spec.Type {
-		// service type has changed, need to replace the service completely.
-		// we cannot use just patch the current service, since it may contain attributes incompatible with the new type.
-		var (
-			currentEndpoint *v1.Endpoints
-			err             error
-		)
-
-		if role == Master {
-			// for the master service we need to re-create the endpoint as well. Get the up-to-date version of
-			// the addresses stored in it before the service is deleted (deletion of the service removes the endpoint)
-			currentEndpoint, err = c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{})
-			if err != nil {
-				return fmt.Errorf("could not get current cluster %s endpoints: %v", role, err)
-			}
-		}
-		err = c.KubeClient.Services(serviceName.Namespace).Delete(serviceName.Name, c.deleteOptions)
-		if err != nil {
-			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
-		}
-
-		// wait until the service is truly deleted
-		c.logger.Debugf("waiting for service to be deleted")
-
-		err = retryutil.Retry(c.OpConfig.ResourceCheckInterval, c.OpConfig.ResourceCheckTimeout,
-			func() (bool, error) {
-				_, err2 := c.KubeClient.Services(serviceName.Namespace).Get(serviceName.Name, metav1.GetOptions{})
-				if err2 == nil {
-					return false, nil
-				}
-				if k8sutil.ResourceNotFound(err2) {
-					return true, nil
-				}
-				return false, err2
-			})
-		if err != nil {
-			return fmt.Errorf("could not delete service %q: %v", serviceName, err)
-		}
-
-		// make sure we clear the stored service and endpoint status if the subsequent create fails.
-		c.Services[role] = nil
-		c.Endpoints[role] = nil
-		if role == Master {
-			// create the new endpoint using the addresses obtained from the previous one
-			endpointSpec := c.generateEndpoint(role, currentEndpoint.Subsets)
-			ep, err := c.KubeClient.Endpoints(endpointSpec.Namespace).Create(endpointSpec)
-			if err != nil {
-				return fmt.Errorf("could not create endpoint %q: %v", endpointName, err)
-			}
-
-			c.Endpoints[role] = ep
-		}
-
-		svc, err := c.KubeClient.Services(serviceName.Namespace).Create(newService)
-		if err != nil {
-			return fmt.Errorf("could not create service %q: %v", serviceName, err)
-		}
-
-		c.Services[role] = svc
-
-		return nil
-	}
 
 	// update the service annotation in order to propagate ELB notation.
 	if len(newService.ObjectMeta.Annotations) > 0 {
@@ -454,18 +395,30 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 		}
 	}
 
-	patchData, err := specPatch(newService.Spec)
-	if err != nil {
-		return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
-	}
+	// now, patch the service spec, but when disabling LoadBalancers do update instead
+	// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
+	oldServiceType := c.Services[role].Spec.Type
+	newServiceType := newService.Spec.Type
+	if newServiceType == "ClusterIP" && newServiceType != oldServiceType {
+		newService.ResourceVersion = c.Services[role].ResourceVersion
+		newService.Spec.ClusterIP = c.Services[role].Spec.ClusterIP
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(newService)
+		if err != nil {
+			return fmt.Errorf("could not update service %q: %v", serviceName, err)
+		}
+	} else {
+		patchData, err := specPatch(newService.Spec)
+		if err != nil {
+			return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
+		}
 
-	// update the service spec
-	svc, err := c.KubeClient.Services(serviceName.Namespace).Patch(
-		serviceName.Name,
-		types.MergePatchType,
-		patchData, "")
-	if err != nil {
-		return fmt.Errorf("could not patch service %q: %v", serviceName, err)
+		svc, err = c.KubeClient.Services(serviceName.Namespace).Patch(
+			serviceName.Name,
+			types.MergePatchType,
+			patchData, "")
+		if err != nil {
+			return fmt.Errorf("could not patch service %q: %v", serviceName, err)
+		}
 	}
 	c.Services[role] = svc
 
