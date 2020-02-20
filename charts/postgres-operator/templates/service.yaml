@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
   name: {{ template "postgres-operator.fullname" . }}
 spec:
+  type: ClusterIP
   ports:
   - port: 8080
     protocol: TCP
@@ -15,7 +16,3 @@ spec:
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
-  sessionAffinity: None
-  type: ClusterIP
-status:
-  loadBalancer: {}
