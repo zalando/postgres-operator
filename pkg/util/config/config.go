@@ -91,12 +91,11 @@ type Config struct {
 	Scalyr
 	LogicalBackup
 
-	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-12:1.6-p2"`
-	Sidecars         map[string]string `name:"sidecar_docker_images"`
-	// default name `operator` enables backward compatibility with the older ServiceAccountName field
-	PodServiceAccountName string `name:"pod_service_account_name" default:"postgres-pod"`
+	WatchedNamespace      string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	EtcdHost              string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
+	DockerImage           string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-12:1.6-p2"`
+	Sidecars              map[string]string `name:"sidecar_docker_images"`
+	PodServiceAccountName string            `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`
