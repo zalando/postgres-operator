@@ -254,28 +254,21 @@ spec:
 
 ## How to clone an existing PostgreSQL cluster
 
-You can spin up a new cluster as a clone of the existing one, using a clone
+You can spin up a new cluster as a clone of the existing one, using a `clone`
 section in the spec. There are two options here:
 
-* Clone directly from a source cluster using `pg_basebackup`
-* Clone from an S3 bucket
+* Clone from an S3 bucket (recommended)
+* Clone directly from a source cluster
 
-### Clone directly
-
-```yaml
-spec:
-  clone:
-    cluster: "acid-batman"
-```
-
-Here `cluster` is a name of a source cluster that is going to be cloned. The
-cluster to clone is assumed to be running and the clone procedure invokes
-`pg_basebackup` from it. The operator will setup the cluster to be cloned to
-connect to the service of the source cluster by name (if the cluster is called
-test, then the connection string will look like host=test port=5432), which
-means that you can clone only from clusters within the same namespace.
+Note, that cloning can also be used for [major version upgrades](administrator.md#minor-and-major-version-upgrade)
+of PostgreSQL.
 
 ### Clone from S3
+
+Cloning from S3 has the advantage that there is no impact on your production
+database. A new Postgres cluster is created by restoring the data of another
+source cluster. If you create it in the same Kubernetes environment, use a
+different name.
 
 ```yaml
 spec:
@@ -287,7 +280,8 @@ spec:
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
-In this case, `uid` field is also mandatory - operator will use it to find a
+Note, that a time zone is required for `timestamp` in the format of +00:00 which
+is UTC. The `uid` field is also mandatory. The operator will use it to find a
 correct key inside an S3 bucket. You can find this field in the metadata of the
 source cluster:
 
@@ -298,9 +292,6 @@ metadata:
   name: acid-test-cluster
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
-
-Note that timezone is required for `timestamp`. Otherwise, offset is relative
-to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
 For non AWS S3 following settings can be set to support cloning from other S3
 implementations:
@@ -317,8 +308,22 @@ spec:
     s3_force_path_style: true
 ```
 
-Note, that cloning can also be used for [major version upgrades](administrator.md#minor-and-major-version-upgrade)
-of PostgreSQL.
+### Clone directly
+
+Another way to get a fresh copy of your source DB cluster is via basebackup. To
+use this feature simply leave out the timestamp field from the clone section.
+The operator will connect to the service of the source cluster by name. If the
+cluster is called test, then the connection string will look like host=test
+port=5432), which means that you can clone only from clusters within the same
+namespace.
+
+```yaml
+spec:
+  clone:
+    cluster: "acid-batman"
+```
+
+Be aware that on a busy source database this can result in an elevated load!
 
 ## Setting up a standby cluster
 
