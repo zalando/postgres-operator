@@ -2,11 +2,11 @@ apiVersion: v1
 entries:
   postgres-operator-ui:
   - apiVersion: v1
-    appVersion: 1.3.0
-    created: "2020-02-20T17:23:07.003929681+01:00"
+    appVersion: 1.4.0
+    created: "2020-02-24T15:32:47.610967635+01:00"
     description: Postgres Operator UI provides a graphical interface for a convenient
       database-as-a-service user experience
-    digest: 1fe8d9323e80b6bcf51f88342fccb49a09466a0dcf27bd089dd3707f3c1d5bbd
+    digest: 00e0eff7056d56467cd5c975657fbb76c8d01accd25a4b7aca81bc42aeac961d
     home: https://github.com/zalando/postgres-operator
     keywords:
     - postgres
@@ -24,6 +24,6 @@ entries:
     sources:
     - https://github.com/zalando/postgres-operator
     urls:
-    - postgres-operator-ui-1.3.0.tgz
-    version: 1.3.0
-generated: "2020-02-20T17:23:07.002847456+01:00"
+    - postgres-operator-ui-1.4.0.tgz
+    version: 1.4.0
+generated: "2020-02-24T15:32:47.610348278+01:00"
