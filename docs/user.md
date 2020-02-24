@@ -254,28 +254,21 @@ spec:
 
 ## How to clone an existing PostgreSQL cluster
 
-You can spin up a new cluster as a clone of the existing one, using a clone
+You can spin up a new cluster as a clone of the existing one, using a `clone`
 section in the spec. There are two options here:
 
-* Clone directly from a source cluster using `pg_basebackup`
-* Clone from an S3 bucket
+* Clone from an S3 bucket (recommended)
+* Clone directly from a source cluster
 
-### Clone directly
-
-```yaml
-spec:
-  clone:
-    cluster: "acid-batman"
-```
-
-Here `cluster` is a name of a source cluster that is going to be cloned. The
-cluster to clone is assumed to be running and the clone procedure invokes
-`pg_basebackup` from it. The operator will setup the cluster to be cloned to
-connect to the service of the source cluster by name (if the cluster is called
-test, then the connection string will look like host=test port=5432), which
-means that you can clone only from clusters within the same namespace.
+Note, that cloning can also be used for [major version upgrades](administrator.md#minor-and-major-version-upgrade)
+of PostgreSQL.
 
 ### Clone from S3
+
+Cloning from S3 has the advantage that there is no impact on your production
+database. A new Postgres cluster is created by restoring the data of another
+source cluster. If you create it in the same Kubernetes environment, use a
+different name.
 
 ```yaml
 spec:
@@ -287,7 +280,8 @@ spec:
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
-In this case, `uid` field is also mandatory - operator will use it to find a
+Note, that a time zone is required for `timestamp` in the format of +00:00 which
+is UTC. The `uid` field is also mandatory. The operator will use it to find a
 correct key inside an S3 bucket. You can find this field in the metadata of the
 source cluster:
 
@@ -298,9 +292,6 @@ metadata:
   name: acid-test-cluster
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
-
-Note that timezone is required for `timestamp`. Otherwise, offset is relative
-to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
 For non AWS S3 following settings can be set to support cloning from other S3
 implementations:
@@ -317,14 +308,35 @@ spec:
     s3_force_path_style: true
 ```
 
+### Clone directly
+
+Another way to get a fresh copy of your source DB cluster is via basebackup. To
+use this feature simply leave out the timestamp field from the clone section.
+The operator will connect to the service of the source cluster by name. If the
+cluster is called test, then the connection string will look like host=test
+port=5432), which means that you can clone only from clusters within the same
+namespace.
+
+```yaml
+spec:
+  clone:
+    cluster: "acid-batman"
+```
+
+Be aware that on a busy source database this can result in an elevated load!
+
 ## Setting up a standby cluster
 
-Standby clusters are like normal cluster but they are streaming from a remote
-cluster. As the first version of this feature, the only scenario covered by
-operator is to stream from a WAL archive of the master. Following the more
-popular infrastructure of using Amazon's S3 buckets, it is mentioned as
-`s3_wal_path` here. To start a cluster as standby add the following `standby`
-section in the YAML file:
+Standby cluster is a [Patroni feature](https://github.com/zalando/patroni/blob/master/docs/replica_bootstrap.rst#standby-cluster)
+that first clones a database, and keeps replicating changes afterwards. As the
+replication is happening by the means of archived WAL files (stored on S3 or
+the equivalent of other cloud providers), the standby cluster can exist in a
+different location than its source database. Unlike cloning, the PostgreSQL
+version between source and target cluster has to be the same.
+
+To start a cluster as standby, add the following `standby` section in the YAML
+file and specify the S3 bucket path. An empty path will result in an error and
+no statefulset will be created.
 
 ```yaml
 spec:
@@ -332,20 +344,62 @@ spec:
     s3_wal_path: "s3 bucket path to the master"
 ```
 
-Things to note:
+At the moment, the operator only allows to stream from the WAL archive of the
+master. Thus, it is recommended to deploy standby clusters with only [one pod](../manifests/standby-manifest.yaml#L10).
+You can raise the instance count when detaching. Note, that the same pod role
+labels like for normal clusters are used: The standby leader is labeled as
+`master`.
 
-- An empty string in the `s3_wal_path` field of the standby cluster will result
-  in an error and no statefulset will be created.
-- Only one pod can be deployed for stand-by cluster.
-- To manually promote the standby_cluster, use `patronictl` and remove config
-  entry.
-- There is no way to transform a non-standby cluster to a standby cluster
-  through the operator. Adding the standby section to the manifest of a running
-  Postgres cluster will have no effect. However, it can be done through Patroni
-  by adding the [standby_cluster](https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster)
-  section using `patronictl edit-config`. Note that the transformed standby
-  cluster will not be doing any streaming. It will be in standby mode and allow
-  read-only transactions only.
+### Providing credentials of source cluster
+
+A standby cluster is replicating the data (including users and passwords) from
+the source database and is read-only. The system and application users (like
+standby, postgres etc.) all have a password that does not match the credentials
+stored in secrets which are created by the operator. One solution is to create
+secrets beforehand and paste in the credentials of the source cluster.
+Otherwise, you will see errors in the Postgres logs saying users cannot log in
+and the operator logs will complain about not being able to sync resources.
+This, however, can safely be ignored as it will be sorted out once the cluster
+is detached from the source (and it’s still harmless if you don’t plan to).
+
+You can also edit the secrets afterwards. Find them by:
+
+```bash
+kubectl get secrets --all-namespaces | grep <postgres-cluster-name>
+```
+
+### Promote the standby
+
+One big advantage of standby clusters is that they can be promoted to a proper
+database cluster. This means it will stop replicating changes from the source,
+and start accept writes itself. This mechanism makes it possible to move
+databases from one place to another with minimal downtime. Currently, the
+operator does not support promoting a standby cluster. It has to be done
+manually using `patronictl edit-config` inside the postgres container of the
+standby leader pod. Remove the following lines from the YAML structure and the
+leader promotion happens immediately. Before doing so, make sure that the
+standby is not behind the source database.
+
+```yaml
+standby_cluster:
+  create_replica_methods:
+    - bootstrap_standby_with_wale
+    - basebackup_fast_xlog
+  restore_command: envdir "/home/postgres/etc/wal-e.d/env-standby" /scripts/restore_command.sh
+     "%f" "%p"
+```
+
+Finally, remove the `standby` section from the postgres cluster manifest.
+
+### Turn a normal cluster into a standby
+
+There is no way to transform a non-standby cluster to a standby cluster through
+the operator. Adding the `standby` section to the manifest of a running
+Postgres cluster will have no effect. But, as explained in the previous
+paragraph it can be done manually through `patronictl edit-config`. This time,
+by adding the `standby_cluster` section to the Patroni configuration. However,
+the transformed standby cluster will not be doing any streaming. It will be in
+standby mode and allow read-only transactions only.
 
 ## Sidecar Support
 

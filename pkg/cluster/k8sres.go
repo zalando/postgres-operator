@@ -1048,11 +1048,13 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	cur := spec.NumberOfInstances
 	newcur := cur
 
-	/* Limit the max number of pods to one, if this is standby-cluster */
 	if spec.StandbyCluster != nil {
-		c.logger.Info("Standby cluster can have maximum of 1 pod")
-		min = 1
-		max = 1
+		if newcur == 1 {
+			min = newcur
+			max = newcur
+		} else {
+			c.logger.Warningf("operator only supports standby clusters with 1 pod")
+		}
 	}
 	if max >= 0 && newcur > max {
 		newcur = max
