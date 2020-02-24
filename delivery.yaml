@@ -74,4 +74,5 @@ pipeline:
               IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui-test
             fi
             export IMAGE
+            make docker
             make push
