@@ -104,4 +104,24 @@ func TestNeedConnPool(t *testing.T) {
 		t.Errorf("%s: Connection pool is not enabled with flag",
 			testName)
 	}
+
+	cluster.Spec = acidv1.PostgresSpec{
+		EnableConnectionPool: boolToPointer(false),
+		ConnectionPool:       &acidv1.ConnectionPool{},
+	}
+
+	if cluster.needConnectionPool() {
+		t.Errorf("%s: Connection pool is still enabled with flag being false",
+			testName)
+	}
+
+	cluster.Spec = acidv1.PostgresSpec{
+		EnableConnectionPool: boolToPointer(true),
+		ConnectionPool:       &acidv1.ConnectionPool{},
+	}
+
+	if !cluster.needConnectionPool() {
+		t.Errorf("%s: Connection pool is not enabled with flag and full",
+			testName)
+	}
 }

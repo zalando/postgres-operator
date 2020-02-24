@@ -9,6 +9,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,6 +37,14 @@ func objectsAreSaved(cluster *Cluster, err error) error {
 
 	if cluster.ConnectionPool.Service == nil {
 		return fmt.Errorf("Service was not saved")
+	}
+
+	return nil
+}
+
+func objectsAreDeleted(cluster *Cluster, err error) error {
+	if cluster.ConnectionPool != nil {
+		return fmt.Errorf("Connection pool was not deleted")
 	}
 
 	return nil
@@ -72,6 +81,13 @@ func TestConnPoolSynchronization(t *testing.T) {
 	clusterMock := *cluster
 	clusterMock.KubeClient = k8sutil.NewMockKubernetesClient()
 
+	clusterDirtyMock := *cluster
+	clusterDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
+	clusterDirtyMock.ConnectionPool = &ConnectionPoolObjects{
+		Deployment: &appsv1.Deployment{},
+		Service:    &v1.Service{},
+	}
+
 	tests := []struct {
 		subTest string
 		oldSpec *acidv1.Postgresql
@@ -93,6 +109,43 @@ func TestConnPoolSynchronization(t *testing.T) {
 			},
 			cluster: &clusterMissingObjects,
 			check:   objectsAreSaved,
+		},
+		{
+			subTest: "create from scratch",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPool: &acidv1.ConnectionPool{},
+				},
+			},
+			cluster: &clusterMissingObjects,
+			check:   objectsAreSaved,
+		},
+		{
+			subTest: "delete if not needed",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPool: &acidv1.ConnectionPool{},
+				},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{},
+			},
+			cluster: &clusterMock,
+			check:   objectsAreDeleted,
+		},
+		{
+			subTest: "cleanup if still there",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{},
+			},
+			cluster: &clusterDirtyMock,
+			check:   objectsAreDeleted,
 		},
 		{
 			subTest: "update deployment",
