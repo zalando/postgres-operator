@@ -674,6 +674,13 @@ func (in *PreparedDatabase) DeepCopyInto(out *PreparedDatabase) {
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
+	if in.Extensions != nil {
+		in, out := &in.Extensions, &out.Extensions
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
