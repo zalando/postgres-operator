@@ -160,7 +160,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								Type: "string",
 							},
 							"s3_force_path_style": {
-								Type: "string",
+								Type: "boolean",
 							},
 							"s3_wal_path": {
 								Type: "string",
@@ -380,6 +380,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 										Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 									},
 								},
+							},
+						},
+					},
+					"serviceAnnotations": {
+						Type: "object",
+						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "string",
 							},
 						},
 					},
@@ -810,6 +818,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
+							"min_cpu_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"min_memory_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
 						},
 					},
 					"timeouts": {
@@ -899,6 +915,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type: "string",
 							},
 							"logical_backup_s3_endpoint": {
+								Type: "string",
+							},
+							"logical_backup_s3_region": {
 								Type: "string",
 							},
 							"logical_backup_s3_secret_access_key": {

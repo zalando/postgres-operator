@@ -9,7 +9,6 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
-	"github.com/zalando/postgres-operator/pkg/util/constants"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -19,7 +18,7 @@ import (
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
-	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
+	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -40,7 +39,7 @@ type KubernetesClient struct {
 	corev1.NamespacesGetter
 	corev1.ServiceAccountsGetter
 	appsv1.StatefulSetsGetter
-	rbacv1beta1.RoleBindingsGetter
+	rbacv1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
 	clientbatchv1beta1.CronJobsGetter
@@ -104,7 +103,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.StatefulSetsGetter = client.AppsV1()
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
-	kubeClient.RoleBindingsGetter = client.RbacV1beta1()
+	kubeClient.RoleBindingsGetter = client.RbacV1()
 	kubeClient.CronJobsGetter = client.BatchV1beta1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
@@ -136,21 +135,37 @@ func SameService(cur, new *v1.Service) (match bool, reason string) {
 		}
 	}
 
-	oldDNSAnnotation := cur.Annotations[constants.ZalandoDNSNameAnnotation]
-	newDNSAnnotation := new.Annotations[constants.ZalandoDNSNameAnnotation]
-	oldELBAnnotation := cur.Annotations[constants.ElbTimeoutAnnotationName]
-	newELBAnnotation := new.Annotations[constants.ElbTimeoutAnnotationName]
+	match = true
 
-	if oldDNSAnnotation != newDNSAnnotation {
-		return false, fmt.Sprintf("new service's %q annotation value %q doesn't match the current one %q",
-			constants.ZalandoDNSNameAnnotation, newDNSAnnotation, oldDNSAnnotation)
-	}
-	if oldELBAnnotation != newELBAnnotation {
-		return false, fmt.Sprintf("new service's %q annotation value %q doesn't match the current one %q",
-			constants.ElbTimeoutAnnotationName, oldELBAnnotation, newELBAnnotation)
+	reasonPrefix := "new service's annotations doesn't match the current one:"
+	for ann := range cur.Annotations {
+		if _, ok := new.Annotations[ann]; !ok {
+			match = false
+			if len(reason) == 0 {
+				reason = reasonPrefix
+			}
+			reason += fmt.Sprintf(" Removed '%s'.", ann)
+		}
 	}
 
-	return true, ""
+	for ann := range new.Annotations {
+		v, ok := cur.Annotations[ann]
+		if !ok {
+			if len(reason) == 0 {
+				reason = reasonPrefix
+			}
+			reason += fmt.Sprintf(" Added '%s' with value '%s'.", ann, new.Annotations[ann])
+			match = false
+		} else if v != new.Annotations[ann] {
+			if len(reason) == 0 {
+				reason = reasonPrefix
+			}
+			reason += fmt.Sprintf(" '%s' changed from '%s' to '%s'.", ann, v, new.Annotations[ann])
+			match = false
+		}
+	}
+
+	return match, reason
 }
 
 // SamePDB compares the PodDisruptionBudgets

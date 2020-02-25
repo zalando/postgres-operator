@@ -23,7 +23,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	oldStatus := c.Status
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -34,16 +33,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
-
-	if err = c.validateResources(&c.Spec); err != nil {
-		err = fmt.Errorf("insufficient resource limits specified: %v", err)
-		if oldStatus.Running() {
-			c.logger.Warning(err)
-			err = nil
-		} else {
-			return err
-		}
-	}
 
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
@@ -73,6 +62,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.logger.Debugf("syncing persistent volumes")
 	if err = c.syncVolumes(); err != nil {
 		err = fmt.Errorf("could not sync persistent volumes: %v", err)
+		return err
+	}
+
+	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
+		err = fmt.Errorf("could not enforce minimum resource limits: %v", err)
 		return err
 	}
 
@@ -122,7 +116,7 @@ func (c *Cluster) syncServices() error {
 		c.logger.Debugf("syncing %s service", role)
 
 		if err := c.syncEndpoint(role); err != nil {
-			return fmt.Errorf("could not sync %s endpont: %v", role, err)
+			return fmt.Errorf("could not sync %s endpoint: %v", role, err)
 		}
 
 		if err := c.syncService(role); err != nil {
