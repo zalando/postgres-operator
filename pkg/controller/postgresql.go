@@ -508,6 +508,14 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 		return fmt.Errorf("could not create pod service account %q : %v", c.opConfig.PodServiceAccountName, err)
 	}
 
+	// create role only if binding references a role
+	// if not role is empty and we rely on an existing cluster role
+	if c.PodServiceAccountRole != nil {
+		if err := c.createRole(namespace); err != nil {
+			return fmt.Errorf("could not create role %q : %v", c.PodServiceAccountRole.Name, err)
+		}
+	}
+
 	if err := c.createRoleBindings(namespace); err != nil {
 		return fmt.Errorf("could not create role binding %q : %v", c.PodServiceAccountRoleBinding.Name, err)
 	}
