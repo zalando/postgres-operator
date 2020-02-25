@@ -15,7 +15,7 @@ spec:
       serviceAccountName: postgres-operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:v1.3.1
+        image: registry.opensource.zalan.do/acid/postgres-operator:v1.4.0
         imagePullPolicy: IfNotPresent
         resources:
           requests:

@@ -359,13 +359,16 @@ stored in secrets which are created by the operator. One solution is to create
 secrets beforehand and paste in the credentials of the source cluster.
 Otherwise, you will see errors in the Postgres logs saying users cannot log in
 and the operator logs will complain about not being able to sync resources.
-This, however, can safely be ignored as it will be sorted out once the cluster
-is detached from the source (and it’s still harmless if you don’t plan to).
 
-You can also edit the secrets afterwards. Find them by:
+When you only run a standby leader, you can safely ignore this, as it will be
+sorted out once the cluster is detached from the source. It is also harmless if
+you don’t plan it. But, when you created a standby replica, too, fix the
+credentials right away. WAL files will pile up on the standby leader if no
+connection can be established between standby replica(s). You can also edit the
+secrets after their creation. Find them by:
 
 ```bash
-kubectl get secrets --all-namespaces | grep <postgres-cluster-name>
+kubectl get secrets --all-namespaces | grep <standby-cluster-name>
 ```
 
 ### Promote the standby

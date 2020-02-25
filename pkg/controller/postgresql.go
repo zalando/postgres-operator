@@ -505,11 +505,11 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 	namespace := event.NewSpec.GetNamespace()
 
 	if err := c.createPodServiceAccount(namespace); err != nil {
-		return fmt.Errorf("could not create pod service account %v : %v", c.opConfig.PodServiceAccountName, err)
+		return fmt.Errorf("could not create pod service account %q : %v", c.opConfig.PodServiceAccountName, err)
 	}
 
 	if err := c.createRoleBindings(namespace); err != nil {
-		return fmt.Errorf("could not create role binding %v : %v", c.PodServiceAccountRoleBinding.Name, err)
+		return fmt.Errorf("could not create role binding %q : %v", c.PodServiceAccountRoleBinding.Name, err)
 	}
 	return nil
 }
@@ -520,16 +520,16 @@ func (c *Controller) createPodServiceAccount(namespace string) error {
 	_, err := c.KubeClient.ServiceAccounts(namespace).Get(podServiceAccountName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof(fmt.Sprintf("creating pod service account in the namespace %v", namespace))
+		c.logger.Infof(fmt.Sprintf("creating pod service account %q in the %q namespace", podServiceAccountName, namespace))
 
 		// get a separate copy of service account
 		// to prevent a race condition when setting a namespace for many clusters
 		sa := *c.PodServiceAccount
 		if _, err = c.KubeClient.ServiceAccounts(namespace).Create(&sa); err != nil {
-			return fmt.Errorf("cannot deploy the pod service account %v defined in the config map to the %v namespace: %v", podServiceAccountName, namespace, err)
+			return fmt.Errorf("cannot deploy the pod service account %q defined in the configuration to the %q namespace: %v", podServiceAccountName, namespace, err)
 		}
 
-		c.logger.Infof("successfully deployed the pod service account %v to the %v namespace", podServiceAccountName, namespace)
+		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, namespace)
 	} else if k8sutil.ResourceAlreadyExists(err) {
 		return nil
 	}
@@ -545,14 +545,14 @@ func (c *Controller) createRoleBindings(namespace string) error {
 	_, err := c.KubeClient.RoleBindings(namespace).Get(podServiceAccountRoleBindingName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof("Creating the role binding %v in the namespace %v", podServiceAccountRoleBindingName, namespace)
+		c.logger.Infof("Creating the role binding %q in the %q namespace", podServiceAccountRoleBindingName, namespace)
 
 		// get a separate copy of role binding
 		// to prevent a race condition when setting a namespace for many clusters
 		rb := *c.PodServiceAccountRoleBinding
 		_, err = c.KubeClient.RoleBindings(namespace).Create(&rb)
 		if err != nil {
-			return fmt.Errorf("cannot bind the pod service account %q defined in the config map to the cluster role in the %q namespace: %v", podServiceAccountName, namespace, err)
+			return fmt.Errorf("cannot bind the pod service account %q defined in the configuration to the cluster role in the %q namespace: %v", podServiceAccountName, namespace, err)
 		}
 
 		c.logger.Infof("successfully deployed the role binding for the pod service account %q to the %q namespace", podServiceAccountName, namespace)
