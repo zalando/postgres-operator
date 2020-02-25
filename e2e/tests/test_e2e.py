@@ -65,7 +65,7 @@ class EndToEndTestCase(unittest.TestCase):
         '''
 
         k8s = self.k8s
-        cluster_label = 'version=acid-minimal-cluster'
+        cluster_label = 'cluster-name=acid-minimal-cluster'
 
         # enable load balancer services
         pg_patch_enable_lbs = {
@@ -113,7 +113,7 @@ class EndToEndTestCase(unittest.TestCase):
         Lower resource limits below configured minimum and let operator fix it
         '''
         k8s = self.k8s
-        cluster_label = 'version=acid-minimal-cluster'
+        cluster_label = 'cluster-name=acid-minimal-cluster'
         _, failover_targets = k8s.get_pg_nodes(cluster_label)
 
         # configure minimum boundaries for CPU and memory limits
@@ -172,7 +172,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
         k8s.wait_for_pod_start("spilo-role=master", self.namespace)
-        self.assert_master_is_unique(self.namespace, version="acid-test-cluster")
+        self.assert_master_is_unique(self.namespace, "acid-test-cluster")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
@@ -180,7 +180,7 @@ class EndToEndTestCase(unittest.TestCase):
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         '''
         k8s = self.k8s
-        labels = "version=acid-minimal-cluster"
+        labels = "cluster-name=acid-minimal-cluster"
 
         k8s.wait_for_pg_to_scale(3)
         self.assertEqual(3, k8s.count_pods_with_label(labels))
@@ -196,7 +196,7 @@ class EndToEndTestCase(unittest.TestCase):
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
         '''
         k8s = self.k8s
-        cluster_label = 'version=acid-minimal-cluster'
+        cluster_label = 'cluster-name=acid-minimal-cluster'
 
         # get nodes of master and replica(s) (expected target of new master)
         current_master_node, failover_targets = k8s.get_pg_nodes(cluster_label)
@@ -334,9 +334,9 @@ class EndToEndTestCase(unittest.TestCase):
             "foo": "bar",
         }
         self.assertTrue(k8s.check_service_annotations(
-            "version=acid-service-annotations,spilo-role=master", annotations))
+            "cluster-name=acid-service-annotations,spilo-role=master", annotations))
         self.assertTrue(k8s.check_service_annotations(
-            "version=acid-service-annotations,spilo-role=replica", annotations))
+            "cluster-name=acid-service-annotations,spilo-role=replica", annotations))
 
         # clean up
         unpatch_custom_service_annotations = {
@@ -346,14 +346,14 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(unpatch_custom_service_annotations)
 
-    def assert_master_is_unique(self, namespace='default', version="acid-minimal-cluster"):
+    def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
            To be called manually after operations that affect pods
         '''
 
         k8s = self.k8s
-        labels = 'spilo-role=master,version=' + version
+        labels = 'spilo-role=master,cluster-name=' + clusterName
 
         num_of_master_pods = k8s.count_pods_with_label(labels, namespace)
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
@@ -438,7 +438,7 @@ class K8s:
         _ = self.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
 
-        labels = 'version=acid-minimal-cluster'
+        labels = 'cluster-name=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
@@ -448,7 +448,7 @@ class K8s:
     def wait_for_master_failover(self, expected_master_nodes, namespace='default'):
         pod_phase = 'Failing over'
         new_master_node = ''
-        labels = 'spilo-role=master,version=acid-minimal-cluster'
+        labels = 'spilo-role=master,cluster-name=acid-minimal-cluster'
 
         while (pod_phase != 'Running') or (new_master_node not in expected_master_nodes):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items

@@ -19,10 +19,15 @@ default_operator_ui_config='{
   "nat_gateways_visible": false,
   "resources_visible": true,
   "users_visible": true,
+  "cost_ebs": 0.119,
+  "cost_core": 0.0575,
+  "cost_memory": 0.014375,
   "postgresql_versions": [
+    "12",
     "11",
     "10",
-    "9.6"
+    "9.6",
+    "9.5"
   ],
   "static_network_whitelist": {
     "localhost": ["172.0.0.1/32"]

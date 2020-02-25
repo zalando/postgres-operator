@@ -160,7 +160,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								Type: "string",
 							},
 							"s3_force_path_style": {
-								Type: "string",
+								Type: "boolean",
 							},
 							"s3_wal_path": {
 								Type: "string",

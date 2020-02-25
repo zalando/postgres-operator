@@ -11,11 +11,11 @@ switchover (planned failover) of the master to the Pod with new minor version.
 The switch should usually take less than 5 seconds, still clients have to
 reconnect.
 
-Major version upgrades are supported via [cloning](user.md#clone-directly). The
-new cluster manifest must have a higher `version` string than the source cluster
-and will be created from a basebackup. Depending of the cluster size, downtime
-in this case can be significant as writes to the database should be stopped and
-all WAL files should be archived first before cloning is started.
+Major version upgrades are supported via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster).
+The new cluster manifest must have a higher `version` string than the source
+cluster and will be created from a basebackup. Depending of the cluster size,
+downtime in this case can be significant as writes to the database should be
+stopped and all WAL files should be archived first before cloning is started.
 
 Note, that simply changing the version string in the `postgresql` manifest does
 not work at present and leads to errors. Neither Patroni nor Postgres Operator
@@ -481,37 +481,71 @@ A secret can be pre-provisioned in different ways:
 
 ## Setting up the Postgres Operator UI
 
-With the v1.2 release the Postgres Operator is shipped with a browser-based
+Since the v1.2 release the Postgres Operator is shipped with a browser-based
 configuration user interface (UI) that simplifies managing Postgres clusters
-with the operator. The UI runs with Node.js and comes with it's own Docker
-image.
+with the operator.
 
-Run NPM to continuously compile `tags/js` code. Basically, it creates an
-`app.js` file in: `static/build/app.js`
+### Building the UI image
 
-```
-(cd ui/app && npm start)
-```
-
-To build the Docker image open a shell and change to the `ui` folder. Then run:
+The UI runs with Node.js and comes with it's own Docker
+image. However, installing Node.js to build the operator UI is not required. It
+is handled via Docker containers when running:
 
 ```bash
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.2.0 .
+make docker
 ```
 
-Apply all manifests for the `ui/manifests` folder to deploy the Postgres
-Operator UI on K8s. For local tests you don't need the Ingress resource.
+### Configure endpoints and options
+
+The UI talks to the K8s API server as well as the Postgres Operator [REST API](developer.md#debugging-the-operator).
+K8s API server URLs are loaded from the machine's kubeconfig environment by
+default. Alternatively, a list can also be passed when starting the Python
+application with the `--cluster` option.
+
+The Operator API endpoint can be configured via the `OPERATOR_API_URL`
+environment variables in the [deployment manifest](../ui/manifests/deployment.yaml#L40).
+You can also expose the operator API through a [service](../manifests/api-service.yaml).
+Some displayed options can be disabled from UI using simple flags under the
+`OPERATOR_UI_CONFIG` field in the deployment.
+
+### Deploy the UI on K8s
+
+Now, apply all manifests from the `ui/manifests` folder to deploy the Postgres
+Operator UI on K8s. Replace the image tag in the deployment manifest if you
+want to test the image you've built with `make docker`. Make sure the pods for
+the operator and the UI are both running.
 
 ```bash
-kubectl apply -f ui/manifests
+sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/deployment.yaml | kubectl apply -f manifests/
+kubectl get all -l application=postgres-operator-ui
 ```
 
-Make sure the pods for the operator and the UI are both running. For local
-testing you need to apply proxying and port forwarding so that the UI can talk
-to the K8s and Postgres Operator REST API. You can use the provided
-`run_local.sh` script for this. Make sure it uses the correct URL to your K8s
-API server, e.g. for minikube it would be `https://192.168.99.100:8443`.
+### Local testing
+
+For local testing you need to apply K8s proxying and operator pod port
+forwarding so that the UI can talk to the K8s and Postgres Operator REST API.
+The Ingress resource is not needed. You can use the provided `run_local.sh`
+script for this. Make sure that:
+
+* Python dependencies are installed on your machine
+* the K8s API server URL is set for kubectl commands, e.g. for minikube it would usually be `https://192.168.99.100:8443`.
+* the pod label selectors for port forwarding are correct
+
+When testing with minikube you have to build the image in its docker environment
+(running `make docker` doesn't do it for you). From the `ui` directory execute:
 
 ```bash
+# compile and build operator UI
+make docker
+
+# build in image in minikube docker env
+eval $(minikube docker-env)
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.3.0 .
+
+# apply UI manifests next to a running Postgres Operator
+kubectl apply -f manifests/
+
+# install python dependencies to run UI locally
+pip3 install -r requirements
 ./run_local.sh
 ```
