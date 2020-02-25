@@ -57,6 +57,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         k8s.wait_for_pod_start('spilo-role=master')
+        k8s.wait_for_pod_start('spilo-role=replica')
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_load_balancer(self):
@@ -191,6 +192,53 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_master_is_unique()
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_node_readisness_label(self):
+        '''
+           Remove node readiness label from master node. This must cause a failover.
+        '''
+        k8s = self.k8s
+        cluster_label = 'cluster-name=acid-minimal-cluster'
+        readiness_label = 'lifecycle-status'
+        readiness_value = 'ready'
+
+        # get nodes of master and replica(s) (expected target of new master)
+        current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
+        num_replicas = len(current_replica_nodes)
+        failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
+
+        # add node_readiness_label to potential failover nodes
+        patch_readiness_label = {
+            "metadata": {
+                "labels": {
+                    readiness_label: readiness_value
+                }
+            }
+        }
+        for failover_target in failover_targets:
+            k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
+
+        # define node_readiness_label in config map which should trigger a failover of the master
+        patch_readiness_label_config = {
+            "data": {
+                "node_readiness_label": readiness_label + ':' + readiness_value,
+            }
+        }
+        k8s.update_config(patch_readiness_label_config)
+
+        k8s.wait_for_master_failover(failover_targets)
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+        new_master_node, new_replica_nodes = k8s.get_pg_nodes(cluster_label)
+        self.assertNotEqual(current_master_node, new_master_node,
+                            "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
+        self.assertEqual(num_replicas, len(new_replica_nodes),
+                         "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
+        self.assert_master_is_unique()
+
+        # patch also master node
+        k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
@@ -199,16 +247,9 @@ class EndToEndTestCase(unittest.TestCase):
         cluster_label = 'cluster-name=acid-minimal-cluster'
 
         # get nodes of master and replica(s) (expected target of new master)
-        current_master_node, failover_targets = k8s.get_pg_nodes(cluster_label)
-        num_replicas = len(failover_targets)
-
-        # if all pods live on the same node, failover will happen to other worker(s)
-        failover_targets = [x for x in failover_targets if x != current_master_node]
-        if len(failover_targets) == 0:
-            nodes = k8s.api.core_v1.list_node()
-            for n in nodes.items:
-                if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != current_master_node:
-                    failover_targets.append(n.metadata.name)
+        current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
+        num_replicas = len(current_replica_nodes)
+        failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
 
         # taint node with postgres=:NoExecute to force failover
         body = {
@@ -346,12 +387,26 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(unpatch_custom_service_annotations)
 
+    def get_failover_targets(self, master_node, replica_nodes):
+        '''
+           If all pods live on the same node, failover will happen to other worker(s)
+        '''
+        k8s = self.k8s
+
+        failover_targets = [x for x in replica_nodes if x != master_node]
+        if len(failover_targets) == 0:
+            nodes = k8s.api.core_v1.list_node()
+            for n in nodes.items:
+                if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != master_node:
+                    failover_targets.append(n.metadata.name)
+
+        return failover_targets
+
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
            To be called manually after operations that affect pods
         '''
-
         k8s = self.k8s
         labels = 'spilo-role=master,cluster-name=' + clusterName
 
