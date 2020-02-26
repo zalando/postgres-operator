@@ -211,6 +211,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
         k8s.wait_for_pod_failover(failover_targets, labels)
+        k8s.wait_for_pod_start('spilo-role=replica')
 
         pods = k8s.api.core_v1.list_namespaced_pod(
             'default', label_selector=labels).items
