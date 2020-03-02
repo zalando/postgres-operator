@@ -5,3 +5,4 @@ resources:
 - postgresql-operator-default-configuration.yaml
 - operator-service-account-rbac.yaml
 - postgres-operator.yaml
+- api-service.yaml

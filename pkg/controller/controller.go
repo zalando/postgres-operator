@@ -7,7 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -57,7 +57,7 @@ type Controller struct {
 	workerLogs map[uint32]ringlog.RingLogger
 
 	PodServiceAccount            *v1.ServiceAccount
-	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
+	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 
 // NewController creates a new controller
@@ -161,11 +161,12 @@ func (c *Controller) initPodServiceAccount() {
 
 	if c.opConfig.PodServiceAccountDefinition == "" {
 		c.opConfig.PodServiceAccountDefinition = `
-		{ "apiVersion": "v1",
-		  "kind": "ServiceAccount",
-		  "metadata": {
-				 "name": "operator"
-		   }
+		{
+			"apiVersion": "v1",
+			"kind": "ServiceAccount",
+			"metadata": {
+				"name": "postgres-pod"
+			}
 		}`
 	}
 
@@ -175,13 +176,13 @@ func (c *Controller) initPodServiceAccount() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse pod service account definition from the operator config map: %v", err))
+		panic(fmt.Errorf("Unable to parse pod service account definition from the operator configuration: %v", err))
 	case groupVersionKind.Kind != "ServiceAccount":
-		panic(fmt.Errorf("pod service account definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+		panic(fmt.Errorf("pod service account definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
 	default:
 		c.PodServiceAccount = obj.(*v1.ServiceAccount)
 		if c.PodServiceAccount.Name != c.opConfig.PodServiceAccountName {
-			c.logger.Warnf("in the operator config map, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
+			c.logger.Warnf("in the operator configuration, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
 			c.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
 		}
 		c.PodServiceAccount.Namespace = ""
@@ -198,7 +199,7 @@ func (c *Controller) initRoleBinding() {
 	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
 		c.opConfig.PodServiceAccountRoleBindingDefinition = fmt.Sprintf(`
 		{
-			"apiVersion": "rbac.authorization.k8s.io/v1beta1",
+			"apiVersion": "rbac.authorization.k8s.io/v1",
 			"kind": "RoleBinding",
 			"metadata": {
 				   "name": "%s"
@@ -223,11 +224,11 @@ func (c *Controller) initRoleBinding() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse the definition of the role binding for the pod service account definition from the operator config map: %v", err))
+		panic(fmt.Errorf("unable to parse the role binding definition from the operator configuration: %v", err))
 	case groupVersionKind.Kind != "RoleBinding":
-		panic(fmt.Errorf("role binding definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+		panic(fmt.Errorf("role binding definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
 	default:
-		c.PodServiceAccountRoleBinding = obj.(*rbacv1beta1.RoleBinding)
+		c.PodServiceAccountRoleBinding = obj.(*rbacv1.RoleBinding)
 		c.PodServiceAccountRoleBinding.Namespace = ""
 		c.logger.Info("successfully parsed")
 

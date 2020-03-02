@@ -160,7 +160,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								Type: "string",
 							},
 							"s3_force_path_style": {
-								Type: "string",
+								Type: "boolean",
 							},
 							"s3_wal_path": {
 								Type: "string",
@@ -380,6 +380,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 										Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 									},
 								},
+							},
+						},
+					},
+					"serviceAnnotations": {
+						Type: "object",
+						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "string",
 							},
 						},
 					},
@@ -717,6 +725,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 								},
 							},
+							"master_pod_move_timeout": {
+								Type: "string",
+							},
 							"node_readiness_label": {
 								Type: "object",
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
@@ -748,10 +759,19 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 								},
 							},
+							"pod_priority_class_name": {
+								Type: "string",
+							},
 							"pod_role_label": {
 								Type: "string",
 							},
+							"pod_service_account_definition": {
+								Type: "string",
+							},
 							"pod_service_account_name": {
+								Type: "string",
+							},
+							"pod_service_account_role_binding_definition": {
 								Type: "string",
 							},
 							"pod_terminate_grace_period": {
@@ -798,6 +818,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
+							"min_cpu_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"min_memory_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
 						},
 					},
 					"timeouts": {
@@ -826,6 +854,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"load_balancer": {
 						Type: "object",
 						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"custom_service_annotations": {
+								Type: "object",
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Schema: &apiextv1beta1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
 							"db_hosted_zone": {
 								Type: "string",
 							},
@@ -834,14 +870,6 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 							"enable_replica_load_balancer": {
 								Type: "boolean",
-							},
-							"custom_service_annotations": {
-								Type: "object",
-								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
-									Schema: &apiextv1beta1.JSONSchemaProps{
-										Type: "string",
-									},
-								},
 							},
 							"master_dns_name_format": {
 								Type: "string",
@@ -877,11 +905,10 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"logical_backup": {
 						Type: "object",
 						Properties: map[string]apiextv1beta1.JSONSchemaProps{
-							"logical_backup_schedule": {
-								Type:    "string",
-								Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
-							},
 							"logical_backup_docker_image": {
+								Type: "string",
+							},
+							"logical_backup_s3_access_key_id": {
 								Type: "string",
 							},
 							"logical_backup_s3_bucket": {
@@ -890,14 +917,18 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"logical_backup_s3_endpoint": {
 								Type: "string",
 							},
-							"logical_backup_s3_sse": {
-								Type: "string",
-							},
-							"logical_backup_s3_access_key_id": {
+							"logical_backup_s3_region": {
 								Type: "string",
 							},
 							"logical_backup_s3_secret_access_key": {
 								Type: "string",
+							},
+							"logical_backup_s3_sse": {
+								Type: "string",
+							},
+							"logical_backup_schedule": {
+								Type:    "string",
+								Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
 							},
 						},
 					},

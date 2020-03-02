@@ -110,8 +110,10 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **min_instances**
   operator will run at least the number of instances for any given Postgres
-  cluster equal to the value of this parameter. When `-1` is specified, no
-  limits are applied. The default is `-1`.
+  cluster equal to the value of this parameter. Standby clusters can still run
+  with `numberOfInstances: 1` as this is the [recommended setup](../user.md#setting-up-a-standby-cluster).
+  When `-1` is specified for `min_instances`, no limits are applied. The default
+  is `-1`.
 
 * **resync_period**
   period between consecutive sync requests. The default is `30m`.
@@ -152,21 +154,22 @@ configuration they are grouped under the `kubernetes` key.
   service account used by Patroni running on individual Pods to communicate
   with the operator. Required even if native Kubernetes support in Patroni is
   not used, because Patroni keeps pod labels in sync with the instance role.
-  The default is `operator`.
+  The default is `postgres-pod`.
 
 * **pod_service_account_definition**
-  The operator tries to create the pod Service Account in the namespace that
-  doesn't define such an account using the YAML definition provided by this
-  option. If not defined, a simple definition that contains only the name will
-  be used. The default is empty.
+  On Postgres cluster creation the operator tries to create the service account
+  for the Postgres pods if it does not exist in the namespace. The internal
+  default service account definition (defines only the name) can be overwritten
+  with this parameter. Make sure to provide a valid YAML or JSON string. The
+  default is empty.
 
 * **pod_service_account_role_binding_definition**
-  This definition must bind pod service account to a role with permission
+  This definition must bind the pod service account to a role with permission
   sufficient for the pods to start and for Patroni to access K8s endpoints;
   service account on its own lacks any such rights starting with K8s v1.8. If
   not explicitly defined by the user, a simple definition that binds the
-  account to the operator's own 'zalando-postgres-operator' cluster role will
-  be used. The default is empty.
+  account to the 'postgres-pod' [cluster role](../../manifests/operator-service-account-rbac.yaml#L198)
+  will be used. The default is empty.
 
 * **pod_terminate_grace_period**
   Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
@@ -318,11 +321,19 @@ CRD-based configuration.
 
 * **default_cpu_limit**
   CPU limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `3`.
+  settings. The default is `1`.
 
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `1Gi`.
+  settings. The default is `500Mi`.
+
+* **min_cpu_limit**
+  hard CPU minimum what we consider to be required to properly run Postgres
+  clusters with Patroni on Kubernetes. The default is `250m`.
+
+* **min_memory_limit**
+  hard memory minimum what we consider to be required to properly run Postgres
+  clusters with Patroni on Kubernetes. The default is `250Mi`.
 
 ## Operator timeouts
 
@@ -380,8 +391,9 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   `false`.
 
 * **custom_service_annotations**
-  when load balancing is enabled, LoadBalancer service is created and
-  this parameter takes service annotations that are applied to service.
+  This key/value map provides a list of annotations that get attached to each
+  service of a cluster created by the operator. If the annotation key is also
+  provided by the cluster definition, the manifest value is used.
   Optional.
 
 * **master_dns_name_format** defines the DNS name string template for the
@@ -453,8 +465,11 @@ grouped under the `logical_backup` key.
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
 
+* **logical_backup_s3_region**
+  Specifies the region of the bucket which is required with some non-AWS S3 storage services. The default is empty.
+
 * **logical_backup_s3_endpoint**
-  When using non-AWS S3 storage, endpoint can be set as a ENV variable.
+  When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.
 
 * **logical_backup_s3_sse**
   Specify server side encription that S3 storage is using. If empty string
@@ -579,4 +594,4 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   CPU limit value for the Scalyr sidecar. The default is `1`.
 
 * **scalyr_memory_limit**
-  Memory limit value for the Scalyr sidecar. The default is `1Gi`.
+  Memory limit value for the Scalyr sidecar. The default is `500Mi`.
