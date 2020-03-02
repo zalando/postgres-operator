@@ -10,4 +10,6 @@ const (
 	ConnectionPoolDefaultCpuLimit      = "100m"
 	ConnectionPoolDefaultMemoryRequest = "100Mi"
 	ConnectionPoolDefaultMemoryLimit   = "100Mi"
+
+	ConnPoolContainer = 0
 )

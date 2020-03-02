@@ -1206,7 +1206,7 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 // Test if two connection pool configuration needs to be synced. For simplicity
 // compare not the actual K8S objects, but the configuration itself and request
 // sync if there is any difference.
-func (c *Cluster) needSyncConnPoolDeployments(oldSpec, newSpec *acidv1.ConnectionPool) (sync bool, reasons []string) {
+func (c *Cluster) needSyncConnPoolSpecs(oldSpec, newSpec *acidv1.ConnectionPool) (sync bool, reasons []string) {
 	reasons = []string{}
 	sync = false
 
@@ -1224,6 +1224,72 @@ func (c *Cluster) needSyncConnPoolDeployments(oldSpec, newSpec *acidv1.Connectio
 		msg := fmt.Sprintf("%s %+v from %s to %s",
 			change.Type, change.Path, change.From, change.To)
 		reasons = append(reasons, msg)
+	}
+
+	return sync, reasons
+}
+
+func syncResources(a, b *v1.ResourceRequirements) bool {
+	for _, res := range []v1.ResourceName{
+		v1.ResourceCPU,
+		v1.ResourceMemory,
+	} {
+		if !a.Limits[res].Equal(b.Limits[res]) ||
+			!a.Requests[res].Equal(b.Requests[res]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Check if we need to synchronize connection pool deploymend due to new
+// defaults, that are different from what we see in the DeploymentSpec
+func (c *Cluster) needSyncConnPoolDefaults(
+	spec *acidv1.ConnectionPool,
+	deployment *appsv1.Deployment) (sync bool, reasons []string) {
+
+	reasons = []string{}
+	sync = false
+
+	config := c.OpConfig.ConnectionPool
+	podTemplate := deployment.Spec.Template
+	poolContainer := podTemplate.Spec.Containers[constants.ConnPoolContainer]
+
+	if spec.NumberOfInstances == nil &&
+		deployment.Spec.Replicas != config.NumberOfInstances {
+
+		sync = true
+		msg := fmt.Sprintf("NumberOfInstances is different (%d vs %d)",
+			deployment.Spec.Replicas, config.NumberOfInstances)
+		reasons = append(reasons, msg)
+	}
+
+	if spec.DockerImage == "" &&
+		poolContainer.Image != config.Image {
+
+		sync = true
+		msg := fmt.Sprintf("DockerImage is different (%s vs %s)",
+			poolContainer.Image, config.Image)
+		reasons = append(reasons, msg)
+	}
+
+	expectedResources, err := generateResourceRequirements(spec.Resources,
+		c.makeDefaultConnPoolResources())
+
+	// An error to generate expected resources means something is not quite
+	// right, but for the purpose of robustness do not panic here, just report
+	// and ignore resources comparison (in the worst case there will be no
+	// updates for new resource values).
+	if err == nil && syncResources(&poolContainer.Resources, expectedResources) {
+		sync = true
+		msg := fmt.Sprintf("Resources are different (%+v vs %+v)",
+			poolContainer.Resources, expectedResources)
+		reasons = append(reasons, msg)
+	}
+
+	if err != nil {
+		c.logger.Warningf("Cannot generate expected resources, %v", err)
 	}
 
 	return sync, reasons

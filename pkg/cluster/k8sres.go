@@ -1754,7 +1754,7 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 	secretSelector := func(key string) *v1.SecretKeySelector {
 		return &v1.SecretKeySelector{
 			LocalObjectReference: v1.LocalObjectReference{
-				Name: c.credentialSecretName(c.OpConfig.SuperUsername),
+				Name: c.credentialSecretName(c.OpConfig.ConnectionPool.User),
 			},
 			Key: key,
 		}

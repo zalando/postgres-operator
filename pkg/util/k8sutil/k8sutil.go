@@ -300,6 +300,18 @@ func (mock *mockDeployment) Get(name string, opts metav1.GetOptions) (*apiappsv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-deployment",
 		},
+		Spec: apiappsv1.DeploymentSpec{
+			Replicas: int32ToPointer(1),
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							Image: "pooler:1.0",
+						},
+					},
+				},
+			},
+		},
 	}, nil
 }
 

@@ -88,6 +88,11 @@ func TestConnPoolSynchronization(t *testing.T) {
 		Service:    &v1.Service{},
 	}
 
+	clusterNewDefaultsMock := *cluster
+	clusterNewDefaultsMock.KubeClient = k8sutil.NewMockKubernetesClient()
+	cluster.OpConfig.ConnectionPool.Image = "pooler:2.0"
+	cluster.OpConfig.ConnectionPool.NumberOfInstances = int32ToPointer(2)
+
 	tests := []struct {
 		subTest string
 		oldSpec *acidv1.Postgresql
@@ -164,6 +169,21 @@ func TestConnPoolSynchronization(t *testing.T) {
 				},
 			},
 			cluster: &clusterMock,
+			check:   deploymentUpdated,
+		},
+		{
+			subTest: "update image from changed defaults",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPool: &acidv1.ConnectionPool{},
+				},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPool: &acidv1.ConnectionPool{},
+				},
+			},
+			cluster: &clusterNewDefaultsMock,
 			check:   deploymentUpdated,
 		},
 	}
