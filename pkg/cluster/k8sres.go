@@ -20,6 +20,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1731,6 +1732,82 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return "logical-backup-" + c.clusterName().Name
 }
 
+// Generate pool size related environment variables.
+//
+// MAX_DB_CONN would specify the global maximum for connections to a target
+// 	database.
+//
+// MAX_CLIENT_CONN is not configurable at the moment, just set it high enough.
+//
+// DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
+// 	most of the queries coming through a connection pooler are from the same
+// 	user to the same db). In case if we want to spin up more connection pool
+// 	instances, take this into account and maintain the same number of
+// 	connections.
+//
+// MIN_SIZE is a pool minimal size, to prevent situation when sudden workload
+// 	have to wait for spinning up a new connections.
+//
+// RESERVE_SIZE is how many additional connections to allow for a pool.
+func (c *Cluster) getConnPoolEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
+	effectiveMode := util.Coalesce(
+		spec.ConnectionPool.Mode,
+		c.OpConfig.ConnectionPool.Mode)
+
+	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	if numberOfInstances == nil {
+		numberOfInstances = util.CoalesceInt32(
+			c.OpConfig.ConnectionPool.NumberOfInstances,
+			k8sutil.Int32ToPointer(1))
+	}
+
+	effectiveMaxDBConn := util.CoalesceInt32(
+		spec.ConnectionPool.MaxDBConnections,
+		c.OpConfig.ConnectionPool.MaxDBConnections)
+
+	if effectiveMaxDBConn == nil {
+		effectiveMaxDBConn = k8sutil.Int32ToPointer(
+			constants.ConnPoolMaxDBConnections)
+	}
+
+	maxDBConn := *effectiveMaxDBConn / *numberOfInstances
+
+	defaultSize := maxDBConn / 2
+	minSize := defaultSize / 2
+	reserveSize := minSize
+
+	return []v1.EnvVar{
+		{
+			Name:  "CONNECTION_POOL_PORT",
+			Value: fmt.Sprint(pgPort),
+		},
+		{
+			Name:  "CONNECTION_POOL_MODE",
+			Value: effectiveMode,
+		},
+		{
+			Name:  "CONNECTION_POOL_DEFAULT_SIZE",
+			Value: fmt.Sprint(defaultSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_MIN_SIZE",
+			Value: fmt.Sprint(minSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_RESERVE_SIZE",
+			Value: fmt.Sprint(reserveSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_MAX_CLIENT_CONN",
+			Value: fmt.Sprint(constants.ConnPoolMaxClientConnections),
+		},
+		{
+			Name:  "CONNECTION_POOL_MAX_DB_CONN",
+			Value: fmt.Sprint(effectiveMaxDBConn),
+		},
+	}
+}
+
 func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 	*v1.PodTemplateSpec, error) {
 
@@ -1738,10 +1815,6 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 	resources, err := generateResourceRequirements(
 		spec.ConnectionPool.Resources,
 		c.makeDefaultConnPoolResources())
-
-	effectiveMode := util.Coalesce(
-		spec.ConnectionPool.Mode,
-		c.OpConfig.ConnectionPool.Mode)
 
 	effectiveDockerImage := util.Coalesce(
 		spec.ConnectionPool.DockerImage,
@@ -1789,15 +1862,9 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 				SecretKeyRef: secretSelector("password"),
 			},
 		},
-		{
-			Name:  "CONNECTION_POOL_MODE",
-			Value: effectiveMode,
-		},
-		{
-			Name:  "CONNECTION_POOL_PORT",
-			Value: fmt.Sprint(pgPort),
-		},
 	}
+
+	envVars = append(envVars, c.getConnPoolEnvVars(spec)...)
 
 	poolerContainer := v1.Container{
 		Name:            connectionPoolContainer,
@@ -1873,7 +1940,9 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 	podTemplate, err := c.generateConnPoolPodTemplate(spec)
 	numberOfInstances := spec.ConnectionPool.NumberOfInstances
 	if numberOfInstances == nil {
-		numberOfInstances = c.OpConfig.ConnectionPool.NumberOfInstances
+		numberOfInstances = util.CoalesceInt32(
+			c.OpConfig.ConnectionPool.NumberOfInstances,
+			k8sutil.Int32ToPointer(1))
 	}
 
 	if err != nil {

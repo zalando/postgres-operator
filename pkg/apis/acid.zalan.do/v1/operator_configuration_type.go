@@ -161,6 +161,7 @@ type ConnectionPoolConfiguration struct {
 	User                 string `json:"connection_pool_user,omitempty"`
 	Image                string `json:"connection_pool_image,omitempty"`
 	Mode                 string `json:"connection_pool_mode,omitempty"`
+	MaxDBConnections     *int32 `json:"connection_pool_max_db_connections,omitempty"`
 	DefaultCPURequest    string `json:"connection_pool_default_cpu_request,omitempty"`
 	DefaultMemoryRequest string `json:"connection_pool_default_memory_request,omitempty"`
 	DefaultCPULimit      string `json:"connection_pool_default_cpu_limit,omitempty"`

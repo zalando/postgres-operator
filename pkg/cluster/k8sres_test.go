@@ -539,6 +539,7 @@ func TestConnPoolPodSpec(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				ConnectionPool: config.ConnectionPool{
+					MaxDBConnections:             int32ToPointer(60),
 					ConnPoolDefaultCPURequest:    "100m",
 					ConnPoolDefaultCPULimit:      "100m",
 					ConnPoolDefaultMemoryRequest: "100Mi",

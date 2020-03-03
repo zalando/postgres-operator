@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func int32ToPointer(value int32) *int32 {
+func Int32ToPointer(value int32) *int32 {
 	return &value
 }
 
@@ -301,7 +301,7 @@ func (mock *mockDeployment) Get(name string, opts metav1.GetOptions) (*apiappsv1
 			Name: "test-deployment",
 		},
 		Spec: apiappsv1.DeploymentSpec{
-			Replicas: int32ToPointer(1),
+			Replicas: Int32ToPointer(1),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -318,7 +318,7 @@ func (mock *mockDeployment) Get(name string, opts metav1.GetOptions) (*apiappsv1
 func (mock *mockDeployment) Patch(name string, t types.PatchType, data []byte, subres ...string) (*apiappsv1.Deployment, error) {
 	return &apiappsv1.Deployment{
 		Spec: apiappsv1.DeploymentSpec{
-			Replicas: int32ToPointer(2),
+			Replicas: Int32ToPointer(2),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-deployment",

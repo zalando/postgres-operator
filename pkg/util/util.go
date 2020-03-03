@@ -141,6 +141,22 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
+// Yeah, golang
+func CoalesceInt32(val, defaultVal *int32) *int32 {
+	if val == nil {
+		return defaultVal
+	}
+	return val
+}
+
+func MaxInt32(a, b *int32) *int32 {
+	if *a > *b {
+		return a
+	}
+
+	return b
+}
+
 // IsSmallerQuantity : checks if first resource is of a smaller quantity than the second
 func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 

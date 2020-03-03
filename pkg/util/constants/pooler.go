@@ -11,5 +11,7 @@ const (
 	ConnectionPoolDefaultMemoryRequest = "100Mi"
 	ConnectionPoolDefaultMemoryLimit   = "100Mi"
 
-	ConnPoolContainer = 0
+	ConnPoolContainer            = 0
+	ConnPoolMaxDBConnections     = 60
+	ConnPoolMaxClientConnections = 10000
 )

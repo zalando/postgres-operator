@@ -176,6 +176,7 @@ type ConnectionPool struct {
 	User              string `json:"user,omitempty"`
 	Mode              string `json:"mode,omitempty"`
 	DockerImage       string `json:"dockerImage,omitempty"`
+	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
 
 	Resources `json:"resources,omitempty"`
 }

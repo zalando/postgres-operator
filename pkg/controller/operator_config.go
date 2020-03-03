@@ -22,6 +22,10 @@ func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, con
 	return config, nil
 }
 
+func int32ToPointer(value int32) *int32 {
+	return &value
+}
+
 // importConfigurationFromCRD is a transitional function that converts CRD configuration to the one based on the configmap
 func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigurationData) *config.Config {
 	result := &config.Config{}
@@ -146,14 +150,13 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// Connection pool. Looks like we can't use defaulting in CRD before 1.17,
 	// so ensure default values here.
-	result.ConnectionPool.NumberOfInstances = fromCRD.ConnectionPool.NumberOfInstances
-	if result.ConnectionPool.NumberOfInstances == nil ||
-		*result.ConnectionPool.NumberOfInstances < 1 {
-		var value int32
+	result.ConnectionPool.NumberOfInstances = util.CoalesceInt32(
+		fromCRD.ConnectionPool.NumberOfInstances,
+		int32ToPointer(1))
 
-		value = 1
-		result.ConnectionPool.NumberOfInstances = &value
-	}
+	result.ConnectionPool.NumberOfInstances = util.MaxInt32(
+		result.ConnectionPool.NumberOfInstances,
+		int32ToPointer(1))
 
 	result.ConnectionPool.Schema = util.Coalesce(
 		fromCRD.ConnectionPool.Schema,
@@ -186,6 +189,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ConnectionPool.ConnPoolDefaultMemoryLimit = util.Coalesce(
 		fromCRD.ConnectionPool.DefaultMemoryLimit,
 		constants.ConnectionPoolDefaultMemoryLimit)
+
+	result.ConnectionPool.MaxDBConnections = util.CoalesceInt32(
+		fromCRD.ConnectionPool.MaxDBConnections,
+		int32ToPointer(constants.ConnPoolMaxDBConnections))
 
 	return result
 }

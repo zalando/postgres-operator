@@ -94,6 +94,7 @@ type ConnectionPool struct {
 	ConnPoolDefaultMemoryRequest string `name:"connection_pool_default_memory_request" default:"100Mi"`
 	ConnPoolDefaultCPULimit      string `name:"connection_pool_default_cpu_limit" default:"3"`
 	ConnPoolDefaultMemoryLimit   string `name:"connection_pool_default_memory_limit" default:"1Gi"`
+	MaxDBConnections             *int32 `name:"connection_pool_max_db_connections" default:"60"`
 }
 
 // Config describes operator config
