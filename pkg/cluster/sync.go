@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"reflect"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -608,29 +607,12 @@ func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql) error 
 	newNeedConnPool := c.needConnectionPoolWorker(&newSpec.Spec)
 	oldNeedConnPool := c.needConnectionPoolWorker(&oldSpec.Spec)
 
-	if oldNeedConnPool && newNeedConnPool {
-		// sync in case of differences, or if no resources present
-		oldPool := oldSpec.Spec.ConnectionPool
-		newPool := newSpec.Spec.ConnectionPool
-
-		if c.ConnectionPool == nil ||
-			c.ConnectionPool.Deployment == nil ||
-			c.ConnectionPool.Service == nil ||
-			!reflect.DeepEqual(oldPool, newPool) {
-
-			c.logger.Debug("syncing connection pool")
-
-			if err := c.syncConnectionPoolWorker(oldSpec, newSpec); err != nil {
-				c.logger.Errorf("could not sync connection pool: %v", err)
-				return err
-			}
-		} else {
-			c.logger.Debug("No connection pool sync")
-		}
-	}
-
-	if !oldNeedConnPool && newNeedConnPool {
-		// sync to create everything
+	if newNeedConnPool {
+		// Try to sync in any case. If we didn't needed connection pool before,
+		// it means we want to create it. If it was already present, still sync
+		// since it could happen that there is no difference in specs, and all
+		// the resources are remembered, but the deployment was manualy deleted
+		// in between
 		c.logger.Debug("syncing connection pool")
 
 		if err := c.syncConnectionPoolWorker(oldSpec, newSpec); err != nil {
