@@ -327,18 +327,21 @@ spec:
                 connection_pool_user:
                   type: string
                   #default: "pooler"
-                connection_pool_number_of_instances:
-                  type: integer
-                  #default: 1
                 connection_pool_image:
                   type: string
-                  #default: "registry.opensource.zalan.do/acid/pgbouncer:1.0.0"
+                  #default: "registry.opensource.zalan.do/acid/pgbouncer:master-5"
+                connection_pool_max_db_connections:
+                  type: integer
+                  #default: 60
                 connection_pool_mode:
                   type: string
                   enum:
                     - "session"
                     - "transaction"
                   #default: "transaction"
+                connection_pool_number_of_instances:
+                  type: integer
+                  #default: 1
                 connection_pool_default_cpu_limit:
                   type: string
                   pattern: '^(\d+m|\d+(\.\d{1,3})?)$'

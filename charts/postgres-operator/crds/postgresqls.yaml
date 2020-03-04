@@ -111,8 +111,13 @@ spec:
               properties:
                 dockerImage:
                   type: string
+                maxDBConnections:
+                  type: integer
                 mode:
                   type: string
+                  enum:
+                    - "session"
+                    - "transaction"
                 numberOfInstances:
                   type: integer
                   minimum: 1
@@ -244,22 +249,6 @@ spec:
                     type: string
             replicaLoadBalancer:  # deprecated
               type: boolean
-            connectionPool:
-              type: object
-              properties:
-                schema:
-                  type: string
-                user:
-                  type: string
-                number_of_instances:
-                  type: integer
-                dockerImage:
-                  type: string
-                mode:
-                  type: string
-                  enum:
-                    - "session"
-                    - "transaction"
             resources:
               type: object
               required:

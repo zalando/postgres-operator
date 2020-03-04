@@ -182,6 +182,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"dockerImage": {
 								Type: "string",
 							},
+							"maxDBConnections": {
+								Type: "integer",
+							},
 							"mode": {
 								Type: "string",
 								Enum: []apiextv1beta1.JSON{
@@ -1129,9 +1132,8 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"connection_pool_image": {
 								Type: "string",
 							},
-							"connection_pool_replicas": {
-								Type:    "integer",
-								Minimum: &min1,
+							"connection_pool_max_db_connections": {
+								Type: "integer",
 							},
 							"connection_pool_mode": {
 								Type: "string",
@@ -1143,6 +1145,10 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 										Raw: []byte(`"transaction"`),
 									},
 								},
+							},
+							"connection_pool_number_of_instances": {
+								Type:    "integer",
+								Minimum: &min1,
 							},
 							"connection_pool_schema": {
 								Type: "string",

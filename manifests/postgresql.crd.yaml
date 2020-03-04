@@ -75,6 +75,8 @@ spec:
               properties:
                 dockerImage:
                   type: string
+                maxDBConnections:
+                  type: integer
                 mode:
                   type: string
                   enum:
