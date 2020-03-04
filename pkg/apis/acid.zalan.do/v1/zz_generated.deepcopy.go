@@ -76,6 +76,11 @@ func (in *ConnectionPool) DeepCopyInto(out *ConnectionPool) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.MaxDBConnections != nil {
+		in, out := &in.MaxDBConnections, &out.MaxDBConnections
+		*out = new(int32)
+		**out = **in
+	}
 	out.Resources = in.Resources
 	return
 }
@@ -95,6 +100,11 @@ func (in *ConnectionPoolConfiguration) DeepCopyInto(out *ConnectionPoolConfigura
 	*out = *in
 	if in.NumberOfInstances != nil {
 		in, out := &in.NumberOfInstances, &out.NumberOfInstances
+		*out = new(int32)
+		**out = **in
+	}
+	if in.MaxDBConnections != nil {
+		in, out := &in.MaxDBConnections, &out.MaxDBConnections
 		*out = new(int32)
 		**out = **in
 	}
