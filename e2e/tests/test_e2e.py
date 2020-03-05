@@ -75,7 +75,7 @@ class EndToEndTestCase(unittest.TestCase):
         '''
 
         k8s = self.k8s
-        cluster_label = 'cluster-name=acid-minimal-cluster'
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
 
         # enable load balancer services
         pg_patch_enable_lbs = {
@@ -123,7 +123,7 @@ class EndToEndTestCase(unittest.TestCase):
         Lower resource limits below configured minimum and let operator fix it
         '''
         k8s = self.k8s
-        cluster_label = 'cluster-name=acid-minimal-cluster'
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
         _, failover_targets = k8s.get_pg_nodes(cluster_label)
 
         # configure minimum boundaries for CPU and memory limits
@@ -190,15 +190,26 @@ class EndToEndTestCase(unittest.TestCase):
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         '''
         k8s = self.k8s
-        labels = "cluster-name=acid-minimal-cluster"
+        labels = "application=spilo,cluster-name=acid-minimal-cluster"
 
-        k8s.wait_for_pg_to_scale(3)
-        self.assertEqual(3, k8s.count_pods_with_label(labels))
-        self.assert_master_is_unique()
+        try:
+            k8s.wait_for_pg_to_scale(3)
+            self.assertEqual(3, k8s.count_pods_with_label(labels))
+            self.assert_master_is_unique()
 
-        k8s.wait_for_pg_to_scale(2)
-        self.assertEqual(2, k8s.count_pods_with_label(labels))
-        self.assert_master_is_unique()
+            k8s.wait_for_pg_to_scale(2)
+            self.assertEqual(2, k8s.count_pods_with_label(labels))
+            self.assert_master_is_unique()
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            pods = k8s.api.core_v1.list_namespaced_pod('default').items
+            for p in pods:
+                response = k8s.api.core_v1.read_namespaced_pod(
+                    name=p.metadata.name,
+                    namespace='default'
+                )
+                print('Pod: {}'.format(response))
+            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
@@ -206,7 +217,7 @@ class EndToEndTestCase(unittest.TestCase):
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
         '''
         k8s = self.k8s
-        cluster_label = 'cluster-name=acid-minimal-cluster'
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
 
         # get nodes of master and replica(s) (expected target of new master)
         current_master_node, failover_targets = k8s.get_pg_nodes(cluster_label)
@@ -361,7 +372,8 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         For a database without connection pool, then turns it on, scale up,
         turn off and on again. Test with different ways of doing this (via
-        enableConnectionPool or connectionPool configuration section).
+        enableConnectionPool or connectionPool configuration section). At the
+        end turn the connection pool off to not interfere with other tests.
         '''
         k8s = self.k8s
         service_labels = {
@@ -560,7 +572,7 @@ class K8s:
         _ = self.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
 
-        labels = 'cluster-name=acid-minimal-cluster'
+        labels = 'application=spilo,cluster-name=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 

@@ -420,18 +420,18 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 // not interfere with it (it lists all the pods via labels, and if there would
 // be no difference, it will recreate also pooler pods).
 func (c *Cluster) connPoolLabelsSelector() *metav1.LabelSelector {
-	labels := c.labelsSet(false)
-	connPoolLabels := map[string]string{
+	connPoolLabels := labels.Set(map[string]string{})
+
+	extraLabels := labels.Set(map[string]string{
 		"connection-pool": c.connPoolName(),
 		"application":     "connection-pool",
-	}
+	})
 
-	for k, v := range connPoolLabels {
-		labels[k] = v
-	}
+	connPoolLabels = labels.Merge(connPoolLabels, c.labelsSet(false))
+	connPoolLabels = labels.Merge(connPoolLabels, extraLabels)
 
 	return &metav1.LabelSelector{
-		MatchLabels:      labels,
+		MatchLabels:      connPoolLabels,
 		MatchExpressions: nil,
 	}
 }
