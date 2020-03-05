@@ -116,6 +116,19 @@ func TestConnPoolSynchronization(t *testing.T) {
 			check:   objectsAreSaved,
 		},
 		{
+			subTest: "create if doesn't exist with a flag",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					EnableConnectionPool: boolToPointer(true),
+				},
+			},
+			cluster: &clusterMissingObjects,
+			check:   objectsAreSaved,
+		},
+		{
 			subTest: "create from scratch",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
