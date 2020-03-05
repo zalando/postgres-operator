@@ -201,7 +201,7 @@ func TestConnPoolSynchronization(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		err := tt.cluster.syncConnectionPool(tt.oldSpec, tt.newSpec)
+		err := tt.cluster.syncConnectionPool(tt.oldSpec, tt.newSpec, mockInstallLookupFunction)
 
 		if err := tt.check(tt.cluster, err); err != nil {
 			t.Errorf("%s [%s]: Could not synchronize, %+v",

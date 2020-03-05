@@ -110,7 +110,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pool
-	if err = c.syncConnectionPool(&oldSpec, newSpec); err != nil {
+	if err = c.syncConnectionPool(&oldSpec, newSpec, c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pool: %v", err)
 	}
 
@@ -464,15 +464,27 @@ func (c *Cluster) syncRoles() (err error) {
 	}
 
 	if c.needConnectionPool() {
-		// An exception from system users, connection pool user
 		connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
 		userNames = append(userNames, connPoolUser.Name)
-		c.pgUsers[connPoolUser.Name] = connPoolUser
 	}
 
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)
+	}
+
+	if c.needConnectionPool() {
+		connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
+
+		// An exception from system users, connection pool user should be
+		// created by operator, but never updated. If connection pool user
+		// already exist, do not update it.
+		if _, exist := dbUsers[connPoolUser.Name]; exist {
+			delete(dbUsers, connPoolUser.Name)
+			delete(c.pgUsers, connPoolUser.Name)
+		} else {
+			c.pgUsers[connPoolUser.Name] = connPoolUser
+		}
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)
@@ -603,7 +615,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	return nil
 }
 
-func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql) error {
+func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql, lookup InstallFunction) error {
 	newNeedConnPool := c.needConnectionPoolWorker(&newSpec.Spec)
 	oldNeedConnPool := c.needConnectionPoolWorker(&oldSpec.Spec)
 
@@ -614,6 +626,30 @@ func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql) error 
 		// the resources are remembered, but the deployment was manualy deleted
 		// in between
 		c.logger.Debug("syncing connection pool")
+
+		// in this case also do not forget to install lookup function as for
+		// creating cluster
+		if !oldNeedConnPool {
+			newConnPool := newSpec.Spec.ConnectionPool
+
+			specSchema := ""
+			specUser := ""
+
+			if newConnPool != nil {
+				specSchema = newConnPool.Schema
+				specUser = newConnPool.Schema
+			}
+
+			schema := util.Coalesce(
+				specSchema,
+				c.OpConfig.ConnectionPool.Schema)
+
+			user := util.Coalesce(
+				specUser,
+				c.OpConfig.ConnectionPool.User)
+
+			lookup(schema, user)
+		}
 
 		if err := c.syncConnectionPoolWorker(oldSpec, newSpec); err != nil {
 			c.logger.Errorf("could not sync connection pool: %v", err)
