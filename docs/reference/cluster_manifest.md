@@ -140,6 +140,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration). Optional.
 
+* **enableConnectionPool**
+  Tells the operator to create a connection pool with a database. If this
+  field is true, a connection pool deployment will be created even if
+  `connectionPool` section is empty. Optional, not set by default.
+
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
   to S3. Default: false. Optional.
@@ -148,11 +153,6 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   Schedule for the logical backup K8s cron job. Please take
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Optional. Default is: "30 00 \* \* \*"
-
-* enableConnectionPool
-  Tells the operator to create a connection pool with a database. If this
-  field is true, a connection pool deployment will be created even if
-  `connectionPool` section is empty. Optional, not set by default.
 
 ## Postgres parameters
 
@@ -375,9 +375,6 @@ present.
 * **numberOfInstances**
   How many instances of connection pool to create.
 
-* **mode**
-  In which mode to run connection pool, transaction or session.
-
 * **schema**
   Schema to create for credentials lookup function.
 
@@ -386,6 +383,12 @@ present.
 
 * **dockerImage**
   Which docker image to use for connection pool deployment.
+
+* **maxDBConnections**
+  How many connections the pooler can max hold.
+
+* **mode**
+  In which mode to run connection pool, transaction or session.
 
 * **resources**
   Resource configuration for connection pool deployment.

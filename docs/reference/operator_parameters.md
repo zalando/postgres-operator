@@ -613,6 +613,9 @@ operator being able to provide some reasonable defaults.
 * **connection_pool_image**
   Docker image to use for connection pool deployment.
 
+* **connection_pool_max_db_connections**
+  How many connections the pooler can max hold.
+
 * **connection_pool_mode**
   Default pool mode, session or transaction.
 
