@@ -414,11 +414,24 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 	}
 }
 
+// Return connection pool labels selector, which should from one point of view
+// inherit most of the labels from the cluster itself, but at the same time
+// have e.g. different `application` label, so that recreatePod operation will
+// not interfere with it (it lists all the pods via labels, and if there would
+// be no difference, it will recreate also pooler pods).
 func (c *Cluster) connPoolLabelsSelector() *metav1.LabelSelector {
+	labels := c.labelsSet(false)
+	connPoolLabels := map[string]string{
+		"connection-pool": c.connPoolName(),
+		"application":     "connection-pool",
+	}
+
+	for k, v := range connPoolLabels {
+		labels[k] = v
+	}
+
 	return &metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"connection-pool": c.connPoolName(),
-		},
+		MatchLabels:      labels,
 		MatchExpressions: nil,
 	}
 }
