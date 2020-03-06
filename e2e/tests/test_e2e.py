@@ -278,7 +278,7 @@ class EndToEndTestCase(unittest.TestCase):
         new_master_node, new_replica_nodes = self.assert_failover(
             current_master_node, num_replicas, failover_targets, cluster_label)
 
-        # patch also master node
+        # patch also node where master ran before
         k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
