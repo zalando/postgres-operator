@@ -65,6 +65,7 @@ func TestConnPoolSynchronization(t *testing.T) {
 					ConnPoolDefaultCPULimit:      "100m",
 					ConnPoolDefaultMemoryRequest: "100Mi",
 					ConnPoolDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:            int32ToPointer(1),
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)

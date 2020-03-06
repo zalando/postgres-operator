@@ -288,6 +288,9 @@ func (mock *mockDeployment) Create(*apiappsv1.Deployment) (*apiappsv1.Deployment
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-deployment",
 		},
+		Spec: apiappsv1.DeploymentSpec{
+			Replicas: Int32ToPointer(1),
+		},
 	}, nil
 }
 
@@ -338,6 +341,9 @@ func (mock *mockDeploymentNotExist) Create(*apiappsv1.Deployment) (*apiappsv1.De
 	return &apiappsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-deployment",
+		},
+		Spec: apiappsv1.DeploymentSpec{
+			Replicas: Int32ToPointer(1),
 		},
 	}, nil
 }

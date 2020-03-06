@@ -299,7 +299,7 @@ class EndToEndTestCase(unittest.TestCase):
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         '''
         k8s = self.k8s
-        labels = "cluster-name=acid-minimal-cluster"
+        labels = "application=spilo,cluster-name=acid-minimal-cluster"
 
         k8s.wait_for_pg_to_scale(3)
         self.assertEqual(3, k8s.count_pods_with_label(labels))
@@ -441,7 +441,7 @@ class EndToEndTestCase(unittest.TestCase):
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
         '''
         k8s = self.k8s
-        cluster_label = 'cluster-name=acid-minimal-cluster'
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
 
         # get nodes of master and replica(s) (expected target of new master)
         current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
@@ -507,7 +507,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_master_is_unique()
 
         return new_master_node, new_replica_nodes
->>>>>>> master
 
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
