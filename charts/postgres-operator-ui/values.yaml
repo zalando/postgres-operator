@@ -8,7 +8,7 @@ replicaCount: 1
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator-ui
-  tag: v1.2.0
+  tag: v1.4.0
   pullPolicy: "IfNotPresent"
 
 rbac:

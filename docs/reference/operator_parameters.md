@@ -110,8 +110,10 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **min_instances**
   operator will run at least the number of instances for any given Postgres
-  cluster equal to the value of this parameter. When `-1` is specified, no
-  limits are applied. The default is `-1`.
+  cluster equal to the value of this parameter. Standby clusters can still run
+  with `numberOfInstances: 1` as this is the [recommended setup](../user.md#setting-up-a-standby-cluster).
+  When `-1` is specified for `min_instances`, no limits are applied. The default
+  is `-1`.
 
 * **resync_period**
   period between consecutive sync requests. The default is `30m`.

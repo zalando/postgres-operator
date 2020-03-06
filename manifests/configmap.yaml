@@ -29,7 +29,7 @@ data:
   # default_cpu_request: 100m
   # default_memory_limit: 500Mi
   # default_memory_request: 100Mi
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16
+  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
   # enable_admin_role_for_users: "true"
   # enable_crd_validation: "true"
   # enable_database_access: "true"
@@ -73,7 +73,9 @@ data:
   pod_label_wait_timeout: 10m
   pod_management_policy: "ordered_ready"
   pod_role_label: spilo-role
+  # pod_service_account_definition: ""
   pod_service_account_name: "postgres-pod"
+  # pod_service_account_role_binding_definition: ""
   pod_terminate_grace_period: 5m
   # postgres_superuser_teams: "postgres_superusers"
   # protected_role_names: "admin"

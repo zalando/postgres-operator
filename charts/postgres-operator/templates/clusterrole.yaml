@@ -63,9 +63,9 @@ rules:
   - secrets
   verbs:
   - create
-  - update
   - delete
   - get
+  - update
 # to check nodes for node readiness label
 - apiGroups:
   - ""
@@ -102,9 +102,9 @@ rules:
   - delete
   - get
   - list
-  - watch
-  - update
   - patch
+  - update
+  - watch
 # to resize the filesystem in Spilo pods when increasing volume size
 - apiGroups:
   - ""

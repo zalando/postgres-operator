@@ -58,7 +58,7 @@ spec:
                 s3_secret_access_key:
                   type: string
                 s3_force_path_style:
-                  type: string
+                  type: boolean
                 s3_wal_path:
                   type: string
                 timestamp:

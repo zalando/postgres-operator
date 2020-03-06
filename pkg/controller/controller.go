@@ -224,7 +224,7 @@ func (c *Controller) initRoleBinding() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("unable to parse the definition of the role binding for the pod service account definition from the operator configuration: %v", err))
+		panic(fmt.Errorf("unable to parse the role binding definition from the operator configuration: %v", err))
 	case groupVersionKind.Kind != "RoleBinding":
 		panic(fmt.Errorf("role binding definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
 	default:

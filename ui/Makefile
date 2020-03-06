@@ -5,8 +5,12 @@ VERSION          ?= $(shell git describe --tags --always --dirty)
 TAG              ?= $(VERSION)
 GITHEAD          = $(shell git rev-parse --short HEAD)
 GITURL           = $(shell git config --get remote.origin.url)
-GITSTATU         = $(shell git status --porcelain || echo 'no changes')
+GITSTATUS        = $(shell git status --porcelain || echo 'no changes')
 TTYFLAGS         = $(shell test -t 0 && echo '-it')
+
+ifdef CDP_PULL_REQUEST_NUMBER
+	CDP_TAG := -${CDP_BUILD_VERSION}
+endif
 
 default: docker
 
@@ -24,11 +28,12 @@ docker: appjs
 	echo `(env)`
 	echo "Tag ${TAG}"
 	echo "Version ${VERSION}"
+	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
-	docker build --rm -t "$(IMAGE):$(TAG)" -f Dockerfile .
+	docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)" -f Dockerfile .
 
-push: docker
-	docker push "$(IMAGE):$(TAG)"
+push:
+	docker push "$(IMAGE):$(TAG)$(CDP_TAG)"
 
 mock:
 	docker run -it -p 8080:8080 "$(IMAGE):$(TAG)" --mock
