@@ -95,7 +95,7 @@ lacks access rights to any of them (except K8s system namespaces like
 'list pods' execute at the cluster scope and fail at the first violation of
 access rights.
 
-## Operators with defined ownership on certain Postgres clusters
+## Operators with defined ownership of certain Postgres clusters
 
 By default, multiple operators can only run together in one K8s cluster when
 isolated into their [own namespaces](administrator.md#specify-the-namespace-to-watch).

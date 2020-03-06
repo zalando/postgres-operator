@@ -19,7 +19,6 @@ var (
 	outOfCluster   bool
 	version        string
 	config         spec.ControllerConfig
-	controllerID   string
 )
 
 func mustParseDuration(d string) time.Duration {

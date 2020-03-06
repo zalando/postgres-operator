@@ -51,13 +51,9 @@ func (c *Controller) listClusters(options metav1.ListOptions) (*acidv1.Postgresq
 		c.logger.Debugf("watch only clusters with controllerID %q", c.controllerID)
 	}
 	for _, pg := range list.Items {
-		if pg.Error != "" {
-			continue
+		if pg.Error == "" && c.hasOwnership(&pg) {
+			pgList.Items = append(pgList.Items, pg)
 		}
-		if !c.hasOwnership(&pg) {
-			continue
-		}
-		pgList.Items = append(pgList.Items, pg)
 	}
 
 	return &pgList, err
