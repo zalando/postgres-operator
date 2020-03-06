@@ -413,12 +413,18 @@ func (c *Cluster) syncSecrets() error {
 			} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
 				secretUsername = constants.ReplicationUserKeyName
 				userMap = c.systemUsers
+			} else if secretUsername == c.systemUsers[constants.ConnectionPoolUserKeyName].Name {
+				secretUsername = constants.ConnectionPoolUserKeyName
+				userMap = c.systemUsers
 			} else {
 				userMap = c.pgUsers
 			}
 			pwdUser := userMap[secretUsername]
 			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
-			if pwdUser.Password != string(secret.Data["password"]) && pwdUser.Origin == spec.RoleOriginInfrastructure {
+			if pwdUser.Password != string(secret.Data["password"]) &&
+				(pwdUser.Origin == spec.RoleOriginInfrastructure ||
+					pwdUser.Origin == spec.RoleConnectionPool) {
+
 				c.logger.Debugf("updating the secret %q from the infrastructure roles", secretSpec.Name)
 				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(secretSpec); err != nil {
 					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
@@ -466,25 +472,12 @@ func (c *Cluster) syncRoles() (err error) {
 	if c.needConnectionPool() {
 		connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
 		userNames = append(userNames, connPoolUser.Name)
+		c.pgUsers[connPoolUser.Name] = connPoolUser
 	}
 
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)
-	}
-
-	if c.needConnectionPool() {
-		connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
-
-		// An exception from system users, connection pool user should be
-		// created by operator, but never updated. If connection pool user
-		// already exist, do not update it.
-		if _, exist := dbUsers[connPoolUser.Name]; exist {
-			delete(dbUsers, connPoolUser.Name)
-			delete(c.pgUsers, connPoolUser.Name)
-		} else {
-			c.pgUsers[connPoolUser.Name] = connPoolUser
-		}
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)

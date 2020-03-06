@@ -1803,7 +1803,7 @@ func (c *Cluster) getConnPoolEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
 		},
 		{
 			Name:  "CONNECTION_POOL_MAX_DB_CONN",
-			Value: fmt.Sprint(effectiveMaxDBConn),
+			Value: fmt.Sprint(maxDBConn),
 		},
 	}
 }

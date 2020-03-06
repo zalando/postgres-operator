@@ -860,7 +860,6 @@ func (c *Cluster) initSystemUsers() {
 	// Connection pool user is an exception, if requested it's going to be
 	// created by operator as a normal pgUser
 	if c.needConnectionPool() {
-
 		// initialize empty connection pool if not done yet
 		if c.Spec.ConnectionPool == nil {
 			c.Spec.ConnectionPool = &acidv1.ConnectionPool{}
@@ -870,10 +869,20 @@ func (c *Cluster) initSystemUsers() {
 			c.Spec.ConnectionPool.User,
 			c.OpConfig.ConnectionPool.User)
 
-		c.systemUsers[constants.ConnectionPoolUserKeyName] = spec.PgUser{
+		// connection pooler application should be able to login with this role
+		connPoolUser := spec.PgUser{
 			Origin:   spec.RoleConnectionPool,
 			Name:     username,
+			Flags:    []string{constants.RoleFlagLogin},
 			Password: util.RandomPassword(constants.PasswordLength),
+		}
+
+		if _, exists := c.pgUsers[username]; !exists {
+			c.pgUsers[username] = connPoolUser
+		}
+
+		if _, exists := c.systemUsers[constants.ConnectionPoolUserKeyName]; !exists {
+			c.systemUsers[constants.ConnectionPoolUserKeyName] = connPoolUser
 		}
 	}
 }
@@ -1256,12 +1265,16 @@ func (c *Cluster) needSyncConnPoolDefaults(
 	podTemplate := deployment.Spec.Template
 	poolContainer := podTemplate.Spec.Containers[constants.ConnPoolContainer]
 
+	if spec == nil {
+		spec = &acidv1.ConnectionPool{}
+	}
+
 	if spec.NumberOfInstances == nil &&
-		deployment.Spec.Replicas != config.NumberOfInstances {
+		*deployment.Spec.Replicas != *config.NumberOfInstances {
 
 		sync = true
 		msg := fmt.Sprintf("NumberOfInstances is different (%d vs %d)",
-			deployment.Spec.Replicas, config.NumberOfInstances)
+			*deployment.Spec.Replicas, *config.NumberOfInstances)
 		reasons = append(reasons, msg)
 	}
 
