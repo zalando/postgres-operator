@@ -11,11 +11,11 @@ switchover (planned failover) of the master to the Pod with new minor version.
 The switch should usually take less than 5 seconds, still clients have to
 reconnect.
 
-Major version upgrades are supported via [cloning](user.md#clone-directly). The
-new cluster manifest must have a higher `version` string than the source cluster
-and will be created from a basebackup. Depending of the cluster size, downtime
-in this case can be significant as writes to the database should be stopped and
-all WAL files should be archived first before cloning is started.
+Major version upgrades are supported via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster).
+The new cluster manifest must have a higher `version` string than the source
+cluster and will be created from a basebackup. Depending of the cluster size,
+downtime in this case can be significant as writes to the database should be
+stopped and all WAL files should be archived first before cloning is started.
 
 Note, that simply changing the version string in the `postgresql` manifest does
 not work at present and leads to errors. Neither Patroni nor Postgres Operator
