@@ -137,6 +137,7 @@ type Config struct {
 	ProtectedRoles            []string          `name:"protected_role_names" default:"admin"`
 	PostgresSuperuserTeams    []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit   bool              `name:"set_memory_request_to_limit" default:"false"`
+	EnableLazyImageUpgrade    bool              `name:"enable_lazy_image_upgrade" default:"false"`
 }
 
 // MustMarshal marshals the config or panics

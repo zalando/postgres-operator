@@ -4,6 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   # enable_crd_validation: true
+  # enable_lazy_image_upgrade: true
   etcd_host: ""
   docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
   # enable_shm_volume: true

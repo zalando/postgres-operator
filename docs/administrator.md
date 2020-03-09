@@ -429,6 +429,10 @@ from numerous escape characters in the latter log entry, view it in CLI with
 `PodTemplate` used by the operator is yet to be updated with the default values
 used internally in K8s.
 
+The operator also support lazy updates of the Spilo image. That means the pod template of a 
+PG cluster's stateful set is updated immediately with the new image, but no rolling upgrade follows. This feature saves you 
+some downtime when you know pods are re-started after the update anyway, for instance due to the node rotation.
+
 ## Logical backups
 
 The operator can manage K8s cron jobs to run logical backups of Postgres

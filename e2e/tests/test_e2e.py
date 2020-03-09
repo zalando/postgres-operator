@@ -346,6 +346,61 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(unpatch_custom_service_annotations)
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_lazy_image_update(self):
+        '''
+        Test lazy update for the Spilo image: operator changes a stateful set but lets pods run with the old image 
+        until they are recreated for reasons other than operator's activity. That works because the operator uses 
+        "onDelete" pod update policy for stateful sets.
+
+        The test covers:
+        1) enabling lazy upgrade in existing operator deployment
+        2) forcing the normal rolling upgrade by changing the operator configmap and restarting its pod
+        '''
+
+        k8s = self.k8s
+        pod0 = "acid-minimal-cluster-0"
+        pod1 = "acid-minimal-cluster-1"
+
+        # enable lazy update
+        patch_lazy_image_upgrade = {
+            "data": {
+                "enable_lazy_image_upgrade": "true",
+                "docker_image": "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16"
+            }
+        }
+        k8s.update_config(patch_lazy_image_upgrade)
+
+        # wait for sts update
+        time.sleep(60)
+
+        # restart the pod to get a container with the new image 
+        k8s.api.core_v1.delete_namespaced_pod(pod0, "default")
+        time.sleep(60)
+
+        # lazy update works if the restarted pod and older pods have different Spilo versions
+        # i.e. the update did not immediately affect all pods
+        new_image = k8s.get_effective_pod_image(pod0)
+        old_image = k8s.get_effective_pod_image(pod1)
+        self.assertNotEqual(old_image, new_image, "Lazy updated failed: pods have the same image {}".format(new_image))
+
+        # clean up
+        unpatch_lazy_image_upgrade = {
+            "data": {
+                "enable_lazy_image_upgrade": "false",
+            }
+        }
+        k8s.update_config(unpatch_lazy_image_upgrade)
+
+        # at this point operator will complete the normal rolling update
+        # so we additonally test if disabling the lazy update (forcing the normal rolling update) works
+        time.sleep(60)
+
+        image0 = k8s.get_effective_pod_image(pod0)
+        image1 = k8s.get_effective_pod_image(pod1)
+
+        self.assertEqual(image0, image1, "Disabling lazy updated failed: pods still have different images {} and {}".format(image0, image1))
+
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
@@ -481,6 +536,14 @@ class K8s:
     def create_with_kubectl(self, path):
         subprocess.run(["kubectl", "create", "-f", path])
 
+    def get_effective_pod_image(self, pod_name, namespace = 'default'):
+        '''
+        Get the Spilo image pod currently uses. In case of lazy rolling updates 
+        it may differ from the one specified in the stateful set.
+        '''
+        pod = self.api.core_v1.list_namespaced_pod(
+            namespace, label_selector="statefulset.kubernetes.io/pod-name=" + pod_name)
+        return pod.items[0].spec.containers[0].image
 
 if __name__ == '__main__':
     unittest.main()
