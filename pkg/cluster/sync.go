@@ -23,6 +23,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	currentPgVersion := c.Spec.PostgresqlParam.PgVersion
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -33,6 +34,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
+
+	if currentPgVersion != newSpec.Spec.PostgresqlParam.PgVersion { // PG versions comparison
+		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", currentPgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
+		// we need that hack to generate statefulset with the old version
+		newSpec.Spec.PostgresqlParam.PgVersion = currentPgVersion
+	}
 
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
