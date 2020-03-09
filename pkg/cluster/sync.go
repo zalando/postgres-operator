@@ -413,17 +413,13 @@ func (c *Cluster) syncSecrets() error {
 			} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
 				secretUsername = constants.ReplicationUserKeyName
 				userMap = c.systemUsers
-			} else if secretUsername == c.systemUsers[constants.ConnectionPoolUserKeyName].Name {
-				secretUsername = constants.ConnectionPoolUserKeyName
-				userMap = c.systemUsers
 			} else {
 				userMap = c.pgUsers
 			}
 			pwdUser := userMap[secretUsername]
 			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
 			if pwdUser.Password != string(secret.Data["password"]) &&
-				(pwdUser.Origin == spec.RoleOriginInfrastructure ||
-					pwdUser.Origin == spec.RoleConnectionPool) {
+				pwdUser.Origin == spec.RoleOriginInfrastructure {
 
 				c.logger.Debugf("updating the secret %q from the infrastructure roles", secretSpec.Name)
 				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(secretSpec); err != nil {
@@ -472,7 +468,10 @@ func (c *Cluster) syncRoles() (err error) {
 	if c.needConnectionPool() {
 		connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
 		userNames = append(userNames, connPoolUser.Name)
-		c.pgUsers[connPoolUser.Name] = connPoolUser
+
+		if _, exists := c.pgUsers[constants.ConnectionPoolUserKeyName]; !exists {
+			c.pgUsers[connPoolUser.Name] = connPoolUser
+		}
 	}
 
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
