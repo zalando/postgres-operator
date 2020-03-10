@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -172,19 +172,19 @@ func (c *Controller) nodeDelete(obj interface{}) {
 }
 
 func (c *Controller) moveMasterPodsOffNode(node *v1.Node) {
-
+	// retry to move master until configured timeout is reached
 	err := retryutil.Retry(1*time.Minute, c.opConfig.MasterPodMoveTimeout,
 		func() (bool, error) {
 			err := c.attemptToMoveMasterPodsOffNode(node)
 			if err != nil {
-				return false, fmt.Errorf("unable to move master pods off the unschedulable node; will retry after delay of 1 minute")
+				return false, err
 			}
 			return true, nil
 		},
 	)
 
 	if err != nil {
-		c.logger.Warningf("failed to move master pods from the node %q: timeout of %v minutes expired", node.Name, c.opConfig.MasterPodMoveTimeout)
+		c.logger.Warningf("failed to move master pods from the node %q: %v", node.Name, err)
 	}
 
 }
