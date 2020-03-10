@@ -23,7 +23,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	currentPgVersion := c.Spec.PostgresqlParam.PgVersion
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -34,12 +33,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
-
-	if currentPgVersion != newSpec.Spec.PostgresqlParam.PgVersion { // PG versions comparison
-		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", currentPgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
-		// we need that hack to generate statefulset with the old version
-		newSpec.Spec.PostgresqlParam.PgVersion = currentPgVersion
-	}
 
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
@@ -291,6 +284,13 @@ func (c *Cluster) syncStatefulSet() error {
 		podsRollingUpdateRequired = c.mergeRollingUpdateFlagUsingCache(sset)
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
+
+		// check if there is no Postgres version mismatch
+		pgVersion, err := c.getNewPgVersion(c.Statefulset.Spec.Template.Spec.Containers, c.Spec.PostgresqlParam.PgVersion)
+		if err != nil {
+			return fmt.Errorf("could not parse current Postgres version: %v", err)
+		}
+		c.Spec.PostgresqlParam.PgVersion = pgVersion
 
 		desiredSS, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
