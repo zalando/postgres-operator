@@ -430,8 +430,8 @@ from numerous escape characters in the latter log entry, view it in CLI with
 used internally in K8s.
 
 The operator also support lazy updates of the Spilo image. That means the pod template of a 
-PG cluster's stateful set is updated immediately with the new image, but no rolling upgrade follows. This feature saves you 
-some downtime when you know pods are re-started after the update anyway, for instance due to the node rotation.
+PG cluster's stateful set is updated immediately with the new image, but no rolling update follows. This feature saves you 
+a switchover - and hence downtime - when you know pods are re-started later anyway, for instance due to the node rotation. To force a rolling update, disable this mode by setting the `enable_lazy_image_upgrade` to `false` in the operator configuration and restart the operator pod. With the standard eager rolling updates the operator checks during Sync all pods run images specified in their respective statefulsets. The operator triggers a rolling upgrade fo PG clusters that violate this condition.
 
 ## Logical backups
 
