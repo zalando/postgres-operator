@@ -109,7 +109,7 @@ class EndToEndTestCase(unittest.TestCase):
                          "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_lazy_image_update(self):
+    def test_lazy_spilo_update(self):
         '''
         Test lazy update for the Spilo image: operator changes a stateful set but lets pods run with the old image 
         until they are recreated for reasons other than operator's activity. That works because the operator uses 
@@ -125,13 +125,13 @@ class EndToEndTestCase(unittest.TestCase):
         pod1 = "acid-minimal-cluster-1"
 
         # enable lazy update
-        patch_lazy_image_upgrade = {
+        patch_lazy_spilo_upgrade = {
             "data": {
-                "enable_lazy_image_upgrade": "true",
+                "enable_lazy_spilo_upgrade": "true",
                 "docker_image": "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16"
             }
         }
-        k8s.update_config(patch_lazy_image_upgrade)
+        k8s.update_config(patch_lazy_spilo_upgrade)
 
         # wait for sts update
         time.sleep(60)
@@ -147,12 +147,12 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertNotEqual(old_image, new_image, "Lazy updated failed: pods have the same image {}".format(new_image))
 
         # clean up
-        unpatch_lazy_image_upgrade = {
+        unpatch_lazy_spilo_upgrade = {
             "data": {
-                "enable_lazy_image_upgrade": "false",
+                "enable_lazy_spilo_upgrade": "false",
             }
         }
-        k8s.update_config(unpatch_lazy_image_upgrade)
+        k8s.update_config(unpatch_lazy_spilo_upgrade)
 
         # at this point operator will complete the normal rolling update
         # so we additonally test if disabling the lazy update (forcing the normal rolling update) works

@@ -246,7 +246,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 
 func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet) (bool, error) {
 
-	if c.OpConfig.EnableLazyImageUpgrade {
+	if c.OpConfig.EnableLazySpiloUpgrade {
 		return false, nil
 	}
 
