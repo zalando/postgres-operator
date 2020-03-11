@@ -441,13 +441,15 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_failover(
             master_node, len(replica_nodes), failover_targets, cluster_label)
 
-        # disable pod anti affintiy again
+        # now disable pod anti affintiy again which will cause yet another failover
         patch_disable_antiaffinity = {
             "data": {
                 "enable_pod_antiaffinity": "false"
             }
         }
         k8s.update_config(patch_disable_antiaffinity)
+        k8s.wait_for_pod_start('spilo-role=master')
+        k8s.wait_for_pod_start('spilo-role=replica')
 
 
 class K8sApi:
