@@ -558,8 +558,3 @@ spec:
 
 Certificate rotation is handled in the spilo image which checks every 5
 minutes if the certificates have changed and reloads postgres accordingly.
-
-Known issues:
-
-* Existing clusters don't handle changes to the `spilo_fsgroup` well.
-
