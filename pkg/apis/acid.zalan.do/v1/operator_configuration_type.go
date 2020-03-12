@@ -53,7 +53,7 @@ type KubernetesMetaConfiguration struct {
 	EnableInitContainers                   *bool                 `json:"enable_init_containers,omitempty"`
 	EnableSidecars                         *bool                 `json:"enable_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
-	ClusterDomain                          string                `json:"cluster_domain"`
+	ClusterDomain                          string                `json:"cluster_domain,omitempty"`
 	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
 	InfrastructureRolesSecretName          spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
 	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
