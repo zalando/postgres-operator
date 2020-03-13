@@ -61,6 +61,7 @@ type PostgresSpec struct {
 	StandbyCluster        *StandbyDescription  `json:"standby"`
 	PodAnnotations        map[string]string    `json:"podAnnotations"`
 	ServiceAnnotations    map[string]string    `json:"serviceAnnotations"`
+	TLS                   *TLSDescription      `json:"tls"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -124,6 +125,13 @@ type Patroni struct {
 //StandbyCluster
 type StandbyDescription struct {
 	S3WalPath string `json:"s3_wal_path,omitempty"`
+}
+
+type TLSDescription struct {
+	SecretName      string `json:"secretName,omitempty"`
+	CertificateFile string `json:"certificateFile,omitempty"`
+	PrivateKeyFile  string `json:"privateKeyFile,omitempty"`
+	CAFile          string `json:"caFile,omitempty"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time

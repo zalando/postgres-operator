@@ -511,3 +511,50 @@ monitoring is outside the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and
 [administrator documentation](administrator.md) for details on how backups are
 executed.
+
+## Custom TLS certificates
+
+By default, the spilo image generates its own TLS certificate during startup.
+This certificate is not secure since it cannot be verified and thus doesn't
+protect from active MITM attacks. In this section we show how a Kubernete
+Secret resources can be loaded with a custom TLS certificate.
+
+Before applying these changes, the operator must also be configured with the
+`spilo_fsgroup` set to the GID matching the postgres user group. If the value
+is not provided, the cluster will default to `103` which is the GID from the
+default spilo image.
+
+Upload the cert as a kubernetes secret:
+```sh
+kubectl create secret tls pg-tls \
+  --key pg-tls.key \
+  --cert pg-tls.crt
+```
+
+Or with a CA:
+```sh
+kubectl create secret generic pg-tls \
+  --from-file=tls.crt=server.crt \
+  --from-file=tls.key=server.key \
+  --from-file=ca.crt=ca.crt
+```
+
+Alternatively it is also possible to use
+[cert-manager](https://cert-manager.io/docs/) to generate these secrets.
+
+Then configure the postgres resource with the TLS secret:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  tls:
+    secretName: "pg-tls"
+    caFile: "ca.crt" # add this if the secret is configured with a CA
+```
+
+Certificate rotation is handled in the spilo image which checks every 5
+minutes if the certificates have changed and reloads postgres accordingly.

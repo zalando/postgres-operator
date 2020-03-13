@@ -251,6 +251,19 @@ spec:
                   type: string
             teamId:
               type: string
+            tls:
+              type: object
+              required:
+                - secretName
+              properties:
+                secretName:
+                  type: string
+                certificateFile:
+                  type: string
+                privateKeyFile:
+                  type: string
+                caFile:
+                  type: string
             tolerations:
               type: array
               items:

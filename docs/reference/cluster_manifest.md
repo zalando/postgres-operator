@@ -359,3 +359,24 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
+
+## Custom TLS certificates
+
+Those parameters are grouped under the `tls` top-level key.
+
+* **secretName**
+  By setting the `secretName` value, the cluster will switch to load the given
+  Kubernetes Secret into the container as a volume and uses that as the
+  certificate instead. It is up to the user to create and manage the
+  Kubernetes Secret either by hand or using a tool like the CertManager
+  operator.
+
+* **certificateFile**
+  Filename of the certificate. Defaults to "tls.crt".
+
+* **privateKeyFile**
+  Filename of the private key. Defaults to "tls.key".
+
+* **caFile**
+  Optional filename to the CA certificate. Useful when the client connects
+  with `sslmode=verify-ca` or `sslmode=verify-full`.
