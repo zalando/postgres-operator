@@ -111,12 +111,12 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   value overrides the `pod_toleration` setting from the operator. Optional.
 
 * **podPriorityClassName**
-   a name of the [priority
-   class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
-   that should be assigned to the cluster pods. When not specified, the value
-   is taken from the `pod_priority_class_name` operator parameter, if not set
-   then the default priority class is taken. The priority class itself must be
-   defined in advance. Optional.
+  a name of the [priority
+  class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
+  that should be assigned to the cluster pods. When not specified, the value
+  is taken from the `pod_priority_class_name` operator parameter, if not set
+  then the default priority class is taken. The priority class itself must be
+  defined in advance. Optional.
 
 * **podAnnotations**
   A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
@@ -184,9 +184,9 @@ explanation of `ttl` and `loop_wait` parameters.
   ```
   hostssl all +pamrole all pam
   ```
-  , where pamrole is the name of the role for the pam authentication; any
-    custom `pg_hba` should include the pam line to avoid breaking pam
-    authentication. Optional.
+  where pamrole is the name of the role for the pam authentication; any
+  custom `pg_hba` should include the pam line to avoid breaking pam
+  authentication. Optional.
 
 * **ttl**
   Patroni `ttl` parameter value, optional. The default is set by the Spilo
@@ -379,4 +379,4 @@ Those parameters are grouped under the `tls` top-level key.
 
 * **caFile**
   Optional filename to the CA certificate. Useful when the client connects
-  with `sslmode=verify-ca` or `sslmode=verify-full`.
+  with `sslmode=verify-ca` or `sslmode=verify-full`. Default is empty.
