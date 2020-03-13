@@ -49,9 +49,18 @@ type Config struct {
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 
+// K8S objects that are belongs to a connection pool
 type ConnectionPoolObjects struct {
 	Deployment *appsv1.Deployment
 	Service    *v1.Service
+
+	// It could happen that a connection pool was enabled, but the operator was
+	// not able to properly process a corresponding event or was restarted. In
+	// this case we will miss missing/require situation and a lookup function
+	// will not be installed. To avoid synchronizing it all the time to prevent
+	// this, we can remember the result in memory at least until the next
+	// restart.
+	LookupFunction bool
 }
 
 type kubeResources struct {
@@ -1303,6 +1312,26 @@ func (c *Cluster) needSyncConnPoolDefaults(
 
 	if err != nil {
 		c.logger.Warningf("Cannot generate expected resources, %v", err)
+	}
+
+	for _, env := range poolContainer.Env {
+		if env.Name == "PGUSER" {
+			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
+
+			if ref.Name != c.credentialSecretName(config.User) {
+				sync = true
+				msg := fmt.Sprintf("Pool user is different (%s vs %s)",
+					ref.Name, config.User)
+				reasons = append(reasons, msg)
+			}
+		}
+
+		if env.Name == "PGSCHEMA" && env.Value != config.Schema {
+			sync = true
+			msg := fmt.Sprintf("Pool schema is different (%s vs %s)",
+				env.Value, config.Schema)
+			reasons = append(reasons, msg)
+		}
 	}
 
 	return sync, reasons

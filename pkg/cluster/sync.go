@@ -469,7 +469,7 @@ func (c *Cluster) syncRoles() (err error) {
 		connPoolUser := c.systemUsers[constants.ConnectionPoolUserKeyName]
 		userNames = append(userNames, connPoolUser.Name)
 
-		if _, exists := c.pgUsers[constants.ConnectionPoolUserKeyName]; !exists {
+		if _, exists := c.pgUsers[connPoolUser.Name]; !exists {
 			c.pgUsers[connPoolUser.Name] = connPoolUser
 		}
 	}
@@ -608,6 +608,10 @@ func (c *Cluster) syncLogicalBackupJob() error {
 }
 
 func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql, lookup InstallFunction) error {
+	if c.ConnectionPool == nil {
+		c.ConnectionPool = &ConnectionPoolObjects{}
+	}
+
 	newNeedConnPool := c.needConnectionPoolWorker(&newSpec.Spec)
 	oldNeedConnPool := c.needConnectionPoolWorker(&oldSpec.Spec)
 
@@ -621,7 +625,7 @@ func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql, lookup
 
 		// in this case also do not forget to install lookup function as for
 		// creating cluster
-		if !oldNeedConnPool {
+		if !oldNeedConnPool || !c.ConnectionPool.LookupFunction {
 			newConnPool := newSpec.Spec.ConnectionPool
 
 			specSchema := ""
@@ -676,11 +680,6 @@ func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql, lookup
 // service is missing, create it. After checking, also remember an object for
 // the future references.
 func (c *Cluster) syncConnectionPoolWorker(oldSpec, newSpec *acidv1.Postgresql) error {
-	if c.ConnectionPool == nil {
-		c.logger.Warning("Connection pool resources are empty")
-		c.ConnectionPool = &ConnectionPoolObjects{}
-	}
-
 	deployment, err := c.KubeClient.
 		Deployments(c.Namespace).
 		Get(c.connPoolName(), metav1.GetOptions{})

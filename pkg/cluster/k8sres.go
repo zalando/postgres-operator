@@ -1822,14 +1822,22 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 		spec.ConnectionPool.DockerImage,
 		c.OpConfig.ConnectionPool.Image)
 
+	effectiveSchema := util.Coalesce(
+		spec.ConnectionPool.Schema,
+		c.OpConfig.ConnectionPool.Schema)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
 	secretSelector := func(key string) *v1.SecretKeySelector {
+		effectiveUser := util.Coalesce(
+			spec.ConnectionPool.User,
+			c.OpConfig.ConnectionPool.User)
+
 		return &v1.SecretKeySelector{
 			LocalObjectReference: v1.LocalObjectReference{
-				Name: c.credentialSecretName(c.OpConfig.ConnectionPool.User),
+				Name: c.credentialSecretName(effectiveUser),
 			},
 			Key: key,
 		}
@@ -1853,10 +1861,8 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 		// the convention is to use the same schema name as
 		// connection pool username
 		{
-			Name: "PGSCHEMA",
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: secretSelector("username"),
-			},
+			Name:  "PGSCHEMA",
+			Value: effectiveSchema,
 		},
 		{
 			Name: "PGPASSWORD",

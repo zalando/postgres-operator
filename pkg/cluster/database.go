@@ -269,6 +269,7 @@ func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin
 // perform remote authentification.
 func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 	var stmtBytes bytes.Buffer
+	c.logger.Info("Installing lookup function")
 
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
@@ -326,5 +327,6 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 		c.logger.Infof("Pool lookup function installed into %s", dbname)
 	}
 
+	c.ConnectionPool.LookupFunction = true
 	return nil
 }

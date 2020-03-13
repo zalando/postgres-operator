@@ -188,8 +188,7 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 		return fmt.Errorf("could not delete deployment: %v", err)
 	}
 
-	c.logger.Infof("Connection pool deployment %q has been deleted",
-		util.NameFromMeta(deployment.ObjectMeta))
+	c.logger.Infof("Connection pool deployment %q has been deleted", deploymentName)
 
 	// Repeat the same for the service object
 	service := c.ConnectionPool.Service
@@ -211,8 +210,7 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 		return fmt.Errorf("could not delete service: %v", err)
 	}
 
-	c.logger.Infof("Connection pool service %q has been deleted",
-		util.NameFromMeta(deployment.ObjectMeta))
+	c.logger.Infof("Connection pool service %q has been deleted", serviceName)
 
 	c.ConnectionPool = nil
 	return nil
