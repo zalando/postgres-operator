@@ -286,11 +286,16 @@ func (c *Cluster) syncStatefulSet() error {
 		c.Statefulset = sset
 
 		// check if there is no Postgres version mismatch
-		pgVersion, err := c.getNewPgVersion(c.Statefulset.Spec.Template.Spec.Containers, c.Spec.PostgresqlParam.PgVersion)
-		if err != nil {
-			return fmt.Errorf("could not parse current Postgres version: %v", err)
+		for _, container := range c.Statefulset.Spec.Template.Spec.Containers {
+			if container.Name != "postgres" {
+				continue
+			}
+			pgVersion, err := c.getNewPgVersion(container, c.Spec.PostgresqlParam.PgVersion)
+			if err != nil {
+				return fmt.Errorf("could not parse current Postgres version: %v", err)
+			}
+			c.Spec.PostgresqlParam.PgVersion = pgVersion
 		}
-		c.Spec.PostgresqlParam.PgVersion = pgVersion
 
 		desiredSS, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {

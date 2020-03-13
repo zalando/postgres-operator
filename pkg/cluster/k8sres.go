@@ -725,25 +725,20 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 	return fmt.Sprintf("%v", pgVersion), nil
 }
 
-func (c *Cluster) getNewPgVersion(containers []v1.Container, newPgVersion string) (string, error) {
+func (c *Cluster) getNewPgVersion(container v1.Container, newPgVersion string) (string, error) {
 	var (
 		spiloConfiguration spiloConfiguration
 		runningPgVersion   string
 		err                error
 	)
 
-	for _, container := range containers {
-		if container.Name != "postgres" {
+	for _, env := range container.Env {
+		if env.Name != "SPILO_CONFIGURATION" {
 			continue
 		}
-		for _, env := range container.Env {
-			if env.Name != "SPILO_CONFIGURATION" {
-				continue
-			}
-			err = json.Unmarshal([]byte(env.Value), &spiloConfiguration)
-			if err != nil {
-				return newPgVersion, err
-			}
+		err = json.Unmarshal([]byte(env.Value), &spiloConfiguration)
+		if err != nil {
+			return newPgVersion, err
 		}
 	}
 
