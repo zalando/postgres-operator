@@ -3,6 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"sort"
 
 	"github.com/sirupsen/logrus"
@@ -26,11 +27,14 @@ import (
 )
 
 const (
-	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%s/bin"
+	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%v/bin"
 	patroniPGBinariesParameterName   = "bin_dir"
 	patroniPGParametersParameterName = "parameters"
 	patroniPGHBAConfParameterName    = "pg_hba"
-	localHost                        = "127.0.0.1/32"
+
+	// the gid of the postgres user in the default spilo image
+	spiloPostgresGID = 103
+	localHost        = "127.0.0.1/32"
 )
 
 type pgUser struct {
@@ -446,6 +450,7 @@ func generatePodTemplate(
 	podAntiAffinityTopologyKey string,
 	additionalSecretMount string,
 	additionalSecretMountPath string,
+	volumes []v1.Volume,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -464,6 +469,7 @@ func generatePodTemplate(
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
 		SecurityContext:               &securityContext,
+		Volumes:                       volumes,
 	}
 
 	if shmVolume != nil && *shmVolume {
@@ -716,6 +722,50 @@ func makeResources(cpuRequest, memoryRequest, cpuLimit, memoryLimit string) acid
 	}
 }
 
+func extractPgVersionFromBinPath(binPath string, template string) (string, error) {
+	var pgVersion float32
+	_, err := fmt.Sscanf(binPath, template, &pgVersion)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%v", pgVersion), nil
+}
+
+func (c *Cluster) getNewPgVersion(container v1.Container, newPgVersion string) (string, error) {
+	var (
+		spiloConfiguration spiloConfiguration
+		runningPgVersion   string
+		err                error
+	)
+
+	for _, env := range container.Env {
+		if env.Name != "SPILO_CONFIGURATION" {
+			continue
+		}
+		err = json.Unmarshal([]byte(env.Value), &spiloConfiguration)
+		if err != nil {
+			return newPgVersion, err
+		}
+	}
+
+	if len(spiloConfiguration.PgLocalConfiguration) > 0 {
+		currentBinPath := fmt.Sprintf("%v", spiloConfiguration.PgLocalConfiguration[patroniPGBinariesParameterName])
+		runningPgVersion, err = extractPgVersionFromBinPath(currentBinPath, pgBinariesLocationTemplate)
+		if err != nil {
+			return "", fmt.Errorf("could not extract Postgres version from %v in SPILO_CONFIGURATION", currentBinPath)
+		}
+	} else {
+		return "", fmt.Errorf("could not find %q setting in SPILO_CONFIGURATION", patroniPGBinariesParameterName)
+	}
+
+	if runningPgVersion != newPgVersion {
+		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", runningPgVersion, newPgVersion)
+		newPgVersion = runningPgVersion
+	}
+
+	return newPgVersion, nil
+}
+
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
@@ -724,6 +774,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		sidecarContainers   []v1.Container
 		podTemplate         *v1.PodTemplateSpec
 		volumeClaimTemplate *v1.PersistentVolumeClaim
+		volumes             []v1.Volume
 	)
 
 	// Improve me. Please.
@@ -840,21 +891,76 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate environment variables for the spilo container
-	spiloEnvVars := deduplicateEnvVars(
-		c.generateSpiloPodEnvVars(c.Postgresql.GetUID(), spiloConfiguration, &spec.Clone,
-			spec.StandbyCluster, customPodEnvVarsList), c.containerName(), c.logger)
+	spiloEnvVars := c.generateSpiloPodEnvVars(
+		c.Postgresql.GetUID(),
+		spiloConfiguration,
+		&spec.Clone,
+		spec.StandbyCluster,
+		customPodEnvVarsList,
+	)
 
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
 
+	// determine the FSGroup for the spilo pod
+	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
+	if spec.SpiloFSGroup != nil {
+		effectiveFSGroup = spec.SpiloFSGroup
+	}
+
 	volumeMounts := generateVolumeMounts(spec.Volume)
+
+	// configure TLS with a custom secret volume
+	if spec.TLS != nil && spec.TLS.SecretName != "" {
+		if effectiveFSGroup == nil {
+			c.logger.Warnf("Setting the default FSGroup to satisfy the TLS configuration")
+			fsGroup := int64(spiloPostgresGID)
+			effectiveFSGroup = &fsGroup
+		}
+		// this is combined with the FSGroup above to give read access to the
+		// postgres user
+		defaultMode := int32(0640)
+		volumes = append(volumes, v1.Volume{
+			Name: "tls-secret",
+			VolumeSource: v1.VolumeSource{
+				Secret: &v1.SecretVolumeSource{
+					SecretName:  spec.TLS.SecretName,
+					DefaultMode: &defaultMode,
+				},
+			},
+		})
+
+		mountPath := "/tls"
+		volumeMounts = append(volumeMounts, v1.VolumeMount{
+			MountPath: mountPath,
+			Name:      "tls-secret",
+			ReadOnly:  true,
+		})
+
+		// use the same filenames as Secret resources by default
+		certFile := ensurePath(spec.TLS.CertificateFile, mountPath, "tls.crt")
+		privateKeyFile := ensurePath(spec.TLS.PrivateKeyFile, mountPath, "tls.key")
+		spiloEnvVars = append(
+			spiloEnvVars,
+			v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: certFile},
+			v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: privateKeyFile},
+		)
+
+		if spec.TLS.CAFile != "" {
+			caFile := ensurePath(spec.TLS.CAFile, mountPath, "")
+			spiloEnvVars = append(
+				spiloEnvVars,
+				v1.EnvVar{Name: "SSL_CA_FILE", Value: caFile},
+			)
+		}
+	}
 
 	// generate the spilo container
 	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
 	spiloContainer := generateContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
-		spiloEnvVars,
+		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 	)
@@ -893,16 +999,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	// determine the FSGroup for the spilo pod
-	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
-	if spec.SpiloFSGroup != nil {
-		effectiveFSGroup = spec.SpiloFSGroup
-	}
-
 	annotations := c.generatePodAnnotations(spec)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
-	if podTemplate, err = generatePodTemplate(
+	podTemplate, err = generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
 		annotations,
@@ -920,10 +1020,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.EnablePodAntiAffinity,
 		c.OpConfig.PodAntiAffinityTopologyKey,
 		c.OpConfig.AdditionalSecretMount,
-		c.OpConfig.AdditionalSecretMountPath); err != nil {
-		return nil, fmt.Errorf("could not generate pod template: %v", err)
-	}
-
+		c.OpConfig.AdditionalSecretMountPath,
+		volumes,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
@@ -1048,11 +1147,13 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	cur := spec.NumberOfInstances
 	newcur := cur
 
-	/* Limit the max number of pods to one, if this is standby-cluster */
 	if spec.StandbyCluster != nil {
-		c.logger.Info("Standby cluster can have maximum of 1 pod")
-		min = 1
-		max = 1
+		if newcur == 1 {
+			min = newcur
+			max = newcur
+		} else {
+			c.logger.Warningf("operator only supports standby clusters with 1 pod")
+		}
 	}
 	if max >= 0 && newcur > max {
 		newcur = max
@@ -1544,7 +1645,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		false,
 		"",
 		c.OpConfig.AdditionalSecretMount,
-		c.OpConfig.AdditionalSecretMountPath); err != nil {
+		c.OpConfig.AdditionalSecretMountPath,
+		nil); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
@@ -1629,7 +1731,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		// Postgres env vars
 		{
 			Name:  "PG_VERSION",
-			Value: c.Spec.PgVersion,
+			Value: c.Spec.PostgresqlParam.PgVersion,
 		},
 		{
 			Name:  "PGPORT",
@@ -1675,4 +1777,14 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return "logical-backup-" + c.clusterName().Name
+}
+
+func ensurePath(file string, defaultDir string, defaultFile string) string {
+	if file == "" {
+		return path.Join(defaultDir, defaultFile)
+	}
+	if !path.IsAbs(file) {
+		return path.Join(defaultDir, file)
+	}
+	return file
 }

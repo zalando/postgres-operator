@@ -110,7 +110,7 @@ configuration:
       log_statement: all
     # teams_api_url: ""
   logging_rest_api:
-    api_port: 8008
+    api_port: 8080
     cluster_history_entries: 1000
     ring_log_lines: 100
   scalyr:

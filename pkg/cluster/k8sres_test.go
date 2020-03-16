@@ -3,9 +3,9 @@ package cluster
 import (
 	"reflect"
 
-	v1 "k8s.io/api/core/v1"
-
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -13,6 +13,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -381,6 +382,135 @@ func TestCloneEnv(t *testing.T) {
 	}
 }
 
+func TestExtractPgVersionFromBinPath(t *testing.T) {
+	testName := "TestExtractPgVersionFromBinPath"
+	tests := []struct {
+		subTest  string
+		binPath  string
+		template string
+		expected string
+	}{
+		{
+			subTest:  "test current bin path with decimal against hard coded template",
+			binPath:  "/usr/lib/postgresql/9.6/bin",
+			template: pgBinariesLocationTemplate,
+			expected: "9.6",
+		},
+		{
+			subTest:  "test current bin path against hard coded template",
+			binPath:  "/usr/lib/postgresql/12/bin",
+			template: pgBinariesLocationTemplate,
+			expected: "12",
+		},
+		{
+			subTest:  "test alternative bin path against a matching template",
+			binPath:  "/usr/pgsql-12/bin",
+			template: "/usr/pgsql-%v/bin",
+			expected: "12",
+		},
+	}
+
+	for _, tt := range tests {
+		pgVersion, err := extractPgVersionFromBinPath(tt.binPath, tt.template)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pgVersion != tt.expected {
+			t.Errorf("%s %s: Expected version %s, have %s instead",
+				testName, tt.subTest, tt.expected, pgVersion)
+		}
+	}
+}
+
+func TestGetPgVersion(t *testing.T) {
+	testName := "TestGetPgVersion"
+	tests := []struct {
+		subTest          string
+		pgContainer      v1.Container
+		currentPgVersion string
+		newPgVersion     string
+	}{
+		{
+			subTest: "new version with decimal point differs from current SPILO_CONFIGURATION",
+			pgContainer: v1.Container{
+				Name: "postgres",
+				Env: []v1.EnvVar{
+					{
+						Name:  "SPILO_CONFIGURATION",
+						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/9.6/bin\"}}",
+					},
+				},
+			},
+			currentPgVersion: "9.6",
+			newPgVersion:     "12",
+		},
+		{
+			subTest: "new version differs from current SPILO_CONFIGURATION",
+			pgContainer: v1.Container{
+				Name: "postgres",
+				Env: []v1.EnvVar{
+					{
+						Name:  "SPILO_CONFIGURATION",
+						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/11/bin\"}}",
+					},
+				},
+			},
+			currentPgVersion: "11",
+			newPgVersion:     "12",
+		},
+		{
+			subTest: "new version is lower than the one found in current SPILO_CONFIGURATION",
+			pgContainer: v1.Container{
+				Name: "postgres",
+				Env: []v1.EnvVar{
+					{
+						Name:  "SPILO_CONFIGURATION",
+						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/12/bin\"}}",
+					},
+				},
+			},
+			currentPgVersion: "12",
+			newPgVersion:     "11",
+		},
+		{
+			subTest: "new version is the same like in the current SPILO_CONFIGURATION",
+			pgContainer: v1.Container{
+				Name: "postgres",
+				Env: []v1.EnvVar{
+					{
+						Name:  "SPILO_CONFIGURATION",
+						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/12/bin\"}}",
+					},
+				},
+			},
+			currentPgVersion: "12",
+			newPgVersion:     "12",
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	for _, tt := range tests {
+		pgVersion, err := cluster.getNewPgVersion(tt.pgContainer, tt.newPgVersion)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pgVersion != tt.currentPgVersion {
+			t.Errorf("%s %s: Expected version %s, have %s instead",
+				testName, tt.subTest, tt.currentPgVersion, pgVersion)
+		}
+	}
+}
+
 func TestSecretVolume(t *testing.T) {
 	testName := "TestSecretVolume"
 	tests := []struct {
@@ -450,4 +580,66 @@ func TestSecretVolume(t *testing.T) {
 				numMountsCheck, numMounts+1)
 		}
 	}
+}
+
+func TestTLS(t *testing.T) {
+	var err error
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+
+	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
+		return acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			TLS: &tls,
+		}
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+	spec = makeSpec(acidv1.TLSDescription{SecretName: "my-secret", CAFile: "ca.crt"})
+	s, err := cluster.generateStatefulSet(&spec)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	fsGroup := int64(103)
+	assert.Equal(t, &fsGroup, s.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
+
+	defaultMode := int32(0640)
+	volume := v1.Volume{
+		Name: "tls-secret",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  "my-secret",
+				DefaultMode: &defaultMode,
+			},
+		},
+	}
+	assert.Contains(t, s.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
+
+	assert.Contains(t, s.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+		MountPath: "/tls",
+		Name:      "tls-secret",
+		ReadOnly:  true,
+	}, "the volume gets mounted in /tls")
+
+	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
+	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
+	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
 }
