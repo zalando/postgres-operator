@@ -473,7 +473,7 @@ class K8s:
     Wraps around K8 api client and helper methods.
     '''
 
-    RETRY_TIMEOUT_SEC = 5
+    RETRY_TIMEOUT_SEC = 10
 
     def __init__(self):
         self.api = K8sApi()
