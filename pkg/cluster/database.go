@@ -320,13 +320,13 @@ func (c *Cluster) databaseSchemaNameValid(schemaName string) bool {
 
 func (c *Cluster) execAlterSchemaDefaultPrivileges(schemaName, owner, rolePrefix string) error {
 	if _, err := c.pgDb.Exec(fmt.Sprintf(schemaDefaultPrivilegesSQL, owner,
-		schemaName, rolePrefix+"_writer", rolePrefix+"_reader", // schema
-		schemaName, rolePrefix+"_reader", // tables
-		schemaName, rolePrefix+"_reader", // sequences
-		schemaName, rolePrefix+"_writer", // tables
-		schemaName, rolePrefix+"_writer", // sequences
-		schemaName, rolePrefix+"_reader", rolePrefix+"_writer", // types
-		schemaName, rolePrefix+"_reader", rolePrefix+"_writer")); err != nil { // functions
+		schemaName, rolePrefix+constants.ReaderRoleNameSuffix, rolePrefix+constants.WriterRoleNameSuffix, // schema
+		schemaName, rolePrefix+constants.ReaderRoleNameSuffix, // tables
+		schemaName, rolePrefix+constants.ReaderRoleNameSuffix, // sequences
+		schemaName, rolePrefix+constants.WriterRoleNameSuffix, // tables
+		schemaName, rolePrefix+constants.WriterRoleNameSuffix, // sequences
+		schemaName, rolePrefix+constants.ReaderRoleNameSuffix, rolePrefix+constants.WriterRoleNameSuffix, // types
+		schemaName, rolePrefix+constants.ReaderRoleNameSuffix, rolePrefix+constants.WriterRoleNameSuffix)); err != nil { // functions
 		return fmt.Errorf("could not alter default privileges for database schema %s: %v", schemaName, err)
 	}
 
@@ -335,13 +335,13 @@ func (c *Cluster) execAlterSchemaDefaultPrivileges(schemaName, owner, rolePrefix
 
 func (c *Cluster) execAlterGlobalDefaultPrivileges(owner, rolePrefix string) error {
 	if _, err := c.pgDb.Exec(fmt.Sprintf(globalDefaultPrivilegesSQL, owner,
-		rolePrefix+"_writer", rolePrefix+"_reader", // schemas
-		rolePrefix+"_reader",                       // tables
-		rolePrefix+"_reader",                       // sequences
-		rolePrefix+"_writer",                       // tables
-		rolePrefix+"_writer",                       // sequences
-		rolePrefix+"_reader", rolePrefix+"_writer", // types
-		rolePrefix+"_reader", rolePrefix+"_writer")); err != nil { // functions
+		rolePrefix+constants.WriterRoleNameSuffix, rolePrefix+constants.ReaderRoleNameSuffix, // schemas
+		rolePrefix+constants.ReaderRoleNameSuffix,                                            // tables
+		rolePrefix+constants.ReaderRoleNameSuffix,                                            // sequences
+		rolePrefix+constants.WriterRoleNameSuffix,                                            // tables
+		rolePrefix+constants.WriterRoleNameSuffix,                                            // sequences
+		rolePrefix+constants.ReaderRoleNameSuffix, rolePrefix+constants.WriterRoleNameSuffix, // types
+		rolePrefix+constants.ReaderRoleNameSuffix, rolePrefix+constants.WriterRoleNameSuffix)); err != nil { // functions
 		return fmt.Errorf("could not alter default privileges for database %s: %v", rolePrefix, err)
 	}
 

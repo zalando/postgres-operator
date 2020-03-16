@@ -85,7 +85,7 @@ type PreparedDatabase struct {
 	Extensions      map[string]string         `json:"extensions,omitempty"`
 }
 
-// PreparedSchema describes elements to be bootstrapped in the schema
+// PreparedSchema describes elements to be bootstrapped per schema
 type PreparedSchema struct {
 	DefaultRoles *bool `json:"defaultRoles,omitempty" defaults:"true"`
 	DefaultUsers bool  `json:"defaultUsers,omitempty" defaults:"false"`

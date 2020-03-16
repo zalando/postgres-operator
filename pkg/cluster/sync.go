@@ -524,7 +524,7 @@ func (c *Cluster) syncDatabases() error {
 	for preparedDatname := range c.Spec.PreparedDatabases {
 		_, exists := currentDatabases[preparedDatname]
 		if !exists {
-			createDatabases[preparedDatname] = preparedDatname + "_owner"
+			createDatabases[preparedDatname] = preparedDatname + constants.OwnerRoleNameSuffix
 		}
 	}
 
@@ -568,7 +568,7 @@ func (c *Cluster) syncPreparedDatabases() error {
 		}()
 
 		// first, set default privileges for prepared database
-		c.execAlterGlobalDefaultPrivileges(preparedDbName+"_owner", preparedDbName)
+		c.execAlterGlobalDefaultPrivileges(preparedDbName+constants.OwnerRoleNameSuffix, preparedDbName)
 
 		// now, prepare defined schemas
 		preparedSchemas := preparedDB.PreparedSchemas
@@ -604,7 +604,7 @@ func (c *Cluster) syncPreparedSchemas(datname string, preparedSchemas map[string
 
 	if createPreparedSchemas, equal := util.SubstractStringSlices(schemas, currentSchemas); !equal {
 		for _, schemaName := range createPreparedSchemas {
-			owner := "_owner"
+			owner := constants.OwnerRoleNameSuffix
 			dbOwner := datname + owner
 			if preparedSchemas[schemaName].DefaultRoles == nil || *preparedSchemas[schemaName].DefaultRoles {
 				owner = datname + "_" + schemaName + owner
@@ -621,14 +621,14 @@ func (c *Cluster) syncPreparedSchemas(datname string, preparedSchemas map[string
 }
 
 func (c *Cluster) syncExtensions(extensions map[string]string) error {
-	c.setProcessName("syncing extensions")
+	c.setProcessName("syncing database extensions")
 
 	createExtensions := make(map[string]string)
 	alterExtensions := make(map[string]string)
 
 	currentExtensions, err := c.getExtensions()
 	if err != nil {
-		return fmt.Errorf("could not get current extensions: %v", err)
+		return fmt.Errorf("could not get current database extensions: %v", err)
 	}
 
 	for extName, newSchema := range extensions {
@@ -638,10 +638,6 @@ func (c *Cluster) syncExtensions(extensions map[string]string) error {
 		} else if currentSchema != newSchema {
 			alterExtensions[extName] = newSchema
 		}
-	}
-
-	if len(createExtensions)+len(alterExtensions) == 0 {
-		return nil
 	}
 
 	for extName, schema := range createExtensions {

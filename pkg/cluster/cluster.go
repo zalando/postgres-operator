@@ -837,8 +837,17 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		c.Spec.PreparedDatabases = preparedDatabases
 	}
 
-	defaultRoles := map[string]string{"_owner": "", "_reader": "", "_writer": "_reader"}
-	defaultUsers := map[string]string{"_owner_user": "_owner", "_reader_user": "_reader", "_writer_user": "_writer"}
+	// create maps with default roles/users as keys and their membership as values
+	defaultRoles := map[string]string{
+		constants.OwnerRoleNameSuffix:  "",
+		constants.ReaderRoleNameSuffix: "",
+		constants.WriterRoleNameSuffix: constants.ReaderRoleNameSuffix,
+	}
+	defaultUsers := map[string]string{
+		constants.OwnerRoleNameSuffix + constants.UserRoleNameSuffix:  constants.OwnerRoleNameSuffix,
+		constants.ReaderRoleNameSuffix + constants.UserRoleNameSuffix: constants.ReaderRoleNameSuffix,
+		constants.WriterRoleNameSuffix + constants.UserRoleNameSuffix: constants.WriterRoleNameSuffix,
+	}
 
 	for preparedDbName, preparedDB := range preparedDatabases {
 		// default roles per database
@@ -858,11 +867,15 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		}
 		for preparedSchemaName, preparedSchema := range preparedSchemas {
 			if preparedSchema.DefaultRoles == nil || *preparedSchema.DefaultRoles {
-				if err := c.initDefaultRoles(defaultRoles, preparedDbName+"_owner", preparedDbName+"_"+preparedSchemaName); err != nil {
+				if err := c.initDefaultRoles(defaultRoles,
+					preparedDbName+constants.OwnerRoleNameSuffix,
+					preparedDbName+"_"+preparedSchemaName); err != nil {
 					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
 				}
 				if preparedSchema.DefaultUsers {
-					if err := c.initDefaultRoles(defaultUsers, preparedDbName+"_owner", preparedDbName+"_"+preparedSchemaName); err != nil {
+					if err := c.initDefaultRoles(defaultUsers,
+						preparedDbName+constants.OwnerRoleNameSuffix,
+						preparedDbName+"_"+preparedSchemaName); err != nil {
 						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
 					}
 				}
@@ -879,7 +892,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		roleName := prefix + defaultRole
 
 		flags := []string{constants.RoleFlagNoLogin}
-		if defaultRole[len(defaultRole)-5:] == "_user" {
+		if defaultRole[len(defaultRole)-5:] == constants.UserRoleNameSuffix {
 			flags = []string{constants.RoleFlagLogin}
 		}
 
@@ -889,10 +902,10 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		}
 
 		adminRole := ""
-		if strings.Contains(defaultRole, "_owner") {
+		if strings.Contains(defaultRole, constants.OwnerRoleNameSuffix) {
 			adminRole = admin
 		} else {
-			adminRole = prefix + "_owner"
+			adminRole = prefix + constants.OwnerRoleNameSuffix
 		}
 
 		newRole := spec.PgUser{
