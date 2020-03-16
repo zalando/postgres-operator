@@ -63,14 +63,14 @@ type Controller struct {
 }
 
 // NewController creates a new controller
-func NewController(controllerConfig *spec.ControllerConfig) *Controller {
+func NewController(controllerConfig *spec.ControllerConfig, controllerId string) *Controller {
 	logger := logrus.New()
 
 	c := &Controller{
 		config:           *controllerConfig,
 		opConfig:         &config.Config{},
 		logger:           logger.WithField("pkg", "controller"),
-		controllerID:     os.Getenv("CONTROLLER_ID"),
+		controllerID:     controllerId,
 		curWorkerCluster: sync.Map{},
 		clusterWorkers:   make(map[spec.NamespacedName]uint32),
 		clusters:         make(map[spec.NamespacedName]*cluster.Cluster),
