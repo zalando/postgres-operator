@@ -284,7 +284,7 @@ configuration they are grouped under the `kubernetes` key.
   used for AWS volume resizing and not required if you don't need that
   capability. The default is `false`.
 
- * **master_pod_move_timeout**
+* **master_pod_move_timeout**
    The period of time to wait for the success of migration of master pods from
    an unschedulable node. The migration includes Patroni switchovers to
    respective replicas on healthy nodes. The situation where master pods still
@@ -472,7 +472,7 @@ grouped under the `logical_backup` key.
   When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.
 
 * **logical_backup_s3_sse**
-  Specify server side encription that S3 storage is using. If empty string
+  Specify server side encryption that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
 
 * **logical_backup_s3_access_key_id**

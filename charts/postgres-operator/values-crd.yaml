@@ -218,7 +218,7 @@ configLogicalBackup:
   logical_backup_s3_endpoint: ""
   # S3 Secret Access Key
   logical_backup_s3_secret_access_key: ""
-  # S3 server side encription
+  # S3 server side encryption
   logical_backup_s3_sse: "AES256"
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
