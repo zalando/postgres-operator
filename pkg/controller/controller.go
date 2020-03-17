@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/apiserver"
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -36,6 +37,7 @@ type Controller struct {
 
 	stopCh chan struct{}
 
+	controllerID     string
 	curWorkerID      uint32 //initialized with 0
 	curWorkerCluster sync.Map
 	clusterWorkers   map[spec.NamespacedName]uint32
@@ -61,13 +63,14 @@ type Controller struct {
 }
 
 // NewController creates a new controller
-func NewController(controllerConfig *spec.ControllerConfig) *Controller {
+func NewController(controllerConfig *spec.ControllerConfig, controllerId string) *Controller {
 	logger := logrus.New()
 
 	c := &Controller{
 		config:           *controllerConfig,
 		opConfig:         &config.Config{},
 		logger:           logger.WithField("pkg", "controller"),
+		controllerID:     controllerId,
 		curWorkerCluster: sync.Map{},
 		clusterWorkers:   make(map[spec.NamespacedName]uint32),
 		clusters:         make(map[spec.NamespacedName]*cluster.Cluster),
@@ -239,6 +242,7 @@ func (c *Controller) initRoleBinding() {
 
 func (c *Controller) initController() {
 	c.initClients()
+	c.controllerID = os.Getenv("CONTROLLER_ID")
 
 	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
 		if err := c.createConfigurationCRD(c.opConfig.EnableCRDValidation); err != nil {
@@ -411,4 +415,17 @@ func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFr
 	}
 
 	return namespace
+}
+
+// hasOwnership returns true if the controller is the "owner" of the postgresql.
+// Whether it's owner is determined by the value of 'acid.zalan.do/controller'
+// annotation. If the value matches the controllerID then it owns it, or if the
+// controllerID is "" and there's no annotation set.
+func (c *Controller) hasOwnership(postgresql *acidv1.Postgresql) bool {
+	if postgresql.Annotations != nil {
+		if owner, ok := postgresql.Annotations[constants.PostgresqlControllerAnnotationKey]; ok {
+			return owner == c.controllerID
+		}
+	}
+	return c.controllerID == ""
 }

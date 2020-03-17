@@ -4,6 +4,8 @@ metadata:
   name: acid-test-cluster
 #  labels:
 #    environment: demo
+#  annotations:
+#    "acid.zalan.do/controller": "second-operator"
 spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
   teamId: "acid"
