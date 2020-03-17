@@ -1262,7 +1262,7 @@ func syncResources(a, b *v1.ResourceRequirements) bool {
 	return false
 }
 
-// Check if we need to synchronize connection pool deploymend due to new
+// Check if we need to synchronize connection pool deployment due to new
 // defaults, that are different from what we see in the DeploymentSpec
 func (c *Cluster) needSyncConnPoolDefaults(
 	spec *acidv1.ConnectionPool,
@@ -1283,7 +1283,7 @@ func (c *Cluster) needSyncConnPoolDefaults(
 		*deployment.Spec.Replicas != *config.NumberOfInstances {
 
 		sync = true
-		msg := fmt.Sprintf("NumberOfInstances is different (%d vs %d)",
+		msg := fmt.Sprintf("NumberOfInstances is different (having %d, required %d)",
 			*deployment.Spec.Replicas, *config.NumberOfInstances)
 		reasons = append(reasons, msg)
 	}
@@ -1292,7 +1292,7 @@ func (c *Cluster) needSyncConnPoolDefaults(
 		poolContainer.Image != config.Image {
 
 		sync = true
-		msg := fmt.Sprintf("DockerImage is different (%s vs %s)",
+		msg := fmt.Sprintf("DockerImage is different (having %s, required %s)",
 			poolContainer.Image, config.Image)
 		reasons = append(reasons, msg)
 	}
@@ -1306,7 +1306,7 @@ func (c *Cluster) needSyncConnPoolDefaults(
 	// updates for new resource values).
 	if err == nil && syncResources(&poolContainer.Resources, expectedResources) {
 		sync = true
-		msg := fmt.Sprintf("Resources are different (%+v vs %+v)",
+		msg := fmt.Sprintf("Resources are different (having %+v, required %+v)",
 			poolContainer.Resources, expectedResources)
 		reasons = append(reasons, msg)
 	}
@@ -1321,7 +1321,7 @@ func (c *Cluster) needSyncConnPoolDefaults(
 
 			if ref.Name != c.credentialSecretName(config.User) {
 				sync = true
-				msg := fmt.Sprintf("Pool user is different (%s vs %s)",
+				msg := fmt.Sprintf("Pool user is different (having %s, required %s)",
 					ref.Name, config.User)
 				reasons = append(reasons, msg)
 			}
@@ -1329,7 +1329,7 @@ func (c *Cluster) needSyncConnPoolDefaults(
 
 		if env.Name == "PGSCHEMA" && env.Value != config.Schema {
 			sync = true
-			msg := fmt.Sprintf("Pool schema is different (%s vs %s)",
+			msg := fmt.Sprintf("Pool schema is different (having %s, required %s)",
 				env.Value, config.Schema)
 			reasons = append(reasons, msg)
 		}

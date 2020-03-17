@@ -51,11 +51,16 @@ const (
 	`
 )
 
-func (c *Cluster) pgConnectionString() string {
+func (c *Cluster) pgConnectionString(dbname string) string {
 	password := c.systemUsers[constants.SuperuserKeyName].Password
 
-	return fmt.Sprintf("host='%s' dbname=postgres sslmode=require user='%s' password='%s' connect_timeout='%d'",
+	if dbname == "" {
+		dbname = "postgres"
+	}
+
+	return fmt.Sprintf("host='%s' dbname='%s' sslmode=require user='%s' password='%s' connect_timeout='%d'",
 		fmt.Sprintf("%s.%s.svc.%s", c.Name, c.Namespace, c.OpConfig.ClusterDomain),
+		dbname,
 		c.systemUsers[constants.SuperuserKeyName].Name,
 		strings.Replace(password, "$", "\\$", -1),
 		constants.PostgresConnectTimeout/time.Second)
@@ -70,13 +75,17 @@ func (c *Cluster) databaseAccessDisabled() bool {
 }
 
 func (c *Cluster) initDbConn() error {
+	return c.initDbConnWithName("")
+}
+
+func (c *Cluster) initDbConnWithName(dbname string) error {
 	c.setProcessName("initializing db connection")
 	if c.pgDb != nil {
 		return nil
 	}
 
 	var conn *sql.DB
-	connstring := c.pgConnectionString()
+	connstring := c.pgConnectionString(dbname)
 
 	finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
@@ -275,6 +284,8 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 		return fmt.Errorf("could not init database connection")
 	}
 	defer func() {
+		// in case if everything went fine this can generate a warning about
+		// trying to close an empty connection.
 		if err := c.closeDbConn(); err != nil {
 			c.logger.Errorf("could not close database connection: %v", err)
 		}
@@ -289,6 +300,10 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 	templater := template.Must(template.New("sql").Parse(connectionPoolLookup))
 
 	for dbname, _ := range currentDatabases {
+		if err := c.initDbConnWithName(dbname); err != nil {
+			return fmt.Errorf("could not init database connection")
+		}
+
 		c.logger.Infof("Install pool lookup function into %s", dbname)
 
 		params := TemplateParams{
@@ -325,6 +340,9 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 		}
 
 		c.logger.Infof("Pool lookup function installed into %s", dbname)
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
 	}
 
 	c.ConnectionPool.LookupFunction = true
