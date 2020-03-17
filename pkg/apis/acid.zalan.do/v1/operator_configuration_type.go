@@ -65,12 +65,12 @@ type KubernetesMetaConfiguration struct {
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
-	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       Duration      `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
+	PodEnvironmentConfigMap    string   `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName       string   `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout       Duration `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity      bool     `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string   `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string   `json:"pod_management_policy,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -167,6 +167,7 @@ type OperatorLogicalBackupConfiguration struct {
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
+	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`
