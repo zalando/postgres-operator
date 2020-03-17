@@ -424,7 +424,7 @@ func (c *Cluster) connPoolLabelsSelector() *metav1.LabelSelector {
 
 	extraLabels := labels.Set(map[string]string{
 		"connection-pool": c.connPoolName(),
-		"application":     "connection-pool",
+		"application":     "db-connection-pool",
 	})
 
 	connPoolLabels = labels.Merge(connPoolLabels, c.labelsSet(false))
