@@ -24,7 +24,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "11"
+    version: "12"
     parameters: # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
