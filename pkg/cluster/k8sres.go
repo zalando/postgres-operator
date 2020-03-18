@@ -21,6 +21,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -123,12 +124,12 @@ func generateResourceRequirements(resources acidv1.Resources, defaultResources a
 	return &result, nil
 }
 
-func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
+func fillResourceList(pgSpec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
 	var err error
 	requests := v1.ResourceList{}
 
-	if spec.CPU != "" {
-		requests[v1.ResourceCPU], err = resource.ParseQuantity(spec.CPU)
+	if pgSpec.CPU != "" {
+		requests[v1.ResourceCPU], err = resource.ParseQuantity(pgSpec.CPU)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse CPU quantity: %v", err)
 		}
@@ -138,8 +139,8 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 			return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
 		}
 	}
-	if spec.Memory != "" {
-		requests[v1.ResourceMemory], err = resource.ParseQuantity(spec.Memory)
+	if pgSpec.Memory != "" {
+		requests[v1.ResourceMemory], err = resource.ParseQuantity(pgSpec.Memory)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse memory quantity: %v", err)
 		}
@@ -766,7 +767,7 @@ func (c *Cluster) getNewPgVersion(container v1.Container, newPgVersion string) (
 	return newPgVersion, nil
 }
 
-func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
+func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
 		err                 error
@@ -782,12 +783,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 		// controller adjusts the default memory request at operator startup
 
-		request := spec.Resources.ResourceRequests.Memory
+		request := pgSpec.Resources.ResourceRequests.Memory
 		if request == "" {
 			request = c.OpConfig.DefaultMemoryRequest
 		}
 
-		limit := spec.Resources.ResourceLimits.Memory
+		limit := pgSpec.Resources.ResourceLimits.Memory
 		if limit == "" {
 			limit = c.OpConfig.DefaultMemoryLimit
 		}
@@ -798,7 +799,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 		if isSmaller {
 			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
-			spec.Resources.ResourceRequests.Memory = limit
+			pgSpec.Resources.ResourceRequests.Memory = limit
 
 		}
 
@@ -806,7 +807,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		// as this sidecar is managed separately
 
 		// adjust sidecar containers defined for that particular cluster
-		for _, sidecar := range spec.Sidecars {
+		for _, sidecar := range pgSpec.Sidecars {
 
 			// TODO #413
 			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
@@ -833,25 +834,31 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	defaultResources := c.makeDefaultResources()
 
-	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
+	resourceRequirements, err := generateResourceRequirements(pgSpec.Resources, defaultResources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
+	if pgSpec.InitContainers != nil && len(pgSpec.InitContainers) > 0 {
 		if c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
 			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
 		}
-		initContainers = spec.InitContainers
+		initContainers = pgSpec.InitContainers
 	}
 
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
 
-	if c.OpConfig.PodEnvironmentConfigMap != "" {
+	if c.OpConfig.PodEnvironmentConfigMap != (spec.NamespacedName{}) {
 		var cm *v1.ConfigMap
-		cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{})
+		cm, err = c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap.Name, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+			// if not found, try again using the operator namespace (old behavior)
+			if k8sutil.ResourceNotFound(err) && c.Namespace != c.OpConfig.PodEnvironmentConfigMap.Namespace {
+				cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap.Name, metav1.GetOptions{})
+			}
+			if err != nil {
+				return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+			}
 		}
 		for k, v := range cm.Data {
 			customPodEnvVarsList = append(customPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
@@ -859,33 +866,33 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		sort.Slice(customPodEnvVarsList,
 			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 	}
-	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" {
+	if pgSpec.StandbyCluster != nil && pgSpec.StandbyCluster.S3WalPath == "" {
 		return nil, fmt.Errorf("s3_wal_path is empty for standby cluster")
 	}
 
 	// backward compatible check for InitContainers
-	if spec.InitContainersOld != nil {
+	if pgSpec.InitContainersOld != nil {
 		msg := "Manifest parameter init_containers is deprecated."
-		if spec.InitContainers == nil {
+		if pgSpec.InitContainers == nil {
 			c.logger.Warningf("%s Consider using initContainers instead.", msg)
-			spec.InitContainers = spec.InitContainersOld
+			pgSpec.InitContainers = pgSpec.InitContainersOld
 		} else {
 			c.logger.Warningf("%s Only value from initContainers is used", msg)
 		}
 	}
 
 	// backward compatible check for PodPriorityClassName
-	if spec.PodPriorityClassNameOld != "" {
+	if pgSpec.PodPriorityClassNameOld != "" {
 		msg := "Manifest parameter pod_priority_class_name is deprecated."
-		if spec.PodPriorityClassName == "" {
+		if pgSpec.PodPriorityClassName == "" {
 			c.logger.Warningf("%s Consider using podPriorityClassName instead.", msg)
-			spec.PodPriorityClassName = spec.PodPriorityClassNameOld
+			pgSpec.PodPriorityClassName = pgSpec.PodPriorityClassNameOld
 		} else {
 			c.logger.Warningf("%s Only value from podPriorityClassName is used", msg)
 		}
 	}
 
-	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
+	spiloConfiguration, err := generateSpiloJSONConfiguration(&pgSpec.PostgresqlParam, &pgSpec.Patroni, c.OpConfig.PamRoleName, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
 	}
@@ -894,24 +901,24 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	spiloEnvVars := c.generateSpiloPodEnvVars(
 		c.Postgresql.GetUID(),
 		spiloConfiguration,
-		&spec.Clone,
-		spec.StandbyCluster,
+		&pgSpec.Clone,
+		pgSpec.StandbyCluster,
 		customPodEnvVarsList,
 	)
 
 	// pickup the docker image for the spilo container
-	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
+	effectiveDockerImage := util.Coalesce(pgSpec.DockerImage, c.OpConfig.DockerImage)
 
 	// determine the FSGroup for the spilo pod
 	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
-	if spec.SpiloFSGroup != nil {
-		effectiveFSGroup = spec.SpiloFSGroup
+	if pgSpec.SpiloFSGroup != nil {
+		effectiveFSGroup = pgSpec.SpiloFSGroup
 	}
 
-	volumeMounts := generateVolumeMounts(spec.Volume)
+	volumeMounts := generateVolumeMounts(pgSpec.Volume)
 
 	// configure TLS with a custom secret volume
-	if spec.TLS != nil && spec.TLS.SecretName != "" {
+	if pgSpec.TLS != nil && pgSpec.TLS.SecretName != "" {
 		if effectiveFSGroup == nil {
 			c.logger.Warnf("Setting the default FSGroup to satisfy the TLS configuration")
 			fsGroup := int64(spiloPostgresGID)
@@ -924,7 +931,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			Name: "tls-secret",
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
-					SecretName:  spec.TLS.SecretName,
+					SecretName:  pgSpec.TLS.SecretName,
 					DefaultMode: &defaultMode,
 				},
 			},
@@ -938,16 +945,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		})
 
 		// use the same filenames as Secret resources by default
-		certFile := ensurePath(spec.TLS.CertificateFile, mountPath, "tls.crt")
-		privateKeyFile := ensurePath(spec.TLS.PrivateKeyFile, mountPath, "tls.key")
+		certFile := ensurePath(pgSpec.TLS.CertificateFile, mountPath, "tls.crt")
+		privateKeyFile := ensurePath(pgSpec.TLS.PrivateKeyFile, mountPath, "tls.key")
 		spiloEnvVars = append(
 			spiloEnvVars,
 			v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: certFile},
 			v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: privateKeyFile},
 		)
 
-		if spec.TLS.CAFile != "" {
-			caFile := ensurePath(spec.TLS.CAFile, mountPath, "")
+		if pgSpec.TLS.CAFile != "" {
+			caFile := ensurePath(pgSpec.TLS.CAFile, mountPath, "")
 			spiloEnvVars = append(
 				spiloEnvVars,
 				v1.EnvVar{Name: "SSL_CA_FILE", Value: caFile},
@@ -966,7 +973,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	)
 
 	// resolve conflicts between operator-global and per-cluster sidecars
-	sideCars := c.mergeSidecars(spec.Sidecars)
+	sideCars := c.mergeSidecars(pgSpec.Sidecars)
 
 	resourceRequirementsScalyrSidecar := makeResources(
 		c.OpConfig.ScalyrCPURequest,
@@ -996,10 +1003,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 	}
 
-	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
-	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
+	tolerationSpec := tolerations(&pgSpec.Tolerations, c.OpConfig.PodToleration)
+	effectivePodPriorityClassName := util.Coalesce(pgSpec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	annotations := c.generatePodAnnotations(spec)
+	annotations := c.generatePodAnnotations(pgSpec)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	podTemplate, err = generatePodTemplate(
@@ -1016,7 +1023,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
-		mountShmVolumeNeeded(c.OpConfig, spec),
+		mountShmVolumeNeeded(c.OpConfig, pgSpec),
 		c.OpConfig.EnablePodAntiAffinity,
 		c.OpConfig.PodAntiAffinityTopologyKey,
 		c.OpConfig.AdditionalSecretMount,
@@ -1027,12 +1034,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
-	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
-		spec.Volume.StorageClass); err != nil {
+	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(pgSpec.Volume.Size,
+		pgSpec.Volume.StorageClass); err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
-	numberOfInstances := c.getNumberOfInstances(spec)
+	numberOfInstances := c.getNumberOfInstances(pgSpec)
 
 	// the operator has domain-specific logic on how to do rolling updates of PG clusters
 	// so we do not use default rolling updates implemented by stateful sets
@@ -1069,13 +1076,13 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	return statefulSet, nil
 }
 
-func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]string {
+func (c *Cluster) generatePodAnnotations(pgSpec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
 	for k, v := range c.OpConfig.CustomPodAnnotations {
 		annotations[k] = v
 	}
-	if spec != nil || spec.PodAnnotations != nil {
-		for k, v := range spec.PodAnnotations {
+	if pgSpec != nil || pgSpec.PodAnnotations != nil {
+		for k, v := range pgSpec.PodAnnotations {
 			annotations[k] = v
 		}
 	}
@@ -1141,13 +1148,13 @@ func (c *Cluster) mergeSidecars(sidecars []acidv1.Sidecar) []acidv1.Sidecar {
 	return result
 }
 
-func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
+func (c *Cluster) getNumberOfInstances(pgSpec *acidv1.PostgresSpec) int32 {
 	min := c.OpConfig.MinInstances
 	max := c.OpConfig.MaxInstances
-	cur := spec.NumberOfInstances
+	cur := pgSpec.NumberOfInstances
 	newcur := cur
 
-	if spec.StandbyCluster != nil {
+	if pgSpec.StandbyCluster != nil {
 		if newcur == 1 {
 			min = newcur
 			max = newcur
@@ -1302,15 +1309,15 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
-func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *acidv1.PostgresSpec) bool {
+func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, pgSpec *acidv1.PostgresSpec) bool {
 
 	switch role {
 
 	case Replica:
 
 		// if the value is explicitly set in a Postgresql manifest, follow this setting
-		if spec.EnableReplicaLoadBalancer != nil {
-			return *spec.EnableReplicaLoadBalancer
+		if pgSpec.EnableReplicaLoadBalancer != nil {
+			return *pgSpec.EnableReplicaLoadBalancer
 		}
 
 		// otherwise, follow the operator configuration
@@ -1318,8 +1325,8 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 	case Master:
 
-		if spec.EnableMasterLoadBalancer != nil {
-			return *spec.EnableMasterLoadBalancer
+		if pgSpec.EnableMasterLoadBalancer != nil {
+			return *pgSpec.EnableMasterLoadBalancer
 		}
 
 		return c.OpConfig.EnableMasterLoadBalancer
@@ -1330,7 +1337,7 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 }
 
-func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role PostgresRole, pgSpec *acidv1.PostgresSpec) *v1.Service {
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 		Type:  v1.ServiceTypeClusterIP,
@@ -1340,12 +1347,12 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
 
-	if c.shouldCreateLoadBalancerForService(role, spec) {
+	if c.shouldCreateLoadBalancerForService(role, pgSpec) {
 
-		// spec.AllowedSourceRanges evaluates to the empty slice of zero length
+		// pgSpec.AllowedSourceRanges evaluates to the empty slice of zero length
 		// when omitted or set to 'null'/empty sequence in the PG manifest
-		if len(spec.AllowedSourceRanges) > 0 {
-			serviceSpec.LoadBalancerSourceRanges = spec.AllowedSourceRanges
+		if len(pgSpec.AllowedSourceRanges) > 0 {
+			serviceSpec.LoadBalancerSourceRanges = pgSpec.AllowedSourceRanges
 		} else {
 			// safe default value: lock a load balancer only to the local address unless overridden explicitly
 			serviceSpec.LoadBalancerSourceRanges = []string{localHost}
@@ -1364,7 +1371,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
 			Labels:      c.roleLabelsSet(true, role),
-			Annotations: c.generateServiceAnnotations(role, spec),
+			Annotations: c.generateServiceAnnotations(role, pgSpec),
 		},
 		Spec: serviceSpec,
 	}
@@ -1372,19 +1379,19 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	return service
 }
 
-func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
+func (c *Cluster) generateServiceAnnotations(role PostgresRole, pgSpec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
 
 	for k, v := range c.OpConfig.CustomServiceAnnotations {
 		annotations[k] = v
 	}
-	if spec != nil || spec.ServiceAnnotations != nil {
-		for k, v := range spec.ServiceAnnotations {
+	if pgSpec != nil || pgSpec.ServiceAnnotations != nil {
+		for k, v := range pgSpec.ServiceAnnotations {
 			annotations[k] = v
 		}
 	}
 
-	if c.shouldCreateLoadBalancerForService(role, spec) {
+	if c.shouldCreateLoadBalancerForService(role, pgSpec) {
 		var dnsName string
 		if role == Master {
 			dnsName = c.masterDNSName()

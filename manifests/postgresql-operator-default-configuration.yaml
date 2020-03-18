@@ -40,7 +40,7 @@ configuration:
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-    # pod_environment_configmap: ""
+    # pod_environment_configmap: "default/my-custom-config"
     pod_management_policy: "ordered_ready"
     # pod_priority_class_name: ""
     pod_role_label: spilo-role

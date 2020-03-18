@@ -336,7 +336,7 @@ metadata:
   name: postgres-operator
 data:
   # referencing config map with custom settings
-  pod_environment_configmap: postgres-pod-config
+  pod_environment_configmap: default/postgres-pod-config
 ```
 
 **OperatorConfiguration**
@@ -349,7 +349,7 @@ metadata:
 configuration:
   kubernetes:
     # referencing config map with custom settings
-    pod_environment_configmap: postgres-pod-config
+    pod_environment_configmap: default/postgres-pod-config
 ```
 
 **referenced ConfigMap `postgres-pod-config`**

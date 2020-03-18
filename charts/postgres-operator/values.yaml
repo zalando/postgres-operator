@@ -67,7 +67,7 @@ configKubernetes:
   enable_pod_disruption_budget: "true"
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: "true"
-  # name of the secret containing infrastructure roles names and passwords
+  # namespaced name of the secret containing infrastructure roles names and passwords
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
   # list of labels that can be inherited from the cluster manifest
@@ -79,15 +79,15 @@ configKubernetes:
   # set of labels that a running and active node should possess to be considered ready
   # node_readiness_label: ""
 
-  # name of the secret containing the OAuth2 token to pass to the teams API
+  # namespaced name of the secret containing the OAuth2 token to pass to the teams API
   # oauth_token_secret_name: postgresql-operator
 
   # defines the template for PDB (Pod Disruption Budget) names
   pdb_name_format: "postgres-{cluster}-pdb"
   # override topology key for pod anti affinity
   pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-  # name of the ConfigMap with environment variables to populate on every pod
-  # pod_environment_configmap: ""
+  # namespaced name of the ConfigMap with environment variables to populate on every pod
+  # pod_environment_configmap: "default/my-custom-config"
 
   # specify the pod management policy of stateful sets of Postgres clusters
   pod_management_policy: "ordered_ready"
