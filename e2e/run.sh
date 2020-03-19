@@ -35,17 +35,15 @@ function start_kind(){
     kind delete cluster --name ${cluster_name}
   fi
 
+  export KUBECONFIG="${kubeconfig_path}"
   kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
   kind load docker-image "${operator_image}" --name ${cluster_name}
   kind load docker-image "${e2e_test_image}" --name ${cluster_name}
-  KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
-  export KUBECONFIG
 }
 
 function set_kind_api_server_ip(){
   # use the actual kubeconfig to connect to the 'kind' API server
   # but update the IP address of the API server to the one from the Docker 'bridge' network
-  cp "${KUBECONFIG}" /tmp
   readonly local kind_api_server_port=6443 # well-known in the 'kind' codebase
   readonly local kind_api_server=$(docker inspect --format "{{ .NetworkSettings.IPAddress }}:${kind_api_server_port}" "${cluster_name}"-control-plane)
   sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
