@@ -1316,7 +1316,7 @@ func (c *Cluster) needSyncConnPoolDefaults(
 	}
 
 	for _, env := range poolContainer.Env {
-		if env.Name == "PGUSER" {
+		if spec.User == "" && env.Name == "PGUSER" {
 			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
 
 			if ref.Name != c.credentialSecretName(config.User) {
@@ -1327,7 +1327,7 @@ func (c *Cluster) needSyncConnPoolDefaults(
 			}
 		}
 
-		if env.Name == "PGSCHEMA" && env.Value != config.Schema {
+		if spec.Schema == "" && env.Name == "PGSCHEMA" && env.Value != config.Schema {
 			sync = true
 			msg := fmt.Sprintf("Pool schema is different (having %s, required %s)",
 				env.Value, config.Schema)
