@@ -2053,6 +2053,13 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 			k8sutil.Int32ToPointer(1))
 	}
 
+	if *numberOfInstances < constants.ConnPoolMinInstances {
+		msg := "Adjusted number of connection pool instances from %d to %d"
+		c.logger.Warningf(msg, numberOfInstances, constants.ConnPoolMinInstances)
+
+		*numberOfInstances = constants.ConnPoolMinInstances
+	}
+
 	if err != nil {
 		return nil, err
 	}

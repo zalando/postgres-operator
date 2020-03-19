@@ -1240,7 +1240,7 @@ func (c *Cluster) needSyncConnPoolSpecs(oldSpec, newSpec *acidv1.ConnectionPool)
 	}
 
 	for _, change := range changelog {
-		msg := fmt.Sprintf("%s %+v from %s to %s",
+		msg := fmt.Sprintf("%s %+v from '%+v' to '%+v'",
 			change.Type, change.Path, change.From, change.To)
 		reasons = append(reasons, msg)
 	}

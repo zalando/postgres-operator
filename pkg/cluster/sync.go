@@ -727,7 +727,7 @@ func (c *Cluster) syncConnectionPoolWorker(oldSpec, newSpec *acidv1.Postgresql) 
 		defaultsSync, defaultsReason := c.needSyncConnPoolDefaults(newConnPool, deployment)
 		reason := append(specReason, defaultsReason...)
 		if specSync || defaultsSync {
-			c.logger.Infof("Update connection pool deployment %s, reason: %s",
+			c.logger.Infof("Update connection pool deployment %s, reason: %+v",
 				c.connPoolName(), reason)
 
 			newDeploymentSpec, err := c.generateConnPoolDeployment(&newSpec.Spec)

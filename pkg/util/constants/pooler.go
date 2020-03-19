@@ -14,4 +14,5 @@ const (
 	ConnPoolContainer            = 0
 	ConnPoolMaxDBConnections     = 60
 	ConnPoolMaxClientConnections = 10000
+	ConnPoolMinInstances         = 2
 )
