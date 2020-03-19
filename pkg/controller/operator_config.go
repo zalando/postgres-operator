@@ -152,11 +152,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// so ensure default values here.
 	result.ConnectionPool.NumberOfInstances = util.CoalesceInt32(
 		fromCRD.ConnectionPool.NumberOfInstances,
-		int32ToPointer(1))
+		int32ToPointer(2))
 
 	result.ConnectionPool.NumberOfInstances = util.MaxInt32(
 		result.ConnectionPool.NumberOfInstances,
-		int32ToPointer(1))
+		int32ToPointer(2))
 
 	result.ConnectionPool.Schema = util.Coalesce(
 		fromCRD.ConnectionPool.Schema,

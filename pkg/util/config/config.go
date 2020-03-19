@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
@@ -210,6 +211,11 @@ func validate(cfg *Config) (err error) {
 	}
 	if cfg.Workers == 0 {
 		err = fmt.Errorf("number of workers should be higher than 0")
+	}
+
+	if *cfg.ConnectionPool.NumberOfInstances < constants.ConnPoolMinInstances {
+		msg := "number of connection pool instances should be higher than %d"
+		err = fmt.Errorf(msg, constants.ConnPoolMinInstances)
 	}
 	return
 }

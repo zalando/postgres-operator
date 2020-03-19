@@ -645,7 +645,7 @@ func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql, lookup
 
 			if newConnPool != nil {
 				specSchema = newConnPool.Schema
-				specUser = newConnPool.Schema
+				specUser = newConnPool.User
 			}
 
 			schema := util.Coalesce(
@@ -656,7 +656,9 @@ func (c *Cluster) syncConnectionPool(oldSpec, newSpec *acidv1.Postgresql, lookup
 				specUser,
 				c.OpConfig.ConnectionPool.User)
 
-			lookup(schema, user)
+			if err := lookup(schema, user); err != nil {
+				return err
+			}
 		}
 
 		if err := c.syncConnectionPoolWorker(oldSpec, newSpec); err != nil {

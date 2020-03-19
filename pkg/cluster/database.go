@@ -44,7 +44,7 @@ const (
 		$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 		REVOKE ALL ON FUNCTION {{.pool_schema}}.user_lookup(text)
-			FROM public, {{.pool_schema}};
+			FROM public, {{.pool_user}};
 		GRANT EXECUTE ON FUNCTION {{.pool_schema}}.user_lookup(text)
 			TO {{.pool_user}};
 		GRANT USAGE ON SCHEMA {{.pool_schema}} TO {{.pool_user}};
@@ -122,6 +122,10 @@ func (c *Cluster) initDbConnWithName(dbname string) error {
 	c.pgDb = conn
 
 	return nil
+}
+
+func (c *Cluster) connectionIsClosed() bool {
+	return c.pgDb == nil
 }
 
 func (c *Cluster) closeDbConn() (err error) {
@@ -284,8 +288,10 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 		return fmt.Errorf("could not init database connection")
 	}
 	defer func() {
-		// in case if everything went fine this can generate a warning about
-		// trying to close an empty connection.
+		if c.connectionIsClosed() {
+			return
+		}
+
 		if err := c.closeDbConn(); err != nil {
 			c.logger.Errorf("could not close database connection: %v", err)
 		}
@@ -300,8 +306,12 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 	templater := template.Must(template.New("sql").Parse(connectionPoolLookup))
 
 	for dbname, _ := range currentDatabases {
+		if dbname == "template0" || dbname == "template1" {
+			continue
+		}
+
 		if err := c.initDbConnWithName(dbname); err != nil {
-			return fmt.Errorf("could not init database connection")
+			return fmt.Errorf("could not init database connection to %s", dbname)
 		}
 
 		c.logger.Infof("Install pool lookup function into %s", dbname)
@@ -312,8 +322,10 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 		}
 
 		if err := templater.Execute(&stmtBytes, params); err != nil {
-			return fmt.Errorf("could not prepare sql statement %+v: %v",
+			c.logger.Errorf("could not prepare sql statement %+v: %v",
 				params, err)
+			// process other databases
+			continue
 		}
 
 		// golang sql will do retries couple of times if pq driver reports
@@ -335,8 +347,10 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 			})
 
 		if execErr != nil {
-			return fmt.Errorf("could not execute after retries %s: %v",
+			c.logger.Errorf("could not execute after retries %s: %v",
 				stmtBytes.String(), err)
+			// process other databases
+			continue
 		}
 
 		c.logger.Infof("Pool lookup function installed into %s", dbname)
