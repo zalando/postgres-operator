@@ -91,10 +91,10 @@ type ConnectionPool struct {
 	Image                        string `name:"connection_pool_image" default:"registry.opensource.zalan.do/acid/pgbouncer:master-5"`
 	Mode                         string `name:"connection_pool_mode" default:"transaction"`
 	MaxDBConnections             *int32 `name:"connection_pool_max_db_connections" default:"60"`
-	ConnPoolDefaultCPURequest    string `name:"connection_pool_default_cpu_request" default:"100m"`
+	ConnPoolDefaultCPURequest    string `name:"connection_pool_default_cpu_request" default:"1"`
 	ConnPoolDefaultMemoryRequest string `name:"connection_pool_default_memory_request" default:"100Mi"`
-	ConnPoolDefaultCPULimit      string `name:"connection_pool_default_cpu_limit" default:"3"`
-	ConnPoolDefaultMemoryLimit   string `name:"connection_pool_default_memory_limit" default:"1Gi"`
+	ConnPoolDefaultCPULimit      string `name:"connection_pool_default_cpu_limit" default:"1"`
+	ConnPoolDefaultMemoryLimit   string `name:"connection_pool_default_memory_limit" default:"100Mi"`
 }
 
 // Config describes operator config
