@@ -305,7 +305,7 @@ spec:
                   #default: "pooler"
                 connection_pool_image:
                   type: string
-                  #default: "registry.opensource.zalan.do/acid/pgbouncer:master-5"
+                  #default: "registry.opensource.zalan.do/acid/pgbouncer"
                 connection_pool_max_db_connections:
                   type: integer
                   #default: 60

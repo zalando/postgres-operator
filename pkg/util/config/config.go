@@ -89,7 +89,7 @@ type ConnectionPool struct {
 	NumberOfInstances            *int32 `name:"connection_pool_number_of_instances" default:"2"`
 	Schema                       string `name:"connection_pool_schema" default:"pooler"`
 	User                         string `name:"connection_pool_user" default:"pooler"`
-	Image                        string `name:"connection_pool_image" default:"registry.opensource.zalan.do/acid/pgbouncer:master-5"`
+	Image                        string `name:"connection_pool_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
 	Mode                         string `name:"connection_pool_mode" default:"transaction"`
 	MaxDBConnections             *int32 `name:"connection_pool_max_db_connections" default:"60"`
 	ConnPoolDefaultCPURequest    string `name:"connection_pool_default_cpu_request" default:"1"`

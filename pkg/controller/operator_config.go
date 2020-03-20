@@ -168,7 +168,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	result.ConnectionPool.Image = util.Coalesce(
 		fromCRD.ConnectionPool.Image,
-		"registry.opensource.zalan.do/acid/pgbouncer:master-5")
+		"registry.opensource.zalan.do/acid/pgbouncer")
 
 	result.ConnectionPool.Mode = util.Coalesce(
 		fromCRD.ConnectionPool.Mode,

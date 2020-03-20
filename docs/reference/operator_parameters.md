@@ -616,10 +616,12 @@ operator being able to provide some reasonable defaults.
 
 * **connection_pool_image**
   Docker image to use for connection pool deployment.
-  Default: "registry.opensource.zalan.do/acid/pgbouncer:master-5"
+  Default: "registry.opensource.zalan.do/acid/pgbouncer"
 
 * **connection_pool_max_db_connections**
-  How many connections the pooler can max hold. Default is 60.
+  How many connections the pooler can max hold. This value is divided by the
+  number of pooler pods. Default is 60 which will make up 30 connections per
+  pod for the default setup with two instances.
 
 * **connection_pool_mode**
   Default pool mode, `session` or `transaction`. Default is `transaction`.
