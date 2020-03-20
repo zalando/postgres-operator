@@ -2071,7 +2071,7 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 			Labels:      c.labelsSet(true),
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
-			// By itself StatefulSet is being deleted with "Ophaned"
+			// By itself StatefulSet is being deleted with "Orphaned"
 			// propagation policy, which means that it's deletion will not
 			// clean up this deployment, but there is a hope that this object
 			// will be garbage collected if something went wrong and operator
@@ -2121,7 +2121,7 @@ func (c *Cluster) generateConnPoolService(spec *acidv1.PostgresSpec) *v1.Service
 			Labels:      c.labelsSet(true),
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
-			// By itself StatefulSet is being deleted with "Ophaned"
+			// By itself StatefulSet is being deleted with "Orphaned"
 			// propagation policy, which means that it's deletion will not
 			// clean up this service, but there is a hope that this object will
 			// be garbage collected if something went wrong and operator didn't
