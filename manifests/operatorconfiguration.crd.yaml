@@ -317,7 +317,7 @@ spec:
                   #default: "transaction"
                 connection_pool_number_of_instances:
                   type: integer
-                  minimum: 2,
+                  minimum: 2
                   #default: 2
                 connection_pool_default_cpu_limit:
                   type: string
@@ -330,7 +330,7 @@ spec:
                 connection_pool_default_memory_limit:
                   type: string
                   pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                  #default: "100m"
+                  #default: "100Mi"
                 connection_pool_default_memory_request:
                   type: string
                   pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
