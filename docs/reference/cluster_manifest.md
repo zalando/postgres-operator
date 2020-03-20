@@ -385,8 +385,8 @@ present.
   Which docker image to use for connection pool deployment.
 
 * **maxDBConnections**
-  How many connections the pooler can max hold. This value is divided by the
-  number of pooler pods.
+  How many connections the pooler can max hold. This value is divided among the
+  pooler pods.
 
 * **mode**
   In which mode to run connection pool, transaction or session.

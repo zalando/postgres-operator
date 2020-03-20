@@ -619,9 +619,9 @@ operator being able to provide some reasonable defaults.
   Default: "registry.opensource.zalan.do/acid/pgbouncer"
 
 * **connection_pool_max_db_connections**
-  How many connections the pooler can max hold. This value is divided by the
-  number of pooler pods. Default is 60 which will make up 30 connections per
-  pod for the default setup with two instances.
+  How many connections the pooler can max hold. This value is divided among the
+  pooler pods. Default is 60 which will make up 30 connections per pod for the
+  default setup with two instances.
 
 * **connection_pool_mode**
   Default pool mode, `session` or `transaction`. Default is `transaction`.
@@ -631,4 +631,4 @@ operator being able to provide some reasonable defaults.
   **connection_pool_default_cpu_limit**
   **connection_pool_default_memory_limit**
   Default resource configuration for connection pool deployment. The internal
-  default for memory limit and request is `100Mi`, for CPU it is `1`.
+  default for memory request and limit is `100Mi`, for CPU it is `500m` and `1`.

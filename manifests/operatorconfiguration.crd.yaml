@@ -326,7 +326,7 @@ spec:
                 connection_pool_default_cpu_request:
                   type: string
                   pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                  #default: "1"
+                  #default: "500m"
                 connection_pool_default_memory_limit:
                   type: string
                   pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'

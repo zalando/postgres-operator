@@ -6,7 +6,7 @@ const (
 	ConnectionPoolSchemaName           = "pooler"
 	ConnectionPoolDefaultType          = "pgbouncer"
 	ConnectionPoolDefaultMode          = "transaction"
-	ConnectionPoolDefaultCpuRequest    = "1"
+	ConnectionPoolDefaultCpuRequest    = "500m"
 	ConnectionPoolDefaultCpuLimit      = "1"
 	ConnectionPoolDefaultMemoryRequest = "100Mi"
 	ConnectionPoolDefaultMemoryLimit   = "100Mi"

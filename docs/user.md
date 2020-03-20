@@ -535,7 +535,7 @@ To configure a new connection pool, specify:
 spec:
   connectionPool:
     # how many instances of connection pool to create
-    number_of_instances: 1
+    number_of_instances: 2
 
     # in which mode to run, session or transaction
     mode: "transaction"
@@ -550,11 +550,11 @@ spec:
     # resources for each instance
     resources:
       requests:
-        cpu: "100m"
-        memory: "100Mi"
+        cpu: 500m
+        memory: 100Mi
       limits:
-        cpu: "100m"
-        memory: "100Mi"
+        cpu: "1"
+        memory: 100Mi
 ```
 
 By default `pgbouncer` is used to create a connection pool. To find out about
