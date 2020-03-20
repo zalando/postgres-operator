@@ -213,7 +213,8 @@ explanation of `ttl` and `loop_wait` parameters.
   slots. Optional.
 
 * **synchronous_mode**
-  Patroni `synchronous_mode` parameter value. The default is set to `false`. Optional.
+  Patroni `synchronous_mode` parameter value. Optional.
+
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
