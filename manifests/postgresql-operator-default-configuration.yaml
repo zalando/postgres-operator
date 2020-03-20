@@ -129,6 +129,6 @@ configuration:
     connection_pool_image: "registry.opensource.zalan.do/acid/pgbouncer:master-5"
     # connection_pool_max_db_connections: 60
     connection_pool_mode: "transaction"
-    connection_pool_number_of_instances: 1
+    connection_pool_number_of_instances: 2
     # connection_pool_schema: "pooler"
     # connection_pool_user: "pooler"
