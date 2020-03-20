@@ -317,7 +317,8 @@ spec:
                   #default: "transaction"
                 connection_pool_number_of_instances:
                   type: integer
-                  #default: 1
+                  minimum: 2,
+                  #default: 2
                 connection_pool_default_cpu_limit:
                   type: string
                   pattern: '^(\d+m|\d+(\.\d{1,3})?)$'

@@ -105,6 +105,7 @@ var OperatorConfigCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefin
 
 var min0 = 0.0
 var min1 = 1.0
+var min2 = 2.0
 var minDisable = -1.0
 
 // PostgresCRDResourceValidation to check applied manifest parameters
@@ -198,7 +199,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 							"numberOfInstances": {
 								Type:    "integer",
-								Minimum: &min1,
+								Minimum: &min2,
 							},
 							"resources": {
 								Type:     "object",
@@ -491,7 +492,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 						Type: "string",
 					},
 					"tls": {
-						Type: "object",
+						Type:     "object",
 						Required: []string{"secretName"},
 						Properties: map[string]apiextv1beta1.JSONSchemaProps{
 							"secretName": {
@@ -1166,7 +1167,7 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 							"connection_pool_number_of_instances": {
 								Type:    "integer",
-								Minimum: &min1,
+								Minimum: &min2,
 							},
 							"connection_pool_schema": {
 								Type: "string",

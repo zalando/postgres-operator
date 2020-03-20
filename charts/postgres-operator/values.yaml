@@ -258,7 +258,7 @@ configConnectionPool:
   # default pooling mode
   connection_pool_mode: "transaction"
   # number of pooler instances
-  connection_pool_number_of_instances: 1
+  connection_pool_number_of_instances: 2
   # default resources
   connection_pool_default_cpu_request: "1"
   connection_pool_default_memory_request: "100Mi"

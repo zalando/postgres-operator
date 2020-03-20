@@ -84,7 +84,7 @@ spec:
                     - "transaction"
                 numberOfInstances:
                   type: integer
-                  minimum: 1
+                  minimum: 2
                 resources:
                   type: object
                   required:
