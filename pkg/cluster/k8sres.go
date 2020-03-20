@@ -223,7 +223,7 @@ PatroniInitDBParams:
 	if patroni.Slots != nil {
 		config.Bootstrap.DCS.Slots = patroni.Slots
 	}
-	if patroni.SynchronousMode != false {
+	if patroni.SynchronousMode {
 		config.Bootstrap.DCS.SynchronousMode = patroni.SynchronousMode
 	}
 
