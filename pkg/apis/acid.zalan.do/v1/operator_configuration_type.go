@@ -65,12 +65,12 @@ type KubernetesMetaConfiguration struct {
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
-	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       Duration      `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
+	PodEnvironmentConfigMap    string   `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName       string   `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout       Duration `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity      bool     `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string   `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string   `json:"pod_management_policy,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -154,14 +154,16 @@ type ScalyrConfiguration struct {
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
 type OperatorLogicalBackupConfiguration struct {
-	Schedule          string `json:"logical_backup_schedule,omitempty"`
-	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
-	S3Region          string `json:"logical_backup_s3_region,omitempty"`
-	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
-	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
-	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`
-	S3SSE             string `json:"logical_backup_s3_sse,omitempty"`
+	Schedule                     string `json:"logical_backup_schedule,omitempty"`
+	DockerImage                  string `json:"logical_backup_docker_image,omitempty"`
+	BackupProvider               string `json:"logical_backup_provider,omitempty"`
+	S3Bucket                     string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Region                     string `json:"logical_backup_s3_region,omitempty"`
+	S3Endpoint                   string `json:"logical_backup_s3_endpoint,omitempty"`
+	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`
+	S3SecretAccessKey            string `json:"logical_backup_s3_secret_access_key,omitempty"`
+	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
+	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
