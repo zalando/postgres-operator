@@ -37,13 +37,30 @@ function aws_upload {
     PATH_TO_BACKUP=s3://$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
     args=()
-
+    
     [[ ! -z "$EXPECTED_SIZE" ]] && args+=("--expected-size=$EXPECTED_SIZE")
     [[ ! -z "$LOGICAL_BACKUP_S3_ENDPOINT" ]] && args+=("--endpoint-url=$LOGICAL_BACKUP_S3_ENDPOINT")
     [[ ! -z "$LOGICAL_BACKUP_S3_REGION" ]] && args+=("--region=$LOGICAL_BACKUP_S3_REGION")
     [[ ! -z "$LOGICAL_BACKUP_S3_SSE" ]] && args+=("--sse=$LOGICAL_BACKUP_S3_SSE")
 
     aws s3 cp - "$PATH_TO_BACKUP" "${args[@]//\'/}"
+}
+
+function gcs_upload {
+    PATH_TO_BACKUP=gs://$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
+    
+    gsutil -o Credentials:gs_service_key_file=$LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS cp - "$PATH_TO_BACKUP"
+}
+
+function upload {
+    case $LOGICAL_BACKUP_PROVIDER in
+        "gcs")
+            gcs_upload
+            ;;
+        *)
+            aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
+            ;;
+    esac
 }
 
 function get_pods {
@@ -93,7 +110,7 @@ for search in "${search_strategy[@]}"; do
 done
 
 set -x
-dump | compress | aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
+dump | compress | upload
 [[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
 set +x
 
