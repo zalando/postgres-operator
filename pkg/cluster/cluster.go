@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
@@ -632,6 +633,28 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			}
 		}
 	}()
+
+	// delete persistent volume claim after scale down
+	if oldSpec.Spec.NumberOfInstances > newSpec.Spec.NumberOfInstances {
+		c.logger.Debug("deleting pvc of shut down pods")
+
+		for i := oldSpec.Spec.NumberOfInstances - 1; i >= newSpec.Spec.NumberOfInstances; i-- {
+
+			// Scaling down to 0 replicas is not cluster deletion so keep the last pvc.
+			// Operator will remove it only when explicit "kubectl pg delete" is issued
+			if i == 0 {
+				c.logger.Info("cluster scaled down to 0 pods; skipping deletion of the last pvc")
+				break
+			}
+
+			podIndex := strconv.Itoa(int(i))
+			pvcName := "pgdata-" + c.Name + "-" + podIndex
+			if err := c.KubeClient.PersistentVolumeClaims(c.Namespace).Delete(pvcName, c.deleteOptions); err != nil {
+				c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
+				// failing to delete pvc does not fail the update; Sync() may also delete unused PVCs later
+			}
+		}
+	}
 
 	// pod disruption budget
 	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances {
