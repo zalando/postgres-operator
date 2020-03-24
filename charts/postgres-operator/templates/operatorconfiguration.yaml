@@ -13,6 +13,7 @@ configuration:
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   kubernetes:
+    pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
     oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
 {{ toYaml .Values.configKubernetes | indent 4 }}
   postgres_pod_resources:

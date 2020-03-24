@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: postgres-pod
+  name: {{ include "postgres-pod.serviceAccountName" . }}
   labels:
     app.kubernetes.io/name: {{ template "postgres-operator.name" . }}
     helm.sh/chart: {{ template "postgres-operator.chart" . }}

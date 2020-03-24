@@ -103,8 +103,6 @@ configKubernetes:
   # service account definition as JSON/YAML string to be used by postgres cluster pods
   # pod_service_account_definition: ""
 
-  # name of service account to be used by postgres cluster pods
-  pod_service_account_name: "postgres-pod"
   # role binding definition as JSON/YAML string to be used by pod service account
   # pod_service_account_role_binding_definition: ""
 
@@ -284,6 +282,11 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name:
 
+podServiceAccount:
+  # The name of the ServiceAccount to be used by postgres cluster pods
+  # If not set a name is generated using the fullname template and "-pod" suffix
+  name: "postgres-pod"
+
 priorityClassName: ""
 
 resources:
@@ -305,3 +308,12 @@ tolerations: []
 # Node labels for pod assignment
 # Ref: https://kubernetes.io/docs/user-guide/node-selection/
 nodeSelector: {}
+
+controllerID:
+  # Specifies whether a controller ID should be defined for the operator
+  # Note, all postgres manifest must then contain the following annotation to be found by this operator
+  # "acid.zalan.do/controller": <controller-ID-of-the-operator>
+  create: false
+  # The name of the controller ID to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
