@@ -2068,7 +2068,7 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.connPoolName(),
 			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
@@ -2118,7 +2118,7 @@ func (c *Cluster) generateConnPoolService(spec *acidv1.PostgresSpec) *v1.Service
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.connPoolName(),
 			Namespace:   c.Namespace,
-			Labels:      c.labelsSet(true),
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
