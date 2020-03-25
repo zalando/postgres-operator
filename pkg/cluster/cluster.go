@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -48,11 +49,26 @@ type Config struct {
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 
+// K8S objects that are belongs to a connection pool
+type ConnectionPoolObjects struct {
+	Deployment *appsv1.Deployment
+	Service    *v1.Service
+
+	// It could happen that a connection pool was enabled, but the operator was
+	// not able to properly process a corresponding event or was restarted. In
+	// this case we will miss missing/require situation and a lookup function
+	// will not be installed. To avoid synchronizing it all the time to prevent
+	// this, we can remember the result in memory at least until the next
+	// restart.
+	LookupFunction bool
+}
+
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
+	ConnectionPool      *ConnectionPoolObjects
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
@@ -184,7 +200,8 @@ func (c *Cluster) isNewCluster() bool {
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
 
-	// clear our the previous state of the cluster users (in case we are running a sync).
+	// clear our the previous state of the cluster users (in case we are
+	// running a sync).
 	c.systemUsers = map[string]spec.PgUser{}
 	c.pgUsers = map[string]spec.PgUser{}
 
@@ -292,8 +309,10 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pods are ready")
 
-	// create database objects unless we are running without pods or disabled that feature explicitly
+	// create database objects unless we are running without pods or disabled
+	// that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+		c.logger.Infof("Create roles")
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
@@ -314,6 +333,26 @@ func (c *Cluster) Create() error {
 
 	if err := c.listResources(); err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
+	}
+
+	// Create connection pool deployment and services if necessary. Since we
+	// need to peform some operations with the database itself (e.g. install
+	// lookup function), do it as the last step, when everything is available.
+	//
+	// Do not consider connection pool as a strict requirement, and if
+	// something fails, report warning
+	if c.needConnectionPool() {
+		if c.ConnectionPool != nil {
+			c.logger.Warning("Connection pool already exists in the cluster")
+			return nil
+		}
+		connPool, err := c.createConnectionPool(c.installLookupFunction)
+		if err != nil {
+			c.logger.Warningf("could not create connection pool: %v", err)
+			return nil
+		}
+		c.logger.Infof("connection pool %q has been successfully created",
+			util.NameFromMeta(connPool.Deployment.ObjectMeta))
 	}
 
 	return nil
@@ -571,7 +610,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	if !reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) {
+	// connection pool needs one system user created, which is done in
+	// initUsers. Check if it needs to be called.
+	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users)
+	needConnPool := c.needConnectionPoolWorker(&newSpec.Spec)
+	if !sameUsers || needConnPool {
 		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
@@ -695,6 +738,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	// sync connection pool
+	if err := c.syncConnectionPool(oldSpec, newSpec, c.installLookupFunction); err != nil {
+		return fmt.Errorf("could not sync connection pool: %v", err)
+	}
+
 	return nil
 }
 
@@ -746,6 +794,12 @@ func (c *Cluster) Delete() {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
 	}
 
+	// Delete connection pool objects anyway, even if it's not mentioned in the
+	// manifest, just to not keep orphaned components in case if something went
+	// wrong
+	if err := c.deleteConnectionPool(); err != nil {
+		c.logger.Warningf("could not remove connection pool: %v", err)
+	}
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
@@ -811,6 +865,35 @@ func (c *Cluster) initSystemUsers() {
 		Origin:   spec.RoleOriginSystem,
 		Name:     c.OpConfig.ReplicationUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
+	}
+
+	// Connection pool user is an exception, if requested it's going to be
+	// created by operator as a normal pgUser
+	if c.needConnectionPool() {
+		// initialize empty connection pool if not done yet
+		if c.Spec.ConnectionPool == nil {
+			c.Spec.ConnectionPool = &acidv1.ConnectionPool{}
+		}
+
+		username := util.Coalesce(
+			c.Spec.ConnectionPool.User,
+			c.OpConfig.ConnectionPool.User)
+
+		// connection pooler application should be able to login with this role
+		connPoolUser := spec.PgUser{
+			Origin:   spec.RoleConnectionPool,
+			Name:     username,
+			Flags:    []string{constants.RoleFlagLogin},
+			Password: util.RandomPassword(constants.PasswordLength),
+		}
+
+		if _, exists := c.pgUsers[username]; !exists {
+			c.pgUsers[username] = connPoolUser
+		}
+
+		if _, exists := c.systemUsers[constants.ConnectionPoolUserKeyName]; !exists {
+			c.systemUsers[constants.ConnectionPoolUserKeyName] = connPoolUser
+		}
 	}
 }
 
@@ -1137,4 +1220,120 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	}
 
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
+}
+
+// Test if two connection pool configuration needs to be synced. For simplicity
+// compare not the actual K8S objects, but the configuration itself and request
+// sync if there is any difference.
+func (c *Cluster) needSyncConnPoolSpecs(oldSpec, newSpec *acidv1.ConnectionPool) (sync bool, reasons []string) {
+	reasons = []string{}
+	sync = false
+
+	changelog, err := diff.Diff(oldSpec, newSpec)
+	if err != nil {
+		c.logger.Infof("Cannot get diff, do not do anything, %+v", err)
+		return false, reasons
+	}
+
+	if len(changelog) > 0 {
+		sync = true
+	}
+
+	for _, change := range changelog {
+		msg := fmt.Sprintf("%s %+v from '%+v' to '%+v'",
+			change.Type, change.Path, change.From, change.To)
+		reasons = append(reasons, msg)
+	}
+
+	return sync, reasons
+}
+
+func syncResources(a, b *v1.ResourceRequirements) bool {
+	for _, res := range []v1.ResourceName{
+		v1.ResourceCPU,
+		v1.ResourceMemory,
+	} {
+		if !a.Limits[res].Equal(b.Limits[res]) ||
+			!a.Requests[res].Equal(b.Requests[res]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Check if we need to synchronize connection pool deployment due to new
+// defaults, that are different from what we see in the DeploymentSpec
+func (c *Cluster) needSyncConnPoolDefaults(
+	spec *acidv1.ConnectionPool,
+	deployment *appsv1.Deployment) (sync bool, reasons []string) {
+
+	reasons = []string{}
+	sync = false
+
+	config := c.OpConfig.ConnectionPool
+	podTemplate := deployment.Spec.Template
+	poolContainer := podTemplate.Spec.Containers[constants.ConnPoolContainer]
+
+	if spec == nil {
+		spec = &acidv1.ConnectionPool{}
+	}
+
+	if spec.NumberOfInstances == nil &&
+		*deployment.Spec.Replicas != *config.NumberOfInstances {
+
+		sync = true
+		msg := fmt.Sprintf("NumberOfInstances is different (having %d, required %d)",
+			*deployment.Spec.Replicas, *config.NumberOfInstances)
+		reasons = append(reasons, msg)
+	}
+
+	if spec.DockerImage == "" &&
+		poolContainer.Image != config.Image {
+
+		sync = true
+		msg := fmt.Sprintf("DockerImage is different (having %s, required %s)",
+			poolContainer.Image, config.Image)
+		reasons = append(reasons, msg)
+	}
+
+	expectedResources, err := generateResourceRequirements(spec.Resources,
+		c.makeDefaultConnPoolResources())
+
+	// An error to generate expected resources means something is not quite
+	// right, but for the purpose of robustness do not panic here, just report
+	// and ignore resources comparison (in the worst case there will be no
+	// updates for new resource values).
+	if err == nil && syncResources(&poolContainer.Resources, expectedResources) {
+		sync = true
+		msg := fmt.Sprintf("Resources are different (having %+v, required %+v)",
+			poolContainer.Resources, expectedResources)
+		reasons = append(reasons, msg)
+	}
+
+	if err != nil {
+		c.logger.Warningf("Cannot generate expected resources, %v", err)
+	}
+
+	for _, env := range poolContainer.Env {
+		if spec.User == "" && env.Name == "PGUSER" {
+			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
+
+			if ref.Name != c.credentialSecretName(config.User) {
+				sync = true
+				msg := fmt.Sprintf("Pool user is different (having %s, required %s)",
+					ref.Name, config.User)
+				reasons = append(reasons, msg)
+			}
+		}
+
+		if spec.Schema == "" && env.Name == "PGSCHEMA" && env.Value != config.Schema {
+			sync = true
+			msg := fmt.Sprintf("Pool schema is different (having %s, required %s)",
+				env.Value, config.Schema)
+			reasons = append(reasons, msg)
+		}
+	}
+
+	return sync, reasons
 }

@@ -18,6 +18,7 @@ import (
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	pkgspec "github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -32,10 +33,12 @@ const (
 	patroniPGBinariesParameterName   = "bin_dir"
 	patroniPGParametersParameterName = "parameters"
 	patroniPGHBAConfParameterName    = "pg_hba"
+	localHost                        = "127.0.0.1/32"
+	connectionPoolContainer          = "connection-pool"
+	pgPort                           = 5432
 
 	// the gid of the postgres user in the default spilo image
 	spiloPostgresGID = 103
-	localHost        = "127.0.0.1/32"
 )
 
 type pgUser struct {
@@ -71,6 +74,10 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
+func (c *Cluster) connPoolName() string {
+	return c.Name + "-pooler"
+}
+
 func (c *Cluster) endpointName(role PostgresRole) string {
 	name := c.Name
 	if role == Replica {
@@ -89,6 +96,28 @@ func (c *Cluster) serviceName(role PostgresRole) string {
 	return name
 }
 
+func (c *Cluster) serviceAddress(role PostgresRole) string {
+	service, exist := c.Services[role]
+
+	if exist {
+		return service.ObjectMeta.Name
+	}
+
+	c.logger.Warningf("No service for role %s", role)
+	return ""
+}
+
+func (c *Cluster) servicePort(role PostgresRole) string {
+	service, exist := c.Services[role]
+
+	if exist {
+		return fmt.Sprint(service.Spec.Ports[0].Port)
+	}
+
+	c.logger.Warningf("No service for role %s", role)
+	return ""
+}
+
 func (c *Cluster) podDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
@@ -97,10 +126,39 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 
 	config := c.OpConfig
 
-	defaultRequests := acidv1.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
-	defaultLimits := acidv1.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
+	defaultRequests := acidv1.ResourceDescription{
+		CPU:    config.Resources.DefaultCPURequest,
+		Memory: config.Resources.DefaultMemoryRequest,
+	}
+	defaultLimits := acidv1.ResourceDescription{
+		CPU:    config.Resources.DefaultCPULimit,
+		Memory: config.Resources.DefaultMemoryLimit,
+	}
 
-	return acidv1.Resources{ResourceRequests: defaultRequests, ResourceLimits: defaultLimits}
+	return acidv1.Resources{
+		ResourceRequests: defaultRequests,
+		ResourceLimits:   defaultLimits,
+	}
+}
+
+// Generate default resource section for connection pool deployment, to be used
+// if nothing custom is specified in the manifest
+func (c *Cluster) makeDefaultConnPoolResources() acidv1.Resources {
+	config := c.OpConfig
+
+	defaultRequests := acidv1.ResourceDescription{
+		CPU:    config.ConnectionPool.ConnPoolDefaultCPURequest,
+		Memory: config.ConnectionPool.ConnPoolDefaultMemoryRequest,
+	}
+	defaultLimits := acidv1.ResourceDescription{
+		CPU:    config.ConnectionPool.ConnPoolDefaultCPULimit,
+		Memory: config.ConnectionPool.ConnPoolDefaultMemoryLimit,
+	}
+
+	return acidv1.Resources{
+		ResourceRequests: defaultRequests,
+		ResourceLimits:   defaultLimits,
+	}
 }
 
 func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
@@ -124,12 +182,12 @@ func generateResourceRequirements(resources acidv1.Resources, defaultResources a
 	return &result, nil
 }
 
-func fillResourceList(pgSpec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
+func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
 	var err error
 	requests := v1.ResourceList{}
 
-	if pgSpec.CPU != "" {
-		requests[v1.ResourceCPU], err = resource.ParseQuantity(pgSpec.CPU)
+	if spec.CPU != "" {
+		requests[v1.ResourceCPU], err = resource.ParseQuantity(spec.CPU)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse CPU quantity: %v", err)
 		}
@@ -139,8 +197,8 @@ func fillResourceList(pgSpec acidv1.ResourceDescription, defaults acidv1.Resourc
 			return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
 		}
 	}
-	if pgSpec.Memory != "" {
-		requests[v1.ResourceMemory], err = resource.ParseQuantity(pgSpec.Memory)
+	if spec.Memory != "" {
+		requests[v1.ResourceMemory], err = resource.ParseQuantity(spec.Memory)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse memory quantity: %v", err)
 		}
@@ -320,7 +378,11 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 		return *tolerationsSpec
 	}
 
-	if len(podToleration["key"]) > 0 || len(podToleration["operator"]) > 0 || len(podToleration["value"]) > 0 || len(podToleration["effect"]) > 0 {
+	if len(podToleration["key"]) > 0 ||
+		len(podToleration["operator"]) > 0 ||
+		len(podToleration["value"]) > 0 ||
+		len(podToleration["effect"]) > 0 {
+
 		return []v1.Toleration{
 			{
 				Key:      podToleration["key"],
@@ -424,9 +486,9 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 
 // Check whether or not we're requested to mount an shm volume,
 // taking into account that PostgreSQL manifest has precedence.
-func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) *bool {
-	if pgSpec.ShmVolume != nil && *pgSpec.ShmVolume {
-		return pgSpec.ShmVolume
+func mountShmVolumeNeeded(opConfig config.Config, spec *acidv1.PostgresSpec) *bool {
+	if spec.ShmVolume != nil && *spec.ShmVolume {
+		return spec.ShmVolume
 	}
 
 	return opConfig.ShmVolume
@@ -551,10 +613,6 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 			Value: c.OpConfig.PodRoleLabel,
 		},
 		{
-			Name:  "KUBERNETES_LABELS",
-			Value: labels.Set(c.OpConfig.ClusterLabels).String(),
-		},
-		{
 			Name: "PGPASSWORD_SUPERUSER",
 			ValueFrom: &v1.EnvVarSource{
 				SecretKeyRef: &v1.SecretKeySelector{
@@ -588,6 +646,12 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 			Name:  "HUMAN_ROLE",
 			Value: c.OpConfig.PamRoleName,
 		},
+	}
+	// Spilo expects cluster labels as JSON
+	if clusterLabels, err := json.Marshal(labels.Set(c.OpConfig.ClusterLabels)); err != nil {
+		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_LABELS", Value: labels.Set(c.OpConfig.ClusterLabels).String()})
+	} else {
+		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_LABELS", Value: string(clusterLabels)})
 	}
 	if spiloConfiguration != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "SPILO_CONFIGURATION", Value: spiloConfiguration})
@@ -767,7 +831,7 @@ func (c *Cluster) getNewPgVersion(container v1.Container, newPgVersion string) (
 	return newPgVersion, nil
 }
 
-func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
+func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
 		err                 error
@@ -783,14 +847,14 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 
 		// controller adjusts the default memory request at operator startup
 
-		request := pgSpec.Resources.ResourceRequests.Memory
+		request := spec.Resources.ResourceRequests.Memory
 		if request == "" {
-			request = c.OpConfig.DefaultMemoryRequest
+			request = c.OpConfig.Resources.DefaultMemoryRequest
 		}
 
-		limit := pgSpec.Resources.ResourceLimits.Memory
+		limit := spec.Resources.ResourceLimits.Memory
 		if limit == "" {
-			limit = c.OpConfig.DefaultMemoryLimit
+			limit = c.OpConfig.Resources.DefaultMemoryLimit
 		}
 
 		isSmaller, err := util.IsSmallerQuantity(request, limit)
@@ -799,7 +863,7 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 		}
 		if isSmaller {
 			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
-			pgSpec.Resources.ResourceRequests.Memory = limit
+			spec.Resources.ResourceRequests.Memory = limit
 
 		}
 
@@ -807,17 +871,17 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 		// as this sidecar is managed separately
 
 		// adjust sidecar containers defined for that particular cluster
-		for _, sidecar := range pgSpec.Sidecars {
+		for _, sidecar := range spec.Sidecars {
 
 			// TODO #413
 			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
 			if request == "" {
-				request = c.OpConfig.DefaultMemoryRequest
+				request = c.OpConfig.Resources.DefaultMemoryRequest
 			}
 
 			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
 			if limit == "" {
-				limit = c.OpConfig.DefaultMemoryLimit
+				limit = c.OpConfig.Resources.DefaultMemoryLimit
 			}
 
 			isSmaller, err := util.IsSmallerQuantity(sidecarRequest, sidecarLimit)
@@ -834,21 +898,21 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 
 	defaultResources := c.makeDefaultResources()
 
-	resourceRequirements, err := generateResourceRequirements(pgSpec.Resources, defaultResources)
+	resourceRequirements, err := generateResourceRequirements(spec.Resources, defaultResources)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
 	}
 
-	if pgSpec.InitContainers != nil && len(pgSpec.InitContainers) > 0 {
+	if spec.InitContainers != nil && len(spec.InitContainers) > 0 {
 		if c.OpConfig.EnableInitContainers != nil && !(*c.OpConfig.EnableInitContainers) {
 			c.logger.Warningf("initContainers specified but disabled in configuration - next statefulset creation would fail")
 		}
-		initContainers = pgSpec.InitContainers
+		initContainers = spec.InitContainers
 	}
 
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
 
-	if c.OpConfig.PodEnvironmentConfigMap != (spec.NamespacedName{}) {
+	if c.OpConfig.PodEnvironmentConfigMap != (pkgspec.NamespacedName{}) {
 		var cm *v1.ConfigMap
 		cm, err = c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap.Name, metav1.GetOptions{})
 		if err != nil {
@@ -866,33 +930,33 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 		sort.Slice(customPodEnvVarsList,
 			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 	}
-	if pgSpec.StandbyCluster != nil && pgSpec.StandbyCluster.S3WalPath == "" {
+	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" {
 		return nil, fmt.Errorf("s3_wal_path is empty for standby cluster")
 	}
 
 	// backward compatible check for InitContainers
-	if pgSpec.InitContainersOld != nil {
+	if spec.InitContainersOld != nil {
 		msg := "Manifest parameter init_containers is deprecated."
-		if pgSpec.InitContainers == nil {
+		if spec.InitContainers == nil {
 			c.logger.Warningf("%s Consider using initContainers instead.", msg)
-			pgSpec.InitContainers = pgSpec.InitContainersOld
+			spec.InitContainers = spec.InitContainersOld
 		} else {
 			c.logger.Warningf("%s Only value from initContainers is used", msg)
 		}
 	}
 
 	// backward compatible check for PodPriorityClassName
-	if pgSpec.PodPriorityClassNameOld != "" {
+	if spec.PodPriorityClassNameOld != "" {
 		msg := "Manifest parameter pod_priority_class_name is deprecated."
-		if pgSpec.PodPriorityClassName == "" {
+		if spec.PodPriorityClassName == "" {
 			c.logger.Warningf("%s Consider using podPriorityClassName instead.", msg)
-			pgSpec.PodPriorityClassName = pgSpec.PodPriorityClassNameOld
+			spec.PodPriorityClassName = spec.PodPriorityClassNameOld
 		} else {
 			c.logger.Warningf("%s Only value from podPriorityClassName is used", msg)
 		}
 	}
 
-	spiloConfiguration, err := generateSpiloJSONConfiguration(&pgSpec.PostgresqlParam, &pgSpec.Patroni, c.OpConfig.PamRoleName, c.logger)
+	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
 	}
@@ -901,24 +965,24 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 	spiloEnvVars := c.generateSpiloPodEnvVars(
 		c.Postgresql.GetUID(),
 		spiloConfiguration,
-		&pgSpec.Clone,
-		pgSpec.StandbyCluster,
+		&spec.Clone,
+		spec.StandbyCluster,
 		customPodEnvVarsList,
 	)
 
 	// pickup the docker image for the spilo container
-	effectiveDockerImage := util.Coalesce(pgSpec.DockerImage, c.OpConfig.DockerImage)
+	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
 
 	// determine the FSGroup for the spilo pod
 	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
-	if pgSpec.SpiloFSGroup != nil {
-		effectiveFSGroup = pgSpec.SpiloFSGroup
+	if spec.SpiloFSGroup != nil {
+		effectiveFSGroup = spec.SpiloFSGroup
 	}
 
-	volumeMounts := generateVolumeMounts(pgSpec.Volume)
+	volumeMounts := generateVolumeMounts(spec.Volume)
 
 	// configure TLS with a custom secret volume
-	if pgSpec.TLS != nil && pgSpec.TLS.SecretName != "" {
+	if spec.TLS != nil && spec.TLS.SecretName != "" {
 		if effectiveFSGroup == nil {
 			c.logger.Warnf("Setting the default FSGroup to satisfy the TLS configuration")
 			fsGroup := int64(spiloPostgresGID)
@@ -931,7 +995,7 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 			Name: "tls-secret",
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
-					SecretName:  pgSpec.TLS.SecretName,
+					SecretName:  spec.TLS.SecretName,
 					DefaultMode: &defaultMode,
 				},
 			},
@@ -945,16 +1009,16 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 		})
 
 		// use the same filenames as Secret resources by default
-		certFile := ensurePath(pgSpec.TLS.CertificateFile, mountPath, "tls.crt")
-		privateKeyFile := ensurePath(pgSpec.TLS.PrivateKeyFile, mountPath, "tls.key")
+		certFile := ensurePath(spec.TLS.CertificateFile, mountPath, "tls.crt")
+		privateKeyFile := ensurePath(spec.TLS.PrivateKeyFile, mountPath, "tls.key")
 		spiloEnvVars = append(
 			spiloEnvVars,
 			v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: certFile},
 			v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: privateKeyFile},
 		)
 
-		if pgSpec.TLS.CAFile != "" {
-			caFile := ensurePath(pgSpec.TLS.CAFile, mountPath, "")
+		if spec.TLS.CAFile != "" {
+			caFile := ensurePath(spec.TLS.CAFile, mountPath, "")
 			spiloEnvVars = append(
 				spiloEnvVars,
 				v1.EnvVar{Name: "SSL_CA_FILE", Value: caFile},
@@ -973,7 +1037,7 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 	)
 
 	// resolve conflicts between operator-global and per-cluster sidecars
-	sideCars := c.mergeSidecars(pgSpec.Sidecars)
+	sideCars := c.mergeSidecars(spec.Sidecars)
 
 	resourceRequirementsScalyrSidecar := makeResources(
 		c.OpConfig.ScalyrCPURequest,
@@ -1003,10 +1067,10 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 		}
 	}
 
-	tolerationSpec := tolerations(&pgSpec.Tolerations, c.OpConfig.PodToleration)
-	effectivePodPriorityClassName := util.Coalesce(pgSpec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
+	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	annotations := c.generatePodAnnotations(pgSpec)
+	annotations := c.generatePodAnnotations(spec)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	podTemplate, err = generatePodTemplate(
@@ -1023,7 +1087,7 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
 		effectivePodPriorityClassName,
-		mountShmVolumeNeeded(c.OpConfig, pgSpec),
+		mountShmVolumeNeeded(c.OpConfig, spec),
 		c.OpConfig.EnablePodAntiAffinity,
 		c.OpConfig.PodAntiAffinityTopologyKey,
 		c.OpConfig.AdditionalSecretMount,
@@ -1034,12 +1098,12 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
 
-	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(pgSpec.Volume.Size,
-		pgSpec.Volume.StorageClass); err != nil {
+	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
+		spec.Volume.StorageClass); err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
-	numberOfInstances := c.getNumberOfInstances(pgSpec)
+	numberOfInstances := c.getNumberOfInstances(spec)
 
 	// the operator has domain-specific logic on how to do rolling updates of PG clusters
 	// so we do not use default rolling updates implemented by stateful sets
@@ -1076,13 +1140,13 @@ func (c *Cluster) generateStatefulSet(pgSpec *acidv1.PostgresSpec) (*appsv1.Stat
 	return statefulSet, nil
 }
 
-func (c *Cluster) generatePodAnnotations(pgSpec *acidv1.PostgresSpec) map[string]string {
+func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
 	for k, v := range c.OpConfig.CustomPodAnnotations {
 		annotations[k] = v
 	}
-	if pgSpec != nil || pgSpec.PodAnnotations != nil {
-		for k, v := range pgSpec.PodAnnotations {
+	if spec != nil || spec.PodAnnotations != nil {
+		for k, v := range spec.PodAnnotations {
 			annotations[k] = v
 		}
 	}
@@ -1148,13 +1212,13 @@ func (c *Cluster) mergeSidecars(sidecars []acidv1.Sidecar) []acidv1.Sidecar {
 	return result
 }
 
-func (c *Cluster) getNumberOfInstances(pgSpec *acidv1.PostgresSpec) int32 {
+func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	min := c.OpConfig.MinInstances
 	max := c.OpConfig.MaxInstances
-	cur := pgSpec.NumberOfInstances
+	cur := spec.NumberOfInstances
 	newcur := cur
 
-	if pgSpec.StandbyCluster != nil {
+	if spec.StandbyCluster != nil {
 		if newcur == 1 {
 			min = newcur
 			max = newcur
@@ -1309,15 +1373,15 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	return &secret
 }
 
-func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, pgSpec *acidv1.PostgresSpec) bool {
+func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *acidv1.PostgresSpec) bool {
 
 	switch role {
 
 	case Replica:
 
 		// if the value is explicitly set in a Postgresql manifest, follow this setting
-		if pgSpec.EnableReplicaLoadBalancer != nil {
-			return *pgSpec.EnableReplicaLoadBalancer
+		if spec.EnableReplicaLoadBalancer != nil {
+			return *spec.EnableReplicaLoadBalancer
 		}
 
 		// otherwise, follow the operator configuration
@@ -1325,8 +1389,8 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, pgSpec *
 
 	case Master:
 
-		if pgSpec.EnableMasterLoadBalancer != nil {
-			return *pgSpec.EnableMasterLoadBalancer
+		if spec.EnableMasterLoadBalancer != nil {
+			return *spec.EnableMasterLoadBalancer
 		}
 
 		return c.OpConfig.EnableMasterLoadBalancer
@@ -1337,7 +1401,7 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, pgSpec *
 
 }
 
-func (c *Cluster) generateService(role PostgresRole, pgSpec *acidv1.PostgresSpec) *v1.Service {
+func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 		Type:  v1.ServiceTypeClusterIP,
@@ -1347,12 +1411,12 @@ func (c *Cluster) generateService(role PostgresRole, pgSpec *acidv1.PostgresSpec
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
 
-	if c.shouldCreateLoadBalancerForService(role, pgSpec) {
+	if c.shouldCreateLoadBalancerForService(role, spec) {
 
-		// pgSpec.AllowedSourceRanges evaluates to the empty slice of zero length
+		// spec.AllowedSourceRanges evaluates to the empty slice of zero length
 		// when omitted or set to 'null'/empty sequence in the PG manifest
-		if len(pgSpec.AllowedSourceRanges) > 0 {
-			serviceSpec.LoadBalancerSourceRanges = pgSpec.AllowedSourceRanges
+		if len(spec.AllowedSourceRanges) > 0 {
+			serviceSpec.LoadBalancerSourceRanges = spec.AllowedSourceRanges
 		} else {
 			// safe default value: lock a load balancer only to the local address unless overridden explicitly
 			serviceSpec.LoadBalancerSourceRanges = []string{localHost}
@@ -1371,7 +1435,7 @@ func (c *Cluster) generateService(role PostgresRole, pgSpec *acidv1.PostgresSpec
 			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
 			Labels:      c.roleLabelsSet(true, role),
-			Annotations: c.generateServiceAnnotations(role, pgSpec),
+			Annotations: c.generateServiceAnnotations(role, spec),
 		},
 		Spec: serviceSpec,
 	}
@@ -1379,19 +1443,19 @@ func (c *Cluster) generateService(role PostgresRole, pgSpec *acidv1.PostgresSpec
 	return service
 }
 
-func (c *Cluster) generateServiceAnnotations(role PostgresRole, pgSpec *acidv1.PostgresSpec) map[string]string {
+func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
 
 	for k, v := range c.OpConfig.CustomServiceAnnotations {
 		annotations[k] = v
 	}
-	if pgSpec != nil || pgSpec.ServiceAnnotations != nil {
-		for k, v := range pgSpec.ServiceAnnotations {
+	if spec != nil || spec.ServiceAnnotations != nil {
+		for k, v := range spec.ServiceAnnotations {
 			annotations[k] = v
 		}
 	}
 
-	if c.shouldCreateLoadBalancerForService(role, pgSpec) {
+	if c.shouldCreateLoadBalancerForService(role, spec) {
 		var dnsName string
 		if role == Master {
 			dnsName = c.masterDNSName()
@@ -1777,6 +1841,306 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return "logical-backup-" + c.clusterName().Name
+}
+
+// Generate pool size related environment variables.
+//
+// MAX_DB_CONN would specify the global maximum for connections to a target
+// 	database.
+//
+// MAX_CLIENT_CONN is not configurable at the moment, just set it high enough.
+//
+// DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
+// 	most of the queries coming through a connection pooler are from the same
+// 	user to the same db). In case if we want to spin up more connection pool
+// 	instances, take this into account and maintain the same number of
+// 	connections.
+//
+// MIN_SIZE is a pool minimal size, to prevent situation when sudden workload
+// 	have to wait for spinning up a new connections.
+//
+// RESERVE_SIZE is how many additional connections to allow for a pool.
+func (c *Cluster) getConnPoolEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
+	effectiveMode := util.Coalesce(
+		spec.ConnectionPool.Mode,
+		c.OpConfig.ConnectionPool.Mode)
+
+	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	if numberOfInstances == nil {
+		numberOfInstances = util.CoalesceInt32(
+			c.OpConfig.ConnectionPool.NumberOfInstances,
+			k8sutil.Int32ToPointer(1))
+	}
+
+	effectiveMaxDBConn := util.CoalesceInt32(
+		spec.ConnectionPool.MaxDBConnections,
+		c.OpConfig.ConnectionPool.MaxDBConnections)
+
+	if effectiveMaxDBConn == nil {
+		effectiveMaxDBConn = k8sutil.Int32ToPointer(
+			constants.ConnPoolMaxDBConnections)
+	}
+
+	maxDBConn := *effectiveMaxDBConn / *numberOfInstances
+
+	defaultSize := maxDBConn / 2
+	minSize := defaultSize / 2
+	reserveSize := minSize
+
+	return []v1.EnvVar{
+		{
+			Name:  "CONNECTION_POOL_PORT",
+			Value: fmt.Sprint(pgPort),
+		},
+		{
+			Name:  "CONNECTION_POOL_MODE",
+			Value: effectiveMode,
+		},
+		{
+			Name:  "CONNECTION_POOL_DEFAULT_SIZE",
+			Value: fmt.Sprint(defaultSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_MIN_SIZE",
+			Value: fmt.Sprint(minSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_RESERVE_SIZE",
+			Value: fmt.Sprint(reserveSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_MAX_CLIENT_CONN",
+			Value: fmt.Sprint(constants.ConnPoolMaxClientConnections),
+		},
+		{
+			Name:  "CONNECTION_POOL_MAX_DB_CONN",
+			Value: fmt.Sprint(maxDBConn),
+		},
+	}
+}
+
+func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
+	*v1.PodTemplateSpec, error) {
+
+	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
+	resources, err := generateResourceRequirements(
+		spec.ConnectionPool.Resources,
+		c.makeDefaultConnPoolResources())
+
+	effectiveDockerImage := util.Coalesce(
+		spec.ConnectionPool.DockerImage,
+		c.OpConfig.ConnectionPool.Image)
+
+	effectiveSchema := util.Coalesce(
+		spec.ConnectionPool.Schema,
+		c.OpConfig.ConnectionPool.Schema)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+
+	secretSelector := func(key string) *v1.SecretKeySelector {
+		effectiveUser := util.Coalesce(
+			spec.ConnectionPool.User,
+			c.OpConfig.ConnectionPool.User)
+
+		return &v1.SecretKeySelector{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: c.credentialSecretName(effectiveUser),
+			},
+			Key: key,
+		}
+	}
+
+	envVars := []v1.EnvVar{
+		{
+			Name:  "PGHOST",
+			Value: c.serviceAddress(Master),
+		},
+		{
+			Name:  "PGPORT",
+			Value: c.servicePort(Master),
+		},
+		{
+			Name: "PGUSER",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: secretSelector("username"),
+			},
+		},
+		// the convention is to use the same schema name as
+		// connection pool username
+		{
+			Name:  "PGSCHEMA",
+			Value: effectiveSchema,
+		},
+		{
+			Name: "PGPASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: secretSelector("password"),
+			},
+		},
+	}
+
+	envVars = append(envVars, c.getConnPoolEnvVars(spec)...)
+
+	poolerContainer := v1.Container{
+		Name:            connectionPoolContainer,
+		Image:           effectiveDockerImage,
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Resources:       *resources,
+		Ports: []v1.ContainerPort{
+			{
+				ContainerPort: pgPort,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+		Env: envVars,
+	}
+
+	podTemplate := &v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Namespace:   c.Namespace,
+			Annotations: c.generatePodAnnotations(spec),
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
+			TerminationGracePeriodSeconds: &gracePeriod,
+			Containers:                    []v1.Container{poolerContainer},
+			// TODO: add tolerations to scheduler pooler on the same node
+			// as database
+			//Tolerations:                   *tolerationsSpec,
+		},
+	}
+
+	return podTemplate, nil
+}
+
+// Return an array of ownerReferences to make an arbitraty object dependent on
+// the StatefulSet. Dependency is made on StatefulSet instead of PostgreSQL CRD
+// while the former is represent the actual state, and only it's deletion means
+// we delete the cluster (e.g. if CRD was deleted, StatefulSet somehow
+// survived, we can't delete an object because it will affect the functioning
+// cluster).
+func (c *Cluster) ownerReferences() []metav1.OwnerReference {
+	controller := true
+
+	if c.Statefulset == nil {
+		c.logger.Warning("Cannot get owner reference, no statefulset")
+		return []metav1.OwnerReference{}
+	}
+
+	return []metav1.OwnerReference{
+		{
+			UID:        c.Statefulset.ObjectMeta.UID,
+			APIVersion: "apps/v1",
+			Kind:       "StatefulSet",
+			Name:       c.Statefulset.ObjectMeta.Name,
+			Controller: &controller,
+		},
+	}
+}
+
+func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
+	*appsv1.Deployment, error) {
+
+	// there are two ways to enable connection pooler, either to specify a
+	// connectionPool section or enableConnectionPool. In the second case
+	// spec.connectionPool will be nil, so to make it easier to calculate
+	// default values, initialize it to an empty structure. It could be done
+	// anywhere, but here is the earliest common entry point between sync and
+	// create code, so init here.
+	if spec.ConnectionPool == nil {
+		spec.ConnectionPool = &acidv1.ConnectionPool{}
+	}
+
+	podTemplate, err := c.generateConnPoolPodTemplate(spec)
+	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	if numberOfInstances == nil {
+		numberOfInstances = util.CoalesceInt32(
+			c.OpConfig.ConnectionPool.NumberOfInstances,
+			k8sutil.Int32ToPointer(1))
+	}
+
+	if *numberOfInstances < constants.ConnPoolMinInstances {
+		msg := "Adjusted number of connection pool instances from %d to %d"
+		c.logger.Warningf(msg, numberOfInstances, constants.ConnPoolMinInstances)
+
+		*numberOfInstances = constants.ConnPoolMinInstances
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.connPoolName(),
+			Namespace:   c.Namespace,
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Annotations: map[string]string{},
+			// make StatefulSet object its owner to represent the dependency.
+			// By itself StatefulSet is being deleted with "Orphaned"
+			// propagation policy, which means that it's deletion will not
+			// clean up this deployment, but there is a hope that this object
+			// will be garbage collected if something went wrong and operator
+			// didn't deleted it.
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: numberOfInstances,
+			Selector: c.connPoolLabelsSelector(),
+			Template: *podTemplate,
+		},
+	}
+
+	return deployment, nil
+}
+
+func (c *Cluster) generateConnPoolService(spec *acidv1.PostgresSpec) *v1.Service {
+
+	// there are two ways to enable connection pooler, either to specify a
+	// connectionPool section or enableConnectionPool. In the second case
+	// spec.connectionPool will be nil, so to make it easier to calculate
+	// default values, initialize it to an empty structure. It could be done
+	// anywhere, but here is the earliest common entry point between sync and
+	// create code, so init here.
+	if spec.ConnectionPool == nil {
+		spec.ConnectionPool = &acidv1.ConnectionPool{}
+	}
+
+	serviceSpec := v1.ServiceSpec{
+		Ports: []v1.ServicePort{
+			{
+				Name:       c.connPoolName(),
+				Port:       pgPort,
+				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
+			},
+		},
+		Type: v1.ServiceTypeClusterIP,
+		Selector: map[string]string{
+			"connection-pool": c.connPoolName(),
+		},
+	}
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.connPoolName(),
+			Namespace:   c.Namespace,
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Annotations: map[string]string{},
+			// make StatefulSet object its owner to represent the dependency.
+			// By itself StatefulSet is being deleted with "Orphaned"
+			// propagation policy, which means that it's deletion will not
+			// clean up this service, but there is a hope that this object will
+			// be garbage collected if something went wrong and operator didn't
+			// deleted it.
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: serviceSpec,
+	}
+
+	return service
 }
 
 func ensurePath(file string, defaultDir string, defaultFile string) string {
