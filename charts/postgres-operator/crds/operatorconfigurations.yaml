@@ -318,6 +318,47 @@ spec:
                   pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                 scalyr_server_url:
                   type: string
+            connection_pool:
+              type: object
+              properties:
+                connection_pool_schema:
+                  type: string
+                  #default: "pooler"
+                connection_pool_user:
+                  type: string
+                  #default: "pooler"
+                connection_pool_image:
+                  type: string
+                  #default: "registry.opensource.zalan.do/acid/pgbouncer"
+                connection_pool_max_db_connections:
+                  type: integer
+                  #default: 60
+                connection_pool_mode:
+                  type: string
+                  enum:
+                    - "session"
+                    - "transaction"
+                  #default: "transaction"
+                connection_pool_number_of_instances:
+                  type: integer
+                  minimum: 2
+                  #default: 2
+                connection_pool_default_cpu_limit:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                  #default: "1"
+                connection_pool_default_cpu_request:
+                  type: string
+                  pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                  #default: "500m"
+                connection_pool_default_memory_limit:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                  #default: "100Mi"
+                connection_pool_default_memory_request:
+                  type: string
+                  pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                  #default: "100Mi"
         status:
           type: object
           additionalProperties:

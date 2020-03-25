@@ -21,6 +21,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,10 +32,12 @@ const (
 	patroniPGBinariesParameterName   = "bin_dir"
 	patroniPGParametersParameterName = "parameters"
 	patroniPGHBAConfParameterName    = "pg_hba"
+	localHost                        = "127.0.0.1/32"
+	connectionPoolContainer          = "connection-pool"
+	pgPort                           = 5432
 
 	// the gid of the postgres user in the default spilo image
 	spiloPostgresGID = 103
-	localHost        = "127.0.0.1/32"
 )
 
 type pgUser struct {
@@ -70,6 +73,10 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
+func (c *Cluster) connPoolName() string {
+	return c.Name + "-pooler"
+}
+
 func (c *Cluster) endpointName(role PostgresRole) string {
 	name := c.Name
 	if role == Replica {
@@ -88,6 +95,28 @@ func (c *Cluster) serviceName(role PostgresRole) string {
 	return name
 }
 
+func (c *Cluster) serviceAddress(role PostgresRole) string {
+	service, exist := c.Services[role]
+
+	if exist {
+		return service.ObjectMeta.Name
+	}
+
+	c.logger.Warningf("No service for role %s", role)
+	return ""
+}
+
+func (c *Cluster) servicePort(role PostgresRole) string {
+	service, exist := c.Services[role]
+
+	if exist {
+		return fmt.Sprint(service.Spec.Ports[0].Port)
+	}
+
+	c.logger.Warningf("No service for role %s", role)
+	return ""
+}
+
 func (c *Cluster) podDisruptionBudgetName() string {
 	return c.OpConfig.PDBNameFormat.Format("cluster", c.Name)
 }
@@ -96,10 +125,39 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 
 	config := c.OpConfig
 
-	defaultRequests := acidv1.ResourceDescription{CPU: config.DefaultCPURequest, Memory: config.DefaultMemoryRequest}
-	defaultLimits := acidv1.ResourceDescription{CPU: config.DefaultCPULimit, Memory: config.DefaultMemoryLimit}
+	defaultRequests := acidv1.ResourceDescription{
+		CPU:    config.Resources.DefaultCPURequest,
+		Memory: config.Resources.DefaultMemoryRequest,
+	}
+	defaultLimits := acidv1.ResourceDescription{
+		CPU:    config.Resources.DefaultCPULimit,
+		Memory: config.Resources.DefaultMemoryLimit,
+	}
 
-	return acidv1.Resources{ResourceRequests: defaultRequests, ResourceLimits: defaultLimits}
+	return acidv1.Resources{
+		ResourceRequests: defaultRequests,
+		ResourceLimits:   defaultLimits,
+	}
+}
+
+// Generate default resource section for connection pool deployment, to be used
+// if nothing custom is specified in the manifest
+func (c *Cluster) makeDefaultConnPoolResources() acidv1.Resources {
+	config := c.OpConfig
+
+	defaultRequests := acidv1.ResourceDescription{
+		CPU:    config.ConnectionPool.ConnPoolDefaultCPURequest,
+		Memory: config.ConnectionPool.ConnPoolDefaultMemoryRequest,
+	}
+	defaultLimits := acidv1.ResourceDescription{
+		CPU:    config.ConnectionPool.ConnPoolDefaultCPULimit,
+		Memory: config.ConnectionPool.ConnPoolDefaultMemoryLimit,
+	}
+
+	return acidv1.Resources{
+		ResourceRequests: defaultRequests,
+		ResourceLimits:   defaultLimits,
+	}
 }
 
 func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
@@ -319,7 +377,11 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 		return *tolerationsSpec
 	}
 
-	if len(podToleration["key"]) > 0 || len(podToleration["operator"]) > 0 || len(podToleration["value"]) > 0 || len(podToleration["effect"]) > 0 {
+	if len(podToleration["key"]) > 0 ||
+		len(podToleration["operator"]) > 0 ||
+		len(podToleration["value"]) > 0 ||
+		len(podToleration["effect"]) > 0 {
+
 		return []v1.Toleration{
 			{
 				Key:      podToleration["key"],
@@ -786,12 +848,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 		request := spec.Resources.ResourceRequests.Memory
 		if request == "" {
-			request = c.OpConfig.DefaultMemoryRequest
+			request = c.OpConfig.Resources.DefaultMemoryRequest
 		}
 
 		limit := spec.Resources.ResourceLimits.Memory
 		if limit == "" {
-			limit = c.OpConfig.DefaultMemoryLimit
+			limit = c.OpConfig.Resources.DefaultMemoryLimit
 		}
 
 		isSmaller, err := util.IsSmallerQuantity(request, limit)
@@ -813,12 +875,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			// TODO #413
 			sidecarRequest := sidecar.Resources.ResourceRequests.Memory
 			if request == "" {
-				request = c.OpConfig.DefaultMemoryRequest
+				request = c.OpConfig.Resources.DefaultMemoryRequest
 			}
 
 			sidecarLimit := sidecar.Resources.ResourceLimits.Memory
 			if limit == "" {
-				limit = c.OpConfig.DefaultMemoryLimit
+				limit = c.OpConfig.Resources.DefaultMemoryLimit
 			}
 
 			isSmaller, err := util.IsSmallerQuantity(sidecarRequest, sidecarLimit)
@@ -1772,6 +1834,306 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return "logical-backup-" + c.clusterName().Name
+}
+
+// Generate pool size related environment variables.
+//
+// MAX_DB_CONN would specify the global maximum for connections to a target
+// 	database.
+//
+// MAX_CLIENT_CONN is not configurable at the moment, just set it high enough.
+//
+// DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
+// 	most of the queries coming through a connection pooler are from the same
+// 	user to the same db). In case if we want to spin up more connection pool
+// 	instances, take this into account and maintain the same number of
+// 	connections.
+//
+// MIN_SIZE is a pool minimal size, to prevent situation when sudden workload
+// 	have to wait for spinning up a new connections.
+//
+// RESERVE_SIZE is how many additional connections to allow for a pool.
+func (c *Cluster) getConnPoolEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
+	effectiveMode := util.Coalesce(
+		spec.ConnectionPool.Mode,
+		c.OpConfig.ConnectionPool.Mode)
+
+	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	if numberOfInstances == nil {
+		numberOfInstances = util.CoalesceInt32(
+			c.OpConfig.ConnectionPool.NumberOfInstances,
+			k8sutil.Int32ToPointer(1))
+	}
+
+	effectiveMaxDBConn := util.CoalesceInt32(
+		spec.ConnectionPool.MaxDBConnections,
+		c.OpConfig.ConnectionPool.MaxDBConnections)
+
+	if effectiveMaxDBConn == nil {
+		effectiveMaxDBConn = k8sutil.Int32ToPointer(
+			constants.ConnPoolMaxDBConnections)
+	}
+
+	maxDBConn := *effectiveMaxDBConn / *numberOfInstances
+
+	defaultSize := maxDBConn / 2
+	minSize := defaultSize / 2
+	reserveSize := minSize
+
+	return []v1.EnvVar{
+		{
+			Name:  "CONNECTION_POOL_PORT",
+			Value: fmt.Sprint(pgPort),
+		},
+		{
+			Name:  "CONNECTION_POOL_MODE",
+			Value: effectiveMode,
+		},
+		{
+			Name:  "CONNECTION_POOL_DEFAULT_SIZE",
+			Value: fmt.Sprint(defaultSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_MIN_SIZE",
+			Value: fmt.Sprint(minSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_RESERVE_SIZE",
+			Value: fmt.Sprint(reserveSize),
+		},
+		{
+			Name:  "CONNECTION_POOL_MAX_CLIENT_CONN",
+			Value: fmt.Sprint(constants.ConnPoolMaxClientConnections),
+		},
+		{
+			Name:  "CONNECTION_POOL_MAX_DB_CONN",
+			Value: fmt.Sprint(maxDBConn),
+		},
+	}
+}
+
+func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
+	*v1.PodTemplateSpec, error) {
+
+	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
+	resources, err := generateResourceRequirements(
+		spec.ConnectionPool.Resources,
+		c.makeDefaultConnPoolResources())
+
+	effectiveDockerImage := util.Coalesce(
+		spec.ConnectionPool.DockerImage,
+		c.OpConfig.ConnectionPool.Image)
+
+	effectiveSchema := util.Coalesce(
+		spec.ConnectionPool.Schema,
+		c.OpConfig.ConnectionPool.Schema)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
+	}
+
+	secretSelector := func(key string) *v1.SecretKeySelector {
+		effectiveUser := util.Coalesce(
+			spec.ConnectionPool.User,
+			c.OpConfig.ConnectionPool.User)
+
+		return &v1.SecretKeySelector{
+			LocalObjectReference: v1.LocalObjectReference{
+				Name: c.credentialSecretName(effectiveUser),
+			},
+			Key: key,
+		}
+	}
+
+	envVars := []v1.EnvVar{
+		{
+			Name:  "PGHOST",
+			Value: c.serviceAddress(Master),
+		},
+		{
+			Name:  "PGPORT",
+			Value: c.servicePort(Master),
+		},
+		{
+			Name: "PGUSER",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: secretSelector("username"),
+			},
+		},
+		// the convention is to use the same schema name as
+		// connection pool username
+		{
+			Name:  "PGSCHEMA",
+			Value: effectiveSchema,
+		},
+		{
+			Name: "PGPASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: secretSelector("password"),
+			},
+		},
+	}
+
+	envVars = append(envVars, c.getConnPoolEnvVars(spec)...)
+
+	poolerContainer := v1.Container{
+		Name:            connectionPoolContainer,
+		Image:           effectiveDockerImage,
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Resources:       *resources,
+		Ports: []v1.ContainerPort{
+			{
+				ContainerPort: pgPort,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+		Env: envVars,
+	}
+
+	podTemplate := &v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Namespace:   c.Namespace,
+			Annotations: c.generatePodAnnotations(spec),
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
+			TerminationGracePeriodSeconds: &gracePeriod,
+			Containers:                    []v1.Container{poolerContainer},
+			// TODO: add tolerations to scheduler pooler on the same node
+			// as database
+			//Tolerations:                   *tolerationsSpec,
+		},
+	}
+
+	return podTemplate, nil
+}
+
+// Return an array of ownerReferences to make an arbitraty object dependent on
+// the StatefulSet. Dependency is made on StatefulSet instead of PostgreSQL CRD
+// while the former is represent the actual state, and only it's deletion means
+// we delete the cluster (e.g. if CRD was deleted, StatefulSet somehow
+// survived, we can't delete an object because it will affect the functioning
+// cluster).
+func (c *Cluster) ownerReferences() []metav1.OwnerReference {
+	controller := true
+
+	if c.Statefulset == nil {
+		c.logger.Warning("Cannot get owner reference, no statefulset")
+		return []metav1.OwnerReference{}
+	}
+
+	return []metav1.OwnerReference{
+		{
+			UID:        c.Statefulset.ObjectMeta.UID,
+			APIVersion: "apps/v1",
+			Kind:       "StatefulSet",
+			Name:       c.Statefulset.ObjectMeta.Name,
+			Controller: &controller,
+		},
+	}
+}
+
+func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
+	*appsv1.Deployment, error) {
+
+	// there are two ways to enable connection pooler, either to specify a
+	// connectionPool section or enableConnectionPool. In the second case
+	// spec.connectionPool will be nil, so to make it easier to calculate
+	// default values, initialize it to an empty structure. It could be done
+	// anywhere, but here is the earliest common entry point between sync and
+	// create code, so init here.
+	if spec.ConnectionPool == nil {
+		spec.ConnectionPool = &acidv1.ConnectionPool{}
+	}
+
+	podTemplate, err := c.generateConnPoolPodTemplate(spec)
+	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	if numberOfInstances == nil {
+		numberOfInstances = util.CoalesceInt32(
+			c.OpConfig.ConnectionPool.NumberOfInstances,
+			k8sutil.Int32ToPointer(1))
+	}
+
+	if *numberOfInstances < constants.ConnPoolMinInstances {
+		msg := "Adjusted number of connection pool instances from %d to %d"
+		c.logger.Warningf(msg, numberOfInstances, constants.ConnPoolMinInstances)
+
+		*numberOfInstances = constants.ConnPoolMinInstances
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.connPoolName(),
+			Namespace:   c.Namespace,
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Annotations: map[string]string{},
+			// make StatefulSet object its owner to represent the dependency.
+			// By itself StatefulSet is being deleted with "Orphaned"
+			// propagation policy, which means that it's deletion will not
+			// clean up this deployment, but there is a hope that this object
+			// will be garbage collected if something went wrong and operator
+			// didn't deleted it.
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: numberOfInstances,
+			Selector: c.connPoolLabelsSelector(),
+			Template: *podTemplate,
+		},
+	}
+
+	return deployment, nil
+}
+
+func (c *Cluster) generateConnPoolService(spec *acidv1.PostgresSpec) *v1.Service {
+
+	// there are two ways to enable connection pooler, either to specify a
+	// connectionPool section or enableConnectionPool. In the second case
+	// spec.connectionPool will be nil, so to make it easier to calculate
+	// default values, initialize it to an empty structure. It could be done
+	// anywhere, but here is the earliest common entry point between sync and
+	// create code, so init here.
+	if spec.ConnectionPool == nil {
+		spec.ConnectionPool = &acidv1.ConnectionPool{}
+	}
+
+	serviceSpec := v1.ServiceSpec{
+		Ports: []v1.ServicePort{
+			{
+				Name:       c.connPoolName(),
+				Port:       pgPort,
+				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
+			},
+		},
+		Type: v1.ServiceTypeClusterIP,
+		Selector: map[string]string{
+			"connection-pool": c.connPoolName(),
+		},
+	}
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.connPoolName(),
+			Namespace:   c.Namespace,
+			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Annotations: map[string]string{},
+			// make StatefulSet object its owner to represent the dependency.
+			// By itself StatefulSet is being deleted with "Orphaned"
+			// propagation policy, which means that it's deletion will not
+			// clean up this service, but there is a hope that this object will
+			// be garbage collected if something went wrong and operator didn't
+			// deleted it.
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: serviceSpec,
+	}
+
+	return service
 }
 
 func ensurePath(file string, defaultDir string, defaultFile string) string {

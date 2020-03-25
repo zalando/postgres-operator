@@ -1,5 +1,7 @@
 package v1
 
+// Operator configuration CRD definition, please use snake_case for field names.
+
 import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 
@@ -65,12 +67,12 @@ type KubernetesMetaConfiguration struct {
 	// TODO: use a proper toleration structure?
 	PodToleration map[string]string `json:"toleration,omitempty"`
 	// TODO: use namespacedname
-	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       Duration      `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
+	PodEnvironmentConfigMap    string   `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName       string   `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout       Duration `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity      bool     `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string   `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string   `json:"pod_management_policy,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -152,6 +154,20 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
+// Defines default configuration for connection pool
+type ConnectionPoolConfiguration struct {
+	NumberOfInstances    *int32 `json:"connection_pool_number_of_instances,omitempty"`
+	Schema               string `json:"connection_pool_schema,omitempty"`
+	User                 string `json:"connection_pool_user,omitempty"`
+	Image                string `json:"connection_pool_image,omitempty"`
+	Mode                 string `json:"connection_pool_mode,omitempty"`
+	MaxDBConnections     *int32 `json:"connection_pool_max_db_connections,omitempty"`
+	DefaultCPURequest    string `json:"connection_pool_default_cpu_request,omitempty"`
+	DefaultMemoryRequest string `json:"connection_pool_default_memory_request,omitempty"`
+	DefaultCPULimit      string `json:"connection_pool_default_cpu_limit,omitempty"`
+	DefaultMemoryLimit   string `json:"connection_pool_default_memory_limit,omitempty"`
+}
+
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
 type OperatorLogicalBackupConfiguration struct {
 	Schedule          string `json:"logical_backup_schedule,omitempty"`
@@ -188,6 +204,7 @@ type OperatorConfigurationData struct {
 	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
+	ConnectionPool             ConnectionPoolConfiguration        `json:"connection_pool"`
 }
 
 //Duration shortens this frequently used name

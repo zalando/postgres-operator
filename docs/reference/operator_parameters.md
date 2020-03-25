@@ -595,3 +595,40 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
 
 * **scalyr_memory_limit**
   Memory limit value for the Scalyr sidecar. The default is `500Mi`.
+
+## Connection pool configuration
+
+Parameters are grouped under the `connection_pool` top-level key and specify
+default configuration for connection pool, if a postgres manifest requests it
+but do not specify some of the parameters. All of them are optional with the
+operator being able to provide some reasonable defaults.
+
+* **connection_pool_number_of_instances**
+  How many instances of connection pool to create. Default is 2 which is also
+  the required minimum.
+
+* **connection_pool_schema**
+  Schema to create for credentials lookup function. Default is `pooler`.
+
+* **connection_pool_user**
+  User to create for connection pool to be able to connect to a database.
+  Default is `pooler`.
+
+* **connection_pool_image**
+  Docker image to use for connection pool deployment.
+  Default: "registry.opensource.zalan.do/acid/pgbouncer"
+
+* **connection_pool_max_db_connections**
+  How many connections the pooler can max hold. This value is divided among the
+  pooler pods. Default is 60 which will make up 30 connections per pod for the
+  default setup with two instances.
+
+* **connection_pool_mode**
+  Default pool mode, `session` or `transaction`. Default is `transaction`.
+
+* **connection_pool_default_cpu_request**
+  **connection_pool_default_memory_reques**
+  **connection_pool_default_cpu_limit**
+  **connection_pool_default_memory_limit**
+  Default resource configuration for connection pool deployment. The internal
+  default for memory request and limit is `100Mi`, for CPU it is `500m` and `1`.

@@ -1,10 +1,12 @@
 package cluster
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"net"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/lib/pq"
@@ -28,13 +30,37 @@ const (
 	getDatabasesSQL       = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
 	createDatabaseSQL     = `CREATE DATABASE "%s" OWNER "%s";`
 	alterDatabaseOwnerSQL = `ALTER DATABASE "%s" OWNER TO "%s";`
+	connectionPoolLookup  = `
+		CREATE SCHEMA IF NOT EXISTS {{.pool_schema}};
+
+		CREATE OR REPLACE FUNCTION {{.pool_schema}}.user_lookup(
+			in i_username text, out uname text, out phash text)
+		RETURNS record AS $$
+		BEGIN
+			SELECT usename, passwd FROM pg_catalog.pg_shadow
+			WHERE usename = i_username INTO uname, phash;
+			RETURN;
+		END;
+		$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+		REVOKE ALL ON FUNCTION {{.pool_schema}}.user_lookup(text)
+			FROM public, {{.pool_user}};
+		GRANT EXECUTE ON FUNCTION {{.pool_schema}}.user_lookup(text)
+			TO {{.pool_user}};
+		GRANT USAGE ON SCHEMA {{.pool_schema}} TO {{.pool_user}};
+	`
 )
 
-func (c *Cluster) pgConnectionString() string {
+func (c *Cluster) pgConnectionString(dbname string) string {
 	password := c.systemUsers[constants.SuperuserKeyName].Password
 
-	return fmt.Sprintf("host='%s' dbname=postgres sslmode=require user='%s' password='%s' connect_timeout='%d'",
+	if dbname == "" {
+		dbname = "postgres"
+	}
+
+	return fmt.Sprintf("host='%s' dbname='%s' sslmode=require user='%s' password='%s' connect_timeout='%d'",
 		fmt.Sprintf("%s.%s.svc.%s", c.Name, c.Namespace, c.OpConfig.ClusterDomain),
+		dbname,
 		c.systemUsers[constants.SuperuserKeyName].Name,
 		strings.Replace(password, "$", "\\$", -1),
 		constants.PostgresConnectTimeout/time.Second)
@@ -49,13 +75,17 @@ func (c *Cluster) databaseAccessDisabled() bool {
 }
 
 func (c *Cluster) initDbConn() error {
+	return c.initDbConnWithName("")
+}
+
+func (c *Cluster) initDbConnWithName(dbname string) error {
 	c.setProcessName("initializing db connection")
 	if c.pgDb != nil {
 		return nil
 	}
 
 	var conn *sql.DB
-	connstring := c.pgConnectionString()
+	connstring := c.pgConnectionString(dbname)
 
 	finalerr := retryutil.Retry(constants.PostgresConnectTimeout, constants.PostgresConnectRetryTimeout,
 		func() (bool, error) {
@@ -92,6 +122,10 @@ func (c *Cluster) initDbConn() error {
 	c.pgDb = conn
 
 	return nil
+}
+
+func (c *Cluster) connectionIsClosed() bool {
+	return c.pgDb == nil
 }
 
 func (c *Cluster) closeDbConn() (err error) {
@@ -242,4 +276,89 @@ func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin
 	}
 
 	return result
+}
+
+// Creates a connection pool credentials lookup function in every database to
+// perform remote authentification.
+func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
+	var stmtBytes bytes.Buffer
+	c.logger.Info("Installing lookup function")
+
+	if err := c.initDbConn(); err != nil {
+		return fmt.Errorf("could not init database connection")
+	}
+	defer func() {
+		if c.connectionIsClosed() {
+			return
+		}
+
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}()
+
+	currentDatabases, err := c.getDatabases()
+	if err != nil {
+		msg := "could not get databases to install pool lookup function: %v"
+		return fmt.Errorf(msg, err)
+	}
+
+	templater := template.Must(template.New("sql").Parse(connectionPoolLookup))
+
+	for dbname, _ := range currentDatabases {
+		if dbname == "template0" || dbname == "template1" {
+			continue
+		}
+
+		if err := c.initDbConnWithName(dbname); err != nil {
+			return fmt.Errorf("could not init database connection to %s", dbname)
+		}
+
+		c.logger.Infof("Install pool lookup function into %s", dbname)
+
+		params := TemplateParams{
+			"pool_schema": poolSchema,
+			"pool_user":   poolUser,
+		}
+
+		if err := templater.Execute(&stmtBytes, params); err != nil {
+			c.logger.Errorf("could not prepare sql statement %+v: %v",
+				params, err)
+			// process other databases
+			continue
+		}
+
+		// golang sql will do retries couple of times if pq driver reports
+		// connections issues (driver.ErrBadConn), but since our query is
+		// idempotent, we can retry in a view of other errors (e.g. due to
+		// failover a db is temporary in a read-only mode or so) to make sure
+		// it was applied.
+		execErr := retryutil.Retry(
+			constants.PostgresConnectTimeout,
+			constants.PostgresConnectRetryTimeout,
+			func() (bool, error) {
+				if _, err := c.pgDb.Exec(stmtBytes.String()); err != nil {
+					msg := fmt.Errorf("could not execute sql statement %s: %v",
+						stmtBytes.String(), err)
+					return false, msg
+				}
+
+				return true, nil
+			})
+
+		if execErr != nil {
+			c.logger.Errorf("could not execute after retries %s: %v",
+				stmtBytes.String(), err)
+			// process other databases
+			continue
+		}
+
+		c.logger.Infof("Pool lookup function installed into %s", dbname)
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}
+
+	c.ConnectionPool.LookupFunction = true
+	return nil
 }

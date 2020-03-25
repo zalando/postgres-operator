@@ -70,6 +70,55 @@ spec:
                 uid:
                   format: uuid
                   type: string
+            connectionPool:
+              type: object
+              properties:
+                dockerImage:
+                  type: string
+                maxDBConnections:
+                  type: integer
+                mode:
+                  type: string
+                  enum:
+                    - "session"
+                    - "transaction"
+                numberOfInstances:
+                  type: integer
+                  minimum: 2
+                resources:
+                  type: object
+                  required:
+                    - requests
+                    - limits
+                  properties:
+                    limits:
+                      type: object
+                      required:
+                        - cpu
+                        - memory
+                      properties:
+                        cpu:
+                          type: string
+                          pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                        memory:
+                          type: string
+                          pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                    requests:
+                      type: object
+                      required:
+                        - cpu
+                        - memory
+                      properties:
+                        cpu:
+                          type: string
+                          pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                        memory:
+                          type: string
+                          pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                schema:
+                  type: string
+                user:
+                  type: string
             databases:
               type: object
               additionalProperties:
@@ -77,6 +126,8 @@ spec:
               # Note: usernames specified here as database owners must be declared in the users key of the spec key.
             dockerImage:
               type: string
+            enableConnectionPool:
+              type: boolean
             enableLogicalBackup:
               type: boolean
             enableMasterLoadBalancer:

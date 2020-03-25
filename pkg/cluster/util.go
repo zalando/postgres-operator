@@ -408,7 +408,32 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 }
 
 func (c *Cluster) labelsSelector() *metav1.LabelSelector {
-	return &metav1.LabelSelector{MatchLabels: c.labelsSet(false), MatchExpressions: nil}
+	return &metav1.LabelSelector{
+		MatchLabels:      c.labelsSet(false),
+		MatchExpressions: nil,
+	}
+}
+
+// Return connection pool labels selector, which should from one point of view
+// inherit most of the labels from the cluster itself, but at the same time
+// have e.g. different `application` label, so that recreatePod operation will
+// not interfere with it (it lists all the pods via labels, and if there would
+// be no difference, it will recreate also pooler pods).
+func (c *Cluster) connPoolLabelsSelector() *metav1.LabelSelector {
+	connPoolLabels := labels.Set(map[string]string{})
+
+	extraLabels := labels.Set(map[string]string{
+		"connection-pool": c.connPoolName(),
+		"application":     "db-connection-pool",
+	})
+
+	connPoolLabels = labels.Merge(connPoolLabels, c.labelsSet(false))
+	connPoolLabels = labels.Merge(connPoolLabels, extraLabels)
+
+	return &metav1.LabelSelector{
+		MatchLabels:      connPoolLabels,
+		MatchExpressions: nil,
+	}
 }
 
 func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) labels.Set {
@@ -482,4 +507,16 @@ func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 
 func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
+}
+
+func (c *Cluster) needConnectionPoolWorker(spec *acidv1.PostgresSpec) bool {
+	if spec.EnableConnectionPool == nil {
+		return spec.ConnectionPool != nil
+	} else {
+		return *spec.EnableConnectionPool
+	}
+}
+
+func (c *Cluster) needConnectionPool() bool {
+	return c.needConnectionPoolWorker(&c.Spec)
 }

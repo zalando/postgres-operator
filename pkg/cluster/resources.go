@@ -90,6 +90,132 @@ func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 	return statefulSet, nil
 }
 
+// Prepare the database for connection pool to be used, i.e. install lookup
+// function (do it first, because it should be fast and if it didn't succeed,
+// it doesn't makes sense to create more K8S objects. At this moment we assume
+// that necessary connection pool user exists.
+//
+// After that create all the objects for connection pool, namely a deployment
+// with a chosen pooler and a service to expose it.
+func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolObjects, error) {
+	var msg string
+	c.setProcessName("creating connection pool")
+
+	schema := c.Spec.ConnectionPool.Schema
+	if schema == "" {
+		schema = c.OpConfig.ConnectionPool.Schema
+	}
+
+	user := c.Spec.ConnectionPool.User
+	if user == "" {
+		user = c.OpConfig.ConnectionPool.User
+	}
+
+	err := lookup(schema, user)
+
+	if err != nil {
+		msg = "could not prepare database for connection pool: %v"
+		return nil, fmt.Errorf(msg, err)
+	}
+
+	deploymentSpec, err := c.generateConnPoolDeployment(&c.Spec)
+	if err != nil {
+		msg = "could not generate deployment for connection pool: %v"
+		return nil, fmt.Errorf(msg, err)
+	}
+
+	// client-go does retry 10 times (with NoBackoff by default) when the API
+	// believe a request can be retried and returns Retry-After header. This
+	// should be good enough to not think about it here.
+	deployment, err := c.KubeClient.
+		Deployments(deploymentSpec.Namespace).
+		Create(deploymentSpec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	serviceSpec := c.generateConnPoolService(&c.Spec)
+	service, err := c.KubeClient.
+		Services(serviceSpec.Namespace).
+		Create(serviceSpec)
+
+	if err != nil {
+		return nil, err
+	}
+
+	c.ConnectionPool = &ConnectionPoolObjects{
+		Deployment: deployment,
+		Service:    service,
+	}
+	c.logger.Debugf("created new connection pool %q, uid: %q",
+		util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
+
+	return c.ConnectionPool, nil
+}
+
+func (c *Cluster) deleteConnectionPool() (err error) {
+	c.setProcessName("deleting connection pool")
+	c.logger.Debugln("deleting connection pool")
+
+	// Lack of connection pooler objects is not a fatal error, just log it if
+	// it was present before in the manifest
+	if c.ConnectionPool == nil {
+		c.logger.Infof("No connection pool to delete")
+		return nil
+	}
+
+	// Clean up the deployment object. If deployment resource we've remembered
+	// is somehow empty, try to delete based on what would we generate
+	deploymentName := c.connPoolName()
+	deployment := c.ConnectionPool.Deployment
+
+	if deployment != nil {
+		deploymentName = deployment.Name
+	}
+
+	// set delete propagation policy to foreground, so that replica set will be
+	// also deleted.
+	policy := metav1.DeletePropagationForeground
+	options := metav1.DeleteOptions{PropagationPolicy: &policy}
+	err = c.KubeClient.
+		Deployments(c.Namespace).
+		Delete(deploymentName, &options)
+
+	if !k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("Connection pool deployment was already deleted")
+	} else if err != nil {
+		return fmt.Errorf("could not delete deployment: %v", err)
+	}
+
+	c.logger.Infof("Connection pool deployment %q has been deleted", deploymentName)
+
+	// Repeat the same for the service object
+	service := c.ConnectionPool.Service
+	serviceName := c.connPoolName()
+
+	if service != nil {
+		serviceName = service.Name
+	}
+
+	// set delete propagation policy to foreground, so that all the dependant
+	// will be deleted.
+	err = c.KubeClient.
+		Services(c.Namespace).
+		Delete(serviceName, &options)
+
+	if !k8sutil.ResourceNotFound(err) {
+		c.logger.Debugf("Connection pool service was already deleted")
+	} else if err != nil {
+		return fmt.Errorf("could not delete service: %v", err)
+	}
+
+	c.logger.Infof("Connection pool service %q has been deleted", serviceName)
+
+	c.ConnectionPool = nil
+	return nil
+}
+
 func getPodIndex(podName string) (int32, error) {
 	parts := strings.Split(podName, "-")
 	if len(parts) == 0 {
@@ -673,4 +799,35 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 // GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
 func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
+}
+
+// Perform actual patching of a connection pool deployment, assuming that all
+// the check were already done before.
+func (c *Cluster) updateConnPoolDeployment(oldDeploymentSpec, newDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+	c.setProcessName("updating connection pool")
+	if c.ConnectionPool == nil || c.ConnectionPool.Deployment == nil {
+		return nil, fmt.Errorf("there is no connection pool in the cluster")
+	}
+
+	patchData, err := specPatch(newDeployment.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("could not form patch for the deployment: %v", err)
+	}
+
+	// An update probably requires RetryOnConflict, but since only one operator
+	// worker at one time will try to update it chances of conflicts are
+	// minimal.
+	deployment, err := c.KubeClient.
+		Deployments(c.ConnectionPool.Deployment.Namespace).
+		Patch(
+			c.ConnectionPool.Deployment.Name,
+			types.MergePatchType,
+			patchData, "")
+	if err != nil {
+		return nil, fmt.Errorf("could not patch deployment: %v", err)
+	}
+
+	c.ConnectionPool.Deployment = deployment
+
+	return deployment, nil
 }
