@@ -18,6 +18,7 @@ import (
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	pkgspec "github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -485,9 +486,9 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 
 // Check whether or not we're requested to mount an shm volume,
 // taking into account that PostgreSQL manifest has precedence.
-func mountShmVolumeNeeded(opConfig config.Config, pgSpec *acidv1.PostgresSpec) *bool {
-	if pgSpec.ShmVolume != nil && *pgSpec.ShmVolume {
-		return pgSpec.ShmVolume
+func mountShmVolumeNeeded(opConfig config.Config, spec *acidv1.PostgresSpec) *bool {
+	if spec.ShmVolume != nil && *spec.ShmVolume {
+		return spec.ShmVolume
 	}
 
 	return opConfig.ShmVolume
@@ -911,11 +912,17 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	customPodEnvVarsList := make([]v1.EnvVar, 0)
 
-	if c.OpConfig.PodEnvironmentConfigMap != "" {
+	if c.OpConfig.PodEnvironmentConfigMap != (pkgspec.NamespacedName{}) {
 		var cm *v1.ConfigMap
-		cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap, metav1.GetOptions{})
+		cm, err = c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap.Name, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+			// if not found, try again using the cluster's namespace if it's different (old behavior)
+			if k8sutil.ResourceNotFound(err) && c.Namespace != c.OpConfig.PodEnvironmentConfigMap.Namespace {
+				cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap.Name, metav1.GetOptions{})
+			}
+			if err != nil {
+				return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+			}
 		}
 		for k, v := range cm.Data {
 			customPodEnvVarsList = append(customPodEnvVarsList, v1.EnvVar{Name: k, Value: v})

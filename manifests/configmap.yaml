@@ -69,7 +69,7 @@ data:
   pdb_name_format: "postgres-{cluster}-pdb"
   # pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   pod_deletion_wait_timeout: 10m
-  # pod_environment_configmap: ""
+  # pod_environment_configmap: "default/my-custom-config"
   pod_label_wait_timeout: 10m
   pod_management_policy: "ordered_ready"
   pod_role_label: spilo-role
