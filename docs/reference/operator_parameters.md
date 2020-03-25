@@ -131,6 +131,10 @@ Those are top-level keys, containing both leaf keys and groups.
   container, change the [operator deployment manually](../../manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
+* **should_delete_unused_pvc**
+  Tells the operator to delete persistent volume claims of no longer running pods. That removes respective persistent volumes because operator configures them with the 'Delete' reclaim policy. Note operator deletes unused PVCs for clusters created both before and after this option is turned on. Deletion is not guaranteed: When it fails, operator retries at next Sync() event.
+  The default is `false`.
+
 ## Postgres users
 
 Parameters describing Postgres users. In a CRD-configuration, they are grouped

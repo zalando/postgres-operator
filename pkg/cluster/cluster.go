@@ -634,8 +634,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
-	// delete persistent volume claim after scale down
-	if oldSpec.Spec.NumberOfInstances > newSpec.Spec.NumberOfInstances {
+	if c.OpConfig.ShouldDeleteUnusedPVC && oldSpec.Spec.NumberOfInstances > newSpec.Spec.NumberOfInstances {
 		c.logger.Debug("deleting pvc of shut down pods")
 
 		for i := oldSpec.Spec.NumberOfInstances - 1; i >= newSpec.Spec.NumberOfInstances; i-- {
