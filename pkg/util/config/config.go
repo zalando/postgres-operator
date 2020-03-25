@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
@@ -21,31 +22,31 @@ type CRD struct {
 
 // Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
-	ResourceCheckInterval   time.Duration     `name:"resource_check_interval" default:"3s"`
-	ResourceCheckTimeout    time.Duration     `name:"resource_check_timeout" default:"10m"`
-	PodLabelWaitTimeout     time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
-	PodDeletionWaitTimeout  time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
-	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
-	SpiloFSGroup            *int64            `name:"spilo_fsgroup"`
-	PodPriorityClassName    string            `name:"pod_priority_class_name"`
-	ClusterDomain           string            `name:"cluster_domain" default:"cluster.local"`
-	SpiloPrivileged         bool              `name:"spilo_privileged" default:"false"`
-	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
-	InheritedLabels         []string          `name:"inherited_labels" default:""`
-	ClusterNameLabel        string            `name:"cluster_name_label" default:"cluster-name"`
-	PodRoleLabel            string            `name:"pod_role_label" default:"spilo-role"`
-	PodToleration           map[string]string `name:"toleration" default:""`
-	DefaultCPURequest       string            `name:"default_cpu_request" default:"100m"`
-	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit         string            `name:"default_cpu_limit" default:"1"`
-	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"500Mi"`
-	MinCPULimit             string            `name:"min_cpu_limit" default:"250m"`
-	MinMemoryLimit          string            `name:"min_memory_limit" default:"250Mi"`
-	PodEnvironmentConfigMap string            `name:"pod_environment_configmap" default:""`
-	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
-	MaxInstances            int32             `name:"max_instances" default:"-1"`
-	MinInstances            int32             `name:"min_instances" default:"-1"`
-	ShmVolume               *bool             `name:"enable_shm_volume" default:"true"`
+	ResourceCheckInterval   time.Duration       `name:"resource_check_interval" default:"3s"`
+	ResourceCheckTimeout    time.Duration       `name:"resource_check_timeout" default:"10m"`
+	PodLabelWaitTimeout     time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
+	PodDeletionWaitTimeout  time.Duration       `name:"pod_deletion_wait_timeout" default:"10m"`
+	PodTerminateGracePeriod time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
+	SpiloFSGroup            *int64              `name:"spilo_fsgroup"`
+	PodPriorityClassName    string              `name:"pod_priority_class_name"`
+	ClusterDomain           string              `name:"cluster_domain" default:"cluster.local"`
+	SpiloPrivileged         bool                `name:"spilo_privileged" default:"false"`
+	ClusterLabels           map[string]string   `name:"cluster_labels" default:"application:spilo"`
+	InheritedLabels         []string            `name:"inherited_labels" default:""`
+	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
+	PodRoleLabel            string              `name:"pod_role_label" default:"spilo-role"`
+	PodToleration           map[string]string   `name:"toleration" default:""`
+	DefaultCPURequest       string              `name:"default_cpu_request" default:"100m"`
+	DefaultMemoryRequest    string              `name:"default_memory_request" default:"100Mi"`
+	DefaultCPULimit         string              `name:"default_cpu_limit" default:"1"`
+	DefaultMemoryLimit      string              `name:"default_memory_limit" default:"500Mi"`
+	MinCPULimit             string              `name:"min_cpu_limit" default:"250m"`
+	MinMemoryLimit          string              `name:"min_memory_limit" default:"250Mi"`
+	PodEnvironmentConfigMap spec.NamespacedName `name:"pod_environment_configmap"`
+	NodeReadinessLabel      map[string]string   `name:"node_readiness_label" default:""`
+	MaxInstances            int32               `name:"max_instances" default:"-1"`
+	MinInstances            int32               `name:"min_instances" default:"-1"`
+	ShmVolume               *bool               `name:"enable_shm_volume" default:"true"`
 }
 
 // Auth describes authentication specific configuration parameters
@@ -83,6 +84,20 @@ type LogicalBackup struct {
 	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:"AES256"`
 }
 
+// Operator options for connection pooler
+type ConnectionPool struct {
+	NumberOfInstances            *int32 `name:"connection_pool_number_of_instances" default:"2"`
+	Schema                       string `name:"connection_pool_schema" default:"pooler"`
+	User                         string `name:"connection_pool_user" default:"pooler"`
+	Image                        string `name:"connection_pool_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
+	Mode                         string `name:"connection_pool_mode" default:"transaction"`
+	MaxDBConnections             *int32 `name:"connection_pool_max_db_connections" default:"60"`
+	ConnPoolDefaultCPURequest    string `name:"connection_pool_default_cpu_request" default:"500m"`
+	ConnPoolDefaultMemoryRequest string `name:"connection_pool_default_memory_request" default:"100Mi"`
+	ConnPoolDefaultCPULimit      string `name:"connection_pool_default_cpu_limit" default:"1"`
+	ConnPoolDefaultMemoryLimit   string `name:"connection_pool_default_memory_limit" default:"100Mi"`
+}
+
 // Config describes operator config
 type Config struct {
 	CRD
@@ -90,6 +105,7 @@ type Config struct {
 	Auth
 	Scalyr
 	LogicalBackup
+	ConnectionPool
 
 	WatchedNamespace      string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	EtcdHost              string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
@@ -195,6 +211,11 @@ func validate(cfg *Config) (err error) {
 	}
 	if cfg.Workers == 0 {
 		err = fmt.Errorf("number of workers should be higher than 0")
+	}
+
+	if *cfg.ConnectionPool.NumberOfInstances < constants.ConnPoolMinInstances {
+		msg := "number of connection pool instances should be higher than %d"
+		err = fmt.Errorf(msg, constants.ConnPoolMinInstances)
 	}
 	return
 }

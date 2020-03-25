@@ -9,6 +9,7 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	v1 "k8s.io/api/core/v1"
@@ -702,5 +703,22 @@ func TestServiceAnnotations(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestInitSystemUsers(t *testing.T) {
+	testName := "Test system users initialization"
+
+	// default cluster without connection pool
+	cl.initSystemUsers()
+	if _, exist := cl.systemUsers[constants.ConnectionPoolUserKeyName]; exist {
+		t.Errorf("%s, connection pool user is present", testName)
+	}
+
+	// cluster with connection pool
+	cl.Spec.EnableConnectionPool = boolToPointer(true)
+	cl.initSystemUsers()
+	if _, exist := cl.systemUsers[constants.ConnectionPoolUserKeyName]; !exist {
+		t.Errorf("%s, connection pool user is not present", testName)
 	}
 }

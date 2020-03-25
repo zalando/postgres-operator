@@ -69,3 +69,7 @@ type ClusterStatus struct {
 	Spec           acidv1.PostgresSpec
 	Error          error
 }
+
+type TemplateParams map[string]interface{}
+
+type InstallFunction func(schema string, user string) error
