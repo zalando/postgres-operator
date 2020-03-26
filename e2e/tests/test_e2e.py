@@ -8,7 +8,6 @@ import yaml
 
 from kubernetes import client, config
 
-
 class EndToEndTestCase(unittest.TestCase):
     '''
     Test interaction of the operator with multiple K8s components.
@@ -380,6 +379,74 @@ class EndToEndTestCase(unittest.TestCase):
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_pvc_deletion(self):
+        '''
+        Operator must remove unused volumes safely:
+        1) Volumes attached to running pods are never removed
+        2) The last volume is kept even if a cluster has 0 pods
+
+        Operator employs 'Delete' reclaim policy for volumes, 
+        so it is sufficient to delete persistent volume claims (pvc) to remove a volume.
+        '''
+
+        k8s = self.k8s
+        self.assert_running_pods_have_volumes()
+
+        # get extra unused pvcs to test Sync
+        k8s.wait_for_pg_to_scale(4)
+        k8s.wait_for_pg_to_scale(2)
+
+        # enable pvc deletion
+        patch = {
+            "data": {
+                "should_delete_unused_pvc": "true"
+            }
+        }
+        k8s.update_config(patch)
+
+        # Sync() at operator start-up deletes unused pvcs that had existed before
+        unused_pvcs = ["pgdata-acid-minimal-cluster-2", "pgdata-acid-minimal-cluster-3"]
+        for pvc in unused_pvcs:
+            k8s.wait_for_pvc_deletion(pvc)
+
+        self.assert_running_pods_have_volumes()
+
+        # Update() deletes pvc on scale down
+        # we do not use wait_for_pg_to_scale here because it waits until a pod is completely gone
+        # we want to capture a potential situation where a pod is in Terminating state
+        # but its pvc is already being deleted
+        # TODO that needs a more thourough test at the DB level
+        k8s.change_number_of_instances(1)
+        k8s.wait_for_pvc_deletion("pgdata-acid-minimal-cluster-1")
+
+        self.assert_running_pods_have_volumes()
+
+        # pvc with index 0 must stay around when cluster has 0 pods
+        last_pvc_name = "pgdata-acid-minimal-cluster-0"
+        volume_before_scaledown = k8s.get_volume_name(last_pvc_name)
+        k8s.wait_for_pg_to_scale(0)
+        self.assertTrue(k8s.pvc_exist(last_pvc_name), "The last pvc was deleted")
+
+        # sanity check
+        k8s.wait_for_pg_to_scale(3)
+        volume_after_scaleup = k8s.get_volume_name(last_pvc_name)
+        self.assertEqual(volume_before_scaledown, volume_after_scaleup, "the surviving pvc must have the same volume before scale down to 0 and after scale up")
+
+        # clean up 
+        patch = {
+            "data": {
+                "should_delete_unused_pvc": "false"
+            }
+        }
+        k8s.update_config(patch)
+
+        # disablement of the feature actually stops volume deletion
+        k8s.wait_for_pg_to_scale(2)
+        self.assert_running_pods_have_volumes()
+        self.assertTrue(k8s.pvc_exist("pgdata-acid-minimal-cluster-2"), "The pvc of a shut down pod was deleted despite the feature is disabled")
+
+
     def get_failover_targets(self, master_node, replica_nodes):
         '''
            If all pods live on the same node, failover will happen to other worker(s)
@@ -451,6 +518,20 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master')
         k8s.wait_for_pod_start('spilo-role=replica')
 
+    def assert_running_pods_have_volumes(self):
+        '''
+        Operator must never delete a pvc and hence volume of a running pod
+        '''
+
+        k8s = self.k8s
+        labels = 'cluster-name=' + 'acid-minimal-cluster'
+
+        pods = k8s.list_pods(labels)
+        for pod in pods:
+            pgdata = [v for v in pod.spec.volumes if v.name == 'pgdata'][0]
+            pvc = pgdata.persistent_volume_claim
+            self.assertTrue(k8s.pvc_exist(pvc.claim_name))
+
 
 class K8sApi:
 
@@ -521,7 +602,7 @@ class K8s:
                     return False
         return True
 
-    def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
+    def change_number_of_instances(self, number_of_instances, namespace='default'):
 
         body = {
             "spec": {
@@ -531,12 +612,19 @@ class K8s:
         _ = self.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
 
+
+    def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
+
+        self.change_number_of_instances(number_of_instances, namespace='default')
         labels = 'cluster-name=acid-minimal-cluster'
         while self.count_pods_with_label(labels) != number_of_instances:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
+    def list_pods(self, labels, namespace='default'):
+        return self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
+
     def count_pods_with_label(self, labels, namespace='default'):
-        return len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items)
+        return len(self.list_pods(labels, namespace))
 
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
@@ -567,12 +655,30 @@ class K8s:
 
         operator_pod = self.api.core_v1.list_namespaced_pod(
             'default', label_selector="name=postgres-operator").items[0].metadata.name
-        self.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf
+        self.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf and issues Sync()
         self.wait_for_operator_pod_start()
 
     def create_with_kubectl(self, path):
         subprocess.run(["kubectl", "create", "-f", path])
 
+    def wait_for_pvc_deletion(self, pvc_name):
+
+        while self.pvc_exist(pvc_name):
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def pvc_exist(self, pvc_name):
+        exists = True
+
+        try:
+          pvc = self.api.core_v1.read_namespaced_persistent_volume_claim(pvc_name, "default")
+        except: # TODO catch not found exception
+          exists = False
+
+        return exists
+
+    def get_volume_name(self, pvc_name):
+        pvc = self.api.core_v1.read_namespaced_persistent_volume_claim(pvc_name, "default")
+        return pvc.spec.volume_name
 
 if __name__ == '__main__':
     unittest.main()
