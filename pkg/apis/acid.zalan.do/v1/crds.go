@@ -1283,6 +1283,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
+							"share_pg_socket_with_sidecars": {
+								Type: "boolean",
+							},
 							"infrastructure_roles_secret_name": {
 								Type: "string",
 							},

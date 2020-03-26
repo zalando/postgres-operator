@@ -1005,6 +1005,14 @@ option must be set to `true`.
 
 If you want to add a sidecar to every cluster managed by the operator, you can specify it in the [operator configuration](administrator.md#sidecars-for-postgres-clusters) instead.
 
+### Accessing the PostgreSQL socket from sidecars
+
+If enabled by the `share_pg_socket_with_sidecars` option in the operator
+configuration the PostgreSQL socket is placed in a volume of type
+`emptyDir` named `postgresql-run`.
+To allow access to the socket from any sidecar container simply add a
+VolumeMount to this volume to your sidecar spec.
+
 ## InitContainers Support
 
 Each cluster can specify arbitrary init containers to run. These containers can
@@ -1048,7 +1056,7 @@ When using AWS with gp3 volumes you should set the mode to `mixed` because it
 will also adjust the IOPS and throughput that can be defined in the manifest.
 Check the [AWS docs](https://aws.amazon.com/ebs/general-purpose/) to learn
 about default and maximum values. Keep in mind that AWS rate-limits updating
-volume specs to no more than once every 6 hours. 
+volume specs to no more than once every 6 hours.
 
 ```yaml
 spec:
