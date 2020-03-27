@@ -7,6 +7,8 @@ import os
 import yaml
 
 from kubernetes import client, config
+from kubernetes.client.rest import ApiException
+
 
 def to_selector(labels):
     return ",".join(["=".join(l) for l in labels.items()])
@@ -257,7 +259,6 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        labels = 'spilo-role=master,' + cluster_label
         readiness_label = 'lifecycle-status'
         readiness_value = 'ready'
 
@@ -482,7 +483,7 @@ class EndToEndTestCase(unittest.TestCase):
         1) Volumes attached to running pods are never removed
         2) The last volume is kept even if a cluster has 0 pods
 
-        Operator employs 'Delete' reclaim policy for volumes, 
+        Operator employs 'Delete' reclaim policy for volumes,
         so it is sufficient to delete persistent volume claims (pvc) to remove a volume.
         '''
 
@@ -527,9 +528,11 @@ class EndToEndTestCase(unittest.TestCase):
         # sanity check
         k8s.wait_for_pg_to_scale(3)
         volume_after_scaleup = k8s.get_volume_name(last_pvc_name)
-        self.assertEqual(volume_before_scaledown, volume_after_scaleup, "the surviving pvc must have the same volume before scale down to 0 and after scale up")
+        self.assertEqual(volume_before_scaledown,
+                         volume_after_scaleup,
+                         "the surviving pvc must have the same volume before scale down to 0 and after scale up")
 
-        # clean up 
+        # clean up
         patch = {
             "data": {
                 "should_delete_unused_pvc": "false"
@@ -540,8 +543,8 @@ class EndToEndTestCase(unittest.TestCase):
         # disablement of the feature actually stops volume deletion
         k8s.wait_for_pg_to_scale(2)
         self.assert_running_pods_have_volumes()
-        self.assertTrue(k8s.pvc_exist("pgdata-acid-minimal-cluster-2"), "The pvc of a shut down pod was deleted despite the feature is disabled")
-
+        self.assertTrue(k8s.pvc_exist("pgdata-acid-minimal-cluster-2"),
+                        "The pvc of a shut down pod was deleted despite the feature is disabled")
 
     def get_failover_targets(self, master_node, replica_nodes):
         '''
@@ -735,7 +738,6 @@ class K8s:
         _ = self.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
 
-
     def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
 
         self.change_number_of_instances(number_of_instances, namespace='default')
@@ -810,18 +812,18 @@ class K8s:
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def pvc_exist(self, pvc_name):
-        exists = True
 
         try:
-          pvc = self.api.core_v1.read_namespaced_persistent_volume_claim(pvc_name, "default")
-        except: # TODO catch not found exception
-          exists = False
+            _ = self.api.core_v1.read_namespaced_persistent_volume_claim(pvc_name, "default")
+        except ApiException:
+            return False
 
-        return exists
+        return True
 
     def get_volume_name(self, pvc_name):
         pvc = self.api.core_v1.read_namespaced_persistent_volume_claim(pvc_name, "default")
         return pvc.spec.volume_name
+
 
 if __name__ == '__main__':
     unittest.main()
