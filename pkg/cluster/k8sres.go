@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -914,11 +915,17 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	if c.OpConfig.PodEnvironmentConfigMap != (pkgspec.NamespacedName{}) {
 		var cm *v1.ConfigMap
-		cm, err = c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap.Name, metav1.GetOptions{})
+		cm, err = c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(
+			context.TODO(),
+			c.OpConfig.PodEnvironmentConfigMap.Name,
+			metav1.GetOptions{})
 		if err != nil {
 			// if not found, try again using the cluster's namespace if it's different (old behavior)
 			if k8sutil.ResourceNotFound(err) && c.Namespace != c.OpConfig.PodEnvironmentConfigMap.Namespace {
-				cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(c.OpConfig.PodEnvironmentConfigMap.Name, metav1.GetOptions{})
+				cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(
+					context.TODO(),
+					c.OpConfig.PodEnvironmentConfigMap.Name,
+					metav1.GetOptions{})
 			}
 			if err != nil {
 				return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
