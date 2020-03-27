@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "11"
+    version: "12"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -511,3 +511,103 @@ monitoring is outside the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and
 [administrator documentation](administrator.md) for details on how backups are
 executed.
+
+## Connection pool
+
+The operator can create a database side connection pool for those applications,
+where an application side pool is not feasible, but a number of connections is
+high. To create a connection pool together with a database, modify the
+manifest:
+
+```yaml
+spec:
+  enableConnectionPool: true
+```
+
+This will tell the operator to create a connection pool with default
+configuration, through which one can access the master via a separate service
+`{cluster-name}-pooler`. In most of the cases provided default configuration
+should be good enough.
+
+To configure a new connection pool, specify:
+
+```
+spec:
+  connectionPool:
+    # how many instances of connection pool to create
+    number_of_instances: 2
+
+    # in which mode to run, session or transaction
+    mode: "transaction"
+
+    # schema, which operator will create to install credentials lookup
+    # function
+    schema: "pooler"
+
+    # user, which operator will create for connection pool
+    user: "pooler"
+
+    # resources for each instance
+    resources:
+      requests:
+        cpu: 500m
+        memory: 100Mi
+      limits:
+        cpu: "1"
+        memory: 100Mi
+```
+
+By default `pgbouncer` is used to create a connection pool. To find out about
+pool modes see [docs](https://www.pgbouncer.org/config.html#pool_mode) (but it
+should be general approach between different implementation).
+
+Note, that using `pgbouncer` means meaningful resource CPU limit should be less
+than 1 core (there is a way to utilize more than one, but in K8S it's easier
+just to spin up more instances).
+
+## Custom TLS certificates
+
+By default, the spilo image generates its own TLS certificate during startup.
+However, this certificate cannot be verified and thus doesn't protect from
+active MITM attacks. In this section we show how to specify a custom TLS
+certificate which is mounted in the database pods via a K8s Secret.
+
+Before applying these changes, the operator must also be configured with the
+`spilo_fsgroup` set to the GID matching the postgres user group. If the value
+is not provided, the cluster will default to `103` which is the GID from the
+default spilo image.
+
+Upload the cert as a kubernetes secret:
+```sh
+kubectl create secret tls pg-tls \
+  --key pg-tls.key \
+  --cert pg-tls.crt
+```
+
+Or with a CA:
+```sh
+kubectl create secret generic pg-tls \
+  --from-file=tls.crt=server.crt \
+  --from-file=tls.key=server.key \
+  --from-file=ca.crt=ca.crt
+```
+
+Alternatively it is also possible to use
+[cert-manager](https://cert-manager.io/docs/) to generate these secrets.
+
+Then configure the postgres resource with the TLS secret:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  tls:
+    secretName: "pg-tls"
+    caFile: "ca.crt" # add this if the secret is configured with a CA
+```
+
+Certificate rotation is handled in the spilo image which checks every 5
+minutes if the certificates have changed and reloads postgres accordingly.

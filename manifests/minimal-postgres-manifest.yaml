@@ -16,4 +16,4 @@ spec:
   databases:
     foo: zalando  # dbname: owner
   postgresql:
-    version: "11"
+    version: "12"

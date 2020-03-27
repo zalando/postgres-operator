@@ -32,6 +32,20 @@ Create a service account name.
 {{- end -}}
 
 {{/*
+Create a pod service account name.
+*/}}
+{{- define "postgres-pod.serviceAccountName" -}}
+{{ default (printf "%s-%v" (include "postgres-operator.fullname" .) "pod") .Values.podServiceAccount.name }}
+{{- end -}}
+
+{{/*
+Create a controller ID.
+*/}}
+{{- define "postgres-operator.controllerID" -}}
+{{ default (include "postgres-operator.fullname" .) .Values.controllerID.name }}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "postgres-operator.chart" -}}

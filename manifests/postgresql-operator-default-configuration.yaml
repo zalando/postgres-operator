@@ -41,7 +41,7 @@ configuration:
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-    # pod_environment_configmap: ""
+    # pod_environment_configmap: "default/my-custom-config"
     pod_management_policy: "ordered_ready"
     # pod_priority_class_name: ""
     pod_role_label: spilo-role
@@ -122,3 +122,14 @@ configuration:
     scalyr_memory_limit: 500Mi
     scalyr_memory_request: 50Mi
     # scalyr_server_url: ""
+  connection_pool:
+    connection_pool_default_cpu_limit: "1"
+    connection_pool_default_cpu_request: "500m"
+    connection_pool_default_memory_limit: 100Mi
+    connection_pool_default_memory_request: 100Mi
+    connection_pool_image: "registry.opensource.zalan.do/acid/pgbouncer:master-5"
+    # connection_pool_max_db_connections: 60
+    connection_pool_mode: "transaction"
+    connection_pool_number_of_instances: 2
+    # connection_pool_schema: "pooler"
+    # connection_pool_user: "pooler"
