@@ -1,5 +1,7 @@
 package v1
 
+// Postgres CRD definition, please use CamelCase for field names.
+
 import (
 	"time"
 
@@ -26,6 +28,9 @@ type PostgresSpec struct {
 	Volume          `json:"volume,omitempty"`
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
+
+	EnableConnectionPool *bool           `json:"enableConnectionPool,omitempty"`
+	ConnectionPool       *ConnectionPool `json:"connectionPool,omitempty"`
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
@@ -161,4 +166,25 @@ type UserFlags []string
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus struct {
 	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+}
+
+// Options for connection pooler
+//
+// TODO: prepared snippets of configuration, one can choose via type, e.g.
+// pgbouncer-large (with higher resources) or odyssey-small (with smaller
+// resources)
+// Type              string `json:"type,omitempty"`
+//
+// TODO: figure out what other important parameters of the connection pool it
+// makes sense to expose. E.g. pool size (min/max boundaries), max client
+// connections etc.
+type ConnectionPool struct {
+	NumberOfInstances *int32 `json:"numberOfInstances,omitempty"`
+	Schema            string `json:"schema,omitempty"`
+	User              string `json:"user,omitempty"`
+	Mode              string `json:"mode,omitempty"`
+	DockerImage       string `json:"dockerImage,omitempty"`
+	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
+
+	Resources `json:"resources,omitempty"`
 }

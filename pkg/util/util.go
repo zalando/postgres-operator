@@ -147,6 +147,40 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
+// Yeah, golang
+func CoalesceInt32(val, defaultVal *int32) *int32 {
+	if val == nil {
+		return defaultVal
+	}
+	return val
+}
+
+// Test if any of the values is nil
+func testNil(values ...*int32) bool {
+	for _, v := range values {
+		if v == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Return maximum of two integers provided via pointers. If one value is not
+// defined, return the other one. If both are not defined, result is also
+// undefined, caller needs to check for that.
+func MaxInt32(a, b *int32) *int32 {
+	if testNil(a, b) {
+		return nil
+	}
+
+	if *a > *b {
+		return a
+	}
+
+	return b
+}
+
 // IsSmallerQuantity : checks if first resource is of a smaller quantity than the second
 func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 

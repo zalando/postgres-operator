@@ -321,11 +321,12 @@ spec:
 ## Custom Pod Environment Variables
 
 It is possible to configure a ConfigMap which is used by the Postgres pods as
-an additional provider for environment variables.
-
-One use case is to customize the Spilo image and configure it with environment
-variables. The ConfigMap with the additional settings is configured in the
-operator's main ConfigMap:
+an additional provider for environment variables. One use case is to customize
+the Spilo image and configure it with environment variables. The ConfigMap with
+the additional settings is referenced in the operator's main configuration.
+A namespace can be specified along with the name. If left out, the configured
+default namespace of your K8s client will be used and if the ConfigMap is not
+found there, the Postgres cluster's namespace is taken when different:
 
 **postgres-operator ConfigMap**
 
@@ -336,7 +337,7 @@ metadata:
   name: postgres-operator
 data:
   # referencing config map with custom settings
-  pod_environment_configmap: postgres-pod-config
+  pod_environment_configmap: default/postgres-pod-config
 ```
 
 **OperatorConfiguration**
@@ -349,7 +350,7 @@ metadata:
 configuration:
   kubernetes:
     # referencing config map with custom settings
-    pod_environment_configmap: postgres-pod-config
+    pod_environment_configmap: default/postgres-pod-config
 ```
 
 **referenced ConfigMap `postgres-pod-config`**

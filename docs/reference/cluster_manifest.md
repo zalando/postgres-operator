@@ -140,6 +140,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration). Optional.
 
+* **enableConnectionPool**
+  Tells the operator to create a connection pool with a database. If this
+  field is true, a connection pool deployment will be created even if
+  `connectionPool` section is empty. Optional, not set by default.
+
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
   to S3. Default: false. Optional.
@@ -359,6 +364,35 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
+
+## Connection pool
+
+Parameters are grouped under the `connectionPool` top-level key and specify
+configuration for connection pool. If this section is not empty, a connection
+pool will be created for a database even if `enableConnectionPool` is not
+present.
+
+* **numberOfInstances**
+  How many instances of connection pool to create.
+
+* **schema**
+  Schema to create for credentials lookup function.
+
+* **user**
+  User to create for connection pool to be able to connect to a database.
+
+* **dockerImage**
+  Which docker image to use for connection pool deployment.
+
+* **maxDBConnections**
+  How many connections the pooler can max hold. This value is divided among the
+  pooler pods.
+
+* **mode**
+  In which mode to run connection pool, transaction or session.
+
+* **resources**
+  Resource configuration for connection pool deployment.
 
 ## Custom TLS certificates
 

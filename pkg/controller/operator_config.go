@@ -8,6 +8,7 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -19,6 +20,10 @@ func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, con
 	}
 
 	return config, nil
+}
+
+func int32ToPointer(value int32) *int32 {
+	return &value
 }
 
 // importConfigurationFromCRD is a transitional function that converts CRD configuration to the one based on the configmap
@@ -142,6 +147,52 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ScalyrMemoryRequest = fromCRD.Scalyr.ScalyrMemoryRequest
 	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
 	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
+
+	// Connection pool. Looks like we can't use defaulting in CRD before 1.17,
+	// so ensure default values here.
+	result.ConnectionPool.NumberOfInstances = util.CoalesceInt32(
+		fromCRD.ConnectionPool.NumberOfInstances,
+		int32ToPointer(2))
+
+	result.ConnectionPool.NumberOfInstances = util.MaxInt32(
+		result.ConnectionPool.NumberOfInstances,
+		int32ToPointer(2))
+
+	result.ConnectionPool.Schema = util.Coalesce(
+		fromCRD.ConnectionPool.Schema,
+		constants.ConnectionPoolSchemaName)
+
+	result.ConnectionPool.User = util.Coalesce(
+		fromCRD.ConnectionPool.User,
+		constants.ConnectionPoolUserName)
+
+	result.ConnectionPool.Image = util.Coalesce(
+		fromCRD.ConnectionPool.Image,
+		"registry.opensource.zalan.do/acid/pgbouncer")
+
+	result.ConnectionPool.Mode = util.Coalesce(
+		fromCRD.ConnectionPool.Mode,
+		constants.ConnectionPoolDefaultMode)
+
+	result.ConnectionPool.ConnPoolDefaultCPURequest = util.Coalesce(
+		fromCRD.ConnectionPool.DefaultCPURequest,
+		constants.ConnectionPoolDefaultCpuRequest)
+
+	result.ConnectionPool.ConnPoolDefaultMemoryRequest = util.Coalesce(
+		fromCRD.ConnectionPool.DefaultMemoryRequest,
+		constants.ConnectionPoolDefaultMemoryRequest)
+
+	result.ConnectionPool.ConnPoolDefaultCPULimit = util.Coalesce(
+		fromCRD.ConnectionPool.DefaultCPULimit,
+		constants.ConnectionPoolDefaultCpuLimit)
+
+	result.ConnectionPool.ConnPoolDefaultMemoryLimit = util.Coalesce(
+		fromCRD.ConnectionPool.DefaultMemoryLimit,
+		constants.ConnectionPoolDefaultMemoryLimit)
+
+	result.ConnectionPool.MaxDBConnections = util.CoalesceInt32(
+		fromCRD.ConnectionPool.MaxDBConnections,
+		int32ToPointer(constants.ConnPoolMaxDBConnections))
 
 	return result
 }
