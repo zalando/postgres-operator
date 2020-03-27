@@ -36,9 +36,6 @@ const (
 	localHost                        = "127.0.0.1/32"
 	connectionPoolContainer          = "connection-pool"
 	pgPort                           = 5432
-
-	// the gid of the postgres user in the default spilo image
-	spiloPostgresGID = 103
 )
 
 type pgUser struct {
@@ -983,13 +980,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// configure TLS with a custom secret volume
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
-		if effectiveFSGroup == nil {
-			c.logger.Warnf("Setting the default FSGroup to satisfy the TLS configuration")
-			fsGroup := int64(spiloPostgresGID)
-			effectiveFSGroup = &fsGroup
-		}
-		// this is combined with the FSGroup above to give read access to the
-		// postgres user
+		// this is combined with the FSGroup in the section above will
+		// give read access to the postgres user
 		defaultMode := int32(0640)
 		volumes = append(volumes, v1.Volume{
 			Name: "tls-secret",

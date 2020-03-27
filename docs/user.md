@@ -572,10 +572,12 @@ However, this certificate cannot be verified and thus doesn't protect from
 active MITM attacks. In this section we show how to specify a custom TLS
 certificate which is mounted in the database pods via a K8s Secret.
 
-Before applying these changes, the operator must also be configured with the
-`spilo_fsgroup` set to the GID matching the postgres user group. If the value
-is not provided, the cluster will default to `103` which is the GID from the
-default spilo image.
+Before applying these changes, in k8s (not in OpenShift) the operator must also 
+be configured with the `spilo_fsgroup` set to the GID matching the postgres user 
+group. If you don't know the value, use `103` which is the GID from the default 
+spilo image (`spilo_fsgroup=103` in the cluster request spec).
+If the value is not provided and you are in k8s (not OpenShift), the certificates 
+will not have proper permissions and the server will not work as desired.
 
 Upload the cert as a kubernetes secret:
 ```sh
