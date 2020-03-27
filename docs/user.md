@@ -512,29 +512,29 @@ monitoring is outside the scope of operator responsibilities. See
 [administrator documentation](administrator.md) for details on how backups are
 executed.
 
-## Connection pool
+## Connection pooler
 
-The operator can create a database side connection pool for those applications,
-where an application side pool is not feasible, but a number of connections is
-high. To create a connection pool together with a database, modify the
+The operator can create a database side connection pooler for those applications,
+where an application side pooler is not feasible, but a number of connections is
+high. To create a connection pooler together with a database, modify the
 manifest:
 
 ```yaml
 spec:
-  enableConnectionPool: true
+  enableConnectionPooler: true
 ```
 
-This will tell the operator to create a connection pool with default
+This will tell the operator to create a connection pooler with default
 configuration, through which one can access the master via a separate service
 `{cluster-name}-pooler`. In most of the cases provided default configuration
 should be good enough.
 
-To configure a new connection pool, specify:
+To configure a new connection pooler, specify:
 
 ```
 spec:
-  connectionPool:
-    # how many instances of connection pool to create
+  connectionPooler:
+    # how many instances of connection pooler to create
     number_of_instances: 2
 
     # in which mode to run, session or transaction
@@ -544,7 +544,7 @@ spec:
     # function
     schema: "pooler"
 
-    # user, which operator will create for connection pool
+    # user, which operator will create for connection pooler
     user: "pooler"
 
     # resources for each instance
@@ -557,9 +557,9 @@ spec:
         memory: 100Mi
 ```
 
-By default `pgbouncer` is used to create a connection pool. To find out about
-pool modes see [docs](https://www.pgbouncer.org/config.html#pool_mode) (but it
-should be general approach between different implementation).
+By default `pgbouncer` is used to create a connection pooler. To find out about
+pooler modes see [docs](https://www.pgbouncer.org/config.html#pooler_mode) (but
+it should be general approach between different implementation).
 
 Note, that using `pgbouncer` means meaningful resource CPU limit should be less
 than 1 core (there is a way to utilize more than one, but in K8S it's easier

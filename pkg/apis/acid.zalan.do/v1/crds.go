@@ -177,7 +177,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
-					"connectionPool": {
+					"connectionPooler": {
 						Type: "object",
 						Properties: map[string]apiextv1beta1.JSONSchemaProps{
 							"dockerImage": {
@@ -259,7 +259,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"dockerImage": {
 						Type: "string",
 					},
-					"enableConnectionPool": {
+					"enableConnectionPooler": {
 						Type: "boolean",
 					},
 					"enableLogicalBackup": {
@@ -1129,32 +1129,32 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 						},
 					},
-					"connection_pool": {
+					"connection_pooler": {
 						Type: "object",
 						Properties: map[string]apiextv1beta1.JSONSchemaProps{
-							"connection_pool_default_cpu_limit": {
+							"connection_pooler_default_cpu_limit": {
 								Type:    "string",
 								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 							},
-							"connection_pool_default_cpu_request": {
+							"connection_pooler_default_cpu_request": {
 								Type:    "string",
 								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 							},
-							"connection_pool_default_memory_limit": {
+							"connection_pooler_default_memory_limit": {
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
-							"connection_pool_default_memory_request": {
+							"connection_pooler_default_memory_request": {
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
-							"connection_pool_image": {
+							"connection_pooler_image": {
 								Type: "string",
 							},
-							"connection_pool_max_db_connections": {
+							"connection_pooler_max_db_connections": {
 								Type: "integer",
 							},
-							"connection_pool_mode": {
+							"connection_pooler_mode": {
 								Type: "string",
 								Enum: []apiextv1beta1.JSON{
 									{
@@ -1165,14 +1165,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 								},
 							},
-							"connection_pool_number_of_instances": {
+							"connection_pooler_number_of_instances": {
 								Type:    "integer",
 								Minimum: &min2,
 							},
-							"connection_pool_schema": {
+							"connection_pooler_schema": {
 								Type: "string",
 							},
-							"connection_pool_user": {
+							"connection_pooler_user": {
 								Type: "string",
 							},
 						},

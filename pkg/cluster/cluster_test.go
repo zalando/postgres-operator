@@ -709,16 +709,16 @@ func TestServiceAnnotations(t *testing.T) {
 func TestInitSystemUsers(t *testing.T) {
 	testName := "Test system users initialization"
 
-	// default cluster without connection pool
+	// default cluster without connection pooler
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers[constants.ConnectionPoolUserKeyName]; exist {
-		t.Errorf("%s, connection pool user is present", testName)
+	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; exist {
+		t.Errorf("%s, connection pooler user is present", testName)
 	}
 
-	// cluster with connection pool
-	cl.Spec.EnableConnectionPool = boolToPointer(true)
+	// cluster with connection pooler
+	cl.Spec.EnableConnectionPooler = boolToPointer(true)
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers[constants.ConnectionPoolUserKeyName]; !exist {
-		t.Errorf("%s, connection pool user is not present", testName)
+	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; !exist {
+		t.Errorf("%s, connection pooler user is not present", testName)
 	}
 }
