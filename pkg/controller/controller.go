@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -99,7 +100,7 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.config.ConfigMapName != (spec.NamespacedName{}) {
 		configMap, err := c.KubeClient.ConfigMaps(c.config.ConfigMapName.Namespace).
-			Get(c.config.ConfigMapName.Name, metav1.GetOptions{})
+			Get(context.TODO(), c.config.ConfigMapName.Name, metav1.GetOptions{})
 		if err != nil {
 			panic(err)
 		}
@@ -406,7 +407,7 @@ func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFr
 
 	} else {
 
-		if _, err := c.KubeClient.Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+		if _, err := c.KubeClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
 			c.logger.Fatalf("Could not find the watched namespace %q", namespace)
 		} else {
 			c.logger.Infof("Listenting to the specific namespace %q", namespace)
