@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -22,7 +23,7 @@ func (c *Controller) nodeListFunc(options metav1.ListOptions) (runtime.Object, e
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.Nodes().List(opts)
+	return c.KubeClient.Nodes().List(context.TODO(), opts)
 }
 
 func (c *Controller) nodeWatchFunc(options metav1.ListOptions) (watch.Interface, error) {
@@ -32,7 +33,7 @@ func (c *Controller) nodeWatchFunc(options metav1.ListOptions) (watch.Interface,
 		TimeoutSeconds:  options.TimeoutSeconds,
 	}
 
-	return c.KubeClient.Nodes().Watch(opts)
+	return c.KubeClient.Nodes().Watch(context.TODO(), opts)
 }
 
 func (c *Controller) nodeAdd(obj interface{}) {
@@ -87,7 +88,7 @@ func (c *Controller) attemptToMoveMasterPodsOffNode(node *v1.Node) error {
 	opts := metav1.ListOptions{
 		LabelSelector: labels.Set(c.opConfig.ClusterLabels).String(),
 	}
-	podList, err := c.KubeClient.Pods(c.opConfig.WatchedNamespace).List(opts)
+	podList, err := c.KubeClient.Pods(c.opConfig.WatchedNamespace).List(context.TODO(), opts)
 	if err != nil {
 		c.logger.Errorf("could not fetch list of the pods: %v", err)
 		return err

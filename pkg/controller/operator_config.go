@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 
 	"time"
@@ -14,7 +15,8 @@ import (
 
 func (c *Controller) readOperatorConfigurationFromCRD(configObjectNamespace, configObjectName string) (*acidv1.OperatorConfiguration, error) {
 
-	config, err := c.KubeClient.AcidV1ClientSet.AcidV1().OperatorConfigurations(configObjectNamespace).Get(configObjectName, metav1.GetOptions{})
+	config, err := c.KubeClient.AcidV1ClientSet.AcidV1().OperatorConfigurations(configObjectNamespace).Get(
+		context.TODO(), configObjectName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("could not get operator configuration object %q: %v", configObjectName, err)
 	}

@@ -3,6 +3,7 @@ package cluster
 // Postgres CustomResourceDefinition object i.e. Spilo
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -88,7 +89,7 @@ type Cluster struct {
 	pgDb             *sql.DB
 	mu               sync.Mutex
 	userSyncStrategy spec.UserSyncer
-	deleteOptions    *metav1.DeleteOptions
+	deleteOptions    metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
 	teamsAPIClient   teams.Interface
@@ -131,7 +132,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
+		deleteOptions:    metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
 	}
@@ -182,7 +183,8 @@ func (c *Cluster) setStatus(status string) {
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
 	// we should take advantage of it.
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch, "status")
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(
+		context.TODO(), c.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
 		// return as newspec is empty, see PR654
@@ -1185,12 +1187,12 @@ func (c *Cluster) deleteClusterObject(
 
 func (c *Cluster) deletePatroniClusterServices() error {
 	get := func(name string) (spec.NamespacedName, error) {
-		svc, err := c.KubeClient.Services(c.Namespace).Get(name, metav1.GetOptions{})
+		svc, err := c.KubeClient.Services(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(svc.ObjectMeta), err
 	}
 
 	deleteServiceFn := func(name string) error {
-		return c.KubeClient.Services(c.Namespace).Delete(name, c.deleteOptions)
+		return c.KubeClient.Services(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
 	return c.deleteClusterObject(get, deleteServiceFn, "service")
@@ -1198,12 +1200,12 @@ func (c *Cluster) deletePatroniClusterServices() error {
 
 func (c *Cluster) deletePatroniClusterEndpoints() error {
 	get := func(name string) (spec.NamespacedName, error) {
-		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(name, metav1.GetOptions{})
+		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(ep.ObjectMeta), err
 	}
 
 	deleteEndpointFn := func(name string) error {
-		return c.KubeClient.Endpoints(c.Namespace).Delete(name, c.deleteOptions)
+		return c.KubeClient.Endpoints(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
 	return c.deleteClusterObject(get, deleteEndpointFn, "endpoint")
@@ -1211,12 +1213,12 @@ func (c *Cluster) deletePatroniClusterEndpoints() error {
 
 func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	get := func(name string) (spec.NamespacedName, error) {
-		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(name, metav1.GetOptions{})
+		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(cm.ObjectMeta), err
 	}
 
 	deleteConfigMapFn := func(name string) error {
-		return c.KubeClient.ConfigMaps(c.Namespace).Delete(name, c.deleteOptions)
+		return c.KubeClient.ConfigMaps(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
