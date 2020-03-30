@@ -274,6 +274,68 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"enableShmVolume": {
 						Type: "boolean",
 					},
+					"env": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"value": {
+										Type: "string",
+									},
+									"valueFrom": {
+										Type: "Object",
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"fieldRef": {
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"apiVersion": {
+														Type: "string",
+													},
+													"fieldPath": {
+														Type: "string",
+													},
+												},
+											},
+											"configMapKeyRef": {
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"name": {
+														Type: "string",
+													},
+													"key": {
+														Type: "string",
+													},
+													"optional": {
+														Type:     "boolean",
+														Nullable: true,
+													},
+												},
+											},
+											"secretKeyRef": {
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"name": {
+														Type: "string",
+													},
+													"key": {
+														Type: "string",
+													},
+													"optional": {
+														Type:     "boolean",
+														Nullable: true,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					"init_containers": {
 						Type:        "array",
 						Description: "Deprecated",
@@ -673,6 +735,49 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 							"subPath": {
 								Type: "string",
+							},
+						},
+					},
+					"volumes": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+								},
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Schema: &apiextv1beta1.JSONSchemaProps{
+										Type: "object",
+									},
+								},
+							},
+						},
+					},
+					"volumeMounts": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"readOnly": {
+										Type: "boolean",
+									},
+									"mountPath": {
+										Type: "string",
+									},
+									"subPath": {
+										Type: "string",
+									},
+									"subPathExpr": {
+										Type: "string",
+									},
+								},
 							},
 						},
 					},

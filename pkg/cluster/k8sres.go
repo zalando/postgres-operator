@@ -572,8 +572,8 @@ func generatePodTemplate(
 }
 
 // generatePodEnvVars generates environment variables for the Spilo Pod
-func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, cloneDescription *acidv1.CloneDescription, standbyDescription *acidv1.StandbyDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
-	envVars := []v1.EnvVar{
+func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration string, envVars []v1.EnvVar, cloneDescription *acidv1.CloneDescription, standbyDescription *acidv1.StandbyDescription, customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
+	defaultEnvVars := []v1.EnvVar{
 		{
 			Name:  "SCOPE",
 			Value: c.Name,
@@ -647,6 +647,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 			Value: c.OpConfig.PamRoleName,
 		},
 	}
+	envVars = append(envVars, defaultEnvVars...)
 	// Spilo expects cluster labels as JSON
 	if clusterLabels, err := json.Marshal(labels.Set(c.OpConfig.ClusterLabels)); err != nil {
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_LABELS", Value: labels.Set(c.OpConfig.ClusterLabels).String()})
@@ -965,6 +966,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	spiloEnvVars := c.generateSpiloPodEnvVars(
 		c.Postgresql.GetUID(),
 		spiloConfiguration,
+		spec.Env,
 		&spec.Clone,
 		spec.StandbyCluster,
 		customPodEnvVarsList,
@@ -1025,6 +1027,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			)
 		}
 	}
+
+	// append volumes and volumemounts in postgres spec
+	volumeMounts = append(volumeMounts, spec.VolumeMounts...)
+	volumes = append(volumes, spec.Volumes...)
 
 	// generate the spilo container
 	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
