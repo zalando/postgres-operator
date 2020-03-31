@@ -70,6 +70,92 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_enable_disable_connection_pool(self):
+        '''
+        For a database without connection pool, then turns it on, scale up,
+        turn off and on again. Test with different ways of doing this (via
+        enableConnectionPool or connectionPool configuration section). At the
+        end turn the connection pool off to not interfere with other tests.
+        '''
+        k8s = self.k8s
+        service_labels = {
+            'cluster-name': 'acid-minimal-cluster',
+        }
+        pod_labels = dict({
+            'connection-pool': 'acid-minimal-cluster-pooler',
+        })
+
+        pod_selector = to_selector(pod_labels)
+        service_selector = to_selector(service_labels)
+
+        try:
+            # enable connection pool
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default',
+                'postgresqls', 'acid-minimal-cluster',
+                {
+                    'spec': {
+                        'enableConnectionPool': True,
+                    }
+                })
+            k8s.wait_for_pod_start(pod_selector)
+
+            pods = k8s.api.core_v1.list_namespaced_pod(
+                'default', label_selector=pod_selector
+            ).items
+
+            self.assertTrue(pods, 'No connection pool pods')
+
+            k8s.wait_for_service(service_selector)
+            services = k8s.api.core_v1.list_namespaced_service(
+                'default', label_selector=service_selector
+            ).items
+            services = [
+                s for s in services
+                if s.metadata.name.endswith('pooler')
+            ]
+
+            self.assertTrue(services, 'No connection pool service')
+
+            # scale up connection pool deployment
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default',
+                'postgresqls', 'acid-minimal-cluster',
+                {
+                    'spec': {
+                        'connectionPool': {
+                            'numberOfInstances': 2,
+                        },
+                    }
+                })
+
+            k8s.wait_for_running_pods(pod_selector, 2)
+
+            # turn it off, keeping configuration section
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default',
+                'postgresqls', 'acid-minimal-cluster',
+                {
+                    'spec': {
+                        'enableConnectionPool': False,
+                    }
+                })
+            k8s.wait_for_pods_to_stop(pod_selector)
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                'acid.zalan.do', 'v1', 'default',
+                'postgresqls', 'acid-minimal-cluster',
+                {
+                    'spec': {
+                        'enableConnectionPool': True,
+                    }
+                })
+            k8s.wait_for_pod_start(pod_selector)
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_load_balancer(self):
         '''
         Test if services are updated when enabling/disabling load balancers
@@ -290,6 +376,10 @@ class EndToEndTestCase(unittest.TestCase):
 
         # patch also node where master ran before
         k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
+
+        # wait a little before proceeding with the pod distribution test
+        time.sleep(k8s.RETRY_TIMEOUT_SEC)
+
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
@@ -350,92 +440,6 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(unpatch_custom_service_annotations)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_enable_disable_connection_pool(self):
-        '''
-        For a database without connection pool, then turns it on, scale up,
-        turn off and on again. Test with different ways of doing this (via
-        enableConnectionPool or connectionPool configuration section). At the
-        end turn the connection pool off to not interfere with other tests.
-        '''
-        k8s = self.k8s
-        service_labels = {
-            'cluster-name': 'acid-minimal-cluster',
-        }
-        pod_labels = dict({
-            'connection-pool': 'acid-minimal-cluster-pooler',
-        })
-
-        pod_selector = to_selector(pod_labels)
-        service_selector = to_selector(service_labels)
-
-        try:
-            # enable connection pool
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'enableConnectionPool': True,
-                    }
-                })
-            k8s.wait_for_pod_start(pod_selector)
-
-            pods = k8s.api.core_v1.list_namespaced_pod(
-                'default', label_selector=pod_selector
-            ).items
-
-            self.assertTrue(pods, 'No connection pool pods')
-
-            k8s.wait_for_service(service_selector)
-            services = k8s.api.core_v1.list_namespaced_service(
-                'default', label_selector=service_selector
-            ).items
-            services = [
-                s for s in services
-                if s.metadata.name.endswith('pooler')
-            ]
-
-            self.assertTrue(services, 'No connection pool service')
-
-            # scale up connection pool deployment
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'connectionPool': {
-                            'numberOfInstances': 2,
-                        },
-                    }
-                })
-
-            k8s.wait_for_running_pods(pod_selector, 2)
-
-            # turn it off, keeping configuration section
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'enableConnectionPool': False,
-                    }
-                })
-            k8s.wait_for_pods_to_stop(pod_selector)
-
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'enableConnectionPool': True,
-                    }
-                })
-            k8s.wait_for_pod_start(pod_selector)
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
-
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
@@ -472,6 +476,9 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_toleration_config)
+
+        # wait a little before proceeding with the pod distribution test
+        time.sleep(k8s.RETRY_TIMEOUT_SEC)
 
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
