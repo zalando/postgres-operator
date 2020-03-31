@@ -1410,7 +1410,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
 		Type:  v1.ServiceTypeClusterIP,
 	}
-	
+
 	if role == Replica || c.patroniKubernetesUseConfigMaps() {
 		serviceSpec.Selector = c.roleLabelsSet(false, role)
 	}
