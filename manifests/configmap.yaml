@@ -98,6 +98,6 @@ data:
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
   # toleration: ""
   # wal_s3_bucket: ""
-  # should_delete_unused_pvc: "false" 
+  # enable_unused_pvc_deletion: "false" 
   watched_namespace: "*"  # listen to all namespaces
   workers: "4"

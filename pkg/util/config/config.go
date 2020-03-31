@@ -153,7 +153,7 @@ type Config struct {
 	ProtectedRoles            []string          `name:"protected_role_names" default:"admin"`
 	PostgresSuperuserTeams    []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit   bool              `name:"set_memory_request_to_limit" default:"false"`
-	ShouldDeleteUnusedPVC     bool              `name:"should_delete_unused_pvc" default:"false"`
+	EnableUnusedPVCDeletion   bool              `name:"enable_unused_pvc_deletion" default:"false"`
 }
 
 // MustMarshal marshals the config or panics

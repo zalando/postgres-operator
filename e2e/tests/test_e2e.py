@@ -504,7 +504,7 @@ class EndToEndTestCase(unittest.TestCase):
         # enable pvc deletion
         patch = {
             "data": {
-                "should_delete_unused_pvc": "true"
+                "enable_unused_pvc_deletion": "true"
             }
         }
         k8s.update_config(patch)
@@ -542,7 +542,7 @@ class EndToEndTestCase(unittest.TestCase):
         # clean up
         patch = {
             "data": {
-                "should_delete_unused_pvc": "false"
+                "enable_unused_pvc_deletion": "false"
             }
         }
         k8s.update_config(patch)

@@ -22,7 +22,7 @@ configGeneral:
   # start any new database pod without limitations on shm memory
   enable_shm_volume: true
   # delete PVCs of shutdown pods
-  should_delete_unused_pvc: false
+  enable_unused_pvc_deletion: false
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Spilo docker image
