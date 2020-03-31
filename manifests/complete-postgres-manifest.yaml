@@ -87,7 +87,7 @@ spec:
 #  - Sat:00:00-04:00
 
   connectionPooler:
-    number_of_instances: 2
+    numberOfInstances: 2
     mode: "transaction"
     schema: "pooler"
     user: "pooler"
