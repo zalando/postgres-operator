@@ -253,10 +253,6 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 
 func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet) (bool, error) {
 
-	if c.OpConfig.EnableLazySpiloUpgrade {
-		return false, nil
-	}
-
 	pods, err := c.listPods()
 	if err != nil {
 		return false, fmt.Errorf("could not list pods of the statefulset: %v", err)
@@ -356,7 +352,7 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 		}
 
-		if !podsRollingUpdateRequired {
+		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if desired and actual statefulsets match
 			// there still may be not up-to-date pods on condition
 			//  (a) the lazy update was just disabled

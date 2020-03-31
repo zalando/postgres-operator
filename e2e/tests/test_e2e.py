@@ -221,24 +221,26 @@ class EndToEndTestCase(unittest.TestCase):
         pod1 = "acid-minimal-cluster-1"
 
         # enable lazy update
+        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16"
         patch_lazy_spilo_upgrade = {
             "data": {
                 "enable_lazy_spilo_upgrade": "true",
-                "docker_image": "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16"
+                "docker_image": conf_image
             }
         }
         k8s.update_config(patch_lazy_spilo_upgrade)
 
-        # wait for sts update
-        time.sleep(60)
-
         # restart the pod to get a container with the new image 
         k8s.api.core_v1.delete_namespaced_pod(pod0, "default")
-        time.sleep(60)
+        k8s.wait_for_pod_start('spilo-role=replica')
+
+        # sanity check: restarted pod runs the image specified in operator's conf
+        new_image = k8s.get_effective_pod_image(pod0)
+        self.assertEqual(conf_image, new_image, 
+            "Lazy updated failed: restarted pod runs image {} different from the one in operator conf {}".format(new_image, conf_image))
 
         # lazy update works if the restarted pod and older pods have different Spilo versions
         # i.e. the update did not immediately affect all pods
-        new_image = k8s.get_effective_pod_image(pod0)
         old_image = k8s.get_effective_pod_image(pod1)
         self.assertNotEqual(old_image, new_image, "Lazy updated failed: pods have the same image {}".format(new_image))
 
