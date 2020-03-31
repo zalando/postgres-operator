@@ -693,7 +693,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 			podIndex := strconv.Itoa(int(i))
 			pvcName := "pgdata-" + c.Name + "-" + podIndex
-			if err := c.KubeClient.PersistentVolumeClaims(c.Namespace).Delete(pvcName, c.deleteOptions); err != nil {
+			if err := c.KubeClient.PersistentVolumeClaims(c.Namespace).Delete(context.TODO(), pvcName, c.deleteOptions); err != nil {
 				c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
 				// failing to delete pvc does not fail the update; Sync() may also delete unused PVCs later
 			}

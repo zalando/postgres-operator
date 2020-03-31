@@ -119,7 +119,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		for i := c.getNumberOfInstances(&c.Spec); ; i++ {
 			podIndex := strconv.Itoa(int(i))
 			pvcName := "pgdata-" + c.Name + "-" + podIndex
-			if err := c.KubeClient.PersistentVolumeClaims(c.Namespace).Delete(pvcName, c.deleteOptions); err != nil {
+			if err := c.KubeClient.PersistentVolumeClaims(c.Namespace).Delete(context.TODO(), pvcName, c.deleteOptions); err != nil {
 				if k8sutil.ResourceNotFound(err) {
 					// no more pvcs to delete
 					break
@@ -128,7 +128,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 				// next Sync() or Update() will retry
 			}
 		}
-
+	}
 	// sync connection pool
 	if err = c.syncConnectionPool(&oldSpec, newSpec, c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pool: %v", err)

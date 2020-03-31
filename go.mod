@@ -9,7 +9,7 @@ require (
 	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
 	github.com/sirupsen/logrus v1.5.0
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/tools v0.0.0-20200326210457-5d86d385bf88 // indirect
+	golang.org/x/tools v0.0.0-20200331025713-a30bf2db82d4 // indirect
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.18.0
 	k8s.io/apiextensions-apiserver v0.18.0
