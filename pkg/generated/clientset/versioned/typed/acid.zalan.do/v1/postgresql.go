@@ -25,6 +25,7 @@ SOFTWARE.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -43,15 +44,15 @@ type PostgresqlsGetter interface {
 
 // PostgresqlInterface has methods to work with Postgresql resources.
 type PostgresqlInterface interface {
-	Create(*v1.Postgresql) (*v1.Postgresql, error)
-	Update(*v1.Postgresql) (*v1.Postgresql, error)
-	UpdateStatus(*v1.Postgresql) (*v1.Postgresql, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.Postgresql, error)
-	List(opts metav1.ListOptions) (*v1.PostgresqlList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Postgresql, err error)
+	Create(ctx context.Context, postgresql *v1.Postgresql, opts metav1.CreateOptions) (*v1.Postgresql, error)
+	Update(ctx context.Context, postgresql *v1.Postgresql, opts metav1.UpdateOptions) (*v1.Postgresql, error)
+	UpdateStatus(ctx context.Context, postgresql *v1.Postgresql, opts metav1.UpdateOptions) (*v1.Postgresql, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Postgresql, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.PostgresqlList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Postgresql, err error)
 	PostgresqlExpansion
 }
 
@@ -70,20 +71,20 @@ func newPostgresqls(c *AcidV1Client, namespace string) *postgresqls {
 }
 
 // Get takes name of the postgresql, and returns the corresponding postgresql object, and an error if there is any.
-func (c *postgresqls) Get(name string, options metav1.GetOptions) (result *v1.Postgresql, err error) {
+func (c *postgresqls) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Postgresql, err error) {
 	result = &v1.Postgresql{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("postgresqls").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Postgresqls that match those selectors.
-func (c *postgresqls) List(opts metav1.ListOptions) (result *v1.PostgresqlList, err error) {
+func (c *postgresqls) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PostgresqlList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -94,13 +95,13 @@ func (c *postgresqls) List(opts metav1.ListOptions) (result *v1.PostgresqlList, 
 		Resource("postgresqls").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested postgresqls.
-func (c *postgresqls) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *postgresqls) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -111,87 +112,90 @@ func (c *postgresqls) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 		Resource("postgresqls").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a postgresql and creates it.  Returns the server's representation of the postgresql, and an error, if there is any.
-func (c *postgresqls) Create(postgresql *v1.Postgresql) (result *v1.Postgresql, err error) {
+func (c *postgresqls) Create(ctx context.Context, postgresql *v1.Postgresql, opts metav1.CreateOptions) (result *v1.Postgresql, err error) {
 	result = &v1.Postgresql{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("postgresqls").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(postgresql).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a postgresql and updates it. Returns the server's representation of the postgresql, and an error, if there is any.
-func (c *postgresqls) Update(postgresql *v1.Postgresql) (result *v1.Postgresql, err error) {
+func (c *postgresqls) Update(ctx context.Context, postgresql *v1.Postgresql, opts metav1.UpdateOptions) (result *v1.Postgresql, err error) {
 	result = &v1.Postgresql{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("postgresqls").
 		Name(postgresql.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(postgresql).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-
-func (c *postgresqls) UpdateStatus(postgresql *v1.Postgresql) (result *v1.Postgresql, err error) {
+func (c *postgresqls) UpdateStatus(ctx context.Context, postgresql *v1.Postgresql, opts metav1.UpdateOptions) (result *v1.Postgresql, err error) {
 	result = &v1.Postgresql{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("postgresqls").
 		Name(postgresql.Name).
 		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(postgresql).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the postgresql and deletes it. Returns an error if one occurs.
-func (c *postgresqls) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *postgresqls) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("postgresqls").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *postgresqls) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *postgresqls) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("postgresqls").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched postgresql.
-func (c *postgresqls) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Postgresql, err error) {
+func (c *postgresqls) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Postgresql, err error) {
 	result = &v1.Postgresql{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("postgresqls").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

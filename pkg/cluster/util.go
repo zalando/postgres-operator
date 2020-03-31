@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
@@ -47,7 +48,7 @@ func (g *SecretOauthTokenGetter) getOAuthToken() (string, error) {
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
 	credentialsSecret, err := g.kubeClient.
 		Secrets(g.OAuthTokenSecretName.Namespace).
-		Get(g.OAuthTokenSecretName.Name, metav1.GetOptions{})
+		Get(context.TODO(), g.OAuthTokenSecretName.Name, metav1.GetOptions{})
 
 	if err != nil {
 		return "", fmt.Errorf("could not get credentials secret: %v", err)
@@ -278,7 +279,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 			listOptions := metav1.ListOptions{
 				LabelSelector: c.labelsSet(false).String(),
 			}
-			ss, err := c.KubeClient.StatefulSets(c.Namespace).List(listOptions)
+			ss, err := c.KubeClient.StatefulSets(c.Namespace).List(context.TODO(), listOptions)
 			if err != nil {
 				return false, err
 			}
@@ -313,7 +314,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 	}
 	podsNumber = 1
 	if !anyReplica {
-		pods, err := c.KubeClient.Pods(namespace).List(listOptions)
+		pods, err := c.KubeClient.Pods(namespace).List(context.TODO(), listOptions)
 		if err != nil {
 			return err
 		}
@@ -327,7 +328,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 		func() (bool, error) {
 			masterCount := 0
 			if !anyReplica {
-				masterPods, err2 := c.KubeClient.Pods(namespace).List(masterListOption)
+				masterPods, err2 := c.KubeClient.Pods(namespace).List(context.TODO(), masterListOption)
 				if err2 != nil {
 					return false, err2
 				}
@@ -337,7 +338,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 				}
 				masterCount = len(masterPods.Items)
 			}
-			replicaPods, err2 := c.KubeClient.Pods(namespace).List(replicaListOption)
+			replicaPods, err2 := c.KubeClient.Pods(namespace).List(context.TODO(), replicaListOption)
 			if err2 != nil {
 				return false, err2
 			}
