@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -237,7 +238,7 @@ func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason st
 	return true, ""
 }
 
-func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
+func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
 	if name != "infrastructureroles-test" {
 		return nil, fmt.Errorf("NotFound")
 	}
@@ -253,7 +254,7 @@ func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, er
 
 }
 
-func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
+func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
 	if name != "infrastructureroles-test" {
 		return nil, fmt.Errorf("NotFound")
 	}
@@ -283,7 +284,7 @@ func (mock *MockDeploymentNotExistGetter) Deployments(namespace string) appsv1.D
 	return &mockDeploymentNotExist{}
 }
 
-func (mock *mockDeployment) Create(*apiappsv1.Deployment) (*apiappsv1.Deployment, error) {
+func (mock *mockDeployment) Create(context.Context, *apiappsv1.Deployment, metav1.CreateOptions) (*apiappsv1.Deployment, error) {
 	return &apiappsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-deployment",
@@ -294,11 +295,11 @@ func (mock *mockDeployment) Create(*apiappsv1.Deployment) (*apiappsv1.Deployment
 	}, nil
 }
 
-func (mock *mockDeployment) Delete(name string, opts *metav1.DeleteOptions) error {
+func (mock *mockDeployment) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return nil
 }
 
-func (mock *mockDeployment) Get(name string, opts metav1.GetOptions) (*apiappsv1.Deployment, error) {
+func (mock *mockDeployment) Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiappsv1.Deployment, error) {
 	return &apiappsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-deployment",
@@ -318,7 +319,7 @@ func (mock *mockDeployment) Get(name string, opts metav1.GetOptions) (*apiappsv1
 	}, nil
 }
 
-func (mock *mockDeployment) Patch(name string, t types.PatchType, data []byte, subres ...string) (*apiappsv1.Deployment, error) {
+func (mock *mockDeployment) Patch(ctx context.Context, name string, t types.PatchType, data []byte, opts metav1.PatchOptions, subres ...string) (*apiappsv1.Deployment, error) {
 	return &apiappsv1.Deployment{
 		Spec: apiappsv1.DeploymentSpec{
 			Replicas: Int32ToPointer(2),
@@ -329,7 +330,7 @@ func (mock *mockDeployment) Patch(name string, t types.PatchType, data []byte, s
 	}, nil
 }
 
-func (mock *mockDeploymentNotExist) Get(name string, opts metav1.GetOptions) (*apiappsv1.Deployment, error) {
+func (mock *mockDeploymentNotExist) Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiappsv1.Deployment, error) {
 	return nil, &apierrors.StatusError{
 		ErrStatus: metav1.Status{
 			Reason: metav1.StatusReasonNotFound,
@@ -337,7 +338,7 @@ func (mock *mockDeploymentNotExist) Get(name string, opts metav1.GetOptions) (*a
 	}
 }
 
-func (mock *mockDeploymentNotExist) Create(*apiappsv1.Deployment) (*apiappsv1.Deployment, error) {
+func (mock *mockDeploymentNotExist) Create(context.Context, *apiappsv1.Deployment, metav1.CreateOptions) (*apiappsv1.Deployment, error) {
 	return &apiappsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-deployment",
@@ -356,7 +357,7 @@ func (mock *MockServiceNotExistGetter) Services(namespace string) corev1.Service
 	return &mockServiceNotExist{}
 }
 
-func (mock *mockService) Create(*v1.Service) (*v1.Service, error) {
+func (mock *mockService) Create(context.Context, *v1.Service, metav1.CreateOptions) (*v1.Service, error) {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-service",
@@ -364,11 +365,11 @@ func (mock *mockService) Create(*v1.Service) (*v1.Service, error) {
 	}, nil
 }
 
-func (mock *mockService) Delete(name string, opts *metav1.DeleteOptions) error {
+func (mock *mockService) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return nil
 }
 
-func (mock *mockService) Get(name string, opts metav1.GetOptions) (*v1.Service, error) {
+func (mock *mockService) Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Service, error) {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-service",
@@ -376,7 +377,7 @@ func (mock *mockService) Get(name string, opts metav1.GetOptions) (*v1.Service, 
 	}, nil
 }
 
-func (mock *mockServiceNotExist) Create(*v1.Service) (*v1.Service, error) {
+func (mock *mockServiceNotExist) Create(context.Context, *v1.Service, metav1.CreateOptions) (*v1.Service, error) {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-service",
@@ -384,7 +385,7 @@ func (mock *mockServiceNotExist) Create(*v1.Service) (*v1.Service, error) {
 	}, nil
 }
 
-func (mock *mockServiceNotExist) Get(name string, opts metav1.GetOptions) (*v1.Service, error) {
+func (mock *mockServiceNotExist) Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Service, error) {
 	return nil, &apierrors.StatusError{
 		ErrStatus: metav1.Status{
 			Reason: metav1.StatusReasonNotFound,
