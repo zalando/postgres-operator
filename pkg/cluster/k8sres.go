@@ -980,8 +980,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	// configure TLS with a custom secret volume
 	if spec.TLS != nil && spec.TLS.SecretName != "" {
-		// this is combined with the FSGroup in the section above will
-		// give read access to the postgres user
+		// this is combined with the FSGroup in the section above
+		// to give read access to the postgres user
 		defaultMode := int32(0640)
 		volumes = append(volumes, v1.Volume{
 			Name: "tls-secret",
