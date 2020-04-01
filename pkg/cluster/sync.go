@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -114,20 +113,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	// remove unused PVCs in case deleting them during scale down failed; see Update()
 	// the last pvc stays until the cluster is explicitly deleted as opposed to being scaled down to 0 pods
 	if c.OpConfig.EnableUnusedPVCDeletion && c.getNumberOfInstances(&c.Spec) > 0 {
-
-		// XXX that also deletes PVC of pods shut down before this change is deployed
-		for i := c.getNumberOfInstances(&c.Spec); ; i++ {
-			podIndex := strconv.Itoa(int(i))
-			pvcName := "pgdata-" + c.Name + "-" + podIndex
-			if err := c.KubeClient.PersistentVolumeClaims(c.Namespace).Delete(context.TODO(), pvcName, c.deleteOptions); err != nil {
-				if k8sutil.ResourceNotFound(err) {
-					// no more pvcs to delete
-					break
-				}
-				c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
-				// next Sync() or Update() will retry
-			}
-		}
+		c.deleteUnusedPersistentVolumeClaims()
 	}
 
 	// sync connection pooler
