@@ -140,10 +140,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration). Optional.
 
-* **enableConnectionPool**
-  Tells the operator to create a connection pool with a database. If this
-  field is true, a connection pool deployment will be created even if
-  `connectionPool` section is empty. Optional, not set by default.
+* **enableConnectionPooler**
+  Tells the operator to create a connection pooler with a database. If this
+  field is true, a connection pooler deployment will be created even if
+  `connectionPooler` section is empty. Optional, not set by default.
 
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
@@ -365,34 +365,34 @@ CPU and memory limits for the sidecar container.
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
 
-## Connection pool
+## Connection pooler
 
-Parameters are grouped under the `connectionPool` top-level key and specify
-configuration for connection pool. If this section is not empty, a connection
-pool will be created for a database even if `enableConnectionPool` is not
+Parameters are grouped under the `connectionPooler` top-level key and specify
+configuration for connection pooler. If this section is not empty, a connection
+pooler will be created for a database even if `enableConnectionPooler` is not
 present.
 
 * **numberOfInstances**
-  How many instances of connection pool to create.
+  How many instances of connection pooler to create.
 
 * **schema**
   Schema to create for credentials lookup function.
 
 * **user**
-  User to create for connection pool to be able to connect to a database.
+  User to create for connection pooler to be able to connect to a database.
 
 * **dockerImage**
-  Which docker image to use for connection pool deployment.
+  Which docker image to use for connection pooler deployment.
 
 * **maxDBConnections**
   How many connections the pooler can max hold. This value is divided among the
   pooler pods.
 
 * **mode**
-  In which mode to run connection pool, transaction or session.
+  In which mode to run connection pooler, transaction or session.
 
 * **resources**
-  Resource configuration for connection pool deployment.
+  Resource configuration for connection pooler deployment.
 
 ## Custom TLS certificates
 
