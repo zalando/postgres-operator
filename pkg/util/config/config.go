@@ -85,17 +85,17 @@ type LogicalBackup struct {
 }
 
 // Operator options for connection pooler
-type ConnectionPool struct {
-	NumberOfInstances            *int32 `name:"connection_pool_number_of_instances" default:"2"`
-	Schema                       string `name:"connection_pool_schema" default:"pooler"`
-	User                         string `name:"connection_pool_user" default:"pooler"`
-	Image                        string `name:"connection_pool_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
-	Mode                         string `name:"connection_pool_mode" default:"transaction"`
-	MaxDBConnections             *int32 `name:"connection_pool_max_db_connections" default:"60"`
-	ConnPoolDefaultCPURequest    string `name:"connection_pool_default_cpu_request" default:"500m"`
-	ConnPoolDefaultMemoryRequest string `name:"connection_pool_default_memory_request" default:"100Mi"`
-	ConnPoolDefaultCPULimit      string `name:"connection_pool_default_cpu_limit" default:"1"`
-	ConnPoolDefaultMemoryLimit   string `name:"connection_pool_default_memory_limit" default:"100Mi"`
+type ConnectionPooler struct {
+	NumberOfInstances                    *int32 `name:"connection_pooler_number_of_instances" default:"2"`
+	Schema                               string `name:"connection_pooler_schema" default:"pooler"`
+	User                                 string `name:"connection_pooler_user" default:"pooler"`
+	Image                                string `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
+	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
+	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
+	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request" default:"500m"`
+	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request" default:"100Mi"`
+	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit" default:"1"`
+	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit" default:"100Mi"`
 }
 
 // Config describes operator config
@@ -105,7 +105,7 @@ type Config struct {
 	Auth
 	Scalyr
 	LogicalBackup
-	ConnectionPool
+	ConnectionPooler
 
 	WatchedNamespace      string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	EtcdHost              string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
@@ -213,9 +213,9 @@ func validate(cfg *Config) (err error) {
 		err = fmt.Errorf("number of workers should be higher than 0")
 	}
 
-	if *cfg.ConnectionPool.NumberOfInstances < constants.ConnPoolMinInstances {
-		msg := "number of connection pool instances should be higher than %d"
-		err = fmt.Errorf(msg, constants.ConnPoolMinInstances)
+	if *cfg.ConnectionPooler.NumberOfInstances < constants.ConnectionPoolerMinInstances {
+		msg := "number of connection pooler instances should be higher than %d"
+		err = fmt.Errorf(msg, constants.ConnectionPoolerMinInstances)
 	}
 	return
 }

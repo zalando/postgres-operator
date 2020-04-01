@@ -29,8 +29,8 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	EnableConnectionPool *bool           `json:"enableConnectionPool,omitempty"`
-	ConnectionPool       *ConnectionPool `json:"connectionPool,omitempty"`
+	EnableConnectionPooler *bool             `json:"enableConnectionPooler,omitempty"`
+	ConnectionPooler       *ConnectionPooler `json:"connectionPooler,omitempty"`
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
@@ -175,10 +175,10 @@ type PostgresStatus struct {
 // resources)
 // Type              string `json:"type,omitempty"`
 //
-// TODO: figure out what other important parameters of the connection pool it
+// TODO: figure out what other important parameters of the connection pooler it
 // makes sense to expose. E.g. pool size (min/max boundaries), max client
 // connections etc.
-type ConnectionPool struct {
+type ConnectionPooler struct {
 	NumberOfInstances *int32 `json:"numberOfInstances,omitempty"`
 	Schema            string `json:"schema,omitempty"`
 	User              string `json:"user,omitempty"`

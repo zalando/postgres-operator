@@ -35,7 +35,7 @@ const (
 	patroniPGParametersParameterName = "parameters"
 	patroniPGHBAConfParameterName    = "pg_hba"
 	localHost                        = "127.0.0.1/32"
-	connectionPoolContainer          = "connection-pool"
+	connectionPoolerContainer        = "connection-pooler"
 	pgPort                           = 5432
 )
 
@@ -72,7 +72,7 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) connPoolName() string {
+func (c *Cluster) connectionPoolerName() string {
 	return c.Name + "-pooler"
 }
 
@@ -139,18 +139,18 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 	}
 }
 
-// Generate default resource section for connection pool deployment, to be used
-// if nothing custom is specified in the manifest
-func (c *Cluster) makeDefaultConnPoolResources() acidv1.Resources {
+// Generate default resource section for connection pooler deployment, to be
+// used if nothing custom is specified in the manifest
+func (c *Cluster) makeDefaultConnectionPoolerResources() acidv1.Resources {
 	config := c.OpConfig
 
 	defaultRequests := acidv1.ResourceDescription{
-		CPU:    config.ConnectionPool.ConnPoolDefaultCPURequest,
-		Memory: config.ConnectionPool.ConnPoolDefaultMemoryRequest,
+		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPURequest,
+		Memory: config.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest,
 	}
 	defaultLimits := acidv1.ResourceDescription{
-		CPU:    config.ConnectionPool.ConnPoolDefaultCPULimit,
-		Memory: config.ConnectionPool.ConnPoolDefaultMemoryLimit,
+		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPULimit,
+		Memory: config.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit,
 	}
 
 	return acidv1.Resources{
@@ -1851,33 +1851,33 @@ func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 //
 // DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
 // 	most of the queries coming through a connection pooler are from the same
-// 	user to the same db). In case if we want to spin up more connection pool
+// 	user to the same db). In case if we want to spin up more connection pooler
 // 	instances, take this into account and maintain the same number of
 // 	connections.
 //
-// MIN_SIZE is a pool minimal size, to prevent situation when sudden workload
+// MIN_SIZE is a pool's minimal size, to prevent situation when sudden workload
 // 	have to wait for spinning up a new connections.
 //
-// RESERVE_SIZE is how many additional connections to allow for a pool.
-func (c *Cluster) getConnPoolEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
+// RESERVE_SIZE is how many additional connections to allow for a pooler.
+func (c *Cluster) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
 	effectiveMode := util.Coalesce(
-		spec.ConnectionPool.Mode,
-		c.OpConfig.ConnectionPool.Mode)
+		spec.ConnectionPooler.Mode,
+		c.OpConfig.ConnectionPooler.Mode)
 
-	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
-			c.OpConfig.ConnectionPool.NumberOfInstances,
+			c.OpConfig.ConnectionPooler.NumberOfInstances,
 			k8sutil.Int32ToPointer(1))
 	}
 
 	effectiveMaxDBConn := util.CoalesceInt32(
-		spec.ConnectionPool.MaxDBConnections,
-		c.OpConfig.ConnectionPool.MaxDBConnections)
+		spec.ConnectionPooler.MaxDBConnections,
+		c.OpConfig.ConnectionPooler.MaxDBConnections)
 
 	if effectiveMaxDBConn == nil {
 		effectiveMaxDBConn = k8sutil.Int32ToPointer(
-			constants.ConnPoolMaxDBConnections)
+			constants.ConnectionPoolerMaxDBConnections)
 	}
 
 	maxDBConn := *effectiveMaxDBConn / *numberOfInstances
@@ -1888,51 +1888,51 @@ func (c *Cluster) getConnPoolEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
 
 	return []v1.EnvVar{
 		{
-			Name:  "CONNECTION_POOL_PORT",
+			Name:  "CONNECTION_POOLER_PORT",
 			Value: fmt.Sprint(pgPort),
 		},
 		{
-			Name:  "CONNECTION_POOL_MODE",
+			Name:  "CONNECTION_POOLER_MODE",
 			Value: effectiveMode,
 		},
 		{
-			Name:  "CONNECTION_POOL_DEFAULT_SIZE",
+			Name:  "CONNECTION_POOLER_DEFAULT_SIZE",
 			Value: fmt.Sprint(defaultSize),
 		},
 		{
-			Name:  "CONNECTION_POOL_MIN_SIZE",
+			Name:  "CONNECTION_POOLER_MIN_SIZE",
 			Value: fmt.Sprint(minSize),
 		},
 		{
-			Name:  "CONNECTION_POOL_RESERVE_SIZE",
+			Name:  "CONNECTION_POOLER_RESERVE_SIZE",
 			Value: fmt.Sprint(reserveSize),
 		},
 		{
-			Name:  "CONNECTION_POOL_MAX_CLIENT_CONN",
-			Value: fmt.Sprint(constants.ConnPoolMaxClientConnections),
+			Name:  "CONNECTION_POOLER_MAX_CLIENT_CONN",
+			Value: fmt.Sprint(constants.ConnectionPoolerMaxClientConnections),
 		},
 		{
-			Name:  "CONNECTION_POOL_MAX_DB_CONN",
+			Name:  "CONNECTION_POOLER_MAX_DB_CONN",
 			Value: fmt.Sprint(maxDBConn),
 		},
 	}
 }
 
-func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
+func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec) (
 	*v1.PodTemplateSpec, error) {
 
 	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
 	resources, err := generateResourceRequirements(
-		spec.ConnectionPool.Resources,
-		c.makeDefaultConnPoolResources())
+		spec.ConnectionPooler.Resources,
+		c.makeDefaultConnectionPoolerResources())
 
 	effectiveDockerImage := util.Coalesce(
-		spec.ConnectionPool.DockerImage,
-		c.OpConfig.ConnectionPool.Image)
+		spec.ConnectionPooler.DockerImage,
+		c.OpConfig.ConnectionPooler.Image)
 
 	effectiveSchema := util.Coalesce(
-		spec.ConnectionPool.Schema,
-		c.OpConfig.ConnectionPool.Schema)
+		spec.ConnectionPooler.Schema,
+		c.OpConfig.ConnectionPooler.Schema)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
@@ -1940,8 +1940,8 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 
 	secretSelector := func(key string) *v1.SecretKeySelector {
 		effectiveUser := util.Coalesce(
-			spec.ConnectionPool.User,
-			c.OpConfig.ConnectionPool.User)
+			spec.ConnectionPooler.User,
+			c.OpConfig.ConnectionPooler.User)
 
 		return &v1.SecretKeySelector{
 			LocalObjectReference: v1.LocalObjectReference{
@@ -1967,7 +1967,7 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 			},
 		},
 		// the convention is to use the same schema name as
-		// connection pool username
+		// connection pooler username
 		{
 			Name:  "PGSCHEMA",
 			Value: effectiveSchema,
@@ -1980,10 +1980,10 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 		},
 	}
 
-	envVars = append(envVars, c.getConnPoolEnvVars(spec)...)
+	envVars = append(envVars, c.getConnectionPoolerEnvVars(spec)...)
 
 	poolerContainer := v1.Container{
-		Name:            connectionPoolContainer,
+		Name:            connectionPoolerContainer,
 		Image:           effectiveDockerImage,
 		ImagePullPolicy: v1.PullIfNotPresent,
 		Resources:       *resources,
@@ -1998,7 +1998,7 @@ func (c *Cluster) generateConnPoolPodTemplate(spec *acidv1.PostgresSpec) (
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
 			Namespace:   c.Namespace,
 			Annotations: c.generatePodAnnotations(spec),
 		},
@@ -2040,32 +2040,32 @@ func (c *Cluster) ownerReferences() []metav1.OwnerReference {
 	}
 }
 
-func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
+func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec) (
 	*appsv1.Deployment, error) {
 
 	// there are two ways to enable connection pooler, either to specify a
-	// connectionPool section or enableConnectionPool. In the second case
-	// spec.connectionPool will be nil, so to make it easier to calculate
+	// connectionPooler section or enableConnectionPooler. In the second case
+	// spec.connectionPooler will be nil, so to make it easier to calculate
 	// default values, initialize it to an empty structure. It could be done
 	// anywhere, but here is the earliest common entry point between sync and
 	// create code, so init here.
-	if spec.ConnectionPool == nil {
-		spec.ConnectionPool = &acidv1.ConnectionPool{}
+	if spec.ConnectionPooler == nil {
+		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
 
-	podTemplate, err := c.generateConnPoolPodTemplate(spec)
-	numberOfInstances := spec.ConnectionPool.NumberOfInstances
+	podTemplate, err := c.generateConnectionPoolerPodTemplate(spec)
+	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
-			c.OpConfig.ConnectionPool.NumberOfInstances,
+			c.OpConfig.ConnectionPooler.NumberOfInstances,
 			k8sutil.Int32ToPointer(1))
 	}
 
-	if *numberOfInstances < constants.ConnPoolMinInstances {
-		msg := "Adjusted number of connection pool instances from %d to %d"
-		c.logger.Warningf(msg, numberOfInstances, constants.ConnPoolMinInstances)
+	if *numberOfInstances < constants.ConnectionPoolerMinInstances {
+		msg := "Adjusted number of connection pooler instances from %d to %d"
+		c.logger.Warningf(msg, numberOfInstances, constants.ConnectionPoolerMinInstances)
 
-		*numberOfInstances = constants.ConnPoolMinInstances
+		*numberOfInstances = constants.ConnectionPoolerMinInstances
 	}
 
 	if err != nil {
@@ -2074,9 +2074,9 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connPoolName(),
+			Name:        c.connectionPoolerName(),
 			Namespace:   c.Namespace,
-			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
@@ -2088,7 +2088,7 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: numberOfInstances,
-			Selector: c.connPoolLabelsSelector(),
+			Selector: c.connectionPoolerLabelsSelector(),
 			Template: *podTemplate,
 		},
 	}
@@ -2096,37 +2096,37 @@ func (c *Cluster) generateConnPoolDeployment(spec *acidv1.PostgresSpec) (
 	return deployment, nil
 }
 
-func (c *Cluster) generateConnPoolService(spec *acidv1.PostgresSpec) *v1.Service {
+func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1.Service {
 
 	// there are two ways to enable connection pooler, either to specify a
-	// connectionPool section or enableConnectionPool. In the second case
-	// spec.connectionPool will be nil, so to make it easier to calculate
+	// connectionPooler section or enableConnectionPooler. In the second case
+	// spec.connectionPooler will be nil, so to make it easier to calculate
 	// default values, initialize it to an empty structure. It could be done
 	// anywhere, but here is the earliest common entry point between sync and
 	// create code, so init here.
-	if spec.ConnectionPool == nil {
-		spec.ConnectionPool = &acidv1.ConnectionPool{}
+	if spec.ConnectionPooler == nil {
+		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
 
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{
-				Name:       c.connPoolName(),
+				Name:       c.connectionPoolerName(),
 				Port:       pgPort,
 				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
 			},
 		},
 		Type: v1.ServiceTypeClusterIP,
 		Selector: map[string]string{
-			"connection-pool": c.connPoolName(),
+			"connection-pooler": c.connectionPoolerName(),
 		},
 	}
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connPoolName(),
+			Name:        c.connectionPoolerName(),
 			Namespace:   c.Namespace,
-			Labels:      c.connPoolLabelsSelector().MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
