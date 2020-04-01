@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -81,6 +82,7 @@ type Cluster struct {
 	acidv1.Postgresql
 	Config
 	logger           *logrus.Entry
+	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
@@ -109,7 +111,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry) *Cluster {
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -140,6 +142,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
 	cluster.oauthTokenGetter = newSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
 	cluster.patroni = patroni.New(cluster.logger)
+	cluster.eventRecorder = eventRecorder
 
 	return cluster
 }
