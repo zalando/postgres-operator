@@ -109,3 +109,5 @@ spec:
     certificateFile: "tls.crt"
     privateKeyFile: "tls.key"
     caFile: ""  # optionally configure Postgres with a CA certificate
+# When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
+# if unknown, set it to 103 which is the usual value in the default spilo images.
