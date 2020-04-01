@@ -958,6 +958,7 @@ func TestTLS(t *testing.T) {
 	var err error
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
+	var spiloFSGroup = int64(103)
 
 	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
@@ -981,6 +982,9 @@ func TestTLS(t *testing.T) {
 				Auth: config.Auth{
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					SpiloFSGroup: &spiloFSGroup,
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
