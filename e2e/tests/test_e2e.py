@@ -70,32 +70,32 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_enable_disable_connection_pool(self):
+    def test_enable_disable_connection_pooler(self):
         '''
-        For a database without connection pool, then turns it on, scale up,
+        For a database without connection pooler, then turns it on, scale up,
         turn off and on again. Test with different ways of doing this (via
-        enableConnectionPool or connectionPool configuration section). At the
-        end turn the connection pool off to not interfere with other tests.
+        enableConnectionPooler or connectionPooler configuration section). At
+        the end turn connection pooler off to not interfere with other tests.
         '''
         k8s = self.k8s
         service_labels = {
             'cluster-name': 'acid-minimal-cluster',
         }
         pod_labels = dict({
-            'connection-pool': 'acid-minimal-cluster-pooler',
+            'connection-pooler': 'acid-minimal-cluster-pooler',
         })
 
         pod_selector = to_selector(pod_labels)
         service_selector = to_selector(service_labels)
 
         try:
-            # enable connection pool
+            # enable connection pooler
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 'acid.zalan.do', 'v1', 'default',
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'enableConnectionPool': True,
+                        'enableConnectionPooler': True,
                     }
                 })
             k8s.wait_for_pod_start(pod_selector)
@@ -104,7 +104,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'default', label_selector=pod_selector
             ).items
 
-            self.assertTrue(pods, 'No connection pool pods')
+            self.assertTrue(pods, 'No connection pooler pods')
 
             k8s.wait_for_service(service_selector)
             services = k8s.api.core_v1.list_namespaced_service(
@@ -115,15 +115,15 @@ class EndToEndTestCase(unittest.TestCase):
                 if s.metadata.name.endswith('pooler')
             ]
 
-            self.assertTrue(services, 'No connection pool service')
+            self.assertTrue(services, 'No connection pooler service')
 
-            # scale up connection pool deployment
+            # scale up connection pooler deployment
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 'acid.zalan.do', 'v1', 'default',
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'connectionPool': {
+                        'connectionPooler': {
                             'numberOfInstances': 2,
                         },
                     }
@@ -137,7 +137,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'enableConnectionPool': False,
+                        'enableConnectionPooler': False,
                     }
                 })
             k8s.wait_for_pods_to_stop(pod_selector)
@@ -147,7 +147,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'enableConnectionPool': True,
+                        'enableConnectionPooler': True,
                     }
                 })
             k8s.wait_for_pod_start(pod_selector)
