@@ -287,6 +287,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"synchronous_mode": {
 								Type: "boolean",
 							},
+							"synchronous_mode_strict": {
+								Type: "boolean",
+							},
 						},
 					},
 					"podAnnotations": {

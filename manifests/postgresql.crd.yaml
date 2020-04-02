@@ -135,6 +135,8 @@ spec:
                   type: integer
                 synchronous_mode:
                   type: boolean
+                synchronous_mode_strict:
+                  type: boolean
             podAnnotations:
               type: object
               additionalProperties:
