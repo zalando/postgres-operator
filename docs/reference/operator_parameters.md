@@ -80,6 +80,12 @@ Those are top-level keys, containing both leaf keys and groups.
   Patroni native Kubernetes support is used. The default is empty (use
   Kubernetes-native DCS).
 
+* **kubernetes_use_configmaps**
+  Select if setup uses endpoints (default), or configmaps to manage leader when
+  DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to
+  use endpoints option, and configmaps is required. By default, 
+  `kubernetes_use_configmaps: false`, meaning endpoints will be used.
+
 * **docker_image**
   Spilo Docker image for Postgres instances. For production, don't rely on the
   default image, as it might be not the most up-to-date one. Instead, build

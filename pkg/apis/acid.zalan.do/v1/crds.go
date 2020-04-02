@@ -727,6 +727,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"etcd_host": {
 						Type: "string",
 					},
+					"kubernetes_use_configmaps": {
+						Type: "boolean",
+					},
 					"max_instances": {
 						Type:        "integer",
 						Description: "-1 = disabled",

@@ -43,6 +43,7 @@ data:
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
+  # kubernetes_use_configmaps: "false"
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
   # inherited_labels: application,environment
   # kube_iam_role: ""

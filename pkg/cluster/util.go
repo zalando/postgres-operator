@@ -510,6 +510,15 @@ func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
 }
 
+func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
+	if !c.patroniUsesKubernetes() {
+		return false
+	}
+
+	// otherwise, follow the operator configuration
+	return c.OpConfig.KubernetesUseConfigMaps
+}
+
 func (c *Cluster) needConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 	if spec.EnableConnectionPooler == nil {
 		return spec.ConnectionPooler != nil

@@ -23,6 +23,8 @@ configGeneral:
   enable_shm_volume: true
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
+  # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
+  # kubernetes_use_configmaps: false
   # Spilo docker image
   docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
   # max number of instances in Postgres cluster. -1 = no limit

@@ -66,6 +66,8 @@ spec:
               type: boolean
             etcd_host:
               type: string
+            kubernetes_use_configmaps:
+              type: boolean
             max_instances:
               type: integer
               minimum: -1  # -1 = disabled
