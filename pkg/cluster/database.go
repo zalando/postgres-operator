@@ -56,10 +56,10 @@ const (
 			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT EXECUTE ON FUNCTIONS TO "%s","%s";
 			ALTER DEFAULT PRIVILEGES IN SCHEMA "%s" GRANT USAGE ON TYPES TO "%s","%s";`
 
-	connectionPoolLookup = `
-		CREATE SCHEMA IF NOT EXISTS {{.pool_schema}};
+	connectionPoolerLookup = `
+		CREATE SCHEMA IF NOT EXISTS {{.pooler_schema}};
 
-		CREATE OR REPLACE FUNCTION {{.pool_schema}}.user_lookup(
+		CREATE OR REPLACE FUNCTION {{.pooler_schema}}.user_lookup(
 			in i_username text, out uname text, out phash text)
 		RETURNS record AS $$
 		BEGIN
@@ -69,11 +69,12 @@ const (
 		END;
 		$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-		REVOKE ALL ON FUNCTION {{.pool_schema}}.user_lookup(text)
-			FROM public, {{.pool_user}};
-		GRANT EXECUTE ON FUNCTION {{.pool_schema}}.user_lookup(text)
-			TO {{.pool_user}};
-		GRANT USAGE ON SCHEMA {{.pool_schema}} TO {{.pool_user}}`
+		REVOKE ALL ON FUNCTION {{.pooler_schema}}.user_lookup(text)
+			FROM public, {{.pooler_user}};
+		GRANT EXECUTE ON FUNCTION {{.pooler_schema}}.user_lookup(text)
+			TO {{.pooler_user}};
+		GRANT USAGE ON SCHEMA {{.pooler_schema}} TO {{.pooler_user}};
+	`
 )
 
 func (c *Cluster) pgConnectionString(dbname string) string {
@@ -462,7 +463,7 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 
 // Creates a connection pool credentials lookup function in every database to
 // perform remote authentification.
-func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
+func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 	var stmtBytes bytes.Buffer
 	c.logger.Info("Installing lookup function")
 
@@ -481,11 +482,11 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 
 	currentDatabases, err := c.getDatabases()
 	if err != nil {
-		msg := "could not get databases to install pool lookup function: %v"
+		msg := "could not get databases to install pooler lookup function: %v"
 		return fmt.Errorf(msg, err)
 	}
 
-	templater := template.Must(template.New("sql").Parse(connectionPoolLookup))
+	templater := template.Must(template.New("sql").Parse(connectionPoolerLookup))
 
 	for dbname, _ := range currentDatabases {
 		if dbname == "template0" || dbname == "template1" {
@@ -496,11 +497,11 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 			return fmt.Errorf("could not init database connection to %s", dbname)
 		}
 
-		c.logger.Infof("Install pool lookup function into %s", dbname)
+		c.logger.Infof("Install pooler lookup function into %s", dbname)
 
 		params := TemplateParams{
-			"pool_schema": poolSchema,
-			"pool_user":   poolUser,
+			"pooler_schema": poolerSchema,
+			"pooler_user":   poolerUser,
 		}
 
 		if err := templater.Execute(&stmtBytes, params); err != nil {
@@ -535,12 +536,12 @@ func (c *Cluster) installLookupFunction(poolSchema, poolUser string) error {
 			continue
 		}
 
-		c.logger.Infof("Pool lookup function installed into %s", dbname)
+		c.logger.Infof("pooler lookup function installed into %s", dbname)
 		if err := c.closeDbConn(); err != nil {
 			c.logger.Errorf("could not close database connection: %v", err)
 		}
 	}
 
-	c.ConnectionPool.LookupFunction = true
+	c.ConnectionPooler.LookupFunction = true
 	return nil
 }
