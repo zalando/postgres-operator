@@ -376,10 +376,11 @@ present.
   How many instances of connection pooler to create.
 
 * **schema**
-  Schema to create for credentials lookup function.
+  Database schema to create for credentials lookup function.
 
 * **user**
   User to create for connection pooler to be able to connect to a database.
+  You can also choose a role from the `users` section or a system user role.
 
 * **dockerImage**
   Which docker image to use for connection pooler deployment.
