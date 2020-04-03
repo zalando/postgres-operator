@@ -527,7 +527,7 @@ spec:
 This will tell the operator to create a connection pooler with default
 configuration, through which one can access the master via a separate service
 `{cluster-name}-pooler`. In most of the cases the
-[default configuration](reference/operator_parameters.md#connection-pool-configuration)
+[default configuration](reference/operator_parameters.md#connection-pooler-configuration)
 should be good enough. To configure a new connection pooler individually for
 each Postgres cluster, specify:
 
@@ -540,7 +540,8 @@ spec:
     # in which mode to run, session or transaction
     mode: "transaction"
 
-    # schema, which operator will create to install credentials lookup function
+    # schema, which operator will create in each database
+    # to install credentials lookup function for connection pooler
     schema: "pooler"
 
     # user, which operator will create for connection pooler
@@ -560,11 +561,11 @@ The `enableConnectionPooler` flag is not required when the `connectionPooler`
 section is present in the manifest. But, it can be used to disable/remove the
 pooler while keeping its configuration.
 
-By default, `pgbouncer` is used as connection pooler. To find out about pooler
-modes read the `pgbouncer` [docs](https://www.pgbouncer.org/config.html#pooler_mode)
+By default, [`PgBouncer`](https://www.pgbouncer.org/) is used as connection pooler.
+To find out about pool modes read the `PgBouncer` [docs](https://www.pgbouncer.org/config.html#pooler_mode)
 (but it should be the general approach between different implementation).
 
-Note, that using `pgbouncer` a meaningful resource CPU limit should be 1 core
+Note, that using `PgBouncer` a meaningful resource CPU limit should be 1 core
 or less (there is a way to utilize more than one, but in K8s it's easier just to
 spin up more instances).
 
