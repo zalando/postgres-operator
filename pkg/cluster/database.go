@@ -34,7 +34,7 @@ const (
 	        LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace ORDER BY 1;`
 
 	createDatabaseSQL       = `CREATE DATABASE "%s" OWNER "%s";`
-	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA IS NOT EXISTS "%s" AUTHORIZATION "%s"`
+	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA IF NOT EXISTS "%s" AUTHORIZATION "%s"`
 	alterDatabaseOwnerSQL   = `ALTER DATABASE "%s" OWNER TO "%s";`
 	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
 	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
