@@ -44,6 +44,10 @@ spec:
         - name: POSTGRES_OPERATOR_CONFIGURATION_OBJECT
           value: {{ template "postgres-operator.fullname" . }}
       {{- end }}
+      {{- if .Values.controllerID.create }}
+        - name: CONTROLLER_ID
+          value: {{ template "postgres-operator.controllerID" . }}
+      {{- end }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
       {{- if .Values.imagePullSecrets }}

@@ -40,12 +40,23 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 // clusterListFunc obtains a list of all PostgreSQL clusters
 func (c *Controller) listClusters(options metav1.ListOptions) (*acidv1.PostgresqlList, error) {
+	var pgList acidv1.PostgresqlList
+
 	// TODO: use the SharedInformer cache instead of quering Kubernetes API directly.
 	list, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.opConfig.WatchedNamespace).List(options)
 	if err != nil {
 		c.logger.Errorf("could not list postgresql objects: %v", err)
 	}
-	return list, err
+	if c.controllerID != "" {
+		c.logger.Debugf("watch only clusters with controllerID %q", c.controllerID)
+	}
+	for _, pg := range list.Items {
+		if pg.Error == "" && c.hasOwnership(&pg) {
+			pgList.Items = append(pgList.Items, pg)
+		}
+	}
+
+	return &pgList, err
 }
 
 // clusterListAndSync lists all manifests and decides whether to run the sync or repair.
@@ -455,41 +466,48 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
-	pg, ok := obj.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
-		return
+	pg := c.postgresqlCheck(obj)
+	if pg != nil {
+		// We will not get multiple Add events for the same cluster
+		c.queueClusterEvent(nil, pg, EventAdd)
 	}
 
-	// We will not get multiple Add events for the same cluster
-	c.queueClusterEvent(nil, pg, EventAdd)
+	return
 }
 
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
-	pgOld, ok := prev.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
-	}
-	pgNew, ok := cur.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
-	}
-	// Avoid the inifinite recursion for status updates
-	if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
-		return
+	pgOld := c.postgresqlCheck(prev)
+	pgNew := c.postgresqlCheck(cur)
+	if pgOld != nil && pgNew != nil {
+		// Avoid the inifinite recursion for status updates
+		if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
+			return
+		}
+		c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 	}
 
-	c.queueClusterEvent(pgOld, pgNew, EventUpdate)
+	return
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {
+	pg := c.postgresqlCheck(obj)
+	if pg != nil {
+		c.queueClusterEvent(pg, nil, EventDelete)
+	}
+
+	return
+}
+
+func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
 	pg, ok := obj.(*acidv1.Postgresql)
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
-		return
+		return nil
 	}
-
-	c.queueClusterEvent(pg, nil, EventDelete)
+	if !c.hasOwnership(pg) {
+		return nil
+	}
+	return pg
 }
 
 /*

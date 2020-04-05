@@ -71,7 +71,7 @@ configKubernetes:
   enable_pod_disruption_budget: true
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
-  # name of the secret containing infrastructure roles names and passwords
+  # namespaced name of the secret containing infrastructure roles names and passwords
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
   # list of labels that can be inherited from the cluster manifest
@@ -86,15 +86,15 @@ configKubernetes:
   # node_readiness_label:
   #   status: ready
 
-  # name of the secret containing the OAuth2 token to pass to the teams API
+  # namespaced name of the secret containing the OAuth2 token to pass to the teams API
   # oauth_token_secret_name: postgresql-operator
 
   # defines the template for PDB (Pod Disruption Budget) names
   pdb_name_format: "postgres-{cluster}-pdb"
   # override topology key for pod anti affinity
   pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-  # name of the ConfigMap with environment variables to populate on every pod
-  # pod_environment_configmap: ""
+  # namespaced name of the ConfigMap with environment variables to populate on every pod
+  # pod_environment_configmap: "default/my-custom-config"
 
   # specify the pod management policy of stateful sets of Postgres clusters
   pod_management_policy: "ordered_ready"
@@ -103,8 +103,6 @@ configKubernetes:
   # service account definition as JSON/YAML string to be used by postgres cluster pods
   # pod_service_account_definition: ""
 
-  # name of service account to be used by postgres cluster pods
-  pod_service_account_name: "postgres-pod"
   # role binding definition as JSON/YAML string to be used by pod service account
   # pod_service_account_role_binding_definition: ""
 
@@ -218,7 +216,7 @@ configLogicalBackup:
   logical_backup_s3_endpoint: ""
   # S3 Secret Access Key
   logical_backup_s3_secret_access_key: ""
-  # S3 server side encription
+  # S3 server side encryption
   logical_backup_s3_sse: "AES256"
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
@@ -269,6 +267,25 @@ configScalyr:
   # Memory request value for the Scalyr sidecar
   scalyr_memory_request: 50Mi
 
+configConnectionPool:
+  # db schema to install lookup function into
+  connection_pool_schema: "pooler"
+  # db user for pooler to use
+  connection_pool_user: "pooler"
+  # docker image
+  connection_pool_image: "registry.opensource.zalan.do/acid/pgbouncer"
+  # max db connections the pooler should hold
+  connection_pool_max_db_connections: 60
+  # default pooling mode
+  connection_pool_mode: "transaction"
+  # number of pooler instances
+  connection_pool_number_of_instances: 2
+  # default resources
+  connection_pool_default_cpu_request: 500m
+  connection_pool_default_memory_request: 100Mi
+  connection_pool_default_cpu_limit: "1"
+  connection_pool_default_memory_limit: 100Mi
+
 rbac:
   # Specifies whether RBAC resources should be created
   create: true
@@ -283,6 +300,11 @@ serviceAccount:
   # The name of the ServiceAccount to use.
   # If not set and create is true, a name is generated using the fullname template
   name:
+
+podServiceAccount:
+  # The name of the ServiceAccount to be used by postgres cluster pods
+  # If not set a name is generated using the fullname template and "-pod" suffix
+  name: "postgres-pod"
 
 priorityClassName: ""
 
@@ -305,3 +327,12 @@ tolerations: []
 # Node labels for pod assignment
 # Ref: https://kubernetes.io/docs/user-guide/node-selection/
 nodeSelector: {}
+
+controllerID:
+  # Specifies whether a controller ID should be defined for the operator
+  # Note, all postgres manifest must then contain the following annotation to be found by this operator
+  # "acid.zalan.do/controller": <controller-ID-of-the-operator>
+  create: false
+  # The name of the controller ID to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:

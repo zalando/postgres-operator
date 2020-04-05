@@ -1,11 +1,13 @@
 package cluster
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 
-	v1 "k8s.io/api/core/v1"
-
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -13,6 +15,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -381,6 +385,135 @@ func TestCloneEnv(t *testing.T) {
 	}
 }
 
+func TestExtractPgVersionFromBinPath(t *testing.T) {
+	testName := "TestExtractPgVersionFromBinPath"
+	tests := []struct {
+		subTest  string
+		binPath  string
+		template string
+		expected string
+	}{
+		{
+			subTest:  "test current bin path with decimal against hard coded template",
+			binPath:  "/usr/lib/postgresql/9.6/bin",
+			template: pgBinariesLocationTemplate,
+			expected: "9.6",
+		},
+		{
+			subTest:  "test current bin path against hard coded template",
+			binPath:  "/usr/lib/postgresql/12/bin",
+			template: pgBinariesLocationTemplate,
+			expected: "12",
+		},
+		{
+			subTest:  "test alternative bin path against a matching template",
+			binPath:  "/usr/pgsql-12/bin",
+			template: "/usr/pgsql-%v/bin",
+			expected: "12",
+		},
+	}
+
+	for _, tt := range tests {
+		pgVersion, err := extractPgVersionFromBinPath(tt.binPath, tt.template)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pgVersion != tt.expected {
+			t.Errorf("%s %s: Expected version %s, have %s instead",
+				testName, tt.subTest, tt.expected, pgVersion)
+		}
+	}
+}
+
+func TestGetPgVersion(t *testing.T) {
+	testName := "TestGetPgVersion"
+	tests := []struct {
+		subTest          string
+		pgContainer      v1.Container
+		currentPgVersion string
+		newPgVersion     string
+	}{
+		{
+			subTest: "new version with decimal point differs from current SPILO_CONFIGURATION",
+			pgContainer: v1.Container{
+				Name: "postgres",
+				Env: []v1.EnvVar{
+					{
+						Name:  "SPILO_CONFIGURATION",
+						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/9.6/bin\"}}",
+					},
+				},
+			},
+			currentPgVersion: "9.6",
+			newPgVersion:     "12",
+		},
+		{
+			subTest: "new version differs from current SPILO_CONFIGURATION",
+			pgContainer: v1.Container{
+				Name: "postgres",
+				Env: []v1.EnvVar{
+					{
+						Name:  "SPILO_CONFIGURATION",
+						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/11/bin\"}}",
+					},
+				},
+			},
+			currentPgVersion: "11",
+			newPgVersion:     "12",
+		},
+		{
+			subTest: "new version is lower than the one found in current SPILO_CONFIGURATION",
+			pgContainer: v1.Container{
+				Name: "postgres",
+				Env: []v1.EnvVar{
+					{
+						Name:  "SPILO_CONFIGURATION",
+						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/12/bin\"}}",
+					},
+				},
+			},
+			currentPgVersion: "12",
+			newPgVersion:     "11",
+		},
+		{
+			subTest: "new version is the same like in the current SPILO_CONFIGURATION",
+			pgContainer: v1.Container{
+				Name: "postgres",
+				Env: []v1.EnvVar{
+					{
+						Name:  "SPILO_CONFIGURATION",
+						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/12/bin\"}}",
+					},
+				},
+			},
+			currentPgVersion: "12",
+			newPgVersion:     "12",
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	for _, tt := range tests {
+		pgVersion, err := cluster.getNewPgVersion(tt.pgContainer, tt.newPgVersion)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if pgVersion != tt.currentPgVersion {
+			t.Errorf("%s %s: Expected version %s, have %s instead",
+				testName, tt.subTest, tt.currentPgVersion, pgVersion)
+		}
+	}
+}
+
 func TestSecretVolume(t *testing.T) {
 	testName := "TestSecretVolume"
 	tests := []struct {
@@ -450,4 +583,435 @@ func TestSecretVolume(t *testing.T) {
 				numMountsCheck, numMounts+1)
 		}
 	}
+}
+
+func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
+	if cpuReq.String() != cluster.OpConfig.ConnectionPool.ConnPoolDefaultCPURequest {
+		return fmt.Errorf("CPU request doesn't match, got %s, expected %s",
+			cpuReq.String(), cluster.OpConfig.ConnectionPool.ConnPoolDefaultCPURequest)
+	}
+
+	memReq := podSpec.Spec.Containers[0].Resources.Requests["memory"]
+	if memReq.String() != cluster.OpConfig.ConnectionPool.ConnPoolDefaultMemoryRequest {
+		return fmt.Errorf("Memory request doesn't match, got %s, expected %s",
+			memReq.String(), cluster.OpConfig.ConnectionPool.ConnPoolDefaultMemoryRequest)
+	}
+
+	cpuLim := podSpec.Spec.Containers[0].Resources.Limits["cpu"]
+	if cpuLim.String() != cluster.OpConfig.ConnectionPool.ConnPoolDefaultCPULimit {
+		return fmt.Errorf("CPU limit doesn't match, got %s, expected %s",
+			cpuLim.String(), cluster.OpConfig.ConnectionPool.ConnPoolDefaultCPULimit)
+	}
+
+	memLim := podSpec.Spec.Containers[0].Resources.Limits["memory"]
+	if memLim.String() != cluster.OpConfig.ConnectionPool.ConnPoolDefaultMemoryLimit {
+		return fmt.Errorf("Memory limit doesn't match, got %s, expected %s",
+			memLim.String(), cluster.OpConfig.ConnectionPool.ConnPoolDefaultMemoryLimit)
+	}
+
+	return nil
+}
+
+func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+	poolLabels := podSpec.ObjectMeta.Labels["connection-pool"]
+
+	if poolLabels != cluster.connPoolLabelsSelector().MatchLabels["connection-pool"] {
+		return fmt.Errorf("Pod labels do not match, got %+v, expected %+v",
+			podSpec.ObjectMeta.Labels, cluster.connPoolLabelsSelector().MatchLabels)
+	}
+
+	return nil
+}
+
+func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+	required := map[string]bool{
+		"PGHOST":               false,
+		"PGPORT":               false,
+		"PGUSER":               false,
+		"PGSCHEMA":             false,
+		"PGPASSWORD":           false,
+		"CONNECTION_POOL_MODE": false,
+		"CONNECTION_POOL_PORT": false,
+	}
+
+	envs := podSpec.Spec.Containers[0].Env
+	for _, env := range envs {
+		required[env.Name] = true
+	}
+
+	for env, value := range required {
+		if !value {
+			return fmt.Errorf("Environment variable %s is not present", env)
+		}
+	}
+
+	return nil
+}
+
+func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+	if podSpec.ObjectMeta.Name != "test-pod-template" {
+		return fmt.Errorf("Custom pod template is not used, current spec %+v",
+			podSpec)
+	}
+
+	return nil
+}
+
+func TestConnPoolPodSpec(t *testing.T) {
+	testName := "Test connection pool pod template generation"
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPool: config.ConnectionPool{
+					MaxDBConnections:             int32ToPointer(60),
+					ConnPoolDefaultCPURequest:    "100m",
+					ConnPoolDefaultCPULimit:      "100m",
+					ConnPoolDefaultMemoryRequest: "100Mi",
+					ConnPoolDefaultMemoryLimit:   "100Mi",
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	var clusterNoDefaultRes = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPool: config.ConnectionPool{},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec) error { return nil }
+
+	tests := []struct {
+		subTest  string
+		spec     *acidv1.PostgresSpec
+		expected error
+		cluster  *Cluster
+		check    func(cluster *Cluster, podSpec *v1.PodTemplateSpec) error
+	}{
+		{
+			subTest: "default configuration",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    noCheck,
+		},
+		{
+			subTest: "no default resources",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: errors.New(`could not generate resource requirements: could not fill resource requests: could not parse default CPU quantity: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`),
+			cluster:  clusterNoDefaultRes,
+			check:    noCheck,
+		},
+		{
+			subTest: "default resources are set",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    testResources,
+		},
+		{
+			subTest: "labels for service",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    testLabels,
+		},
+		{
+			subTest: "required envs",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    testEnvs,
+		},
+	}
+	for _, tt := range tests {
+		podSpec, err := tt.cluster.generateConnPoolPodTemplate(tt.spec)
+
+		if err != tt.expected && err.Error() != tt.expected.Error() {
+			t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
+				testName, tt.subTest, err, tt.expected)
+		}
+
+		err = tt.check(cluster, podSpec)
+		if err != nil {
+			t.Errorf("%s [%s]: Pod spec is incorrect, %+v",
+				testName, tt.subTest, err)
+		}
+	}
+}
+
+func testDeploymentOwnwerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
+	owner := deployment.ObjectMeta.OwnerReferences[0]
+
+	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
+		return fmt.Errorf("Ownere reference is incorrect, got %s, expected %s",
+			owner.Name, cluster.Statefulset.ObjectMeta.Name)
+	}
+
+	return nil
+}
+
+func testSelector(cluster *Cluster, deployment *appsv1.Deployment) error {
+	labels := deployment.Spec.Selector.MatchLabels
+	expected := cluster.connPoolLabelsSelector().MatchLabels
+
+	if labels["connection-pool"] != expected["connection-pool"] {
+		return fmt.Errorf("Labels are incorrect, got %+v, expected %+v",
+			labels, expected)
+	}
+
+	return nil
+}
+
+func TestConnPoolDeploymentSpec(t *testing.T) {
+	testName := "Test connection pool deployment spec generation"
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPool: config.ConnectionPool{
+					ConnPoolDefaultCPURequest:    "100m",
+					ConnPoolDefaultCPULimit:      "100m",
+					ConnPoolDefaultMemoryRequest: "100Mi",
+					ConnPoolDefaultMemoryLimit:   "100Mi",
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+	cluster.Statefulset = &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sts",
+		},
+	}
+
+	noCheck := func(cluster *Cluster, deployment *appsv1.Deployment) error {
+		return nil
+	}
+
+	tests := []struct {
+		subTest  string
+		spec     *acidv1.PostgresSpec
+		expected error
+		cluster  *Cluster
+		check    func(cluster *Cluster, deployment *appsv1.Deployment) error
+	}{
+		{
+			subTest: "default configuration",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    noCheck,
+		},
+		{
+			subTest: "owner reference",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    testDeploymentOwnwerReference,
+		},
+		{
+			subTest: "selector",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			expected: nil,
+			cluster:  cluster,
+			check:    testSelector,
+		},
+	}
+	for _, tt := range tests {
+		deployment, err := tt.cluster.generateConnPoolDeployment(tt.spec)
+
+		if err != tt.expected && err.Error() != tt.expected.Error() {
+			t.Errorf("%s [%s]: Could not generate deployment spec,\n %+v, expected\n %+v",
+				testName, tt.subTest, err, tt.expected)
+		}
+
+		err = tt.check(cluster, deployment)
+		if err != nil {
+			t.Errorf("%s [%s]: Deployment spec is incorrect, %+v",
+				testName, tt.subTest, err)
+		}
+	}
+}
+
+func testServiceOwnwerReference(cluster *Cluster, service *v1.Service) error {
+	owner := service.ObjectMeta.OwnerReferences[0]
+
+	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
+		return fmt.Errorf("Ownere reference is incorrect, got %s, expected %s",
+			owner.Name, cluster.Statefulset.ObjectMeta.Name)
+	}
+
+	return nil
+}
+
+func testServiceSelector(cluster *Cluster, service *v1.Service) error {
+	selector := service.Spec.Selector
+
+	if selector["connection-pool"] != cluster.connPoolName() {
+		return fmt.Errorf("Selector is incorrect, got %s, expected %s",
+			selector["connection-pool"], cluster.connPoolName())
+	}
+
+	return nil
+}
+
+func TestConnPoolServiceSpec(t *testing.T) {
+	testName := "Test connection pool service spec generation"
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPool: config.ConnectionPool{
+					ConnPoolDefaultCPURequest:    "100m",
+					ConnPoolDefaultCPULimit:      "100m",
+					ConnPoolDefaultMemoryRequest: "100Mi",
+					ConnPoolDefaultMemoryLimit:   "100Mi",
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+	cluster.Statefulset = &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sts",
+		},
+	}
+
+	noCheck := func(cluster *Cluster, deployment *v1.Service) error {
+		return nil
+	}
+
+	tests := []struct {
+		subTest string
+		spec    *acidv1.PostgresSpec
+		cluster *Cluster
+		check   func(cluster *Cluster, deployment *v1.Service) error
+	}{
+		{
+			subTest: "default configuration",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			cluster: cluster,
+			check:   noCheck,
+		},
+		{
+			subTest: "owner reference",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			cluster: cluster,
+			check:   testServiceOwnwerReference,
+		},
+		{
+			subTest: "selector",
+			spec: &acidv1.PostgresSpec{
+				ConnectionPool: &acidv1.ConnectionPool{},
+			},
+			cluster: cluster,
+			check:   testServiceSelector,
+		},
+	}
+	for _, tt := range tests {
+		service := tt.cluster.generateConnPoolService(tt.spec)
+
+		if err := tt.check(cluster, service); err != nil {
+			t.Errorf("%s [%s]: Service spec is incorrect, %+v",
+				testName, tt.subTest, err)
+		}
+	}
+}
+
+func TestTLS(t *testing.T) {
+	var err error
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+
+	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
+		return acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			TLS: &tls,
+		}
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+	spec = makeSpec(acidv1.TLSDescription{SecretName: "my-secret", CAFile: "ca.crt"})
+	s, err := cluster.generateStatefulSet(&spec)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	fsGroup := int64(103)
+	assert.Equal(t, &fsGroup, s.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
+
+	defaultMode := int32(0640)
+	volume := v1.Volume{
+		Name: "tls-secret",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  "my-secret",
+				DefaultMode: &defaultMode,
+			},
+		},
+	}
+	assert.Contains(t, s.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
+
+	assert.Contains(t, s.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+		MountPath: "/tls",
+		Name:      "tls-secret",
+		ReadOnly:  true,
+	}, "the volume gets mounted in /tls")
+
+	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
+	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
+	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
 }

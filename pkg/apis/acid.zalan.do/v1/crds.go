@@ -105,6 +105,7 @@ var OperatorConfigCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefin
 
 var min0 = 0.0
 var min1 = 1.0
+var min2 = 2.0
 var minDisable = -1.0
 
 // PostgresCRDResourceValidation to check applied manifest parameters
@@ -176,6 +177,76 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"connectionPool": {
+						Type: "object",
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"dockerImage": {
+								Type: "string",
+							},
+							"maxDBConnections": {
+								Type: "integer",
+							},
+							"mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"session"`),
+									},
+									{
+										Raw: []byte(`"transaction"`),
+									},
+								},
+							},
+							"numberOfInstances": {
+								Type:    "integer",
+								Minimum: &min2,
+							},
+							"resources": {
+								Type:     "object",
+								Required: []string{"requests", "limits"},
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"limits": {
+										Type:     "object",
+										Required: []string{"cpu", "memory"},
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"cpu": {
+												Type:        "string",
+												Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
+												Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+											},
+											"memory": {
+												Type:        "string",
+												Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
+												Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+											},
+										},
+									},
+									"requests": {
+										Type:     "object",
+										Required: []string{"cpu", "memory"},
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"cpu": {
+												Type:        "string",
+												Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
+												Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+											},
+											"memory": {
+												Type:        "string",
+												Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
+												Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+											},
+										},
+									},
+								},
+							},
+							"schema": {
+								Type: "string",
+							},
+							"user": {
+								Type: "string",
+							},
+						},
+					},
 					"databases": {
 						Type: "object",
 						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
@@ -188,6 +259,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"dockerImage": {
 						Type: "string",
 					},
+					"enableConnectionPool": {
+						Type: "boolean",
+					},
 					"enableLogicalBackup": {
 						Type: "boolean",
 					},
@@ -199,6 +273,68 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					},
 					"enableShmVolume": {
 						Type: "boolean",
+					},
+					"env": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"value": {
+										Type: "string",
+									},
+									"valueFrom": {
+										Type: "Object",
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"fieldRef": {
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"apiVersion": {
+														Type: "string",
+													},
+													"fieldPath": {
+														Type: "string",
+													},
+												},
+											},
+											"configMapKeyRef": {
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"name": {
+														Type: "string",
+													},
+													"key": {
+														Type: "string",
+													},
+													"optional": {
+														Type:     "boolean",
+														Nullable: true,
+													},
+												},
+											},
+											"secretKeyRef": {
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"name": {
+														Type: "string",
+													},
+													"key": {
+														Type: "string",
+													},
+													"optional": {
+														Type:     "boolean",
+														Nullable: true,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 					"init_containers": {
 						Type:        "array",
@@ -417,6 +553,24 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"teamId": {
 						Type: "string",
 					},
+					"tls": {
+						Type:     "object",
+						Required: []string{"secretName"},
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"secretName": {
+								Type: "string",
+							},
+							"certificateFile": {
+								Type: "string",
+							},
+							"privateKeyFile": {
+								Type: "string",
+							},
+							"caFile": {
+								Type: "string",
+							},
+						},
+					},
 					"tolerations": {
 						Type: "array",
 						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
@@ -581,6 +735,49 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 							"subPath": {
 								Type: "string",
+							},
+						},
+					},
+					"volumes": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+								},
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Schema: &apiextv1beta1.JSONSchemaProps{
+										Type: "object",
+									},
+								},
+							},
+						},
+					},
+					"volumeMounts": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"readOnly": {
+										Type: "boolean",
+									},
+									"mountPath": {
+										Type: "string",
+									},
+									"subPath": {
+										Type: "string",
+									},
+									"subPathExpr": {
+										Type: "string",
+									},
+								},
 							},
 						},
 					},
@@ -1033,6 +1230,54 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
 							"scalyr_server_url": {
+								Type: "string",
+							},
+						},
+					},
+					"connection_pool": {
+						Type: "object",
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"connection_pool_default_cpu_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"connection_pool_default_cpu_request": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"connection_pool_default_memory_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"connection_pool_default_memory_request": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"connection_pool_image": {
+								Type: "string",
+							},
+							"connection_pool_max_db_connections": {
+								Type: "integer",
+							},
+							"connection_pool_mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"session"`),
+									},
+									{
+										Raw: []byte(`"transaction"`),
+									},
+								},
+							},
+							"connection_pool_number_of_instances": {
+								Type:    "integer",
+								Minimum: &min2,
+							},
+							"connection_pool_schema": {
+								Type: "string",
+							},
+							"connection_pool_user": {
 								Type: "string",
 							},
 						},
