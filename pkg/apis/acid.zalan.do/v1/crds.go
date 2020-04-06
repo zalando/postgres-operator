@@ -358,6 +358,12 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"maximum_lag_on_failover": {
 								Type: "integer",
 							},
+							"synchronous_mode": {
+								Type: "boolean",
+							},
+							"synchronous_mode_strict": {
+								Type: "boolean",
+							},
 						},
 					},
 					"podAnnotations": {

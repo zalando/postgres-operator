@@ -184,6 +184,10 @@ spec:
                   type: integer
                 maximum_lag_on_failover:
                   type: integer
+                synchronous_mode:
+                  type: boolean
+                synchronous_mode_strict:
+                  type: boolean
             podAnnotations:
               type: object
               additionalProperties:
