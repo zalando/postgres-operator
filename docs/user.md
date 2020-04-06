@@ -584,7 +584,10 @@ don't know the value, use `103` which is the GID from the default spilo image
 OpenShift allocates the users and groups dynamically (based on scc), and their
 range is different in every namespace. Due to this dynamic behaviour, it's not
 trivial to know at deploy time the uid/gid of the user in the cluster.
-This way, in OpenShift, you may want to skip the spilo_fsgroup setting.
+This way, in OpenShift, you want to skip the spilo_fsgroup setting.
+
+Note: instead of spilo_fsgroup in the Operator configmMap, we can use 
+`spiloFSGroup` which is defined per pg cluster deployment.
 
 Upload the cert as a kubernetes secret:
 ```sh
