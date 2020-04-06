@@ -76,6 +76,7 @@ ACCESS_TOKEN_URL = getenv('ACCESS_TOKEN_URL')
 TOKENINFO_URL = getenv('OAUTH2_TOKEN_INFO_URL')
 
 OPERATOR_API_URL = getenv('OPERATOR_API_URL', 'http://postgres-operator')
+OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
 OPERATOR_UI_CONFIG = getenv('OPERATOR_UI_CONFIG', '{}')
 OPERATOR_UI_MAINTENANCE_CHECK = getenv('OPERATOR_UI_MAINTENANCE_CHECK', '{}')
 READ_ONLY_MODE = getenv('READ_ONLY_MODE', False) in [True, 'true']
@@ -83,6 +84,13 @@ SPILO_S3_BACKUP_PREFIX = getenv('SPILO_S3_BACKUP_PREFIX', 'spilo/')
 SUPERUSER_TEAM = getenv('SUPERUSER_TEAM', 'acid')
 TARGET_NAMESPACE = getenv('TARGET_NAMESPACE')
 GOOGLE_ANALYTICS = getenv('GOOGLE_ANALYTICS', False)
+
+# storage pricing, i.e. https://aws.amazon.com/ebs/pricing/
+COST_EBS = float(getenv('COST_EBS', 0.119))  # GB per month
+
+# compute costs, i.e. https://www.ec2instances.info/?region=eu-central-1&selected=m5.2xlarge
+COST_CORE = 30.5 * 24 * float(getenv('COST_CORE', 0.0575))  # Core per hour m5.2xlarge / 8.
+COST_MEMORY = 30.5 * 24 * float(getenv('COST_MEMORY', 0.014375))  # Memory GB m5.2xlarge / 32.
 
 WALE_S3_ENDPOINT = getenv(
     'WALE_S3_ENDPOINT',
@@ -293,6 +301,9 @@ DEFAULT_UI_CONFIG = {
     'dns_format_string': '{0}.{1}.{2}',
     'pgui_link': '',
     'static_network_whitelist': {},
+    'cost_ebs': COST_EBS,
+    'cost_core': COST_CORE,
+    'cost_memory': COST_MEMORY
 }
 
 
@@ -1003,6 +1014,7 @@ def main(port, secret_key, debug, clusters: list):
     logger.info(f'App URL: {APP_URL}')
     logger.info(f'Authorize URL: {AUTHORIZE_URL}')
     logger.info(f'Operator API URL: {OPERATOR_API_URL}')
+    logger.info(f'Operator cluster name label: {OPERATOR_CLUSTER_NAME_LABEL}')
     logger.info(f'Readonly mode: {"enabled" if READ_ONLY_MODE else "disabled"}')  # noqa
     logger.info(f'Spilo S3 backup bucket: {SPILO_S3_BACKUP_BUCKET}')
     logger.info(f'Spilo S3 backup prefix: {SPILO_S3_BACKUP_PREFIX}')

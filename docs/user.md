@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "11"
+    version: "12"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -65,7 +65,7 @@ our test cluster.
 
 ```bash
 # get name of master pod of acid-minimal-cluster
-export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,version=acid-minimal-cluster,spilo-role=master)
+export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,cluster-name=acid-minimal-cluster,spilo-role=master)
 
 # set up port forward
 kubectl port-forward $PGMASTER 6432:5432
@@ -232,11 +232,11 @@ spec:
       memory: 300Mi
 ```
 
-The minimum limit to properly run the `postgresql` resource is `256m` for `cpu`
-and `256Mi` for `memory`. If a lower value is set in the manifest the operator
-will cancel ADD or UPDATE events on this resource with an error. If no
-resources are defined in the manifest the operator will obtain the configured
-[default requests](reference/operator_parameters.md#kubernetes-resource-requests).
+The minimum limits to properly run the `postgresql` resource are configured to
+`250m` for `cpu` and `250Mi` for `memory`. If a lower value is set in the
+manifest the operator will raise the limits to the configured minimum values.
+If no resources are defined in the manifest they will be obtained from the
+configured [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
@@ -254,28 +254,21 @@ spec:
 
 ## How to clone an existing PostgreSQL cluster
 
-You can spin up a new cluster as a clone of the existing one, using a clone
+You can spin up a new cluster as a clone of the existing one, using a `clone`
 section in the spec. There are two options here:
 
-* Clone directly from a source cluster using `pg_basebackup`
-* Clone from an S3 bucket
+* Clone from an S3 bucket (recommended)
+* Clone directly from a source cluster
 
-### Clone directly
-
-```yaml
-spec:
-  clone:
-    cluster: "acid-batman"
-```
-
-Here `cluster` is a name of a source cluster that is going to be cloned. The
-cluster to clone is assumed to be running and the clone procedure invokes
-`pg_basebackup` from it. The operator will setup the cluster to be cloned to
-connect to the service of the source cluster by name (if the cluster is called
-test, then the connection string will look like host=test port=5432), which
-means that you can clone only from clusters within the same namespace.
+Note, that cloning can also be used for [major version upgrades](administrator.md#minor-and-major-version-upgrade)
+of PostgreSQL.
 
 ### Clone from S3
+
+Cloning from S3 has the advantage that there is no impact on your production
+database. A new Postgres cluster is created by restoring the data of another
+source cluster. If you create it in the same Kubernetes environment, use a
+different name.
 
 ```yaml
 spec:
@@ -287,7 +280,8 @@ spec:
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
-In this case, `uid` field is also mandatory - operator will use it to find a
+Note, that a time zone is required for `timestamp` in the format of +00:00 which
+is UTC. The `uid` field is also mandatory. The operator will use it to find a
 correct key inside an S3 bucket. You can find this field in the metadata of the
 source cluster:
 
@@ -298,9 +292,6 @@ metadata:
   name: acid-test-cluster
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
-
-Note that timezone is required for `timestamp`. Otherwise, offset is relative
-to UTC, see [RFC 3339 section 5.6) 3339 section 5.6](https://www.ietf.org/rfc/rfc3339.txt).
 
 For non AWS S3 following settings can be set to support cloning from other S3
 implementations:
@@ -317,14 +308,35 @@ spec:
     s3_force_path_style: true
 ```
 
+### Clone directly
+
+Another way to get a fresh copy of your source DB cluster is via basebackup. To
+use this feature simply leave out the timestamp field from the clone section.
+The operator will connect to the service of the source cluster by name. If the
+cluster is called test, then the connection string will look like host=test
+port=5432), which means that you can clone only from clusters within the same
+namespace.
+
+```yaml
+spec:
+  clone:
+    cluster: "acid-batman"
+```
+
+Be aware that on a busy source database this can result in an elevated load!
+
 ## Setting up a standby cluster
 
-Standby clusters are like normal cluster but they are streaming from a remote
-cluster. As the first version of this feature, the only scenario covered by
-operator is to stream from a WAL archive of the master. Following the more
-popular infrastructure of using Amazon's S3 buckets, it is mentioned as
-`s3_wal_path` here. To start a cluster as standby add the following `standby`
-section in the YAML file:
+Standby cluster is a [Patroni feature](https://github.com/zalando/patroni/blob/master/docs/replica_bootstrap.rst#standby-cluster)
+that first clones a database, and keeps replicating changes afterwards. As the
+replication is happening by the means of archived WAL files (stored on S3 or
+the equivalent of other cloud providers), the standby cluster can exist in a
+different location than its source database. Unlike cloning, the PostgreSQL
+version between source and target cluster has to be the same.
+
+To start a cluster as standby, add the following `standby` section in the YAML
+file and specify the S3 bucket path. An empty path will result in an error and
+no statefulset will be created.
 
 ```yaml
 spec:
@@ -332,20 +344,65 @@ spec:
     s3_wal_path: "s3 bucket path to the master"
 ```
 
-Things to note:
+At the moment, the operator only allows to stream from the WAL archive of the
+master. Thus, it is recommended to deploy standby clusters with only [one pod](../manifests/standby-manifest.yaml#L10).
+You can raise the instance count when detaching. Note, that the same pod role
+labels like for normal clusters are used: The standby leader is labeled as
+`master`.
 
-- An empty string in the `s3_wal_path` field of the standby cluster will result
-  in an error and no statefulset will be created.
-- Only one pod can be deployed for stand-by cluster.
-- To manually promote the standby_cluster, use `patronictl` and remove config
-  entry.
-- There is no way to transform a non-standby cluster to a standby cluster
-  through the operator. Adding the standby section to the manifest of a running
-  Postgres cluster will have no effect. However, it can be done through Patroni
-  by adding the [standby_cluster](https://github.com/zalando/patroni/blob/bd2c54581abb42a7d3a3da551edf0b8732eefd27/docs/replica_bootstrap.rst#standby-cluster)
-  section using `patronictl edit-config`. Note that the transformed standby
-  cluster will not be doing any streaming. It will be in standby mode and allow
-  read-only transactions only.
+### Providing credentials of source cluster
+
+A standby cluster is replicating the data (including users and passwords) from
+the source database and is read-only. The system and application users (like
+standby, postgres etc.) all have a password that does not match the credentials
+stored in secrets which are created by the operator. One solution is to create
+secrets beforehand and paste in the credentials of the source cluster.
+Otherwise, you will see errors in the Postgres logs saying users cannot log in
+and the operator logs will complain about not being able to sync resources.
+
+When you only run a standby leader, you can safely ignore this, as it will be
+sorted out once the cluster is detached from the source. It is also harmless if
+you don’t plan it. But, when you created a standby replica, too, fix the
+credentials right away. WAL files will pile up on the standby leader if no
+connection can be established between standby replica(s). You can also edit the
+secrets after their creation. Find them by:
+
+```bash
+kubectl get secrets --all-namespaces | grep <standby-cluster-name>
+```
+
+### Promote the standby
+
+One big advantage of standby clusters is that they can be promoted to a proper
+database cluster. This means it will stop replicating changes from the source,
+and start accept writes itself. This mechanism makes it possible to move
+databases from one place to another with minimal downtime. Currently, the
+operator does not support promoting a standby cluster. It has to be done
+manually using `patronictl edit-config` inside the postgres container of the
+standby leader pod. Remove the following lines from the YAML structure and the
+leader promotion happens immediately. Before doing so, make sure that the
+standby is not behind the source database.
+
+```yaml
+standby_cluster:
+  create_replica_methods:
+    - bootstrap_standby_with_wale
+    - basebackup_fast_xlog
+  restore_command: envdir "/home/postgres/etc/wal-e.d/env-standby" /scripts/restore_command.sh
+     "%f" "%p"
+```
+
+Finally, remove the `standby` section from the postgres cluster manifest.
+
+### Turn a normal cluster into a standby
+
+There is no way to transform a non-standby cluster to a standby cluster through
+the operator. Adding the `standby` section to the manifest of a running
+Postgres cluster will have no effect. But, as explained in the previous
+paragraph it can be done manually through `patronictl edit-config`. This time,
+by adding the `standby_cluster` section to the Patroni configuration. However,
+the transformed standby cluster will not be doing any streaming. It will be in
+standby mode and allow read-only transactions only.
 
 ## Sidecar Support
 
@@ -454,3 +511,112 @@ monitoring is outside the scope of operator responsibilities. See
 [configuration reference](reference/cluster_manifest.md) and
 [administrator documentation](administrator.md) for details on how backups are
 executed.
+
+## Connection pooler
+
+The operator can create a database side connection pooler for those applications
+where an application side pooler is not feasible, but a number of connections is
+high. To create a connection pooler together with a database, modify the
+manifest:
+
+```yaml
+spec:
+  enableConnectionPooler: true
+```
+
+This will tell the operator to create a connection pooler with default
+configuration, through which one can access the master via a separate service
+`{cluster-name}-pooler`. In most of the cases the
+[default configuration](reference/operator_parameters.md#connection-pooler-configuration)
+should be good enough. To configure a new connection pooler individually for
+each Postgres cluster, specify:
+
+```
+spec:
+  connectionPooler:
+    # how many instances of connection pooler to create
+    numberOfInstances: 2
+
+    # in which mode to run, session or transaction
+    mode: "transaction"
+
+    # schema, which operator will create in each database
+    # to install credentials lookup function for connection pooler
+    schema: "pooler"
+
+    # user, which operator will create for connection pooler
+    user: "pooler"
+
+    # resources for each instance
+    resources:
+      requests:
+        cpu: 500m
+        memory: 100Mi
+      limits:
+        cpu: "1"
+        memory: 100Mi
+```
+
+The `enableConnectionPooler` flag is not required when the `connectionPooler`
+section is present in the manifest. But, it can be used to disable/remove the
+pooler while keeping its configuration.
+
+By default, [`PgBouncer`](https://www.pgbouncer.org/) is used as connection pooler.
+To find out about pool modes read the `PgBouncer` [docs](https://www.pgbouncer.org/config.html#pooler_mode)
+(but it should be the general approach between different implementation).
+
+Note, that using `PgBouncer` a meaningful resource CPU limit should be 1 core
+or less (there is a way to utilize more than one, but in K8s it's easier just to
+spin up more instances).
+
+## Custom TLS certificates
+
+By default, the spilo image generates its own TLS certificate during startup.
+However, this certificate cannot be verified and thus doesn't protect from
+active MITM attacks. In this section we show how to specify a custom TLS
+certificate which is mounted in the database pods via a K8s Secret.
+
+Before applying these changes, in k8s the operator must also be configured with
+the `spilo_fsgroup` set to the GID matching the postgres user group. If you
+don't know the value, use `103` which is the GID from the default spilo image
+(`spilo_fsgroup=103` in the cluster request spec).
+
+OpenShift allocates the users and groups dynamically (based on scc), and their
+range is different in every namespace. Due to this dynamic behaviour, it's not
+trivial to know at deploy time the uid/gid of the user in the cluster.
+This way, in OpenShift, you may want to skip the spilo_fsgroup setting.
+
+Upload the cert as a kubernetes secret:
+```sh
+kubectl create secret tls pg-tls \
+  --key pg-tls.key \
+  --cert pg-tls.crt
+```
+
+Or with a CA:
+```sh
+kubectl create secret generic pg-tls \
+  --from-file=tls.crt=server.crt \
+  --from-file=tls.key=server.key \
+  --from-file=ca.crt=ca.crt
+```
+
+Alternatively it is also possible to use
+[cert-manager](https://cert-manager.io/docs/) to generate these secrets.
+
+Then configure the postgres resource with the TLS secret:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  tls:
+    secretName: "pg-tls"
+    caFile: "ca.crt" # add this if the secret is configured with a CA
+```
+
+Certificate rotation is handled in the spilo image which checks every 5
+minutes if the certificates have changed and reloads postgres accordingly.

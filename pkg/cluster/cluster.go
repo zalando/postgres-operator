@@ -3,6 +3,7 @@ package cluster
 // Postgres CustomResourceDefinition object i.e. Spilo
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +31,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	"github.com/zalando/postgres-operator/pkg/util/users"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 var (
@@ -45,7 +47,21 @@ type Config struct {
 	RestConfig                   *rest.Config
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
-	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
+	PodServiceAccountRoleBinding *rbacv1.RoleBinding
+}
+
+// K8S objects that are belongs to a connection pooler
+type ConnectionPoolerObjects struct {
+	Deployment *appsv1.Deployment
+	Service    *v1.Service
+
+	// It could happen that a connection pooler was enabled, but the operator
+	// was not able to properly process a corresponding event or was restarted.
+	// In this case we will miss missing/require situation and a lookup function
+	// will not be installed. To avoid synchronizing it all the time to prevent
+	// this, we can remember the result in memory at least until the next
+	// restart.
+	LookupFunction bool
 }
 
 type kubeResources struct {
@@ -53,6 +69,7 @@ type kubeResources struct {
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
+	ConnectionPooler    *ConnectionPoolerObjects
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
@@ -72,7 +89,7 @@ type Cluster struct {
 	pgDb             *sql.DB
 	mu               sync.Mutex
 	userSyncStrategy spec.UserSyncer
-	deleteOptions    *metav1.DeleteOptions
+	deleteOptions    metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
 	teamsAPIClient   teams.Interface
@@ -115,7 +132,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
 		userSyncStrategy: users.DefaultUserSyncStrategy{},
-		deleteOptions:    &metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
+		deleteOptions:    metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
 	}
@@ -166,7 +183,8 @@ func (c *Cluster) setStatus(status string) {
 	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
 	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
 	// we should take advantage of it.
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(c.Name, types.MergePatchType, patch, "status")
+	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(
+		context.TODO(), c.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
 	if err != nil {
 		c.logger.Errorf("could not update status: %v", err)
 		// return as newspec is empty, see PR654
@@ -184,7 +202,8 @@ func (c *Cluster) isNewCluster() bool {
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
 
-	// clear our the previous state of the cluster users (in case we are running a sync).
+	// clear our the previous state of the cluster users (in case we are
+	// running a sync).
 	c.systemUsers = map[string]spec.PgUser{}
 	c.pgUsers = map[string]spec.PgUser{}
 
@@ -227,8 +246,8 @@ func (c *Cluster) Create() error {
 
 	c.setStatus(acidv1.ClusterStatusCreating)
 
-	if err = c.validateResources(&c.Spec); err != nil {
-		return fmt.Errorf("insufficient resource limits specified: %v", err)
+	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
+		return fmt.Errorf("could not enforce minimum resource limits: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -292,8 +311,10 @@ func (c *Cluster) Create() error {
 	}
 	c.logger.Infof("pods are ready")
 
-	// create database objects unless we are running without pods or disabled that feature explicitly
+	// create database objects unless we are running without pods or disabled
+	// that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&c.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
+		c.logger.Infof("Create roles")
 		if err = c.createRoles(); err != nil {
 			return fmt.Errorf("could not create users: %v", err)
 		}
@@ -314,6 +335,26 @@ func (c *Cluster) Create() error {
 
 	if err := c.listResources(); err != nil {
 		c.logger.Errorf("could not list resources: %v", err)
+	}
+
+	// Create connection pooler deployment and services if necessary. Since we
+	// need to perform some operations with the database itself (e.g. install
+	// lookup function), do it as the last step, when everything is available.
+	//
+	// Do not consider connection pooler as a strict requirement, and if
+	// something fails, report warning
+	if c.needConnectionPooler() {
+		if c.ConnectionPooler != nil {
+			c.logger.Warning("Connection pooler already exists in the cluster")
+			return nil
+		}
+		connectionPooler, err := c.createConnectionPooler(c.installLookupFunction)
+		if err != nil {
+			c.logger.Warningf("could not create connection pooler: %v", err)
+			return nil
+		}
+		c.logger.Infof("connection pooler %q has been successfully created",
+			util.NameFromMeta(connectionPooler.Deployment.ObjectMeta))
 	}
 
 	return nil
@@ -495,38 +536,38 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 
 }
 
-func (c *Cluster) validateResources(spec *acidv1.PostgresSpec) error {
-
-	// setting limits too low can cause unnecessary evictions / OOM kills
-	const (
-		cpuMinLimit    = "256m"
-		memoryMinLimit = "256Mi"
-	)
+func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 
 	var (
 		isSmaller bool
 		err       error
 	)
 
+	// setting limits too low can cause unnecessary evictions / OOM kills
+	minCPULimit := c.OpConfig.MinCPULimit
+	minMemoryLimit := c.OpConfig.MinMemoryLimit
+
 	cpuLimit := spec.Resources.ResourceLimits.CPU
 	if cpuLimit != "" {
-		isSmaller, err = util.IsSmallerQuantity(cpuLimit, cpuMinLimit)
+		isSmaller, err = util.IsSmallerQuantity(cpuLimit, minCPULimit)
 		if err != nil {
-			return fmt.Errorf("error validating CPU limit: %v", err)
+			return fmt.Errorf("could not compare defined CPU limit %s with configured minimum value %s: %v", cpuLimit, minCPULimit, err)
 		}
 		if isSmaller {
-			return fmt.Errorf("defined CPU limit %s is below required minimum %s to properly run postgresql resource", cpuLimit, cpuMinLimit)
+			c.logger.Warningf("defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
+			spec.Resources.ResourceLimits.CPU = minCPULimit
 		}
 	}
 
 	memoryLimit := spec.Resources.ResourceLimits.Memory
 	if memoryLimit != "" {
-		isSmaller, err = util.IsSmallerQuantity(memoryLimit, memoryMinLimit)
+		isSmaller, err = util.IsSmallerQuantity(memoryLimit, minMemoryLimit)
 		if err != nil {
-			return fmt.Errorf("error validating memory limit: %v", err)
+			return fmt.Errorf("could not compare defined memory limit %s with configured minimum value %s: %v", memoryLimit, minMemoryLimit, err)
 		}
 		if isSmaller {
-			return fmt.Errorf("defined memory limit %s is below required minimum %s to properly run postgresql resource", memoryLimit, memoryMinLimit)
+			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
+			spec.Resources.ResourceLimits.Memory = minMemoryLimit
 		}
 	}
 
@@ -543,7 +584,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	oldStatus := c.Status
 	c.setStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
@@ -555,26 +595,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
-	if err := c.validateResources(&newSpec.Spec); err != nil {
-		err = fmt.Errorf("insufficient resource limits specified: %v", err)
-
-		// cancel update only when (already too low) pod resources were edited
-		// if cluster was successfully running before the update, continue but log a warning
-		isCPULimitSmaller, err2 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.CPU, oldSpec.Spec.Resources.ResourceLimits.CPU)
-		isMemoryLimitSmaller, err3 := util.IsSmallerQuantity(newSpec.Spec.Resources.ResourceLimits.Memory, oldSpec.Spec.Resources.ResourceLimits.Memory)
-
-		if oldStatus.Running() && !isCPULimitSmaller && !isMemoryLimitSmaller && err2 == nil && err3 == nil {
-			c.logger.Warning(err)
-		} else {
-			updateFailed = true
-			return err
-		}
-	}
-
-	if oldSpec.Spec.PgVersion != newSpec.Spec.PgVersion { // PG versions comparison
-		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", oldSpec.Spec.PgVersion, newSpec.Spec.PgVersion)
+	if oldSpec.Spec.PostgresqlParam.PgVersion != newSpec.Spec.PostgresqlParam.PgVersion { // PG versions comparison
+		c.logger.Warningf("postgresql version change(%q -> %q) has no effect",
+			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
 		//we need that hack to generate statefulset with the old version
-		newSpec.Spec.PgVersion = oldSpec.Spec.PgVersion
+		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
 
 	// Service
@@ -587,7 +612,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	if !reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) {
+	// connection pooler needs one system user created, which is done in
+	// initUsers. Check if it needs to be called.
+	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users)
+	needConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
+	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
@@ -616,12 +645,21 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// Statefulset
 	func() {
+		if err := c.enforceMinResourceLimits(&c.Spec); err != nil {
+			c.logger.Errorf("could not sync resources: %v", err)
+			updateFailed = true
+			return
+		}
+
 		oldSs, err := c.generateStatefulSet(&oldSpec.Spec)
 		if err != nil {
 			c.logger.Errorf("could not generate old statefulset spec: %v", err)
 			updateFailed = true
 			return
 		}
+
+		// update newSpec to for latter comparison with oldSpec
+		c.enforceMinResourceLimits(&newSpec.Spec)
 
 		newSs, err := c.generateStatefulSet(&newSpec.Spec)
 		if err != nil {
@@ -702,6 +740,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	// sync connection pooler
+	if err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
+		return fmt.Errorf("could not sync connection pooler: %v", err)
+	}
+
 	return nil
 }
 
@@ -753,6 +796,12 @@ func (c *Cluster) Delete() {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
 	}
 
+	// Delete connection pooler objects anyway, even if it's not mentioned in the
+	// manifest, just to not keep orphaned components in case if something went
+	// wrong
+	if err := c.deleteConnectionPooler(); err != nil {
+		c.logger.Warningf("could not remove connection pooler: %v", err)
+	}
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
@@ -818,6 +867,35 @@ func (c *Cluster) initSystemUsers() {
 		Origin:   spec.RoleOriginSystem,
 		Name:     c.OpConfig.ReplicationUsername,
 		Password: util.RandomPassword(constants.PasswordLength),
+	}
+
+	// Connection pooler user is an exception, if requested it's going to be
+	// created by operator as a normal pgUser
+	if c.needConnectionPooler() {
+		// initialize empty connection pooler if not done yet
+		if c.Spec.ConnectionPooler == nil {
+			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
+		}
+
+		username := util.Coalesce(
+			c.Spec.ConnectionPooler.User,
+			c.OpConfig.ConnectionPooler.User)
+
+		// connection pooler application should be able to login with this role
+		connectionPoolerUser := spec.PgUser{
+			Origin:   spec.RoleConnectionPooler,
+			Name:     username,
+			Flags:    []string{constants.RoleFlagLogin},
+			Password: util.RandomPassword(constants.PasswordLength),
+		}
+
+		if _, exists := c.pgUsers[username]; !exists {
+			c.pgUsers[username] = connectionPoolerUser
+		}
+
+		if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
+			c.systemUsers[constants.ConnectionPoolerUserKeyName] = connectionPoolerUser
+		}
 	}
 }
 
@@ -1109,12 +1187,12 @@ func (c *Cluster) deleteClusterObject(
 
 func (c *Cluster) deletePatroniClusterServices() error {
 	get := func(name string) (spec.NamespacedName, error) {
-		svc, err := c.KubeClient.Services(c.Namespace).Get(name, metav1.GetOptions{})
+		svc, err := c.KubeClient.Services(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(svc.ObjectMeta), err
 	}
 
 	deleteServiceFn := func(name string) error {
-		return c.KubeClient.Services(c.Namespace).Delete(name, c.deleteOptions)
+		return c.KubeClient.Services(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
 	return c.deleteClusterObject(get, deleteServiceFn, "service")
@@ -1122,12 +1200,12 @@ func (c *Cluster) deletePatroniClusterServices() error {
 
 func (c *Cluster) deletePatroniClusterEndpoints() error {
 	get := func(name string) (spec.NamespacedName, error) {
-		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(name, metav1.GetOptions{})
+		ep, err := c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(ep.ObjectMeta), err
 	}
 
 	deleteEndpointFn := func(name string) error {
-		return c.KubeClient.Endpoints(c.Namespace).Delete(name, c.deleteOptions)
+		return c.KubeClient.Endpoints(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
 	return c.deleteClusterObject(get, deleteEndpointFn, "endpoint")
@@ -1135,13 +1213,129 @@ func (c *Cluster) deletePatroniClusterEndpoints() error {
 
 func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	get := func(name string) (spec.NamespacedName, error) {
-		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(name, metav1.GetOptions{})
+		cm, err := c.KubeClient.ConfigMaps(c.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		return util.NameFromMeta(cm.ObjectMeta), err
 	}
 
 	deleteConfigMapFn := func(name string) error {
-		return c.KubeClient.ConfigMaps(c.Namespace).Delete(name, c.deleteOptions)
+		return c.KubeClient.ConfigMaps(c.Namespace).Delete(context.TODO(), name, c.deleteOptions)
 	}
 
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
+}
+
+// Test if two connection pooler configuration needs to be synced. For simplicity
+// compare not the actual K8S objects, but the configuration itself and request
+// sync if there is any difference.
+func (c *Cluster) needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler) (sync bool, reasons []string) {
+	reasons = []string{}
+	sync = false
+
+	changelog, err := diff.Diff(oldSpec, newSpec)
+	if err != nil {
+		c.logger.Infof("Cannot get diff, do not do anything, %+v", err)
+		return false, reasons
+	}
+
+	if len(changelog) > 0 {
+		sync = true
+	}
+
+	for _, change := range changelog {
+		msg := fmt.Sprintf("%s %+v from '%+v' to '%+v'",
+			change.Type, change.Path, change.From, change.To)
+		reasons = append(reasons, msg)
+	}
+
+	return sync, reasons
+}
+
+func syncResources(a, b *v1.ResourceRequirements) bool {
+	for _, res := range []v1.ResourceName{
+		v1.ResourceCPU,
+		v1.ResourceMemory,
+	} {
+		if !a.Limits[res].Equal(b.Limits[res]) ||
+			!a.Requests[res].Equal(b.Requests[res]) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Check if we need to synchronize connection pooler deployment due to new
+// defaults, that are different from what we see in the DeploymentSpec
+func (c *Cluster) needSyncConnectionPoolerDefaults(
+	spec *acidv1.ConnectionPooler,
+	deployment *appsv1.Deployment) (sync bool, reasons []string) {
+
+	reasons = []string{}
+	sync = false
+
+	config := c.OpConfig.ConnectionPooler
+	podTemplate := deployment.Spec.Template
+	poolerContainer := podTemplate.Spec.Containers[constants.ConnectionPoolerContainer]
+
+	if spec == nil {
+		spec = &acidv1.ConnectionPooler{}
+	}
+
+	if spec.NumberOfInstances == nil &&
+		*deployment.Spec.Replicas != *config.NumberOfInstances {
+
+		sync = true
+		msg := fmt.Sprintf("NumberOfInstances is different (having %d, required %d)",
+			*deployment.Spec.Replicas, *config.NumberOfInstances)
+		reasons = append(reasons, msg)
+	}
+
+	if spec.DockerImage == "" &&
+		poolerContainer.Image != config.Image {
+
+		sync = true
+		msg := fmt.Sprintf("DockerImage is different (having %s, required %s)",
+			poolerContainer.Image, config.Image)
+		reasons = append(reasons, msg)
+	}
+
+	expectedResources, err := generateResourceRequirements(spec.Resources,
+		c.makeDefaultConnectionPoolerResources())
+
+	// An error to generate expected resources means something is not quite
+	// right, but for the purpose of robustness do not panic here, just report
+	// and ignore resources comparison (in the worst case there will be no
+	// updates for new resource values).
+	if err == nil && syncResources(&poolerContainer.Resources, expectedResources) {
+		sync = true
+		msg := fmt.Sprintf("Resources are different (having %+v, required %+v)",
+			poolerContainer.Resources, expectedResources)
+		reasons = append(reasons, msg)
+	}
+
+	if err != nil {
+		c.logger.Warningf("Cannot generate expected resources, %v", err)
+	}
+
+	for _, env := range poolerContainer.Env {
+		if spec.User == "" && env.Name == "PGUSER" {
+			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
+
+			if ref.Name != c.credentialSecretName(config.User) {
+				sync = true
+				msg := fmt.Sprintf("pooler user is different (having %s, required %s)",
+					ref.Name, config.User)
+				reasons = append(reasons, msg)
+			}
+		}
+
+		if spec.Schema == "" && env.Name == "PGSCHEMA" && env.Value != config.Schema {
+			sync = true
+			msg := fmt.Sprintf("pooler schema is different (having %s, required %s)",
+				env.Value, config.Schema)
+			reasons = append(reasons, msg)
+		}
+	}
+
+	return sync, reasons
 }

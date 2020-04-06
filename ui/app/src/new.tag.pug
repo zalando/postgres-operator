@@ -408,7 +408,7 @@ new
                           ref='cpuLimit'
                           type='number'
                           placeholder='{ cpu.state.limit.initialValue }'
-                          min='1'
+                          min='250'
                           required
                           value='{ cpu.state.limit.state }'
                           onchange='{ cpu.state.limit.edit }'
@@ -434,7 +434,7 @@ new
                           onkeyup='{ memory.state.request.edit }'
                         )
                         .input-group-addon
-                          .input-units Gi
+                          .input-units Mi
 
                       .input-group
                         .input-group-addon.resource-type Limit
@@ -442,14 +442,14 @@ new
                           ref='memoryLimit'
                           type='number'
                           placeholder='{ memory.state.limit.initialValue }'
-                          min='1'
+                          min='250'
                           required
                           value='{ memory.state.limit.state }'
                           onchange='{ memory.state.limit.edit }'
                           onkeyup='{ memory.state.limit.edit }'
                         )
                         .input-group-addon
-                          .input-units Gi
+                          .input-units Mi
 
       .col-lg-3
         help-general(config='{ opts.config }')
@@ -519,10 +519,10 @@ new
         resources:
           requests:
             cpu: {{ cpu.state.request.state }}m
-            memory: {{ memory.state.request.state }}Gi
+            memory: {{ memory.state.request.state }}Mi
           limits:
             cpu: {{ cpu.state.limit.state }}m
-            memory: {{ memory.state.limit.state }}Gi{{#if restoring}}
+            memory: {{ memory.state.limit.state }}Mi{{#if restoring}}
 
         clone:
           cluster: "{{ backup.state.name.state }}"
@@ -786,8 +786,8 @@ new
       return instance
     }
 
-    this.cpu = DynamicResource({ request: 100, limit: 1000 })
-    this.memory = DynamicResource({ request: 1, limit: 1 })
+    this.cpu = DynamicResource({ request: 100, limit: 500 })
+    this.memory = DynamicResource({ request: 100, limit: 500 })
 
     this.backup = DynamicSet({
       type: () => 'empty',

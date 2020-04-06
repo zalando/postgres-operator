@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from furl import furl
 from json import dumps
 from logging import getLogger
-from os import environ
+from os import environ, getenv
 from requests import Session
 from urllib.parse import urljoin
 from uuid import UUID
@@ -15,6 +15,8 @@ from .utils import Attrs, defaulting, these
 logger = getLogger(__name__)
 
 session = Session()
+
+OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
 
 
 def request(cluster, path, **kwargs):
@@ -137,7 +139,7 @@ def read_pods(cluster, namespace, spilo_cluster):
         cluster=cluster,
         resource_type='pods',
         namespace=namespace,
-        label_selector={'version': spilo_cluster},
+        label_selector={OPERATOR_CLUSTER_NAME_LABEL: spilo_cluster},
     )
 
 

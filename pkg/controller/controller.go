@@ -1,18 +1,20 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
 
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/apiserver"
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -36,6 +38,7 @@ type Controller struct {
 
 	stopCh chan struct{}
 
+	controllerID     string
 	curWorkerID      uint32 //initialized with 0
 	curWorkerCluster sync.Map
 	clusterWorkers   map[spec.NamespacedName]uint32
@@ -57,17 +60,18 @@ type Controller struct {
 	workerLogs map[uint32]ringlog.RingLogger
 
 	PodServiceAccount            *v1.ServiceAccount
-	PodServiceAccountRoleBinding *rbacv1beta1.RoleBinding
+	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 
 // NewController creates a new controller
-func NewController(controllerConfig *spec.ControllerConfig) *Controller {
+func NewController(controllerConfig *spec.ControllerConfig, controllerId string) *Controller {
 	logger := logrus.New()
 
 	c := &Controller{
 		config:           *controllerConfig,
 		opConfig:         &config.Config{},
 		logger:           logger.WithField("pkg", "controller"),
+		controllerID:     controllerId,
 		curWorkerCluster: sync.Map{},
 		clusterWorkers:   make(map[spec.NamespacedName]uint32),
 		clusters:         make(map[spec.NamespacedName]*cluster.Cluster),
@@ -96,7 +100,7 @@ func (c *Controller) initOperatorConfig() {
 
 	if c.config.ConfigMapName != (spec.NamespacedName{}) {
 		configMap, err := c.KubeClient.ConfigMaps(c.config.ConfigMapName.Namespace).
-			Get(c.config.ConfigMapName.Name, metav1.GetOptions{})
+			Get(context.TODO(), c.config.ConfigMapName.Name, metav1.GetOptions{})
 		if err != nil {
 			panic(err)
 		}
@@ -161,11 +165,12 @@ func (c *Controller) initPodServiceAccount() {
 
 	if c.opConfig.PodServiceAccountDefinition == "" {
 		c.opConfig.PodServiceAccountDefinition = `
-		{ "apiVersion": "v1",
-		  "kind": "ServiceAccount",
-		  "metadata": {
-				 "name": "operator"
-		   }
+		{
+			"apiVersion": "v1",
+			"kind": "ServiceAccount",
+			"metadata": {
+				"name": "postgres-pod"
+			}
 		}`
 	}
 
@@ -175,13 +180,13 @@ func (c *Controller) initPodServiceAccount() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse pod service account definition from the operator config map: %v", err))
+		panic(fmt.Errorf("Unable to parse pod service account definition from the operator configuration: %v", err))
 	case groupVersionKind.Kind != "ServiceAccount":
-		panic(fmt.Errorf("pod service account definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+		panic(fmt.Errorf("pod service account definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
 	default:
 		c.PodServiceAccount = obj.(*v1.ServiceAccount)
 		if c.PodServiceAccount.Name != c.opConfig.PodServiceAccountName {
-			c.logger.Warnf("in the operator config map, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
+			c.logger.Warnf("in the operator configuration, the pod service account name %v does not match the name %v given in the account definition; using the former for consistency", c.opConfig.PodServiceAccountName, c.PodServiceAccount.Name)
 			c.PodServiceAccount.Name = c.opConfig.PodServiceAccountName
 		}
 		c.PodServiceAccount.Namespace = ""
@@ -198,7 +203,7 @@ func (c *Controller) initRoleBinding() {
 	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
 		c.opConfig.PodServiceAccountRoleBindingDefinition = fmt.Sprintf(`
 		{
-			"apiVersion": "rbac.authorization.k8s.io/v1beta1",
+			"apiVersion": "rbac.authorization.k8s.io/v1",
 			"kind": "RoleBinding",
 			"metadata": {
 				   "name": "%s"
@@ -223,11 +228,11 @@ func (c *Controller) initRoleBinding() {
 
 	switch {
 	case err != nil:
-		panic(fmt.Errorf("Unable to parse the definition of the role binding for the pod service account definition from the operator config map: %v", err))
+		panic(fmt.Errorf("unable to parse the role binding definition from the operator configuration: %v", err))
 	case groupVersionKind.Kind != "RoleBinding":
-		panic(fmt.Errorf("role binding definition in the operator config map defines another type of resource: %v", groupVersionKind.Kind))
+		panic(fmt.Errorf("role binding definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
 	default:
-		c.PodServiceAccountRoleBinding = obj.(*rbacv1beta1.RoleBinding)
+		c.PodServiceAccountRoleBinding = obj.(*rbacv1.RoleBinding)
 		c.PodServiceAccountRoleBinding.Namespace = ""
 		c.logger.Info("successfully parsed")
 
@@ -238,6 +243,7 @@ func (c *Controller) initRoleBinding() {
 
 func (c *Controller) initController() {
 	c.initClients()
+	c.controllerID = os.Getenv("CONTROLLER_ID")
 
 	if configObjectName := os.Getenv("POSTGRES_OPERATOR_CONFIGURATION_OBJECT"); configObjectName != "" {
 		if err := c.createConfigurationCRD(c.opConfig.EnableCRDValidation); err != nil {
@@ -401,7 +407,7 @@ func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFr
 
 	} else {
 
-		if _, err := c.KubeClient.Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+		if _, err := c.KubeClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
 			c.logger.Fatalf("Could not find the watched namespace %q", namespace)
 		} else {
 			c.logger.Infof("Listenting to the specific namespace %q", namespace)
@@ -410,4 +416,17 @@ func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFr
 	}
 
 	return namespace
+}
+
+// hasOwnership returns true if the controller is the "owner" of the postgresql.
+// Whether it's owner is determined by the value of 'acid.zalan.do/controller'
+// annotation. If the value matches the controllerID then it owns it, or if the
+// controllerID is "" and there's no annotation set.
+func (c *Controller) hasOwnership(postgresql *acidv1.Postgresql) bool {
+	if postgresql.Annotations != nil {
+		if owner, ok := postgresql.Annotations[constants.PostgresqlControllerAnnotationKey]; ok {
+			return owner == c.controllerID
+		}
+	}
+	return c.controllerID == ""
 }

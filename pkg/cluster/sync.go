@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -23,7 +24,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	oldStatus := c.Status
+	oldSpec := c.Postgresql
 	c.setSpec(newSpec)
 
 	defer func() {
@@ -34,16 +35,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			c.setStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
-
-	if err = c.validateResources(&c.Spec); err != nil {
-		err = fmt.Errorf("insufficient resource limits specified: %v", err)
-		if oldStatus.Running() {
-			c.logger.Warning(err)
-			err = nil
-		} else {
-			return err
-		}
-	}
 
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
@@ -73,6 +64,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.logger.Debugf("syncing persistent volumes")
 	if err = c.syncVolumes(); err != nil {
 		err = fmt.Errorf("could not sync persistent volumes: %v", err)
+		return err
+	}
+
+	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
+		err = fmt.Errorf("could not enforce minimum resource limits: %v", err)
 		return err
 	}
 
@@ -114,6 +110,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
+	// sync connection pooler
+	if err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
+		return fmt.Errorf("could not sync connection pooler: %v", err)
+	}
+
 	return err
 }
 
@@ -122,7 +123,7 @@ func (c *Cluster) syncServices() error {
 		c.logger.Debugf("syncing %s service", role)
 
 		if err := c.syncEndpoint(role); err != nil {
-			return fmt.Errorf("could not sync %s endpont: %v", role, err)
+			return fmt.Errorf("could not sync %s endpoint: %v", role, err)
 		}
 
 		if err := c.syncService(role); err != nil {
@@ -140,7 +141,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 	)
 	c.setProcessName("syncing %s service", role)
 
-	if svc, err = c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{}); err == nil {
+	if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err == nil {
 		c.Services[role] = svc
 		desiredSvc := c.generateService(role, &c.Spec)
 		if match, reason := k8sutil.SameService(svc, desiredSvc); !match {
@@ -166,7 +167,7 @@ func (c *Cluster) syncService(role PostgresRole) error {
 			return fmt.Errorf("could not create missing %s service: %v", role, err)
 		}
 		c.logger.Infof("%s service %q already exists", role, util.NameFromMeta(svc.ObjectMeta))
-		if svc, err = c.KubeClient.Services(c.Namespace).Get(c.serviceName(role), metav1.GetOptions{}); err != nil {
+		if svc, err = c.KubeClient.Services(c.Namespace).Get(context.TODO(), c.serviceName(role), metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing %s service: %v", role, err)
 		}
 	}
@@ -181,7 +182,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 	)
 	c.setProcessName("syncing %s endpoint", role)
 
-	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{}); err == nil {
+	if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err == nil {
 		// TODO: No syncing of endpoints here, is this covered completely by updateService?
 		c.Endpoints[role] = ep
 		return nil
@@ -200,7 +201,7 @@ func (c *Cluster) syncEndpoint(role PostgresRole) error {
 			return fmt.Errorf("could not create missing %s endpoint: %v", role, err)
 		}
 		c.logger.Infof("%s endpoint %q already exists", role, util.NameFromMeta(ep.ObjectMeta))
-		if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(c.endpointName(role), metav1.GetOptions{}); err != nil {
+		if ep, err = c.KubeClient.Endpoints(c.Namespace).Get(context.TODO(), c.endpointName(role), metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing %s endpoint: %v", role, err)
 		}
 	}
@@ -213,7 +214,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 		pdb *policybeta1.PodDisruptionBudget
 		err error
 	)
-	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
+	if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err == nil {
 		c.PodDisruptionBudget = pdb
 		newPDB := c.generatePodDisruptionBudget()
 		if match, reason := k8sutil.SamePDB(pdb, newPDB); !match {
@@ -239,7 +240,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 			return fmt.Errorf("could not create pod disruption budget: %v", err)
 		}
 		c.logger.Infof("pod disruption budget %q already exists", util.NameFromMeta(pdb.ObjectMeta))
-		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(c.podDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
+		if pdb, err = c.KubeClient.PodDisruptionBudgets(c.Namespace).Get(context.TODO(), c.podDisruptionBudgetName(), metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing %q pod disruption budget", util.NameFromMeta(pdb.ObjectMeta))
 		}
 	}
@@ -255,7 +256,7 @@ func (c *Cluster) syncStatefulSet() error {
 		podsRollingUpdateRequired bool
 	)
 	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
-	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(), metav1.GetOptions{})
+	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(context.TODO(), c.statefulSetName(), metav1.GetOptions{})
 	if err != nil {
 		if !k8sutil.ResourceNotFound(err) {
 			return fmt.Errorf("could not get statefulset: %v", err)
@@ -290,6 +291,18 @@ func (c *Cluster) syncStatefulSet() error {
 		podsRollingUpdateRequired = c.mergeRollingUpdateFlagUsingCache(sset)
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
+
+		// check if there is no Postgres version mismatch
+		for _, container := range c.Statefulset.Spec.Template.Spec.Containers {
+			if container.Name != "postgres" {
+				continue
+			}
+			pgVersion, err := c.getNewPgVersion(container, c.Spec.PostgresqlParam.PgVersion)
+			if err != nil {
+				return fmt.Errorf("could not parse current Postgres version: %v", err)
+			}
+			c.Spec.PostgresqlParam.PgVersion = pgVersion
+		}
 
 		desiredSS, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
@@ -392,14 +405,14 @@ func (c *Cluster) syncSecrets() error {
 	secrets := c.generateUserSecrets()
 
 	for secretUsername, secretSpec := range secrets {
-		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(secretSpec); err == nil {
+		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
 			c.Secrets[secret.UID] = secret
 			c.logger.Debugf("created new secret %q, uid: %q", util.NameFromMeta(secret.ObjectMeta), secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
 			var userMap map[string]spec.PgUser
-			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(secretSpec.Name, metav1.GetOptions{}); err != nil {
+			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(context.TODO(), secretSpec.Name, metav1.GetOptions{}); err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
 			if secretUsername != string(secret.Data["username"]) {
@@ -418,9 +431,11 @@ func (c *Cluster) syncSecrets() error {
 			}
 			pwdUser := userMap[secretUsername]
 			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
-			if pwdUser.Password != string(secret.Data["password"]) && pwdUser.Origin == spec.RoleOriginInfrastructure {
+			if pwdUser.Password != string(secret.Data["password"]) &&
+				pwdUser.Origin == spec.RoleOriginInfrastructure {
+
 				c.logger.Debugf("updating the secret %q from the infrastructure roles", secretSpec.Name)
-				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(secretSpec); err != nil {
+				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secretSpec, metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
 				}
 			} else {
@@ -462,6 +477,16 @@ func (c *Cluster) syncRoles() (err error) {
 	for _, u := range c.pgUsers {
 		userNames = append(userNames, u.Name)
 	}
+
+	if c.needConnectionPooler() {
+		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
+		userNames = append(userNames, connectionPoolerUser.Name)
+
+		if _, exists := c.pgUsers[connectionPoolerUser.Name]; !exists {
+			c.pgUsers[connectionPoolerUser.Name] = connectionPoolerUser
+		}
+	}
+
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)
@@ -553,7 +578,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	// sync the job if it exists
 
 	jobName := c.getLogicalBackupJobName()
-	if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(jobName, metav1.GetOptions{}); err == nil {
+	if job, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(context.TODO(), jobName, metav1.GetOptions{}); err == nil {
 
 		desiredJob, err = c.generateLogicalBackupJob()
 		if err != nil {
@@ -587,9 +612,171 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			return fmt.Errorf("could not create missing logical backup job: %v", err)
 		}
 		c.logger.Infof("logical backup job %q already exists", jobName)
-		if _, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(jobName, metav1.GetOptions{}); err != nil {
+		if _, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(context.TODO(), jobName, metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing logical backup job: %v", err)
 		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, lookup InstallFunction) error {
+	if c.ConnectionPooler == nil {
+		c.ConnectionPooler = &ConnectionPoolerObjects{}
+	}
+
+	newNeedConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
+	oldNeedConnectionPooler := c.needConnectionPoolerWorker(&oldSpec.Spec)
+
+	if newNeedConnectionPooler {
+		// Try to sync in any case. If we didn't needed connection pooler before,
+		// it means we want to create it. If it was already present, still sync
+		// since it could happen that there is no difference in specs, and all
+		// the resources are remembered, but the deployment was manually deleted
+		// in between
+		c.logger.Debug("syncing connection pooler")
+
+		// in this case also do not forget to install lookup function as for
+		// creating cluster
+		if !oldNeedConnectionPooler || !c.ConnectionPooler.LookupFunction {
+			newConnectionPooler := newSpec.Spec.ConnectionPooler
+
+			specSchema := ""
+			specUser := ""
+
+			if newConnectionPooler != nil {
+				specSchema = newConnectionPooler.Schema
+				specUser = newConnectionPooler.User
+			}
+
+			schema := util.Coalesce(
+				specSchema,
+				c.OpConfig.ConnectionPooler.Schema)
+
+			user := util.Coalesce(
+				specUser,
+				c.OpConfig.ConnectionPooler.User)
+
+			if err := lookup(schema, user); err != nil {
+				return err
+			}
+		}
+
+		if err := c.syncConnectionPoolerWorker(oldSpec, newSpec); err != nil {
+			c.logger.Errorf("could not sync connection pooler: %v", err)
+			return err
+		}
+	}
+
+	if oldNeedConnectionPooler && !newNeedConnectionPooler {
+		// delete and cleanup resources
+		if err := c.deleteConnectionPooler(); err != nil {
+			c.logger.Warningf("could not remove connection pooler: %v", err)
+		}
+	}
+
+	if !oldNeedConnectionPooler && !newNeedConnectionPooler {
+		// delete and cleanup resources if not empty
+		if c.ConnectionPooler != nil &&
+			(c.ConnectionPooler.Deployment != nil ||
+				c.ConnectionPooler.Service != nil) {
+
+			if err := c.deleteConnectionPooler(); err != nil {
+				c.logger.Warningf("could not remove connection pooler: %v", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// Synchronize connection pooler resources. Effectively we're interested only in
+// synchronizing the corresponding deployment, but in case of deployment or
+// service is missing, create it. After checking, also remember an object for
+// the future references.
+func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql) error {
+	deployment, err := c.KubeClient.
+		Deployments(c.Namespace).
+		Get(context.TODO(), c.connectionPoolerName(), metav1.GetOptions{})
+
+	if err != nil && k8sutil.ResourceNotFound(err) {
+		msg := "Deployment %s for connection pooler synchronization is not found, create it"
+		c.logger.Warningf(msg, c.connectionPoolerName())
+
+		deploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec)
+		if err != nil {
+			msg = "could not generate deployment for connection pooler: %v"
+			return fmt.Errorf(msg, err)
+		}
+
+		deployment, err := c.KubeClient.
+			Deployments(deploymentSpec.Namespace).
+			Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+
+		if err != nil {
+			return err
+		}
+
+		c.ConnectionPooler.Deployment = deployment
+	} else if err != nil {
+		return fmt.Errorf("could not get connection pooler deployment to sync: %v", err)
+	} else {
+		c.ConnectionPooler.Deployment = deployment
+
+		// actual synchronization
+		oldConnectionPooler := oldSpec.Spec.ConnectionPooler
+		newConnectionPooler := newSpec.Spec.ConnectionPooler
+		specSync, specReason := c.needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
+		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, deployment)
+		reason := append(specReason, defaultsReason...)
+		if specSync || defaultsSync {
+			c.logger.Infof("Update connection pooler deployment %s, reason: %+v",
+				c.connectionPoolerName(), reason)
+
+			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec)
+			if err != nil {
+				msg := "could not generate deployment for connection pooler: %v"
+				return fmt.Errorf(msg, err)
+			}
+
+			oldDeploymentSpec := c.ConnectionPooler.Deployment
+
+			deployment, err := c.updateConnectionPoolerDeployment(
+				oldDeploymentSpec,
+				newDeploymentSpec)
+
+			if err != nil {
+				return err
+			}
+
+			c.ConnectionPooler.Deployment = deployment
+			return nil
+		}
+	}
+
+	service, err := c.KubeClient.
+		Services(c.Namespace).
+		Get(context.TODO(), c.connectionPoolerName(), metav1.GetOptions{})
+
+	if err != nil && k8sutil.ResourceNotFound(err) {
+		msg := "Service %s for connection pooler synchronization is not found, create it"
+		c.logger.Warningf(msg, c.connectionPoolerName())
+
+		serviceSpec := c.generateConnectionPoolerService(&newSpec.Spec)
+		service, err := c.KubeClient.
+			Services(serviceSpec.Namespace).
+			Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
+
+		if err != nil {
+			return err
+		}
+
+		c.ConnectionPooler.Service = service
+	} else if err != nil {
+		return fmt.Errorf("could not get connection pooler service to sync: %v", err)
+	} else {
+		// Service updates are not supported and probably not that useful anyway
+		c.ConnectionPooler.Service = service
 	}
 
 	return nil

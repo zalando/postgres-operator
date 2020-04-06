@@ -1,5 +1,7 @@
 package v1
 
+// Postgres CRD definition, please use CamelCase for field names.
+
 import (
 	"time"
 
@@ -26,6 +28,9 @@ type PostgresSpec struct {
 	Volume          `json:"volume,omitempty"`
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
+
+	EnableConnectionPooler *bool             `json:"enableConnectionPooler,omitempty"`
+	ConnectionPooler       *ConnectionPooler `json:"connectionPooler,omitempty"`
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
@@ -60,6 +65,8 @@ type PostgresSpec struct {
 	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
 	StandbyCluster        *StandbyDescription  `json:"standby"`
 	PodAnnotations        map[string]string    `json:"podAnnotations"`
+	ServiceAnnotations    map[string]string    `json:"serviceAnnotations"`
+	TLS                   *TLSDescription      `json:"tls"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -111,13 +118,15 @@ type Resources struct {
 
 // Patroni contains Patroni-specific configuration
 type Patroni struct {
-	InitDB               map[string]string            `json:"initdb"`
-	PgHba                []string                     `json:"pg_hba"`
-	TTL                  uint32                       `json:"ttl"`
-	LoopWait             uint32                       `json:"loop_wait"`
-	RetryTimeout         uint32                       `json:"retry_timeout"`
-	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
-	Slots                map[string]map[string]string `json:"slots"`
+	InitDB                map[string]string            `json:"initdb"`
+	PgHba                 []string                     `json:"pg_hba"`
+	TTL                   uint32                       `json:"ttl"`
+	LoopWait              uint32                       `json:"loop_wait"`
+	RetryTimeout          uint32                       `json:"retry_timeout"`
+	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	Slots                 map[string]map[string]string `json:"slots"`
+	SynchronousMode       bool                         `json:"synchronous_mode"`
+	SynchronousModeStrict bool                         `json:"synchronous_mode_strict"`
 }
 
 //StandbyCluster
@@ -127,6 +136,13 @@ type StandbyDescription struct {
 	StandbyMethod     string `json:"standby_method,omitempty"`
 	StandbyPort       string `json:"standby_port,omitempty"`
 	StandbySecretName string `json:"standby_secret_name,omitempty"`
+}
+
+type TLSDescription struct {
+	SecretName      string `json:"secretName,omitempty"`
+	CertificateFile string `json:"certificateFile,omitempty"`
+	PrivateKeyFile  string `json:"privateKeyFile,omitempty"`
+	CAFile          string `json:"caFile,omitempty"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time
@@ -156,4 +172,25 @@ type UserFlags []string
 // PostgresStatus contains status of the PostgreSQL cluster (running, creation failed etc.)
 type PostgresStatus struct {
 	PostgresClusterStatus string `json:"PostgresClusterStatus"`
+}
+
+// Options for connection pooler
+//
+// TODO: prepared snippets of configuration, one can choose via type, e.g.
+// pgbouncer-large (with higher resources) or odyssey-small (with smaller
+// resources)
+// Type              string `json:"type,omitempty"`
+//
+// TODO: figure out what other important parameters of the connection pooler it
+// makes sense to expose. E.g. pool size (min/max boundaries), max client
+// connections etc.
+type ConnectionPooler struct {
+	NumberOfInstances *int32 `json:"numberOfInstances,omitempty"`
+	Schema            string `json:"schema,omitempty"`
+	User              string `json:"user,omitempty"`
+	Mode              string `json:"mode,omitempty"`
+	DockerImage       string `json:"dockerImage,omitempty"`
+	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
+
+	Resources `json:"resources,omitempty"`
 }

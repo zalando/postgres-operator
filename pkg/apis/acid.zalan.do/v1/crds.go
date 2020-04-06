@@ -105,6 +105,7 @@ var OperatorConfigCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefin
 
 var min0 = 0.0
 var min1 = 1.0
+var min2 = 2.0
 var minDisable = -1.0
 
 // PostgresCRDResourceValidation to check applied manifest parameters
@@ -160,7 +161,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								Type: "string",
 							},
 							"s3_force_path_style": {
-								Type: "string",
+								Type: "boolean",
 							},
 							"s3_wal_path": {
 								Type: "string",
@@ -176,6 +177,76 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"connectionPooler": {
+						Type: "object",
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"dockerImage": {
+								Type: "string",
+							},
+							"maxDBConnections": {
+								Type: "integer",
+							},
+							"mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"session"`),
+									},
+									{
+										Raw: []byte(`"transaction"`),
+									},
+								},
+							},
+							"numberOfInstances": {
+								Type:    "integer",
+								Minimum: &min2,
+							},
+							"resources": {
+								Type:     "object",
+								Required: []string{"requests", "limits"},
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"limits": {
+										Type:     "object",
+										Required: []string{"cpu", "memory"},
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"cpu": {
+												Type:        "string",
+												Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
+												Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+											},
+											"memory": {
+												Type:        "string",
+												Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
+												Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+											},
+										},
+									},
+									"requests": {
+										Type:     "object",
+										Required: []string{"cpu", "memory"},
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"cpu": {
+												Type:        "string",
+												Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
+												Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+											},
+											"memory": {
+												Type:        "string",
+												Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
+												Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+											},
+										},
+									},
+								},
+							},
+							"schema": {
+								Type: "string",
+							},
+							"user": {
+								Type: "string",
+							},
+						},
+					},
 					"databases": {
 						Type: "object",
 						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
@@ -187,6 +258,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					},
 					"dockerImage": {
 						Type: "string",
+					},
+					"enableConnectionPooler": {
+						Type: "boolean",
 					},
 					"enableLogicalBackup": {
 						Type: "boolean",
@@ -283,6 +357,12 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 							"maximum_lag_on_failover": {
 								Type: "integer",
+							},
+							"synchronous_mode": {
+								Type: "boolean",
+							},
+							"synchronous_mode_strict": {
+								Type: "boolean",
 							},
 						},
 					},
@@ -383,6 +463,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"serviceAnnotations": {
+						Type: "object",
+						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
+					},
 					"sidecars": {
 						Type: "array",
 						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
@@ -408,6 +496,24 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					},
 					"teamId": {
 						Type: "string",
+					},
+					"tls": {
+						Type:     "object",
+						Required: []string{"secretName"},
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"secretName": {
+								Type: "string",
+							},
+							"certificateFile": {
+								Type: "string",
+							},
+							"privateKeyFile": {
+								Type: "string",
+							},
+							"caFile": {
+								Type: "string",
+							},
+						},
 					},
 					"tolerations": {
 						Type: "array",
@@ -627,6 +733,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"etcd_host": {
 						Type: "string",
 					},
+					"kubernetes_use_configmaps": {
+						Type: "boolean",
+					},
 					"max_instances": {
 						Type:        "integer",
 						Description: "-1 = disabled",
@@ -810,6 +919,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
+							"min_cpu_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"min_memory_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
 						},
 					},
 					"timeouts": {
@@ -899,6 +1016,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type: "string",
 							},
 							"logical_backup_s3_endpoint": {
+								Type: "string",
+							},
+							"logical_backup_s3_region": {
 								Type: "string",
 							},
 							"logical_backup_s3_secret_access_key": {
@@ -1014,6 +1134,54 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
 							"scalyr_server_url": {
+								Type: "string",
+							},
+						},
+					},
+					"connection_pooler": {
+						Type: "object",
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"connection_pooler_default_cpu_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"connection_pooler_default_cpu_request": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"connection_pooler_default_memory_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"connection_pooler_default_memory_request": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"connection_pooler_image": {
+								Type: "string",
+							},
+							"connection_pooler_max_db_connections": {
+								Type: "integer",
+							},
+							"connection_pooler_mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"session"`),
+									},
+									{
+										Raw: []byte(`"transaction"`),
+									},
+								},
+							},
+							"connection_pooler_number_of_instances": {
+								Type:    "integer",
+								Minimum: &min2,
+							},
+							"connection_pooler_schema": {
+								Type: "string",
+							},
+							"connection_pooler_user": {
 								Type: "string",
 							},
 						},

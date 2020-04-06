@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -40,12 +41,23 @@ func (c *Controller) clusterResync(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 
 // clusterListFunc obtains a list of all PostgreSQL clusters
 func (c *Controller) listClusters(options metav1.ListOptions) (*acidv1.PostgresqlList, error) {
+	var pgList acidv1.PostgresqlList
+
 	// TODO: use the SharedInformer cache instead of quering Kubernetes API directly.
-	list, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.opConfig.WatchedNamespace).List(options)
+	list, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.opConfig.WatchedNamespace).List(context.TODO(), options)
 	if err != nil {
 		c.logger.Errorf("could not list postgresql objects: %v", err)
 	}
-	return list, err
+	if c.controllerID != "" {
+		c.logger.Debugf("watch only clusters with controllerID %q", c.controllerID)
+	}
+	for _, pg := range list.Items {
+		if pg.Error == "" && c.hasOwnership(&pg) {
+			pgList.Items = append(pgList.Items, pg)
+		}
+	}
+
+	return &pgList, err
 }
 
 // clusterListAndSync lists all manifests and decides whether to run the sync or repair.
@@ -455,41 +467,48 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 }
 
 func (c *Controller) postgresqlAdd(obj interface{}) {
-	pg, ok := obj.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
-		return
+	pg := c.postgresqlCheck(obj)
+	if pg != nil {
+		// We will not get multiple Add events for the same cluster
+		c.queueClusterEvent(nil, pg, EventAdd)
 	}
 
-	// We will not get multiple Add events for the same cluster
-	c.queueClusterEvent(nil, pg, EventAdd)
+	return
 }
 
 func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
-	pgOld, ok := prev.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
-	}
-	pgNew, ok := cur.(*acidv1.Postgresql)
-	if !ok {
-		c.logger.Errorf("could not cast to postgresql spec")
-	}
-	// Avoid the inifinite recursion for status updates
-	if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
-		return
+	pgOld := c.postgresqlCheck(prev)
+	pgNew := c.postgresqlCheck(cur)
+	if pgOld != nil && pgNew != nil {
+		// Avoid the inifinite recursion for status updates
+		if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
+			return
+		}
+		c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 	}
 
-	c.queueClusterEvent(pgOld, pgNew, EventUpdate)
+	return
 }
 
 func (c *Controller) postgresqlDelete(obj interface{}) {
+	pg := c.postgresqlCheck(obj)
+	if pg != nil {
+		c.queueClusterEvent(pg, nil, EventDelete)
+	}
+
+	return
+}
+
+func (c *Controller) postgresqlCheck(obj interface{}) *acidv1.Postgresql {
 	pg, ok := obj.(*acidv1.Postgresql)
 	if !ok {
 		c.logger.Errorf("could not cast to postgresql spec")
-		return
+		return nil
 	}
-
-	c.queueClusterEvent(pg, nil, EventDelete)
+	if !c.hasOwnership(pg) {
+		return nil
+	}
+	return pg
 }
 
 /*
@@ -505,11 +524,11 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 	namespace := event.NewSpec.GetNamespace()
 
 	if err := c.createPodServiceAccount(namespace); err != nil {
-		return fmt.Errorf("could not create pod service account %v : %v", c.opConfig.PodServiceAccountName, err)
+		return fmt.Errorf("could not create pod service account %q : %v", c.opConfig.PodServiceAccountName, err)
 	}
 
 	if err := c.createRoleBindings(namespace); err != nil {
-		return fmt.Errorf("could not create role binding %v : %v", c.PodServiceAccountRoleBinding.Name, err)
+		return fmt.Errorf("could not create role binding %q : %v", c.PodServiceAccountRoleBinding.Name, err)
 	}
 	return nil
 }
@@ -517,19 +536,19 @@ func (c *Controller) submitRBACCredentials(event ClusterEvent) error {
 func (c *Controller) createPodServiceAccount(namespace string) error {
 
 	podServiceAccountName := c.opConfig.PodServiceAccountName
-	_, err := c.KubeClient.ServiceAccounts(namespace).Get(podServiceAccountName, metav1.GetOptions{})
+	_, err := c.KubeClient.ServiceAccounts(namespace).Get(context.TODO(), podServiceAccountName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof(fmt.Sprintf("creating pod service account in the namespace %v", namespace))
+		c.logger.Infof(fmt.Sprintf("creating pod service account %q in the %q namespace", podServiceAccountName, namespace))
 
 		// get a separate copy of service account
 		// to prevent a race condition when setting a namespace for many clusters
 		sa := *c.PodServiceAccount
-		if _, err = c.KubeClient.ServiceAccounts(namespace).Create(&sa); err != nil {
-			return fmt.Errorf("cannot deploy the pod service account %v defined in the config map to the %v namespace: %v", podServiceAccountName, namespace, err)
+		if _, err = c.KubeClient.ServiceAccounts(namespace).Create(context.TODO(), &sa, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("cannot deploy the pod service account %q defined in the configuration to the %q namespace: %v", podServiceAccountName, namespace, err)
 		}
 
-		c.logger.Infof("successfully deployed the pod service account %v to the %v namespace", podServiceAccountName, namespace)
+		c.logger.Infof("successfully deployed the pod service account %q to the %q namespace", podServiceAccountName, namespace)
 	} else if k8sutil.ResourceAlreadyExists(err) {
 		return nil
 	}
@@ -542,17 +561,17 @@ func (c *Controller) createRoleBindings(namespace string) error {
 	podServiceAccountName := c.opConfig.PodServiceAccountName
 	podServiceAccountRoleBindingName := c.PodServiceAccountRoleBinding.Name
 
-	_, err := c.KubeClient.RoleBindings(namespace).Get(podServiceAccountRoleBindingName, metav1.GetOptions{})
+	_, err := c.KubeClient.RoleBindings(namespace).Get(context.TODO(), podServiceAccountRoleBindingName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 
-		c.logger.Infof("Creating the role binding %v in the namespace %v", podServiceAccountRoleBindingName, namespace)
+		c.logger.Infof("Creating the role binding %q in the %q namespace", podServiceAccountRoleBindingName, namespace)
 
 		// get a separate copy of role binding
 		// to prevent a race condition when setting a namespace for many clusters
 		rb := *c.PodServiceAccountRoleBinding
-		_, err = c.KubeClient.RoleBindings(namespace).Create(&rb)
+		_, err = c.KubeClient.RoleBindings(namespace).Create(context.TODO(), &rb, metav1.CreateOptions{})
 		if err != nil {
-			return fmt.Errorf("cannot bind the pod service account %q defined in the config map to the cluster role in the %q namespace: %v", podServiceAccountName, namespace, err)
+			return fmt.Errorf("cannot bind the pod service account %q defined in the configuration to the cluster role in the %q namespace: %v", podServiceAccountName, namespace, err)
 		}
 
 		c.logger.Infof("successfully deployed the role binding for the pod service account %q to the %q namespace", podServiceAccountName, namespace)

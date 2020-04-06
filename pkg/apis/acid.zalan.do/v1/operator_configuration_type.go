@@ -1,5 +1,7 @@
 package v1
 
+// Operator configuration CRD definition, please use snake_case for field names.
+
 import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 
@@ -53,7 +55,7 @@ type KubernetesMetaConfiguration struct {
 	EnableInitContainers                   *bool                 `json:"enable_init_containers,omitempty"`
 	EnableSidecars                         *bool                 `json:"enable_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
-	ClusterDomain                          string                `json:"cluster_domain"`
+	ClusterDomain                          string                `json:"cluster_domain,omitempty"`
 	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
 	InfrastructureRolesSecretName          spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
 	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
@@ -63,14 +65,13 @@ type KubernetesMetaConfiguration struct {
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
-	PodToleration map[string]string `json:"toleration,omitempty"`
-	// TODO: use namespacedname
-	PodEnvironmentConfigMap    string        `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName       string        `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout       time.Duration `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity      bool          `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey string        `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy        string        `json:"pod_management_policy,omitempty"`
+	PodToleration              map[string]string   `json:"toleration,omitempty"`
+	PodEnvironmentConfigMap    spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName       string              `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout       Duration            `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string              `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string              `json:"pod_management_policy,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -79,6 +80,8 @@ type PostgresPodResourcesDefaults struct {
 	DefaultMemoryRequest string `json:"default_memory_request,omitempty"`
 	DefaultCPULimit      string `json:"default_cpu_limit,omitempty"`
 	DefaultMemoryLimit   string `json:"default_memory_limit,omitempty"`
+	MinCPULimit          string `json:"min_cpu_limit,omitempty"`
+	MinMemoryLimit       string `json:"min_memory_limit,omitempty"`
 }
 
 // OperatorTimeouts defines the timeout of ResourceCheck, PodWait, ReadyWait
@@ -150,11 +153,26 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
+// Defines default configuration for connection pooler
+type ConnectionPoolerConfiguration struct {
+	NumberOfInstances    *int32 `json:"connection_pooler_number_of_instances,omitempty"`
+	Schema               string `json:"connection_pooler_schema,omitempty"`
+	User                 string `json:"connection_pooler_user,omitempty"`
+	Image                string `json:"connection_pooler_image,omitempty"`
+	Mode                 string `json:"connection_pooler_mode,omitempty"`
+	MaxDBConnections     *int32 `json:"connection_pooler_max_db_connections,omitempty"`
+	DefaultCPURequest    string `json:"connection_pooler_default_cpu_request,omitempty"`
+	DefaultMemoryRequest string `json:"connection_pooler_default_memory_request,omitempty"`
+	DefaultCPULimit      string `json:"connection_pooler_default_cpu_limit,omitempty"`
+	DefaultMemoryLimit   string `json:"connection_pooler_default_memory_limit,omitempty"`
+}
+
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
 type OperatorLogicalBackupConfiguration struct {
 	Schedule          string `json:"logical_backup_schedule,omitempty"`
 	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
 	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Region          string `json:"logical_backup_s3_region,omitempty"`
 	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
 	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
 	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`
@@ -165,6 +183,7 @@ type OperatorLogicalBackupConfiguration struct {
 type OperatorConfigurationData struct {
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`
 	MinInstances               int32                              `json:"min_instances,omitempty"`
@@ -185,6 +204,7 @@ type OperatorConfigurationData struct {
 	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
+	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
 }
 
 //Duration shortens this frequently used name

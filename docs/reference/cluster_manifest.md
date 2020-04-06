@@ -111,17 +111,22 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   value overrides the `pod_toleration` setting from the operator. Optional.
 
 * **podPriorityClassName**
-   a name of the [priority
-   class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
-   that should be assigned to the cluster pods. When not specified, the value
-   is taken from the `pod_priority_class_name` operator parameter, if not set
-   then the default priority class is taken. The priority class itself must be
-   defined in advance. Optional.
+  a name of the [priority
+  class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
+  that should be assigned to the cluster pods. When not specified, the value
+  is taken from the `pod_priority_class_name` operator parameter, if not set
+  then the default priority class is taken. The priority class itself must be
+  defined in advance. Optional.
 
 * **podAnnotations**
   A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
   to each pod created for the database.
 
+* **serviceAnnotations**
+  A map of key value pairs that gets attached as [annotations](https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/)
+  to the services created for the database cluster. Check the
+  [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#load-balancers-and-allowed-ip-ranges)
+  for more information regarding default values and overwrite rules.
 
 * **enableShmVolume**
   Start a database pod without limitations on shm memory. By default Docker
@@ -134,6 +139,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   (`enable_shm_volume`, which is `true` by default). It it's present and value
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration). Optional.
+
+* **enableConnectionPooler**
+  Tells the operator to create a connection pooler with a database. If this
+  field is true, a connection pooler deployment will be created even if
+  `connectionPooler` section is empty. Optional, not set by default.
 
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
@@ -179,9 +189,9 @@ explanation of `ttl` and `loop_wait` parameters.
   ```
   hostssl all +pamrole all pam
   ```
-  , where pamrole is the name of the role for the pam authentication; any
-    custom `pg_hba` should include the pam line to avoid breaking pam
-    authentication. Optional.
+  where pamrole is the name of the role for the pam authentication; any
+  custom `pg_hba` should include the pam line to avoid breaking pam
+  authentication. Optional.
 
 * **ttl**
   Patroni `ttl` parameter value, optional. The default is set by the Spilo
@@ -207,6 +217,12 @@ explanation of `ttl` and `loop_wait` parameters.
   automatically created by Patroni for cluster members and permanent replication
   slots. Optional.
 
+* **synchronous_mode**
+  Patroni `synchronous_mode` parameter value. The default is set to `false`. Optional.
+  
+* **synchronous_mode_strict**
+  Patroni `synchronous_mode_strict` parameter value. Can be used in addition to `synchronous_mode`. The default is set to `false`. Optional.
+  
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
@@ -371,3 +387,54 @@ CPU and memory limits for the sidecar container.
 * **memory**
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
+
+## Connection pooler
+
+Parameters are grouped under the `connectionPooler` top-level key and specify
+configuration for connection pooler. If this section is not empty, a connection
+pooler will be created for a database even if `enableConnectionPooler` is not
+present.
+
+* **numberOfInstances**
+  How many instances of connection pooler to create.
+
+* **schema**
+  Database schema to create for credentials lookup function.
+
+* **user**
+  User to create for connection pooler to be able to connect to a database.
+  You can also choose a role from the `users` section or a system user role.
+
+* **dockerImage**
+  Which docker image to use for connection pooler deployment.
+
+* **maxDBConnections**
+  How many connections the pooler can max hold. This value is divided among the
+  pooler pods.
+
+* **mode**
+  In which mode to run connection pooler, transaction or session.
+
+* **resources**
+  Resource configuration for connection pooler deployment.
+
+## Custom TLS certificates
+
+Those parameters are grouped under the `tls` top-level key.
+
+* **secretName**
+  By setting the `secretName` value, the cluster will switch to load the given
+  Kubernetes Secret into the container as a volume and uses that as the
+  certificate instead. It is up to the user to create and manage the
+  Kubernetes Secret either by hand or using a tool like the CertManager
+  operator.
+
+* **certificateFile**
+  Filename of the certificate. Defaults to "tls.crt".
+
+* **privateKeyFile**
+  Filename of the private key. Defaults to "tls.key".
+
+* **caFile**
+  Optional filename to the CA certificate. Useful when the client connects
+  with `sslmode=verify-ca` or `sslmode=verify-full`. Default is empty.
