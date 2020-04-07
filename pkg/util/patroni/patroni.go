@@ -30,26 +30,26 @@ type Interface interface {
 
 // HttpGetResponse contains data returned by Get to host/8008
 type HttpGetResponse struct {
-	State                    string `json:"type,omitempty"`
-	PostmasterStartTime      string `json:"type,omitempty"`
-	Role                     string `json:"type,omitempty"`
-	ServerVersion            int    `json:"type,omitempty"`
-	ClusterUnlocked          bool   `json:"type,omitempty"`
-	Timeline                 int    `json:"type,omitempty"`
-	Xlog                     Xlog   `json:"type,omitempty"`
-	DatabaseSystemIdentifier string `json:"type,omitempty"`
-	PatroniInfo              Info   `json:"type,omitempty"`
+	State                    string `json:"state,omitempty"`
+	PostmasterStartTime      string `json:"posmaster_start_time,omitempty"`
+	Role                     string `json:"role,omitempty"`
+	ServerVersion            int    `json:"server_version,omitempty"`
+	ClusterUnlocked          bool   `json:"cluster_unlocked,omitempty"`
+	Timeline                 int    `json:"timeline,omitempty"`
+	Xlog                     Xlog   `json:"xlog"`
+	DatabaseSystemIdentifier string `json:"database_system_indetifier,omitempty"`
+	PatroniInfo              Info   `json:"patroni"`
 }
 
 // Xlog contains wal locaiton
 type Xlog struct {
-	Location int `json:"type,omitempty"`
+	Location int `json:"location"`
 }
 
 // Info cotains Patroni version and cluser scope
 type Info struct {
-	Version string `json:"type,omitempty"`
-	Scope   string `json:"type,omitempty"`
+	Version string `json:"version,omitempty"`
+	Scope   string `json:"scope,omitempty"`
 }
 
 // Patroni API client
@@ -164,13 +164,18 @@ func (p *Patroni) GetNodeState(server *v1.Pod) (string, error) {
 	}
 	defer response.Body.Close()
 
+	p.logger.Infof("http get response: %+v", response)
+
 	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return "", fmt.Errorf("could not read response: %v", err)
+	}
 
 	err = json.Unmarshal(body, &pResponse)
 	if err != nil {
 		return "", fmt.Errorf("could not unmarshal response: %v", err)
 	}
-	p.logger.Infof("http get response: %+v", pResponse)
+	p.logger.Infof("parsed http get response: %+v", pResponse)
 
 	return pResponse.State, nil
 
