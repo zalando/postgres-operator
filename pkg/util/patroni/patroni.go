@@ -38,18 +38,18 @@ type HttpGetResponse struct {
 	Timeline                 int    `json:"type,omitempty"`
 	Xlog                     Xlog   `json:"type,omitempty"`
 	DatabaseSystemIdentifier string `json:"type,omitempty"`
-	patroniInfo              Info   `json:"type,omitempty"`
+	PatroniInfo              Info   `json:"type,omitempty"`
 }
 
 // Xlog contains wal locaiton
 type Xlog struct {
-	location int `json:"type,omitempty"`
+	Location int `json:"type,omitempty"`
 }
 
 // Info cotains Patroni version and cluser scope
 type Info struct {
-	version string `json:"type,omitempty"`
-	scope   string `json:"type,omitempty"`
+	Version string `json:"type,omitempty"`
+	Scope   string `json:"type,omitempty"`
 }
 
 // Patroni API client
@@ -170,6 +170,7 @@ func (p *Patroni) GetNodeState(server *v1.Pod) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not unmarshal response: %v", err)
 	}
+	p.logger.Infof("http get response: %s", pResponse)
 
 	return pResponse.State, nil
 
