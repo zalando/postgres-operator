@@ -170,7 +170,7 @@ func (p *Patroni) GetNodeState(server *v1.Pod) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not unmarshal response: %v", err)
 	}
-	p.logger.Infof("http get response: %s", pResponse)
+	p.logger.Infof("http get response: %+v", pResponse)
 
 	return pResponse.State, nil
 
