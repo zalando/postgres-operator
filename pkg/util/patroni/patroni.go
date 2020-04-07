@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -25,6 +25,31 @@ const (
 type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
+	GetNodeState(pod *v1.Pod) (string, error)
+}
+
+// HttpGetResponse contains data returned by Get to host/8008
+type HttpGetResponse struct {
+	State                    string `json:"type,omitempty"`
+	PostmasterStartTime      string `json:"type,omitempty"`
+	Role                     string `json:"type,omitempty"`
+	ServerVersion            int    `json:"type,omitempty"`
+	ClusterUnlocked          bool   `json:"type,omitempty"`
+	Timeline                 int    `json:"type,omitempty"`
+	Xlog                     Xlog   `json:"type,omitempty"`
+	DatabaseSystemIdentifier string `json:"type,omitempty"`
+	patroniInfo              Info   `json:"type,omitempty"`
+}
+
+// Xlog contains wal locaiton
+type Xlog struct {
+	location int `json:"type,omitempty"`
+}
+
+// Info cotains Patroni version and cluser scope
+type Info struct {
+	version string `json:"type,omitempty"`
+	scope   string `json:"type,omitempty"`
 }
 
 // Patroni API client
@@ -122,4 +147,30 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 		return err
 	}
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
+}
+
+//GetNodeState returns node state reported by Patroni API call.
+func (p *Patroni) GetNodeState(server *v1.Pod) (string, error) {
+
+	var pResponse HttpGetResponse
+
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return "", err
+	}
+	response, err := p.httpClient.Get(apiURLString)
+	if err != nil {
+		return "", fmt.Errorf("could not perform Get request: %v", err)
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+
+	err = json.Unmarshal(body, &pResponse)
+	if err != nil {
+		return "", fmt.Errorf("could not unmarshal response: %v", err)
+	}
+
+	return pResponse.State, nil
+
 }

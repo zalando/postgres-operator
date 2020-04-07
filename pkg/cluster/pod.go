@@ -294,6 +294,19 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	return pod, nil
 }
 
+func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
+
+	for _, pod := range pods.Items {
+		state, err := c.patroni.GetNodeState(&pod)
+		if err != nil || state != "running" {
+			c.logger.Warningf("cannot re-create pod %s: patroni not in 'running' state", pod.Name)
+			return false
+		}
+
+	}
+	return true
+}
+
 func (c *Cluster) recreatePods() error {
 	c.setProcessName("starting to recreate pods")
 	ls := c.labelsSet(false)
@@ -308,6 +321,10 @@ func (c *Cluster) recreatePods() error {
 		return fmt.Errorf("could not get the list of pods: %v", err)
 	}
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
+
+	if !c.isSafeToRecreatePods(pods) {
+		return fmt.Errorf("postpone pod recreation until next Sync: some pods are being initilalized and recreation is unsafe")
+	}
 
 	var (
 		masterPod, newMasterPod, newPod *v1.Pod
