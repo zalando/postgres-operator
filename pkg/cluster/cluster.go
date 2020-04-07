@@ -877,9 +877,16 @@ func (c *Cluster) initSystemUsers() {
 			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		username := util.Coalesce(
-			c.Spec.ConnectionPooler.User,
-			c.OpConfig.ConnectionPooler.User)
+		// Using superuser as pooler user is not a good idea. First of all it's
+		// not going to be synced correctly with the current implementation,
+		// and second it's a bad practice.
+		username := c.OpConfig.ConnectionPooler.User
+
+		if c.Spec.ConnectionPooler.User != c.OpConfig.SuperUsername {
+			username = util.Coalesce(
+				c.Spec.ConnectionPooler.User,
+				c.OpConfig.ConnectionPooler.User)
+		}
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{

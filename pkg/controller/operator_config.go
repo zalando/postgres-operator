@@ -169,6 +169,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 		fromCRD.ConnectionPooler.User,
 		constants.ConnectionPoolerUserName)
 
+	if result.ConnectionPooler.User == result.SuperUsername {
+		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		panic(fmt.Errorf(msg, result.ConnectionPooler.User))
+	}
+
 	result.ConnectionPooler.Image = util.Coalesce(
 		fromCRD.ConnectionPooler.Image,
 		"registry.opensource.zalan.do/acid/pgbouncer")

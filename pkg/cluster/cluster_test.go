@@ -721,4 +721,17 @@ func TestInitSystemUsers(t *testing.T) {
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; !exist {
 		t.Errorf("%s, connection pooler user is not present", testName)
 	}
+
+	// superuser is not allowed as connection pool user
+	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
+		User: "postgres",
+	}
+	cl.OpConfig.SuperUsername = "postgres"
+	cl.OpConfig.ConnectionPooler.User = "pooler"
+
+	cl.initSystemUsers()
+	if _, exist := cl.pgUsers["pooler"]; !exist {
+		t.Errorf("%s, Superuser is not allowed to be a connection pool user", testName)
+	}
+
 }
