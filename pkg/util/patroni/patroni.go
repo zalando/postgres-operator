@@ -152,7 +152,7 @@ func (p *Patroni) GetNodeState(server *v1.Pod) (string, error) {
 
 	state, ok := data["state"].(string)
 	if !ok {
-		return "", errors.New("Patroni Get call rerturned wrong type for 'state' field")
+		return "", errors.New("Patroni Get call response contains wrong type for 'state' field")
 	}
 
 	return state, nil
