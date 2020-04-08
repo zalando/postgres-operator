@@ -294,6 +294,7 @@ rbac:
 
 crd:
   # Specifies whether custom resource definitions should be created
+  # When using helm3, this is ignored; instead use "--skip-crds" to skip.
   create: true
 
 serviceAccount:
