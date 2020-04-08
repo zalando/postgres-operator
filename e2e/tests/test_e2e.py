@@ -516,20 +516,11 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.assert_running_pods_have_volumes()
 
-        # Update() deletes pvc on scale down
-        # we do not use wait_for_pg_to_scale here because it waits until a pod is completely gone
-        # we want to capture a potential situation where a pod is in Terminating state
-        # but its pvc is already being deleted
-        # TODO that needs a more thourough test at the DB level
-        k8s.change_number_of_instances(1)
-        k8s.wait_for_pvc_deletion("pgdata-acid-minimal-cluster-1")
-
-        self.assert_running_pods_have_volumes()
-
         # pvc with index 0 must stay around when cluster has 0 pods
         last_pvc_name = "pgdata-acid-minimal-cluster-0"
         volume_before_scaledown = k8s.get_volume_name(last_pvc_name)
         k8s.wait_for_pg_to_scale(0)
+        k8s.update_config(patch) # force a Sync to delete unused PVCs
         self.assertTrue(k8s.pvc_exist(last_pvc_name), "The last pvc was deleted")
 
         # sanity check
@@ -538,6 +529,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(volume_before_scaledown,
                          volume_after_scaleup,
                          "the surviving pvc must have the same volume before scale down to 0 and after scale up")
+
+        self.assert_running_pods_have_volumes()
 
         # clean up
         patch = {

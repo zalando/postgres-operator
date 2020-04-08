@@ -678,10 +678,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
-	if c.OpConfig.EnableUnusedPVCDeletion && oldSpec.Spec.NumberOfInstances > newSpec.Spec.NumberOfInstances {
-		c.deleteUnusedPersistentVolumeClaims()
-	}
-
 	// pod disruption budget
 	if oldSpec.Spec.NumberOfInstances != newSpec.Spec.NumberOfInstances {
 		c.logger.Debug("syncing pod disruption budgets")
