@@ -882,7 +882,11 @@ func (c *Cluster) initSystemUsers() {
 		// and second it's a bad practice.
 		username := c.OpConfig.ConnectionPooler.User
 
-		if c.Spec.ConnectionPooler.User != c.OpConfig.SuperUsername {
+		isSuperUser := c.Spec.ConnectionPooler.User == c.OpConfig.SuperUsername
+		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
+			c.Spec.ConnectionPooler.User, "connection pool role")
+
+		if !isSuperUser && !isProtectedUser {
 			username = util.Coalesce(
 				c.Spec.ConnectionPooler.User,
 				c.OpConfig.ConnectionPooler.User)
