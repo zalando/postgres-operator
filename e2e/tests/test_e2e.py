@@ -205,9 +205,9 @@ class EndToEndTestCase(unittest.TestCase):
                          "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_lazy_spilo_update(self):
+    def test_lazy_spilo_upgrade(self):
         '''
-        Test lazy update for the Spilo image: operator changes a stateful set but lets pods run with the old image 
+        Test lazy upgrade for the Spilo image: operator changes a stateful set but lets pods run with the old image 
         until they are recreated for reasons other than operator's activity. That works because the operator uses 
         "onDelete" pod update policy for stateful sets.
 
@@ -232,12 +232,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         # restart the pod to get a container with the new image 
         k8s.api.core_v1.delete_namespaced_pod(pod0, "default")
-        k8s.wait_for_pod_start('spilo-role=replica')
+        k8s.wait_for_running_pods('version=acid-minimal-cluster', 2)
 
         # sanity check: restarted pod runs the image specified in operator's conf
         new_image = k8s.get_effective_pod_image(pod0)
         self.assertEqual(conf_image, new_image, 
-            "Lazy updated failed: restarted pod runs image {} different from the one in operator conf {}".format(new_image, conf_image))
+            "Lazy upgrade failed: restarted pod runs image {} different from the one in operator conf {}".format(new_image, conf_image))
 
         # lazy update works if the restarted pod and older pods have different Spilo versions
         # i.e. the update did not immediately affect all pods
@@ -252,14 +252,15 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(unpatch_lazy_spilo_upgrade)
 
-        # at this point operator will complete the normal rolling update
-        # so we additonally test if disabling the lazy update (forcing the normal rolling update) works
+        # at this point operator will complete the normal rolling upgrade
+        # so we additonally test if disabling the lazy upgrade (forcing the normal rolling upgrade) works
+        # XXX there is no easy way to wait until the end of Sync()
         time.sleep(60)
 
         image0 = k8s.get_effective_pod_image(pod0)
         image1 = k8s.get_effective_pod_image(pod1)
 
-        self.assertEqual(image0, image1, "Disabling lazy updated failed: pods still have different images {} and {}".format(image0, image1))
+        self.assertEqual(image0, image1, "Disabling lazy upgrade failed: pods still have different images {} and {}".format(image0, image1))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_logical_backup_cron_job(self):
