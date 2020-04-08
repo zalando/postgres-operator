@@ -129,7 +129,4 @@ spec:
 # to the "/tls/" path where the secret is being mounted by default.
 # When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
 # if unknown, set it to 103 which is the usual value in the default spilo images.
-# Instead of spiloFSGroup, one can define in operator configMap spilo_fsgroup, 
-# automating it for all pg clusters deployments.
-# In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup, as it's being
-# set dynamically at deploytime.
+# In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.
