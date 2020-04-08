@@ -74,7 +74,7 @@ func (c *Cluster) deleteUnusedPersistentVolumeClaims() {
 				break
 			}
 			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
-			// next Sync() or Update() will retry
+			// next Sync() will retry
 		}
 	}
 

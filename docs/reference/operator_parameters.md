@@ -138,7 +138,7 @@ Those are top-level keys, containing both leaf keys and groups.
   The default is `false`.
 
 * **enable_unused_pvc_deletion**
-  Tells the operator to delete persistent volume claims of no longer running pods. That removes respective persistent volumes because operator configures them with the 'Delete' reclaim policy. Note operator deletes unused PVCs for clusters created both before and after this option is turned on. Deletion is not guaranteed: When it fails, operator retries at next Sync() event.
+  Tells the operator to delete persistent volume claims of no longer running pods. That removes respective persistent volumes because the operator configures them with the 'Delete' reclaim policy. The operator deletes unused PVCs for clusters created both before and after this option is turned on. Deletion is not guaranteed: When it fails, operator retries at the next Sync() event.
   The default is `false`.
 
 ## Postgres users
