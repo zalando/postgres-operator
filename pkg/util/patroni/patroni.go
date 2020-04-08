@@ -3,6 +3,7 @@ package patroni
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -26,30 +27,6 @@ type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 	GetNodeState(pod *v1.Pod) (string, error)
-}
-
-// HttpGetResponse contains data returned by Get to host/8008
-type HttpGetResponse struct {
-	State                    string `json:"state,omitempty"`
-	PostmasterStartTime      string `json:"posmaster_start_time,omitempty"`
-	Role                     string `json:"role,omitempty"`
-	ServerVersion            int    `json:"server_version,omitempty"`
-	ClusterUnlocked          bool   `json:"cluster_unlocked,omitempty"`
-	Timeline                 int    `json:"timeline,omitempty"`
-	Xlog                     Xlog   `json:"xlog"`
-	DatabaseSystemIdentifier string `json:"database_system_indetifier,omitempty"`
-	PatroniInfo              Info   `json:"patroni"`
-}
-
-// Xlog contains wal locaiton
-type Xlog struct {
-	Location int `json:"location"`
-}
-
-// Info cotains Patroni version and cluser scope
-type Info struct {
-	Version string `json:"version,omitempty"`
-	Scope   string `json:"scope,omitempty"`
 }
 
 // Patroni API client
@@ -152,8 +129,6 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 //GetNodeState returns node state reported by Patroni API call.
 func (p *Patroni) GetNodeState(server *v1.Pod) (string, error) {
 
-	var pResponse HttpGetResponse
-
 	apiURLString, err := apiURL(server)
 	if err != nil {
 		return "", err
@@ -164,19 +139,22 @@ func (p *Patroni) GetNodeState(server *v1.Pod) (string, error) {
 	}
 	defer response.Body.Close()
 
-	p.logger.Infof("http get response: %+v", response)
-
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("could not read response: %v", err)
 	}
 
-	err = json.Unmarshal(body, &pResponse)
+	data := make(map[string]interface{})
+	err = json.Unmarshal(body, &data)
 	if err != nil {
-		return "", fmt.Errorf("could not unmarshal response: %v", err)
+		return "", err
 	}
-	p.logger.Infof("parsed http get response: %+v", pResponse)
 
-	return pResponse.State, nil
+	state, ok := data["state"].(string)
+	if !ok {
+		return "", errors.New("Patroni Get call rerturned wrong type for 'state' field")
+	}
+
+	return state, nil
 
 }
