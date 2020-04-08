@@ -118,13 +118,15 @@ type Resources struct {
 
 // Patroni contains Patroni-specific configuration
 type Patroni struct {
-	InitDB               map[string]string            `json:"initdb"`
-	PgHba                []string                     `json:"pg_hba"`
-	TTL                  uint32                       `json:"ttl"`
-	LoopWait             uint32                       `json:"loop_wait"`
-	RetryTimeout         uint32                       `json:"retry_timeout"`
-	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
-	Slots                map[string]map[string]string `json:"slots"`
+	InitDB                map[string]string            `json:"initdb"`
+	PgHba                 []string                     `json:"pg_hba"`
+	TTL                   uint32                       `json:"ttl"`
+	LoopWait              uint32                       `json:"loop_wait"`
+	RetryTimeout          uint32                       `json:"retry_timeout"`
+	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	Slots                 map[string]map[string]string `json:"slots"`
+	SynchronousMode       bool                         `json:"synchronous_mode"`
+	SynchronousModeStrict bool                         `json:"synchronous_mode_strict"`
 }
 
 //StandbyCluster

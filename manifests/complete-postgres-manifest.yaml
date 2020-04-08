@@ -67,6 +67,8 @@ spec:
     ttl: 30
     loop_wait: &loop_wait 10
     retry_timeout: 10
+    synchronous_mode: false
+    synchronous_mode_strict: false
     maximum_lag_on_failover: 33554432
 
 # restore a Postgres DB with point-in-time-recovery

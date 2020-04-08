@@ -217,6 +217,12 @@ explanation of `ttl` and `loop_wait` parameters.
   automatically created by Patroni for cluster members and permanent replication
   slots. Optional.
 
+* **synchronous_mode**
+  Patroni `synchronous_mode` parameter value. The default is set to `false`. Optional.
+  
+* **synchronous_mode_strict**
+  Patroni `synchronous_mode_strict` parameter value. Can be used in addition to `synchronous_mode`. The default is set to `false`. Optional.
+  
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
@@ -376,10 +382,11 @@ present.
   How many instances of connection pooler to create.
 
 * **schema**
-  Schema to create for credentials lookup function.
+  Database schema to create for credentials lookup function.
 
 * **user**
   User to create for connection pooler to be able to connect to a database.
+  You can also choose a role from the `users` section or a system user role.
 
 * **dockerImage**
   Which docker image to use for connection pooler deployment.

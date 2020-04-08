@@ -358,6 +358,12 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"maximum_lag_on_failover": {
 								Type: "integer",
 							},
+							"synchronous_mode": {
+								Type: "boolean",
+							},
+							"synchronous_mode_strict": {
+								Type: "boolean",
+							},
 						},
 					},
 					"podAnnotations": {
@@ -726,6 +732,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					},
 					"etcd_host": {
 						Type: "string",
+					},
+					"kubernetes_use_configmaps": {
+						Type: "boolean",
 					},
 					"max_instances": {
 						Type:        "integer",
