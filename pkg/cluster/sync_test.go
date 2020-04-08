@@ -18,8 +18,8 @@ func int32ToPointer(value int32) *int32 {
 }
 
 func deploymentUpdated(cluster *Cluster, err error) error {
-	if cluster.ConnectionPool.Deployment.Spec.Replicas == nil ||
-		*cluster.ConnectionPool.Deployment.Spec.Replicas != 2 {
+	if cluster.ConnectionPooler.Deployment.Spec.Replicas == nil ||
+		*cluster.ConnectionPooler.Deployment.Spec.Replicas != 2 {
 		return fmt.Errorf("Wrong nubmer of instances")
 	}
 
@@ -27,15 +27,15 @@ func deploymentUpdated(cluster *Cluster, err error) error {
 }
 
 func objectsAreSaved(cluster *Cluster, err error) error {
-	if cluster.ConnectionPool == nil {
-		return fmt.Errorf("Connection pool resources are empty")
+	if cluster.ConnectionPooler == nil {
+		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	if cluster.ConnectionPool.Deployment == nil {
+	if cluster.ConnectionPooler.Deployment == nil {
 		return fmt.Errorf("Deployment was not saved")
 	}
 
-	if cluster.ConnectionPool.Service == nil {
+	if cluster.ConnectionPooler.Service == nil {
 		return fmt.Errorf("Service was not saved")
 	}
 
@@ -43,15 +43,15 @@ func objectsAreSaved(cluster *Cluster, err error) error {
 }
 
 func objectsAreDeleted(cluster *Cluster, err error) error {
-	if cluster.ConnectionPool != nil {
-		return fmt.Errorf("Connection pool was not deleted")
+	if cluster.ConnectionPooler != nil {
+		return fmt.Errorf("Connection pooler was not deleted")
 	}
 
 	return nil
 }
 
-func TestConnPoolSynchronization(t *testing.T) {
-	testName := "Test connection pool synchronization"
+func TestConnectionPoolerSynchronization(t *testing.T) {
+	testName := "Test connection pooler synchronization"
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -60,12 +60,12 @@ func TestConnPoolSynchronization(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
-				ConnectionPool: config.ConnectionPool{
-					ConnPoolDefaultCPURequest:    "100m",
-					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100Mi",
-					ConnPoolDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:            int32ToPointer(1),
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    int32ToPointer(1),
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
@@ -84,15 +84,15 @@ func TestConnPoolSynchronization(t *testing.T) {
 
 	clusterDirtyMock := *cluster
 	clusterDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
-	clusterDirtyMock.ConnectionPool = &ConnectionPoolObjects{
+	clusterDirtyMock.ConnectionPooler = &ConnectionPoolerObjects{
 		Deployment: &appsv1.Deployment{},
 		Service:    &v1.Service{},
 	}
 
 	clusterNewDefaultsMock := *cluster
 	clusterNewDefaultsMock.KubeClient = k8sutil.NewMockKubernetesClient()
-	cluster.OpConfig.ConnectionPool.Image = "pooler:2.0"
-	cluster.OpConfig.ConnectionPool.NumberOfInstances = int32ToPointer(2)
+	cluster.OpConfig.ConnectionPooler.Image = "pooler:2.0"
+	cluster.OpConfig.ConnectionPooler.NumberOfInstances = int32ToPointer(2)
 
 	tests := []struct {
 		subTest string
@@ -105,12 +105,12 @@ func TestConnPoolSynchronization(t *testing.T) {
 			subTest: "create if doesn't exist",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			cluster: &clusterMissingObjects,
@@ -123,7 +123,7 @@ func TestConnPoolSynchronization(t *testing.T) {
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					EnableConnectionPool: boolToPointer(true),
+					EnableConnectionPooler: boolToPointer(true),
 				},
 			},
 			cluster: &clusterMissingObjects,
@@ -136,7 +136,7 @@ func TestConnPoolSynchronization(t *testing.T) {
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			cluster: &clusterMissingObjects,
@@ -146,7 +146,7 @@ func TestConnPoolSynchronization(t *testing.T) {
 			subTest: "delete if not needed",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
@@ -170,14 +170,14 @@ func TestConnPoolSynchronization(t *testing.T) {
 			subTest: "update deployment",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{
+					ConnectionPooler: &acidv1.ConnectionPooler{
 						NumberOfInstances: int32ToPointer(1),
 					},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{
+					ConnectionPooler: &acidv1.ConnectionPooler{
 						NumberOfInstances: int32ToPointer(2),
 					},
 				},
@@ -189,12 +189,12 @@ func TestConnPoolSynchronization(t *testing.T) {
 			subTest: "update image from changed defaults",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			cluster: &clusterNewDefaultsMock,
@@ -202,7 +202,7 @@ func TestConnPoolSynchronization(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		err := tt.cluster.syncConnectionPool(tt.oldSpec, tt.newSpec, mockInstallLookupFunction)
+		err := tt.cluster.syncConnectionPooler(tt.oldSpec, tt.newSpec, mockInstallLookupFunction)
 
 		if err := tt.check(tt.cluster, err); err != nil {
 			t.Errorf("%s [%s]: Could not synchronize, %+v",

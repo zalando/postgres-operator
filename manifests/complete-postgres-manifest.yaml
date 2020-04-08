@@ -19,6 +19,7 @@ spec:
     - createdb
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
+#  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
@@ -66,6 +67,8 @@ spec:
     ttl: 30
     loop_wait: &loop_wait 10
     retry_timeout: 10
+    synchronous_mode: false
+    synchronous_mode_strict: false
     maximum_lag_on_failover: 33554432
 
 # restore a Postgres DB with point-in-time-recovery
@@ -84,6 +87,19 @@ spec:
 #  maintenanceWindows:
 #  - 01:00-06:00  #UTC
 #  - Sat:00:00-04:00
+
+  connectionPooler:
+    numberOfInstances: 2
+    mode: "transaction"
+    schema: "pooler"
+    user: "pooler"
+    resources:
+      requests:
+        cpu: 300m
+        memory: 100Mi
+      limits:
+        cpu: "1"
+        memory: 100Mi
 
   initContainers:
   - name: date
@@ -109,3 +125,5 @@ spec:
     certificateFile: "tls.crt"
     privateKeyFile: "tls.key"
     caFile: ""  # optionally configure Postgres with a CA certificate
+# When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
+# if unknown, set it to 103 which is the usual value in the default spilo images.

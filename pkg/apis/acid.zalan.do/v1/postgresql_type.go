@@ -29,8 +29,8 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	EnableConnectionPool *bool           `json:"enableConnectionPool,omitempty"`
-	ConnectionPool       *ConnectionPool `json:"connectionPool,omitempty"`
+	EnableConnectionPooler *bool             `json:"enableConnectionPooler,omitempty"`
+	ConnectionPooler       *ConnectionPooler `json:"connectionPooler,omitempty"`
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
@@ -118,13 +118,15 @@ type Resources struct {
 
 // Patroni contains Patroni-specific configuration
 type Patroni struct {
-	InitDB               map[string]string            `json:"initdb"`
-	PgHba                []string                     `json:"pg_hba"`
-	TTL                  uint32                       `json:"ttl"`
-	LoopWait             uint32                       `json:"loop_wait"`
-	RetryTimeout         uint32                       `json:"retry_timeout"`
-	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
-	Slots                map[string]map[string]string `json:"slots"`
+	InitDB                map[string]string            `json:"initdb"`
+	PgHba                 []string                     `json:"pg_hba"`
+	TTL                   uint32                       `json:"ttl"`
+	LoopWait              uint32                       `json:"loop_wait"`
+	RetryTimeout          uint32                       `json:"retry_timeout"`
+	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	Slots                 map[string]map[string]string `json:"slots"`
+	SynchronousMode       bool                         `json:"synchronous_mode"`
+	SynchronousModeStrict bool                         `json:"synchronous_mode_strict"`
 }
 
 //StandbyCluster
@@ -175,10 +177,10 @@ type PostgresStatus struct {
 // resources)
 // Type              string `json:"type,omitempty"`
 //
-// TODO: figure out what other important parameters of the connection pool it
+// TODO: figure out what other important parameters of the connection pooler it
 // makes sense to expose. E.g. pool size (min/max boundaries), max client
 // connections etc.
-type ConnectionPool struct {
+type ConnectionPooler struct {
 	NumberOfInstances *int32 `json:"numberOfInstances,omitempty"`
 	Schema            string `json:"schema,omitempty"`
 	User              string `json:"user,omitempty"`

@@ -4,7 +4,7 @@ package constants
 const (
 	PasswordLength            = 64
 	SuperuserKeyName          = "superuser"
-	ConnectionPoolUserKeyName = "pooler"
+	ConnectionPoolerUserKeyName = "pooler"
 	ReplicationUserKeyName    = "replication"
 	RoleFlagSuperuser         = "SUPERUSER"
 	RoleFlagInherit           = "INHERIT"
