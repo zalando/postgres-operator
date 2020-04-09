@@ -125,5 +125,8 @@ spec:
     certificateFile: "tls.crt"
     privateKeyFile: "tls.key"
     caFile: ""  # optionally configure Postgres with a CA certificate
+# file names can be also defined with absolute path, and will no longer be relative
+# to the "/tls/" path where the secret is being mounted by default.
 # When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
 # if unknown, set it to 103 which is the usual value in the default spilo images.
+# In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.

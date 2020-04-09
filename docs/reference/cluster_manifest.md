@@ -419,5 +419,9 @@ Those parameters are grouped under the `tls` top-level key.
   Filename of the private key. Defaults to "tls.key".
 
 * **caFile**
-  Optional filename to the CA certificate. Useful when the client connects
-  with `sslmode=verify-ca` or `sslmode=verify-full`. Default is empty.
+  Optional filename to the CA certificate (e.g. "ca.crt"). Useful when the
+  client connects with `sslmode=verify-ca` or `sslmode=verify-full`.
+  Default is empty.
+
+  Optionally one can provide full path for any of them. By default it is
+  relative to the "/tls/", which is mount path of the tls secret.
