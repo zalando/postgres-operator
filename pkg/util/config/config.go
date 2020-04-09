@@ -218,5 +218,11 @@ func validate(cfg *Config) (err error) {
 		msg := "number of connection pooler instances should be higher than %d"
 		err = fmt.Errorf(msg, constants.ConnectionPoolerMinInstances)
 	}
+
+	if cfg.ConnectionPooler.User == cfg.SuperUsername {
+		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		err = fmt.Errorf(msg, cfg.ConnectionPooler.User)
+	}
+
 	return
 }
