@@ -682,6 +682,37 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"additionalVolumes": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"name", "mountPath", "volumeSource"},
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"mountPath": {
+										Type: "string",
+									},
+									"targetContainers": {
+										Type: "array",
+										Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"volumeSource": {
+										Type: "object",
+									},
+									"subPath": {
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			"status": {

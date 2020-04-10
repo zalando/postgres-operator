@@ -500,7 +500,7 @@ func mountShmVolumeNeeded(opConfig config.Config, spec *acidv1.PostgresSpec) *bo
 	return opConfig.ShmVolume
 }
 
-func generatePodTemplate(
+func (c *Cluster) generatePodTemplate(
 	namespace string,
 	labels labels.Set,
 	annotations map[string]string,
@@ -520,6 +520,7 @@ func generatePodTemplate(
 	additionalSecretMount string,
 	additionalSecretMountPath string,
 	volumes []v1.Volume,
+	additionalVolumes []acidv1.AdditionalVolume,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -557,6 +558,10 @@ func generatePodTemplate(
 
 	if additionalSecretMount != "" {
 		addSecretVolume(&podSpec, additionalSecretMount, additionalSecretMountPath)
+	}
+
+	if additionalVolumes != nil {
+		c.addAdditionalVolumes(&podSpec, additionalVolumes)
 	}
 
 	template := v1.PodTemplateSpec{
@@ -1084,7 +1089,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	annotations := c.generatePodAnnotations(spec)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
-	podTemplate, err = generatePodTemplate(
+	podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
 		annotations,
@@ -1104,7 +1109,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		volumes,
-	)
+		spec.AdditionalVolumes)
+
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
 	}
@@ -1292,6 +1298,69 @@ func addSecretVolume(podSpec *v1.PodSpec, additionalSecretMount string, addition
 				Name:      additionalSecretMount,
 				MountPath: additionalSecretMountPath,
 			})
+		podSpec.Containers[i].VolumeMounts = mounts
+	}
+
+	podSpec.Volumes = volumes
+}
+
+func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
+	additionalVolumes []acidv1.AdditionalVolume) {
+
+	volumes := podSpec.Volumes
+	mountPaths := map[string]acidv1.AdditionalVolume{}
+	for i, v := range additionalVolumes {
+		if previousVolume, exist := mountPaths[v.MountPath]; exist {
+			msg := "Volume %+v cannot be mounted to the same path as %+v"
+			c.logger.Warningf(msg, v, previousVolume)
+			continue
+		}
+
+		if v.MountPath == constants.PostgresDataMount {
+			msg := "Cannot mount volume on postgresql data directory, %+v"
+			c.logger.Warningf(msg, v)
+			continue
+		}
+
+		if v.TargetContainers == nil {
+			spiloContainer := podSpec.Containers[0]
+			additionalVolumes[i].TargetContainers = []string{spiloContainer.Name}
+		}
+
+		for _, target := range v.TargetContainers {
+			if target == "all" && len(v.TargetContainers) != 1 {
+				msg := `Target containers could be either "all" or a list
+						of containers, mixing those is not allowed, %+v`
+				c.logger.Warningf(msg, v)
+				continue
+			}
+		}
+
+		volumes = append(volumes,
+			v1.Volume{
+				Name:         v.Name,
+				VolumeSource: v.VolumeSource,
+			},
+		)
+
+		mountPaths[v.MountPath] = v
+	}
+
+	c.logger.Infof("Mount additional volumes: %+v", additionalVolumes)
+
+	for i := range podSpec.Containers {
+		mounts := podSpec.Containers[i].VolumeMounts
+		for _, v := range additionalVolumes {
+			for _, target := range v.TargetContainers {
+				if podSpec.Containers[i].Name == target || target == "all" {
+					mounts = append(mounts, v1.VolumeMount{
+						Name:      v.Name,
+						MountPath: v.MountPath,
+						SubPath:   v.SubPath,
+					})
+				}
+			}
+		}
 		podSpec.Containers[i].VolumeMounts = mounts
 	}
 
@@ -1702,7 +1771,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	annotations := c.generatePodAnnotations(&c.Spec)
 
 	// re-use the method that generates DB pod templates
-	if podTemplate, err = generatePodTemplate(
+	if podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
 		labels,
 		annotations,
@@ -1721,8 +1790,9 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		"",
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		nil); err != nil {
-		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
+		nil,
+		[]acidv1.AdditionalVolume{}); err != nil {
+			return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
 	// overwrite specific params of logical backups pods

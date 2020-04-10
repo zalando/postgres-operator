@@ -67,6 +67,7 @@ type PostgresSpec struct {
 	PodAnnotations        map[string]string    `json:"podAnnotations"`
 	ServiceAnnotations    map[string]string    `json:"serviceAnnotations"`
 	TLS                   *TLSDescription      `json:"tls"`
+	AdditionalVolumes     []AdditionalVolume   `json:"additionalVolumes,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -96,6 +97,14 @@ type Volume struct {
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass"`
 	SubPath      string `json:"subPath,omitempty"`
+}
+
+type AdditionalVolume struct {
+	Name             string          `json:"name"`
+	MountPath        string          `json:"mountPath"`
+	SubPath          string          `json:"subPath"`
+	TargetContainers []string        `json:"targetContainers"`
+	VolumeSource     v1.VolumeSource `json:"volume"`
 }
 
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.

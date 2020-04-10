@@ -12,6 +12,29 @@ spec:
   volume:
     size: 1Gi
 #    storageClass: my-sc
+  additionalVolumes:
+    - name: data
+      mountPath: /home/postgres/pgdata/partitions
+      targetContainers:
+        - postgres
+      volumeSource:
+        PersistentVolumeClaim:
+          claimName: pvc-postgresql-data-partitions
+          readyOnly: false
+    - name: conf
+      mountPath: /etc/telegraf
+      subPath: telegraf.conf
+      targetContainers:
+        - telegraf-sidecar
+      volumeSource:
+        configMap:
+          name: my-config-map
+    - name: empty
+      mountPath: /opt/empty
+      targetContainers:
+        - all
+      volumeSource:
+        emptyDir: {}
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:
