@@ -301,6 +301,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 						Type:    "string",
 						Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
 					},
+					"logicalBackupExcludeTablePatterns": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
+					},
 					"maintenanceWindows": {
 						Type: "array",
 						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
