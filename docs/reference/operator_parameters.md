@@ -80,6 +80,12 @@ Those are top-level keys, containing both leaf keys and groups.
   Patroni native Kubernetes support is used. The default is empty (use
   Kubernetes-native DCS).
 
+* **kubernetes_use_configmaps**
+  Select if setup uses endpoints (default), or configmaps to manage leader when
+  DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to
+  use endpoints option, and configmaps is required. By default,
+  `kubernetes_use_configmaps: false`, meaning endpoints will be used.
+
 * **docker_image**
   Spilo Docker image for Postgres instances. For production, don't rely on the
   default image, as it might be not the most up-to-date one. Instead, build
@@ -132,7 +138,7 @@ Those are top-level keys, containing both leaf keys and groups.
   The default is `false`.
 
 * **enable_unused_pvc_deletion**
-  Tells the operator to delete persistent volume claims of no longer running pods. That removes respective persistent volumes because operator configures them with the 'Delete' reclaim policy. Note operator deletes unused PVCs for clusters created both before and after this option is turned on. Deletion is not guaranteed: When it fails, operator retries at next Sync() event.
+  Tells the operator to delete persistent volume claims of no longer running pods. That removes respective persistent volumes because the operator configures them with the 'Delete' reclaim policy. The operator deletes unused PVCs for clusters created both before and after this option is turned on. Deletion is not guaranteed: When it fails, operator retries at the next Sync() event.
   The default is `false`.
 
 ## Postgres users
@@ -601,39 +607,42 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
 * **scalyr_memory_limit**
   Memory limit value for the Scalyr sidecar. The default is `500Mi`.
 
-## Connection pool configuration
+## Connection pooler configuration
 
-Parameters are grouped under the `connection_pool` top-level key and specify
-default configuration for connection pool, if a postgres manifest requests it
+Parameters are grouped under the `connection_pooler` top-level key and specify
+default configuration for connection pooler, if a postgres manifest requests it
 but do not specify some of the parameters. All of them are optional with the
 operator being able to provide some reasonable defaults.
 
-* **connection_pool_number_of_instances**
-  How many instances of connection pool to create. Default is 2 which is also
+* **connection_pooler_number_of_instances**
+  How many instances of connection pooler to create. Default is 2 which is also
   the required minimum.
 
-* **connection_pool_schema**
-  Schema to create for credentials lookup function. Default is `pooler`.
+* **connection_pooler_schema**
+  Database schema to create for credentials lookup function to be used by the
+  connection pooler. Is is created in every database of the Postgres cluster.
+  You can also choose an existing schema. Default schema is `pooler`.
 
-* **connection_pool_user**
-  User to create for connection pool to be able to connect to a database.
-  Default is `pooler`.
+* **connection_pooler_user**
+  User to create for connection pooler to be able to connect to a database.
+  You can also choose an existing role, but make sure it has the `LOGIN`
+  privilege. Default role is `pooler`.
 
-* **connection_pool_image**
-  Docker image to use for connection pool deployment.
+* **connection_pooler_image**
+  Docker image to use for connection pooler deployment.
   Default: "registry.opensource.zalan.do/acid/pgbouncer"
 
-* **connection_pool_max_db_connections**
+* **connection_pooler_max_db_connections**
   How many connections the pooler can max hold. This value is divided among the
   pooler pods. Default is 60 which will make up 30 connections per pod for the
   default setup with two instances.
 
-* **connection_pool_mode**
-  Default pool mode, `session` or `transaction`. Default is `transaction`.
+* **connection_pooler_mode**
+  Default pooler mode, `session` or `transaction`. Default is `transaction`.
 
-* **connection_pool_default_cpu_request**
-  **connection_pool_default_memory_reques**
-  **connection_pool_default_cpu_limit**
-  **connection_pool_default_memory_limit**
-  Default resource configuration for connection pool deployment. The internal
+* **connection_pooler_default_cpu_request**
+  **connection_pooler_default_memory_reques**
+  **connection_pooler_default_cpu_limit**
+  **connection_pooler_default_memory_limit**
+  Default resource configuration for connection pooler deployment. The internal
   default for memory request and limit is `100Mi`, for CPU it is `500m` and `1`.

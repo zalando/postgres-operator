@@ -65,16 +65,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 					"locale":         "en_US.UTF-8",
 					"data-checksums": "true",
 				},
-				PgHba:                []string{"hostssl all all 0.0.0.0/0 md5", "host    all all 0.0.0.0/0 md5"},
-				TTL:                  30,
-				LoopWait:             10,
-				RetryTimeout:         10,
-				MaximumLagOnFailover: 33554432,
-				Slots:                map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
+				PgHba:                 []string{"hostssl all all 0.0.0.0/0 md5", "host    all all 0.0.0.0/0 md5"},
+				TTL:                   30,
+				LoopWait:              10,
+				RetryTimeout:          10,
+				MaximumLagOnFailover:  33554432,
+				SynchronousMode:       true,
+				SynchronousModeStrict: true,
+				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 			},
 			role:     "zalandos",
 			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -587,38 +589,38 @@ func TestSecretVolume(t *testing.T) {
 
 func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
-	if cpuReq.String() != cluster.OpConfig.ConnectionPool.ConnPoolDefaultCPURequest {
+	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
 		return fmt.Errorf("CPU request doesn't match, got %s, expected %s",
-			cpuReq.String(), cluster.OpConfig.ConnectionPool.ConnPoolDefaultCPURequest)
+			cpuReq.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest)
 	}
 
 	memReq := podSpec.Spec.Containers[0].Resources.Requests["memory"]
-	if memReq.String() != cluster.OpConfig.ConnectionPool.ConnPoolDefaultMemoryRequest {
+	if memReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest {
 		return fmt.Errorf("Memory request doesn't match, got %s, expected %s",
-			memReq.String(), cluster.OpConfig.ConnectionPool.ConnPoolDefaultMemoryRequest)
+			memReq.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest)
 	}
 
 	cpuLim := podSpec.Spec.Containers[0].Resources.Limits["cpu"]
-	if cpuLim.String() != cluster.OpConfig.ConnectionPool.ConnPoolDefaultCPULimit {
+	if cpuLim.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPULimit {
 		return fmt.Errorf("CPU limit doesn't match, got %s, expected %s",
-			cpuLim.String(), cluster.OpConfig.ConnectionPool.ConnPoolDefaultCPULimit)
+			cpuLim.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPULimit)
 	}
 
 	memLim := podSpec.Spec.Containers[0].Resources.Limits["memory"]
-	if memLim.String() != cluster.OpConfig.ConnectionPool.ConnPoolDefaultMemoryLimit {
+	if memLim.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit {
 		return fmt.Errorf("Memory limit doesn't match, got %s, expected %s",
-			memLim.String(), cluster.OpConfig.ConnectionPool.ConnPoolDefaultMemoryLimit)
+			memLim.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit)
 	}
 
 	return nil
 }
 
 func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
-	poolLabels := podSpec.ObjectMeta.Labels["connection-pool"]
+	poolerLabels := podSpec.ObjectMeta.Labels["connection-pooler"]
 
-	if poolLabels != cluster.connPoolLabelsSelector().MatchLabels["connection-pool"] {
+	if poolerLabels != cluster.connectionPoolerLabelsSelector().MatchLabels["connection-pooler"] {
 		return fmt.Errorf("Pod labels do not match, got %+v, expected %+v",
-			podSpec.ObjectMeta.Labels, cluster.connPoolLabelsSelector().MatchLabels)
+			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector().MatchLabels)
 	}
 
 	return nil
@@ -626,13 +628,13 @@ func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 
 func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	required := map[string]bool{
-		"PGHOST":               false,
-		"PGPORT":               false,
-		"PGUSER":               false,
-		"PGSCHEMA":             false,
-		"PGPASSWORD":           false,
-		"CONNECTION_POOL_MODE": false,
-		"CONNECTION_POOL_PORT": false,
+		"PGHOST":                 false,
+		"PGPORT":                 false,
+		"PGUSER":                 false,
+		"PGSCHEMA":               false,
+		"PGPASSWORD":             false,
+		"CONNECTION_POOLER_MODE": false,
+		"CONNECTION_POOLER_PORT": false,
 	}
 
 	envs := podSpec.Spec.Containers[0].Env
@@ -658,8 +660,8 @@ func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error 
 	return nil
 }
 
-func TestConnPoolPodSpec(t *testing.T) {
-	testName := "Test connection pool pod template generation"
+func TestConnectionPoolerPodSpec(t *testing.T) {
+	testName := "Test connection pooler pod template generation"
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -668,12 +670,12 @@ func TestConnPoolPodSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
-				ConnectionPool: config.ConnectionPool{
-					MaxDBConnections:             int32ToPointer(60),
-					ConnPoolDefaultCPURequest:    "100m",
-					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100Mi",
-					ConnPoolDefaultMemoryLimit:   "100Mi",
+				ConnectionPooler: config.ConnectionPooler{
+					MaxDBConnections:                     int32ToPointer(60),
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
@@ -686,7 +688,7 @@ func TestConnPoolPodSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
-				ConnectionPool: config.ConnectionPool{},
+				ConnectionPooler: config.ConnectionPooler{},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
 
@@ -702,7 +704,7 @@ func TestConnPoolPodSpec(t *testing.T) {
 		{
 			subTest: "default configuration",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -711,7 +713,7 @@ func TestConnPoolPodSpec(t *testing.T) {
 		{
 			subTest: "no default resources",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			expected: errors.New(`could not generate resource requirements: could not fill resource requests: could not parse default CPU quantity: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`),
 			cluster:  clusterNoDefaultRes,
@@ -720,7 +722,7 @@ func TestConnPoolPodSpec(t *testing.T) {
 		{
 			subTest: "default resources are set",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -729,7 +731,7 @@ func TestConnPoolPodSpec(t *testing.T) {
 		{
 			subTest: "labels for service",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -738,7 +740,7 @@ func TestConnPoolPodSpec(t *testing.T) {
 		{
 			subTest: "required envs",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -746,7 +748,7 @@ func TestConnPoolPodSpec(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		podSpec, err := tt.cluster.generateConnPoolPodTemplate(tt.spec)
+		podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(tt.spec)
 
 		if err != tt.expected && err.Error() != tt.expected.Error() {
 			t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
@@ -774,9 +776,9 @@ func testDeploymentOwnwerReference(cluster *Cluster, deployment *appsv1.Deployme
 
 func testSelector(cluster *Cluster, deployment *appsv1.Deployment) error {
 	labels := deployment.Spec.Selector.MatchLabels
-	expected := cluster.connPoolLabelsSelector().MatchLabels
+	expected := cluster.connectionPoolerLabelsSelector().MatchLabels
 
-	if labels["connection-pool"] != expected["connection-pool"] {
+	if labels["connection-pooler"] != expected["connection-pooler"] {
 		return fmt.Errorf("Labels are incorrect, got %+v, expected %+v",
 			labels, expected)
 	}
@@ -784,8 +786,8 @@ func testSelector(cluster *Cluster, deployment *appsv1.Deployment) error {
 	return nil
 }
 
-func TestConnPoolDeploymentSpec(t *testing.T) {
-	testName := "Test connection pool deployment spec generation"
+func TestConnectionPoolerDeploymentSpec(t *testing.T) {
+	testName := "Test connection pooler deployment spec generation"
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -794,11 +796,11 @@ func TestConnPoolDeploymentSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
-				ConnectionPool: config.ConnectionPool{
-					ConnPoolDefaultCPURequest:    "100m",
-					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100Mi",
-					ConnPoolDefaultMemoryLimit:   "100Mi",
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
@@ -822,7 +824,7 @@ func TestConnPoolDeploymentSpec(t *testing.T) {
 		{
 			subTest: "default configuration",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -831,7 +833,7 @@ func TestConnPoolDeploymentSpec(t *testing.T) {
 		{
 			subTest: "owner reference",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -840,7 +842,7 @@ func TestConnPoolDeploymentSpec(t *testing.T) {
 		{
 			subTest: "selector",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -848,7 +850,7 @@ func TestConnPoolDeploymentSpec(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		deployment, err := tt.cluster.generateConnPoolDeployment(tt.spec)
+		deployment, err := tt.cluster.generateConnectionPoolerDeployment(tt.spec)
 
 		if err != tt.expected && err.Error() != tt.expected.Error() {
 			t.Errorf("%s [%s]: Could not generate deployment spec,\n %+v, expected\n %+v",
@@ -877,16 +879,16 @@ func testServiceOwnwerReference(cluster *Cluster, service *v1.Service) error {
 func testServiceSelector(cluster *Cluster, service *v1.Service) error {
 	selector := service.Spec.Selector
 
-	if selector["connection-pool"] != cluster.connPoolName() {
+	if selector["connection-pooler"] != cluster.connectionPoolerName() {
 		return fmt.Errorf("Selector is incorrect, got %s, expected %s",
-			selector["connection-pool"], cluster.connPoolName())
+			selector["connection-pooler"], cluster.connectionPoolerName())
 	}
 
 	return nil
 }
 
-func TestConnPoolServiceSpec(t *testing.T) {
-	testName := "Test connection pool service spec generation"
+func TestConnectionPoolerServiceSpec(t *testing.T) {
+	testName := "Test connection pooler service spec generation"
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -895,11 +897,11 @@ func TestConnPoolServiceSpec(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
-				ConnectionPool: config.ConnectionPool{
-					ConnPoolDefaultCPURequest:    "100m",
-					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100Mi",
-					ConnPoolDefaultMemoryLimit:   "100Mi",
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
@@ -922,7 +924,7 @@ func TestConnPoolServiceSpec(t *testing.T) {
 		{
 			subTest: "default configuration",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			cluster: cluster,
 			check:   noCheck,
@@ -930,7 +932,7 @@ func TestConnPoolServiceSpec(t *testing.T) {
 		{
 			subTest: "owner reference",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			cluster: cluster,
 			check:   testServiceOwnwerReference,
@@ -938,14 +940,14 @@ func TestConnPoolServiceSpec(t *testing.T) {
 		{
 			subTest: "selector",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPool: &acidv1.ConnectionPool{},
+				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			cluster: cluster,
 			check:   testServiceSelector,
 		},
 	}
 	for _, tt := range tests {
-		service := tt.cluster.generateConnPoolService(tt.spec)
+		service := tt.cluster.generateConnectionPoolerService(tt.spec)
 
 		if err := tt.check(cluster, service); err != nil {
 			t.Errorf("%s [%s]: Service spec is incorrect, %+v",
@@ -958,6 +960,7 @@ func TestTLS(t *testing.T) {
 	var err error
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
+	var spiloFSGroup = int64(103)
 
 	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
@@ -981,6 +984,9 @@ func TestTLS(t *testing.T) {
 				Auth: config.Auth{
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					SpiloFSGroup: &spiloFSGroup,
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)

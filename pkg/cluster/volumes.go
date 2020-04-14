@@ -15,6 +15,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
+	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
 )
 
@@ -50,6 +51,33 @@ func (c *Cluster) deletePersistentVolumeClaims() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) deleteUnusedPersistentVolumeClaims() {
+
+	c.logger.Debug("deleting pvc of shut down pods")
+
+	// Scaling down to 0 replicas is not cluster deletion so keep the last pvc.
+	// Operator will remove it only when explicit "kubectl pg delete" is issued
+	if c.getNumberOfInstances(&c.Spec) == 0 {
+		c.logger.Info("cluster scaled down to 0 pods; skipping deletion of the last pvc")
+		return
+	}
+
+	// XXX that also deletes PVC of pods shut down before this change is deployed
+	for i := c.getNumberOfInstances(&c.Spec); ; i++ {
+		podIndex := strconv.Itoa(int(i))
+		pvcName := "pgdata-" + c.Name + "-" + podIndex
+		if err := c.KubeClient.PersistentVolumeClaims(c.Namespace).Delete(context.TODO(), pvcName, c.deleteOptions); err != nil {
+			if k8sutil.ResourceNotFound(err) {
+				// no more pvcs to delete
+				break
+			}
+			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
+			// next Sync() will retry
+		}
+	}
+
 }
 
 func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {

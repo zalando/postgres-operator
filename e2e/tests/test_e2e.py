@@ -71,32 +71,32 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_enable_disable_connection_pool(self):
+    def test_enable_disable_connection_pooler(self):
         '''
-        For a database without connection pool, then turns it on, scale up,
+        For a database without connection pooler, then turns it on, scale up,
         turn off and on again. Test with different ways of doing this (via
-        enableConnectionPool or connectionPool configuration section). At the
-        end turn the connection pool off to not interfere with other tests.
+        enableConnectionPooler or connectionPooler configuration section). At
+        the end turn connection pooler off to not interfere with other tests.
         '''
         k8s = self.k8s
         service_labels = {
             'cluster-name': 'acid-minimal-cluster',
         }
         pod_labels = dict({
-            'connection-pool': 'acid-minimal-cluster-pooler',
+            'connection-pooler': 'acid-minimal-cluster-pooler',
         })
 
         pod_selector = to_selector(pod_labels)
         service_selector = to_selector(service_labels)
 
         try:
-            # enable connection pool
+            # enable connection pooler
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 'acid.zalan.do', 'v1', 'default',
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'enableConnectionPool': True,
+                        'enableConnectionPooler': True,
                     }
                 })
             k8s.wait_for_pod_start(pod_selector)
@@ -105,7 +105,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'default', label_selector=pod_selector
             ).items
 
-            self.assertTrue(pods, 'No connection pool pods')
+            self.assertTrue(pods, 'No connection pooler pods')
 
             k8s.wait_for_service(service_selector)
             services = k8s.api.core_v1.list_namespaced_service(
@@ -116,15 +116,15 @@ class EndToEndTestCase(unittest.TestCase):
                 if s.metadata.name.endswith('pooler')
             ]
 
-            self.assertTrue(services, 'No connection pool service')
+            self.assertTrue(services, 'No connection pooler service')
 
-            # scale up connection pool deployment
+            # scale up connection pooler deployment
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 'acid.zalan.do', 'v1', 'default',
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'connectionPool': {
+                        'connectionPooler': {
                             'numberOfInstances': 2,
                         },
                     }
@@ -138,7 +138,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'enableConnectionPool': False,
+                        'enableConnectionPooler': False,
                     }
                 })
             k8s.wait_for_pods_to_stop(pod_selector)
@@ -148,7 +148,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'enableConnectionPool': True,
+                        'enableConnectionPooler': True,
                     }
                 })
             k8s.wait_for_pod_start(pod_selector)
@@ -516,20 +516,11 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.assert_running_pods_have_volumes()
 
-        # Update() deletes pvc on scale down
-        # we do not use wait_for_pg_to_scale here because it waits until a pod is completely gone
-        # we want to capture a potential situation where a pod is in Terminating state
-        # but its pvc is already being deleted
-        # TODO that needs a more thourough test at the DB level
-        k8s.change_number_of_instances(1)
-        k8s.wait_for_pvc_deletion("pgdata-acid-minimal-cluster-1")
-
-        self.assert_running_pods_have_volumes()
-
         # pvc with index 0 must stay around when cluster has 0 pods
         last_pvc_name = "pgdata-acid-minimal-cluster-0"
         volume_before_scaledown = k8s.get_volume_name(last_pvc_name)
         k8s.wait_for_pg_to_scale(0)
+        k8s.update_config(patch) # force a Sync to delete unused PVCs
         self.assertTrue(k8s.pvc_exist(last_pvc_name), "The last pvc was deleted")
 
         # sanity check
@@ -538,6 +529,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(volume_before_scaledown,
                          volume_after_scaleup,
                          "the surviving pvc must have the same volume before scale down to 0 and after scale up")
+
+        self.assert_running_pods_have_volumes()
 
         # clean up
         patch = {
