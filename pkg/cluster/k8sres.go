@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -1802,6 +1803,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
 			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
+		{
+			Name:  "LOGICAL_BACKUP_EXCLUDE_TABLE_PATTERNS",
+			Value: strings.Join(c.Postgresql.Spec.LogicalBackupExcludeTablePatterns, ","),
 		},
 		// Postgres env vars
 		{

@@ -4,7 +4,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-IFS=$'\n\t'
+IFS=$'\n\t '
 
 ALL_DB_SIZE_QUERY="select sum(pg_database_size(datname)::numeric) from pg_database;"
 PG_BIN=$PG_DIR/$PG_VERSION/bin
@@ -20,8 +20,19 @@ function estimate_size {
 }
 
 function dump {
-    # settings are taken from the environment
-    "$PG_BIN"/pg_dumpall
+    for DB_NAME in $(psql -q -A -t -c "SELECT datname FROM pg_database");do
+        if [[ "${DB_NAME}" =~ ^(template0|template1)$ ]]; then
+            continue
+        fi
+
+        exclude_table_args=()
+        for pattern in ${LOGICAL_BACKUP_EXCLUDE_TABLE_PATTERNS//,/ };do
+            exclude_table_args+=("--exclude-table=${pattern}")
+        done
+
+        # settings are taken from the environment
+        "$PG_BIN"/pg_dump "${exclude_table_args[@]//\'/}" ${DB_NAME}
+    done
 }
 
 function compress {

@@ -154,6 +154,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Optional. Default is: "30 00 \* \* \*"
 
+* **logicalBackupExcludeTablePatterns**
+  Exclude table patterns for logical backup. Will be passed to pg_dump's
+  `--exclude-table` argument. Optional. Default is to backup everything.
+
 ## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key, which is

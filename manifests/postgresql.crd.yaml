@@ -151,6 +151,10 @@ spec:
             logicalBackupSchedule:
               type: string
               pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
+            logicalBackupExcludeTablePatterns:
+              type: array
+              items:
+                type: string
             maintenanceWindows:
               type: array
               items:
