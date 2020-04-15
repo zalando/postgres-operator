@@ -513,6 +513,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"caFile": {
 								Type: "string",
 							},
+							"caSecretName": {
+								Type: "string",
+							},
 						},
 					},
 					"tolerations": {

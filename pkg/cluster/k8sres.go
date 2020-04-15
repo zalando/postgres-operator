@@ -519,7 +519,6 @@ func (c *Cluster) generatePodTemplate(
 	podAntiAffinityTopologyKey string,
 	additionalSecretMount string,
 	additionalSecretMountPath string,
-	volumes []v1.Volume,
 	additionalVolumes []acidv1.AdditionalVolume,
 ) (*v1.PodTemplateSpec, error) {
 
@@ -539,7 +538,6 @@ func (c *Cluster) generatePodTemplate(
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
 		SecurityContext:               &securityContext,
-		Volumes:                       volumes,
 	}
 
 	if shmVolume != nil && *shmVolume {
@@ -854,7 +852,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		sidecarContainers   []v1.Container
 		podTemplate         *v1.PodTemplateSpec
 		volumeClaimTemplate *v1.PersistentVolumeClaim
-		volumes             []v1.Volume
+		additionalVolumes   = spec.AdditionalVolumes
 	)
 
 	// Improve me. Please.
@@ -1007,21 +1005,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		// this is combined with the FSGroup in the section above
 		// to give read access to the postgres user
 		defaultMode := int32(0640)
-		volumes = append(volumes, v1.Volume{
-			Name: "tls-secret",
+		mountPath := "/tls"
+		additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
+			Name:      spec.TLS.SecretName,
+			MountPath: mountPath,
 			VolumeSource: v1.VolumeSource{
 				Secret: &v1.SecretVolumeSource{
 					SecretName:  spec.TLS.SecretName,
 					DefaultMode: &defaultMode,
 				},
 			},
-		})
-
-		mountPath := "/tls"
-		volumeMounts = append(volumeMounts, v1.VolumeMount{
-			MountPath: mountPath,
-			Name:      "tls-secret",
-			ReadOnly:  true,
 		})
 
 		// use the same filenames as Secret resources by default
@@ -1034,11 +1027,31 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		)
 
 		if spec.TLS.CAFile != "" {
-			caFile := ensurePath(spec.TLS.CAFile, mountPath, "")
+			// support scenario when the ca.crt resides in a different secret, diff path
+			mountPathCA := mountPath
+			if spec.TLS.CASecretName != "" {
+				mountPathCA = mountPath + "ca"
+			}
+
+			caFile := ensurePath(spec.TLS.CAFile, mountPathCA, "")
 			spiloEnvVars = append(
 				spiloEnvVars,
 				v1.EnvVar{Name: "SSL_CA_FILE", Value: caFile},
 			)
+
+			// the ca file from CASecretName secret takes priority
+			if spec.TLS.CASecretName != "" {
+				additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
+					Name:      spec.TLS.CASecretName,
+					MountPath: mountPathCA,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  spec.TLS.CASecretName,
+							DefaultMode: &defaultMode,
+						},
+					},
+				})
+			}
 		}
 	}
 
@@ -1108,8 +1121,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.PodAntiAffinityTopologyKey,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		volumes,
-		spec.AdditionalVolumes)
+		additionalVolumes)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
@@ -1614,11 +1626,11 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			c.logger.Info(msg, description.S3WalPath)
 
 			envs := []v1.EnvVar{
-				v1.EnvVar{
+				{
 					Name:  "CLONE_WAL_S3_BUCKET",
 					Value: c.OpConfig.WALES3Bucket,
 				},
-				v1.EnvVar{
+				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 					Value: getBucketScopeSuffix(description.UID),
 				},
@@ -1790,7 +1802,6 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		"",
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		nil,
 		[]acidv1.AdditionalVolume{}); err != nil {
 			return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
