@@ -961,6 +961,7 @@ func TestTLS(t *testing.T) {
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
 	var spiloFSGroup = int64(103)
+	var additionalVolumes = spec.AdditionalVolumes
 
 	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
@@ -1000,8 +1001,20 @@ func TestTLS(t *testing.T) {
 	assert.Equal(t, &fsGroup, s.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
 
 	defaultMode := int32(0640)
+	mountPath := "/tls"
+	additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
+		Name:      spec.TLS.SecretName,
+		MountPath: mountPath,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  spec.TLS.SecretName,
+				DefaultMode: &defaultMode,
+			},
+		},
+	})
+
 	volume := v1.Volume{
-		Name: "tls-secret",
+		Name: "my-secret",
 		VolumeSource: v1.VolumeSource{
 			Secret: &v1.SecretVolumeSource{
 				SecretName:  "my-secret",
@@ -1013,8 +1026,7 @@ func TestTLS(t *testing.T) {
 
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
 		MountPath: "/tls",
-		Name:      "tls-secret",
-		ReadOnly:  true,
+		Name:      "my-secret",
 	}, "the volume gets mounted in /tls")
 
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})

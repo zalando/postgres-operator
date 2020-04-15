@@ -148,6 +148,7 @@ type TLSDescription struct {
 	CertificateFile string `json:"certificateFile,omitempty"`
 	PrivateKeyFile  string `json:"privateKeyFile,omitempty"`
 	CAFile          string `json:"caFile,omitempty"`
+	CASecretName    string `json:"caSecretName,omitempty"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time
