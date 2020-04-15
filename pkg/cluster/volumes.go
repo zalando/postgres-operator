@@ -57,14 +57,14 @@ func (c *Cluster) deleteUnusedPersistentVolumeClaims() {
 
 	c.logger.Debug("deleting pvc of shut down pods")
 
-	// Scaling down to 0 replicas is not cluster deletion so keep the last pvc.
-	// Operator will remove it only when explicit "kubectl pg delete" is issued
+	// Scaling down to 0 replicas is not cluster deletion so keep the last PVC
+	// Operator removes it only when explicit "kubectl pg delete" is issued
 	if c.getNumberOfInstances(&c.Spec) == 0 {
 		c.logger.Info("cluster scaled down to 0 pods; skipping deletion of the last pvc")
 		return
 	}
 
-	// XXX that also deletes PVC of pods shut down before this change is deployed
+	// XXX also deletes PVCs of pods shut down before this change is deployed
 	for i := c.getNumberOfInstances(&c.Spec); ; i++ {
 		podIndex := strconv.Itoa(int(i))
 		pvcName := "pgdata-" + c.Name + "-" + podIndex

@@ -110,8 +110,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// remove unused PVCs in case deleting them during scale down failed; see Update()
-	// the last pvc stays until the cluster is explicitly deleted as opposed to being scaled down to 0 pods
+	// remove PVCs of shut down pods
+	// the last PVC stays until the cluster is explicitly deleted as opposed to scaled down to 0 pods
 	if c.OpConfig.EnableUnusedPVCDeletion && c.getNumberOfInstances(&c.Spec) > 0 {
 		c.deleteUnusedPersistentVolumeClaims()
 	}
