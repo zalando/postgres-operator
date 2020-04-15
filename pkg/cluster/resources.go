@@ -105,7 +105,12 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 	var msg string
 	c.setProcessName("creating connection pooler")
 
+	if c.ConnectionPooler == nil {
+		c.ConnectionPooler = &ConnectionPoolerObjects{}
+	}
+
 	schema := c.Spec.ConnectionPooler.Schema
+
 	if schema == "" {
 		schema = c.OpConfig.ConnectionPooler.Schema
 	}

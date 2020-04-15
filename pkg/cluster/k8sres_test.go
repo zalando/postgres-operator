@@ -1021,3 +1021,172 @@ func TestTLS(t *testing.T) {
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
 }
+
+func TestAdditionalVolume(t *testing.T) {
+	testName := "TestAdditionalVolume"
+	tests := []struct {
+		subTest   string
+		podSpec   *v1.PodSpec
+		volumePos int
+	}{
+		{
+			subTest: "empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{},
+					},
+				},
+			},
+			volumePos: 0,
+		},
+		{
+			subTest: "non empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			volumePos: 1,
+		},
+		{
+			subTest: "non empty PodSpec with sidecar",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+					{
+						Name: "sidecar",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			volumePos: 1,
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	for _, tt := range tests {
+		// Test with additional volume mounted in all containers
+		additionalVolumeMount := []acidv1.AdditionalVolume{
+			{
+				Name:             "test",
+				MountPath:        "/test",
+				TargetContainers: []string{"all"},
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
+
+		if volumeName != additionalVolumeMount[0].Name {
+			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
+				testName, tt.subTest, additionalVolumeMount, volumeName)
+		}
+
+		for i := range tt.podSpec.Containers {
+			volumeMountName := tt.podSpec.Containers[i].VolumeMounts[tt.volumePos].Name
+
+			if volumeMountName != additionalVolumeMount[0].Name {
+				t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
+					testName, tt.subTest, additionalVolumeMount, volumeMountName)
+			}
+
+		}
+
+		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		if numMountsCheck != numMounts+1 {
+			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+				numMountsCheck, numMounts+1)
+		}
+	}
+
+	for _, tt := range tests {
+		// Test with additional volume mounted only in first container
+		additionalVolumeMount := []acidv1.AdditionalVolume{
+			{
+				Name:             "test",
+				MountPath:        "/test",
+				TargetContainers: []string{"postgres"},
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
+
+		if volumeName != additionalVolumeMount[0].Name {
+			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
+				testName, tt.subTest, additionalVolumeMount, volumeName)
+		}
+
+		for _, container := range tt.podSpec.Containers {
+			if container.Name == "postgres" {
+				volumeMountName := container.VolumeMounts[tt.volumePos].Name
+
+				if volumeMountName != additionalVolumeMount[0].Name {
+					t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
+						testName, tt.subTest, additionalVolumeMount, volumeMountName)
+				}
+
+				numMountsCheck := len(container.VolumeMounts)
+				if numMountsCheck != numMounts+1 {
+					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+						numMountsCheck, numMounts+1)
+				}
+			} else {
+				numMountsCheck := len(container.VolumeMounts)
+				if numMountsCheck == numMounts+1 {
+					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+						numMountsCheck, numMounts)
+				}
+			}
+		}
+	}
+}
