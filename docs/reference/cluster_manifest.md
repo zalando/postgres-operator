@@ -435,5 +435,12 @@ Those parameters are grouped under the `tls` top-level key.
   client connects with `sslmode=verify-ca` or `sslmode=verify-full`.
   Default is empty.
 
+* **caSecretName**
+  By setting the `caSecretName` value, the ca certificate file defined by the
+  `caFile` will be fetched from this secret instead of `secretName` above.
+  This secret has to hold a file with that name in its root.
+
   Optionally one can provide full path for any of them. By default it is
   relative to the "/tls/", which is mount path of the tls secret.
+  If `caSecretName` is defined, the ca.crt path is relative to "/tlsca/",
+  otherwise to the same "/tls/".

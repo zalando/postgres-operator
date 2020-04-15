@@ -9,6 +9,24 @@ metadata:
 spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
   teamId: "acid"
+  numberOfInstances: 2
+  users:  # Application/Robot users
+    zalando:
+    - superuser
+    - createdb
+  enableMasterLoadBalancer: false
+  enableReplicaLoadBalancer: false
+#  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
+  allowedSourceRanges:  # load balancers' source ranges for both master and replica services
+  - 127.0.0.1/32
+  databases:
+    foo: zalando
+  postgresql:
+    version: "12"
+    parameters: # Expert section
+      shared_buffers: "32MB"
+      max_connections: "10"
+      log_statement: "all"
   volume:
     size: 1Gi
 #    storageClass: my-sc
@@ -35,24 +53,6 @@ spec:
         - all
       volumeSource:
         emptyDir: {}
-  numberOfInstances: 2
-  users:  # Application/Robot users
-    zalando:
-    - superuser
-    - createdb
-  enableMasterLoadBalancer: false
-  enableReplicaLoadBalancer: false
-#  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
-  allowedSourceRanges:  # load balancers' source ranges for both master and replica services
-  - 127.0.0.1/32
-  databases:
-    foo: zalando
-  postgresql:
-    version: "12"
-    parameters: # Expert section
-      shared_buffers: "32MB"
-      max_connections: "10"
-      log_statement: "all"
 
   enableShmVolume: true
 #  spiloFSGroup: 103
@@ -148,8 +148,10 @@ spec:
     certificateFile: "tls.crt"
     privateKeyFile: "tls.key"
     caFile: ""  # optionally configure Postgres with a CA certificate
+    caSecretName: "" # optionally the ca.crt can come from this secret instead.
 # file names can be also defined with absolute path, and will no longer be relative
-# to the "/tls/" path where the secret is being mounted by default.
+# to the "/tls/" path where the secret is being mounted by default, and "/tlsca/"
+# where the caSecret is mounted by default.
 # When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
 # if unknown, set it to 103 which is the usual value in the default spilo images.
 # In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.

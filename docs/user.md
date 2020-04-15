@@ -585,7 +585,7 @@ OpenShift allocates the users and groups dynamically (based on scc), and their
 range is different in every namespace. Due to this dynamic behaviour, it's not
 trivial to know at deploy time the uid/gid of the user in the cluster.
 Therefore, instead of using a global `spilo_fsgroup` setting, use the `spiloFSGroup` field
-per Postgres cluster.```
+per Postgres cluster.
 
 Upload the cert as a kubernetes secret:
 ```sh
@@ -594,16 +594,13 @@ kubectl create secret tls pg-tls \
   --cert pg-tls.crt
 ```
 
-Or with a CA:
+When doing client auth, CA can come optionally from the same secret:
 ```sh
 kubectl create secret generic pg-tls \
   --from-file=tls.crt=server.crt \
   --from-file=tls.key=server.key \
   --from-file=ca.crt=ca.crt
 ```
-
-Alternatively it is also possible to use
-[cert-manager](https://cert-manager.io/docs/) to generate these secrets.
 
 Then configure the postgres resource with the TLS secret:
 
@@ -618,6 +615,30 @@ spec:
     secretName: "pg-tls"
     caFile: "ca.crt" # add this if the secret is configured with a CA
 ```
+
+Optionally, the CA can be provided by a different secret:
+```sh
+kubectl create secret generic pg-tls-ca \
+  --from-file=ca.crt=ca.crt
+```
+
+Then configure the postgres resource with the TLS secret:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+
+metadata:
+  name: acid-test-cluster
+spec:
+  tls:
+    secretName: "pg-tls"    # this should hold tls.key and tls.crt
+    caSecretName: "pg-tls-ca" # this should hold ca.crt
+    caFile: "ca.crt" # add this if the secret is configured with a CA
+```
+
+Alternatively, it is also possible to use
+[cert-manager](https://cert-manager.io/docs/) to generate these secrets.
 
 Certificate rotation is handled in the spilo image which checks every 5
 minutes if the certificates have changed and reloads postgres accordingly.
