@@ -783,8 +783,10 @@ func (c *Cluster) Delete() {
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
-		if err := c.deleteEndpoint(role); err != nil {
-			c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+		if !c.patroniKubernetesUseConfigMaps() {
+			if err := c.deleteEndpoint(role); err != nil {
+				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+			}
 		}
 
 		if err := c.deleteService(role); err != nil {
@@ -1160,11 +1162,21 @@ type clusterObjectDelete func(name string) error
 
 func (c *Cluster) deletePatroniClusterObjects() error {
 	// TODO: figure out how to remove leftover patroni objects in other cases
+	var actionsList []simpleActionWithResult
+
 	if !c.patroniUsesKubernetes() {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
-	c.logger.Debugf("removing leftover Patroni objects (endpoints, services and configmaps)")
-	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps} {
+
+	if c.patroniKubernetesUseConfigMaps() {
+		actionsList = []simpleActionWithResult{c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps}
+		c.logger.Debugf("removing leftover Patroni objects (services and configmaps)")
+	} else {
+		c.logger.Debugf("removing leftover Patroni objects (endpoints, services and configmaps)")
+		actionsList = []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps}
+	}
+
+	for _, deleter := range actionsList {
 		if err := deleter(); err != nil {
 			return err
 		}

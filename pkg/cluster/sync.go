@@ -122,10 +122,11 @@ func (c *Cluster) syncServices() error {
 	for _, role := range []PostgresRole{Master, Replica} {
 		c.logger.Debugf("syncing %s service", role)
 
-		if err := c.syncEndpoint(role); err != nil {
-			return fmt.Errorf("could not sync %s endpoint: %v", role, err)
+		if !c.patroniKubernetesUseConfigMaps() {
+			if err := c.syncEndpoint(role); err != nil {
+				return fmt.Errorf("could not sync %s endpoint: %v", role, err)
+			}
 		}
-
 		if err := c.syncService(role); err != nil {
 			return fmt.Errorf("could not sync %s service: %v", role, err)
 		}
