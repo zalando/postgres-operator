@@ -207,8 +207,8 @@ class EndToEndTestCase(unittest.TestCase):
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
         '''
-        Test lazy upgrade for the Spilo image: operator changes a stateful set but lets pods run with the old image 
-        until they are recreated for reasons other than operator's activity. That works because the operator uses 
+        Test lazy upgrade for the Spilo image: operator changes a stateful set but lets pods run with the old image
+        until they are recreated for reasons other than operator's activity. That works because the operator uses
         "onDelete" pod update policy for stateful sets.
 
         The test covers:
@@ -230,13 +230,13 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_lazy_spilo_upgrade)
 
-        # restart the pod to get a container with the new image 
+        # restart the pod to get a container with the new image
         k8s.api.core_v1.delete_namespaced_pod(pod0, "default")
-        k8s.wait_for_running_pods('version=acid-minimal-cluster', 2)
+        k8s.wait_for_running_pods('cluster-name=acid-minimal-cluster', 2)
 
         # sanity check: restarted pod runs the image specified in operator's conf
         new_image = k8s.get_effective_pod_image(pod0)
-        self.assertEqual(conf_image, new_image, 
+        self.assertEqual(conf_image, new_image,
             "Lazy upgrade failed: restarted pod runs image {} different from the one in operator conf {}".format(new_image, conf_image))
 
         # lazy update works if the restarted pod and older pods have different Spilo versions
@@ -783,7 +783,7 @@ class K8s:
 
     def get_effective_pod_image(self, pod_name, namespace = 'default'):
         '''
-        Get the Spilo image pod currently uses. In case of lazy rolling updates 
+        Get the Spilo image pod currently uses. In case of lazy rolling updates
         it may differ from the one specified in the stateful set.
         '''
         pod = self.api.core_v1.list_namespaced_pod(
