@@ -1173,6 +1173,7 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 	}
 	actionsList = append(actionList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
 
+	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
 	for _, deleter := range actionsList {
 		if err := deleter(); err != nil {
 			return err
