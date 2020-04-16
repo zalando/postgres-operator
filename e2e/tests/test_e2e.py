@@ -268,7 +268,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(0, len(jobs),
                          "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
-
+    """
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_safe_pod_recreation(self):
         '''
@@ -326,7 +326,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(masterPod.spec.containers[0].resources.requests['cpu'], "100m",
                          "Expected CPU requests {}, found {}"
                          .format("100cpu", masterPod.spec.containers[0].resources.requests['cpu']))
-
+    """
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):
