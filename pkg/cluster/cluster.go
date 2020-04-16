@@ -741,7 +741,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pooler
-	if err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
+	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
+		c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 

@@ -111,7 +111,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pooler
-	if err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
+	if _, err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
@@ -620,7 +620,13 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	return nil
 }
 
-func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, lookup InstallFunction) error {
+func (c *Cluster) syncConnectionPooler(oldSpec,
+	newSpec *acidv1.Postgresql,
+	lookup InstallFunction) (SyncReason, error) {
+
+	var reason SyncReason
+	var err error
+
 	if c.ConnectionPooler == nil {
 		c.ConnectionPooler = &ConnectionPoolerObjects{}
 	}
@@ -657,20 +663,20 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 				specUser,
 				c.OpConfig.ConnectionPooler.User)
 
-			if err := lookup(schema, user); err != nil {
-				return err
+			if err = lookup(schema, user); err != nil {
+				return NoSync, err
 			}
 		}
 
-		if err := c.syncConnectionPoolerWorker(oldSpec, newSpec); err != nil {
+		if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec); err != nil {
 			c.logger.Errorf("could not sync connection pooler: %v", err)
-			return err
+			return reason, err
 		}
 	}
 
 	if oldNeedConnectionPooler && !newNeedConnectionPooler {
 		// delete and cleanup resources
-		if err := c.deleteConnectionPooler(); err != nil {
+		if err = c.deleteConnectionPooler(); err != nil {
 			c.logger.Warningf("could not remove connection pooler: %v", err)
 		}
 	}
@@ -681,20 +687,22 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 			(c.ConnectionPooler.Deployment != nil ||
 				c.ConnectionPooler.Service != nil) {
 
-			if err := c.deleteConnectionPooler(); err != nil {
+			if err = c.deleteConnectionPooler(); err != nil {
 				c.logger.Warningf("could not remove connection pooler: %v", err)
 			}
 		}
 	}
 
-	return nil
+	return reason, nil
 }
 
 // Synchronize connection pooler resources. Effectively we're interested only in
 // synchronizing the corresponding deployment, but in case of deployment or
 // service is missing, create it. After checking, also remember an object for
 // the future references.
-func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql) error {
+func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql) (
+	SyncReason, error) {
+
 	deployment, err := c.KubeClient.
 		Deployments(c.Namespace).
 		Get(context.TODO(), c.connectionPoolerName(), metav1.GetOptions{})
@@ -706,7 +714,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		deploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec)
 		if err != nil {
 			msg = "could not generate deployment for connection pooler: %v"
-			return fmt.Errorf(msg, err)
+			return NoSync, fmt.Errorf(msg, err)
 		}
 
 		deployment, err := c.KubeClient.
@@ -714,18 +722,35 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
 
 		if err != nil {
-			return err
+			return NoSync, err
 		}
 
 		c.ConnectionPooler.Deployment = deployment
 	} else if err != nil {
-		return fmt.Errorf("could not get connection pooler deployment to sync: %v", err)
+		msg := "could not get connection pooler deployment to sync: %v"
+		return NoSync, fmt.Errorf(msg, err)
 	} else {
 		c.ConnectionPooler.Deployment = deployment
 
 		// actual synchronization
 		oldConnectionPooler := oldSpec.Spec.ConnectionPooler
 		newConnectionPooler := newSpec.Spec.ConnectionPooler
+
+		// sync implementation below assumes that both old and new specs are
+		// not nil, but it can happen. To avoid any confusion like updating a
+		// deployment because the specification changed from nil to an empty
+		// struct (that was initialized somewhere before) replace any nil with
+		// an empty spec.
+		if oldConnectionPooler == nil {
+			oldConnectionPooler = &acidv1.ConnectionPooler{}
+		}
+
+		if newConnectionPooler == nil {
+			newConnectionPooler = &acidv1.ConnectionPooler{}
+		}
+
+		c.logger.Infof("Old: %+v, New %+v", oldConnectionPooler, newConnectionPooler)
+
 		specSync, specReason := c.needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, deployment)
 		reason := append(specReason, defaultsReason...)
@@ -736,7 +761,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec)
 			if err != nil {
 				msg := "could not generate deployment for connection pooler: %v"
-				return fmt.Errorf(msg, err)
+				return reason, fmt.Errorf(msg, err)
 			}
 
 			oldDeploymentSpec := c.ConnectionPooler.Deployment
@@ -746,11 +771,11 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 				newDeploymentSpec)
 
 			if err != nil {
-				return err
+				return reason, err
 			}
 
 			c.ConnectionPooler.Deployment = deployment
-			return nil
+			return reason, nil
 		}
 	}
 
@@ -768,16 +793,17 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 
 		if err != nil {
-			return err
+			return NoSync, err
 		}
 
 		c.ConnectionPooler.Service = service
 	} else if err != nil {
-		return fmt.Errorf("could not get connection pooler service to sync: %v", err)
+		msg := "could not get connection pooler service to sync: %v"
+		return NoSync, fmt.Errorf(msg, err)
 	} else {
 		// Service updates are not supported and probably not that useful anyway
 		c.ConnectionPooler.Service = service
 	}
 
-	return nil
+	return NoSync, nil
 }
