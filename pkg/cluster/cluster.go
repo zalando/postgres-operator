@@ -1169,12 +1169,9 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 	}
 
 	if c.patroniKubernetesUseConfigMaps() {
-		actionsList = []simpleActionWithResult{c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps}
-		c.logger.Debugf("removing leftover Patroni objects (services and configmaps)")
-	} else {
-		c.logger.Debugf("removing leftover Patroni objects (endpoints, services and configmaps)")
-		actionsList = []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps}
+		actionsList = append(actionList, c.deletePatroniClusterEndpoints)
 	}
+	actionsList = append(actionList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
 
 	for _, deleter := range actionsList {
 		if err := deleter(); err != nil {
