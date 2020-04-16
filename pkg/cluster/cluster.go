@@ -1168,10 +1168,10 @@ func (c *Cluster) deletePatroniClusterObjects() error {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
 
-	if c.patroniKubernetesUseConfigMaps() {
-		actionsList = append(actionList, c.deletePatroniClusterEndpoints)
+	if !c.patroniKubernetesUseConfigMaps() {
+		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
 	}
-	actionsList = append(actionList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
+	actionsList = append(actionsList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
 
 	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
 	for _, deleter := range actionsList {
