@@ -627,7 +627,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         pods = k8s.list_pods(labels)
         for pod in pods:
-            pgdata = [v for v in pod.spec.volumes if v.name == 'pgdata']
+            pgdata = [v for v in pod.spec.volumes if 'pgdata' in v.name]
             self.assertTrue(len(pgdata) > 0, "No pgdata volumes found")
             if len(pgdata) > 0:
                 pvc = pgdata[0].persistent_volume_claim
