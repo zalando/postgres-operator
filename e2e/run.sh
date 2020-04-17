@@ -10,6 +10,7 @@ cd $(dirname "$0");
 
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
+readonly spilo_test_image="registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16"
 
 function pull_images(){
 
@@ -38,6 +39,7 @@ function start_kind(){
   kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
   kind load docker-image "${operator_image}" --name ${cluster_name}
   kind load docker-image "${e2e_test_image}" --name ${cluster_name}
+  kind load docker-image "${spilo_test_image}" --name ${cluster_name}
   KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
   export KUBECONFIG
 }

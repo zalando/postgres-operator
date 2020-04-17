@@ -19,7 +19,7 @@ class EndToEndTestCase(unittest.TestCase):
     '''
 
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
-    TEST_TIMEOUT_SEC = 1000
+    TEST_TIMEOUT_SEC = 600
 
     @classmethod
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
