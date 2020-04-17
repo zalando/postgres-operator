@@ -498,7 +498,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_running_pods_have_volumes()
 
         # get extra unused pvcs to test Sync
-        k8s.wait_for_pg_to_scale(4)
+        k8s.wait_for_pg_to_scale(3)
         k8s.wait_for_pg_to_scale(2)
 
         # enable pvc deletion
@@ -510,9 +510,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(patch)
 
         # Sync() at operator start-up deletes unused pvcs that had existed before
-        unused_pvcs = ["pgdata-acid-minimal-cluster-2", "pgdata-acid-minimal-cluster-3"]
-        for pvc in unused_pvcs:
-            k8s.wait_for_pvc_deletion(pvc)
+        unused_pvc = "pgdata-acid-minimal-cluster-2"
+        k8s.wait_for_pvc_deletion(unused_pvc)
 
         self.assert_running_pods_have_volumes()
 
@@ -520,7 +519,7 @@ class EndToEndTestCase(unittest.TestCase):
         last_pvc_name = "pgdata-acid-minimal-cluster-0"
         volume_before_scaledown = k8s.get_volume_name(last_pvc_name)
         k8s.wait_for_pg_to_scale(0)
-        k8s.update_config(patch) # force a Sync to delete unused PVCs
+        k8s.restart_operator()  # force a Sync to delete unused PVCs
         self.assertTrue(k8s.pvc_exist(last_pvc_name), "The last pvc was deleted")
 
         # sanity check
@@ -543,7 +542,7 @@ class EndToEndTestCase(unittest.TestCase):
         # disablement of the feature actually stops volume deletion
         k8s.wait_for_pg_to_scale(2)
         self.assert_running_pods_have_volumes()
-        self.assertTrue(k8s.pvc_exist("pgdata-acid-minimal-cluster-2"),
+        self.assertTrue(k8s.pvc_exist(unused_pvc),
                         "The pvc of a shut down pod was deleted despite the feature is disabled")
 
     def get_failover_targets(self, master_node, replica_nodes):
@@ -796,7 +795,9 @@ class K8s:
 
     def update_config(self, config_map_patch):
         self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
+        self.restart_operator()
 
+    def restart_operator(self):
         operator_pod = self.api.core_v1.list_namespaced_pod(
             'default', label_selector="name=postgres-operator").items[0].metadata.name
         self.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf and issues Sync()
