@@ -228,7 +228,7 @@ class EndToEndTestCase(unittest.TestCase):
             if pod.metadata.labels.get('spilo-role') == 'master':
                 master_pod = pod.metadata.name
             elif pod.metadata.labels.get('spilo-role') == 'replica':
-                k8s.api.core_v1.delete_namespaced_pod(pod, 'default')
+                k8s.api.core_v1.delete_namespaced_pod(pod.metadata.name, 'default')
                 k8s.wait_for_pod_start('spilo-role=replica')
                 replica_pod = pod.metadata.name
 
