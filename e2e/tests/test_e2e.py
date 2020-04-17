@@ -223,12 +223,12 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(patch_lazy_spilo_upgrade)
 
         # restart the pod to get a container with the new image
-        podsList = k8s.api.core_v1.list_namespaced_pod(namespace, label_selector=pg_cluster_name)
+        podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
         for pod in podsList.items:
             if pod.metadata.labels.get('spilo-role') == 'master':
                 master_pod = pod.metadata.name
             elif pod.metadata.labels.get('spilo-role') == 'replica':
-                k8s.api.core_v1.delete_namespaced_pod(pod, "default")
+                k8s.api.core_v1.delete_namespaced_pod(pod, 'default')
                 k8s.wait_for_pod_start('spilo-role=replica')
                 replica_pod = pod.metadata.name
 
