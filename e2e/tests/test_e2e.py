@@ -142,15 +142,6 @@ class EndToEndTestCase(unittest.TestCase):
                 })
             k8s.wait_for_pods_to_stop(pod_selector)
 
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'enableConnectionPooler': True,
-                    }
-                })
-            k8s.wait_for_pod_start(pod_selector)
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
@@ -217,11 +208,12 @@ class EndToEndTestCase(unittest.TestCase):
         '''
 
         k8s = self.k8s
-        pod0 = "acid-minimal-cluster-0"
-        pod1 = "acid-minimal-cluster-1"
+        master_pod = ""
+        replica_pod = ""
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
 
         # enable lazy update
-        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p112"
+        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p111"
         patch_lazy_spilo_upgrade = {
             "data": {
                 "enable_lazy_spilo_upgrade": "true",
@@ -231,17 +223,23 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(patch_lazy_spilo_upgrade)
 
         # restart the pod to get a container with the new image
-        k8s.api.core_v1.delete_namespaced_pod(pod0, "default")
-        k8s.wait_for_running_pods('cluster-name=acid-minimal-cluster', 2)
+        podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pg_cluster_name)
+        for pod in podsList.items:
+            if pod.metadata.labels.get('spilo-role') == 'master':
+                master_pod = pod.metadata.name
+            elif pod.metadata.labels.get('spilo-role') == 'replica':
+                k8s.api.core_v1.delete_namespaced_pod(pod, "default")
+                k8s.wait_for_pod_start('spilo-role=replica')
+                replica_pod = pod.metadata.name
 
         # sanity check: restarted pod runs the image specified in operator's conf
-        new_image = k8s.get_effective_pod_image(pod0)
+        new_image = k8s.get_effective_pod_image(replica_pod)
         self.assertEqual(conf_image, new_image,
             "Lazy upgrade failed: restarted pod runs image {} different from the one in operator conf {}".format(new_image, conf_image))
 
         # lazy update works if the restarted pod and older pods have different Spilo versions
         # i.e. the update did not immediately affect all pods
-        old_image = k8s.get_effective_pod_image(pod1)
+        old_image = k8s.get_effective_pod_image(master_pod)
         self.assertNotEqual(old_image, new_image, "Lazy updated failed: pods have the same image {}".format(new_image))
 
         # clean up
@@ -257,8 +255,8 @@ class EndToEndTestCase(unittest.TestCase):
         # XXX there is no easy way to wait until the end of Sync()
         time.sleep(60)
 
-        image0 = k8s.get_effective_pod_image(pod0)
-        image1 = k8s.get_effective_pod_image(pod1)
+        image0 = k8s.get_effective_pod_image(replica_pod)
+        image1 = k8s.get_effective_pod_image(master_pod)
 
         self.assertEqual(image0, image1, "Disabling lazy upgrade failed: pods still have different images {} and {}".format(image0, image1))
 
