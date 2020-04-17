@@ -223,7 +223,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(patch_lazy_spilo_upgrade)
 
         # restart the pod to get a container with the new image
-        podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pg_cluster_name)
+        podsList = k8s.api.core_v1.list_namespaced_pod(namespace, label_selector=pg_cluster_name)
         for pod in podsList.items:
             if pod.metadata.labels.get('spilo-role') == 'master':
                 master_pod = pod.metadata.name
