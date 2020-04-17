@@ -221,7 +221,7 @@ class EndToEndTestCase(unittest.TestCase):
         pod1 = "acid-minimal-cluster-1"
 
         # enable lazy update
-        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16"
+        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p112"
         patch_lazy_spilo_upgrade = {
             "data": {
                 "enable_lazy_spilo_upgrade": "true",
