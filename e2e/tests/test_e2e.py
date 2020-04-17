@@ -627,11 +627,11 @@ class EndToEndTestCase(unittest.TestCase):
 
         pods = k8s.list_pods(labels)
         for pod in pods:
-            pgdata = [v for v in pod.spec.volumes if 'pgdata' in v.name]
-            self.assertTrue(len(pgdata) > 0, "No pgdata volumes found")
-            if len(pgdata) > 0:
-                pvc = pgdata[0].persistent_volume_claim
-                self.assertTrue(k8s.pvc_exist(pvc.claim_name), "PVC does not exist")
+            if pod.metadata.labels.get('spilo-role') in ['master', 'replica']:
+                pgdata = [v for v in pod.spec.volumes if 'pgdata' in v.name]
+                if len(pgdata) > 0:
+                    pvc = pgdata[0].persistent_volume_claim
+                    self.assertTrue(k8s.pvc_exist(pvc.claim_name), "PVC does not exist")
 
 
 class K8sApi:
