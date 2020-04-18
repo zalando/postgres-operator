@@ -228,9 +228,9 @@ class EndToEndTestCase(unittest.TestCase):
             if pod.metadata.labels.get('spilo-role') == 'master':
                 master_pod = pod.metadata.name
             elif pod.metadata.labels.get('spilo-role') == 'replica':
-                k8s.api.core_v1.delete_namespaced_pod(pod.metadata.name, 'default')
-                k8s.wait_for_pod_start('spilo-role=replica')
                 replica_pod = pod.metadata.name
+                k8s.api.core_v1.delete_namespaced_pod(replica_pod, 'default')
+                k8s.wait_for_pod_start('spilo-role=replica')
 
         # sanity check: restarted pod runs the image specified in operator's conf
         new_image = k8s.get_effective_pod_image(replica_pod)
