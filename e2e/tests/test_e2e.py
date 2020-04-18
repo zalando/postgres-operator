@@ -235,7 +235,7 @@ class EndToEndTestCase(unittest.TestCase):
         # sanity check: restarted pod runs the image specified in operator's conf
         new_image = k8s.get_effective_pod_image(replica_pod)
         self.assertEqual(conf_image, new_image,
-            "Lazy upgrade failed: restarted pod runs image {} different from the one in operator conf {}".format(new_image, conf_image))
+            "Lazy upgrade failed: restarted pod {} runs image {} different from the one in operator conf {}".format(replica_pod, new_image, conf_image))
 
         # lazy update works if the restarted pod and older pods have different Spilo versions
         # i.e. the update did not immediately affect all pods
