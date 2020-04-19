@@ -79,7 +79,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					NumberOfInstances:                    int32ToPointer(1),
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	cluster.Statefulset = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
