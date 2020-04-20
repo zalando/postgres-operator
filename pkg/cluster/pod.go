@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -339,14 +340,20 @@ func (c *Cluster) recreatePods() error {
 	)
 	replicas := make([]spec.NamespacedName, 0)
 	for i, pod := range pods.Items {
+		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+
+		// final check if spec of running pod differs from template
+		if reflect.DeepEqual(pod.Spec, c.Statefulset.Spec.Template.Spec) {
+			c.logger.Infof("%q pod %q already updated", role, podName)
+			continue
+		}
 
 		if role == Master {
 			masterPod = &pods.Items[i]
 			continue
 		}
 
-		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
 		if newPod, err = c.recreatePod(podName); err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 		}
