@@ -344,7 +344,6 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        labels = 'spilo-role=master,' + cluster_label
         readiness_label = 'lifecycle-status'
         readiness_value = 'ready'
 
@@ -727,7 +726,6 @@ class K8s:
 
     def get_patroni_state(self, pod):
         return pod.metadata.annotations["status"]["state"]
-
 
 
 if __name__ == '__main__':
