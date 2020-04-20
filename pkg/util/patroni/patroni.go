@@ -26,7 +26,7 @@ const (
 type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
-	GetNodeState(pod *v1.Pod) (string, error)
+	GetPatroniMemberState(pod *v1.Pod) (string, error)
 }
 
 // Patroni API client
@@ -126,8 +126,8 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
 }
 
-//GetNodeState returns node state reported by Patroni API call.
-func (p *Patroni) GetNodeState(server *v1.Pod) (string, error) {
+//GetPatroniMemberState returns node state reported by Patroni API call.
+func (p *Patroni) GetPatroniMemberState(server *v1.Pod) (string, error) {
 
 	apiURLString, err := apiURL(server)
 	if err != nil {
