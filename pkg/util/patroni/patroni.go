@@ -126,7 +126,7 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
 }
 
-//GetPatroniMemberState returns node state reported by Patroni API call.
+//GetPatroniMemberState returns a state of member of a Patroni cluster
 func (p *Patroni) GetPatroniMemberState(server *v1.Pod) (string, error) {
 
 	apiURLString, err := apiURL(server)

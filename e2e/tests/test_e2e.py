@@ -724,9 +724,6 @@ class K8s:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
 
-    def get_patroni_state(self, pod):
-        return pod.metadata.annotations["status"]["state"]
-
 
 if __name__ == '__main__':
     unittest.main()
