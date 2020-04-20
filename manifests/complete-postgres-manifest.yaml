@@ -9,9 +9,6 @@ metadata:
 spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
   teamId: "acid"
-  volume:
-    size: 1Gi
-#    storageClass: my-sc
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:
@@ -30,6 +27,32 @@ spec:
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
+  volume:
+    size: 1Gi
+#    storageClass: my-sc
+  additionalVolumes:
+    - name: data
+      mountPath: /home/postgres/pgdata/partitions
+      targetContainers:
+        - postgres
+      volumeSource:
+        PersistentVolumeClaim:
+          claimName: pvc-postgresql-data-partitions
+          readyOnly: false
+    - name: conf
+      mountPath: /etc/telegraf
+      subPath: telegraf.conf
+      targetContainers:
+        - telegraf-sidecar
+      volumeSource:
+        configMap:
+          name: my-config-map
+    - name: empty
+      mountPath: /opt/empty
+      targetContainers:
+        - all
+      volumeSource:
+        emptyDir: {}
 
   enableShmVolume: true
 #  spiloFSGroup: 103
@@ -67,6 +90,8 @@ spec:
     ttl: 30
     loop_wait: &loop_wait 10
     retry_timeout: 10
+    synchronous_mode: false
+    synchronous_mode_strict: false
     maximum_lag_on_failover: 33554432
 
 # restore a Postgres DB with point-in-time-recovery
@@ -123,5 +148,10 @@ spec:
     certificateFile: "tls.crt"
     privateKeyFile: "tls.key"
     caFile: ""  # optionally configure Postgres with a CA certificate
+    caSecretName: "" # optionally the ca.crt can come from this secret instead.
+# file names can be also defined with absolute path, and will no longer be relative
+# to the "/tls/" path where the secret is being mounted by default, and "/tlsca/"
+# where the caSecret is mounted by default.
 # When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
 # if unknown, set it to 103 which is the usual value in the default spilo images.
+# In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.

@@ -741,7 +741,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pooler
-	if err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
+	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
+		c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
@@ -783,8 +784,10 @@ func (c *Cluster) Delete() {
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
-		if err := c.deleteEndpoint(role); err != nil {
-			c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+		if !c.patroniKubernetesUseConfigMaps() {
+			if err := c.deleteEndpoint(role); err != nil {
+				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+			}
 		}
 
 		if err := c.deleteService(role); err != nil {
@@ -877,9 +880,20 @@ func (c *Cluster) initSystemUsers() {
 			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		username := util.Coalesce(
-			c.Spec.ConnectionPooler.User,
-			c.OpConfig.ConnectionPooler.User)
+		// Using superuser as pooler user is not a good idea. First of all it's
+		// not going to be synced correctly with the current implementation,
+		// and second it's a bad practice.
+		username := c.OpConfig.ConnectionPooler.User
+
+		isSuperUser := c.Spec.ConnectionPooler.User == c.OpConfig.SuperUsername
+		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
+			c.Spec.ConnectionPooler.User, "connection pool role")
+
+		if !isSuperUser && !isProtectedUser {
+			username = util.Coalesce(
+				c.Spec.ConnectionPooler.User,
+				c.OpConfig.ConnectionPooler.User)
+		}
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{
@@ -1149,11 +1163,19 @@ type clusterObjectDelete func(name string) error
 
 func (c *Cluster) deletePatroniClusterObjects() error {
 	// TODO: figure out how to remove leftover patroni objects in other cases
+	var actionsList []simpleActionWithResult
+
 	if !c.patroniUsesKubernetes() {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
-	c.logger.Debugf("removing leftover Patroni objects (endpoints, services and configmaps)")
-	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps} {
+
+	if !c.patroniKubernetesUseConfigMaps() {
+		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
+	}
+	actionsList = append(actionsList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
+
+	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
+	for _, deleter := range actionsList {
 		if err := deleter(); err != nil {
 			return err
 		}

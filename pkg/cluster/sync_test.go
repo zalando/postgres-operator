@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -17,7 +18,7 @@ func int32ToPointer(value int32) *int32 {
 	return &value
 }
 
-func deploymentUpdated(cluster *Cluster, err error) error {
+func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
 	if cluster.ConnectionPooler.Deployment.Spec.Replicas == nil ||
 		*cluster.ConnectionPooler.Deployment.Spec.Replicas != 2 {
 		return fmt.Errorf("Wrong nubmer of instances")
@@ -26,7 +27,7 @@ func deploymentUpdated(cluster *Cluster, err error) error {
 	return nil
 }
 
-func objectsAreSaved(cluster *Cluster, err error) error {
+func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 	if cluster.ConnectionPooler == nil {
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
@@ -42,9 +43,19 @@ func objectsAreSaved(cluster *Cluster, err error) error {
 	return nil
 }
 
-func objectsAreDeleted(cluster *Cluster, err error) error {
+func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
 	if cluster.ConnectionPooler != nil {
 		return fmt.Errorf("Connection pooler was not deleted")
+	}
+
+	return nil
+}
+
+func noEmptySync(cluster *Cluster, err error, reason SyncReason) error {
+	for _, msg := range reason {
+		if strings.HasPrefix(msg, "update [] from '<nil>' to '") {
+			return fmt.Errorf("There is an empty reason, %s", msg)
+		}
 	}
 
 	return nil
@@ -91,15 +102,15 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 
 	clusterNewDefaultsMock := *cluster
 	clusterNewDefaultsMock.KubeClient = k8sutil.NewMockKubernetesClient()
-	cluster.OpConfig.ConnectionPooler.Image = "pooler:2.0"
-	cluster.OpConfig.ConnectionPooler.NumberOfInstances = int32ToPointer(2)
 
 	tests := []struct {
-		subTest string
-		oldSpec *acidv1.Postgresql
-		newSpec *acidv1.Postgresql
-		cluster *Cluster
-		check   func(cluster *Cluster, err error) error
+		subTest          string
+		oldSpec          *acidv1.Postgresql
+		newSpec          *acidv1.Postgresql
+		cluster          *Cluster
+		defaultImage     string
+		defaultInstances int32
+		check            func(cluster *Cluster, err error, reason SyncReason) error
 	}{
 		{
 			subTest: "create if doesn't exist",
@@ -113,8 +124,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster: &clusterMissingObjects,
-			check:   objectsAreSaved,
+			cluster:          &clusterMissingObjects,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreSaved,
 		},
 		{
 			subTest: "create if doesn't exist with a flag",
@@ -126,8 +139,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					EnableConnectionPooler: boolToPointer(true),
 				},
 			},
-			cluster: &clusterMissingObjects,
-			check:   objectsAreSaved,
+			cluster:          &clusterMissingObjects,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreSaved,
 		},
 		{
 			subTest: "create from scratch",
@@ -139,8 +154,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster: &clusterMissingObjects,
-			check:   objectsAreSaved,
+			cluster:          &clusterMissingObjects,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreSaved,
 		},
 		{
 			subTest: "delete if not needed",
@@ -152,8 +169,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
-			cluster: &clusterMock,
-			check:   objectsAreDeleted,
+			cluster:          &clusterMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreDeleted,
 		},
 		{
 			subTest: "cleanup if still there",
@@ -163,8 +182,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
-			cluster: &clusterDirtyMock,
-			check:   objectsAreDeleted,
+			cluster:          &clusterDirtyMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreDeleted,
 		},
 		{
 			subTest: "update deployment",
@@ -182,8 +203,10 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					},
 				},
 			},
-			cluster: &clusterMock,
-			check:   deploymentUpdated,
+			cluster:          &clusterMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            deploymentUpdated,
 		},
 		{
 			subTest: "update image from changed defaults",
@@ -197,14 +220,40 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster: &clusterNewDefaultsMock,
-			check:   deploymentUpdated,
+			cluster:          &clusterNewDefaultsMock,
+			defaultImage:     "pooler:2.0",
+			defaultInstances: 2,
+			check:            deploymentUpdated,
+		},
+		{
+			subTest: "there is no sync from nil to an empty spec",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					EnableConnectionPooler: boolToPointer(true),
+					ConnectionPooler:       nil,
+				},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					EnableConnectionPooler: boolToPointer(true),
+					ConnectionPooler:       &acidv1.ConnectionPooler{},
+				},
+			},
+			cluster:          &clusterMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            noEmptySync,
 		},
 	}
 	for _, tt := range tests {
-		err := tt.cluster.syncConnectionPooler(tt.oldSpec, tt.newSpec, mockInstallLookupFunction)
+		tt.cluster.OpConfig.ConnectionPooler.Image = tt.defaultImage
+		tt.cluster.OpConfig.ConnectionPooler.NumberOfInstances =
+			int32ToPointer(tt.defaultInstances)
 
-		if err := tt.check(tt.cluster, err); err != nil {
+		reason, err := tt.cluster.syncConnectionPooler(tt.oldSpec,
+			tt.newSpec, mockInstallLookupFunction)
+
+		if err := tt.check(tt.cluster, err, reason); err != nil {
 			t.Errorf("%s [%s]: Could not synchronize, %+v",
 				testName, tt.subTest, err)
 		}
