@@ -268,66 +268,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertEqual(0, len(jobs),
                          "Expected 0 logical backup jobs, found {}".format(len(jobs)))
 
-    """
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_safe_pod_recreation(self):
-        '''
-        Operator skips pods re-creation if there is at least one pod for which patroni reports "creating replica" state
-        '''
-
-        k8s = self.k8s
-        nodes = self.get_pg_nodes()
-
-         # get test data for re-init
-        master = nodes[0]
-        cmd = 'pgbench -i -s 30 -n'
-        k8s.exec_into_pod(master, cmd)
-
-        # start reinit
-        replica = nodes[1][0]
-        cmd = 'patronictl reinit $SCOPE ' + replica
-        k8s.exec_into_pod(master, cmd)
-
-        # force rolling upgrade
-        patch = {
-            "spec": {
-                "resources": {
-                    "requests": {
-                        "cpu": "100m",
-                        "memory": "50Mi"
-                    },
-                    "limits": {
-                        "cpu": "200m",
-                        "memory": "200Mi"
-                    }
-                }
-            }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", patch)
-
-        replica_state = ""
-        while replica_state != "running":
-            replica_state = k8s.get_patroni_state(self, replica)
-            time.sleep(k8s.RETRY_TIMEOUT_SEC)
-
-        # next Sync does the update
-        k8s.delete_operator_pod()
-        k8s.wait_for_pod_start('spilo-role=replica')
-
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        labels = 'spilo-role=master,' + cluster_label
-
-        pods = k8s.api.core_v1.list_namespaced_pod(
-            'default', label_selector=labels).items
-        self.assert_master_is_unique()
-        masterPod = pods[0]
-
-        self.assertEqual(masterPod.spec.containers[0].resources.requests['cpu'], "100m",
-                         "Expected CPU requests {}, found {}"
-                         .format("100cpu", masterPod.spec.containers[0].resources.requests['cpu']))
-    """
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):
         '''
