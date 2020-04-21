@@ -343,7 +343,7 @@ func (c *Cluster) recreatePods() error {
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
 		// final check if spec of running pod differs from template
-		if pod.ObjectMeta.Labels["controller-revision-hash"] == c.Statefulset.Status.CurrentRevision {
+		if pod.ObjectMeta.Labels["controller-revision-hash"] == c.Statefulset.Status.UpdateRevision {
 			c.logger.Infof("%q pod %q already updated", role, podName)
 			continue
 		}
