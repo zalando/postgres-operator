@@ -1095,6 +1095,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	if globalSidecarContainersByDockerImage, err = generateSidecarContainers(globalSidecarsByDockerImage, defaultResources, len(clusterSpecificSidecars), c.logger); err != nil {
 		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
 	}
+	// make the resulting list reproducible
+	// c.OpConfig.SidecarImages is unsorted by Golang definition
+	// .Name is unique
+	sort.Slice(globalSidecarContainersByDockerImage, func(i, j int) bool {
+		return globalSidecarContainersByDockerImage[i].Name < globalSidecarContainersByDockerImage[j].Name
+	})
 
 	// generate scalyr sidecar container
 	var scalyrSidecars []v1.Container
@@ -1818,7 +1824,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		[]acidv1.AdditionalVolume{}); err != nil {
-			return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
+		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
 	// overwrite specific params of logical backups pods
