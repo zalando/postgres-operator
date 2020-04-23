@@ -237,7 +237,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
 			lg.Error(cl.Error)
-			c.eventRecorder.Eventf(&cl.Postgresql, v1.EventTypeWarning, "Create", "%v", cl.Error)
+			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Create", "%v", cl.Error)
 
 			return
 		}
@@ -277,7 +277,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 		cl.Delete()
 		// Fixme - no error handling for delete ?
-		// c.eventRecorder.Eventf(&cl.Postgresql, v1.EventTypeWarning, "Delete", "%v", cl.Error)
+		// c.eventRecorder.Eventf(cl.GetReference, v1.EventTypeWarning, "Delete", "%v", cl.Error)
 
 		func() {
 			defer c.clustersMu.Unlock()
@@ -308,7 +308,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 		if err := cl.Sync(event.NewSpec); err != nil {
 			cl.Error = fmt.Sprintf("could not sync cluster: %v", err)
-			c.eventRecorder.Eventf(&cl.Postgresql, v1.EventTypeWarning, "Sync", "%v", cl.Error)
+			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Sync", "%v", cl.Error)
 			lg.Error(cl.Error)
 			return
 		}
