@@ -68,6 +68,7 @@ type PostgresSpec struct {
 	PodAnnotations        map[string]string           `json:"podAnnotations"`
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations"`
 	TLS                   *TLSDescription             `json:"tls"`
+	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -112,6 +113,14 @@ type Volume struct {
 	SubPath      string `json:"subPath,omitempty"`
 }
 
+type AdditionalVolume struct {
+	Name             string          `json:"name"`
+	MountPath        string          `json:"mountPath"`
+	SubPath          string          `json:"subPath"`
+	TargetContainers []string        `json:"targetContainers"`
+	VolumeSource     v1.VolumeSource `json:"volume"`
+}
+
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
 type PostgresqlParam struct {
 	PgVersion  string            `json:"version"`
@@ -132,13 +141,15 @@ type Resources struct {
 
 // Patroni contains Patroni-specific configuration
 type Patroni struct {
-	InitDB               map[string]string            `json:"initdb"`
-	PgHba                []string                     `json:"pg_hba"`
-	TTL                  uint32                       `json:"ttl"`
-	LoopWait             uint32                       `json:"loop_wait"`
-	RetryTimeout         uint32                       `json:"retry_timeout"`
-	MaximumLagOnFailover float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
-	Slots                map[string]map[string]string `json:"slots"`
+	InitDB                map[string]string            `json:"initdb"`
+	PgHba                 []string                     `json:"pg_hba"`
+	TTL                   uint32                       `json:"ttl"`
+	LoopWait              uint32                       `json:"loop_wait"`
+	RetryTimeout          uint32                       `json:"retry_timeout"`
+	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	Slots                 map[string]map[string]string `json:"slots"`
+	SynchronousMode       bool                         `json:"synchronous_mode"`
+	SynchronousModeStrict bool                         `json:"synchronous_mode_strict"`
 }
 
 //StandbyCluster
@@ -151,6 +162,7 @@ type TLSDescription struct {
 	CertificateFile string `json:"certificateFile,omitempty"`
 	PrivateKeyFile  string `json:"privateKeyFile,omitempty"`
 	CAFile          string `json:"caFile,omitempty"`
+	CASecretName    string `json:"caSecretName,omitempty"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time

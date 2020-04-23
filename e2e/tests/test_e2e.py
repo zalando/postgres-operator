@@ -344,7 +344,6 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        labels = 'spilo-role=master,' + cluster_label
         readiness_label = 'lifecycle-status'
         readiness_value = 'ready'
 
@@ -709,13 +708,15 @@ class K8s:
     def wait_for_logical_backup_job_creation(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
-    def update_config(self, config_map_patch):
-        self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
-
+    def delete_operator_pod(self):
         operator_pod = self.api.core_v1.list_namespaced_pod(
             'default', label_selector="name=postgres-operator").items[0].metadata.name
         self.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf
         self.wait_for_operator_pod_start()
+
+    def update_config(self, config_map_patch):
+        self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
+        self.delete_operator_pod()
 
     def create_with_kubectl(self, path):
         return subprocess.run(

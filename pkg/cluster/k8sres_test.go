@@ -65,16 +65,18 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 					"locale":         "en_US.UTF-8",
 					"data-checksums": "true",
 				},
-				PgHba:                []string{"hostssl all all 0.0.0.0/0 md5", "host    all all 0.0.0.0/0 md5"},
-				TTL:                  30,
-				LoopWait:             10,
-				RetryTimeout:         10,
-				MaximumLagOnFailover: 33554432,
-				Slots:                map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
+				PgHba:                 []string{"hostssl all all 0.0.0.0/0 md5", "host    all all 0.0.0.0/0 md5"},
+				TTL:                   30,
+				LoopWait:              10,
+				RetryTimeout:          10,
+				MaximumLagOnFailover:  33554432,
+				SynchronousMode:       true,
+				SynchronousModeStrict: true,
+				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 			},
 			role:     "zalandos",
 			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
 		},
 	}
 	for _, tt := range tests {
@@ -959,6 +961,7 @@ func TestTLS(t *testing.T) {
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
 	var spiloFSGroup = int64(103)
+	var additionalVolumes = spec.AdditionalVolumes
 
 	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
@@ -998,8 +1001,20 @@ func TestTLS(t *testing.T) {
 	assert.Equal(t, &fsGroup, s.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
 
 	defaultMode := int32(0640)
+	mountPath := "/tls"
+	additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
+		Name:      spec.TLS.SecretName,
+		MountPath: mountPath,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  spec.TLS.SecretName,
+				DefaultMode: &defaultMode,
+			},
+		},
+	})
+
 	volume := v1.Volume{
-		Name: "tls-secret",
+		Name: "my-secret",
 		VolumeSource: v1.VolumeSource{
 			Secret: &v1.SecretVolumeSource{
 				SecretName:  "my-secret",
@@ -1011,11 +1026,179 @@ func TestTLS(t *testing.T) {
 
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
 		MountPath: "/tls",
-		Name:      "tls-secret",
-		ReadOnly:  true,
+		Name:      "my-secret",
 	}, "the volume gets mounted in /tls")
 
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
+}
+
+func TestAdditionalVolume(t *testing.T) {
+	testName := "TestAdditionalVolume"
+	tests := []struct {
+		subTest   string
+		podSpec   *v1.PodSpec
+		volumePos int
+	}{
+		{
+			subTest: "empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{},
+					},
+				},
+			},
+			volumePos: 0,
+		},
+		{
+			subTest: "non empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			volumePos: 1,
+		},
+		{
+			subTest: "non empty PodSpec with sidecar",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+					{
+						Name: "sidecar",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			volumePos: 1,
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	for _, tt := range tests {
+		// Test with additional volume mounted in all containers
+		additionalVolumeMount := []acidv1.AdditionalVolume{
+			{
+				Name:             "test",
+				MountPath:        "/test",
+				TargetContainers: []string{"all"},
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
+
+		if volumeName != additionalVolumeMount[0].Name {
+			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
+				testName, tt.subTest, additionalVolumeMount, volumeName)
+		}
+
+		for i := range tt.podSpec.Containers {
+			volumeMountName := tt.podSpec.Containers[i].VolumeMounts[tt.volumePos].Name
+
+			if volumeMountName != additionalVolumeMount[0].Name {
+				t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
+					testName, tt.subTest, additionalVolumeMount, volumeMountName)
+			}
+
+		}
+
+		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		if numMountsCheck != numMounts+1 {
+			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+				numMountsCheck, numMounts+1)
+		}
+	}
+
+	for _, tt := range tests {
+		// Test with additional volume mounted only in first container
+		additionalVolumeMount := []acidv1.AdditionalVolume{
+			{
+				Name:             "test",
+				MountPath:        "/test",
+				TargetContainers: []string{"postgres"},
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
+
+		if volumeName != additionalVolumeMount[0].Name {
+			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
+				testName, tt.subTest, additionalVolumeMount, volumeName)
+		}
+
+		for _, container := range tt.podSpec.Containers {
+			if container.Name == "postgres" {
+				volumeMountName := container.VolumeMounts[tt.volumePos].Name
+
+				if volumeMountName != additionalVolumeMount[0].Name {
+					t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
+						testName, tt.subTest, additionalVolumeMount, volumeMountName)
+				}
+
+				numMountsCheck := len(container.VolumeMounts)
+				if numMountsCheck != numMounts+1 {
+					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+						numMountsCheck, numMounts+1)
+				}
+			} else {
+				numMountsCheck := len(container.VolumeMounts)
+				if numMountsCheck == numMounts+1 {
+					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+						numMountsCheck, numMounts)
+				}
+			}
+		}
+	}
 }

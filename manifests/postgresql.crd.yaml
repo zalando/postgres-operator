@@ -38,6 +38,28 @@ spec:
             - teamId
             - postgresql
           properties:
+            additionalVolumes:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                  - mountPath
+                  - volumeSource
+                properties:
+                  name:
+                    type: string
+                  mountPath:
+                    type: string
+                  targetContainers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
+                  volumeSource:
+                    type: object
+                  subPath:
+                    type: string
             allowedSourceRanges:
               type: array
               nullable: true
@@ -184,6 +206,10 @@ spec:
                   type: integer
                 maximum_lag_on_failover:
                   type: integer
+                synchronous_mode:
+                  type: boolean
+                synchronous_mode_strict:
+                  type: boolean
             podAnnotations:
               type: object
               additionalProperties:
@@ -334,6 +360,8 @@ spec:
                 privateKeyFile:
                   type: string
                 caFile:
+                  type: string
+                caSecretName:
                   type: string
             tolerations:
               type: array

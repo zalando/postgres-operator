@@ -83,7 +83,7 @@ Those are top-level keys, containing both leaf keys and groups.
 * **kubernetes_use_configmaps**
   Select if setup uses endpoints (default), or configmaps to manage leader when
   DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to
-  use endpoints option, and configmaps is required. By default, 
+  use endpoints option, and configmaps is required. By default,
   `kubernetes_use_configmaps: false`, meaning endpoints will be used.
 
 * **docker_image**
@@ -615,11 +615,14 @@ operator being able to provide some reasonable defaults.
   the required minimum.
 
 * **connection_pooler_schema**
-  Schema to create for credentials lookup function. Default is `pooler`.
+  Database schema to create for credentials lookup function to be used by the
+  connection pooler. Is is created in every database of the Postgres cluster.
+  You can also choose an existing schema. Default schema is `pooler`.
 
 * **connection_pooler_user**
   User to create for connection pooler to be able to connect to a database.
-  Default is `pooler`.
+  You can also choose an existing role, but make sure it has the `LOGIN`
+  privilege. Default role is `pooler`.
 
 * **connection_pooler_image**
   Docker image to use for connection pooler deployment.
