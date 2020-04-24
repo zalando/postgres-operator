@@ -560,12 +560,12 @@ func (c *Cluster) syncDatabases() error {
 		}
 	}
 
-	for datname, newOwner := range c.Spec.Databases {
-		currentOwner, exists := currentDatabases[datname]
+	for databaseName, newOwner := range c.Spec.Databases {
+		currentOwner, exists := currentDatabases[databaseName]
 		if !exists {
-			createDatabases[datname] = newOwner
+			createDatabases[databaseName] = newOwner
 		} else if currentOwner != newOwner {
-			alterOwnerDatabases[datname] = newOwner
+			alterOwnerDatabases[databaseName] = newOwner
 		}
 	}
 
@@ -573,13 +573,13 @@ func (c *Cluster) syncDatabases() error {
 		return nil
 	}
 
-	for datname, owner := range createDatabases {
-		if err = c.executeCreateDatabase(datname, owner); err != nil {
+	for databaseName, owner := range createDatabases {
+		if err = c.executeCreateDatabase(databaseName, owner); err != nil {
 			return err
 		}
 	}
-	for datname, owner := range alterOwnerDatabases {
-		if err = c.executeAlterDatabaseOwner(datname, owner); err != nil {
+	for databaseName, owner := range alterOwnerDatabases {
+		if err = c.executeAlterDatabaseOwner(databaseName, owner); err != nil {
 			return err
 		}
 	}
@@ -620,7 +620,7 @@ func (c *Cluster) syncPreparedDatabases() error {
 	return nil
 }
 
-func (c *Cluster) syncPreparedSchemas(datname string, preparedSchemas map[string]acidv1.PreparedSchema) error {
+func (c *Cluster) syncPreparedSchemas(databaseName string, preparedSchemas map[string]acidv1.PreparedSchema) error {
 	c.setProcessName("syncing prepared schemas")
 
 	currentSchemas, err := c.getSchemas()
@@ -637,13 +637,13 @@ func (c *Cluster) syncPreparedSchemas(datname string, preparedSchemas map[string
 	if createPreparedSchemas, equal := util.SubstractStringSlices(schemas, currentSchemas); !equal {
 		for _, schemaName := range createPreparedSchemas {
 			owner := constants.OwnerRoleNameSuffix
-			dbOwner := datname + owner
+			dbOwner := databaseName + owner
 			if preparedSchemas[schemaName].DefaultRoles == nil || *preparedSchemas[schemaName].DefaultRoles {
-				owner = datname + "_" + schemaName + owner
+				owner = databaseName + "_" + schemaName + owner
 			} else {
 				owner = dbOwner
 			}
-			if err = c.executeCreateDatabaseSchema(datname, schemaName, dbOwner, owner); err != nil {
+			if err = c.executeCreateDatabaseSchema(databaseName, schemaName, dbOwner, owner); err != nil {
 				return err
 			}
 		}

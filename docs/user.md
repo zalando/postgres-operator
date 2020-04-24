@@ -94,7 +94,10 @@ created on every cluster managed by the operator.
 * `teams API roles`: automatically create users for every member of the team
 owning the database cluster.
 
-In the next sections, we will cover those use cases in more details.
+In the next sections, we will cover those use cases in more details. Note, that
+the Postgres Operator can also create databases with pre-defined owner, reader
+and writer roles which saves you the manual setup. Read more in the next
+chapter.
 
 ### Manifest roles
 
@@ -215,6 +218,129 @@ and `enable_teams_api` must be set to `true`. There are more settings available
 to choose superusers, group roles, [PAM configuration](https://github.com/CyberDem0n/pam-oauth2)
 etc. An OAuth2 token can be passed to the Teams API via a secret. The name for
 this secret is configurable with the `oauth_token_secret_name` parameter.
+
+## Prepared databases with best practice roles setup
+
+The `users` section in the manifests only allows for creating database roles
+with global privileges. Fine-grained data access control or role membership can
+not be defined and must be set up by the user in the database. But, the Postgres
+Operator offers a separate section to specify `preparedDatabases` that will be
+bootstrapped with pre-defined owner, reader and writer roles on a database-level
+and, optionally, on a schema-level, too. `preparedDatabases` also enable users
+to specify PostgreSQL extensions that shall be created in the bootstrap process.
+
+### Default database and schema
+
+A prepared database is already created by adding an empty `preparedDatabases`
+section to the manifest. The database will then be called like the Postgres
+cluster manifest (`-` are replaced with `_`) and will also contain a schema
+called `data`.
+
+```yaml
+spec:
+  preparedDatabases: {}
+```
+
+### Default NOLOGIN roles
+
+Given an example with a specified database and schema:
+
+```yaml
+spec:
+  preparedDatabases:
+    foo:
+      schemas:
+        bar: {}
+```
+
+Postgres Operator will create the following NOLOGIN roles:
+
+| Role name      | Member of      | Admin         |
+| -------------- | -------------- | ------------- |
+| foo_owner      |                | admin         |
+| foo_reader     |                | foo_owner     |
+| foo_writer     | foo_reader     | foo_owner     |
+| foo_bar_owner  |                | foo_owner     |
+| foo_bar_reader |                | foo_bar_owner |
+| foo_bar_writer | foo_bar_reader | foo_bar_owner |
+
+The `<dbname>_owner` role is the database owner and should be used when creating
+new database objects. All members of the `admin` role, e.g. teams API roles, can
+become the owner with the `SET ROLE` command. [Default privileges](https://www.postgresql.org/docs/12/sql-alterdefaultprivileges.html)
+are configured for the owner role so that the `<dbname>_reader` role
+automatically gets read-access (SELECT) to new tables and sequences and the
+`<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
+USAGE and UPDATE on sequences). Both get USAGE on types and EXECUTE on
+functions. The same principle applies on the schema level. Note, that the
+database-level roles will have access incl. default privileges on all database
+schemas, too. If you don't need the dedicated schema roles - i.e. you only use
+one schema - you can disable the creation like this:
+
+```yaml
+spec:
+  preparedDatabases:
+    foo:
+      schemas:
+        bar:
+          defaultRoles: false
+```
+
+### Default LOGIN roles
+
+The roles described in the previous paragraph can be granted to LOGIN roles from
+the `users` section in the manifest. Optionally, the Postgres Operator can also
+bootstrap default LOGIN roles for the database an each schema individually.
+These roles will get the `_user` suffix and they inherit all right from their
+NOLOGIN counterparts.
+
+| Role name           | Member of      | Admin         |
+| ------------------- | -------------- | ------------- |
+| foo_owner_user      | foo_owner      | admin         |
+| foo_reader_user     | foo_reader     | foo_owner     |
+| foo_writer_user     | foo_writer     | foo_owner     |
+| foo_bar_owner_user  | foo_bar_owner  | foo_owner     |
+| foo_bar_reader_user | foo_bar_reader | foo_bar_owner |
+| foo_bar_writer_user | foo_bar_writer | foo_bar_owner |
+
+These default users are enabled in the manifest with the `defaultUsers` flag:
+
+```yaml
+spec:
+  preparedDatabases:
+    foo:
+      defaultUsers: true
+      schemas:
+        bar:
+          defaultUsers: true
+```
+
+### Database extensions
+
+Prepared databases also allow for creating Postgres extensions during bootstrap.
+They will be created by the database owner in the specified schema.
+
+```yaml
+spec:
+  preparedDatabases:
+    foo:
+      extensions:
+        pg_partman: public
+        postgis: data
+```
+
+Some extensions require SUPERUSER rights on creation unless they are not
+whitelisted by the [pgextwlist](https://github.com/dimitri/pgextwlist)
+extension, that is shipped with the Spilo image. To see which extensions are
+on the list check the `extwlist.extension` parameter in the postgresql.conf
+file.
+
+```bash
+SHOW extwlist.extensions;
+```
+
+Make sure that `pgextlist` is also listed under `shared_preload_libraries` in
+the PostgreSQL configuration. Then the database owner should be able to create
+the extension specified in the manifest.
 
 ## Resource definition
 
@@ -584,8 +710,8 @@ don't know the value, use `103` which is the GID from the default spilo image
 OpenShift allocates the users and groups dynamically (based on scc), and their
 range is different in every namespace. Due to this dynamic behaviour, it's not
 trivial to know at deploy time the uid/gid of the user in the cluster.
-Therefore, instead of using a global `spilo_fsgroup` setting, use the `spiloFSGroup` field
-per Postgres cluster.
+Therefore, instead of using a global `spilo_fsgroup` setting, use the
+`spiloFSGroup` field per Postgres cluster.
 
 Upload the cert as a kubernetes secret:
 ```sh

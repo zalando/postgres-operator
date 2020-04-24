@@ -27,7 +27,7 @@ const (
 	 WHERE a.rolname = ANY($1)
 	 ORDER BY 1;`
 
-	getDatabasesSQL = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
+	getDatabasesSQL = `SELECT databaseName, pg_get_userbyid(datdba) AS owner FROM pg_database;`
 	getSchemasSQL   = `SELECT n.nspname AS dbschema FROM pg_catalog.pg_namespace n
 			WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' ORDER BY 1`
 	getExtensionsSQL = `SELECT e.extname, n.nspname FROM pg_catalog.pg_extension e
@@ -235,12 +235,12 @@ func (c *Cluster) getDatabases() (dbs map[string]string, err error) {
 	dbs = make(map[string]string)
 
 	for rows.Next() {
-		var datname, owner string
+		var databaseName, owner string
 
-		if err = rows.Scan(&datname, &owner); err != nil {
+		if err = rows.Scan(&databaseName, &owner); err != nil {
 			return nil, fmt.Errorf("error when processing row: %v", err)
 		}
-		dbs[datname] = owner
+		dbs[databaseName] = owner
 	}
 
 	return dbs, err
@@ -248,37 +248,37 @@ func (c *Cluster) getDatabases() (dbs map[string]string, err error) {
 
 // executeCreateDatabase creates new database with the given owner.
 // The caller is responsible for opening and closing the database connection.
-func (c *Cluster) executeCreateDatabase(datname, owner string) error {
-	return c.execCreateOrAlterDatabase(datname, owner, createDatabaseSQL,
+func (c *Cluster) executeCreateDatabase(databaseName, owner string) error {
+	return c.execCreateOrAlterDatabase(databaseName, owner, createDatabaseSQL,
 		"creating database", "create database")
 }
 
 // executeAlterDatabaseOwner changes the owner of the given database.
 // The caller is responsible for opening and closing the database connection.
-func (c *Cluster) executeAlterDatabaseOwner(datname string, owner string) error {
-	return c.execCreateOrAlterDatabase(datname, owner, alterDatabaseOwnerSQL,
+func (c *Cluster) executeAlterDatabaseOwner(databaseName string, owner string) error {
+	return c.execCreateOrAlterDatabase(databaseName, owner, alterDatabaseOwnerSQL,
 		"changing owner for database", "alter database owner")
 }
 
-func (c *Cluster) execCreateOrAlterDatabase(datname, owner, statement, doing, operation string) error {
-	if !c.databaseNameOwnerValid(datname, owner) {
+func (c *Cluster) execCreateOrAlterDatabase(databaseName, owner, statement, doing, operation string) error {
+	if !c.databaseNameOwnerValid(databaseName, owner) {
 		return nil
 	}
-	c.logger.Infof("%s %q owner %q", doing, datname, owner)
-	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, datname, owner)); err != nil {
+	c.logger.Infof("%s %q owner %q", doing, databaseName, owner)
+	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, databaseName, owner)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
 	return nil
 }
 
-func (c *Cluster) databaseNameOwnerValid(datname, owner string) bool {
+func (c *Cluster) databaseNameOwnerValid(databaseName, owner string) bool {
 	if _, ok := c.pgUsers[owner]; !ok {
-		c.logger.Infof("skipping creation of the %q database, user %q does not exist", datname, owner)
+		c.logger.Infof("skipping creation of the %q database, user %q does not exist", databaseName, owner)
 		return false
 	}
 
-	if !databaseNameRegexp.MatchString(datname) {
-		c.logger.Infof("database %q has invalid name", datname)
+	if !databaseNameRegexp.MatchString(databaseName) {
+		c.logger.Infof("database %q has invalid name", databaseName)
 		return false
 	}
 	return true
@@ -320,12 +320,12 @@ func (c *Cluster) getSchemas() (schemas []string, err error) {
 
 // executeCreateDatabaseSchema creates new database schema with the given owner.
 // The caller is responsible for opening and closing the database connection.
-func (c *Cluster) executeCreateDatabaseSchema(datname, schemaName, dbOwner string, schemaOwner string) error {
-	return c.execCreateDatabaseSchema(datname, schemaName, dbOwner, schemaOwner, createDatabaseSchemaSQL,
+func (c *Cluster) executeCreateDatabaseSchema(databaseName, schemaName, dbOwner string, schemaOwner string) error {
+	return c.execCreateDatabaseSchema(databaseName, schemaName, dbOwner, schemaOwner, createDatabaseSchemaSQL,
 		"creating database schema", "create database schema")
 }
 
-func (c *Cluster) execCreateDatabaseSchema(datname, schemaName, dbOwner, schemaOwner, statement, doing, operation string) error {
+func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, schemaOwner, statement, doing, operation string) error {
 	if !c.databaseSchemaNameValid(schemaName) {
 		return nil
 	}
@@ -335,10 +335,10 @@ func (c *Cluster) execCreateDatabaseSchema(datname, schemaName, dbOwner, schemaO
 	}
 
 	// set default privileges for schema
-	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, datname)
+	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, databaseName)
 	if schemaOwner != dbOwner {
-		c.execAlterSchemaDefaultPrivileges(schemaName, dbOwner, datname+"_"+schemaName)
-		c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, datname+"_"+schemaName)
+		c.execAlterSchemaDefaultPrivileges(schemaName, dbOwner, databaseName+"_"+schemaName)
+		c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, databaseName+"_"+schemaName)
 	}
 
 	return nil
