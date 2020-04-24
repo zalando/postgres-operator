@@ -1148,12 +1148,26 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
+	annotations = make(map[string]string)
+
+	ToPropagateAnnotations := c.OpConfig.StatefulsetPropAnnotations
+	if ToPropagateAnnotations != nil {
+		PgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
+		for _, anno := range ToPropagateAnnotations {
+			for k, v := range PgCRDAnnotations {
+				if k == anno {
+					annotations[k] = v
+				}
+			}
+		}
+	}
+
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: map[string]string{rollingUpdateStatefulsetAnnotationKey: "false"},
+			Annotations: annotations,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -1531,6 +1545,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		},
 		Spec: serviceSpec,
 	}
+	c.logger.Warningln("Rafia get service annotations", service.GetObjectMeta)
 
 	return service
 }
@@ -1803,7 +1818,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		[]acidv1.AdditionalVolume{}); err != nil {
-			return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
+		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
 	// overwrite specific params of logical backups pods

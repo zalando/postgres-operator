@@ -72,6 +72,7 @@ type KubernetesMetaConfiguration struct {
 	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
 	PodAntiAffinityTopologyKey string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy        string              `json:"pod_management_policy,omitempty"`
+	StatefulsetPropAnnotations []string            `json:"statefulset_propagate_annotations,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -205,6 +206,7 @@ type OperatorConfigurationData struct {
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
 	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	StatefulsetPropAnnotations []string                           `json:"statefulset_propagate_annotations,omitempty"`
 }
 
 //Duration shortens this frequently used name
