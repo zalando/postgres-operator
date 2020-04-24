@@ -553,10 +553,10 @@ func (c *Cluster) syncDatabases() error {
 		preparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
 		c.Spec.PreparedDatabases = preparedDatabases
 	}
-	for preparedDatname := range c.Spec.PreparedDatabases {
-		_, exists := currentDatabases[preparedDatname]
+	for preparedDatabaseName := range c.Spec.PreparedDatabases {
+		_, exists := currentDatabases[preparedDatabaseName]
 		if !exists {
-			createDatabases[preparedDatname] = preparedDatname + constants.OwnerRoleNameSuffix
+			createDatabases[preparedDatabaseName] = preparedDatabaseName + constants.OwnerRoleNameSuffix
 		}
 	}
 

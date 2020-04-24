@@ -160,9 +160,9 @@ func (c *Cluster) closeDbConn() (err error) {
 		c.logger.Debug("closing database connection")
 		if err = c.pgDb.Close(); err != nil {
 			c.logger.Errorf("could not close database connection: %v", err)
-		} else {
-			c.pgDb = nil
 		}
+		c.pgDb = nil
+
 		return nil
 	}
 	c.logger.Warning("attempted to close an empty db connection object")
@@ -488,7 +488,7 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 
 	templater := template.Must(template.New("sql").Parse(connectionPoolerLookup))
 
-	for dbname, _ := range currentDatabases {
+	for dbname := range currentDatabases {
 		if dbname == "template0" || dbname == "template1" {
 			continue
 		}
