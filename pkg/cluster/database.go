@@ -27,7 +27,7 @@ const (
 	 WHERE a.rolname = ANY($1)
 	 ORDER BY 1;`
 
-	getDatabasesSQL = `SELECT databaseName, pg_get_userbyid(datdba) AS owner FROM pg_database;`
+	getDatabasesSQL = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
 	getSchemasSQL   = `SELECT n.nspname AS dbschema FROM pg_catalog.pg_namespace n
 			WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' ORDER BY 1`
 	getExtensionsSQL = `SELECT e.extname, n.nspname FROM pg_catalog.pg_extension e
@@ -235,12 +235,12 @@ func (c *Cluster) getDatabases() (dbs map[string]string, err error) {
 	dbs = make(map[string]string)
 
 	for rows.Next() {
-		var databaseName, owner string
+		var datname, owner string
 
-		if err = rows.Scan(&databaseName, &owner); err != nil {
+		if err = rows.Scan(&datname, &owner); err != nil {
 			return nil, fmt.Errorf("error when processing row: %v", err)
 		}
-		dbs[databaseName] = owner
+		dbs[datname] = owner
 	}
 
 	return dbs, err
