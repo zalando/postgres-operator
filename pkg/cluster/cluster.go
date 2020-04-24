@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 
@@ -44,6 +45,7 @@ var (
 	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
 	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 	patroniObjectSuffixes = []string{"leader", "config", "sync", "failover"}
+	finalizerName         = "postgres-operator.acid.zalan.do"
 )
 
 // Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
@@ -260,6 +262,10 @@ func (c *Cluster) Create() (err error) {
 	}()
 
 	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
+	c.logger.Info("Adding finalizer.")
+	if err = c.AddFinalizer(); err != nil {
+		return fmt.Errorf("could not add Finalizer: %v", err)
+	}
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -762,6 +768,98 @@ func (c *Cluster) compareServices(old, new *v1.Service) (bool, string) {
 	return true, ""
 }
 
+// AddFinalizer patches the postgresql CR to add our finalizer.
+func (c *Cluster) AddFinalizer() error {
+	if c.HasFinalizer() {
+		c.logger.Debugf("Finalizer %s already exists.", finalizerName)
+		return nil
+	}
+
+	currentSpec := c.DeepCopy()
+	newSpec := c.DeepCopy()
+	newSpec.ObjectMeta.SetFinalizers(append(newSpec.ObjectMeta.Finalizers, finalizerName))
+	patchBytes, err := getPatchBytes(currentSpec, newSpec)
+	if err != nil {
+		return fmt.Errorf("Unable to produce patch to add finalizer: %v", err)
+	}
+
+	updatedSpec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(
+		context.TODO(), c.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("Could not add finalizer: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	c.setSpec(updatedSpec)
+	return nil
+}
+
+// RemoveFinalizer patches postgresql CR to remove finalizer.
+func (c *Cluster) RemoveFinalizer() error {
+	if !c.HasFinalizer() {
+		c.logger.Debugf("No finalizer %s exists to remove.", finalizerName)
+		return nil
+	}
+	currentSpec := c.DeepCopy()
+	newSpec := c.DeepCopy()
+	newSpec.ObjectMeta.SetFinalizers(removeString(newSpec.ObjectMeta.Finalizers, finalizerName))
+	patchBytes, err := getPatchBytes(currentSpec, newSpec)
+	if err != nil {
+		return fmt.Errorf("Unable to produce patch to remove finalizer: %v", err)
+	}
+
+	updatedSpec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(
+		context.TODO(), c.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("Could not remove finalizer: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	c.setSpec(updatedSpec)
+
+	return nil
+}
+
+// HasFinalizer checks if our finalizer is currently set or not
+func (c *Cluster) HasFinalizer() bool {
+	for _, finalizer := range c.ObjectMeta.Finalizers {
+		if finalizer == finalizerName {
+			return true
+		}
+	}
+	return false
+}
+
+// Iterate through slice and remove certain string, then return cleaned slice
+func removeString(slice []string, s string) (result []string) {
+	for _, item := range slice {
+		if item == s {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+// getPatchBytes will produce a JSONpatch between the two parameters of type acidv1.Postgresql
+func getPatchBytes(oldSpec, newSpec *acidv1.Postgresql) ([]byte, error) {
+	oldData, err := json.Marshal(oldSpec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal oldSpec for postgresql %s/%s: %v", oldSpec.Namespace, oldSpec.Name, err)
+	}
+
+	newData, err := json.Marshal(newSpec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to Marshal newSpec for postgresql %s/%s: %v", newSpec.Namespace, newSpec.Name, err)
+	}
+
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to CreateMergePatch for postgresl %s/%s: %v", oldSpec.Namespace, oldSpec.Name, err)
+	}
+	return patchBytes, nil
+}
+
 // Update changes Kubernetes objects according to the new specification. Unlike the sync case, the missing object
 // (i.e. service) is treated as an error
 // logical backup cron jobs are an exception: a user-initiated Update can enable a logical backup job
@@ -1050,6 +1148,11 @@ func (c *Cluster) Delete() {
 		}
 	}
 
+	// If we are done deleting our various resources we remove the finalizer to let K8S finally delete the Postgres CR
+	c.logger.Info("Done cleaning up, removing our finalizer.")
+	if err := c.RemoveFinalizer(); err != nil {
+		c.logger.Errorf("Error removing Finalizer: %v", err)
+	}
 }
 
 // NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
