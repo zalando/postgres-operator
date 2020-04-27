@@ -548,10 +548,8 @@ func (c *Cluster) syncDatabases() error {
 	}
 
 	// if no prepared databases are specified create a database named like the cluster
-	preparedDatabases := c.Spec.PreparedDatabases
-	if preparedDatabases == nil || len(preparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
-		preparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
-		c.Spec.PreparedDatabases = preparedDatabases
+	if c.Spec.PreparedDatabases != nil && len(c.Spec.PreparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
+		c.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
 	}
 	for preparedDatabaseName := range c.Spec.PreparedDatabases {
 		_, exists := currentDatabases[preparedDatabaseName]

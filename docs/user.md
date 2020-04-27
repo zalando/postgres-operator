@@ -219,15 +219,16 @@ to choose superusers, group roles, [PAM configuration](https://github.com/CyberD
 etc. An OAuth2 token can be passed to the Teams API via a secret. The name for
 this secret is configurable with the `oauth_token_secret_name` parameter.
 
-## Prepared databases with best practice roles setup
+## Prepared databases with roles and default privileges
 
 The `users` section in the manifests only allows for creating database roles
 with global privileges. Fine-grained data access control or role membership can
 not be defined and must be set up by the user in the database. But, the Postgres
 Operator offers a separate section to specify `preparedDatabases` that will be
-bootstrapped with pre-defined owner, reader and writer roles on a database-level
-and, optionally, on a schema-level, too. `preparedDatabases` also enable users
-to specify PostgreSQL extensions that shall be created in the bootstrap process.
+created with pre-defined owner, reader and writer roles for each individual
+database and, optionally, for each database schema, too. `preparedDatabases`
+also enable users to specify PostgreSQL extensions that shall be created in a
+given database schema.
 
 ### Default database and schema
 
@@ -271,10 +272,14 @@ are configured for the owner role so that the `<dbname>_reader` role
 automatically gets read-access (SELECT) to new tables and sequences and the
 `<dbname>_writer` receives write-access (INSERT, UPDATE, DELETE on tables,
 USAGE and UPDATE on sequences). Both get USAGE on types and EXECUTE on
-functions. The same principle applies on the schema level. Note, that the
-database-level roles will have access incl. default privileges on all database
-schemas, too. If you don't need the dedicated schema roles - i.e. you only use
-one schema - you can disable the creation like this:
+functions.
+
+The same principle applies for database schemas which are owned by the
+`<dbname>_<schema>_owner` role. `<dbname>_<schema>_reader` is read-only,
+`<dbname>_<schema>_writer` has write access and inherit reading from the reader
+role. Note, that the `<dbname>_*` roles have access incl. default privileges on
+all schemas, too. If you don't need the dedicated schema roles - i.e. you only
+use one schema - you can disable the creation like this:
 
 ```yaml
 spec:
@@ -285,13 +290,15 @@ spec:
           defaultRoles: false
 ```
 
+Then the schemas are owned by the database owner, too.
+
 ### Default LOGIN roles
 
 The roles described in the previous paragraph can be granted to LOGIN roles from
 the `users` section in the manifest. Optionally, the Postgres Operator can also
-bootstrap default LOGIN roles for the database an each schema individually.
-These roles will get the `_user` suffix and they inherit all right from their
-NOLOGIN counterparts.
+create default LOGIN roles for the database an each schema individually. These
+roles will get the `_user` suffix and they inherit all rights from their NOLOGIN
+counterparts.
 
 | Role name           | Member of      | Admin         |
 | ------------------- | -------------- | ------------- |
@@ -316,8 +323,8 @@ spec:
 
 ### Database extensions
 
-Prepared databases also allow for creating Postgres extensions during bootstrap.
-They will be created by the database owner in the specified schema.
+Prepared databases also allow for creating Postgres extensions. They will be
+created by the database owner in the specified schema.
 
 ```yaml
 spec:
