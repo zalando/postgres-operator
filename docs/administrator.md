@@ -509,8 +509,8 @@ A secret can be pre-provisioned in different ways:
 
 ## Sidecars for Postgres clusters
 
-A list of sidecars can be added to any cluster created by the 
-operator. 
+A list of sidecars is added to each cluster created by the
+operator. The default is empty list.
 
 
 ```yaml
