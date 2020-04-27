@@ -104,7 +104,7 @@ type AdditionalVolume struct {
 	MountPath        string          `json:"mountPath"`
 	SubPath          string          `json:"subPath"`
 	TargetContainers []string        `json:"targetContainers"`
-	VolumeSource     v1.VolumeSource `json:"volume"`
+	VolumeSource     v1.VolumeSource `json:"volumeSource"`
 }
 
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
