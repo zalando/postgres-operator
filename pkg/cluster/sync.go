@@ -330,6 +330,20 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
+		ToPropagateAnnotations := c.OpConfig.StatefulsetPropAnnotations
+		PgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
+		annotations := make(map[string]string)
+
+		if ToPropagateAnnotations != nil && PgCRDAnnotations != nil {
+			for _, anno := range ToPropagateAnnotations {
+				for k, v := range PgCRDAnnotations {
+					if k == anno {
+						annotations[k] = v
+					}
+				}
+			}
+			c.updateStatefulSetAnnotations(annotations)
+		}
 	}
 
 	// Apply special PostgreSQL parameters that can only be set via the Patroni API.

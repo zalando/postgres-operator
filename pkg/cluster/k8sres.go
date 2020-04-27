@@ -1150,18 +1150,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	annotations = make(map[string]string)
 
-	ToPropagateAnnotations := c.OpConfig.StatefulsetPropAnnotations
-	if ToPropagateAnnotations != nil {
-		PgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
-		for _, anno := range ToPropagateAnnotations {
-			for k, v := range PgCRDAnnotations {
-				if k == anno {
-					annotations[k] = v
-				}
-			}
-		}
-	}
-
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
@@ -1545,7 +1533,6 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		},
 		Spec: serviceSpec,
 	}
-	c.logger.Warningln("Rafia get service annotations", service.GetObjectMeta)
 
 	return service
 }

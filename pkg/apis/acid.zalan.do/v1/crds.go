@@ -838,8 +838,8 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								},
 							},
 							"statefulset_propagate_annotations": {
-								Type: "object",
-								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+								Type: "array",
+								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1beta1.JSONSchemaProps{
 										Type: "string",
 									},
