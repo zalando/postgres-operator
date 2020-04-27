@@ -37,7 +37,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	testName := "TestGenerateSpiloConfig"
 	tests := []struct {
@@ -102,7 +102,7 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	testName := "TestCreateLoadBalancerLogic"
 	tests := []struct {
@@ -164,7 +164,8 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
-				logger),
+				logger,
+				eventRecorder),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
@@ -187,7 +188,8 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
-				logger),
+				logger,
+				eventRecorder),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
@@ -210,7 +212,8 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
-				logger),
+				logger,
+				eventRecorder),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
@@ -233,7 +236,8 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
-				logger),
+				logger,
+				eventRecorder),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-databass-budget",
@@ -368,7 +372,7 @@ func TestCloneEnv(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	for _, tt := range tests {
 		envs := cluster.generateCloneEnvironment(tt.cloneOpts)
@@ -502,7 +506,7 @@ func TestGetPgVersion(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	for _, tt := range tests {
 		pgVersion, err := cluster.getNewPgVersion(tt.pgContainer, tt.newPgVersion)
@@ -678,7 +682,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	var clusterNoDefaultRes = New(
 		Config{
@@ -690,7 +694,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				},
 				ConnectionPooler: config.ConnectionPooler{},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec) error { return nil }
 
@@ -803,7 +807,7 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 	cluster.Statefulset = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-sts",
@@ -904,7 +908,7 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 	cluster.Statefulset = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-sts",
@@ -990,7 +994,7 @@ func TestTLS(t *testing.T) {
 					SpiloFSGroup: &spiloFSGroup,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 	spec = makeSpec(acidv1.TLSDescription{SecretName: "my-secret", CAFile: "ca.crt"})
 	s, err := cluster.generateStatefulSet(&spec)
 	if err != nil {
@@ -1112,7 +1116,7 @@ func TestAdditionalVolume(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	for _, tt := range tests {
 		// Test with additional volume mounted in all containers
