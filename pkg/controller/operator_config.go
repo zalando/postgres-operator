@@ -44,7 +44,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.ShmVolume = fromCRD.ShmVolume
-	result.Sidecars = fromCRD.Sidecars
+	result.SidecarImages = fromCRD.SidecarImages
+	result.SidecarContainers = fromCRD.SidecarContainers
 
 	// user config
 	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername

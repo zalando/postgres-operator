@@ -530,3 +530,22 @@ func (c *Cluster) needConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 func (c *Cluster) needConnectionPooler() bool {
 	return c.needConnectionPoolerWorker(&c.Spec)
 }
+
+// Earlier arguments take priority
+func mergeContainers(containers ...[]v1.Container) ([]v1.Container, []string) {
+	containerNameTaken := map[string]bool{}
+	result := make([]v1.Container, 0)
+	conflicts := make([]string, 0)
+
+	for _, containerArray := range containers {
+		for _, container := range containerArray {
+			if _, taken := containerNameTaken[container.Name]; taken {
+				conflicts = append(conflicts, container.Name)
+			} else {
+				containerNameTaken[container.Name] = true
+				result = append(result, container)
+			}
+		}
+	}
+	return result, conflicts
+}

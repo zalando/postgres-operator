@@ -797,6 +797,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 						},
 					},
+					"sidecars": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Allows: true,
+								},
+							},
+						},
+					},
 					"workers": {
 						Type:    "integer",
 						Minimum: &min1,

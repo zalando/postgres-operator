@@ -507,6 +507,33 @@ A secret can be pre-provisioned in different ways:
 * Automatically provisioned via a custom K8s controller like
   [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)
 
+## Sidecars for Postgres clusters
+
+A list of sidecars is added to each cluster created by the
+operator. The default is empty list.
+
+
+```yaml
+kind: OperatorConfiguration
+configuration:
+  sidecars:
+  - image: image:123
+    name: global-sidecar
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - mountPath: /custom-pgdata-mountpoint
+      name: pgdata
+  - ...
+```
+
+In addition to any environment variables you specify, the following environment variables are always passed to sidecars:
+
+  - `POD_NAME` - field reference to `metadata.name`
+  - `POD_NAMESPACE` - field reference to `metadata.namespace`
+  - `POSTGRES_USER` - the superuser that can be used to connect to the database
+  - `POSTGRES_PASSWORD` - the password for the superuser
+
 ## Setting up the Postgres Operator UI
 
 Since the v1.2 release the Postgres Operator is shipped with a browser-based
