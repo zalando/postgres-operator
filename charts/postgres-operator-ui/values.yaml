@@ -42,6 +42,7 @@ envs:
 service:
   type: "ClusterIP"
   port: "8080"
+  nodePort:
 
 # configure UI ingress. If needed: "enabled: true"
 ingress:
