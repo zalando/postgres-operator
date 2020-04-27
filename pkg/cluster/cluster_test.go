@@ -13,6 +13,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -21,6 +22,8 @@ const (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
+var eventRecorder = record.NewFakeRecorder(1)
+
 var cl = New(
 	Config{
 		OpConfig: config.Config{
@@ -34,6 +37,7 @@ var cl = New(
 	k8sutil.NewMockKubernetesClient(),
 	acidv1.Postgresql{},
 	logger,
+	eventRecorder,
 )
 
 func TestInitRobotUsers(t *testing.T) {

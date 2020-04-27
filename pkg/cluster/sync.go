@@ -343,10 +343,12 @@ func (c *Cluster) syncStatefulSet() error {
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if podsRollingUpdateRequired {
 		c.logger.Debugln("performing rolling update")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 		if err := c.recreatePods(); err != nil {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
 		c.logger.Infof("pods have been recreated")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
 			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
 		}

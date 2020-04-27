@@ -36,7 +36,7 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger)
+		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
 
 	cluster.Statefulset = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -85,7 +85,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger)
+		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
 
 	cluster.Spec = acidv1.PostgresSpec{
 		ConnectionPooler: &acidv1.ConnectionPooler{},
