@@ -13,6 +13,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -21,6 +22,8 @@ const (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
+var eventRecorder = record.NewFakeRecorder(1)
+
 var cl = New(
 	Config{
 		OpConfig: config.Config{
@@ -34,6 +37,7 @@ var cl = New(
 	k8sutil.NewMockKubernetesClient(),
 	acidv1.Postgresql{},
 	logger,
+	eventRecorder,
 )
 
 func TestInitRobotUsers(t *testing.T) {
@@ -720,5 +724,39 @@ func TestInitSystemUsers(t *testing.T) {
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; !exist {
 		t.Errorf("%s, connection pooler user is not present", testName)
+	}
+
+	// superuser is not allowed as connection pool user
+	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
+		User: "postgres",
+	}
+	cl.OpConfig.SuperUsername = "postgres"
+	cl.OpConfig.ConnectionPooler.User = "pooler"
+
+	cl.initSystemUsers()
+	if _, exist := cl.pgUsers["pooler"]; !exist {
+		t.Errorf("%s, Superuser is not allowed to be a connection pool user", testName)
+	}
+
+	// neither protected users are
+	delete(cl.pgUsers, "pooler")
+	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
+		User: "admin",
+	}
+	cl.OpConfig.ProtectedRoles = []string{"admin"}
+
+	cl.initSystemUsers()
+	if _, exist := cl.pgUsers["pooler"]; !exist {
+		t.Errorf("%s, Protected user are not allowed to be a connection pool user", testName)
+	}
+
+	delete(cl.pgUsers, "pooler")
+	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
+		User: "standby",
+	}
+
+	cl.initSystemUsers()
+	if _, exist := cl.pgUsers["pooler"]; !exist {
+		t.Errorf("%s, System users are not allowed to be a connection pool user", testName)
 	}
 }

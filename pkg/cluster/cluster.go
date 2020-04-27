@@ -21,8 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/reference"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
@@ -81,6 +84,7 @@ type Cluster struct {
 	acidv1.Postgresql
 	Config
 	logger           *logrus.Entry
+	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
@@ -109,7 +113,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry) *Cluster {
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -140,7 +144,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
 	cluster.oauthTokenGetter = newSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
 	cluster.patroni = patroni.New(cluster.logger)
-
+	cluster.eventRecorder = eventRecorder
 	return cluster
 }
 
@@ -164,6 +168,16 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 		Name:      fmt.Sprintf(procName, args...),
 		StartTime: time.Now(),
 	}
+}
+
+// GetReference of Postgres CR object
+// i.e. required to emit events to this resource
+func (c *Cluster) GetReference() *v1.ObjectReference {
+	ref, err := reference.GetReference(scheme.Scheme, &c.Postgresql)
+	if err != nil {
+		c.logger.Errorf("could not get reference for Postgresql CR %v/%v: %v", c.Postgresql.Namespace, c.Postgresql.Name, err)
+	}
+	return ref
 }
 
 // SetStatus of Postgres cluster
@@ -245,6 +259,7 @@ func (c *Cluster) Create() error {
 	}()
 
 	c.setStatus(acidv1.ClusterStatusCreating)
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
 	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
 		return fmt.Errorf("could not enforce minimum resource limits: %v", err)
@@ -263,6 +278,7 @@ func (c *Cluster) Create() error {
 				return fmt.Errorf("could not create %s endpoint: %v", role, err)
 			}
 			c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Endpoints", "Endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 		}
 
 		if c.Services[role] != nil {
@@ -273,6 +289,7 @@ func (c *Cluster) Create() error {
 			return fmt.Errorf("could not create %s service: %v", role, err)
 		}
 		c.logger.Infof("%s service %q has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Services", "The service %q for role %s has been successfully created", util.NameFromMeta(service.ObjectMeta), role)
 	}
 
 	if err = c.initUsers(); err != nil {
@@ -284,6 +301,7 @@ func (c *Cluster) Create() error {
 		return fmt.Errorf("could not create secrets: %v", err)
 	}
 	c.logger.Infof("secrets have been successfully created")
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Secrets", "The secrets have been successfully created")
 
 	if c.PodDisruptionBudget != nil {
 		return fmt.Errorf("pod disruption budget already exists in the cluster")
@@ -302,6 +320,7 @@ func (c *Cluster) Create() error {
 		return fmt.Errorf("could not create statefulset: %v", err)
 	}
 	c.logger.Infof("statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
+	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
 	c.logger.Info("waiting for the cluster being ready")
 
@@ -310,6 +329,7 @@ func (c *Cluster) Create() error {
 		return err
 	}
 	c.logger.Infof("pods are ready")
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Pods are ready")
 
 	// create database objects unless we are running without pods or disabled
 	// that feature explicitly
@@ -566,6 +586,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 		}
 		if isSmaller {
 			c.logger.Warningf("defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
 			spec.Resources.ResourceLimits.CPU = minCPULimit
 		}
 	}
@@ -578,6 +599,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 		}
 		if isSmaller {
 			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
 			spec.Resources.ResourceLimits.Memory = minMemoryLimit
 		}
 	}
@@ -608,6 +630,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	if oldSpec.Spec.PostgresqlParam.PgVersion != newSpec.Spec.PostgresqlParam.PgVersion { // PG versions comparison
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect",
+			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "PostgreSQL", "postgresql version change(%q -> %q) has no effect",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
 		//we need that hack to generate statefulset with the old version
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
@@ -752,7 +776,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pooler
-	if err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
+	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
+		c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
@@ -767,6 +792,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 func (c *Cluster) Delete() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
 
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
@@ -794,8 +820,10 @@ func (c *Cluster) Delete() {
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
-		if err := c.deleteEndpoint(role); err != nil {
-			c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+		if !c.patroniKubernetesUseConfigMaps() {
+			if err := c.deleteEndpoint(role); err != nil {
+				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+			}
 		}
 
 		if err := c.deleteService(role); err != nil {
@@ -888,9 +916,20 @@ func (c *Cluster) initSystemUsers() {
 			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		username := util.Coalesce(
-			c.Spec.ConnectionPooler.User,
-			c.OpConfig.ConnectionPooler.User)
+		// Using superuser as pooler user is not a good idea. First of all it's
+		// not going to be synced correctly with the current implementation,
+		// and second it's a bad practice.
+		username := c.OpConfig.ConnectionPooler.User
+
+		isSuperUser := c.Spec.ConnectionPooler.User == c.OpConfig.SuperUsername
+		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
+			c.Spec.ConnectionPooler.User, "connection pool role")
+
+		if !isSuperUser && !isProtectedUser {
+			username = util.Coalesce(
+				c.Spec.ConnectionPooler.User,
+				c.OpConfig.ConnectionPooler.User)
+		}
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{
@@ -1092,6 +1131,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 
 	var err error
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
+	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 
 	var wg sync.WaitGroup
 
@@ -1118,6 +1158,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
 		if err = <-podLabelErr; err != nil {
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
@@ -1133,6 +1174,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	// close the label waiting channel no sooner than the waiting goroutine terminates.
 	close(podLabelErr)
 
+	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	return err
 
 }
@@ -1160,11 +1202,19 @@ type clusterObjectDelete func(name string) error
 
 func (c *Cluster) deletePatroniClusterObjects() error {
 	// TODO: figure out how to remove leftover patroni objects in other cases
+	var actionsList []simpleActionWithResult
+
 	if !c.patroniUsesKubernetes() {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
-	c.logger.Debugf("removing leftover Patroni objects (endpoints, services and configmaps)")
-	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps} {
+
+	if !c.patroniKubernetesUseConfigMaps() {
+		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
+	}
+	actionsList = append(actionsList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
+
+	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
+	for _, deleter := range actionsList {
 		if err := deleter(); err != nil {
 			return err
 		}

@@ -294,6 +294,27 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	return pod, nil
 }
 
+func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
+
+	/*
+	 Operator should not re-create pods if there is at least one replica being bootstrapped
+	 because Patroni might use other replicas to take basebackup from (see Patroni's "clonefrom" tag).
+
+	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
+	 after this check succeeds but before a pod is re-created
+	*/
+
+	for _, pod := range pods.Items {
+		state, err := c.patroni.GetPatroniMemberState(&pod)
+		if err != nil || state == "creating replica" {
+			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
+			return false
+		}
+
+	}
+	return true
+}
+
 func (c *Cluster) recreatePods() error {
 	c.setProcessName("starting to recreate pods")
 	ls := c.labelsSet(false)
@@ -308,6 +329,10 @@ func (c *Cluster) recreatePods() error {
 		return fmt.Errorf("could not get the list of pods: %v", err)
 	}
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
+
+	if !c.isSafeToRecreatePods(pods) {
+		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initilalized")
+	}
 
 	var (
 		masterPod, newMasterPod, newPod *v1.Pod

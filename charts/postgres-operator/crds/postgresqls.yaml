@@ -74,6 +74,28 @@ spec:
             - teamId
             - postgresql
           properties:
+            additionalVolumes:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                  - mountPath
+                  - volumeSource
+                properties:
+                  name:
+                    type: string
+                  mountPath:
+                    type: string
+                  targetContainers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
+                  volumeSource:
+                    type: object
+                  subPath:
+                    type: string
             allowedSourceRanges:
               type: array
               nullable: true
@@ -342,6 +364,21 @@ spec:
                   type: string
             teamId:
               type: string
+            tls:
+              type: object
+              required:
+                - secretName
+              properties:
+                secretName:
+                  type: string
+                certificateFile:
+                  type: string
+                privateKeyFile:
+                  type: string
+                caFile:
+                  type: string
+                caSecretName:
+                  type: string
             tolerations:
               type: array
               items:
