@@ -1095,10 +1095,10 @@ func syncResources(a, b *v1.ResourceRequirements) bool {
 // DCS, reuses the master's endpoint to store the leader related metadata. If we remove the endpoint
 // before the pods, it will be re-created by the current master pod and will remain, obstructing the
 // creation of the new cluster with the same name. Therefore, the endpoints should be deleted last.
-func (c *Cluster) Delete() {
+func (c *Cluster) Delete() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of cluster resources")
 
 	if err := c.deleteStreams(); err != nil {
 		c.logger.Warningf("could not delete event streams: %v", err)
@@ -1151,8 +1151,10 @@ func (c *Cluster) Delete() {
 	// If we are done deleting our various resources we remove the finalizer to let K8S finally delete the Postgres CR
 	c.logger.Info("Done cleaning up, removing our finalizer.")
 	if err := c.RemoveFinalizer(); err != nil {
-		c.logger.Errorf("Error removing Finalizer: %v", err)
+		return fmt.Errorf("Done cleaning up, but error when trying to remove our finalizer: %v", err)
 	}
+
+	return nil
 }
 
 // NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).
