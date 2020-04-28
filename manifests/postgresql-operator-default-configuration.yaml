@@ -13,8 +13,11 @@ configuration:
   resync_period: 30m
   repair_period: 5m
   # set_memory_request_to_limit: false
-  # sidecar_docker_images:
-  #   example: "exampleimage:exampletag"
+  # sidecars:
+  # - image: image:123
+  #   name: global-sidecar-1
+  #   ports:
+  #   - containerPort: 80
   workers: 4
   users:
     replication_username: standby

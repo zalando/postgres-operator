@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -181,18 +182,20 @@ type OperatorLogicalBackupConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
-	EtcdHost                   string                             `json:"etcd_host,omitempty"`
-	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
-	DockerImage                string                             `json:"docker_image,omitempty"`
-	Workers                    uint32                             `json:"workers,omitempty"`
-	MinInstances               int32                              `json:"min_instances,omitempty"`
-	MaxInstances               int32                              `json:"max_instances,omitempty"`
-	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
-	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
-	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
-	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
-	Sidecars                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	EnableCRDValidation     *bool    `json:"enable_crd_validation,omitempty"`
+	EtcdHost                string   `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps bool     `json:"kubernetes_use_configmaps,omitempty"`
+	DockerImage             string   `json:"docker_image,omitempty"`
+	Workers                 uint32   `json:"workers,omitempty"`
+	MinInstances            int32    `json:"min_instances,omitempty"`
+	MaxInstances            int32    `json:"max_instances,omitempty"`
+	ResyncPeriod            Duration `json:"resync_period,omitempty"`
+	RepairPeriod            Duration `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit bool     `json:"set_memory_request_to_limit,omitempty"`
+	ShmVolume               *bool    `json:"enable_shm_volume,omitempty"`
+	// deprecated in favour of SidecarContainers
+	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	SidecarContainers          []v1.Container                     `json:"sidecars,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`

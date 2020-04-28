@@ -312,11 +312,18 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 		*out = new(bool)
 		**out = **in
 	}
-	if in.Sidecars != nil {
-		in, out := &in.Sidecars, &out.Sidecars
+	if in.SidecarImages != nil {
+		in, out := &in.SidecarImages, &out.SidecarImages
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
+		}
+	}
+	if in.SidecarContainers != nil {
+		in, out := &in.SidecarContainers, &out.SidecarContainers
+		*out = make([]corev1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	out.PostgresUsersConfiguration = in.PostgresUsersConfiguration
