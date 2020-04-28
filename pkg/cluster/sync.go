@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -337,7 +338,8 @@ func (c *Cluster) syncStatefulSet() error {
 		if ToPropagateAnnotations != nil && PgCRDAnnotations != nil {
 			for _, anno := range ToPropagateAnnotations {
 				for k, v := range PgCRDAnnotations {
-					if k == anno {
+					matched, err := regexp.MatchString(anno, k)
+					if err == nil && matched {
 						annotations[k] = v
 					}
 				}
