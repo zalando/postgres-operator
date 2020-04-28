@@ -202,6 +202,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		}
 	}
 	out.PodEnvironmentConfigMap = in.PodEnvironmentConfigMap
+	if in.StatefulsetPropagateAnnotations != nil {
+		in, out := &in.StatefulsetPropagateAnnotations, &out.StatefulsetPropagateAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

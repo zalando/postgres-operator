@@ -331,21 +331,8 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-		ToPropagateAnnotations := c.OpConfig.StatefulsetPropAnnotations
-		PgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
-		annotations := make(map[string]string)
-
-		if ToPropagateAnnotations != nil && PgCRDAnnotations != nil {
-			for _, anno := range ToPropagateAnnotations {
-				for k, v := range PgCRDAnnotations {
-					matched, err := regexp.MatchString(anno, k)
-					if err == nil && matched {
-						annotations[k] = v
-					}
-				}
-			}
-			c.updateStatefulSetAnnotations(annotations)
-		}
+		annotations := c.PropagateAnnotationsToStatefulsets(c.Statefulset.Annotations)
+		c.updateStatefulSetAnnotations(annotations)
 	}
 
 	// Apply special PostgreSQL parameters that can only be set via the Patroni API.
@@ -368,6 +355,26 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 	}
 	return nil
+}
+
+// PropagateAnnotationsToStatefulsets updates annotations to statefulsets if required
+// based on the annotations in postgres CRD
+func (c *Cluster) PropagateAnnotationsToStatefulsets(annotations map[string]string) map[string]string {
+	ToPropagateAnnotations := c.OpConfig.StatefulsetPropagateAnnotations
+	PgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
+
+	if ToPropagateAnnotations != nil && PgCRDAnnotations != nil {
+		for _, anno := range ToPropagateAnnotations {
+			for k, v := range PgCRDAnnotations {
+				matched, err := regexp.MatchString(anno, k)
+				if err == nil && matched {
+					annotations[k] = v
+				}
+			}
+		}
+	}
+	return annotations
+
 }
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters

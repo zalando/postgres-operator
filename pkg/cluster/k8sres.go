@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 
@@ -1149,13 +1150,14 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	annotations = make(map[string]string)
+	annotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: annotations,
+			Annotations: c.PropagateAnnotationsToStatefulsets(annotations),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
