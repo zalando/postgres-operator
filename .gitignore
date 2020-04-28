@@ -28,6 +28,7 @@ _testmain.go
 /vendor/
 /build/
 /docker/build/
+/github.com/
 .idea
 
 scm-source.json

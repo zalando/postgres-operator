@@ -45,6 +45,7 @@ type KubernetesClient struct {
 	corev1.NodesGetter
 	corev1.NamespacesGetter
 	corev1.ServiceAccountsGetter
+	corev1.EventsGetter
 	appsv1.StatefulSetsGetter
 	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
@@ -142,6 +143,7 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1()
 	kubeClient.CronJobsGetter = client.BatchV1beta1()
+	kubeClient.EventsGetter = client.CoreV1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {

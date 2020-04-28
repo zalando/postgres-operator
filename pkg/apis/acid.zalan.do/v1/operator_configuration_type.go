@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -194,6 +195,7 @@ type OperatorConfigurationData struct {
 	SetMemoryRequestToLimit         bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                       *bool                              `json:"enable_shm_volume,omitempty"`
 	Sidecars                        map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	SidecarContainers               []v1.Container                     `json:"sidecars,omitempty"`
 	PostgresUsersConfiguration      PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                      KubernetesMetaConfiguration        `json:"kubernetes"`
 	PostgresPodResources            PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
