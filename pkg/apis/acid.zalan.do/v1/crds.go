@@ -942,6 +942,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"pod_environment_configmap": {
 								Type: "string",
 							},
+							"pod_environment_secret": {
+								Type: "string",
+							},
 							"pod_management_policy": {
 								Type: "string",
 								Enum: []apiextv1beta1.JSON{

@@ -145,6 +145,8 @@ spec:
                   type: string
                 pod_environment_configmap:
                   type: string
+                pod_environment_secret:
+                  type: string
                 pod_management_policy:
                   type: string
                   enum:
