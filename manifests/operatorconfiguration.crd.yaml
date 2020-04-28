@@ -197,6 +197,8 @@ spec:
                   type: boolean
                 enable_replica_load_balancer:
                   type: boolean
+                enable_pooler_load_balancer:
+                  type: boolean
                 master_dns_name_format:
                   type: string
                 replica_dns_name_format:
