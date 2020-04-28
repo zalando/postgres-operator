@@ -20,7 +20,6 @@ import (
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
-	pkgspec "github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -784,6 +783,67 @@ func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.
 	return result
 }
 
+// Return list of variables the pod recieved from the configured ConfigMap
+func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
+	configMapPodEnvVarsList := make([]v1.EnvVar, 0)
+
+	if c.OpConfig.PodEnvironmentConfigMap.Name == "" {
+		return configMapPodEnvVarsList, nil
+	}
+
+	cm, err := c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(
+		context.TODO(),
+		c.OpConfig.PodEnvironmentConfigMap.Name,
+		metav1.GetOptions{})
+	if err != nil {
+		// if not found, try again using the cluster's namespace if it's different (old behavior)
+		if k8sutil.ResourceNotFound(err) && c.Namespace != c.OpConfig.PodEnvironmentConfigMap.Namespace {
+			cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(
+				context.TODO(),
+				c.OpConfig.PodEnvironmentConfigMap.Name,
+				metav1.GetOptions{})
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
+		}
+	}
+	for k, v := range cm.Data {
+		configMapPodEnvVarsList = append(configMapPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
+	}
+	return configMapPodEnvVarsList, nil
+}
+
+// Return list of variables the pod recieved from the configured Secret
+func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
+	secretPodEnvVarsList := make([]v1.EnvVar, 0)
+
+	if c.OpConfig.PodEnvironmentSecret == "" {
+		return secretPodEnvVarsList, nil
+	}
+
+	secret, err := c.KubeClient.Secrets(c.OpConfig.PodEnvironmentSecret).Get(
+		context.TODO(),
+		c.OpConfig.PodEnvironmentSecret,
+		metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("could not read Secret PodEnvironmentSecretName: %v", err)
+	}
+
+	for k := range secret.Data {
+		secretPodEnvVarsList = append(secretPodEnvVarsList,
+			v1.EnvVar{Name: k, ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: c.OpConfig.PodEnvironmentSecret,
+					},
+					Key: k,
+				},
+			}})
+	}
+
+	return secretPodEnvVarsList, nil
+}
+
 func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.ResourceRequirements) *v1.Container {
 	name := sidecar.Name
 	if name == "" {
@@ -943,32 +1003,23 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers = spec.InitContainers
 	}
 
-	customPodEnvVarsList := make([]v1.EnvVar, 0)
-
-	if c.OpConfig.PodEnvironmentConfigMap != (pkgspec.NamespacedName{}) {
-		var cm *v1.ConfigMap
-		cm, err = c.KubeClient.ConfigMaps(c.OpConfig.PodEnvironmentConfigMap.Namespace).Get(
-			context.TODO(),
-			c.OpConfig.PodEnvironmentConfigMap.Name,
-			metav1.GetOptions{})
-		if err != nil {
-			// if not found, try again using the cluster's namespace if it's different (old behavior)
-			if k8sutil.ResourceNotFound(err) && c.Namespace != c.OpConfig.PodEnvironmentConfigMap.Namespace {
-				cm, err = c.KubeClient.ConfigMaps(c.Namespace).Get(
-					context.TODO(),
-					c.OpConfig.PodEnvironmentConfigMap.Name,
-					metav1.GetOptions{})
-			}
-			if err != nil {
-				return nil, fmt.Errorf("could not read PodEnvironmentConfigMap: %v", err)
-			}
-		}
-		for k, v := range cm.Data {
-			customPodEnvVarsList = append(customPodEnvVarsList, v1.EnvVar{Name: k, Value: v})
-		}
-		sort.Slice(customPodEnvVarsList,
-			func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
+	// fetch env vars from custom ConfigMap
+	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
+	if err != nil {
+		return nil, err
 	}
+
+	// fetch env vars from custom ConfigMap
+	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
+	if err != nil {
+		return nil, err
+	}
+
+	// concat all custom pod env vars and sort them
+	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
+	sort.Slice(customPodEnvVarsList,
+		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
+
 	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" {
 		return nil, fmt.Errorf("s3_wal_path is empty for standby cluster")
 	}
