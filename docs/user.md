@@ -442,6 +442,8 @@ The PostgreSQL volume is shared with sidecars and is mounted at
 specified but globally disabled in the configuration. The `enable_sidecars`
 option must be set to `true`.
 
+If you want to add a sidecar to every cluster managed by the operator, you can specify it in the [operator configuration](administrator.md#sidecars-for-postgres-clusters) instead.
+
 ## InitContainers Support
 
 Each cluster can specify arbitrary init containers to run. These containers can

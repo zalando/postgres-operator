@@ -178,6 +178,11 @@ func (c *Controller) warnOnDeprecatedOperatorParameters() {
 		c.logger.Warningf("Operator configuration parameter 'enable_load_balancer' is deprecated and takes no effect. " +
 			"Consider using the 'enable_master_load_balancer' or 'enable_replica_load_balancer' instead.")
 	}
+
+	if len(c.opConfig.SidecarImages) > 0 {
+		c.logger.Warningf("Operator configuration parameter 'sidecar_docker_images' is deprecated. " +
+			"Consider using 'sidecars' instead.")
+	}
 }
 
 func (c *Controller) initPodServiceAccount() {

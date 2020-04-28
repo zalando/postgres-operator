@@ -18,6 +18,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -1205,4 +1206,202 @@ func TestAdditionalVolume(t *testing.T) {
 			}
 		}
 	}
+}
+
+// inject sidecars through all available mechanisms and check the resulting container specs
+func TestSidecars(t *testing.T) {
+	var err error
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+
+	generateKubernetesResources := func(cpuRequest string, cpuLimit string, memoryRequest string, memoryLimit string) v1.ResourceRequirements {
+		parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
+		assert.NoError(t, err)
+		parsedCPULimit, err := resource.ParseQuantity(cpuLimit)
+		assert.NoError(t, err)
+		parsedMemoryRequest, err := resource.ParseQuantity(memoryRequest)
+		assert.NoError(t, err)
+		parsedMemoryLimit, err := resource.ParseQuantity(memoryLimit)
+		assert.NoError(t, err)
+		return v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    parsedCPURequest,
+				v1.ResourceMemory: parsedMemoryRequest,
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    parsedCPULimit,
+				v1.ResourceMemory: parsedMemoryLimit,
+			},
+		}
+	}
+
+	spec = acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+		Sidecars: []acidv1.Sidecar{
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar",
+			},
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar-with-resources",
+				Resources: acidv1.Resources{
+					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
+					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
+				},
+			},
+			acidv1.Sidecar{
+				Name:        "replace-sidecar",
+				DockerImage: "overwrite-image",
+			},
+		},
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					DefaultCPURequest:    "200m",
+					DefaultCPULimit:      "500m",
+					DefaultMemoryRequest: "0.7Gi",
+					DefaultMemoryLimit:   "1.3Gi",
+				},
+				SidecarImages: map[string]string{
+					"deprecated-global-sidecar": "image:123",
+				},
+				SidecarContainers: []v1.Container{
+					v1.Container{
+						Name: "global-sidecar",
+					},
+					// will be replaced by a cluster specific sidecar with the same name
+					v1.Container{
+						Name:  "replace-sidecar",
+						Image: "replaced-image",
+					},
+				},
+				Scalyr: config.Scalyr{
+					ScalyrAPIKey:        "abc",
+					ScalyrImage:         "scalyr-image",
+					ScalyrCPURequest:    "220m",
+					ScalyrCPULimit:      "520m",
+					ScalyrMemoryRequest: "0.9Gi",
+					// ise default memory limit
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+
+	s, err := cluster.generateStatefulSet(&spec)
+	assert.NoError(t, err)
+
+	env := []v1.EnvVar{
+		{
+			Name: "POD_NAME",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "POSTGRES_USER",
+			Value: superUserName,
+		},
+		{
+			Name: "POSTGRES_PASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: "",
+					},
+					Key: "password",
+				},
+			},
+		},
+	}
+	mounts := []v1.VolumeMount{
+		v1.VolumeMount{
+			Name:      "pgdata",
+			MountPath: "/home/postgres/pgdata",
+		},
+	}
+
+	// deduplicated sidecars and Patroni
+	assert.Equal(t, 7, len(s.Spec.Template.Spec.Containers), "wrong number of containers")
+
+	// cluster specific sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "cluster-specific-sidecar",
+		Env:             env,
+		Resources:       generateKubernetesResources("200m", "500m", "0.7Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts:    mounts,
+	})
+
+	// container specific resources
+	expectedResources := generateKubernetesResources("210m", "510m", "0.8Gi", "1.4Gi")
+	assert.Equal(t, expectedResources.Requests[v1.ResourceCPU], s.Spec.Template.Spec.Containers[2].Resources.Requests[v1.ResourceCPU])
+	assert.Equal(t, expectedResources.Limits[v1.ResourceCPU], s.Spec.Template.Spec.Containers[2].Resources.Limits[v1.ResourceCPU])
+	assert.Equal(t, expectedResources.Requests[v1.ResourceMemory], s.Spec.Template.Spec.Containers[2].Resources.Requests[v1.ResourceMemory])
+	assert.Equal(t, expectedResources.Limits[v1.ResourceMemory], s.Spec.Template.Spec.Containers[2].Resources.Limits[v1.ResourceMemory])
+
+	// deprecated global sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "deprecated-global-sidecar",
+		Image:           "image:123",
+		Env:             env,
+		Resources:       generateKubernetesResources("200m", "500m", "0.7Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts:    mounts,
+	})
+
+	// global sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:         "global-sidecar",
+		Env:          env,
+		VolumeMounts: mounts,
+	})
+
+	// replaced sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "replace-sidecar",
+		Image:           "overwrite-image",
+		Resources:       generateKubernetesResources("200m", "500m", "0.7Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Env:             env,
+		VolumeMounts:    mounts,
+	})
+
+	// replaced sidecar
+	// the order in env is important
+	scalyrEnv := append([]v1.EnvVar{v1.EnvVar{Name: "SCALYR_API_KEY", Value: "abc"}, v1.EnvVar{Name: "SCALYR_SERVER_HOST", Value: ""}}, env...)
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "scalyr-sidecar",
+		Image:           "scalyr-image",
+		Resources:       generateKubernetesResources("220m", "520m", "0.9Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Env:             scalyrEnv,
+		VolumeMounts:    mounts,
+	})
+
 }

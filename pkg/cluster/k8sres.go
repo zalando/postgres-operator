@@ -462,8 +462,7 @@ func generateContainer(
 }
 
 func generateSidecarContainers(sidecars []acidv1.Sidecar,
-	volumeMounts []v1.VolumeMount, defaultResources acidv1.Resources,
-	superUserName string, credentialsSecretName string, logger *logrus.Entry) ([]v1.Container, error) {
+	defaultResources acidv1.Resources, startIndex int, logger *logrus.Entry) ([]v1.Container, error) {
 
 	if len(sidecars) > 0 {
 		result := make([]v1.Container, 0)
@@ -482,12 +481,61 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 				return nil, err
 			}
 
-			sc := getSidecarContainer(sidecar, index, volumeMounts, resources, superUserName, credentialsSecretName, logger)
+			sc := getSidecarContainer(sidecar, startIndex+index, resources)
 			result = append(result, *sc)
 		}
 		return result, nil
 	}
 	return nil, nil
+}
+
+// adds common fields to sidecars
+func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string, logger *logrus.Entry) []v1.Container {
+	result := []v1.Container{}
+
+	for _, container := range in {
+		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+		env := []v1.EnvVar{
+			{
+				Name: "POD_NAME",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.name",
+					},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.namespace",
+					},
+				},
+			},
+			{
+				Name:  "POSTGRES_USER",
+				Value: superUserName,
+			},
+			{
+				Name: "POSTGRES_PASSWORD",
+				ValueFrom: &v1.EnvVarSource{
+					SecretKeyRef: &v1.SecretKeySelector{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: credentialsSecretName,
+						},
+						Key: "password",
+					},
+				},
+			},
+		}
+		mergedEnv := append(container.Env, env...)
+		container.Env = deduplicateEnvVars(mergedEnv, container.Name, logger)
+		result = append(result, container)
+	}
+
+	return result
 }
 
 // Check whether or not we're requested to mount an shm volume,
@@ -724,58 +772,18 @@ func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.
 	return result
 }
 
-func getSidecarContainer(sidecar acidv1.Sidecar, index int, volumeMounts []v1.VolumeMount,
-	resources *v1.ResourceRequirements, superUserName string, credentialsSecretName string, logger *logrus.Entry) *v1.Container {
+func getSidecarContainer(sidecar acidv1.Sidecar, index int, resources *v1.ResourceRequirements) *v1.Container {
 	name := sidecar.Name
 	if name == "" {
 		name = fmt.Sprintf("sidecar-%d", index)
 	}
 
-	env := []v1.EnvVar{
-		{
-			Name: "POD_NAME",
-			ValueFrom: &v1.EnvVarSource{
-				FieldRef: &v1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.name",
-				},
-			},
-		},
-		{
-			Name: "POD_NAMESPACE",
-			ValueFrom: &v1.EnvVarSource{
-				FieldRef: &v1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.namespace",
-				},
-			},
-		},
-		{
-			Name:  "POSTGRES_USER",
-			Value: superUserName,
-		},
-		{
-			Name: "POSTGRES_PASSWORD",
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: &v1.SecretKeySelector{
-					LocalObjectReference: v1.LocalObjectReference{
-						Name: credentialsSecretName,
-					},
-					Key: "password",
-				},
-			},
-		},
-	}
-	if len(sidecar.Env) > 0 {
-		env = append(env, sidecar.Env...)
-	}
 	return &v1.Container{
 		Name:            name,
 		Image:           sidecar.DockerImage,
 		ImagePullPolicy: v1.PullIfNotPresent,
 		Resources:       *resources,
-		VolumeMounts:    volumeMounts,
-		Env:             deduplicateEnvVars(env, name, logger),
+		Env:             sidecar.Env,
 		Ports:           sidecar.Ports,
 	}
 }
@@ -1065,36 +1073,62 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.Resources.SpiloPrivileged,
 	)
 
-	// resolve conflicts between operator-global and per-cluster sidecars
-	sideCars := c.mergeSidecars(spec.Sidecars)
+	// generate container specs for sidecars specified in the cluster manifest
+	clusterSpecificSidecars := []v1.Container{}
+	if spec.Sidecars != nil && len(spec.Sidecars) > 0 {
+		// warn if sidecars are defined, but globally disabled (does not apply to globally defined sidecars)
+		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
+			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
+		}
 
-	resourceRequirementsScalyrSidecar := makeResources(
-		c.OpConfig.ScalyrCPURequest,
-		c.OpConfig.ScalyrMemoryRequest,
-		c.OpConfig.ScalyrCPULimit,
-		c.OpConfig.ScalyrMemoryLimit,
-	)
+		if clusterSpecificSidecars, err = generateSidecarContainers(spec.Sidecars, defaultResources, 0, c.logger); err != nil {
+			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+		}
+	}
+
+	// decrapted way of providing global sidecars
+	var globalSidecarContainersByDockerImage []v1.Container
+	var globalSidecarsByDockerImage []acidv1.Sidecar
+	for name, dockerImage := range c.OpConfig.SidecarImages {
+		globalSidecarsByDockerImage = append(globalSidecarsByDockerImage, acidv1.Sidecar{Name: name, DockerImage: dockerImage})
+	}
+	if globalSidecarContainersByDockerImage, err = generateSidecarContainers(globalSidecarsByDockerImage, defaultResources, len(clusterSpecificSidecars), c.logger); err != nil {
+		return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
+	}
+	// make the resulting list reproducible
+	// c.OpConfig.SidecarImages is unsorted by Golang definition
+	// .Name is unique
+	sort.Slice(globalSidecarContainersByDockerImage, func(i, j int) bool {
+		return globalSidecarContainersByDockerImage[i].Name < globalSidecarContainersByDockerImage[j].Name
+	})
 
 	// generate scalyr sidecar container
-	if scalyrSidecar :=
+	var scalyrSidecars []v1.Container
+	if scalyrSidecar, err :=
 		generateScalyrSidecarSpec(c.Name,
 			c.OpConfig.ScalyrAPIKey,
 			c.OpConfig.ScalyrServerURL,
 			c.OpConfig.ScalyrImage,
-			&resourceRequirementsScalyrSidecar, c.logger); scalyrSidecar != nil {
-		sideCars = append(sideCars, *scalyrSidecar)
+			c.OpConfig.ScalyrCPURequest,
+			c.OpConfig.ScalyrMemoryRequest,
+			c.OpConfig.ScalyrCPULimit,
+			c.OpConfig.ScalyrMemoryLimit,
+			defaultResources,
+			c.logger); err != nil {
+		return nil, fmt.Errorf("could not generate Scalyr sidecar: %v", err)
+	} else {
+		if scalyrSidecar != nil {
+			scalyrSidecars = append(scalyrSidecars, *scalyrSidecar)
+		}
 	}
 
-	// generate sidecar containers
-	if sideCars != nil && len(sideCars) > 0 {
-		if c.OpConfig.EnableSidecars != nil && !(*c.OpConfig.EnableSidecars) {
-			c.logger.Warningf("sidecars specified but disabled in configuration - next statefulset creation would fail")
-		}
-		if sidecarContainers, err = generateSidecarContainers(sideCars, volumeMounts, defaultResources,
-			c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger); err != nil {
-			return nil, fmt.Errorf("could not generate sidecar containers: %v", err)
-		}
+	sidecarContainers, conflicts := mergeContainers(clusterSpecificSidecars, c.Config.OpConfig.SidecarContainers, globalSidecarContainersByDockerImage, scalyrSidecars)
+	for containerName := range conflicts {
+		c.logger.Warningf("a sidecar is specified twice. Ignoring sidecar %q in favor of %q with high a precendence",
+			containerName, containerName)
 	}
+
+	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
@@ -1188,57 +1222,44 @@ func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]s
 }
 
 func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage string,
-	containerResources *acidv1.Resources, logger *logrus.Entry) *acidv1.Sidecar {
+	scalyrCPURequest string, scalyrMemoryRequest string, scalyrCPULimit string, scalyrMemoryLimit string,
+	defaultResources acidv1.Resources, logger *logrus.Entry) (*v1.Container, error) {
 	if APIKey == "" || dockerImage == "" {
 		if APIKey == "" && dockerImage != "" {
 			logger.Warning("Not running Scalyr sidecar: SCALYR_API_KEY must be defined")
 		}
-		return nil
+		return nil, nil
 	}
-	scalarSpec := &acidv1.Sidecar{
-		Name:        "scalyr-sidecar",
-		DockerImage: dockerImage,
-		Env: []v1.EnvVar{
-			{
-				Name:  "SCALYR_API_KEY",
-				Value: APIKey,
-			},
-			{
-				Name:  "SCALYR_SERVER_HOST",
-				Value: clusterName,
-			},
+	resourcesScalyrSidecar := makeResources(
+		scalyrCPURequest,
+		scalyrMemoryRequest,
+		scalyrCPULimit,
+		scalyrMemoryLimit,
+	)
+	resourceRequirementsScalyrSidecar, err := generateResourceRequirements(resourcesScalyrSidecar, defaultResources)
+	if err != nil {
+		return nil, fmt.Errorf("invalid resources for Scalyr sidecar: %v", err)
+	}
+	env := []v1.EnvVar{
+		{
+			Name:  "SCALYR_API_KEY",
+			Value: APIKey,
 		},
-		Resources: *containerResources,
+		{
+			Name:  "SCALYR_SERVER_HOST",
+			Value: clusterName,
+		},
 	}
 	if serverURL != "" {
-		scalarSpec.Env = append(scalarSpec.Env, v1.EnvVar{Name: "SCALYR_SERVER_URL", Value: serverURL})
+		env = append(env, v1.EnvVar{Name: "SCALYR_SERVER_URL", Value: serverURL})
 	}
-	return scalarSpec
-}
-
-// mergeSidecar merges globally-defined sidecars with those defined in the cluster manifest
-func (c *Cluster) mergeSidecars(sidecars []acidv1.Sidecar) []acidv1.Sidecar {
-	globalSidecarsToSkip := map[string]bool{}
-	result := make([]acidv1.Sidecar, 0)
-
-	for i, sidecar := range sidecars {
-		dockerImage, ok := c.OpConfig.Sidecars[sidecar.Name]
-		if ok {
-			if dockerImage != sidecar.DockerImage {
-				c.logger.Warningf("merging definitions for sidecar %q: "+
-					"ignoring %q in the global scope in favor of %q defined in the cluster",
-					sidecar.Name, dockerImage, sidecar.DockerImage)
-			}
-			globalSidecarsToSkip[sidecar.Name] = true
-		}
-		result = append(result, sidecars[i])
-	}
-	for name, dockerImage := range c.OpConfig.Sidecars {
-		if !globalSidecarsToSkip[name] {
-			result = append(result, acidv1.Sidecar{Name: name, DockerImage: dockerImage})
-		}
-	}
-	return result
+	return &v1.Container{
+		Name:            "scalyr-sidecar",
+		Image:           dockerImage,
+		Env:             env,
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Resources:       *resourceRequirementsScalyrSidecar,
+	}, nil
 }
 
 func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
@@ -1803,7 +1824,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
 		[]acidv1.AdditionalVolume{}); err != nil {
-			return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
+		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
 	// overwrite specific params of logical backups pods
