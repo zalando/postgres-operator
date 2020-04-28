@@ -1299,7 +1299,7 @@ func TestSidecars(t *testing.T) {
 					// ise default memory limit
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	s, err := cluster.generateStatefulSet(&spec)
 	assert.NoError(t, err)
