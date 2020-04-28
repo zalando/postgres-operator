@@ -210,7 +210,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
 
         # update docker image in config and enable the lazy upgrade
-        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115"
+        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
         patch_lazy_spilo_upgrade = {
             "data": {
                 "docker_image": conf_image,
