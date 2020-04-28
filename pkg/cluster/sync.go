@@ -109,9 +109,9 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			err = fmt.Errorf("could not sync databases: %v", err)
 			return err
 		}
-		c.logger.Debugf("syncing database schemas")
+		c.logger.Debugf("syncing prepared databases with schemas")
 		if err = c.syncPreparedDatabases(); err != nil {
-			err = fmt.Errorf("could not sync database schemas: %v", err)
+			err = fmt.Errorf("could not sync prepared database: %v", err)
 			return err
 		}
 	}
@@ -534,6 +534,7 @@ func (c *Cluster) syncDatabases() error {
 
 	createDatabases := make(map[string]string)
 	alterOwnerDatabases := make(map[string]string)
+	preparedDatabases := make([]string, 0)
 
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
@@ -557,6 +558,7 @@ func (c *Cluster) syncDatabases() error {
 		_, exists := currentDatabases[preparedDatabaseName]
 		if !exists {
 			createDatabases[preparedDatabaseName] = preparedDatabaseName + constants.OwnerRoleNameSuffix
+			preparedDatabases = append(preparedDatabases, preparedDatabaseName)
 		}
 	}
 
@@ -584,6 +586,13 @@ func (c *Cluster) syncDatabases() error {
 		}
 	}
 
+	// set default privileges for prepared database
+	for _, preparedDatabase := range preparedDatabases {
+		if err = c.execAlterGlobalDefaultPrivileges(preparedDatabase+constants.OwnerRoleNameSuffix, preparedDatabase); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -598,9 +607,6 @@ func (c *Cluster) syncPreparedDatabases() error {
 				c.logger.Errorf("could not close database connection: %v", err)
 			}
 		}()
-
-		// first, set default privileges for prepared database
-		c.execAlterGlobalDefaultPrivileges(preparedDbName+constants.OwnerRoleNameSuffix, preparedDbName)
 
 		// now, prepare defined schemas
 		preparedSchemas := preparedDB.PreparedSchemas
