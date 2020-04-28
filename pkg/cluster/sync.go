@@ -331,7 +331,7 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-		annotations := c.PropagateAnnotationsToStatefulsets(c.Statefulset.Annotations)
+		annotations := c.AnnotationsToPropagate(c.Statefulset.Annotations)
 		c.updateStatefulSetAnnotations(annotations)
 	}
 
@@ -359,9 +359,9 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-// PropagateAnnotationsToStatefulsets updates annotations to statefulsets if required
+// AnnotationsToPropagate get the annotations to update if required
 // based on the annotations in postgres CRD
-func (c *Cluster) PropagateAnnotationsToStatefulsets(annotations map[string]string) map[string]string {
+func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[string]string {
 	ToPropagateAnnotations := c.OpConfig.StatefulsetPropagateAnnotations
 	PgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
 
@@ -369,7 +369,11 @@ func (c *Cluster) PropagateAnnotationsToStatefulsets(annotations map[string]stri
 		for _, anno := range ToPropagateAnnotations {
 			for k, v := range PgCRDAnnotations {
 				matched, err := regexp.MatchString(anno, k)
-				if err == nil && matched {
+				if err != nil {
+					c.logger.Errorf("annotations matching issue: %v", err)
+					return nil
+				}
+				if matched {
 					annotations[k] = v
 				}
 			}
@@ -732,6 +736,11 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	deployment, err := c.KubeClient.
 		Deployments(c.Namespace).
 		Get(context.TODO(), c.connectionPoolerName(), metav1.GetOptions{})
+
+	newAnnotations := c.AnnotationsToPropagate(deployment.Annotations)
+	if newAnnotations != nil {
+		c.updateConnectionPoolerAnnotations(newAnnotations)
+	}
 
 	if err != nil && k8sutil.ResourceNotFound(err) {
 		msg := "Deployment %s for connection pooler synchronization is not found, create it"
