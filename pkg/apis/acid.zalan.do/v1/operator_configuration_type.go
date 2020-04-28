@@ -194,7 +194,7 @@ type OperatorConfigurationData struct {
 	RepairPeriod                    Duration                           `json:"repair_period,omitempty"`
 	SetMemoryRequestToLimit         bool                               `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume                       *bool                              `json:"enable_shm_volume,omitempty"`
-	Sidecars                        map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	SidecarImages                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
 	SidecarContainers               []v1.Container                     `json:"sidecars,omitempty"`
 	PostgresUsersConfiguration      PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                      KubernetesMetaConfiguration        `json:"kubernetes"`
