@@ -646,7 +646,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// connection pooler needs one system user created, which is done in
 	// initUsers. Check if it needs to be called.
-	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users)
+	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
+		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
 	needConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("syncing secrets")
@@ -783,7 +784,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// sync connection pooler
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
 		c.installLookupFunction); err != nil {
-		return fmt.Errorf("could not sync connection pooler: %v", err)
+		c.logger.Errorf("could not sync connection pooler: %v", err)
+		updateFailed = true
 	}
 
 	return nil
@@ -956,10 +958,8 @@ func (c *Cluster) initSystemUsers() {
 
 func (c *Cluster) initPreparedDatabaseRoles() error {
 
-	preparedDatabases := c.Spec.PreparedDatabases
-	if preparedDatabases == nil || len(preparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
-		preparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
-		c.Spec.PreparedDatabases = preparedDatabases
+	if c.Spec.PreparedDatabases != nil && len(c.Spec.PreparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
+		c.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
 	}
 
 	// create maps with default roles/users as keys and their membership as values
@@ -974,7 +974,7 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		constants.WriterRoleNameSuffix + constants.UserRoleNameSuffix: constants.WriterRoleNameSuffix,
 	}
 
-	for preparedDbName, preparedDB := range preparedDatabases {
+	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
 		// default roles per database
 		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
