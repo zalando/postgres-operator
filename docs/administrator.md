@@ -509,9 +509,8 @@ A secret can be pre-provisioned in different ways:
 
 ## Sidecars for Postgres clusters
 
-A list of sidecars is added to each cluster created by the
-operator. The default is empty list.
-
+A list of sidecars is added to each cluster created by the operator. The default
+is empty.
 
 ```yaml
 kind: OperatorConfiguration
@@ -527,7 +526,8 @@ configuration:
   - ...
 ```
 
-In addition to any environment variables you specify, the following environment variables are always passed to sidecars:
+In addition to any environment variables you specify, the following environment
+variables are always passed to sidecars:
 
   - `POD_NAME` - field reference to `metadata.name`
   - `POD_NAMESPACE` - field reference to `metadata.namespace`

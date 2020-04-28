@@ -305,7 +305,7 @@ spec:
                   type: integer
                 ring_log_lines:
                   type: integer
-            scalyr:
+            scalyr:  # deprecated
               type: object
               properties:
                 scalyr_api_key:
