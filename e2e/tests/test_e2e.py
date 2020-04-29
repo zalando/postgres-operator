@@ -506,14 +506,10 @@ class EndToEndTestCase(unittest.TestCase):
 
         pg_crd_annotations = {
             "metadata": {
-                "annotations": [
-                    {
-                        "deployment-time": "2020-04-30 12:00:00",
-                    },
-                    {
-                        "downscaler/downtime_replicas": "0",
-                    },
-                ],
+                "annotations": {
+                    "deployment-time": "2020-04-30 12:00:00",
+                    "downscaler/downtime_replicas": "0",
+                },
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -732,7 +728,7 @@ class K8s:
     def check_service_annotations(self, svc_labels, annotations, namespace='default'):
         svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
         for svc in svcs:
-            if len(svc.metadata.annotations) != len(annotations):
+            if len(svc.metadata.annotations) < len(annotations):
                 return False
             for key in svc.metadata.annotations:
                 if svc.metadata.annotations[key] != annotations[key]:
