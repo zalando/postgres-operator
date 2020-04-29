@@ -421,6 +421,43 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"preparedDatabases": {
+						Type: "object",
+						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"defaultUsers": {
+										Type: "boolean",
+									},
+									"extensions": {
+										Type: "object",
+										AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"schemas": {
+										Type: "object",
+										AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"defaultUsers": {
+														Type: "boolean",
+													},
+													"defaultRoles": {
+														Type: "boolean",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					"replicaLoadBalancer": {
 						Type:        "boolean",
 						Description: "Deprecated",

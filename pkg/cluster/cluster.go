@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -227,6 +228,10 @@ func (c *Cluster) initUsers() error {
 		return fmt.Errorf("could not init infrastructure roles: %v", err)
 	}
 
+	if err := c.initPreparedDatabaseRoles(); err != nil {
+		return fmt.Errorf("could not init default users: %v", err)
+	}
+
 	if err := c.initRobotUsers(); err != nil {
 		return fmt.Errorf("could not init robot users: %v", err)
 	}
@@ -342,6 +347,9 @@ func (c *Cluster) Create() error {
 
 		if err = c.syncDatabases(); err != nil {
 			return fmt.Errorf("could not sync databases: %v", err)
+		}
+		if err = c.syncPreparedDatabases(); err != nil {
+			return fmt.Errorf("could not sync prepared databases: %v", err)
 		}
 		c.logger.Infof("databases have been successfully created")
 	}
@@ -649,7 +657,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	// connection pooler needs one system user created, which is done in
 	// initUsers. Check if it needs to be called.
-	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users)
+	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
+		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
 	needConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("syncing secrets")
@@ -766,10 +775,18 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.logger.Errorf("could not sync roles: %v", err)
 			updateFailed = true
 		}
-		if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
+		if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) ||
+			!reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases) {
 			c.logger.Infof("syncing databases")
 			if err := c.syncDatabases(); err != nil {
 				c.logger.Errorf("could not sync databases: %v", err)
+				updateFailed = true
+			}
+		}
+		if !reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases) {
+			c.logger.Infof("syncing prepared databases")
+			if err := c.syncPreparedDatabases(); err != nil {
+				c.logger.Errorf("could not sync prepared databases: %v", err)
 				updateFailed = true
 			}
 		}
@@ -778,7 +795,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// sync connection pooler
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
 		c.installLookupFunction); err != nil {
-		return fmt.Errorf("could not sync connection pooler: %v", err)
+		c.logger.Errorf("could not sync connection pooler: %v", err)
+		updateFailed = true
 	}
 
 	return nil
@@ -947,6 +965,100 @@ func (c *Cluster) initSystemUsers() {
 			c.systemUsers[constants.ConnectionPoolerUserKeyName] = connectionPoolerUser
 		}
 	}
+}
+
+func (c *Cluster) initPreparedDatabaseRoles() error {
+
+	if c.Spec.PreparedDatabases != nil && len(c.Spec.PreparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
+		c.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
+	}
+
+	// create maps with default roles/users as keys and their membership as values
+	defaultRoles := map[string]string{
+		constants.OwnerRoleNameSuffix:  "",
+		constants.ReaderRoleNameSuffix: "",
+		constants.WriterRoleNameSuffix: constants.ReaderRoleNameSuffix,
+	}
+	defaultUsers := map[string]string{
+		constants.OwnerRoleNameSuffix + constants.UserRoleNameSuffix:  constants.OwnerRoleNameSuffix,
+		constants.ReaderRoleNameSuffix + constants.UserRoleNameSuffix: constants.ReaderRoleNameSuffix,
+		constants.WriterRoleNameSuffix + constants.UserRoleNameSuffix: constants.WriterRoleNameSuffix,
+	}
+
+	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
+		// default roles per database
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName); err != nil {
+			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
+		}
+		if preparedDB.DefaultUsers {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName); err != nil {
+				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
+			}
+		}
+
+		// default roles per database schema
+		preparedSchemas := preparedDB.PreparedSchemas
+		if len(preparedDB.PreparedSchemas) == 0 {
+			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
+		}
+		for preparedSchemaName, preparedSchema := range preparedSchemas {
+			if preparedSchema.DefaultRoles == nil || *preparedSchema.DefaultRoles {
+				if err := c.initDefaultRoles(defaultRoles,
+					preparedDbName+constants.OwnerRoleNameSuffix,
+					preparedDbName+"_"+preparedSchemaName); err != nil {
+					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
+				}
+				if preparedSchema.DefaultUsers {
+					if err := c.initDefaultRoles(defaultUsers,
+						preparedDbName+constants.OwnerRoleNameSuffix,
+						preparedDbName+"_"+preparedSchemaName); err != nil {
+						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string) error {
+
+	for defaultRole, inherits := range defaultRoles {
+
+		roleName := prefix + defaultRole
+
+		flags := []string{constants.RoleFlagNoLogin}
+		if defaultRole[len(defaultRole)-5:] == constants.UserRoleNameSuffix {
+			flags = []string{constants.RoleFlagLogin}
+		}
+
+		memberOf := make([]string, 0)
+		if inherits != "" {
+			memberOf = append(memberOf, prefix+inherits)
+		}
+
+		adminRole := ""
+		if strings.Contains(defaultRole, constants.OwnerRoleNameSuffix) {
+			adminRole = admin
+		} else {
+			adminRole = prefix + constants.OwnerRoleNameSuffix
+		}
+
+		newRole := spec.PgUser{
+			Origin:    spec.RoleOriginBootstrap,
+			Name:      roleName,
+			Password:  util.RandomPassword(constants.PasswordLength),
+			Flags:     flags,
+			MemberOf:  memberOf,
+			AdminRole: adminRole,
+		}
+		if currentRole, present := c.pgUsers[roleName]; present {
+			c.pgUsers[roleName] = c.resolveNameConflict(&currentRole, &newRole)
+		} else {
+			c.pgUsers[roleName] = newRole
+		}
+	}
+	return nil
 }
 
 func (c *Cluster) initRobotUsers() error {
