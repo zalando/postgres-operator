@@ -34,6 +34,10 @@ spec:
         configuration:
           type: object
           properties:
+            # statefulset_propagate_annotations:
+            #   type: array
+            #   items:
+            #     type: string
             docker_image:
               type: string
             enable_crd_validation:
