@@ -31,9 +31,8 @@ pipeline:
             make deps docker
         - desc: 'Run unit tests'
           cmd: |
-            export GOPATH=$(go env GOPATH)
-            export PATH=$PATH:$GOPATH
-            make test
+            export PATH=$PATH:$HOME/go/bin
+            go test ./...
         - desc: 'Run e2e tests'
           cmd: |
             make e2e
