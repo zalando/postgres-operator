@@ -1,7 +1,7 @@
 FROM alpine:3.6
 MAINTAINER team-acid@zalando.de
 
-EXPOSE 8080
+EXPOSE 8081
 
 RUN \
   apk add --no-cache \
@@ -29,6 +29,7 @@ RUN \
     /var/cache/apk/*
 
 COPY requirements.txt /
+COPY start_server.sh /
 RUN pip3 install -r /requirements.txt
 
 COPY operator_ui /operator_ui
@@ -37,4 +38,4 @@ ARG VERSION=dev
 RUN sed -i "s/__version__ = .*/__version__ = '${VERSION}'/" /operator_ui/__init__.py
 
 WORKDIR /
-ENTRYPOINT ["/usr/bin/python3", "-m", "operator_ui"]
+CMD ["/usr/bin/python3", "-m", "operator_ui"]
