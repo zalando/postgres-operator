@@ -353,8 +353,7 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-
-		annotations := c.PropagateAnnotationsToStatefulsets(c.Statefulset.Annotations)
+		annotations := c.AnnotationsToPropagate(c.Statefulset.Annotations)
 		c.updateStatefulSetAnnotations(annotations)
 
 		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
@@ -395,9 +394,9 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-// PropagateAnnotationsToStatefulsets updates annotations to statefulsets if required
+// AnnotationsToPropagate get the annotations to update if required
 // based on the annotations in postgres CRD
-func (c *Cluster) PropagateAnnotationsToStatefulsets(annotations map[string]string) map[string]string {
+func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[string]string {
 	ToPropagateAnnotations := c.OpConfig.StatefulsetPropagateAnnotations
 	PgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
 
@@ -405,14 +404,18 @@ func (c *Cluster) PropagateAnnotationsToStatefulsets(annotations map[string]stri
 		for _, anno := range ToPropagateAnnotations {
 			for k, v := range PgCRDAnnotations {
 				matched, err := regexp.MatchString(anno, k)
-				if err == nil && matched {
+				if err != nil {
+					c.logger.Errorf("annotations matching issue: %v", err)
+					return nil
+				}
+				if matched {
 					annotations[k] = v
 				}
 			}
 		}
 	}
-	return annotations
 
+	return annotations
 }
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
@@ -839,6 +842,11 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			c.ConnectionPooler.Deployment = deployment
 			return reason, nil
 		}
+	}
+
+	newAnnotations := c.AnnotationsToPropagate(c.ConnectionPooler.Deployment.Annotations)
+	if newAnnotations != nil {
+		c.updateConnectionPoolerAnnotations(newAnnotations)
 	}
 
 	service, err := c.KubeClient.
