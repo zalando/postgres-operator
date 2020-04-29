@@ -343,6 +343,11 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 	out.Scalyr = in.Scalyr
 	out.LogicalBackup = in.LogicalBackup
 	in.ConnectionPooler.DeepCopyInto(&out.ConnectionPooler)
+	if in.StatefulsetPropagateAnnotations != nil {
+		in, out := &in.StatefulsetPropagateAnnotations, &out.StatefulsetPropagateAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
