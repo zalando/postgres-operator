@@ -19,4 +19,5 @@ install:
 script:
   - hack/verify-codegen.sh
   - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -v
+  - go test ./...
   - make e2e
