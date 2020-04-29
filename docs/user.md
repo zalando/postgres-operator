@@ -374,7 +374,10 @@ spec:
 
 Adding existing database schemas to the manifest to create roles for them as
 well is up the user and not done by the operator. Remember that if you don't
-specify any schema a new database schema called `data` will be created.
+specify any schema a new database schema called `data` will be created. When
+everything got synced (roles, schemas, extensions), you are free to remove the
+database from the `databases` section. Note, that the operator does not delete
+database objects or revoke privileges when removed from the manifest.
 
 ## Resource definition
 
