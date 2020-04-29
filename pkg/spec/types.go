@@ -31,6 +31,7 @@ const (
 	RoleOriginInfrastructure
 	RoleOriginTeamsAPI
 	RoleOriginSystem
+	RoleOriginBootstrap
 	RoleConnectionPooler
 )
 
@@ -180,6 +181,8 @@ func (r RoleOrigin) String() string {
 		return "teams API role"
 	case RoleOriginSystem:
 		return "system role"
+	case RoleOriginBootstrap:
+		return "bootstrapped role"
 	case RoleConnectionPooler:
 		return "connection pooler role"
 	default:

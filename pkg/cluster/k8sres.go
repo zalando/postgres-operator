@@ -1470,6 +1470,13 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 		return nil
 	}
 
+	//skip NOLOGIN users
+	for _, flag := range pgUser.Flags {
+		if flag == constants.RoleFlagNoLogin {
+			return nil
+		}
+	}
+
 	username := pgUser.Name
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

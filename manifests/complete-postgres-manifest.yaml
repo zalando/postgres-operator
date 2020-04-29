@@ -21,6 +21,17 @@ spec:
   - 127.0.0.1/32
   databases:
     foo: zalando
+  preparedDatabases:
+    bar:
+      defaultUsers: true
+      extensions:
+        pg_partman: public
+        pgcrypto: public
+      schemas:
+        data: {}
+        history:
+          defaultRoles: true
+          defaultUsers: false
   postgresql:
     version: "12"
     parameters: # Expert section

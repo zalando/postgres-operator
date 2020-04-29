@@ -73,26 +73,44 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 }
 
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
-func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserRequest, db *sql.DB) error {
-	for _, r := range reqs {
-		switch r.Kind {
+func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSyncUserRequest, db *sql.DB) error {
+	var reqretries []spec.PgSyncUserRequest
+	var errors []string
+	for _, request := range requests {
+		switch request.Kind {
 		case spec.PGSyncUserAdd:
-			if err := strategy.createPgUser(r.User, db); err != nil {
-				return fmt.Errorf("could not create user %q: %v", r.User.Name, err)
+			if err := strategy.createPgUser(request.User, db); err != nil {
+				reqretries = append(reqretries, request)
+				errors = append(errors, fmt.Sprintf("could not create user %q: %v", request.User.Name, err))
 			}
 		case spec.PGsyncUserAlter:
-			if err := strategy.alterPgUser(r.User, db); err != nil {
-				return fmt.Errorf("could not alter user %q: %v", r.User.Name, err)
+			if err := strategy.alterPgUser(request.User, db); err != nil {
+				reqretries = append(reqretries, request)
+				errors = append(errors, fmt.Sprintf("could not alter user %q: %v", request.User.Name, err))
 			}
 		case spec.PGSyncAlterSet:
-			if err := strategy.alterPgUserSet(r.User, db); err != nil {
-				return fmt.Errorf("could not set custom user %q parameters: %v", r.User.Name, err)
+			if err := strategy.alterPgUserSet(request.User, db); err != nil {
+				reqretries = append(reqretries, request)
+				errors = append(errors, fmt.Sprintf("could not set custom user %q parameters: %v", request.User.Name, err))
 			}
 		default:
-			return fmt.Errorf("unrecognized operation: %v", r.Kind)
+			return fmt.Errorf("unrecognized operation: %v", request.Kind)
 		}
 
 	}
+
+	// creating roles might fail if group role members are created before the parent role
+	// retry adding roles as long as the number of failed attempts is shrinking
+	if len(reqretries) > 0 {
+		if len(reqretries) < len(requests) {
+			if err := strategy.ExecuteSyncRequests(reqretries, db); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("could not execute sync requests for users: %v", errors)
+		}
+	}
+
 	return nil
 }
 func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql.DB) (err error) {

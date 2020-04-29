@@ -237,6 +237,26 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+            preparedDatabases:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  defaultUsers:
+                    type: boolean
+                  extensions:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  schemas:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        defaultUsers:
+                          type: boolean
+                        defaultRoles:
+                          type: boolean
             replicaLoadBalancer:  # deprecated
               type: boolean
             resources:
