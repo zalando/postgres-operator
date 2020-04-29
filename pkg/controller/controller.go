@@ -76,7 +76,7 @@ func NewController(controllerConfig *spec.ControllerConfig, controllerId string)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logger.Debugf)
+	eventBroadcaster.StartLogging(logger.Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: myComponentName})
 
 	c := &Controller{
