@@ -290,7 +290,7 @@ spec:
           defaultRoles: false
 ```
 
-Then the schemas are owned by the database owner, too.
+Then, the schemas are owned by the database owner, too.
 
 ### Default LOGIN roles
 
@@ -348,6 +348,33 @@ SHOW extwlist.extensions;
 Make sure that `pgextlist` is also listed under `shared_preload_libraries` in
 the PostgreSQL configuration. Then the database owner should be able to create
 the extension specified in the manifest.
+
+### From `databases` to `preparedDatabases`
+
+If you wish to create the role setup described above for databases listed under
+the `databases` key, you have to make sure that the owner role follows the
+`<dbname>_owner` naming convention of `preparedDatabases`. As roles are synced
+first, this can be done with one edit:
+
+```yaml
+# before
+spec:
+  databases:
+    foo: db_owner
+
+# after
+spec:
+  databases:
+    foo: foo_owner
+  preparedDatabases:
+    foo:
+      schemas:
+        my_existing_schema: {}
+```
+
+Adding existing database schemas to the manifest to create roles for them as
+well is up the user and not done by the operator. Remember that if you don't
+specify any schema a new database schema called `data` will be created.
 
 ## Resource definition
 
