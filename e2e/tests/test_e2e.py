@@ -142,15 +142,6 @@ class EndToEndTestCase(unittest.TestCase):
                 })
             k8s.wait_for_pods_to_stop(pod_selector)
 
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'enableConnectionPooler': True,
-                    }
-                })
-            k8s.wait_for_pod_start(pod_selector)
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
@@ -203,6 +194,66 @@ class EndToEndTestCase(unittest.TestCase):
         repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
         self.assertEqual(repl_svc_type, 'ClusterIP',
                          "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_lazy_spilo_upgrade(self):
+        '''
+        Test lazy upgrade for the Spilo image: operator changes a stateful set but lets pods run with the old image
+        until they are recreated for reasons other than operator's activity. That works because the operator configures
+        stateful sets to use "onDelete" pod update policy.
+
+        The test covers:
+        1) enabling lazy upgrade in existing operator deployment
+        2) forcing the normal rolling upgrade by changing the operator configmap and restarting its pod
+        '''
+
+        k8s = self.k8s
+
+        # update docker image in config and enable the lazy upgrade
+        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
+        patch_lazy_spilo_upgrade = {
+            "data": {
+                "docker_image": conf_image,
+                "enable_lazy_spilo_upgrade": "true"
+            }
+        }
+        k8s.update_config(patch_lazy_spilo_upgrade)
+
+        pod0 = 'acid-minimal-cluster-0'
+        pod1 = 'acid-minimal-cluster-1'
+
+        # restart the pod to get a container with the new image
+        k8s.api.core_v1.delete_namespaced_pod(pod0, 'default')
+        time.sleep(60)
+
+        # lazy update works if the restarted pod and older pods run different Spilo versions
+        new_image = k8s.get_effective_pod_image(pod0)
+        old_image = k8s.get_effective_pod_image(pod1)
+        self.assertNotEqual(new_image, old_image, "Lazy updated failed: pods have the same image {}".format(new_image))
+
+        # sanity check
+        assert_msg = "Image {} of a new pod differs from {} in operator conf".format(new_image, conf_image)
+        self.assertEqual(new_image, conf_image, assert_msg)
+
+        # clean up
+        unpatch_lazy_spilo_upgrade = {
+            "data": {
+                "enable_lazy_spilo_upgrade": "false",
+            }
+        }
+        k8s.update_config(unpatch_lazy_spilo_upgrade)
+
+        # at this point operator will complete the normal rolling upgrade
+        # so we additonally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
+
+        # XXX there is no easy way to wait until the end of Sync()
+        time.sleep(60)
+
+        image0 = k8s.get_effective_pod_image(pod0)
+        image1 = k8s.get_effective_pod_image(pod1)
+
+        assert_msg = "Disabling lazy upgrade failed: pods still have different images {} and {}".format(image0, image1)
+        self.assertEqual(image0, image1, assert_msg)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_logical_backup_cron_job(self):
@@ -594,7 +645,7 @@ class K8s:
 
     def wait_for_operator_pod_start(self):
         self. wait_for_pod_start("name=postgres-operator")
-        # HACK operator must register CRD / add existing PG clusters after pod start up
+        # HACK operator must register CRD and/or Sync existing PG clusters after start up
         # for local execution ~ 10 seconds suffices
         time.sleep(60)
 
@@ -723,6 +774,15 @@ class K8s:
             ["kubectl", "create", "-f", path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
+
+    def get_effective_pod_image(self, pod_name, namespace='default'):
+        '''
+        Get the Spilo image pod currently uses. In case of lazy rolling updates
+        it may differ from the one specified in the stateful set.
+        '''
+        pod = self.api.core_v1.list_namespaced_pod(
+            namespace, label_selector="statefulset.kubernetes.io/pod-name=" + pod_name)
+        return pod.items[0].spec.containers[0].image
 
 
 if __name__ == '__main__':

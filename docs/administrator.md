@@ -458,6 +458,17 @@ from numerous escape characters in the latter log entry, view it in CLI with
 `PodTemplate` used by the operator is yet to be updated with the default values
 used internally in K8s.
 
+The operator also support lazy updates of the Spilo image. That means the pod
+template of a PG cluster's stateful set is updated immediately with the new
+image, but no rolling update follows. This feature saves you a switchover - and
+hence downtime - when you know pods are re-started later anyway, for instance
+due to the node rotation. To force a rolling update, disable this mode by
+setting the `enable_lazy_spilo_upgrade` to `false` in the operator configuration
+and restart the operator pod. With the standard eager rolling updates the
+operator checks during Sync all pods run images specified in their respective
+statefulsets. The operator triggers a rolling upgrade for PG clusters that
+violate this condition.
+
 ## Logical backups
 
 The operator can manage K8s cron jobs to run logical backups of Postgres
@@ -509,9 +520,8 @@ A secret can be pre-provisioned in different ways:
 
 ## Sidecars for Postgres clusters
 
-A list of sidecars is added to each cluster created by the
-operator. The default is empty list.
-
+A list of sidecars is added to each cluster created by the operator. The default
+is empty.
 
 ```yaml
 kind: OperatorConfiguration
@@ -527,7 +537,8 @@ configuration:
   - ...
 ```
 
-In addition to any environment variables you specify, the following environment variables are always passed to sidecars:
+In addition to any environment variables you specify, the following environment
+variables are always passed to sidecars:
 
   - `POD_NAME` - field reference to `metadata.name`
   - `POD_NAMESPACE` - field reference to `metadata.namespace`

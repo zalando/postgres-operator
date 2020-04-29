@@ -19,6 +19,8 @@ configTarget: "ConfigMap"
 configGeneral:
   # choose if deployment creates/updates CRDs with OpenAPIV3Validation
   enable_crd_validation: "true"
+  # update only the statefulsets without immediately doing the rolling update
+  enable_lazy_spilo_upgrade: "false"
   # start any new database pod without limitations on shm memory
   enable_shm_volume: "true"
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
@@ -26,7 +28,7 @@ configGeneral:
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: "false"
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: "-1"
   # min number of instances in Postgres cluster. -1 = no limit
