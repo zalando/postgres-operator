@@ -457,7 +457,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         patch_custom_service_annotations = {
             "data": {
-                "custom_service_annotatons": "foo:bar",
+                "custom_service_annotations": "foo:bar",
             }
         }
         k8s.update_config(patch_custom_service_annotations)
