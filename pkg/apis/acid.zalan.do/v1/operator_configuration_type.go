@@ -183,6 +183,7 @@ type OperatorLogicalBackupConfiguration struct {
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	EnableCRDValidation     *bool    `json:"enable_crd_validation,omitempty"`
+	EnableLazySpiloUpgrade  bool     `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EtcdHost                string   `json:"etcd_host,omitempty"`
 	KubernetesUseConfigMaps bool     `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage             string   `json:"docker_image,omitempty"`

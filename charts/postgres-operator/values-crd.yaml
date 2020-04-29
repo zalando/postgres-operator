@@ -19,6 +19,8 @@ configTarget: "OperatorConfigurationCRD"
 configGeneral:
   # choose if deployment creates/updates CRDs with OpenAPIV3Validation
   enable_crd_validation: true
+  # update only the statefulsets without immediately doing the rolling update
+  enable_lazy_spilo_upgrade: false
   # start any new database pod without limitations on shm memory
   enable_shm_volume: true
   # etcd connection string for Patroni. Empty uses K8s-native DCS.

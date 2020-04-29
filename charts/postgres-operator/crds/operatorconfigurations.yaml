@@ -62,6 +62,8 @@ spec:
               type: string
             enable_crd_validation:
               type: boolean
+            enable_lazy_spilo_upgrade:
+              type: boolean
             enable_shm_volume:
               type: boolean
             etcd_host:

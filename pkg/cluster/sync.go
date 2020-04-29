@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
@@ -252,6 +252,28 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	return nil
 }
 
+func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet) (bool, error) {
+
+	pods, err := c.listPods()
+	if err != nil {
+		return false, fmt.Errorf("could not list pods of the statefulset: %v", err)
+	}
+
+	for _, pod := range pods {
+
+		effectivePodImage := pod.Spec.Containers[0].Image
+		ssImage := desiredSset.Spec.Template.Spec.Containers[0].Image
+
+		if ssImage != effectivePodImage {
+			c.logger.Infof("not all pods were re-started when the lazy upgrade was enabled; forcing the rolling upgrade now")
+			return true, nil
+		}
+
+	}
+
+	return false, nil
+}
+
 func (c *Cluster) syncStatefulSet() error {
 	var (
 		podsRollingUpdateRequired bool
@@ -330,6 +352,19 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
+
+		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
+			// even if desired and actual statefulsets match
+			// there still may be not up-to-date pods on condition
+			//  (a) the lazy update was just disabled
+			// and
+			//  (b) some of the pods were not restarted when the lazy update was still in place
+			podsRollingUpdateRequired, err = c.mustUpdatePodsAfterLazyUpdate(desiredSS)
+			if err != nil {
+				return fmt.Errorf("could not list pods of the statefulset: %v", err)
+			}
+		}
+
 	}
 
 	// Apply special PostgreSQL parameters that can only be set via the Patroni API.

@@ -3,11 +3,12 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
   # enable_crd_validation: true
+  # enable_lazy_spilo_upgrade: false
+  # enable_shm_volume: true
   etcd_host: ""
   # kubernetes_use_configmaps: false
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
-  # enable_shm_volume: true
   max_instances: -1
   min_instances: -1
   resync_period: 30m

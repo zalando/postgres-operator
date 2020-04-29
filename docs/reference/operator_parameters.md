@@ -75,6 +75,10 @@ Those are top-level keys, containing both leaf keys and groups.
   [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
   The default is `true`.
 
+* **enable_lazy_spilo_upgrade**
+  Instruct operator to update only the statefulsets with the new image without immediately doing the rolling update. The assumption is pods will be re-started later with the new image, for example due to the node rotation.
+  The default is `false`.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use

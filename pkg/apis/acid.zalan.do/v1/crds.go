@@ -761,6 +761,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"enable_crd_validation": {
 						Type: "boolean",
 					},
+					"enable_lazy_spilo_upgrade": {
+						Type: "boolean",
+					},
 					"enable_shm_volume": {
 						Type: "boolean",
 					},

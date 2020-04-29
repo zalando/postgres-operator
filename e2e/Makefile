@@ -44,5 +44,5 @@ tools: docker
 	# install pinned version of 'kind'
 	GO111MODULE=on go get sigs.k8s.io/kind@v0.5.1
 
-test:
+e2etest:
 	./run.sh
