@@ -457,7 +457,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         patch_custom_service_annotations = {
             "data": {
-                "custom_service_annotations": "foo:bar",
+                "custom_service_annotatons": "foo:bar",
             }
         }
         k8s.update_config(patch_custom_service_annotations)
@@ -477,9 +477,9 @@ class EndToEndTestCase(unittest.TestCase):
             "foo": "bar",
         }
         self.assertTrue(k8s.check_service_annotations(
-            "cluster-name=acid-service-annotations,spilo-role=master", annotations))
+            "cluster-name=acid-minimal-cluster,spilo-role=master", annotations))
         self.assertTrue(k8s.check_service_annotations(
-            "cluster-name=acid-service-annotations,spilo-role=replica", annotations))
+            "cluster-name=acid-minimal-cluster,spilo-role=replica", annotations))
 
         # clean up
         unpatch_custom_service_annotations = {
@@ -488,6 +488,44 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(unpatch_custom_service_annotations)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_statefulset_annotation_propagation(self):
+        '''
+           Inject annotation to Postgresql CRD and check it's propagation to stateful set
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        patch_sset_propagate_annotations = {
+            "data": {
+                "statefulset_propagate_annotations": "deployment-time,downscaler/*",
+            }
+        }
+        k8s.update_config(patch_sset_propagate_annotations)
+
+        pg_crd_annotations = {
+            "metadata": {
+                "annotations": [
+                    {
+                        "deployment-time": "2020-04-30 12:00:00",
+                    },
+                    {
+                        "downscaler/downtime_replicas": "0",
+                    },
+                ],
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotations)
+
+        k8s.delete_operator_pod()
+
+        annotations = {
+            "deployment-time": "2020-04-30 12:00:00",
+            "downscaler/downtime_replicas": "0",
+        }
+        self.assertTrue(k8s.check_statefulset_annotations(cluster_label, annotations))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
@@ -698,6 +736,16 @@ class K8s:
                 return False
             for key in svc.metadata.annotations:
                 if svc.metadata.annotations[key] != annotations[key]:
+                    return False
+        return True
+
+    def check_statefulset_annotations(self, sset_labels, annotations, namespace='default'):
+        ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=sset_labels, limit=1).items
+        for sset in ssets:
+            if len(sset.metadata.annotations) < len(annotations):
+                return False
+            for key in sset.metadata.annotations:
+                if sset.metadata.annotations[key] != annotations[key]:
                     return False
         return True
 
