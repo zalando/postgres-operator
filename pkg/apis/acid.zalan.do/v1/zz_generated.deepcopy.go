@@ -525,8 +525,8 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.EnablePoolerLoadBalancer != nil {
-		in, out := &in.EnablePoolerLoadBalancer, &out.EnablePoolerLoadBalancer
+	if in.EnableMasterPoolerLoadBalancer != nil {
+		in, out := &in.EnableMasterPoolerLoadBalancer, &out.EnableMasterPoolerLoadBalancer
 		*out = new(bool)
 		**out = **in
 	}

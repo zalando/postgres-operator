@@ -2211,11 +2211,11 @@ func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec) 
 }
 
 func (c *Cluster) shouldCreateLoadBalancerForPoolerService(spec *acidv1.PostgresSpec) bool {
-	if spec.EnablePoolerLoadBalancer != nil {
-		return *spec.EnablePoolerLoadBalancer
+	if spec.EnableMasterPoolerLoadBalancer != nil {
+		return *spec.EnableMasterPoolerLoadBalancer
 	}
 
-	return c.OpConfig.EnablePoolerLoadBalancer
+	return c.OpConfig.EnableMasterPoolerLoadBalancer
 }
 
 func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1.Service {
