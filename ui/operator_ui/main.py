@@ -362,7 +362,6 @@ def get_config():
 
 
 def get_teams_for_user(user_name):
-    logger.info("Teamservice URL: {}".format(TEAM_SERVICE_URL))
     if not TEAM_SERVICE_URL:
         return loads(getenv('TEAMS', '[]'))
 
