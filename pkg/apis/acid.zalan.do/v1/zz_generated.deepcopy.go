@@ -634,6 +634,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.EnableUnusedPVCDeletion != nil {
+		in, out := &in.EnableUnusedPVCDeletion, &out.EnableUnusedPVCDeletion
+		*out = new(bool)
+		**out = **in
+	}
 	if in.InitContainersOld != nil {
 		in, out := &in.InitContainersOld, &out.InitContainersOld
 		*out = make([]corev1.Container, len(*in))

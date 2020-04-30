@@ -183,6 +183,7 @@ type OperatorLogicalBackupConfiguration struct {
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	EnableCRDValidation     *bool    `json:"enable_crd_validation,omitempty"`
+	EnableUnusedPVCDeletion bool     `json:"enable_unused_pvc_deletion,omitempty"`
 	EnableLazySpiloUpgrade  bool     `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EtcdHost                string   `json:"etcd_host,omitempty"`
 	KubernetesUseConfigMaps bool     `json:"kubernetes_use_configmaps,omitempty"`

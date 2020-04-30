@@ -158,6 +158,8 @@ spec:
               type: boolean
             enableShmVolume:
               type: boolean
+            enableUnusedPvcDeletion:
+              type: boolean
             init_containers:  # deprecated
               type: array
               nullable: true

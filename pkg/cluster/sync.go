@@ -118,7 +118,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 
 	// remove PVCs of shut down pods
 	// the last PVC stays until the cluster is explicitly deleted as opposed to scaled down to 0 pods
-	if c.OpConfig.EnableUnusedPVCDeletion && c.getNumberOfInstances(&c.Spec) > 0 {
+	if c.mustEnableUnusedPvcDeletion() && c.getNumberOfInstances(&c.Spec) > 0 {
 		c.deleteUnusedPersistentVolumeClaims()
 	}
 
@@ -128,6 +128,14 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	return err
+}
+
+func (c *Cluster) mustEnableUnusedPvcDeletion() bool {
+	if c.Spec.EnableUnusedPVCDeletion != nil {
+		return *c.Spec.EnableUnusedPVCDeletion
+	}
+
+	return c.OpConfig.EnableUnusedPVCDeletion
 }
 
 func (c *Cluster) syncServices() error {

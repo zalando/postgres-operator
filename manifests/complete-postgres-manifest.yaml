@@ -66,6 +66,7 @@ spec:
 #          name: my-config-map
 
   enableShmVolume: true
+# enableUnusedPvcDeletion: false
 #  spiloFSGroup: 103
 #  podAnnotations:
 #    annotation.key: value

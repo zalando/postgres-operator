@@ -140,6 +140,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration). Optional.
 
+* **enableUnusedPvcDeletion**
+  Tells the operator to delete persistent volume claims of no longer running pods. That removes respective persistent volumes because the operator configures them with the 'Delete' reclaim policy. The operator deletes unused PVCs for clusters created both before and after this option is turned on. Deletion is not guaranteed: When it fails, operator retries at the next Sync() event.
+  The default is `false`.
+
 * **enableConnectionPooler**
   Tells the operator to create a connection pooler with a database. If this
   field is true, a connection pooler deployment will be created even if

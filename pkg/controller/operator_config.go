@@ -45,6 +45,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.ShmVolume = fromCRD.ShmVolume
+	result.EnableUnusedPVCDeletion = fromCRD.EnableUnusedPVCDeletion
 	result.SidecarImages = fromCRD.SidecarImages
 	result.SidecarContainers = fromCRD.SidecarContainers
 
