@@ -732,6 +732,7 @@ class K8s:
         for svc in svcs:
             for key, value in annotations:
                 if key not in svc.metadata.annotations or svc.metadata.annotations[key] != value:
+                    print("Expected key {} not found in annotations {}".format(key, svc.metadata.annotation))
                     return False
         return True
 
@@ -740,6 +741,7 @@ class K8s:
         for sset in ssets:
             for key, value in annotations:
                 if key not in sset.metadata.annotations or sset.metadata.annotations[key] != value:
+                    print("Expected key {} not found in annotations {}".format(key, sset.metadata.annotation))
                     return False
         return True
 
