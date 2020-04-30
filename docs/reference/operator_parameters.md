@@ -151,7 +151,7 @@ Those are top-level keys, containing both leaf keys and groups.
   [operator deployment manually](../../manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
-* **statefulset_propagate_annotations**
+* **downscaler_annotations**
   An array of annotations from PostgresCRD that should be passed on to the statefulsets.
   This also accepts the regular expression like downscaler/*, etc.
   These annotations will also be passed to the connection-pooler deployments if any.

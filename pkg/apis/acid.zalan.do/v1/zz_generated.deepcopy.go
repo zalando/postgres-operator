@@ -202,8 +202,8 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		}
 	}
 	out.PodEnvironmentConfigMap = in.PodEnvironmentConfigMap
-	if in.StatefulsetPropagateAnnotations != nil {
-		in, out := &in.StatefulsetPropagateAnnotations, &out.StatefulsetPropagateAnnotations
+	if in.DownscalerAnnotations != nil {
+		in, out := &in.DownscalerAnnotations, &out.DownscalerAnnotations
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
@@ -343,8 +343,8 @@ func (in *OperatorConfigurationData) DeepCopyInto(out *OperatorConfigurationData
 	out.Scalyr = in.Scalyr
 	out.LogicalBackup = in.LogicalBackup
 	in.ConnectionPooler.DeepCopyInto(&out.ConnectionPooler)
-	if in.StatefulsetPropagateAnnotations != nil {
-		in, out := &in.StatefulsetPropagateAnnotations, &out.StatefulsetPropagateAnnotations
+	if in.DownscalerAnnotations != nil {
+		in, out := &in.DownscalerAnnotations, &out.DownscalerAnnotations
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

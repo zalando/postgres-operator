@@ -502,7 +502,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         patch_sset_propagate_annotations = {
             "data": {
-                "statefulset_propagate_annotations": "deployment-time,downscaler/*",
+                "downscaler_annotations": "deployment-time,downscaler/*",
             }
         }
         k8s.update_config(patch_sset_propagate_annotations)

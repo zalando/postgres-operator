@@ -66,14 +66,14 @@ type KubernetesMetaConfiguration struct {
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
-	PodToleration                   map[string]string   `json:"toleration,omitempty"`
-	PodEnvironmentConfigMap         spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
-	PodPriorityClassName            string              `json:"pod_priority_class_name,omitempty"`
-	MasterPodMoveTimeout            Duration            `json:"master_pod_move_timeout,omitempty"`
-	EnablePodAntiAffinity           bool                `json:"enable_pod_antiaffinity,omitempty"`
-	PodAntiAffinityTopologyKey      string              `json:"pod_antiaffinity_topology_key,omitempty"`
-	PodManagementPolicy             string              `json:"pod_management_policy,omitempty"`
-	StatefulsetPropagateAnnotations []string            `json:"statefulset_propagate_annotations,omitempty"`
+	PodToleration              map[string]string   `json:"toleration,omitempty"`
+	PodEnvironmentConfigMap    spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
+	PodPriorityClassName       string              `json:"pod_priority_class_name,omitempty"`
+	MasterPodMoveTimeout       Duration            `json:"master_pod_move_timeout,omitempty"`
+	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
+	PodAntiAffinityTopologyKey string              `json:"pod_antiaffinity_topology_key,omitempty"`
+	PodManagementPolicy        string              `json:"pod_management_policy,omitempty"`
+	DownscalerAnnotations      []string            `json:"downscaler_annotations,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -196,21 +196,21 @@ type OperatorConfigurationData struct {
 	SetMemoryRequestToLimit bool     `json:"set_memory_request_to_limit,omitempty"`
 	ShmVolume               *bool    `json:"enable_shm_volume,omitempty"`
 	// deprecated in favour of SidecarContainers
-	SidecarImages                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
-	SidecarContainers               []v1.Container                     `json:"sidecars,omitempty"`
-	PostgresUsersConfiguration      PostgresUsersConfiguration         `json:"users"`
-	Kubernetes                      KubernetesMetaConfiguration        `json:"kubernetes"`
-	PostgresPodResources            PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
-	Timeouts                        OperatorTimeouts                   `json:"timeouts"`
-	LoadBalancer                    LoadBalancerConfiguration          `json:"load_balancer"`
-	AWSGCP                          AWSGCPConfiguration                `json:"aws_or_gcp"`
-	OperatorDebug                   OperatorDebugConfiguration         `json:"debug"`
-	TeamsAPI                        TeamsAPIConfiguration              `json:"teams_api"`
-	LoggingRESTAPI                  LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
-	Scalyr                          ScalyrConfiguration                `json:"scalyr"`
-	LogicalBackup                   OperatorLogicalBackupConfiguration `json:"logical_backup"`
-	ConnectionPooler                ConnectionPoolerConfiguration      `json:"connection_pooler"`
-	StatefulsetPropagateAnnotations []string                           `json:"statefulset_propagate_annotations,omitempty"`
+	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	SidecarContainers          []v1.Container                     `json:"sidecars,omitempty"`
+	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
+	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
+	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
+	Timeouts                   OperatorTimeouts                   `json:"timeouts"`
+	LoadBalancer               LoadBalancerConfiguration          `json:"load_balancer"`
+	AWSGCP                     AWSGCPConfiguration                `json:"aws_or_gcp"`
+	OperatorDebug              OperatorDebugConfiguration         `json:"debug"`
+	TeamsAPI                   TeamsAPIConfiguration              `json:"teams_api"`
+	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
+	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
+	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
+	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	DownscalerAnnotations      []string                           `json:"downscaler_annotations,omitempty"`
 }
 
 //Duration shortens this frequently used name

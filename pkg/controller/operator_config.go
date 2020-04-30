@@ -48,7 +48,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SidecarImages = fromCRD.SidecarImages
 	result.SidecarContainers = fromCRD.SidecarContainers
 
-	result.StatefulsetPropagateAnnotations = fromCRD.StatefulsetPropagateAnnotations
+	result.DownscalerAnnotations = fromCRD.Kubernetes.DownscalerAnnotations
 
 	// user config
 	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername

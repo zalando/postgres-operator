@@ -165,11 +165,6 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   If `targetContainers` is empty, additional volumes will be mounted only in the `postgres` container.
   If you set the `all` special item, it will be mounted in all containers (postgres + sidecars).
   Else you can set the list of target containers in which the additional volumes will be mounted (eg : postgres, telegraf)
-  
-  * **statefulset_propagate_annotations**
-  An array of annotations from PostgresCRD that should be passed on to the statefulsets.
-  This also accepts the regular expression like downscaler/*, etc.
-  These annotations will also be passed to the connection-pooler deployments if any.
 
 ## Postgres parameters
 

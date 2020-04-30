@@ -137,7 +137,7 @@ type Config struct {
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
-	StatefulsetPropagateAnnotations        []string          `name:"statefulset_propagate_annotations"`
+	DownscalerAnnotations                  []string          `name:"downscaler_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility

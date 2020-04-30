@@ -4,7 +4,7 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
-  # statefulset_propagate_annotations:
+  # downscaler_annotations:
   #   - deployment-time
   #   - downscaler/*
   # enable_crd_validation: true

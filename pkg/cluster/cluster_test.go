@@ -34,7 +34,7 @@ var cl = New(
 				SuperUsername:       superUserName,
 				ReplicationUsername: replicationUserName,
 			},
-			StatefulsetPropagateAnnotations: []string{"downscaler/*"},
+			DownscalerAnnotations: []string{"downscaler/*"},
 		},
 	},
 	k8sutil.NewMockKubernetesClient(),

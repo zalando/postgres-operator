@@ -34,7 +34,7 @@ spec:
         configuration:
           type: object
           properties:
-            # statefulset_propagate_annotations:
+            # downscaler_annotations:
             #   type: array
             #   items:
             #     type: string
