@@ -41,6 +41,10 @@ spec:
               value: "http://localhost:8081"
             - name: "OPERATOR_API_URL"
               value: {{ .Values.envs.operatorApiUrl }}
+            - name: "OPERATOR_CLUSTER_NAME_LABEL"
+              value: {{ .Values.envs.operatorClusterNameLabel }}
+            - name: "RESOURCES_VISIBLE"
+              value: {{ .Values.envs.resourcesVisible }}
             - name: "TARGET_NAMESPACE"
               value: {{ .Values.envs.targetNamespace }}
             - name: "TEAMS"

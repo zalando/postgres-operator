@@ -25,8 +25,8 @@ serviceAccount:
 # configure UI pod resources
 resources:
   limits:
-    cpu: 300m
-    memory: 3000Mi
+    cpu: 200m
+    memory: 200Mi
   requests:
     cpu: 100m
     memory: 100Mi
@@ -36,6 +36,8 @@ envs:
   # IMPORTANT: While operator chart and UI chart are idendependent, this is the interface between
   # UI and operator API. Insert the service name of the operator API here!
   operatorApiUrl: "http://postgres-operator:8080"
+  operatorClusterNameLabel: "cluster-name"
+  resourcesVisible: "False"
   targetNamespace: "default"
 
 # configure UI service
