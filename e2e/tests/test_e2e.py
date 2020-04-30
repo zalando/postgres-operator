@@ -571,7 +571,7 @@ class EndToEndTestCase(unittest.TestCase):
         last_pvc_name = "pgdata-acid-minimal-cluster-0"
         volume_before_scaledown = k8s.get_volume_name(last_pvc_name)
         k8s.wait_for_pg_to_scale(0)
-        k8s.update_config(patch) # force a Sync to delete unused PVCs
+        k8s.update_config(patch)  # force a Sync to delete unused PVCs
         self.assertTrue(k8s.pvc_exist(last_pvc_name), "The last pvc was deleted")
 
         # sanity check
@@ -878,6 +878,7 @@ class K8s:
     def get_volume_name(self, pvc_name):
         pvc = self.api.core_v1.read_namespaced_persistent_volume_claim(pvc_name, "default")
         return pvc.spec.volume_name
+
     def get_effective_pod_image(self, pod_name, namespace='default'):
         '''
         Get the Spilo image pod currently uses. In case of lazy rolling updates
