@@ -53,8 +53,19 @@ them.
 
 ## Watch pods being created
 
+Check if the database pods are coming up. Use the label `application=spilo` to
+filter and list the label `spilo-role` to see when the master is promoted and
+replicas get their labels.
+
 ```bash
-kubectl get pods -w --show-labels
+kubectl get pods -l application=spilo -L spilo-role -w
+```
+
+The operator also emits K8s events to the Postgresql CRD which can be inspected
+in the operator logs or with:
+
+```bash
+kubectl describe postgresql acid-minimal-cluster
 ```
 
 ## Connect to PostgreSQL
@@ -736,14 +747,14 @@ spin up more instances).
 
 ## Custom TLS certificates
 
-By default, the spilo image generates its own TLS certificate during startup.
+By default, the Spilo image generates its own TLS certificate during startup.
 However, this certificate cannot be verified and thus doesn't protect from
 active MITM attacks. In this section we show how to specify a custom TLS
 certificate which is mounted in the database pods via a K8s Secret.
 
 Before applying these changes, in k8s the operator must also be configured with
 the `spilo_fsgroup` set to the GID matching the postgres user group. If you
-don't know the value, use `103` which is the GID from the default spilo image
+don't know the value, use `103` which is the GID from the default Spilo image
 (`spilo_fsgroup=103` in the cluster request spec).
 
 OpenShift allocates the users and groups dynamically (based on scc), and their
@@ -805,5 +816,5 @@ spec:
 Alternatively, it is also possible to use
 [cert-manager](https://cert-manager.io/docs/) to generate these secrets.
 
-Certificate rotation is handled in the spilo image which checks every 5
+Certificate rotation is handled in the Spilo image which checks every 5
 minutes if the certificates have changed and reloads postgres accordingly.
