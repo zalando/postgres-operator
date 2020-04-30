@@ -94,7 +94,7 @@ data:
   # sidecar_docker_images: ""
   # set_memory_request_to_limit: "false"
   spilo_privileged: "false"
-  # statefulset_propagate_annotation: "deployment-time,downscaler/*"
+  # statefulset_propagate_annotations: "deployment-time,downscaler/*"
   super_username: postgres
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"

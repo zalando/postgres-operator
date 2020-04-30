@@ -403,12 +403,12 @@ func (c *Cluster) syncStatefulSet() error {
 // AnnotationsToPropagate get the annotations to update if required
 // based on the annotations in postgres CRD
 func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[string]string {
-	ToPropagateAnnotations := c.OpConfig.StatefulsetPropagateAnnotations
-	PgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
+	toPropagateAnnotations := c.OpConfig.StatefulsetPropagateAnnotations
+	pgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
 
-	if ToPropagateAnnotations != nil && PgCRDAnnotations != nil {
-		for _, anno := range ToPropagateAnnotations {
-			for k, v := range PgCRDAnnotations {
+	if toPropagateAnnotations != nil && pgCRDAnnotations != nil {
+		for _, anno := range toPropagateAnnotations {
+			for k, v := range pgCRDAnnotations {
 				matched, err := regexp.MatchString(anno, k)
 				if err != nil {
 					c.logger.Errorf("annotations matching issue: %v", err)

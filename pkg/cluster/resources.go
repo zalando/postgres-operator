@@ -869,7 +869,7 @@ func (c *Cluster) updateConnectionPoolerAnnotations(annotations map[string]strin
 		metav1.PatchOptions{},
 		"")
 	if err != nil {
-		return nil, fmt.Errorf("could not patch conenction pooler annotations %q: %v", patchData, err)
+		return nil, fmt.Errorf("could not patch connection pooler annotations %q: %v", patchData, err)
 	}
 	return result, nil
 
