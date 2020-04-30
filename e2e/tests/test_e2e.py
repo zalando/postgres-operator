@@ -518,8 +518,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotations)
 
-        k8s.delete_operator_pod()
-
+        # wait a little before proceeding
+        time.sleep(60)
         annotations = {
             "deployment-time": "2020-04-30 12:00:00",
             "downscaler/downtime_replicas": "0",
@@ -731,7 +731,7 @@ class K8s:
     def check_service_annotations(self, svc_labels, annotations, namespace='default'):
         svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
         for svc in svcs:
-            for key, value in annotations.iteritems():
+            for key, value in annotations.items():
                 if key not in svc.metadata.annotations or svc.metadata.annotations[key] != value:
                     print("Expected key {} not found in annotations {}".format(key, svc.metadata.annotation))
                     return False
@@ -740,7 +740,7 @@ class K8s:
     def check_statefulset_annotations(self, sset_labels, annotations, namespace='default'):
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=sset_labels, limit=1).items
         for sset in ssets:
-            for key, value in annotations.iteritems():
+            for key, value in annotations.items():
                 if key not in sset.metadata.annotations or sset.metadata.annotations[key] != value:
                     print("Expected key {} not found in annotations {}".format(key, sset.metadata.annotation))
                     return False
