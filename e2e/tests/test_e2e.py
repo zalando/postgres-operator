@@ -465,7 +465,8 @@ class EndToEndTestCase(unittest.TestCase):
         pg_patch_custom_annotations = {
             "spec": {
                 "serviceAnnotations": {
-                    "annotation.key": "value"
+                    "annotation.key": "value",
+                    "foo": "bar",
                 }
             }
         }
@@ -730,7 +731,7 @@ class K8s:
     def check_service_annotations(self, svc_labels, annotations, namespace='default'):
         svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
         for svc in svcs:
-            for key, value in annotations:
+            for key, value in annotations.iteritems():
                 if key not in svc.metadata.annotations or svc.metadata.annotations[key] != value:
                     print("Expected key {} not found in annotations {}".format(key, svc.metadata.annotation))
                     return False
@@ -739,7 +740,7 @@ class K8s:
     def check_statefulset_annotations(self, sset_labels, annotations, namespace='default'):
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=sset_labels, limit=1).items
         for sset in ssets:
-            for key, value in annotations:
+            for key, value in annotations.iteritems():
                 if key not in sset.metadata.annotations or sset.metadata.annotations[key] != value:
                     print("Expected key {} not found in annotations {}".format(key, sset.metadata.annotation))
                     return False
