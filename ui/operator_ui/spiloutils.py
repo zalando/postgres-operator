@@ -322,7 +322,7 @@ def read_basebackups(
             f=configure_backup_cxt,
             aws_instance_profile=use_aws_instance_profile,
             s3_prefix=f's3://{bucket}/{prefix}{pg_cluster}{suffix}/wal/',
-        )._backup_list(detail=True)
+        )._backup_list(detail=True)._backup_list(prefix=f"{prefix}{pg_cluster}{suffix}/wal/")
     ]
 
 
