@@ -30,6 +30,7 @@ data:
   # default_memory_limit: 500Mi
   # default_memory_request: 100Mi
   docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
+  # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_validation: "true"
   # enable_database_access: "true"
@@ -94,7 +95,6 @@ data:
   # sidecar_docker_images: ""
   # set_memory_request_to_limit: "false"
   spilo_privileged: "false"
-  # downscaler_annotations: "deployment-time,downscaler/*"
   super_username: postgres
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"

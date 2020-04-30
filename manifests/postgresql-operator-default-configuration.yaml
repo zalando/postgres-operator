@@ -24,9 +24,6 @@ configuration:
     replication_username: standby
     super_username: postgres
   kubernetes:
-    # downscaler_annotations:
-    #   - deployment-time
-    #   - downscaler/*
     cluster_domain: cluster.local
     cluster_labels:
       application: spilo
@@ -34,6 +31,9 @@ configuration:
     # custom_pod_annotations:
     #   keya: valuea
     #   keyb: valueb
+    # downscaler_annotations:
+    # - deployment-time
+    # - downscaler/*
     enable_init_containers: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true

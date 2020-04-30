@@ -151,11 +151,6 @@ Those are top-level keys, containing both leaf keys and groups.
   [operator deployment manually](../../manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
-* **downscaler_annotations**
-  An array of annotations from PostgresCRD that should be passed on to the statefulsets.
-  This also accepts the regular expression like downscaler/*, etc.
-  These annotations will also be passed to the connection-pooler deployments if any.
-
 ## Postgres users
 
 Parameters describing Postgres users. In a CRD-configuration, they are grouped
@@ -204,6 +199,12 @@ configuration they are grouped under the `kubernetes` key.
   This key/value map provides a list of annotations that get attached to each pod
   of a database created by the operator. If the annotation key is also provided
   by the database definition, the database definition value is used.
+
+* **downscaler_annotations**
+  An array of annotations that should be passed from Postgres CRD on to the
+  statefulset and, if exists, to the connection pooler deployment as well.
+  Regular expressions like `downscaler/*` etc. are also accepted. Can be used
+  with [kube-downscaler](https://github.com/hjacobs/kube-downscaler).
 
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not

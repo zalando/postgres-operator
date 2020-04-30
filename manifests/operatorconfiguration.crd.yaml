@@ -81,10 +81,6 @@ spec:
             kubernetes:
               type: object
               properties:
-                # downscaler_annotations:
-                #   type: array
-                #   items:
-                #     type: string
                 cluster_domain:
                   type: string
                 cluster_labels:
@@ -96,6 +92,10 @@ spec:
                 custom_pod_annotations:
                   type: object
                   additionalProperties:
+                    type: string
+                downscaler_annotations:
+                  type: array
+                  items:
                     type: string
                 enable_init_containers:
                   type: boolean

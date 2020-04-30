@@ -62,6 +62,7 @@ type KubernetesMetaConfiguration struct {
 	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
+	DownscalerAnnotations                  []string              `json:"downscaler_annotations,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`
@@ -73,7 +74,6 @@ type KubernetesMetaConfiguration struct {
 	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
 	PodAntiAffinityTopologyKey string              `json:"pod_antiaffinity_topology_key,omitempty"`
 	PodManagementPolicy        string              `json:"pod_management_policy,omitempty"`
-	DownscalerAnnotations      []string            `json:"downscaler_annotations,omitempty"`
 }
 
 // PostgresPodResourcesDefaults defines the spec of default resources
@@ -210,7 +210,6 @@ type OperatorConfigurationData struct {
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
 	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
-	DownscalerAnnotations      []string                           `json:"downscaler_annotations,omitempty"`
 }
 
 //Duration shortens this frequently used name
