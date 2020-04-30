@@ -54,6 +54,9 @@ configUsers:
   super_username: postgres
 
 configKubernetes:
+  # downscaler_annotations:
+  #   - deployment-time
+  #   - downscaler/*
   # default DNS domain of K8s cluster where operator is running
   cluster_domain: cluster.local
   # additional labels assigned to the cluster objects

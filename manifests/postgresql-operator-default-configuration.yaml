@@ -4,9 +4,6 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
-  # downscaler_annotations:
-  #   - deployment-time
-  #   - downscaler/*
   # enable_crd_validation: true
   # enable_lazy_spilo_upgrade: false
   # enable_shm_volume: true
@@ -27,6 +24,9 @@ configuration:
     replication_username: standby
     super_username: postgres
   kubernetes:
+    # downscaler_annotations:
+    #   - deployment-time
+    #   - downscaler/*
     cluster_domain: cluster.local
     cluster_labels:
       application: spilo

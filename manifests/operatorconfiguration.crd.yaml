@@ -34,10 +34,6 @@ spec:
         configuration:
           type: object
           properties:
-            # downscaler_annotations:
-            #   type: array
-            #   items:
-            #     type: string
             docker_image:
               type: string
             enable_crd_validation:
@@ -85,6 +81,10 @@ spec:
             kubernetes:
               type: object
               properties:
+                # downscaler_annotations:
+                #   type: array
+                #   items:
+                #     type: string
                 cluster_domain:
                   type: string
                 cluster_labels:
