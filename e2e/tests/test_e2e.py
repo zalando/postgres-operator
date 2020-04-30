@@ -428,7 +428,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
 
         # wait a little before proceeding with the pod distribution test
-        time.sleep(k8s.RETRY_TIMEOUT_SEC)
+        time.sleep(30)
 
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
@@ -472,6 +472,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_custom_annotations)
 
+        # wait a little before proceeding
+        time.sleep(30)
         annotations = {
             "annotation.key": "value",
             "foo": "bar",
@@ -562,7 +564,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(patch_toleration_config)
 
         # wait a little before proceeding with the pod distribution test
-        time.sleep(k8s.RETRY_TIMEOUT_SEC)
+        time.sleep(30)
 
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
@@ -728,20 +730,16 @@ class K8s:
     def check_service_annotations(self, svc_labels, annotations, namespace='default'):
         svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
         for svc in svcs:
-            if len(svc.metadata.annotations) < len(annotations):
-                return False
-            for key in svc.metadata.annotations:
-                if svc.metadata.annotations[key] != annotations[key]:
+            for key, value in annotations:
+                if key not in svc.metadata.annotations or svc.metadata.annotations[key] != value:
                     return False
         return True
 
     def check_statefulset_annotations(self, sset_labels, annotations, namespace='default'):
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=sset_labels, limit=1).items
         for sset in ssets:
-            if len(sset.metadata.annotations) < len(annotations):
-                return False
-            for key in sset.metadata.annotations:
-                if sset.metadata.annotations[key] != annotations[key]:
+            for key, value in annotations:
+                if key not in sset.metadata.annotations or sset.metadata.annotations[key] != value:
                     return False
         return True
 
