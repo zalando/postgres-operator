@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,8 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/reference"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
@@ -50,14 +54,14 @@ type Config struct {
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 
-// K8S objects that are belongs to a connection pool
-type ConnectionPoolObjects struct {
+// K8S objects that are belongs to a connection pooler
+type ConnectionPoolerObjects struct {
 	Deployment *appsv1.Deployment
 	Service    *v1.Service
 
-	// It could happen that a connection pool was enabled, but the operator was
-	// not able to properly process a corresponding event or was restarted. In
-	// this case we will miss missing/require situation and a lookup function
+	// It could happen that a connection pooler was enabled, but the operator
+	// was not able to properly process a corresponding event or was restarted.
+	// In this case we will miss missing/require situation and a lookup function
 	// will not be installed. To avoid synchronizing it all the time to prevent
 	// this, we can remember the result in memory at least until the next
 	// restart.
@@ -69,7 +73,7 @@ type kubeResources struct {
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
-	ConnectionPool      *ConnectionPoolObjects
+	ConnectionPooler    *ConnectionPoolerObjects
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
@@ -81,6 +85,7 @@ type Cluster struct {
 	acidv1.Postgresql
 	Config
 	logger           *logrus.Entry
+	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
@@ -109,7 +114,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry) *Cluster {
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -140,7 +145,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
 	cluster.oauthTokenGetter = newSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
 	cluster.patroni = patroni.New(cluster.logger)
-
+	cluster.eventRecorder = eventRecorder
 	return cluster
 }
 
@@ -164,6 +169,16 @@ func (c *Cluster) setProcessName(procName string, args ...interface{}) {
 		Name:      fmt.Sprintf(procName, args...),
 		StartTime: time.Now(),
 	}
+}
+
+// GetReference of Postgres CR object
+// i.e. required to emit events to this resource
+func (c *Cluster) GetReference() *v1.ObjectReference {
+	ref, err := reference.GetReference(scheme.Scheme, &c.Postgresql)
+	if err != nil {
+		c.logger.Errorf("could not get reference for Postgresql CR %v/%v: %v", c.Postgresql.Namespace, c.Postgresql.Name, err)
+	}
+	return ref
 }
 
 // SetStatus of Postgres cluster
@@ -213,6 +228,10 @@ func (c *Cluster) initUsers() error {
 		return fmt.Errorf("could not init infrastructure roles: %v", err)
 	}
 
+	if err := c.initPreparedDatabaseRoles(); err != nil {
+		return fmt.Errorf("could not init default users: %v", err)
+	}
+
 	if err := c.initRobotUsers(); err != nil {
 		return fmt.Errorf("could not init robot users: %v", err)
 	}
@@ -245,6 +264,7 @@ func (c *Cluster) Create() error {
 	}()
 
 	c.setStatus(acidv1.ClusterStatusCreating)
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
 	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
 		return fmt.Errorf("could not enforce minimum resource limits: %v", err)
@@ -263,6 +283,7 @@ func (c *Cluster) Create() error {
 				return fmt.Errorf("could not create %s endpoint: %v", role, err)
 			}
 			c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Endpoints", "Endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
 		}
 
 		if c.Services[role] != nil {
@@ -273,6 +294,7 @@ func (c *Cluster) Create() error {
 			return fmt.Errorf("could not create %s service: %v", role, err)
 		}
 		c.logger.Infof("%s service %q has been successfully created", role, util.NameFromMeta(service.ObjectMeta))
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Services", "The service %q for role %s has been successfully created", util.NameFromMeta(service.ObjectMeta), role)
 	}
 
 	if err = c.initUsers(); err != nil {
@@ -284,6 +306,7 @@ func (c *Cluster) Create() error {
 		return fmt.Errorf("could not create secrets: %v", err)
 	}
 	c.logger.Infof("secrets have been successfully created")
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Secrets", "The secrets have been successfully created")
 
 	if c.PodDisruptionBudget != nil {
 		return fmt.Errorf("pod disruption budget already exists in the cluster")
@@ -302,6 +325,7 @@ func (c *Cluster) Create() error {
 		return fmt.Errorf("could not create statefulset: %v", err)
 	}
 	c.logger.Infof("statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
+	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Statefulset %q has been successfully created", util.NameFromMeta(ss.ObjectMeta))
 
 	c.logger.Info("waiting for the cluster being ready")
 
@@ -310,6 +334,7 @@ func (c *Cluster) Create() error {
 		return err
 	}
 	c.logger.Infof("pods are ready")
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "StatefulSet", "Pods are ready")
 
 	// create database objects unless we are running without pods or disabled
 	// that feature explicitly
@@ -322,6 +347,9 @@ func (c *Cluster) Create() error {
 
 		if err = c.syncDatabases(); err != nil {
 			return fmt.Errorf("could not sync databases: %v", err)
+		}
+		if err = c.syncPreparedDatabases(); err != nil {
+			return fmt.Errorf("could not sync prepared databases: %v", err)
 		}
 		c.logger.Infof("databases have been successfully created")
 	}
@@ -337,24 +365,24 @@ func (c *Cluster) Create() error {
 		c.logger.Errorf("could not list resources: %v", err)
 	}
 
-	// Create connection pool deployment and services if necessary. Since we
-	// need to peform some operations with the database itself (e.g. install
+	// Create connection pooler deployment and services if necessary. Since we
+	// need to perform some operations with the database itself (e.g. install
 	// lookup function), do it as the last step, when everything is available.
 	//
-	// Do not consider connection pool as a strict requirement, and if
+	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	if c.needConnectionPool() {
-		if c.ConnectionPool != nil {
-			c.logger.Warning("Connection pool already exists in the cluster")
+	if c.needConnectionPooler() {
+		if c.ConnectionPooler != nil {
+			c.logger.Warning("Connection pooler already exists in the cluster")
 			return nil
 		}
-		connPool, err := c.createConnectionPool(c.installLookupFunction)
+		connectionPooler, err := c.createConnectionPooler(c.installLookupFunction)
 		if err != nil {
-			c.logger.Warningf("could not create connection pool: %v", err)
+			c.logger.Warningf("could not create connection pooler: %v", err)
 			return nil
 		}
-		c.logger.Infof("connection pool %q has been successfully created",
-			util.NameFromMeta(connPool.Deployment.ObjectMeta))
+		c.logger.Infof("connection pooler %q has been successfully created",
+			util.NameFromMeta(connectionPooler.Deployment.ObjectMeta))
 	}
 
 	return nil
@@ -450,6 +478,14 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
+	// lazy Spilo update: modify the image in the statefulset itself but let its pods run with the old image
+	// until they are re-created for other reasons, for example node rotation
+	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Containers[0].Image, statefulSet.Spec.Template.Spec.Containers[0].Image) {
+		needsReplace = true
+		needsRollUpdate = false
+		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image doesn't match the current one")
+	}
+
 	if needsRollUpdate || needsReplace {
 		match = false
 	}
@@ -481,8 +517,6 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 	checks := []containerCheck{
 		newCheck("new statefulset %s's %s (index %d) name doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
-		newCheck("new statefulset %s's %s (index %d) image doesn't match the current one",
-			func(a, b v1.Container) bool { return a.Image != b.Image }),
 		newCheck("new statefulset %s's %s (index %d) ports don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
 		newCheck("new statefulset %s's %s (index %d) resources don't match the current ones",
@@ -491,6 +525,11 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
 		newCheck("new statefulset %s's %s (index %d) environment sources don't match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
+	}
+
+	if !c.OpConfig.EnableLazySpiloUpgrade {
+		checks = append(checks, newCheck("new statefulset %s's %s (index %d) image doesn't match the current one",
+			func(a, b v1.Container) bool { return a.Image != b.Image }))
 	}
 
 	for index, containerA := range setA {
@@ -555,6 +594,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 		}
 		if isSmaller {
 			c.logger.Warningf("defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
 			spec.Resources.ResourceLimits.CPU = minCPULimit
 		}
 	}
@@ -567,6 +607,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 		}
 		if isSmaller {
 			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
 			spec.Resources.ResourceLimits.Memory = minMemoryLimit
 		}
 	}
@@ -598,6 +639,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if oldSpec.Spec.PostgresqlParam.PgVersion != newSpec.Spec.PostgresqlParam.PgVersion { // PG versions comparison
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "PostgreSQL", "postgresql version change(%q -> %q) has no effect",
+			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
 		//we need that hack to generate statefulset with the old version
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
 	}
@@ -612,11 +655,12 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// connection pool needs one system user created, which is done in
+	// connection pooler needs one system user created, which is done in
 	// initUsers. Check if it needs to be called.
-	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users)
-	needConnPool := c.needConnectionPoolWorker(&newSpec.Spec)
-	if !sameUsers || needConnPool {
+	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
+		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
+	needConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
+	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
@@ -731,18 +775,28 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			c.logger.Errorf("could not sync roles: %v", err)
 			updateFailed = true
 		}
-		if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) {
+		if !reflect.DeepEqual(oldSpec.Spec.Databases, newSpec.Spec.Databases) ||
+			!reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases) {
 			c.logger.Infof("syncing databases")
 			if err := c.syncDatabases(); err != nil {
 				c.logger.Errorf("could not sync databases: %v", err)
 				updateFailed = true
 			}
 		}
+		if !reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases) {
+			c.logger.Infof("syncing prepared databases")
+			if err := c.syncPreparedDatabases(); err != nil {
+				c.logger.Errorf("could not sync prepared databases: %v", err)
+				updateFailed = true
+			}
+		}
 	}
 
-	// sync connection pool
-	if err := c.syncConnectionPool(oldSpec, newSpec, c.installLookupFunction); err != nil {
-		return fmt.Errorf("could not sync connection pool: %v", err)
+	// sync connection pooler
+	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
+		c.installLookupFunction); err != nil {
+		c.logger.Errorf("could not sync connection pooler: %v", err)
+		updateFailed = true
 	}
 
 	return nil
@@ -756,6 +810,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 func (c *Cluster) Delete() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
 
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
@@ -783,8 +838,10 @@ func (c *Cluster) Delete() {
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
-		if err := c.deleteEndpoint(role); err != nil {
-			c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+		if !c.patroniKubernetesUseConfigMaps() {
+			if err := c.deleteEndpoint(role); err != nil {
+				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+			}
 		}
 
 		if err := c.deleteService(role); err != nil {
@@ -796,11 +853,11 @@ func (c *Cluster) Delete() {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
 	}
 
-	// Delete connection pool objects anyway, even if it's not mentioned in the
+	// Delete connection pooler objects anyway, even if it's not mentioned in the
 	// manifest, just to not keep orphaned components in case if something went
 	// wrong
-	if err := c.deleteConnectionPool(); err != nil {
-		c.logger.Warningf("could not remove connection pool: %v", err)
+	if err := c.deleteConnectionPooler(); err != nil {
+		c.logger.Warningf("could not remove connection pooler: %v", err)
 	}
 }
 
@@ -869,34 +926,139 @@ func (c *Cluster) initSystemUsers() {
 		Password: util.RandomPassword(constants.PasswordLength),
 	}
 
-	// Connection pool user is an exception, if requested it's going to be
+	// Connection pooler user is an exception, if requested it's going to be
 	// created by operator as a normal pgUser
-	if c.needConnectionPool() {
-		// initialize empty connection pool if not done yet
-		if c.Spec.ConnectionPool == nil {
-			c.Spec.ConnectionPool = &acidv1.ConnectionPool{}
+	if c.needConnectionPooler() {
+		// initialize empty connection pooler if not done yet
+		if c.Spec.ConnectionPooler == nil {
+			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		username := util.Coalesce(
-			c.Spec.ConnectionPool.User,
-			c.OpConfig.ConnectionPool.User)
+		// Using superuser as pooler user is not a good idea. First of all it's
+		// not going to be synced correctly with the current implementation,
+		// and second it's a bad practice.
+		username := c.OpConfig.ConnectionPooler.User
+
+		isSuperUser := c.Spec.ConnectionPooler.User == c.OpConfig.SuperUsername
+		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
+			c.Spec.ConnectionPooler.User, "connection pool role")
+
+		if !isSuperUser && !isProtectedUser {
+			username = util.Coalesce(
+				c.Spec.ConnectionPooler.User,
+				c.OpConfig.ConnectionPooler.User)
+		}
 
 		// connection pooler application should be able to login with this role
-		connPoolUser := spec.PgUser{
-			Origin:   spec.RoleConnectionPool,
+		connectionPoolerUser := spec.PgUser{
+			Origin:   spec.RoleConnectionPooler,
 			Name:     username,
 			Flags:    []string{constants.RoleFlagLogin},
 			Password: util.RandomPassword(constants.PasswordLength),
 		}
 
 		if _, exists := c.pgUsers[username]; !exists {
-			c.pgUsers[username] = connPoolUser
+			c.pgUsers[username] = connectionPoolerUser
 		}
 
-		if _, exists := c.systemUsers[constants.ConnectionPoolUserKeyName]; !exists {
-			c.systemUsers[constants.ConnectionPoolUserKeyName] = connPoolUser
+		if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
+			c.systemUsers[constants.ConnectionPoolerUserKeyName] = connectionPoolerUser
 		}
 	}
+}
+
+func (c *Cluster) initPreparedDatabaseRoles() error {
+
+	if c.Spec.PreparedDatabases != nil && len(c.Spec.PreparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
+		c.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
+	}
+
+	// create maps with default roles/users as keys and their membership as values
+	defaultRoles := map[string]string{
+		constants.OwnerRoleNameSuffix:  "",
+		constants.ReaderRoleNameSuffix: "",
+		constants.WriterRoleNameSuffix: constants.ReaderRoleNameSuffix,
+	}
+	defaultUsers := map[string]string{
+		constants.OwnerRoleNameSuffix + constants.UserRoleNameSuffix:  constants.OwnerRoleNameSuffix,
+		constants.ReaderRoleNameSuffix + constants.UserRoleNameSuffix: constants.ReaderRoleNameSuffix,
+		constants.WriterRoleNameSuffix + constants.UserRoleNameSuffix: constants.WriterRoleNameSuffix,
+	}
+
+	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
+		// default roles per database
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName); err != nil {
+			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
+		}
+		if preparedDB.DefaultUsers {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName); err != nil {
+				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
+			}
+		}
+
+		// default roles per database schema
+		preparedSchemas := preparedDB.PreparedSchemas
+		if len(preparedDB.PreparedSchemas) == 0 {
+			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
+		}
+		for preparedSchemaName, preparedSchema := range preparedSchemas {
+			if preparedSchema.DefaultRoles == nil || *preparedSchema.DefaultRoles {
+				if err := c.initDefaultRoles(defaultRoles,
+					preparedDbName+constants.OwnerRoleNameSuffix,
+					preparedDbName+"_"+preparedSchemaName); err != nil {
+					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
+				}
+				if preparedSchema.DefaultUsers {
+					if err := c.initDefaultRoles(defaultUsers,
+						preparedDbName+constants.OwnerRoleNameSuffix,
+						preparedDbName+"_"+preparedSchemaName); err != nil {
+						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string) error {
+
+	for defaultRole, inherits := range defaultRoles {
+
+		roleName := prefix + defaultRole
+
+		flags := []string{constants.RoleFlagNoLogin}
+		if defaultRole[len(defaultRole)-5:] == constants.UserRoleNameSuffix {
+			flags = []string{constants.RoleFlagLogin}
+		}
+
+		memberOf := make([]string, 0)
+		if inherits != "" {
+			memberOf = append(memberOf, prefix+inherits)
+		}
+
+		adminRole := ""
+		if strings.Contains(defaultRole, constants.OwnerRoleNameSuffix) {
+			adminRole = admin
+		} else {
+			adminRole = prefix + constants.OwnerRoleNameSuffix
+		}
+
+		newRole := spec.PgUser{
+			Origin:    spec.RoleOriginBootstrap,
+			Name:      roleName,
+			Password:  util.RandomPassword(constants.PasswordLength),
+			Flags:     flags,
+			MemberOf:  memberOf,
+			AdminRole: adminRole,
+		}
+		if currentRole, present := c.pgUsers[roleName]; present {
+			c.pgUsers[roleName] = c.resolveNameConflict(&currentRole, &newRole)
+		} else {
+			c.pgUsers[roleName] = newRole
+		}
+	}
+	return nil
 }
 
 func (c *Cluster) initRobotUsers() error {
@@ -1081,6 +1243,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 
 	var err error
 	c.logger.Debugf("switching over from %q to %q", curMaster.Name, candidate)
+	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switching over from %q to %q", curMaster.Name, candidate)
 
 	var wg sync.WaitGroup
 
@@ -1107,6 +1270,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 
 	if err = c.patroni.Switchover(curMaster, candidate.Name); err == nil {
 		c.logger.Debugf("successfully switched over from %q to %q", curMaster.Name, candidate)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Successfully switched over from %q to %q", curMaster.Name, candidate)
 		if err = <-podLabelErr; err != nil {
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
@@ -1122,6 +1286,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	// close the label waiting channel no sooner than the waiting goroutine terminates.
 	close(podLabelErr)
 
+	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	return err
 
 }
@@ -1149,11 +1314,19 @@ type clusterObjectDelete func(name string) error
 
 func (c *Cluster) deletePatroniClusterObjects() error {
 	// TODO: figure out how to remove leftover patroni objects in other cases
+	var actionsList []simpleActionWithResult
+
 	if !c.patroniUsesKubernetes() {
 		c.logger.Infof("not cleaning up Etcd Patroni objects on cluster delete")
 	}
-	c.logger.Debugf("removing leftover Patroni objects (endpoints, services and configmaps)")
-	for _, deleter := range []simpleActionWithResult{c.deletePatroniClusterEndpoints, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps} {
+
+	if !c.patroniKubernetesUseConfigMaps() {
+		actionsList = append(actionsList, c.deletePatroniClusterEndpoints)
+	}
+	actionsList = append(actionsList, c.deletePatroniClusterServices, c.deletePatroniClusterConfigMaps)
+
+	c.logger.Debugf("removing leftover Patroni objects (endpoints / services and configmaps)")
+	for _, deleter := range actionsList {
 		if err := deleter(); err != nil {
 			return err
 		}
@@ -1224,10 +1397,10 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
 }
 
-// Test if two connection pool configuration needs to be synced. For simplicity
+// Test if two connection pooler configuration needs to be synced. For simplicity
 // compare not the actual K8S objects, but the configuration itself and request
 // sync if there is any difference.
-func (c *Cluster) needSyncConnPoolSpecs(oldSpec, newSpec *acidv1.ConnectionPool) (sync bool, reasons []string) {
+func (c *Cluster) needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler) (sync bool, reasons []string) {
 	reasons = []string{}
 	sync = false
 
@@ -1264,21 +1437,21 @@ func syncResources(a, b *v1.ResourceRequirements) bool {
 	return false
 }
 
-// Check if we need to synchronize connection pool deployment due to new
+// Check if we need to synchronize connection pooler deployment due to new
 // defaults, that are different from what we see in the DeploymentSpec
-func (c *Cluster) needSyncConnPoolDefaults(
-	spec *acidv1.ConnectionPool,
+func (c *Cluster) needSyncConnectionPoolerDefaults(
+	spec *acidv1.ConnectionPooler,
 	deployment *appsv1.Deployment) (sync bool, reasons []string) {
 
 	reasons = []string{}
 	sync = false
 
-	config := c.OpConfig.ConnectionPool
+	config := c.OpConfig.ConnectionPooler
 	podTemplate := deployment.Spec.Template
-	poolContainer := podTemplate.Spec.Containers[constants.ConnPoolContainer]
+	poolerContainer := podTemplate.Spec.Containers[constants.ConnectionPoolerContainer]
 
 	if spec == nil {
-		spec = &acidv1.ConnectionPool{}
+		spec = &acidv1.ConnectionPooler{}
 	}
 
 	if spec.NumberOfInstances == nil &&
@@ -1291,25 +1464,25 @@ func (c *Cluster) needSyncConnPoolDefaults(
 	}
 
 	if spec.DockerImage == "" &&
-		poolContainer.Image != config.Image {
+		poolerContainer.Image != config.Image {
 
 		sync = true
 		msg := fmt.Sprintf("DockerImage is different (having %s, required %s)",
-			poolContainer.Image, config.Image)
+			poolerContainer.Image, config.Image)
 		reasons = append(reasons, msg)
 	}
 
 	expectedResources, err := generateResourceRequirements(spec.Resources,
-		c.makeDefaultConnPoolResources())
+		c.makeDefaultConnectionPoolerResources())
 
 	// An error to generate expected resources means something is not quite
 	// right, but for the purpose of robustness do not panic here, just report
 	// and ignore resources comparison (in the worst case there will be no
 	// updates for new resource values).
-	if err == nil && syncResources(&poolContainer.Resources, expectedResources) {
+	if err == nil && syncResources(&poolerContainer.Resources, expectedResources) {
 		sync = true
 		msg := fmt.Sprintf("Resources are different (having %+v, required %+v)",
-			poolContainer.Resources, expectedResources)
+			poolerContainer.Resources, expectedResources)
 		reasons = append(reasons, msg)
 	}
 
@@ -1317,13 +1490,13 @@ func (c *Cluster) needSyncConnPoolDefaults(
 		c.logger.Warningf("Cannot generate expected resources, %v", err)
 	}
 
-	for _, env := range poolContainer.Env {
+	for _, env := range poolerContainer.Env {
 		if spec.User == "" && env.Name == "PGUSER" {
 			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
 
 			if ref.Name != c.credentialSecretName(config.User) {
 				sync = true
-				msg := fmt.Sprintf("Pool user is different (having %s, required %s)",
+				msg := fmt.Sprintf("pooler user is different (having %s, required %s)",
 					ref.Name, config.User)
 				reasons = append(reasons, msg)
 			}
@@ -1331,7 +1504,7 @@ func (c *Cluster) needSyncConnPoolDefaults(
 
 		if spec.Schema == "" && env.Name == "PGSCHEMA" && env.Value != config.Schema {
 			sync = true
-			msg := fmt.Sprintf("Pool schema is different (having %s, required %s)",
+			msg := fmt.Sprintf("pooler schema is different (having %s, required %s)",
 				env.Value, config.Schema)
 			reasons = append(reasons, msg)
 		}

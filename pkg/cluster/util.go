@@ -415,24 +415,24 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 	}
 }
 
-// Return connection pool labels selector, which should from one point of view
+// Return connection pooler labels selector, which should from one point of view
 // inherit most of the labels from the cluster itself, but at the same time
 // have e.g. different `application` label, so that recreatePod operation will
 // not interfere with it (it lists all the pods via labels, and if there would
 // be no difference, it will recreate also pooler pods).
-func (c *Cluster) connPoolLabelsSelector() *metav1.LabelSelector {
-	connPoolLabels := labels.Set(map[string]string{})
+func (c *Cluster) connectionPoolerLabelsSelector() *metav1.LabelSelector {
+	connectionPoolerLabels := labels.Set(map[string]string{})
 
 	extraLabels := labels.Set(map[string]string{
-		"connection-pool": c.connPoolName(),
-		"application":     "db-connection-pool",
+		"connection-pooler": c.connectionPoolerName(),
+		"application":       "db-connection-pooler",
 	})
 
-	connPoolLabels = labels.Merge(connPoolLabels, c.labelsSet(false))
-	connPoolLabels = labels.Merge(connPoolLabels, extraLabels)
+	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, c.labelsSet(false))
+	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, extraLabels)
 
 	return &metav1.LabelSelector{
-		MatchLabels:      connPoolLabels,
+		MatchLabels:      connectionPoolerLabels,
 		MatchExpressions: nil,
 	}
 }
@@ -510,14 +510,42 @@ func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
 }
 
-func (c *Cluster) needConnectionPoolWorker(spec *acidv1.PostgresSpec) bool {
-	if spec.EnableConnectionPool == nil {
-		return spec.ConnectionPool != nil
+func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
+	if !c.patroniUsesKubernetes() {
+		return false
+	}
+
+	// otherwise, follow the operator configuration
+	return c.OpConfig.KubernetesUseConfigMaps
+}
+
+func (c *Cluster) needConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
+	if spec.EnableConnectionPooler == nil {
+		return spec.ConnectionPooler != nil
 	} else {
-		return *spec.EnableConnectionPool
+		return *spec.EnableConnectionPooler
 	}
 }
 
-func (c *Cluster) needConnectionPool() bool {
-	return c.needConnectionPoolWorker(&c.Spec)
+func (c *Cluster) needConnectionPooler() bool {
+	return c.needConnectionPoolerWorker(&c.Spec)
+}
+
+// Earlier arguments take priority
+func mergeContainers(containers ...[]v1.Container) ([]v1.Container, []string) {
+	containerNameTaken := map[string]bool{}
+	result := make([]v1.Container, 0)
+	conflicts := make([]string, 0)
+
+	for _, containerArray := range containers {
+		for _, container := range containerArray {
+			if _, taken := containerNameTaken[container.Name]; taken {
+				conflicts = append(conflicts, container.Name)
+			} else {
+				containerNameTaken[container.Name] = true
+				result = append(result, container)
+			}
+		}
+	}
+	return result, conflicts
 }

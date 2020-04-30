@@ -13,6 +13,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -21,6 +23,8 @@ const (
 )
 
 var logger = logrus.New().WithField("test", "cluster")
+var eventRecorder = record.NewFakeRecorder(1)
+
 var cl = New(
 	Config{
 		OpConfig: config.Config{
@@ -32,8 +36,9 @@ var cl = New(
 		},
 	},
 	k8sutil.NewMockKubernetesClient(),
-	acidv1.Postgresql{},
+	acidv1.Postgresql{ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "test"}},
 	logger,
+	eventRecorder,
 )
 
 func TestInitRobotUsers(t *testing.T) {
@@ -709,16 +714,136 @@ func TestServiceAnnotations(t *testing.T) {
 func TestInitSystemUsers(t *testing.T) {
 	testName := "Test system users initialization"
 
-	// default cluster without connection pool
+	// default cluster without connection pooler
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers[constants.ConnectionPoolUserKeyName]; exist {
-		t.Errorf("%s, connection pool user is present", testName)
+	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; exist {
+		t.Errorf("%s, connection pooler user is present", testName)
 	}
 
-	// cluster with connection pool
-	cl.Spec.EnableConnectionPool = boolToPointer(true)
+	// cluster with connection pooler
+	cl.Spec.EnableConnectionPooler = boolToPointer(true)
 	cl.initSystemUsers()
-	if _, exist := cl.systemUsers[constants.ConnectionPoolUserKeyName]; !exist {
-		t.Errorf("%s, connection pool user is not present", testName)
+	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; !exist {
+		t.Errorf("%s, connection pooler user is not present", testName)
+	}
+
+	// superuser is not allowed as connection pool user
+	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
+		User: "postgres",
+	}
+	cl.OpConfig.SuperUsername = "postgres"
+	cl.OpConfig.ConnectionPooler.User = "pooler"
+
+	cl.initSystemUsers()
+	if _, exist := cl.pgUsers["pooler"]; !exist {
+		t.Errorf("%s, Superuser is not allowed to be a connection pool user", testName)
+	}
+
+	// neither protected users are
+	delete(cl.pgUsers, "pooler")
+	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
+		User: "admin",
+	}
+	cl.OpConfig.ProtectedRoles = []string{"admin"}
+
+	cl.initSystemUsers()
+	if _, exist := cl.pgUsers["pooler"]; !exist {
+		t.Errorf("%s, Protected user are not allowed to be a connection pool user", testName)
+	}
+
+	delete(cl.pgUsers, "pooler")
+	cl.Spec.ConnectionPooler = &acidv1.ConnectionPooler{
+		User: "standby",
+	}
+
+	cl.initSystemUsers()
+	if _, exist := cl.pgUsers["pooler"]; !exist {
+		t.Errorf("%s, System users are not allowed to be a connection pool user", testName)
+	}
+}
+
+func TestPreparedDatabases(t *testing.T) {
+	testName := "TestDefaultPreparedDatabase"
+
+	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{}
+	cl.initPreparedDatabaseRoles()
+
+	for _, role := range []string{"acid_test_owner", "acid_test_reader", "acid_test_writer",
+		"acid_test_data_owner", "acid_test_data_reader", "acid_test_data_writer"} {
+		if _, exist := cl.pgUsers[role]; !exist {
+			t.Errorf("%s, default role %q for prepared database not present", testName, role)
+		}
+	}
+
+	testName = "TestPreparedDatabaseWithSchema"
+
+	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{
+		"foo": {
+			DefaultUsers: true,
+			PreparedSchemas: map[string]acidv1.PreparedSchema{
+				"bar": {
+					DefaultUsers: true,
+				},
+			},
+		},
+	}
+	cl.initPreparedDatabaseRoles()
+
+	for _, role := range []string{
+		"foo_owner", "foo_reader", "foo_writer",
+		"foo_owner_user", "foo_reader_user", "foo_writer_user",
+		"foo_bar_owner", "foo_bar_reader", "foo_bar_writer",
+		"foo_bar_owner_user", "foo_bar_reader_user", "foo_bar_writer_user"} {
+		if _, exist := cl.pgUsers[role]; !exist {
+			t.Errorf("%s, default role %q for prepared database not present", testName, role)
+		}
+	}
+
+	roleTests := []struct {
+		subTest  string
+		role     string
+		memberOf string
+		admin    string
+	}{
+		{
+			subTest:  "Test admin role of owner",
+			role:     "foo_owner",
+			memberOf: "",
+			admin:    "admin",
+		},
+		{
+			subTest:  "Test writer is a member of reader",
+			role:     "foo_writer",
+			memberOf: "foo_reader",
+			admin:    "foo_owner",
+		},
+		{
+			subTest:  "Test reader LOGIN role",
+			role:     "foo_reader_user",
+			memberOf: "foo_reader",
+			admin:    "foo_owner",
+		},
+		{
+			subTest:  "Test schema owner",
+			role:     "foo_bar_owner",
+			memberOf: "",
+			admin:    "foo_owner",
+		},
+		{
+			subTest:  "Test schema writer LOGIN role",
+			role:     "foo_bar_writer_user",
+			memberOf: "foo_bar_writer",
+			admin:    "foo_bar_owner",
+		},
+	}
+
+	for _, tt := range roleTests {
+		user := cl.pgUsers[tt.role]
+		if (tt.memberOf == "" && len(user.MemberOf) > 0) || (tt.memberOf != "" && user.MemberOf[0] != tt.memberOf) {
+			t.Errorf("%s, incorrect membership for default role %q. Expected %q, got %q", tt.subTest, tt.role, tt.memberOf, user.MemberOf[0])
+		}
+		if user.AdminRole != tt.admin {
+			t.Errorf("%s, incorrect admin role for default role %q. Expected %q, got %q", tt.subTest, tt.role, tt.admin, user.AdminRole)
+		}
 	}
 }

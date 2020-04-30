@@ -19,12 +19,16 @@ configTarget: "ConfigMap"
 configGeneral:
   # choose if deployment creates/updates CRDs with OpenAPIV3Validation
   enable_crd_validation: "true"
+  # update only the statefulsets without immediately doing the rolling update
+  enable_lazy_spilo_upgrade: "false"
   # start any new database pod without limitations on shm memory
   enable_shm_volume: "true"
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
+  # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
+  # kubernetes_use_configmaps: "false"
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
+  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: "-1"
   # min number of instances in Postgres cluster. -1 = no limit
@@ -244,24 +248,24 @@ configTeamsApi:
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
 
 # configure connection pooler deployment created by the operator
-configConnectionPool:
+configConnectionPooler:
   # db schema to install lookup function into
-  connection_pool_schema: "pooler"
+  connection_pooler_schema: "pooler"
   # db user for pooler to use
-  connection_pool_user: "pooler"
+  connection_pooler_user: "pooler"
   # docker image
-  connection_pool_image: "registry.opensource.zalan.do/acid/pgbouncer"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer"
   # max db connections the pooler should hold
-  connection_pool_max_db_connections: 60
+  connection_pooler_max_db_connections: "60"
   # default pooling mode
-  connection_pool_mode: "transaction"
+  connection_pooler_mode: "transaction"
   # number of pooler instances
-  connection_pool_number_of_instances: 2
+  connection_pooler_number_of_instances: "2"
   # default resources
-  connection_pool_default_cpu_request: 500m
-  connection_pool_default_memory_request: 100Mi
-  connection_pool_default_cpu_limit: "1"
-  connection_pool_default_memory_limit: 100Mi
+  connection_pooler_default_cpu_request: 500m
+  connection_pooler_default_memory_request: 100Mi
+  connection_pooler_default_cpu_limit: "1"
+  connection_pooler_default_memory_limit: 100Mi
 
 rbac:
   # Specifies whether RBAC resources should be created
@@ -269,6 +273,7 @@ rbac:
 
 crd:
   # Specifies whether custom resource definitions should be created
+  # When using helm3, this is ignored; instead use "--skip-crds" to skip.
   create: true
 
 serviceAccount:

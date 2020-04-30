@@ -140,10 +140,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration). Optional.
 
-* **enableConnectionPool**
-  Tells the operator to create a connection pool with a database. If this
-  field is true, a connection pool deployment will be created even if
-  `connectionPool` section is empty. Optional, not set by default.
+* **enableConnectionPooler**
+  Tells the operator to create a connection pooler with a database. If this
+  field is true, a connection pooler deployment will be created even if
+  `connectionPooler` section is empty. Optional, not set by default.
 
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
@@ -154,6 +154,18 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Optional. Default is: "30 00 \* \* \*"
 
+* **additionalVolumes**
+  List of additional volumes to mount in each container of the statefulset pod.
+  Each item must contain a `name`, `mountPath`, and `volumeSource` which is a
+  [kubernetes volumeSource](https://godoc.org/k8s.io/api/core/v1#VolumeSource).
+  It allows you to mount existing PersistentVolumeClaims, ConfigMaps and Secrets inside the StatefulSet.
+  Also an `emptyDir` volume can be shared between initContainer and statefulSet.
+  Additionaly, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
+  You can also specify in which container the additional Volumes will be mounted with the `targetContainers` array option.
+  If `targetContainers` is empty, additional volumes will be mounted only in the `postgres` container.
+  If you set the `all` special item, it will be mounted in all containers (postgres + sidecars).
+  Else you can set the list of target containers in which the additional volumes will be mounted (eg : postgres, telegraf)
+  
 ## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key, which is
@@ -217,6 +229,12 @@ explanation of `ttl` and `loop_wait` parameters.
   automatically created by Patroni for cluster members and permanent replication
   slots. Optional.
 
+* **synchronous_mode**
+  Patroni `synchronous_mode` parameter value. The default is set to `false`. Optional.
+  
+* **synchronous_mode_strict**
+  Patroni `synchronous_mode_strict` parameter value. Can be used in addition to `synchronous_mode`. The default is set to `false`. Optional.
+  
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
@@ -365,34 +383,35 @@ CPU and memory limits for the sidecar container.
   memory limits for the sidecar container. Optional, overrides the
   `default_memory_limits` operator configuration parameter. Optional.
 
-## Connection pool
+## Connection pooler
 
-Parameters are grouped under the `connectionPool` top-level key and specify
-configuration for connection pool. If this section is not empty, a connection
-pool will be created for a database even if `enableConnectionPool` is not
+Parameters are grouped under the `connectionPooler` top-level key and specify
+configuration for connection pooler. If this section is not empty, a connection
+pooler will be created for a database even if `enableConnectionPooler` is not
 present.
 
 * **numberOfInstances**
-  How many instances of connection pool to create.
+  How many instances of connection pooler to create.
 
 * **schema**
-  Schema to create for credentials lookup function.
+  Database schema to create for credentials lookup function.
 
 * **user**
-  User to create for connection pool to be able to connect to a database.
+  User to create for connection pooler to be able to connect to a database.
+  You can also choose a role from the `users` section or a system user role.
 
 * **dockerImage**
-  Which docker image to use for connection pool deployment.
+  Which docker image to use for connection pooler deployment.
 
 * **maxDBConnections**
   How many connections the pooler can max hold. This value is divided among the
   pooler pods.
 
 * **mode**
-  In which mode to run connection pool, transaction or session.
+  In which mode to run connection pooler, transaction or session.
 
 * **resources**
-  Resource configuration for connection pool deployment.
+  Resource configuration for connection pooler deployment.
 
 ## Custom TLS certificates
 
@@ -412,5 +431,16 @@ Those parameters are grouped under the `tls` top-level key.
   Filename of the private key. Defaults to "tls.key".
 
 * **caFile**
-  Optional filename to the CA certificate. Useful when the client connects
-  with `sslmode=verify-ca` or `sslmode=verify-full`. Default is empty.
+  Optional filename to the CA certificate (e.g. "ca.crt"). Useful when the
+  client connects with `sslmode=verify-ca` or `sslmode=verify-full`.
+  Default is empty.
+
+* **caSecretName**
+  By setting the `caSecretName` value, the ca certificate file defined by the
+  `caFile` will be fetched from this secret instead of `secretName` above.
+  This secret has to hold a file with that name in its root.
+
+  Optionally one can provide full path for any of them. By default it is
+  relative to the "/tls/", which is mount path of the tls secret.
+  If `caSecretName` is defined, the ca.crt path is relative to "/tlsca/",
+  otherwise to the same "/tls/".

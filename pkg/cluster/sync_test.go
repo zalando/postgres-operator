@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -17,41 +18,51 @@ func int32ToPointer(value int32) *int32 {
 	return &value
 }
 
-func deploymentUpdated(cluster *Cluster, err error) error {
-	if cluster.ConnectionPool.Deployment.Spec.Replicas == nil ||
-		*cluster.ConnectionPool.Deployment.Spec.Replicas != 2 {
+func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
+	if cluster.ConnectionPooler.Deployment.Spec.Replicas == nil ||
+		*cluster.ConnectionPooler.Deployment.Spec.Replicas != 2 {
 		return fmt.Errorf("Wrong nubmer of instances")
 	}
 
 	return nil
 }
 
-func objectsAreSaved(cluster *Cluster, err error) error {
-	if cluster.ConnectionPool == nil {
-		return fmt.Errorf("Connection pool resources are empty")
+func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
+	if cluster.ConnectionPooler == nil {
+		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	if cluster.ConnectionPool.Deployment == nil {
+	if cluster.ConnectionPooler.Deployment == nil {
 		return fmt.Errorf("Deployment was not saved")
 	}
 
-	if cluster.ConnectionPool.Service == nil {
+	if cluster.ConnectionPooler.Service == nil {
 		return fmt.Errorf("Service was not saved")
 	}
 
 	return nil
 }
 
-func objectsAreDeleted(cluster *Cluster, err error) error {
-	if cluster.ConnectionPool != nil {
-		return fmt.Errorf("Connection pool was not deleted")
+func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
+	if cluster.ConnectionPooler != nil {
+		return fmt.Errorf("Connection pooler was not deleted")
 	}
 
 	return nil
 }
 
-func TestConnPoolSynchronization(t *testing.T) {
-	testName := "Test connection pool synchronization"
+func noEmptySync(cluster *Cluster, err error, reason SyncReason) error {
+	for _, msg := range reason {
+		if strings.HasPrefix(msg, "update [] from '<nil>' to '") {
+			return fmt.Errorf("There is an empty reason, %s", msg)
+		}
+	}
+
+	return nil
+}
+
+func TestConnectionPoolerSynchronization(t *testing.T) {
+	testName := "Test connection pooler synchronization"
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -60,15 +71,15 @@ func TestConnPoolSynchronization(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
-				ConnectionPool: config.ConnectionPool{
-					ConnPoolDefaultCPURequest:    "100m",
-					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100Mi",
-					ConnPoolDefaultMemoryLimit:   "100Mi",
-					NumberOfInstances:            int32ToPointer(1),
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    int32ToPointer(1),
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	cluster.Statefulset = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -84,37 +95,39 @@ func TestConnPoolSynchronization(t *testing.T) {
 
 	clusterDirtyMock := *cluster
 	clusterDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
-	clusterDirtyMock.ConnectionPool = &ConnectionPoolObjects{
+	clusterDirtyMock.ConnectionPooler = &ConnectionPoolerObjects{
 		Deployment: &appsv1.Deployment{},
 		Service:    &v1.Service{},
 	}
 
 	clusterNewDefaultsMock := *cluster
 	clusterNewDefaultsMock.KubeClient = k8sutil.NewMockKubernetesClient()
-	cluster.OpConfig.ConnectionPool.Image = "pooler:2.0"
-	cluster.OpConfig.ConnectionPool.NumberOfInstances = int32ToPointer(2)
 
 	tests := []struct {
-		subTest string
-		oldSpec *acidv1.Postgresql
-		newSpec *acidv1.Postgresql
-		cluster *Cluster
-		check   func(cluster *Cluster, err error) error
+		subTest          string
+		oldSpec          *acidv1.Postgresql
+		newSpec          *acidv1.Postgresql
+		cluster          *Cluster
+		defaultImage     string
+		defaultInstances int32
+		check            func(cluster *Cluster, err error, reason SyncReason) error
 	}{
 		{
 			subTest: "create if doesn't exist",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster: &clusterMissingObjects,
-			check:   objectsAreSaved,
+			cluster:          &clusterMissingObjects,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreSaved,
 		},
 		{
 			subTest: "create if doesn't exist with a flag",
@@ -123,11 +136,13 @@ func TestConnPoolSynchronization(t *testing.T) {
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					EnableConnectionPool: boolToPointer(true),
+					EnableConnectionPooler: boolToPointer(true),
 				},
 			},
-			cluster: &clusterMissingObjects,
-			check:   objectsAreSaved,
+			cluster:          &clusterMissingObjects,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreSaved,
 		},
 		{
 			subTest: "create from scratch",
@@ -136,24 +151,28 @@ func TestConnPoolSynchronization(t *testing.T) {
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster: &clusterMissingObjects,
-			check:   objectsAreSaved,
+			cluster:          &clusterMissingObjects,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreSaved,
 		},
 		{
 			subTest: "delete if not needed",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
-			cluster: &clusterMock,
-			check:   objectsAreDeleted,
+			cluster:          &clusterMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreDeleted,
 		},
 		{
 			subTest: "cleanup if still there",
@@ -163,48 +182,78 @@ func TestConnPoolSynchronization(t *testing.T) {
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
-			cluster: &clusterDirtyMock,
-			check:   objectsAreDeleted,
+			cluster:          &clusterDirtyMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreDeleted,
 		},
 		{
 			subTest: "update deployment",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{
+					ConnectionPooler: &acidv1.ConnectionPooler{
 						NumberOfInstances: int32ToPointer(1),
 					},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{
+					ConnectionPooler: &acidv1.ConnectionPooler{
 						NumberOfInstances: int32ToPointer(2),
 					},
 				},
 			},
-			cluster: &clusterMock,
-			check:   deploymentUpdated,
+			cluster:          &clusterMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            deploymentUpdated,
 		},
 		{
 			subTest: "update image from changed defaults",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPool: &acidv1.ConnectionPool{},
+					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster: &clusterNewDefaultsMock,
-			check:   deploymentUpdated,
+			cluster:          &clusterNewDefaultsMock,
+			defaultImage:     "pooler:2.0",
+			defaultInstances: 2,
+			check:            deploymentUpdated,
+		},
+		{
+			subTest: "there is no sync from nil to an empty spec",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					EnableConnectionPooler: boolToPointer(true),
+					ConnectionPooler:       nil,
+				},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					EnableConnectionPooler: boolToPointer(true),
+					ConnectionPooler:       &acidv1.ConnectionPooler{},
+				},
+			},
+			cluster:          &clusterMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            noEmptySync,
 		},
 	}
 	for _, tt := range tests {
-		err := tt.cluster.syncConnectionPool(tt.oldSpec, tt.newSpec, mockInstallLookupFunction)
+		tt.cluster.OpConfig.ConnectionPooler.Image = tt.defaultImage
+		tt.cluster.OpConfig.ConnectionPooler.NumberOfInstances =
+			int32ToPointer(tt.defaultInstances)
 
-		if err := tt.check(tt.cluster, err); err != nil {
+		reason, err := tt.cluster.syncConnectionPooler(tt.oldSpec,
+			tt.newSpec, mockInstallLookupFunction)
+
+		if err := tt.check(tt.cluster, err, reason); err != nil {
 			t.Errorf("%s [%s]: Could not synchronize, %+v",
 				testName, tt.subTest, err)
 		}

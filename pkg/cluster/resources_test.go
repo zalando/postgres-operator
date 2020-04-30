@@ -19,8 +19,8 @@ func boolToPointer(value bool) *bool {
 	return &value
 }
 
-func TestConnPoolCreationAndDeletion(t *testing.T) {
-	testName := "Test connection pool creation"
+func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
+	testName := "Test connection pooler creation"
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -29,14 +29,14 @@ func TestConnPoolCreationAndDeletion(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
-				ConnectionPool: config.ConnectionPool{
-					ConnPoolDefaultCPURequest:    "100m",
-					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100Mi",
-					ConnPoolDefaultMemoryLimit:   "100Mi",
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger)
+		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
 
 	cluster.Statefulset = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -45,31 +45,31 @@ func TestConnPoolCreationAndDeletion(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		ConnectionPool: &acidv1.ConnectionPool{},
+		ConnectionPooler: &acidv1.ConnectionPooler{},
 	}
-	poolResources, err := cluster.createConnectionPool(mockInstallLookupFunction)
+	poolerResources, err := cluster.createConnectionPooler(mockInstallLookupFunction)
 
 	if err != nil {
-		t.Errorf("%s: Cannot create connection pool, %s, %+v",
-			testName, err, poolResources)
+		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
+			testName, err, poolerResources)
 	}
 
-	if poolResources.Deployment == nil {
-		t.Errorf("%s: Connection pool deployment is empty", testName)
+	if poolerResources.Deployment == nil {
+		t.Errorf("%s: Connection pooler deployment is empty", testName)
 	}
 
-	if poolResources.Service == nil {
-		t.Errorf("%s: Connection pool service is empty", testName)
+	if poolerResources.Service == nil {
+		t.Errorf("%s: Connection pooler service is empty", testName)
 	}
 
-	err = cluster.deleteConnectionPool()
+	err = cluster.deleteConnectionPooler()
 	if err != nil {
-		t.Errorf("%s: Cannot delete connection pool, %s", testName, err)
+		t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
 	}
 }
 
-func TestNeedConnPool(t *testing.T) {
-	testName := "Test how connection pool can be enabled"
+func TestNeedConnectionPooler(t *testing.T) {
+	testName := "Test how connection pooler can be enabled"
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
@@ -78,50 +78,50 @@ func TestNeedConnPool(t *testing.T) {
 					SuperUsername:       superUserName,
 					ReplicationUsername: replicationUserName,
 				},
-				ConnectionPool: config.ConnectionPool{
-					ConnPoolDefaultCPURequest:    "100m",
-					ConnPoolDefaultCPULimit:      "100m",
-					ConnPoolDefaultMemoryRequest: "100Mi",
-					ConnPoolDefaultMemoryLimit:   "100Mi",
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger)
+		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
 
 	cluster.Spec = acidv1.PostgresSpec{
-		ConnectionPool: &acidv1.ConnectionPool{},
+		ConnectionPooler: &acidv1.ConnectionPooler{},
 	}
 
-	if !cluster.needConnectionPool() {
-		t.Errorf("%s: Connection pool is not enabled with full definition",
+	if !cluster.needConnectionPooler() {
+		t.Errorf("%s: Connection pooler is not enabled with full definition",
 			testName)
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableConnectionPool: boolToPointer(true),
+		EnableConnectionPooler: boolToPointer(true),
 	}
 
-	if !cluster.needConnectionPool() {
-		t.Errorf("%s: Connection pool is not enabled with flag",
+	if !cluster.needConnectionPooler() {
+		t.Errorf("%s: Connection pooler is not enabled with flag",
 			testName)
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableConnectionPool: boolToPointer(false),
-		ConnectionPool:       &acidv1.ConnectionPool{},
+		EnableConnectionPooler: boolToPointer(false),
+		ConnectionPooler:       &acidv1.ConnectionPooler{},
 	}
 
-	if cluster.needConnectionPool() {
-		t.Errorf("%s: Connection pool is still enabled with flag being false",
+	if cluster.needConnectionPooler() {
+		t.Errorf("%s: Connection pooler is still enabled with flag being false",
 			testName)
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableConnectionPool: boolToPointer(true),
-		ConnectionPool:       &acidv1.ConnectionPool{},
+		EnableConnectionPooler: boolToPointer(true),
+		ConnectionPooler:       &acidv1.ConnectionPooler{},
 	}
 
-	if !cluster.needConnectionPool() {
-		t.Errorf("%s: Connection pool is not enabled with flag and full",
+	if !cluster.needConnectionPooler() {
+		t.Errorf("%s: Connection pooler is not enabled with flag and full",
 			testName)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -153,18 +154,18 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
-// Defines default configuration for connection pool
-type ConnectionPoolConfiguration struct {
-	NumberOfInstances    *int32 `json:"connection_pool_number_of_instances,omitempty"`
-	Schema               string `json:"connection_pool_schema,omitempty"`
-	User                 string `json:"connection_pool_user,omitempty"`
-	Image                string `json:"connection_pool_image,omitempty"`
-	Mode                 string `json:"connection_pool_mode,omitempty"`
-	MaxDBConnections     *int32 `json:"connection_pool_max_db_connections,omitempty"`
-	DefaultCPURequest    string `json:"connection_pool_default_cpu_request,omitempty"`
-	DefaultMemoryRequest string `json:"connection_pool_default_memory_request,omitempty"`
-	DefaultCPULimit      string `json:"connection_pool_default_cpu_limit,omitempty"`
-	DefaultMemoryLimit   string `json:"connection_pool_default_memory_limit,omitempty"`
+// Defines default configuration for connection pooler
+type ConnectionPoolerConfiguration struct {
+	NumberOfInstances    *int32 `json:"connection_pooler_number_of_instances,omitempty"`
+	Schema               string `json:"connection_pooler_schema,omitempty"`
+	User                 string `json:"connection_pooler_user,omitempty"`
+	Image                string `json:"connection_pooler_image,omitempty"`
+	Mode                 string `json:"connection_pooler_mode,omitempty"`
+	MaxDBConnections     *int32 `json:"connection_pooler_max_db_connections,omitempty"`
+	DefaultCPURequest    string `json:"connection_pooler_default_cpu_request,omitempty"`
+	DefaultMemoryRequest string `json:"connection_pooler_default_memory_request,omitempty"`
+	DefaultCPULimit      string `json:"connection_pooler_default_cpu_limit,omitempty"`
+	DefaultMemoryLimit   string `json:"connection_pooler_default_memory_limit,omitempty"`
 }
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
@@ -181,17 +182,21 @@ type OperatorLogicalBackupConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
-	EtcdHost                   string                             `json:"etcd_host,omitempty"`
-	DockerImage                string                             `json:"docker_image,omitempty"`
-	Workers                    uint32                             `json:"workers,omitempty"`
-	MinInstances               int32                              `json:"min_instances,omitempty"`
-	MaxInstances               int32                              `json:"max_instances,omitempty"`
-	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
-	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
-	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
-	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
-	Sidecars                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	EnableCRDValidation     *bool    `json:"enable_crd_validation,omitempty"`
+	EnableLazySpiloUpgrade  bool     `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EtcdHost                string   `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps bool     `json:"kubernetes_use_configmaps,omitempty"`
+	DockerImage             string   `json:"docker_image,omitempty"`
+	Workers                 uint32   `json:"workers,omitempty"`
+	MinInstances            int32    `json:"min_instances,omitempty"`
+	MaxInstances            int32    `json:"max_instances,omitempty"`
+	ResyncPeriod            Duration `json:"resync_period,omitempty"`
+	RepairPeriod            Duration `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit bool     `json:"set_memory_request_to_limit,omitempty"`
+	ShmVolume               *bool    `json:"enable_shm_volume,omitempty"`
+	// deprecated in favour of SidecarContainers
+	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	SidecarContainers          []v1.Container                     `json:"sidecars,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`
@@ -203,7 +208,7 @@ type OperatorConfigurationData struct {
 	LoggingRESTAPI             LoggingRESTAPIConfiguration        `json:"logging_rest_api"`
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
-	ConnectionPool             ConnectionPoolConfiguration        `json:"connection_pool"`
+	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
 }
 
 //Duration shortens this frequently used name

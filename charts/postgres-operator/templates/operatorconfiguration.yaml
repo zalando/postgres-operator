@@ -32,8 +32,6 @@ configuration:
 {{ toYaml .Values.configTeamsApi | indent 4 }}
   logging_rest_api:
 {{ toYaml .Values.configLoggingRestApi | indent 4 }}
-  scalyr:
-{{ toYaml .Values.configScalyr | indent 4 }}
-  connection_pool:
-{{ toYaml .Values.configConnectionPool | indent 4 }}
+  connection_pooler:
+{{ toYaml .Values.configConnectionPooler | indent 4 }}
 {{- end }}

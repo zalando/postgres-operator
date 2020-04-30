@@ -17,8 +17,9 @@ pipelines with no access to Kubernetes directly.
 
 * Rolling updates on Postgres cluster changes
 * Volume resize without Pod restarts
+* Database connection pooler
 * Cloning Postgres clusters
-* Logical Backups to S3 Bucket
+* Logical backups to S3 Bucket
 * Standby cluster from S3 WAL archive
 * Configurable for non-cloud environments
 * UI to create and edit Postgres cluster manifests

@@ -94,37 +94,42 @@ func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 	return statefulSet, nil
 }
 
-// Prepare the database for connection pool to be used, i.e. install lookup
+// Prepare the database for connection pooler to be used, i.e. install lookup
 // function (do it first, because it should be fast and if it didn't succeed,
 // it doesn't makes sense to create more K8S objects. At this moment we assume
-// that necessary connection pool user exists.
+// that necessary connection pooler user exists.
 //
-// After that create all the objects for connection pool, namely a deployment
+// After that create all the objects for connection pooler, namely a deployment
 // with a chosen pooler and a service to expose it.
-func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolObjects, error) {
+func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoolerObjects, error) {
 	var msg string
-	c.setProcessName("creating connection pool")
+	c.setProcessName("creating connection pooler")
 
-	schema := c.Spec.ConnectionPool.Schema
-	if schema == "" {
-		schema = c.OpConfig.ConnectionPool.Schema
+	if c.ConnectionPooler == nil {
+		c.ConnectionPooler = &ConnectionPoolerObjects{}
 	}
 
-	user := c.Spec.ConnectionPool.User
+	schema := c.Spec.ConnectionPooler.Schema
+
+	if schema == "" {
+		schema = c.OpConfig.ConnectionPooler.Schema
+	}
+
+	user := c.Spec.ConnectionPooler.User
 	if user == "" {
-		user = c.OpConfig.ConnectionPool.User
+		user = c.OpConfig.ConnectionPooler.User
 	}
 
 	err := lookup(schema, user)
 
 	if err != nil {
-		msg = "could not prepare database for connection pool: %v"
+		msg = "could not prepare database for connection pooler: %v"
 		return nil, fmt.Errorf(msg, err)
 	}
 
-	deploymentSpec, err := c.generateConnPoolDeployment(&c.Spec)
+	deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec)
 	if err != nil {
-		msg = "could not generate deployment for connection pool: %v"
+		msg = "could not generate deployment for connection pooler: %v"
 		return nil, fmt.Errorf(msg, err)
 	}
 
@@ -139,7 +144,7 @@ func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolO
 		return nil, err
 	}
 
-	serviceSpec := c.generateConnPoolService(&c.Spec)
+	serviceSpec := c.generateConnectionPoolerService(&c.Spec)
 	service, err := c.KubeClient.
 		Services(serviceSpec.Namespace).
 		Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
@@ -148,31 +153,31 @@ func (c *Cluster) createConnectionPool(lookup InstallFunction) (*ConnectionPoolO
 		return nil, err
 	}
 
-	c.ConnectionPool = &ConnectionPoolObjects{
+	c.ConnectionPooler = &ConnectionPoolerObjects{
 		Deployment: deployment,
 		Service:    service,
 	}
-	c.logger.Debugf("created new connection pool %q, uid: %q",
+	c.logger.Debugf("created new connection pooler %q, uid: %q",
 		util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
 
-	return c.ConnectionPool, nil
+	return c.ConnectionPooler, nil
 }
 
-func (c *Cluster) deleteConnectionPool() (err error) {
-	c.setProcessName("deleting connection pool")
-	c.logger.Debugln("deleting connection pool")
+func (c *Cluster) deleteConnectionPooler() (err error) {
+	c.setProcessName("deleting connection pooler")
+	c.logger.Debugln("deleting connection pooler")
 
 	// Lack of connection pooler objects is not a fatal error, just log it if
 	// it was present before in the manifest
-	if c.ConnectionPool == nil {
-		c.logger.Infof("No connection pool to delete")
+	if c.ConnectionPooler == nil {
+		c.logger.Infof("No connection pooler to delete")
 		return nil
 	}
 
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
-	deploymentName := c.connPoolName()
-	deployment := c.ConnectionPool.Deployment
+	deploymentName := c.connectionPoolerName()
+	deployment := c.ConnectionPooler.Deployment
 
 	if deployment != nil {
 		deploymentName = deployment.Name
@@ -187,16 +192,16 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 		Delete(context.TODO(), deploymentName, options)
 
 	if !k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("Connection pool deployment was already deleted")
+		c.logger.Debugf("Connection pooler deployment was already deleted")
 	} else if err != nil {
 		return fmt.Errorf("could not delete deployment: %v", err)
 	}
 
-	c.logger.Infof("Connection pool deployment %q has been deleted", deploymentName)
+	c.logger.Infof("Connection pooler deployment %q has been deleted", deploymentName)
 
 	// Repeat the same for the service object
-	service := c.ConnectionPool.Service
-	serviceName := c.connPoolName()
+	service := c.ConnectionPooler.Service
+	serviceName := c.connectionPoolerName()
 
 	if service != nil {
 		serviceName = service.Name
@@ -209,14 +214,14 @@ func (c *Cluster) deleteConnectionPool() (err error) {
 		Delete(context.TODO(), serviceName, options)
 
 	if !k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("Connection pool service was already deleted")
+		c.logger.Debugf("Connection pooler service was already deleted")
 	} else if err != nil {
 		return fmt.Errorf("could not delete service: %v", err)
 	}
 
-	c.logger.Infof("Connection pool service %q has been deleted", serviceName)
+	c.logger.Infof("Connection pooler service %q has been deleted", serviceName)
 
-	c.ConnectionPool = nil
+	c.ConnectionPooler = nil
 	return nil
 }
 
@@ -816,12 +821,12 @@ func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
 }
 
-// Perform actual patching of a connection pool deployment, assuming that all
+// Perform actual patching of a connection pooler deployment, assuming that all
 // the check were already done before.
-func (c *Cluster) updateConnPoolDeployment(oldDeploymentSpec, newDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
-	c.setProcessName("updating connection pool")
-	if c.ConnectionPool == nil || c.ConnectionPool.Deployment == nil {
-		return nil, fmt.Errorf("there is no connection pool in the cluster")
+func (c *Cluster) updateConnectionPoolerDeployment(oldDeploymentSpec, newDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+	c.setProcessName("updating connection pooler")
+	if c.ConnectionPooler == nil || c.ConnectionPooler.Deployment == nil {
+		return nil, fmt.Errorf("there is no connection pooler in the cluster")
 	}
 
 	patchData, err := specPatch(newDeployment.Spec)
@@ -833,9 +838,9 @@ func (c *Cluster) updateConnPoolDeployment(oldDeploymentSpec, newDeployment *app
 	// worker at one time will try to update it chances of conflicts are
 	// minimal.
 	deployment, err := c.KubeClient.
-		Deployments(c.ConnectionPool.Deployment.Namespace).Patch(
+		Deployments(c.ConnectionPooler.Deployment.Namespace).Patch(
 		context.TODO(),
-		c.ConnectionPool.Deployment.Name,
+		c.ConnectionPooler.Deployment.Name,
 		types.MergePatchType,
 		patchData,
 		metav1.PatchOptions{},
@@ -844,7 +849,7 @@ func (c *Cluster) updateConnPoolDeployment(oldDeploymentSpec, newDeployment *app
 		return nil, fmt.Errorf("could not patch deployment: %v", err)
 	}
 
-	c.ConnectionPool.Deployment = deployment
+	c.ConnectionPooler.Deployment = deployment
 
 	return deployment, nil
 }

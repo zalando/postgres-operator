@@ -177,7 +177,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
-					"connectionPool": {
+					"connectionPooler": {
 						Type: "object",
 						Properties: map[string]apiextv1beta1.JSONSchemaProps{
 							"dockerImage": {
@@ -259,7 +259,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"dockerImage": {
 						Type: "string",
 					},
-					"enableConnectionPool": {
+					"enableConnectionPooler": {
 						Type: "boolean",
 					},
 					"enableLogicalBackup": {
@@ -358,6 +358,12 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"maximum_lag_on_failover": {
 								Type: "integer",
 							},
+							"synchronous_mode": {
+								Type: "boolean",
+							},
+							"synchronous_mode_strict": {
+								Type: "boolean",
+							},
 						},
 					},
 					"podAnnotations": {
@@ -410,6 +416,43 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 									Schema: &apiextv1beta1.JSONSchemaProps{
 										Type: "string",
+									},
+								},
+							},
+						},
+					},
+					"preparedDatabases": {
+						Type: "object",
+						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"defaultUsers": {
+										Type: "boolean",
+									},
+									"extensions": {
+										Type: "object",
+										AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"schemas": {
+										Type: "object",
+										AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"defaultUsers": {
+														Type: "boolean",
+													},
+													"defaultRoles": {
+														Type: "boolean",
+													},
+												},
+											},
+										},
 									},
 								},
 							},
@@ -505,6 +548,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								Type: "string",
 							},
 							"caFile": {
+								Type: "string",
+							},
+							"caSecretName": {
 								Type: "string",
 							},
 						},
@@ -676,6 +722,37 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"additionalVolumes": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"name", "mountPath", "volumeSource"},
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"mountPath": {
+										Type: "string",
+									},
+									"targetContainers": {
+										Type: "array",
+										Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"volumeSource": {
+										Type: "object",
+									},
+									"subPath": {
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			"status": {
@@ -721,11 +798,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"enable_crd_validation": {
 						Type: "boolean",
 					},
+					"enable_lazy_spilo_upgrade": {
+						Type: "boolean",
+					},
 					"enable_shm_volume": {
 						Type: "boolean",
 					},
 					"etcd_host": {
 						Type: "string",
+					},
+					"kubernetes_use_configmaps": {
+						Type: "boolean",
 					},
 					"max_instances": {
 						Type:        "integer",
@@ -751,6 +834,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 							Schema: &apiextv1beta1.JSONSchemaProps{
 								Type: "string",
+							},
+						},
+					},
+					"sidecars": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Allows: true,
+								},
 							},
 						},
 					},
@@ -1129,32 +1223,32 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 						},
 					},
-					"connection_pool": {
+					"connection_pooler": {
 						Type: "object",
 						Properties: map[string]apiextv1beta1.JSONSchemaProps{
-							"connection_pool_default_cpu_limit": {
+							"connection_pooler_default_cpu_limit": {
 								Type:    "string",
 								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 							},
-							"connection_pool_default_cpu_request": {
+							"connection_pooler_default_cpu_request": {
 								Type:    "string",
 								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
 							},
-							"connection_pool_default_memory_limit": {
+							"connection_pooler_default_memory_limit": {
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
-							"connection_pool_default_memory_request": {
+							"connection_pooler_default_memory_request": {
 								Type:    "string",
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
-							"connection_pool_image": {
+							"connection_pooler_image": {
 								Type: "string",
 							},
-							"connection_pool_max_db_connections": {
+							"connection_pooler_max_db_connections": {
 								Type: "integer",
 							},
-							"connection_pool_mode": {
+							"connection_pooler_mode": {
 								Type: "string",
 								Enum: []apiextv1beta1.JSON{
 									{
@@ -1165,14 +1259,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 								},
 							},
-							"connection_pool_number_of_instances": {
+							"connection_pooler_number_of_instances": {
 								Type:    "integer",
 								Minimum: &min2,
 							},
-							"connection_pool_schema": {
+							"connection_pooler_schema": {
 								Type: "string",
 							},
-							"connection_pool_user": {
+							"connection_pooler_user": {
 								Type: "string",
 							},
 						},

@@ -34,7 +34,9 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// general config
 	result.EnableCRDValidation = fromCRD.EnableCRDValidation
+	result.EnableLazySpiloUpgrade = fromCRD.EnableLazySpiloUpgrade
 	result.EtcdHost = fromCRD.EtcdHost
+	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
 	result.DockerImage = fromCRD.DockerImage
 	result.Workers = fromCRD.Workers
 	result.MinInstances = fromCRD.MinInstances
@@ -43,7 +45,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.ShmVolume = fromCRD.ShmVolume
-	result.Sidecars = fromCRD.Sidecars
+	result.SidecarImages = fromCRD.SidecarImages
+	result.SidecarContainers = fromCRD.SidecarContainers
 
 	// user config
 	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername
@@ -150,51 +153,56 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ScalyrCPULimit = fromCRD.Scalyr.ScalyrCPULimit
 	result.ScalyrMemoryLimit = fromCRD.Scalyr.ScalyrMemoryLimit
 
-	// Connection pool. Looks like we can't use defaulting in CRD before 1.17,
+	// Connection pooler. Looks like we can't use defaulting in CRD before 1.17,
 	// so ensure default values here.
-	result.ConnectionPool.NumberOfInstances = util.CoalesceInt32(
-		fromCRD.ConnectionPool.NumberOfInstances,
+	result.ConnectionPooler.NumberOfInstances = util.CoalesceInt32(
+		fromCRD.ConnectionPooler.NumberOfInstances,
 		int32ToPointer(2))
 
-	result.ConnectionPool.NumberOfInstances = util.MaxInt32(
-		result.ConnectionPool.NumberOfInstances,
+	result.ConnectionPooler.NumberOfInstances = util.MaxInt32(
+		result.ConnectionPooler.NumberOfInstances,
 		int32ToPointer(2))
 
-	result.ConnectionPool.Schema = util.Coalesce(
-		fromCRD.ConnectionPool.Schema,
-		constants.ConnectionPoolSchemaName)
+	result.ConnectionPooler.Schema = util.Coalesce(
+		fromCRD.ConnectionPooler.Schema,
+		constants.ConnectionPoolerSchemaName)
 
-	result.ConnectionPool.User = util.Coalesce(
-		fromCRD.ConnectionPool.User,
-		constants.ConnectionPoolUserName)
+	result.ConnectionPooler.User = util.Coalesce(
+		fromCRD.ConnectionPooler.User,
+		constants.ConnectionPoolerUserName)
 
-	result.ConnectionPool.Image = util.Coalesce(
-		fromCRD.ConnectionPool.Image,
+	if result.ConnectionPooler.User == result.SuperUsername {
+		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		panic(fmt.Errorf(msg, result.ConnectionPooler.User))
+	}
+
+	result.ConnectionPooler.Image = util.Coalesce(
+		fromCRD.ConnectionPooler.Image,
 		"registry.opensource.zalan.do/acid/pgbouncer")
 
-	result.ConnectionPool.Mode = util.Coalesce(
-		fromCRD.ConnectionPool.Mode,
-		constants.ConnectionPoolDefaultMode)
+	result.ConnectionPooler.Mode = util.Coalesce(
+		fromCRD.ConnectionPooler.Mode,
+		constants.ConnectionPoolerDefaultMode)
 
-	result.ConnectionPool.ConnPoolDefaultCPURequest = util.Coalesce(
-		fromCRD.ConnectionPool.DefaultCPURequest,
-		constants.ConnectionPoolDefaultCpuRequest)
+	result.ConnectionPooler.ConnectionPoolerDefaultCPURequest = util.Coalesce(
+		fromCRD.ConnectionPooler.DefaultCPURequest,
+		constants.ConnectionPoolerDefaultCpuRequest)
 
-	result.ConnectionPool.ConnPoolDefaultMemoryRequest = util.Coalesce(
-		fromCRD.ConnectionPool.DefaultMemoryRequest,
-		constants.ConnectionPoolDefaultMemoryRequest)
+	result.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest = util.Coalesce(
+		fromCRD.ConnectionPooler.DefaultMemoryRequest,
+		constants.ConnectionPoolerDefaultMemoryRequest)
 
-	result.ConnectionPool.ConnPoolDefaultCPULimit = util.Coalesce(
-		fromCRD.ConnectionPool.DefaultCPULimit,
-		constants.ConnectionPoolDefaultCpuLimit)
+	result.ConnectionPooler.ConnectionPoolerDefaultCPULimit = util.Coalesce(
+		fromCRD.ConnectionPooler.DefaultCPULimit,
+		constants.ConnectionPoolerDefaultCpuLimit)
 
-	result.ConnectionPool.ConnPoolDefaultMemoryLimit = util.Coalesce(
-		fromCRD.ConnectionPool.DefaultMemoryLimit,
-		constants.ConnectionPoolDefaultMemoryLimit)
+	result.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit = util.Coalesce(
+		fromCRD.ConnectionPooler.DefaultMemoryLimit,
+		constants.ConnectionPoolerDefaultMemoryLimit)
 
-	result.ConnectionPool.MaxDBConnections = util.CoalesceInt32(
-		fromCRD.ConnectionPool.MaxDBConnections,
-		int32ToPointer(constants.ConnPoolMaxDBConnections))
+	result.ConnectionPooler.MaxDBConnections = util.CoalesceInt32(
+		fromCRD.ConnectionPooler.MaxDBConnections,
+		int32ToPointer(constants.ConnectionPoolerMaxDBConnections))
 
 	return result
 }

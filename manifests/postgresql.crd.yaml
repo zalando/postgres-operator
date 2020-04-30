@@ -38,6 +38,28 @@ spec:
             - teamId
             - postgresql
           properties:
+            additionalVolumes:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                  - mountPath
+                  - volumeSource
+                properties:
+                  name:
+                    type: string
+                  mountPath:
+                    type: string
+                  targetContainers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
+                  volumeSource:
+                    type: object
+                  subPath:
+                    type: string
             allowedSourceRanges:
               type: array
               nullable: true
@@ -70,7 +92,7 @@ spec:
                 uid:
                   format: uuid
                   type: string
-            connectionPool:
+            connectionPooler:
               type: object
               properties:
                 dockerImage:
@@ -126,7 +148,7 @@ spec:
               # Note: usernames specified here as database owners must be declared in the users key of the spec key.
             dockerImage:
               type: string
-            enableConnectionPool:
+            enableConnectionPooler:
               type: boolean
             enableLogicalBackup:
               type: boolean
@@ -184,6 +206,10 @@ spec:
                   type: integer
                 maximum_lag_on_failover:
                   type: integer
+                synchronous_mode:
+                  type: boolean
+                synchronous_mode_strict:
+                  type: boolean
             podAnnotations:
               type: object
               additionalProperties:
@@ -211,6 +237,26 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+            preparedDatabases:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  defaultUsers:
+                    type: boolean
+                  extensions:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  schemas:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        defaultUsers:
+                          type: boolean
+                        defaultRoles:
+                          type: boolean
             replicaLoadBalancer:  # deprecated
               type: boolean
             resources:
@@ -314,6 +360,8 @@ spec:
                 privateKeyFile:
                   type: string
                 caFile:
+                  type: string
+                caSecretName:
                   type: string
             tolerations:
               type: array

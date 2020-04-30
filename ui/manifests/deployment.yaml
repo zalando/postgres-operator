@@ -44,6 +44,8 @@ spec:
               value: "http://postgres-operator:8080"
             - name: "OPERATOR_CLUSTER_NAME_LABEL"
               value: "cluster-name"
+            - name: "RESOURCES_VISIBLE"
+              value: "False"
             - name: "TARGET_NAMESPACE"
               value: "default"
             - name: "TEAMS"
