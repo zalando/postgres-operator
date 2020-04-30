@@ -1,5 +1,5 @@
 Flask-OAuthlib==0.9.5
-Flask==1.1.1
+Flask==1.1.2
 backoff==1.8.1
 boto3==1.10.4
 boto==2.49.0
