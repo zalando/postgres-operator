@@ -273,6 +273,26 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+            preparedDatabases:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  defaultUsers:
+                    type: boolean
+                  extensions:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  schemas:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        defaultUsers:
+                          type: boolean
+                        defaultRoles:
+                          type: boolean
             replicaLoadBalancer:  # deprecated
               type: boolean
             resources:
@@ -364,6 +384,21 @@ spec:
                   type: string
             teamId:
               type: string
+            tls:
+              type: object
+              required:
+                - secretName
+              properties:
+                secretName:
+                  type: string
+                certificateFile:
+                  type: string
+                privateKeyFile:
+                  type: string
+                caFile:
+                  type: string
+                caSecretName:
+                  type: string
             tolerations:
               type: array
               items:

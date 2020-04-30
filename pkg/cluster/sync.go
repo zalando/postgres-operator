@@ -3,11 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
-
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -15,6 +11,11 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/volumes"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
@@ -108,6 +109,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			err = fmt.Errorf("could not sync databases: %v", err)
 			return err
 		}
+		c.logger.Debugf("syncing prepared databases with schemas")
+		if err = c.syncPreparedDatabases(); err != nil {
+			err = fmt.Errorf("could not sync prepared database: %v", err)
+			return err
+		}
 	}
 
 	// remove PVCs of shut down pods
@@ -117,7 +123,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pooler
-	if err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
+	if _, err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
@@ -128,10 +134,11 @@ func (c *Cluster) syncServices() error {
 	for _, role := range []PostgresRole{Master, Replica} {
 		c.logger.Debugf("syncing %s service", role)
 
-		if err := c.syncEndpoint(role); err != nil {
-			return fmt.Errorf("could not sync %s endpoint: %v", role, err)
+		if !c.patroniKubernetesUseConfigMaps() {
+			if err := c.syncEndpoint(role); err != nil {
+				return fmt.Errorf("could not sync %s endpoint: %v", role, err)
+			}
 		}
-
 		if err := c.syncService(role); err != nil {
 			return fmt.Errorf("could not sync %s service: %v", role, err)
 		}
@@ -257,6 +264,28 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	return nil
 }
 
+func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet) (bool, error) {
+
+	pods, err := c.listPods()
+	if err != nil {
+		return false, fmt.Errorf("could not list pods of the statefulset: %v", err)
+	}
+
+	for _, pod := range pods {
+
+		effectivePodImage := pod.Spec.Containers[0].Image
+		ssImage := desiredSset.Spec.Template.Spec.Containers[0].Image
+
+		if ssImage != effectivePodImage {
+			c.logger.Infof("not all pods were re-started when the lazy upgrade was enabled; forcing the rolling upgrade now")
+			return true, nil
+		}
+
+	}
+
+	return false, nil
+}
+
 func (c *Cluster) syncStatefulSet() error {
 	var (
 		podsRollingUpdateRequired bool
@@ -335,6 +364,19 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
+
+		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
+			// even if desired and actual statefulsets match
+			// there still may be not up-to-date pods on condition
+			//  (a) the lazy update was just disabled
+			// and
+			//  (b) some of the pods were not restarted when the lazy update was still in place
+			podsRollingUpdateRequired, err = c.mustUpdatePodsAfterLazyUpdate(desiredSS)
+			if err != nil {
+				return fmt.Errorf("could not list pods of the statefulset: %v", err)
+			}
+		}
+
 	}
 
 	// Apply special PostgreSQL parameters that can only be set via the Patroni API.
@@ -348,10 +390,12 @@ func (c *Cluster) syncStatefulSet() error {
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if podsRollingUpdateRequired {
 		c.logger.Debugln("performing rolling update")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
 		if err := c.recreatePods(); err != nil {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
 		c.logger.Infof("pods have been recreated")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
 			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
 		}
@@ -531,6 +575,7 @@ func (c *Cluster) syncDatabases() error {
 
 	createDatabases := make(map[string]string)
 	alterOwnerDatabases := make(map[string]string)
+	preparedDatabases := make([]string, 0)
 
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
@@ -546,12 +591,24 @@ func (c *Cluster) syncDatabases() error {
 		return fmt.Errorf("could not get current databases: %v", err)
 	}
 
-	for datname, newOwner := range c.Spec.Databases {
-		currentOwner, exists := currentDatabases[datname]
+	// if no prepared databases are specified create a database named like the cluster
+	if c.Spec.PreparedDatabases != nil && len(c.Spec.PreparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
+		c.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
+	}
+	for preparedDatabaseName := range c.Spec.PreparedDatabases {
+		_, exists := currentDatabases[preparedDatabaseName]
 		if !exists {
-			createDatabases[datname] = newOwner
+			createDatabases[preparedDatabaseName] = preparedDatabaseName + constants.OwnerRoleNameSuffix
+			preparedDatabases = append(preparedDatabases, preparedDatabaseName)
+		}
+	}
+
+	for databaseName, newOwner := range c.Spec.Databases {
+		currentOwner, exists := currentDatabases[databaseName]
+		if !exists {
+			createDatabases[databaseName] = newOwner
 		} else if currentOwner != newOwner {
-			alterOwnerDatabases[datname] = newOwner
+			alterOwnerDatabases[databaseName] = newOwner
 		}
 	}
 
@@ -559,13 +616,116 @@ func (c *Cluster) syncDatabases() error {
 		return nil
 	}
 
-	for datname, owner := range createDatabases {
-		if err = c.executeCreateDatabase(datname, owner); err != nil {
+	for databaseName, owner := range createDatabases {
+		if err = c.executeCreateDatabase(databaseName, owner); err != nil {
 			return err
 		}
 	}
-	for datname, owner := range alterOwnerDatabases {
-		if err = c.executeAlterDatabaseOwner(datname, owner); err != nil {
+	for databaseName, owner := range alterOwnerDatabases {
+		if err = c.executeAlterDatabaseOwner(databaseName, owner); err != nil {
+			return err
+		}
+	}
+
+	// set default privileges for prepared database
+	for _, preparedDatabase := range preparedDatabases {
+		if err = c.execAlterGlobalDefaultPrivileges(preparedDatabase+constants.OwnerRoleNameSuffix, preparedDatabase); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPreparedDatabases() error {
+	c.setProcessName("syncing prepared databases")
+	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
+		if err := c.initDbConnWithName(preparedDbName); err != nil {
+			return fmt.Errorf("could not init connection to database %s: %v", preparedDbName, err)
+		}
+		defer func() {
+			if err := c.closeDbConn(); err != nil {
+				c.logger.Errorf("could not close database connection: %v", err)
+			}
+		}()
+
+		// now, prepare defined schemas
+		preparedSchemas := preparedDB.PreparedSchemas
+		if len(preparedDB.PreparedSchemas) == 0 {
+			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
+		}
+		if err := c.syncPreparedSchemas(preparedDbName, preparedSchemas); err != nil {
+			return err
+		}
+
+		// install extensions
+		if err := c.syncExtensions(preparedDB.Extensions); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncPreparedSchemas(databaseName string, preparedSchemas map[string]acidv1.PreparedSchema) error {
+	c.setProcessName("syncing prepared schemas")
+
+	currentSchemas, err := c.getSchemas()
+	if err != nil {
+		return fmt.Errorf("could not get current schemas: %v", err)
+	}
+
+	var schemas []string
+
+	for schema := range preparedSchemas {
+		schemas = append(schemas, schema)
+	}
+
+	if createPreparedSchemas, equal := util.SubstractStringSlices(schemas, currentSchemas); !equal {
+		for _, schemaName := range createPreparedSchemas {
+			owner := constants.OwnerRoleNameSuffix
+			dbOwner := databaseName + owner
+			if preparedSchemas[schemaName].DefaultRoles == nil || *preparedSchemas[schemaName].DefaultRoles {
+				owner = databaseName + "_" + schemaName + owner
+			} else {
+				owner = dbOwner
+			}
+			if err = c.executeCreateDatabaseSchema(databaseName, schemaName, dbOwner, owner); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) syncExtensions(extensions map[string]string) error {
+	c.setProcessName("syncing database extensions")
+
+	createExtensions := make(map[string]string)
+	alterExtensions := make(map[string]string)
+
+	currentExtensions, err := c.getExtensions()
+	if err != nil {
+		return fmt.Errorf("could not get current database extensions: %v", err)
+	}
+
+	for extName, newSchema := range extensions {
+		currentSchema, exists := currentExtensions[extName]
+		if !exists {
+			createExtensions[extName] = newSchema
+		} else if currentSchema != newSchema {
+			alterExtensions[extName] = newSchema
+		}
+	}
+
+	for extName, schema := range createExtensions {
+		if err = c.executeCreateExtension(extName, schema); err != nil {
+			return err
+		}
+	}
+	for extName, schema := range alterExtensions {
+		if err = c.executeAlterExtension(extName, schema); err != nil {
 			return err
 		}
 	}
@@ -626,7 +786,13 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	return nil
 }
 
-func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, lookup InstallFunction) error {
+func (c *Cluster) syncConnectionPooler(oldSpec,
+	newSpec *acidv1.Postgresql,
+	lookup InstallFunction) (SyncReason, error) {
+
+	var reason SyncReason
+	var err error
+
 	if c.ConnectionPooler == nil {
 		c.ConnectionPooler = &ConnectionPoolerObjects{}
 	}
@@ -663,20 +829,20 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 				specUser,
 				c.OpConfig.ConnectionPooler.User)
 
-			if err := lookup(schema, user); err != nil {
-				return err
+			if err = lookup(schema, user); err != nil {
+				return NoSync, err
 			}
 		}
 
-		if err := c.syncConnectionPoolerWorker(oldSpec, newSpec); err != nil {
+		if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec); err != nil {
 			c.logger.Errorf("could not sync connection pooler: %v", err)
-			return err
+			return reason, err
 		}
 	}
 
 	if oldNeedConnectionPooler && !newNeedConnectionPooler {
 		// delete and cleanup resources
-		if err := c.deleteConnectionPooler(); err != nil {
+		if err = c.deleteConnectionPooler(); err != nil {
 			c.logger.Warningf("could not remove connection pooler: %v", err)
 		}
 	}
@@ -687,20 +853,22 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 			(c.ConnectionPooler.Deployment != nil ||
 				c.ConnectionPooler.Service != nil) {
 
-			if err := c.deleteConnectionPooler(); err != nil {
+			if err = c.deleteConnectionPooler(); err != nil {
 				c.logger.Warningf("could not remove connection pooler: %v", err)
 			}
 		}
 	}
 
-	return nil
+	return reason, nil
 }
 
 // Synchronize connection pooler resources. Effectively we're interested only in
 // synchronizing the corresponding deployment, but in case of deployment or
 // service is missing, create it. After checking, also remember an object for
 // the future references.
-func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql) error {
+func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql) (
+	SyncReason, error) {
+
 	deployment, err := c.KubeClient.
 		Deployments(c.Namespace).
 		Get(context.TODO(), c.connectionPoolerName(), metav1.GetOptions{})
@@ -712,7 +880,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		deploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec)
 		if err != nil {
 			msg = "could not generate deployment for connection pooler: %v"
-			return fmt.Errorf(msg, err)
+			return NoSync, fmt.Errorf(msg, err)
 		}
 
 		deployment, err := c.KubeClient.
@@ -720,18 +888,35 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
 
 		if err != nil {
-			return err
+			return NoSync, err
 		}
 
 		c.ConnectionPooler.Deployment = deployment
 	} else if err != nil {
-		return fmt.Errorf("could not get connection pooler deployment to sync: %v", err)
+		msg := "could not get connection pooler deployment to sync: %v"
+		return NoSync, fmt.Errorf(msg, err)
 	} else {
 		c.ConnectionPooler.Deployment = deployment
 
 		// actual synchronization
 		oldConnectionPooler := oldSpec.Spec.ConnectionPooler
 		newConnectionPooler := newSpec.Spec.ConnectionPooler
+
+		// sync implementation below assumes that both old and new specs are
+		// not nil, but it can happen. To avoid any confusion like updating a
+		// deployment because the specification changed from nil to an empty
+		// struct (that was initialized somewhere before) replace any nil with
+		// an empty spec.
+		if oldConnectionPooler == nil {
+			oldConnectionPooler = &acidv1.ConnectionPooler{}
+		}
+
+		if newConnectionPooler == nil {
+			newConnectionPooler = &acidv1.ConnectionPooler{}
+		}
+
+		c.logger.Infof("Old: %+v, New %+v", oldConnectionPooler, newConnectionPooler)
+
 		specSync, specReason := c.needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, deployment)
 		reason := append(specReason, defaultsReason...)
@@ -742,7 +927,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec)
 			if err != nil {
 				msg := "could not generate deployment for connection pooler: %v"
-				return fmt.Errorf(msg, err)
+				return reason, fmt.Errorf(msg, err)
 			}
 
 			oldDeploymentSpec := c.ConnectionPooler.Deployment
@@ -752,11 +937,11 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 				newDeploymentSpec)
 
 			if err != nil {
-				return err
+				return reason, err
 			}
 
 			c.ConnectionPooler.Deployment = deployment
-			return nil
+			return reason, nil
 		}
 	}
 
@@ -774,16 +959,17 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 
 		if err != nil {
-			return err
+			return NoSync, err
 		}
 
 		c.ConnectionPooler.Service = service
 	} else if err != nil {
-		return fmt.Errorf("could not get connection pooler service to sync: %v", err)
+		msg := "could not get connection pooler service to sync: %v"
+		return NoSync, fmt.Errorf(msg, err)
 	} else {
 		// Service updates are not supported and probably not that useful anyway
 		c.ConnectionPooler.Service = service
 	}
 
-	return nil
+	return NoSync, nil
 }

@@ -34,6 +34,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// general config
 	result.EnableCRDValidation = fromCRD.EnableCRDValidation
+	result.EnableLazySpiloUpgrade = fromCRD.EnableLazySpiloUpgrade
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
 	result.DockerImage = fromCRD.DockerImage
@@ -44,7 +45,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.ShmVolume = fromCRD.ShmVolume
-	result.Sidecars = fromCRD.Sidecars
+	result.SidecarImages = fromCRD.SidecarImages
+	result.SidecarContainers = fromCRD.SidecarContainers
 
 	// user config
 	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername

@@ -42,6 +42,9 @@ envs:
 service:
   type: "ClusterIP"
   port: "8080"
+  # If the type of the service is NodePort a port can be specified using the nodePort field
+  # If the nodePort field is not specified, or if it has no value, then a random port is used
+  # notePort: 32521
 
 # configure UI ingress. If needed: "enabled: true"
 ingress:

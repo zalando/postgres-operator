@@ -7,24 +7,24 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/cache"
-
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/apiserver"
 	"github.com/zalando/postgres-operator/pkg/cluster"
+	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/ringlog"
-
-	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
+	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 )
 
 // Controller represents operator controller
@@ -35,6 +35,9 @@ type Controller struct {
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
 	apiserver  *apiserver.Server
+
+	eventRecorder    record.EventRecorder
+	eventBroadcaster record.EventBroadcaster
 
 	stopCh chan struct{}
 
@@ -67,10 +70,21 @@ type Controller struct {
 func NewController(controllerConfig *spec.ControllerConfig, controllerId string) *Controller {
 	logger := logrus.New()
 
+	var myComponentName = "postgres-operator"
+	if controllerId != "" {
+		myComponentName += "/" + controllerId
+	}
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(logger.Infof)
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: myComponentName})
+
 	c := &Controller{
 		config:           *controllerConfig,
 		opConfig:         &config.Config{},
 		logger:           logger.WithField("pkg", "controller"),
+		eventRecorder:    recorder,
+		eventBroadcaster: eventBroadcaster,
 		controllerID:     controllerId,
 		curWorkerCluster: sync.Map{},
 		clusterWorkers:   make(map[spec.NamespacedName]uint32),
@@ -93,6 +107,11 @@ func (c *Controller) initClients() {
 	if err != nil {
 		c.logger.Fatalf("could not create kubernetes clients: %v", err)
 	}
+	c.eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: c.KubeClient.EventsGetter.Events("")})
+	if err != nil {
+		c.logger.Fatalf("could not setup kubernetes event sink: %v", err)
+	}
+
 }
 
 func (c *Controller) initOperatorConfig() {
@@ -158,6 +177,11 @@ func (c *Controller) warnOnDeprecatedOperatorParameters() {
 	if c.opConfig.EnableLoadBalancer != nil {
 		c.logger.Warningf("Operator configuration parameter 'enable_load_balancer' is deprecated and takes no effect. " +
 			"Consider using the 'enable_master_load_balancer' or 'enable_replica_load_balancer' instead.")
+	}
+
+	if len(c.opConfig.SidecarImages) > 0 {
+		c.logger.Warningf("Operator configuration parameter 'sidecar_docker_images' is deprecated. " +
+			"Consider using 'sidecars' instead.")
 	}
 }
 
