@@ -33,28 +33,28 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result := &config.Config{}
 
 	// general config
-	result.EnableCRDValidation = fromCRD.EnableCRDValidation
+	result.EnableCRDValidation = util.CoalesceBool(fromCRD.EnableCRDValidation, util.True())
 	result.EnableLazySpiloUpgrade = fromCRD.EnableLazySpiloUpgrade
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
-	result.DockerImage = fromCRD.DockerImage
+	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115")
 	result.Workers = fromCRD.Workers
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
 	result.ResyncPeriod = time.Duration(fromCRD.ResyncPeriod)
 	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
-	result.ShmVolume = fromCRD.ShmVolume
+	result.ShmVolume = util.CoalesceBool(fromCRD.ShmVolume, util.True())
 	result.SidecarImages = fromCRD.SidecarImages
 	result.SidecarContainers = fromCRD.SidecarContainers
 
 	// user config
-	result.SuperUsername = fromCRD.PostgresUsersConfiguration.SuperUsername
-	result.ReplicationUsername = fromCRD.PostgresUsersConfiguration.ReplicationUsername
+	result.SuperUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.SuperUsername, "postgres")
+	result.ReplicationUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.ReplicationUsername, "standby")
 
 	// kubernetes config
 	result.CustomPodAnnotations = fromCRD.Kubernetes.CustomPodAnnotations
-	result.PodServiceAccountName = fromCRD.Kubernetes.PodServiceAccountName
+	result.PodServiceAccountName = util.Coalesce(fromCRD.Kubernetes.PodServiceAccountName, "postgres-pod")
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
 	result.PodEnvironmentConfigMap = fromCRD.Kubernetes.PodEnvironmentConfigMap
@@ -64,31 +64,31 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ClusterDomain = util.Coalesce(fromCRD.Kubernetes.ClusterDomain, "cluster.local")
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
-	result.EnablePodDisruptionBudget = fromCRD.Kubernetes.EnablePodDisruptionBudget
-	result.EnableInitContainers = fromCRD.Kubernetes.EnableInitContainers
-	result.EnableSidecars = fromCRD.Kubernetes.EnableSidecars
+	result.EnablePodDisruptionBudget = util.CoalesceBool(fromCRD.Kubernetes.EnablePodDisruptionBudget, util.True())
+	result.EnableInitContainers = util.CoalesceBool(fromCRD.Kubernetes.EnableInitContainers, util.True())
+	result.EnableSidecars = util.CoalesceBool(fromCRD.Kubernetes.EnableSidecars, util.True())
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
-	result.PodRoleLabel = fromCRD.Kubernetes.PodRoleLabel
+	result.PodRoleLabel = util.Coalesce(fromCRD.Kubernetes.PodRoleLabel, "spilo-role")
 	result.ClusterLabels = fromCRD.Kubernetes.ClusterLabels
 	result.InheritedLabels = fromCRD.Kubernetes.InheritedLabels
 	result.DownscalerAnnotations = fromCRD.Kubernetes.DownscalerAnnotations
-	result.ClusterNameLabel = fromCRD.Kubernetes.ClusterNameLabel
+	result.ClusterNameLabel = util.Coalesce(fromCRD.Kubernetes.ClusterNameLabel, "cluster-name")
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
-	result.PodManagementPolicy = fromCRD.Kubernetes.PodManagementPolicy
+	result.PodManagementPolicy = util.Coalesce(fromCRD.Kubernetes.PodManagementPolicy, "ordered_ready")
 	result.MasterPodMoveTimeout = time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout)
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
-	result.PodAntiAffinityTopologyKey = fromCRD.Kubernetes.PodAntiAffinityTopologyKey
+	result.PodAntiAffinityTopologyKey = util.Coalesce(fromCRD.Kubernetes.PodAntiAffinityTopologyKey, "kubernetes.io/hostname")
 
 	// Postgres Pod resources
-	result.DefaultCPURequest = fromCRD.PostgresPodResources.DefaultCPURequest
-	result.DefaultMemoryRequest = fromCRD.PostgresPodResources.DefaultMemoryRequest
-	result.DefaultCPULimit = fromCRD.PostgresPodResources.DefaultCPULimit
-	result.DefaultMemoryLimit = fromCRD.PostgresPodResources.DefaultMemoryLimit
-	result.MinCPULimit = fromCRD.PostgresPodResources.MinCPULimit
-	result.MinMemoryLimit = fromCRD.PostgresPodResources.MinMemoryLimit
+	result.DefaultCPURequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPURequest, "100m")
+	result.DefaultMemoryRequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultMemoryRequest, "100Mi")
+	result.DefaultCPULimit = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPULimit, "1")
+	result.DefaultMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.DefaultMemoryLimit, "500Mi")
+	result.MinCPULimit = util.Coalesce(fromCRD.PostgresPodResources.MinCPULimit, "250m")
+	result.MinMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.MinMemoryLimit, "250Mi")
 
 	// timeout config
 	result.ResourceCheckInterval = time.Duration(fromCRD.Timeouts.ResourceCheckInterval)
@@ -115,8 +115,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AdditionalSecretMountPath = fromCRD.AWSGCP.AdditionalSecretMountPath
 
 	// logical backup config
-	result.LogicalBackupSchedule = fromCRD.LogicalBackup.Schedule
-	result.LogicalBackupDockerImage = fromCRD.LogicalBackup.DockerImage
+	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup")
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 	result.LogicalBackupS3Region = fromCRD.LogicalBackup.S3Region
 	result.LogicalBackupS3Endpoint = fromCRD.LogicalBackup.S3Endpoint

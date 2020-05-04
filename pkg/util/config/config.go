@@ -83,7 +83,7 @@ type LogicalBackup struct {
 	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
 	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
 	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
-	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:"AES256"`
+	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:""`
 }
 
 // Operator options for connection pooler
