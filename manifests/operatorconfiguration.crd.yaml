@@ -93,6 +93,10 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+                downscaler_annotations:
+                  type: array
+                  items:
+                    type: string
                 enable_init_containers:
                   type: boolean
                 enable_pod_antiaffinity:

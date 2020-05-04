@@ -853,3 +853,24 @@ func (c *Cluster) updateConnectionPoolerDeployment(oldDeploymentSpec, newDeploym
 
 	return deployment, nil
 }
+
+//updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
+func (c *Cluster) updateConnectionPoolerAnnotations(annotations map[string]string) (*appsv1.Deployment, error) {
+	c.logger.Debugf("updating connection pooler annotations")
+	patchData, err := metaAnnotationsPatch(annotations)
+	if err != nil {
+		return nil, fmt.Errorf("could not form patch for the deployment metadata: %v", err)
+	}
+	result, err := c.KubeClient.Deployments(c.ConnectionPooler.Deployment.Namespace).Patch(
+		context.TODO(),
+		c.ConnectionPooler.Deployment.Name,
+		types.MergePatchType,
+		[]byte(patchData),
+		metav1.PatchOptions{},
+		"")
+	if err != nil {
+		return nil, fmt.Errorf("could not patch connection pooler annotations %q: %v", patchData, err)
+	}
+	return result, nil
+
+}

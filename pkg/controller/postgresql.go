@@ -487,7 +487,9 @@ func (c *Controller) postgresqlUpdate(prev, cur interface{}) {
 	if pgOld != nil && pgNew != nil {
 		// Avoid the inifinite recursion for status updates
 		if reflect.DeepEqual(pgOld.Spec, pgNew.Spec) {
-			return
+			if reflect.DeepEqual(pgNew.Annotations, pgOld.Annotations) {
+				return
+			}
 		}
 		c.queueClusterEvent(pgOld, pgNew, EventUpdate)
 	}

@@ -34,6 +34,7 @@ type Resources struct {
 	SpiloPrivileged         bool                `name:"spilo_privileged" default:"false"`
 	ClusterLabels           map[string]string   `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels         []string            `name:"inherited_labels" default:""`
+	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
 	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel            string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration           map[string]string   `name:"toleration" default:""`

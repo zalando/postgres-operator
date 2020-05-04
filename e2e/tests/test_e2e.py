@@ -428,7 +428,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
 
         # wait a little before proceeding with the pod distribution test
-        time.sleep(k8s.RETRY_TIMEOUT_SEC)
+        time.sleep(30)
 
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
@@ -465,21 +465,24 @@ class EndToEndTestCase(unittest.TestCase):
         pg_patch_custom_annotations = {
             "spec": {
                 "serviceAnnotations": {
-                    "annotation.key": "value"
+                    "annotation.key": "value",
+                    "foo": "bar",
                 }
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_custom_annotations)
 
+        # wait a little before proceeding
+        time.sleep(30)
         annotations = {
             "annotation.key": "value",
             "foo": "bar",
         }
         self.assertTrue(k8s.check_service_annotations(
-            "cluster-name=acid-service-annotations,spilo-role=master", annotations))
+            "cluster-name=acid-minimal-cluster,spilo-role=master", annotations))
         self.assertTrue(k8s.check_service_annotations(
-            "cluster-name=acid-service-annotations,spilo-role=replica", annotations))
+            "cluster-name=acid-minimal-cluster,spilo-role=replica", annotations))
 
         # clean up
         unpatch_custom_service_annotations = {
@@ -488,6 +491,40 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(unpatch_custom_service_annotations)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_statefulset_annotation_propagation(self):
+        '''
+           Inject annotation to Postgresql CRD and check it's propagation to stateful set
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        patch_sset_propagate_annotations = {
+            "data": {
+                "downscaler_annotations": "deployment-time,downscaler/*",
+            }
+        }
+        k8s.update_config(patch_sset_propagate_annotations)
+
+        pg_crd_annotations = {
+            "metadata": {
+                "annotations": {
+                    "deployment-time": "2020-04-30 12:00:00",
+                    "downscaler/downtime_replicas": "0",
+                },
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotations)
+
+        # wait a little before proceeding
+        time.sleep(60)
+        annotations = {
+            "deployment-time": "2020-04-30 12:00:00",
+            "downscaler/downtime_replicas": "0",
+        }
+        self.assertTrue(k8s.check_statefulset_annotations(cluster_label, annotations))
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
@@ -528,7 +565,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(patch_toleration_config)
 
         # wait a little before proceeding with the pod distribution test
-        time.sleep(k8s.RETRY_TIMEOUT_SEC)
+        time.sleep(30)
 
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
@@ -694,10 +731,18 @@ class K8s:
     def check_service_annotations(self, svc_labels, annotations, namespace='default'):
         svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
         for svc in svcs:
-            if len(svc.metadata.annotations) != len(annotations):
-                return False
-            for key in svc.metadata.annotations:
-                if svc.metadata.annotations[key] != annotations[key]:
+            for key, value in annotations.items():
+                if key not in svc.metadata.annotations or svc.metadata.annotations[key] != value:
+                    print("Expected key {} not found in annotations {}".format(key, svc.metadata.annotation))
+                    return False
+        return True
+
+    def check_statefulset_annotations(self, sset_labels, annotations, namespace='default'):
+        ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=sset_labels, limit=1).items
+        for sset in ssets:
+            for key, value in annotations.items():
+                if key not in sset.metadata.annotations or sset.metadata.annotations[key] != value:
+                    print("Expected key {} not found in annotations {}".format(key, sset.metadata.annotation))
                     return False
         return True
 
