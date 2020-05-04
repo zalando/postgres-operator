@@ -180,6 +180,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.DownscalerAnnotations != nil {
+		in, out := &in.DownscalerAnnotations, &out.DownscalerAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.NodeReadinessLabel != nil {
 		in, out := &in.NodeReadinessLabel, &out.NodeReadinessLabel
 		*out = make(map[string]string, len(*in))

@@ -62,6 +62,7 @@ type KubernetesMetaConfiguration struct {
 	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
+	DownscalerAnnotations                  []string              `json:"downscaler_annotations,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`

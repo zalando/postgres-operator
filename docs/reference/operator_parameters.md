@@ -200,6 +200,12 @@ configuration they are grouped under the `kubernetes` key.
   of a database created by the operator. If the annotation key is also provided
   by the database definition, the database definition value is used.
 
+* **downscaler_annotations**
+  An array of annotations that should be passed from Postgres CRD on to the
+  statefulset and, if exists, to the connection pooler deployment as well.
+  Regular expressions like `downscaler/*` etc. are also accepted. Can be used
+  with [kube-downscaler](https://github.com/hjacobs/kube-downscaler).
+
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not
   specified, the value is taken from the operator namespace. A special `*`
