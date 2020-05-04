@@ -34,6 +34,7 @@ type Resources struct {
 	SpiloPrivileged         bool                `name:"spilo_privileged" default:"false"`
 	ClusterLabels           map[string]string   `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels         []string            `name:"inherited_labels" default:""`
+	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
 	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel            string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration           map[string]string   `name:"toleration" default:""`
@@ -82,7 +83,7 @@ type LogicalBackup struct {
 	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
 	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
 	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
-	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:"AES256"`
+	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:""`
 }
 
 // Operator options for connection pooler

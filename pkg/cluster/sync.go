@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -358,6 +359,8 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
+		annotations := c.AnnotationsToPropagate(c.Statefulset.Annotations)
+		c.updateStatefulSetAnnotations(annotations)
 
 		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if desired and actual statefulsets match
@@ -395,6 +398,30 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 	}
 	return nil
+}
+
+// AnnotationsToPropagate get the annotations to update if required
+// based on the annotations in postgres CRD
+func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[string]string {
+	toPropagateAnnotations := c.OpConfig.DownscalerAnnotations
+	pgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
+
+	if toPropagateAnnotations != nil && pgCRDAnnotations != nil {
+		for _, anno := range toPropagateAnnotations {
+			for k, v := range pgCRDAnnotations {
+				matched, err := regexp.MatchString(anno, k)
+				if err != nil {
+					c.logger.Errorf("annotations matching issue: %v", err)
+					return nil
+				}
+				if matched {
+					annotations[k] = v
+				}
+			}
+		}
+	}
+
+	return annotations
 }
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
@@ -937,6 +964,11 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			c.ConnectionPooler.Deployment = deployment
 			return reason, nil
 		}
+	}
+
+	newAnnotations := c.AnnotationsToPropagate(c.ConnectionPooler.Deployment.Annotations)
+	if newAnnotations != nil {
+		c.updateConnectionPoolerAnnotations(newAnnotations)
 	}
 
 	service, err := c.KubeClient.

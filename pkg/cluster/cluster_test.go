@@ -28,18 +28,47 @@ var eventRecorder = record.NewFakeRecorder(1)
 var cl = New(
 	Config{
 		OpConfig: config.Config{
-			ProtectedRoles: []string{"admin"},
+			PodManagementPolicy: "ordered_ready",
+			ProtectedRoles:      []string{"admin"},
 			Auth: config.Auth{
 				SuperUsername:       superUserName,
 				ReplicationUsername: replicationUserName,
 			},
+			Resources: config.Resources{
+				DownscalerAnnotations: []string{"downscaler/*"},
+			},
 		},
 	},
 	k8sutil.NewMockKubernetesClient(),
-	acidv1.Postgresql{ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "test"}},
+	acidv1.Postgresql{ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "test", Annotations: map[string]string{"downscaler/downtime_replicas": "0"}}},
 	logger,
 	eventRecorder,
 )
+
+func TestStatefulSetAnnotations(t *testing.T) {
+	testName := "CheckStatefulsetAnnotations"
+	spec := acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+	}
+	ss, err := cl.generateStatefulSet(&spec)
+	if err != nil {
+		t.Errorf("in %s no statefulset created %v", testName, err)
+	}
+	if ss != nil {
+		annotation := ss.ObjectMeta.GetAnnotations()
+		if _, ok := annotation["downscaler/downtime_replicas"]; !ok {
+			t.Errorf("in %s respective annotation not found on sts", testName)
+		}
+	}
+
+}
 
 func TestInitRobotUsers(t *testing.T) {
 	testName := "TestInitRobotUsers"
