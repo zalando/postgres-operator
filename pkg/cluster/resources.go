@@ -336,18 +336,17 @@ func (c *Cluster) updateService(role PostgresRole, oldService *v1.Service, newSe
 func (c *Cluster) deleteService(role PostgresRole) error {
 	c.logger.Debugf("deleting service %s", role)
 
-	service, ok := c.Services[role]
-	if !ok {
+	if c.Services[role] == nil {
 		c.logger.Debugf("No service for %s role was found, nothing to delete", role)
 		return nil
 	}
 
-	if err := c.KubeClient.Services(service.Namespace).Delete(context.TODO(), service.Name, c.deleteOptions); err != nil {
+	if err := c.KubeClient.Services(c.Services[role].Namespace).Delete(context.TODO(), c.Services[role].Name, c.deleteOptions); err != nil {
 		return err
 	}
 
-	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(service.ObjectMeta))
-	c.Services[role] = nil
+	c.logger.Infof("%s service %q has been deleted", role, util.NameFromMeta(c.Services[role].ObjectMeta))
+	delete(c.Services, role)
 
 	return nil
 }
@@ -485,8 +484,7 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	}
 
 	c.logger.Infof("endpoint %q has been deleted", util.NameFromMeta(c.Endpoints[role].ObjectMeta))
-
-	c.Endpoints[role] = nil
+	delete(c.Endpoints, role)
 
 	return nil
 }
