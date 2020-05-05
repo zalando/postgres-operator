@@ -7,7 +7,7 @@ metadata:
 #  annotations:
 #    "acid.zalan.do/controller": "second-operator"
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
+  dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users

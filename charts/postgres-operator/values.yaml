@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.4.0
+  tag: v1.5.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -28,7 +28,7 @@ configGeneral:
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: "false"
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p115
+  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: "-1"
   # min number of instances in Postgres cluster. -1 = no limit
@@ -203,7 +203,7 @@ configAwsOrGcp:
 # configure K8s cron job managed by the operator
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:master-58"
   # S3 Access Key ID
   logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
@@ -257,7 +257,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-7"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: "60"
   # default pooling mode
