@@ -1102,24 +1102,29 @@ func (c *Cluster) Delete() error {
 
 	if err := c.deleteStreams(); err != nil {
 		c.logger.Warningf("could not delete event streams: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete event streams: %v", err)
 	}
 
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
 	if err := c.deleteLogicalBackupJob(); err != nil {
 		c.logger.Warningf("could not remove the logical backup k8s cron job; %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not remove the logical backup k8s cron job; %v", err)
 	}
 
 	if err := c.deleteStatefulSet(); err != nil {
 		c.logger.Warningf("could not delete statefulset: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete statefulset: %v", err)
 	}
 
 	if err := c.deleteSecrets(); err != nil {
 		c.logger.Warningf("could not delete secrets: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete secrets: %v", err)
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
 		c.logger.Warningf("could not delete pod disruption budget: %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete pod disruption budget: %v", err)
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
@@ -1127,16 +1132,19 @@ func (c *Cluster) Delete() error {
 		if !c.patroniKubernetesUseConfigMaps() {
 			if err := c.deleteEndpoint(role); err != nil {
 				c.logger.Warningf("could not delete %s endpoint: %v", role, err)
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete %s endpoint: %v", role, err)
 			}
 		}
 
 		if err := c.deleteService(role); err != nil {
 			c.logger.Warningf("could not delete %s service: %v", role, err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not delete %s service: %v", role, err)
 		}
 	}
 
 	if err := c.deletePatroniClusterObjects(); err != nil {
 		c.logger.Warningf("could not remove leftover patroni objects; %v", err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not remove leftover patroni objects; %v", err)
 	}
 
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
@@ -1145,6 +1153,7 @@ func (c *Cluster) Delete() error {
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		if err := c.deleteConnectionPooler(role); err != nil {
 			c.logger.Warningf("could not remove connection pooler: %v", err)
+			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "Delete", "Could not remove connection pooler: %v", err)
 		}
 	}
 
