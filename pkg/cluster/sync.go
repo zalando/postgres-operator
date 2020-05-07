@@ -582,13 +582,14 @@ func (c *Cluster) syncVolumes() error {
 	if !act {
 		return nil
 	}
-	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{AWSRegion: c.OpConfig.AWSRegion}}); err != nil {
-		c.logger.Infof("could not sync volumes: %v", err)
-		c.logger.Infof("trying to update volume claim")
+	if c.OpConfig.EnablePvcResize {
 		if err := c.resizeVolumeClaims(c.Spec.Volume); err != nil {
 			return fmt.Errorf("could not sync volume claims: %v", err)
 		}
-		return nil
+	} else {
+		if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{AWSRegion: c.OpConfig.AWSRegion}}); err != nil {
+			return fmt.Errorf("could not sync volumes: %v", err)
+		}
 	}
 
 	c.logger.Infof("volumes have been synced successfully")
