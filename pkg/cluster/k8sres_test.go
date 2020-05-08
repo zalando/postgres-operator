@@ -112,7 +112,7 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	expectedValuesGSBucket := []ExpectedValue{
 		ExpectedValue{
