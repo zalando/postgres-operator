@@ -7,6 +7,7 @@ gevent.monkey.patch_all()
 
 import requests
 import tokens
+import sys
 
 from backoff import expo, on_exception
 from click import ParamType, command, echo, option
