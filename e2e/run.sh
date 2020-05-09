@@ -61,11 +61,6 @@ function clean_up(){
   unset KUBECONFIG
   kind delete cluster --name ${cluster_name}
   rm -rf ${kubeconfig_path}
-
-  if [[ $os_type == 'darwin' ]]
-  then
-    rm -rf "${kubeconfig_path}.bak"
-  fi
 }
 
 function main(){
