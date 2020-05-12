@@ -331,7 +331,7 @@ func (c *Cluster) recreatePods() error {
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
 
 	if !c.isSafeToRecreatePods(pods) {
-		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initilalized")
+		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initialized")
 	}
 
 	var (
