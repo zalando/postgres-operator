@@ -582,6 +582,7 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
+	in.NodeAffinity.DeepCopyInto(&out.NodeAffinity)
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]corev1.Toleration, len(*in))

@@ -337,25 +337,39 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 	return
 }
 
-func nodeAffinity(nodeReadinessLabel map[string]string) *v1.Affinity {
-	matchExpressions := make([]v1.NodeSelectorRequirement, 0)
-	if len(nodeReadinessLabel) == 0 {
+func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
+	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
 	}
-	for k, v := range nodeReadinessLabel {
-		matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
-			Key:      k,
-			Operator: v1.NodeSelectorOpIn,
-			Values:   []string{v},
-		})
+	nodeAffinityCopy := *&v1.NodeAffinity{}
+	if nodeAffinity != nil {
+		nodeAffinityCopy = *nodeAffinity.DeepCopy()
+	}
+	if len(nodeReadinessLabel) > 0 {
+		matchExpressions := make([]v1.NodeSelectorRequirement, 0)
+		for k, v := range nodeReadinessLabel {
+			matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
+				Key:      k,
+				Operator: v1.NodeSelectorOpIn,
+				Values:   []string{v},
+			})
+		}
+		nodeReadinessSelectorTerm := v1.NodeSelectorTerm{MatchExpressions: matchExpressions}
+		if nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					nodeReadinessSelectorTerm,
+				},
+			}
+		} else {
+			nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
+				NodeSelectorTerms: append(nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, nodeReadinessSelectorTerm),
+			}
+		}
 	}
 
 	return &v1.Affinity{
-		NodeAffinity: &v1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{{MatchExpressions: matchExpressions}},
-			},
-		},
+		NodeAffinity: &nodeAffinityCopy,
 	}
 }
 
@@ -1135,7 +1149,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
 	annotations := c.generatePodAnnotations(spec)
-
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
@@ -1146,7 +1159,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		sidecarContainers,
 		&tolerationSpec,
 		effectiveFSGroup,
-		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		nodeAffinity(c.OpConfig.NodeReadinessLabel, &spec.NodeAffinity),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
@@ -1824,7 +1837,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		[]v1.Container{},
 		&[]v1.Toleration{},
 		nil,
-		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
