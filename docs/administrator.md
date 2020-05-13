@@ -95,6 +95,34 @@ lacks access rights to any of them (except K8s system namespaces like
 'list pods' execute at the cluster scope and fail at the first violation of
 access rights.
 
+## Operators with defined ownership of certain Postgres clusters
+
+By default, multiple operators can only run together in one K8s cluster when
+isolated into their [own namespaces](administrator.md#specify-the-namespace-to-watch).
+But, it is also possible to define ownership between operator instances and
+Postgres clusters running all in the same namespace or K8s cluster without
+interfering.
+
+First, define the [`CONTROLLER_ID`](../../manifests/postgres-operator.yaml#L38)
+environment variable in the operator deployment manifest. Then specify the ID
+in every Postgres cluster manifest you want this operator to watch using the
+`"acid.zalan.do/controller"` annotation:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: demo-cluster
+  annotations:
+    "acid.zalan.do/controller": "second-operator"
+spec:
+  ...
+```
+
+Every other Postgres cluster which lacks the annotation will be ignored by this
+operator. Conversely, operators without a defined `CONTROLLER_ID` will ignore
+clusters with defined ownership of another operator.
+
 ## Role-based access control for the operator
 
 The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
@@ -293,11 +321,12 @@ spec:
 ## Custom Pod Environment Variables
 
 It is possible to configure a ConfigMap which is used by the Postgres pods as
-an additional provider for environment variables.
-
-One use case is to customize the Spilo image and configure it with environment
-variables. The ConfigMap with the additional settings is configured in the
-operator's main ConfigMap:
+an additional provider for environment variables. One use case is to customize
+the Spilo image and configure it with environment variables. The ConfigMap with
+the additional settings is referenced in the operator's main configuration.
+A namespace can be specified along with the name. If left out, the configured
+default namespace of your K8s client will be used and if the ConfigMap is not
+found there, the Postgres cluster's namespace is taken when different:
 
 **postgres-operator ConfigMap**
 
@@ -308,7 +337,7 @@ metadata:
   name: postgres-operator
 data:
   # referencing config map with custom settings
-  pod_environment_configmap: postgres-pod-config
+  pod_environment_configmap: default/postgres-pod-config
 ```
 
 **OperatorConfiguration**
@@ -321,7 +350,7 @@ metadata:
 configuration:
   kubernetes:
     # referencing config map with custom settings
-    pod_environment_configmap: postgres-pod-config
+    pod_environment_configmap: default/postgres-pod-config
 ```
 
 **referenced ConfigMap `postgres-pod-config`**
@@ -429,6 +458,17 @@ from numerous escape characters in the latter log entry, view it in CLI with
 `PodTemplate` used by the operator is yet to be updated with the default values
 used internally in K8s.
 
+The operator also support lazy updates of the Spilo image. That means the pod
+template of a PG cluster's stateful set is updated immediately with the new
+image, but no rolling update follows. This feature saves you a switchover - and
+hence downtime - when you know pods are re-started later anyway, for instance
+due to the node rotation. To force a rolling update, disable this mode by
+setting the `enable_lazy_spilo_upgrade` to `false` in the operator configuration
+and restart the operator pod. With the standard eager rolling updates the
+operator checks during Sync all pods run images specified in their respective
+statefulsets. The operator triggers a rolling upgrade for PG clusters that
+violate this condition.
+
 ## Logical backups
 
 The operator can manage K8s cron jobs to run logical backups of Postgres
@@ -477,6 +517,33 @@ A secret can be pre-provisioned in different ways:
 * Generic secret created via `kubectl create secret generic some-cloud-creds --from-file=some-cloud-credentials-file.json`
 * Automatically provisioned via a custom K8s controller like
   [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)
+
+## Sidecars for Postgres clusters
+
+A list of sidecars is added to each cluster created by the operator. The default
+is empty.
+
+```yaml
+kind: OperatorConfiguration
+configuration:
+  sidecars:
+  - image: image:123
+    name: global-sidecar
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - mountPath: /custom-pgdata-mountpoint
+      name: pgdata
+  - ...
+```
+
+In addition to any environment variables you specify, the following environment
+variables are always passed to sidecars:
+
+  - `POD_NAME` - field reference to `metadata.name`
+  - `POD_NAMESPACE` - field reference to `metadata.namespace`
+  - `POSTGRES_USER` - the superuser that can be used to connect to the database
+  - `POSTGRES_PASSWORD` - the password for the superuser
 
 ## Setting up the Postgres Operator UI
 

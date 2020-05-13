@@ -11,6 +11,9 @@ spec:
   ports:
     - port: {{ .Values.service.port }}
       targetPort: 8081
+      {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
       protocol: TCP
   selector:
     app.kubernetes.io/instance: {{ .Release.Name }}

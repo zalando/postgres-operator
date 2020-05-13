@@ -133,11 +133,11 @@ var requestsURLtc = []struct {
 }{
 	{
 		"coffee://localhost/",
-		fmt.Errorf(`Get coffee://localhost/teams/acid: unsupported protocol scheme "coffee"`),
+		fmt.Errorf(`Get "coffee://localhost/teams/acid": unsupported protocol scheme "coffee"`),
 	},
 	{
 		"http://192.168.0.%31/",
-		fmt.Errorf(`parse http://192.168.0.%%31/teams/acid: invalid URL escape "%%31"`),
+		fmt.Errorf(`parse "http://192.168.0.%%31/teams/acid": invalid URL escape "%%31"`),
 	},
 }
 

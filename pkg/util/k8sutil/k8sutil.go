@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -9,11 +10,13 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
+	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -25,6 +28,10 @@ import (
 	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func Int32ToPointer(value int32) *int32 {
+	return &value
+}
 
 // KubernetesClient describes getters for Kubernetes objects
 type KubernetesClient struct {
@@ -38,7 +45,9 @@ type KubernetesClient struct {
 	corev1.NodesGetter
 	corev1.NamespacesGetter
 	corev1.ServiceAccountsGetter
+	corev1.EventsGetter
 	appsv1.StatefulSetsGetter
+	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
 	apiextbeta1.CustomResourceDefinitionsGetter
@@ -53,6 +62,34 @@ type mockSecret struct {
 }
 
 type MockSecretGetter struct {
+}
+
+type mockDeployment struct {
+	appsv1.DeploymentInterface
+}
+
+type mockDeploymentNotExist struct {
+	appsv1.DeploymentInterface
+}
+
+type MockDeploymentGetter struct {
+}
+
+type MockDeploymentNotExistGetter struct {
+}
+
+type mockService struct {
+	corev1.ServiceInterface
+}
+
+type mockServiceNotExist struct {
+	corev1.ServiceInterface
+}
+
+type MockServiceGetter struct {
+}
+
+type MockServiceNotExistGetter struct {
 }
 
 type mockConfigMap struct {
@@ -101,10 +138,12 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.NodesGetter = client.CoreV1()
 	kubeClient.NamespacesGetter = client.CoreV1()
 	kubeClient.StatefulSetsGetter = client.AppsV1()
+	kubeClient.DeploymentsGetter = client.AppsV1()
 	kubeClient.PodDisruptionBudgetsGetter = client.PolicyV1beta1()
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1()
 	kubeClient.CronJobsGetter = client.BatchV1beta1()
+	kubeClient.EventsGetter = client.CoreV1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {
@@ -201,7 +240,7 @@ func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason st
 	return true, ""
 }
 
-func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, error) {
+func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
 	if name != "infrastructureroles-test" {
 		return nil, fmt.Errorf("NotFound")
 	}
@@ -217,7 +256,7 @@ func (c *mockSecret) Get(name string, options metav1.GetOptions) (*v1.Secret, er
 
 }
 
-func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
+func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
 	if name != "infrastructureroles-test" {
 		return nil, fmt.Errorf("NotFound")
 	}
@@ -230,19 +269,145 @@ func (c *mockConfigMap) Get(name string, options metav1.GetOptions) (*v1.ConfigM
 }
 
 // Secrets to be mocked
-func (c *MockSecretGetter) Secrets(namespace string) corev1.SecretInterface {
+func (mock *MockSecretGetter) Secrets(namespace string) corev1.SecretInterface {
 	return &mockSecret{}
 }
 
 // ConfigMaps to be mocked
-func (c *MockConfigMapsGetter) ConfigMaps(namespace string) corev1.ConfigMapInterface {
+func (mock *MockConfigMapsGetter) ConfigMaps(namespace string) corev1.ConfigMapInterface {
 	return &mockConfigMap{}
+}
+
+func (mock *MockDeploymentGetter) Deployments(namespace string) appsv1.DeploymentInterface {
+	return &mockDeployment{}
+}
+
+func (mock *MockDeploymentNotExistGetter) Deployments(namespace string) appsv1.DeploymentInterface {
+	return &mockDeploymentNotExist{}
+}
+
+func (mock *mockDeployment) Create(context.Context, *apiappsv1.Deployment, metav1.CreateOptions) (*apiappsv1.Deployment, error) {
+	return &apiappsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-deployment",
+		},
+		Spec: apiappsv1.DeploymentSpec{
+			Replicas: Int32ToPointer(1),
+		},
+	}, nil
+}
+
+func (mock *mockDeployment) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+	return nil
+}
+
+func (mock *mockDeployment) Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiappsv1.Deployment, error) {
+	return &apiappsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-deployment",
+		},
+		Spec: apiappsv1.DeploymentSpec{
+			Replicas: Int32ToPointer(1),
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						v1.Container{
+							Image: "pooler:1.0",
+						},
+					},
+				},
+			},
+		},
+	}, nil
+}
+
+func (mock *mockDeployment) Patch(ctx context.Context, name string, t types.PatchType, data []byte, opts metav1.PatchOptions, subres ...string) (*apiappsv1.Deployment, error) {
+	return &apiappsv1.Deployment{
+		Spec: apiappsv1.DeploymentSpec{
+			Replicas: Int32ToPointer(2),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-deployment",
+		},
+	}, nil
+}
+
+func (mock *mockDeploymentNotExist) Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiappsv1.Deployment, error) {
+	return nil, &apierrors.StatusError{
+		ErrStatus: metav1.Status{
+			Reason: metav1.StatusReasonNotFound,
+		},
+	}
+}
+
+func (mock *mockDeploymentNotExist) Create(context.Context, *apiappsv1.Deployment, metav1.CreateOptions) (*apiappsv1.Deployment, error) {
+	return &apiappsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-deployment",
+		},
+		Spec: apiappsv1.DeploymentSpec{
+			Replicas: Int32ToPointer(1),
+		},
+	}, nil
+}
+
+func (mock *MockServiceGetter) Services(namespace string) corev1.ServiceInterface {
+	return &mockService{}
+}
+
+func (mock *MockServiceNotExistGetter) Services(namespace string) corev1.ServiceInterface {
+	return &mockServiceNotExist{}
+}
+
+func (mock *mockService) Create(context.Context, *v1.Service, metav1.CreateOptions) (*v1.Service, error) {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-service",
+		},
+	}, nil
+}
+
+func (mock *mockService) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+	return nil
+}
+
+func (mock *mockService) Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Service, error) {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-service",
+		},
+	}, nil
+}
+
+func (mock *mockServiceNotExist) Create(context.Context, *v1.Service, metav1.CreateOptions) (*v1.Service, error) {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-service",
+		},
+	}, nil
+}
+
+func (mock *mockServiceNotExist) Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Service, error) {
+	return nil, &apierrors.StatusError{
+		ErrStatus: metav1.Status{
+			Reason: metav1.StatusReasonNotFound,
+		},
+	}
 }
 
 // NewMockKubernetesClient for other tests
 func NewMockKubernetesClient() KubernetesClient {
 	return KubernetesClient{
-		SecretsGetter:    &MockSecretGetter{},
-		ConfigMapsGetter: &MockConfigMapsGetter{},
+		SecretsGetter:     &MockSecretGetter{},
+		ConfigMapsGetter:  &MockConfigMapsGetter{},
+		DeploymentsGetter: &MockDeploymentGetter{},
+		ServicesGetter:    &MockServiceGetter{},
+	}
+}
+
+func ClientMissingObjects() KubernetesClient {
+	return KubernetesClient{
+		DeploymentsGetter: &MockDeploymentNotExistGetter{},
+		ServicesGetter:    &MockServiceNotExistGetter{},
 	}
 }

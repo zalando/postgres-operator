@@ -92,6 +92,8 @@ postgresql
         .alert.alert-success(if='{ progress.masterLabel }') PostgreSQL master available, label is attached
         .alert.alert-success(if='{ progress.masterLabel && progress.dnsName }') PostgreSQL ready: <strong>{ progress.dnsName }</strong>
 
+        .alert.alert-success(if='{ progress.pooler }') Connection pooler deployment created
+
       .col-lg-3
         help-general(config='{ opts.config }')
 
@@ -122,9 +124,11 @@ postgresql
       jQuery.get(
         '/postgresqls/' + this.cluster_path,
       ).done(data => {
+        this.progress.pooler = false
         this.progress.postgresql = true
         this.progress.postgresqlManifest = data
         this.progress.createdTimestamp = data.metadata.creationTimestamp
+        this.progress.poolerEnabled = data.spec.enableConnectionPooler
         this.uid = this.progress.postgresqlManifest.metadata.uid
         this.update()
 
@@ -159,6 +163,11 @@ postgresql
                 // Kubernetes Service name should resolve
                 this.progress.dnsName = data.metadata.name + '.' + data.metadata.namespace
               }
+
+              jQuery.get('/pooler/' + this.cluster_path).done(data => {
+                this.progress.pooler = {"url": ""}
+                this.update()
+              })
 
               this.update()
             })
