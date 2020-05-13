@@ -1345,7 +1345,7 @@ func (c *Cluster) deleteClusterObject(
 				objType, namespacedName)
 
 			if err = del(name); err != nil {
-				return fmt.Errorf("could not Patroni delete cluster object %q with name %q: %v",
+				return fmt.Errorf("could not delete Patroni cluster object %q with name %q: %v",
 					objType, namespacedName, err)
 			}
 

@@ -191,7 +191,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 		Deployments(c.Namespace).
 		Delete(context.TODO(), deploymentName, options)
 
-	if !k8sutil.ResourceNotFound(err) {
+	if k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("Connection pooler deployment was already deleted")
 	} else if err != nil {
 		return fmt.Errorf("could not delete deployment: %v", err)
@@ -213,7 +213,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 		Services(c.Namespace).
 		Delete(context.TODO(), serviceName, options)
 
-	if !k8sutil.ResourceNotFound(err) {
+	if k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("Connection pooler service was already deleted")
 	} else if err != nil {
 		return fmt.Errorf("could not delete service: %v", err)
