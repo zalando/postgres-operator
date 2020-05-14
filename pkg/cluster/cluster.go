@@ -822,10 +822,6 @@ func (c *Cluster) Delete() {
 	}
 
 	for _, obj := range c.Secrets {
-		if doDelete, user := c.shouldDeleteSecret(obj); !doDelete {
-			c.logger.Warningf("not removing secret %q for the system user %q", obj.GetName(), user)
-			continue
-		}
 		if err := c.deleteSecret(obj); err != nil {
 			c.logger.Warningf("could not delete secret: %v", err)
 		}
@@ -1298,11 +1294,6 @@ func (c *Cluster) Lock() {
 // Unlock unlocks the cluster
 func (c *Cluster) Unlock() {
 	c.mu.Unlock()
-}
-
-func (c *Cluster) shouldDeleteSecret(secret *v1.Secret) (delete bool, userName string) {
-	secretUser := string(secret.Data["username"])
-	return (secretUser != c.OpConfig.ReplicationUsername && secretUser != c.OpConfig.SuperUsername), secretUser
 }
 
 type simpleActionWithResult func() error
