@@ -12,7 +12,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 )
@@ -330,36 +329,6 @@ func TestInitHumanUsersWithSuperuserTeams(t *testing.T) {
 
 		if !reflect.DeepEqual(cl.pgUsers, tt.result) {
 			t.Errorf("%s expects %#v, got %#v", testName, tt.result, cl.pgUsers)
-		}
-	}
-}
-
-func TestShouldDeleteSecret(t *testing.T) {
-	testName := "TestShouldDeleteSecret"
-
-	tests := []struct {
-		secret  *v1.Secret
-		outcome bool
-	}{
-		{
-			secret:  &v1.Secret{Data: map[string][]byte{"username": []byte("foobar")}},
-			outcome: true,
-		},
-		{
-			secret: &v1.Secret{Data: map[string][]byte{"username": []byte(superUserName)}},
-
-			outcome: false,
-		},
-		{
-			secret:  &v1.Secret{Data: map[string][]byte{"username": []byte(replicationUserName)}},
-			outcome: false,
-		},
-	}
-
-	for _, tt := range tests {
-		if outcome, username := cl.shouldDeleteSecret(tt.secret); outcome != tt.outcome {
-			t.Errorf("%s expects the check for deletion of the username %q secret to return %t, got %t",
-				testName, username, tt.outcome, outcome)
 		}
 	}
 }
