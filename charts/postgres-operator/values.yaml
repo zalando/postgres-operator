@@ -200,10 +200,10 @@ configAwsOrGcp:
   # S3 bucket to use for shipping WAL segments with WAL-E
   # wal_s3_bucket: ""
 
-  # GCS Bucket to use for shipping WAL segments with WAL-E
+  # GCS bucket to use for shipping WAL segments with WAL-E
   # wal_gs_bucket: ""
 
-  # GCP Credentials for setting the GOOGLE_APPLICATION_CREDNETIALS environment variable
+  # GCP credentials for setting the GOOGLE_APPLICATION_CREDNETIALS environment variable
   # gcp_credentials: ""
 
 # configure K8s cron job managed by the operator
