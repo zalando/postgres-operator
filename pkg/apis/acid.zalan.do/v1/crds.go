@@ -555,6 +555,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"schedulerName": {
+						Type: "string",
+					},
 					"tolerations": {
 						Type: "array",
 						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
