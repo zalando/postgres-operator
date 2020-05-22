@@ -535,7 +535,7 @@ The configuration paramaters that we will be using are:
 ### Generate a K8 secret resource
 
 Generate the K8 secret resource that will contain your service account's 
-credentials. It highly recommended to use a service account and limit it's
+credentials. It's highly recommended to use a service account and limit its
 scope to just the WAL-E bucket. 
 
 ```yaml
