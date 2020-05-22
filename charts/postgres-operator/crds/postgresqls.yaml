@@ -190,6 +190,8 @@ spec:
               type: boolean
             enableMasterLoadBalancer:
               type: boolean
+            enablePublicLoadBalancer:
+              type: boolean
             enableReplicaLoadBalancer:
               type: boolean
             enableShmVolume:

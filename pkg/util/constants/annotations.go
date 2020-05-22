@@ -5,6 +5,7 @@ const (
 	ZalandoDNSNameAnnotation           = "external-dns.alpha.kubernetes.io/hostname"
 	ElbTimeoutAnnotationName           = "service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout"
 	ElbTimeoutAnnotationValue          = "3600"
+	ElbInternal                        = "service.beta.kubernetes.io/aws-load-balancer-internal"
 	KubeIAmAnnotation                  = "iam.amazonaws.com/role"
 	VolumeStorateProvisionerAnnotation = "pv.kubernetes.io/provisioned-by"
 	PostgresqlControllerAnnotationKey  = "acid.zalan.do/controller"

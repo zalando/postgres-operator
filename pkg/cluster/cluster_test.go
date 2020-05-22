@@ -403,6 +403,8 @@ func TestServiceAnnotations(t *testing.T) {
 		enableMasterLoadBalancerOC    bool
 		enableReplicaLoadBalancerSpec *bool
 		enableReplicaLoadBalancerOC   bool
+		enablePublicLoadBalancerSpec  *bool
+		enablePublicLoadBalancerOC    bool
 		operatorAnnotations           map[string]string
 		clusterAnnotations            map[string]string
 		expect                        map[string]string
@@ -427,6 +429,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -447,6 +450,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -458,6 +462,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 				"foo": "bar",
 			},
 		},
@@ -479,6 +484,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 				"foo": "bar",
 			},
 		},
@@ -493,6 +499,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -506,6 +513,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -519,6 +527,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -532,6 +541,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		// REPLICA
@@ -554,6 +564,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -574,6 +585,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -585,6 +597,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 				"foo": "bar",
 			},
 		},
@@ -606,6 +619,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 				"foo": "bar",
 			},
 		},
@@ -620,6 +634,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -633,6 +648,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "1800",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -646,6 +662,7 @@ func TestServiceAnnotations(t *testing.T) {
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		{
@@ -658,6 +675,47 @@ func TestServiceAnnotations(t *testing.T) {
 			},
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test-repl.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
+			},
+		},
+		//PUBLIC
+		{
+			about:                        "Public ELB disabled in spec and OperatorConfig",
+			role:                         "master",
+			enableMasterLoadBalancerSpec: &enabled,
+			enablePublicLoadBalancerSpec: &disabled,
+			enablePublicLoadBalancerOC:   false,
+			operatorAnnotations:          make(map[string]string),
+			clusterAnnotations:           make(map[string]string),
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
+			},
+		},
+		{
+			about:                        "Enable public ELB with EnablePublicLoadBalancer in spec but disabled in OperatorConfig",
+			role:                         "master",
+			enableMasterLoadBalancerSpec: &enabled,
+			enablePublicLoadBalancerSpec: &enabled,
+			enablePublicLoadBalancerOC:   false,
+			operatorAnnotations:          make(map[string]string),
+			clusterAnnotations:           make(map[string]string),
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+			},
+		},
+		{
+			about:                        "Enable public ELB with enable_public_load_balancer in OperatorConfig",
+			role:                         "master",
+			enableMasterLoadBalancerSpec: &enabled,
+			enablePublicLoadBalancerOC:   true,
+			operatorAnnotations:          make(map[string]string),
+			clusterAnnotations:           make(map[string]string),
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
 			},
 		},
@@ -685,6 +743,7 @@ func TestServiceAnnotations(t *testing.T) {
 			cl.OpConfig.CustomServiceAnnotations = tt.operatorAnnotations
 			cl.OpConfig.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerOC
 			cl.OpConfig.EnableReplicaLoadBalancer = tt.enableReplicaLoadBalancerOC
+			cl.OpConfig.EnablePublicLoadBalancer = tt.enablePublicLoadBalancerOC
 			cl.OpConfig.MasterDNSNameFormat = "{cluster}.{team}.{hostedzone}"
 			cl.OpConfig.ReplicaDNSNameFormat = "{cluster}-repl.{team}.{hostedzone}"
 			cl.OpConfig.DbHostedZone = "db.example.com"
@@ -694,6 +753,7 @@ func TestServiceAnnotations(t *testing.T) {
 			cl.Postgresql.Spec.ServiceAnnotations = tt.clusterAnnotations
 			cl.Postgresql.Spec.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerSpec
 			cl.Postgresql.Spec.EnableReplicaLoadBalancer = tt.enableReplicaLoadBalancerSpec
+			cl.Postgresql.Spec.EnablePublicLoadBalancer = tt.enablePublicLoadBalancerSpec
 
 			got := cl.generateServiceAnnotations(tt.role, &cl.Postgresql.Spec)
 			if len(tt.expect) != len(got) {

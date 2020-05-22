@@ -40,6 +40,7 @@ type PostgresSpec struct {
 	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
 	// in that case the var evaluates to nil and the value is taken from the operator config
 	EnableMasterLoadBalancer  *bool `json:"enableMasterLoadBalancer,omitempty"`
+	EnablePublicLoadBalancer  *bool `json:"enablePublicLoadBalancer,omitempty"`
 	EnableReplicaLoadBalancer *bool `json:"enableReplicaLoadBalancer,omitempty"`
 
 	// deprecated load balancer settings maintained for backward compatibility

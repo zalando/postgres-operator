@@ -150,13 +150,15 @@ configTimeouts:
 
 # configure behavior of load balancers
 configLoadBalancer:
-  # DNS zone for cluster DNS name when load balancer is configured for cluster
-  db_hosted_zone: db.example.com
   # annotations to apply to service when load balancing is enabled
   # custom_service_annotations: "keyx:valuez,keya:valuea"
 
+  # DNS zone for cluster DNS name when load balancer is configured for cluster
+  db_hosted_zone: db.example.com
   # toggles service type load balancer pointing to the master pod of the cluster
   enable_master_load_balancer: "false"
+  # toggles load balancer annotation service.beta.kubernetes.io/aws-load-balancer-internal
+  enable_public_load_balancer: "false"
   # toggles service type load balancer pointing to the replica pod of the cluster
   enable_replica_load_balancer: "false"
   # defines the DNS name string template for the master load balancer cluster

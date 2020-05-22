@@ -1525,6 +1525,17 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 }
 
+func (c *Cluster) shouldUseInternalLoadBalancerForService(spec *acidv1.PostgresSpec) bool {
+
+	// if the value is explicitly set in a Postgresql manifest, follow this setting
+	if spec.EnablePublicLoadBalancer != nil {
+		return !(*spec.EnablePublicLoadBalancer)
+	}
+
+	// otherwise, follow the operator configuration
+	return !c.OpConfig.EnablePublicLoadBalancer
+}
+
 func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{{Name: "postgresql", Port: 5432, TargetPort: intstr.IntOrString{IntVal: 5432}}},
@@ -1594,6 +1605,10 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 		}
 		// External DNS name annotation is not customizable
 		annotations[constants.ZalandoDNSNameAnnotation] = dnsName
+
+		if c.shouldUseInternalLoadBalancerForService(spec) {
+			annotations[constants.ElbInternal] = "true"
+		}
 	}
 
 	if len(annotations) == 0 {

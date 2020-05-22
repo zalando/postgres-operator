@@ -101,6 +101,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	// load balancer config
 	result.DbHostedZone = fromCRD.LoadBalancer.DbHostedZone
 	result.EnableMasterLoadBalancer = fromCRD.LoadBalancer.EnableMasterLoadBalancer
+	result.EnablePublicLoadBalancer = fromCRD.LoadBalancer.EnablePublicLoadBalancer
 	result.EnableReplicaLoadBalancer = fromCRD.LoadBalancer.EnableReplicaLoadBalancer
 	result.CustomServiceAnnotations = fromCRD.LoadBalancer.CustomServiceAnnotations
 	result.MasterDNSNameFormat = fromCRD.LoadBalancer.MasterDNSNameFormat

@@ -82,6 +82,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   `enable_replica_load_balancer` parameter) to define whether to enable the
   load balancer pointing to the Postgres standby instances. Optional.
 
+* **enablePublicLoadBalancer**
+  boolean flag to override the operator defaults (set by the
+  `enable_public_load_balancer` parameter) to define whether to use an internal
+  or public ELB. Optional.
+
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter
   defines the comma-separated range of IP networks (in CIDR-notation). The
@@ -231,10 +236,10 @@ explanation of `ttl` and `loop_wait` parameters.
 
 * **synchronous_mode**
   Patroni `synchronous_mode` parameter value. The default is set to `false`. Optional.
-  
+
 * **synchronous_mode_strict**
   Patroni `synchronous_mode_strict` parameter value. Can be used in addition to `synchronous_mode`. The default is set to `false`. Optional.
-  
+
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)

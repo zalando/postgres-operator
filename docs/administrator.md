@@ -400,6 +400,11 @@ services:
   config parameter `custom_service_annotations` or the  cluster parameter
   `serviceAnnotations`.
 
+If `enable_public_load_balancer` is disabled (default) another annotation is
+added to indicate the usage of an internal ELB:
+
+- `service.beta.kubernetes.io/aws-load-balancer-internal: "true"`
+
 To limit the range of IP addresses that can reach a load balancer, specify the
 desired ranges in the `allowedSourceRanges` field (applies to both master and
 replica load balancers). To prevent exposing load balancers to the entire

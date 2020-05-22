@@ -268,6 +268,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"enableMasterLoadBalancer": {
 						Type: "boolean",
 					},
+					"enablePublicLoadBalancer": {
+						Type: "boolean",
+					},
 					"enableReplicaLoadBalancer": {
 						Type: "boolean",
 					},
@@ -1060,6 +1063,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type: "string",
 							},
 							"enable_master_load_balancer": {
+								Type: "boolean",
+							},
+							"enable_public_load_balancer": {
 								Type: "boolean",
 							},
 							"enable_replica_load_balancer": {

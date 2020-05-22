@@ -411,12 +411,16 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
 
 * **enable_master_load_balancer**
   toggles service type load balancer pointing to the master pod of the cluster.
-  Can be overridden by individual cluster settings. The default is `true`.
+  Can be overridden by individual cluster settings. The default is `false`.
 
 * **enable_replica_load_balancer**
   toggles service type load balancer pointing to the replica pod of the
   cluster.  Can be overridden by individual cluster settings. The default is
   `false`.
+
+* **enable_public_load_balancer**
+  when using load balancer services they can be internal or public which can be
+  toggled with this option. The default is `false`.  
 
 * **custom_service_annotations**
   This key/value map provides a list of annotations that get attached to each
