@@ -48,7 +48,6 @@ function set_kind_api_server_ip(){
   cp "${KUBECONFIG}" /tmp
   readonly local kind_api_server_port=6443 # well-known in the 'kind' codebase
   readonly local kind_api_server=$(docker inspect --format "{{ .NetworkSettings.IPAddress }}:${kind_api_server_port}" "${cluster_name}"-control-plane)
-  
   sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
 }
 
