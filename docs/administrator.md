@@ -553,7 +553,7 @@ stringData:
 ### Setup your operator configuration values
 
 With the `psql-wale-creds` resource applied to your cluster, ensure that
-the operator's configuration is setup like the following:
+the operator's configuration is set up like the following:
 
 ```yml
 ...
