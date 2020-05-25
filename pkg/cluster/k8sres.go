@@ -531,7 +531,7 @@ func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, su
 				},
 			},
 		}
-		mergedEnv := append(container.Env, env...)
+		mergedEnv := append(env, container.Env...)
 		container.Env = deduplicateEnvVars(mergedEnv, container.Name, logger)
 		result = append(result, container)
 	}

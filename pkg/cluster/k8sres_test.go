@@ -1394,7 +1394,7 @@ func TestSidecars(t *testing.T) {
 
 	// replaced sidecar
 	// the order in env is important
-	scalyrEnv := append([]v1.EnvVar{v1.EnvVar{Name: "SCALYR_API_KEY", Value: "abc"}, v1.EnvVar{Name: "SCALYR_SERVER_HOST", Value: ""}}, env...)
+	scalyrEnv := append(env, v1.EnvVar{Name: "SCALYR_API_KEY", Value: "abc"}, v1.EnvVar{Name: "SCALYR_SERVER_HOST", Value: ""})
 	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
 		Name:            "scalyr-sidecar",
 		Image:           "scalyr-image",
