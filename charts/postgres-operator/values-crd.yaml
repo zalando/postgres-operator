@@ -160,7 +160,7 @@ configTimeouts:
 # configure behavior of load balancers
 configLoadBalancer:
   # global toggle to allow public load balancers
-  allow_public_load_balancers: "false"
+  allow_public_load_balancers: false
   # annotations to apply to service when load balancing is enabled
   # custom_service_annotations:
   #   keyx: valuez
