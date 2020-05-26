@@ -135,8 +135,9 @@ type Config struct {
 	TeamAdminRole                          string            `name:"team_admin_role" default:"admin"`
 	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"false"`
-	EnablePublicLoadBalancer               bool              `name:"enable_public_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
+	AllowPublicLoadBalancers               *bool             `name:"allow_public_load_balancers" default:"true"`
+	DefaultLoadBalancerSchema              string            `name:"default_load_balancer_schema" default:"true"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`

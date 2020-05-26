@@ -193,16 +193,19 @@ spec:
             load_balancer:
               type: object
               properties:
+                allow_public_load_balancers:
+                  type: boolean
                 custom_service_annotations:
                   type: object
                   additionalProperties:
                     type: string
                 db_hosted_zone:
                   type: string
-                enable_master_load_balancer:
-                  type: boolean
-                enable_public_load_balancer:
-                  type: boolean
+                default_load_balancer_schema:
+                  type: string
+                  enum:
+                    - "internal"
+                    - "public"
                 enable_replica_load_balancer:
                   type: boolean
                 master_dns_name_format:

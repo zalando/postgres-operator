@@ -82,10 +82,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   `enable_replica_load_balancer` parameter) to define whether to enable the
   load balancer pointing to the Postgres standby instances. Optional.
 
-* **enablePublicLoadBalancer**
-  boolean flag to override the operator defaults (set by the
-  `enable_public_load_balancer` parameter) to define whether to use an internal
-  or public ELB. Optional.
+* **loadBalancerSchema**
+  can be either `internal` or `public`. Overrides the configured default schema
+  but will not work for `public`, if this is forbidden with
+  `allow_public_load_balancers` set to false. Optional.
 
 * **allowedSourceRanges**
   when one or more load balancers are enabled for the cluster, this parameter

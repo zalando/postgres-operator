@@ -1527,13 +1527,18 @@ func (c *Cluster) shouldCreateLoadBalancerForService(role PostgresRole, spec *ac
 
 func (c *Cluster) shouldUseInternalLoadBalancerForService(spec *acidv1.PostgresSpec) bool {
 
+	// check if public load balancers are even allowed
+	if c.OpConfig.AllowPublicLoadBalancers == nil || !(*c.OpConfig.AllowPublicLoadBalancers) {
+		return true
+	}
+
 	// if the value is explicitly set in a Postgresql manifest, follow this setting
-	if spec.EnablePublicLoadBalancer != nil {
-		return !(*spec.EnablePublicLoadBalancer)
+	if spec.LoadBalancerSchema != "" {
+		return spec.LoadBalancerSchema == "internal"
 	}
 
 	// otherwise, follow the operator configuration
-	return !c.OpConfig.EnablePublicLoadBalancer
+	return c.OpConfig.DefaultLoadBalancerSchema == "internal"
 }
 
 func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) *v1.Service {

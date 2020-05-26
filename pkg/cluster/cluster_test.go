@@ -403,8 +403,9 @@ func TestServiceAnnotations(t *testing.T) {
 		enableMasterLoadBalancerOC    bool
 		enableReplicaLoadBalancerSpec *bool
 		enableReplicaLoadBalancerOC   bool
-		enablePublicLoadBalancerSpec  *bool
-		enablePublicLoadBalancerOC    bool
+		allowPublicLoadBalancersOC    *bool
+		loadBalancerSchemaSpec        string
+		defaultLoadBalancerSchemaOC   string
 		operatorAnnotations           map[string]string
 		clusterAnnotations            map[string]string
 		expect                        map[string]string
@@ -681,11 +682,12 @@ func TestServiceAnnotations(t *testing.T) {
 		},
 		//PUBLIC
 		{
-			about:                        "Public ELB disabled in spec and OperatorConfig",
+			about:                        "Internal ELB set in spec and OperatorConfig, but public LB allowed",
 			role:                         "master",
 			enableMasterLoadBalancerSpec: &enabled,
-			enablePublicLoadBalancerSpec: &disabled,
-			enablePublicLoadBalancerOC:   false,
+			allowPublicLoadBalancersOC:   &enabled,
+			loadBalancerSchemaSpec:       "internal",
+			defaultLoadBalancerSchemaOC:  "internal",
 			operatorAnnotations:          make(map[string]string),
 			clusterAnnotations:           make(map[string]string),
 			expect: map[string]string{
@@ -695,11 +697,12 @@ func TestServiceAnnotations(t *testing.T) {
 			},
 		},
 		{
-			about:                        "Enable public ELB with EnablePublicLoadBalancer in spec but disabled in OperatorConfig",
+			about:                        "Internal ELB set in OperatorConfig overwritten by spec. Public LB allowed",
 			role:                         "master",
 			enableMasterLoadBalancerSpec: &enabled,
-			enablePublicLoadBalancerSpec: &enabled,
-			enablePublicLoadBalancerOC:   false,
+			allowPublicLoadBalancersOC:   &enabled,
+			loadBalancerSchemaSpec:       "public",
+			defaultLoadBalancerSchemaOC:  "internal",
 			operatorAnnotations:          make(map[string]string),
 			clusterAnnotations:           make(map[string]string),
 			expect: map[string]string{
@@ -708,15 +711,32 @@ func TestServiceAnnotations(t *testing.T) {
 			},
 		},
 		{
-			about:                        "Enable public ELB with enable_public_load_balancer in OperatorConfig",
+			about:                        "Public ELB set in OperatorConfig overwritten by spec. Public LB allowed",
 			role:                         "master",
 			enableMasterLoadBalancerSpec: &enabled,
-			enablePublicLoadBalancerOC:   true,
+			allowPublicLoadBalancersOC:   &enabled,
+			loadBalancerSchemaSpec:       "internal",
+			defaultLoadBalancerSchemaOC:  "public",
 			operatorAnnotations:          make(map[string]string),
 			clusterAnnotations:           make(map[string]string),
 			expect: map[string]string{
 				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
 				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
+			},
+		},
+		{
+			about:                        "Public ELB set in spec, but not globally not allowed",
+			role:                         "master",
+			enableMasterLoadBalancerSpec: &enabled,
+			allowPublicLoadBalancersOC:   &disabled,
+			loadBalancerSchemaSpec:       "public",
+			operatorAnnotations:          make(map[string]string),
+			clusterAnnotations:           make(map[string]string),
+			expect: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname":                            "test.acid.db.example.com",
+				"service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout": "3600",
+				"service.beta.kubernetes.io/aws-load-balancer-internal":                "true",
 			},
 		},
 		// COMMON
@@ -743,7 +763,8 @@ func TestServiceAnnotations(t *testing.T) {
 			cl.OpConfig.CustomServiceAnnotations = tt.operatorAnnotations
 			cl.OpConfig.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerOC
 			cl.OpConfig.EnableReplicaLoadBalancer = tt.enableReplicaLoadBalancerOC
-			cl.OpConfig.EnablePublicLoadBalancer = tt.enablePublicLoadBalancerOC
+			cl.OpConfig.AllowPublicLoadBalancers = tt.allowPublicLoadBalancersOC
+			cl.OpConfig.DefaultLoadBalancerSchema = tt.defaultLoadBalancerSchemaOC
 			cl.OpConfig.MasterDNSNameFormat = "{cluster}.{team}.{hostedzone}"
 			cl.OpConfig.ReplicaDNSNameFormat = "{cluster}-repl.{team}.{hostedzone}"
 			cl.OpConfig.DbHostedZone = "db.example.com"
@@ -753,7 +774,7 @@ func TestServiceAnnotations(t *testing.T) {
 			cl.Postgresql.Spec.ServiceAnnotations = tt.clusterAnnotations
 			cl.Postgresql.Spec.EnableMasterLoadBalancer = tt.enableMasterLoadBalancerSpec
 			cl.Postgresql.Spec.EnableReplicaLoadBalancer = tt.enableReplicaLoadBalancerSpec
-			cl.Postgresql.Spec.EnablePublicLoadBalancer = tt.enablePublicLoadBalancerSpec
+			cl.Postgresql.Spec.LoadBalancerSchema = tt.loadBalancerSchemaSpec
 
 			got := cl.generateServiceAnnotations(tt.role, &cl.Postgresql.Spec)
 			if len(tt.expect) != len(got) {

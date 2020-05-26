@@ -154,8 +154,6 @@ spec:
               type: boolean
             enableMasterLoadBalancer:
               type: boolean
-            enablePublicLoadBalancer:
-              type: boolean
             enableReplicaLoadBalancer:
               type: boolean
             enableShmVolume:
@@ -172,6 +170,11 @@ spec:
               items:
                 type: object
                 additionalProperties: true
+            loadBalancerSchema:
+              type: string
+              enum:
+                - "internal"
+                - "public"
             logicalBackupSchedule:
               type: string
               pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'

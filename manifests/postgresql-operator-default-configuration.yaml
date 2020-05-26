@@ -76,12 +76,13 @@ configuration:
     resource_check_interval: 3s
     resource_check_timeout: 10m
   load_balancer:
+    allow_public_load_balancers: false
     # custom_service_annotations:
     #   keyx: valuex
     #   keyy: valuey
     # db_hosted_zone: ""
+    default_load_balancer_schema: "internal"
     enable_master_load_balancer: false
-    enable_public_load_balancer: false
     enable_replica_load_balancer: false
     master_dns_name_format: "{cluster}.{team}.{hostedzone}"
     replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"

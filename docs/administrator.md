@@ -400,8 +400,9 @@ services:
   config parameter `custom_service_annotations` or the  cluster parameter
   `serviceAnnotations`.
 
-If `enable_public_load_balancer` is disabled (default) another annotation is
-added to indicate the usage of an internal ELB:
+If `allow_public_load_balancer` is disabled or the the `loadBalancerSchema` is
+set to `"internal"` another annotation is added to indicate the usage of an
+internal ELB:
 
 - `service.beta.kubernetes.io/aws-load-balancer-internal: "true"`
 

@@ -5,6 +5,7 @@ metadata:
 data:
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
+  allow_public_load_balancers: "false"
   api_port: "8080"
   aws_region: eu-central-1
   cluster_domain: cluster.local
@@ -29,6 +30,7 @@ data:
   # default_cpu_request: 100m
   # default_memory_limit: 500Mi
   # default_memory_request: 100Mi
+  default_load_balancer_schema: "internal"
   docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
@@ -39,7 +41,6 @@ data:
   enable_master_load_balancer: "false"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
-  enable_public_load_balancer: "false"
   enable_replica_load_balancer: "false"
   # enable_shm_volume: "true"
   # enable_sidecars: "true"

@@ -268,9 +268,6 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"enableMasterLoadBalancer": {
 						Type: "boolean",
 					},
-					"enablePublicLoadBalancer": {
-						Type: "boolean",
-					},
 					"enableReplicaLoadBalancer": {
 						Type: "boolean",
 					},
@@ -297,6 +294,17 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 									Allows: true,
 								},
+							},
+						},
+					},
+					"loadBalancerSchema": {
+						Type: "string",
+						Enum: []apiextv1beta1.JSON{
+							{
+								Raw: []byte(`"internal"`),
+							},
+							{
+								Raw: []byte(`"public"`),
 							},
 						},
 					},
@@ -1051,6 +1059,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"load_balancer": {
 						Type: "object",
 						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"allow_public_load_balancers": {
+								Type: "boolean",
+							},
 							"custom_service_annotations": {
 								Type: "object",
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
@@ -1062,10 +1073,18 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"db_hosted_zone": {
 								Type: "string",
 							},
-							"enable_master_load_balancer": {
-								Type: "boolean",
+							"default_load_balancer_schema": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"internal"`),
+									},
+									{
+										Raw: []byte(`"public"`),
+									},
+								},
 							},
-							"enable_public_load_balancer": {
+							"enable_master_load_balancer": {
 								Type: "boolean",
 							},
 							"enable_replica_load_balancer": {

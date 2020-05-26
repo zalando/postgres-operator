@@ -418,12 +418,16 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   cluster.  Can be overridden by individual cluster settings. The default is
   `false`.
 
-* **enable_public_load_balancer**
-  when using load balancer services they can be internal or public which can be
-  toggled with this option. The default is `false`.  
+* **default_load_balancer_schema**
+  when using load balancer services they can be `internal` or `public` which can
+  be toggled with this option. Note, that public load balancers must be allowed
+  via configuration (see next option). The default is `internal`.
+
+* **allow_public_load_balancers**
+  global toggle to allow usage of public load balancers. The default is `true`.
 
 * **custom_service_annotations**
-  This key/value map provides a list of annotations that get attached to each
+  this key/value map provides a list of annotations that get attached to each
   service of a cluster created by the operator. If the annotation key is also
   provided by the cluster definition, the manifest value is used.
   Optional.
