@@ -25,7 +25,7 @@ import (
 const (
 	md5prefix         = "md5"
 	scramsha256prefix = "SCRAM-SHA-256"
-	saltlenght        = 16
+	saltlength        = 16
 	iterations        = 4096
 )
 
@@ -67,35 +67,60 @@ func NameFromMeta(meta metav1.ObjectMeta) spec.NamespacedName {
 		Name:      meta.Name,
 	}
 }
+type Hasher func(user spec.PgUser) string
+type Random func(n int) string
 
-// PGUserPassword is used to generate md5 password hash for a given user. It does nothing for already hashed passwords.
-func PGUserPassword(user spec.PgUser, encryption string) string {
+type Encryptor struct {
+	encrypt Hasher
+	random Random
+}
+
+func NewEncryptor(encryption string) *Encryptor {
+	e := Encryptor{random:RandomPassword}
+	m := map[string]Hasher{
+		"md5":           e.PGUserPasswordMD5,
+		"scram-sha-256": e.PGUserPasswordScramSHA256,
+	}
+	hasher, ok := m[encryption]
+	if !ok {
+		hasher = e.PGUserPasswordMD5
+	}
+	e.encrypt = hasher
+	return &e
+}
+
+func (e *Encryptor) PGUserPassword(user spec.PgUser) string {
 	if (len(user.Password) == md5.Size*2+len(md5prefix) && user.Password[:3] == md5prefix) ||
 		(len(user.Password) > len(scramsha256prefix) && user.Password[:len(scramsha256prefix)] == scramsha256prefix) || user.Password == "" {
 		// Avoid processing already encrypted or empty passwords
 		return user.Password
 	}
-	if encryption == "scram-sha-256" {
-		salt := []byte(RandomPassword(saltlenght))
-		key := pbkdf2.Key([]byte(user.Password), salt, iterations, 32, sha256.New)
-		mac := hmac.New(sha256.New, key)
-		mac.Write([]byte("Server Key"))
-		serverKey := mac.Sum(nil)
-		mac = hmac.New(sha256.New, key)
-		mac.Write([]byte("Client Key"))
-		clientKey := mac.Sum(nil)
-		storedKey := sha256.Sum256(clientKey)
-		pass := fmt.Sprintf("%s$%v:%s$%s:%s",
-			scramsha256prefix,
-			iterations,
-			base64.StdEncoding.EncodeToString(salt),
-			base64.StdEncoding.EncodeToString(storedKey[:]),
-			base64.StdEncoding.EncodeToString(serverKey),
-		)
-		return pass
-	}
+	return e.encrypt(user)
+}
+
+func (e *Encryptor) PGUserPasswordMD5(user spec.PgUser) string {
 	s := md5.Sum([]byte(user.Password + user.Name)) // #nosec, using md5 since PostgreSQL uses it for hashing passwords.
 	return md5prefix + hex.EncodeToString(s[:])
+}
+
+func (e *Encryptor) PGUserPasswordScramSHA256(user spec.PgUser) string {
+	salt := []byte(e.random(saltlength))
+	key := pbkdf2.Key([]byte(user.Password), salt, iterations, 32, sha256.New)
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte("Server Key"))
+	serverKey := mac.Sum(nil)
+	mac = hmac.New(sha256.New, key)
+	mac.Write([]byte("Client Key"))
+	clientKey := mac.Sum(nil)
+	storedKey := sha256.Sum256(clientKey)
+	pass := fmt.Sprintf("%s$%v:%s$%s:%s",
+		scramsha256prefix,
+		iterations,
+		base64.StdEncoding.EncodeToString(salt),
+		base64.StdEncoding.EncodeToString(storedKey[:]),
+		base64.StdEncoding.EncodeToString(serverKey),
+	)
+	return pass
 }
 
 // Diff returns diffs between 2 objects

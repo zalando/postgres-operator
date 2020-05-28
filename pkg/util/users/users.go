@@ -46,7 +46,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 			}
 		} else {
 			r := spec.PgSyncUserRequest{}
-			newMD5Password := util.PGUserPassword(newUser, strategy.PasswordEncryption)
+			newMD5Password := util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(newUser)
 
 			if dbUser.Password != newMD5Password {
 				r.User.Password = newMD5Password
@@ -141,7 +141,7 @@ func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.D
 	if user.Password == "" {
 		userPassword = "PASSWORD NULL"
 	} else {
-		userPassword = fmt.Sprintf(passwordTemplate, util.PGUserPassword(user, strategy.PasswordEncryption))
+		userPassword = fmt.Sprintf(passwordTemplate, util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(user))
 	}
 	query := fmt.Sprintf(createUserSQL, user.Name, strings.Join(userFlags, " "), userPassword)
 
@@ -182,7 +182,7 @@ func produceAlterStmt(user spec.PgUser, encryption string) string {
 	flags := user.Flags
 
 	if password != "" {
-		result = append(result, fmt.Sprintf(passwordTemplate, util.PGUserPassword(user, encryption)))
+		result = append(result, fmt.Sprintf(passwordTemplate, util.NewEncryptor(encryption).PGUserPassword(user)))
 	}
 	if len(flags) != 0 {
 		result = append(result, strings.Join(flags, " "))
