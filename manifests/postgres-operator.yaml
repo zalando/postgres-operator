@@ -12,17 +12,17 @@ spec:
       labels:
         name: postgres-operator
     spec:
-      serviceAccountName: zalando-postgres-operator
+      serviceAccountName: postgres-operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:v1.2.0
+        image: registry.opensource.zalan.do/acid/postgres-operator:v1.5.0
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            cpu: 500m
+            cpu: 100m
             memory: 250Mi
           limits:
-            cpu: 2000m
+            cpu: 500m
             memory: 500Mi
         securityContext:
           runAsUser: 1000
@@ -35,3 +35,6 @@ spec:
         # In order to use the ConfigMap instead, uncomment these lines and comment out the two lines above
         # - name: CONFIG_MAP_NAME
         #   value: "postgres-operator"
+        # Define an ID to isolate controllers from each other
+        # - name: CONTROLLER_ID
+        #   value: "second-operator"

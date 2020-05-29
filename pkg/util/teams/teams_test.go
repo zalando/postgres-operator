@@ -24,7 +24,7 @@ var teamsAPItc = []struct {
 	{`{
 "dn": "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
 "id": "acid",
-"id_name": "ACID",
+"id_name": "acid",
 "team_id": "111222",
 "type": "official",
 "name": "Acid team name",
@@ -70,7 +70,7 @@ var teamsAPItc = []struct {
 		&Team{
 			Dn:           "cn=100100,ou=official,ou=foobar,dc=zalando,dc=net",
 			ID:           "acid",
-			TeamName:     "ACID",
+			TeamName:     "acid",
 			TeamID:       "111222",
 			Type:         "official",
 			FullName:     "Acid team name",
@@ -133,11 +133,11 @@ var requestsURLtc = []struct {
 }{
 	{
 		"coffee://localhost/",
-		fmt.Errorf(`Get coffee://localhost/teams/acid: unsupported protocol scheme "coffee"`),
+		fmt.Errorf(`Get "coffee://localhost/teams/acid": unsupported protocol scheme "coffee"`),
 	},
 	{
 		"http://192.168.0.%31/",
-		fmt.Errorf(`parse http://192.168.0.%%31/teams/acid: invalid URL escape "%%31"`),
+		fmt.Errorf(`parse "http://192.168.0.%%31/teams/acid": invalid URL escape "%%31"`),
 	},
 }
 

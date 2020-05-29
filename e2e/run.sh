@@ -30,15 +30,15 @@ function pull_images(){
 function start_kind(){
 
   # avoid interference with previous test runs
-  if [[ $(kind-linux-amd64 get clusters | grep "^${cluster_name}*") != "" ]]
+  if [[ $(kind get clusters | grep "^${cluster_name}*") != "" ]]
   then
-    kind-linux-amd64 delete cluster --name ${cluster_name}
+    kind delete cluster --name ${cluster_name}
   fi
 
-  kind-linux-amd64 create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
-  kind-linux-amd64 load docker-image "${operator_image}" --name ${cluster_name}
-  kind-linux-amd64 load docker-image "${e2e_test_image}" --name ${cluster_name}
-  KUBECONFIG="$(kind-linux-amd64 get kubeconfig-path --name=${cluster_name})"
+  kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
+  kind load docker-image "${operator_image}" --name ${cluster_name}
+  kind load docker-image "${e2e_test_image}" --name ${cluster_name}
+  KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
   export KUBECONFIG
 }
 
@@ -58,7 +58,7 @@ function run_tests(){
 
 function clean_up(){
   unset KUBECONFIG
-  kind-linux-amd64 delete cluster --name ${cluster_name}
+  kind delete cluster --name ${cluster_name}
   rm -rf ${kubeconfig_path}
 }
 

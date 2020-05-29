@@ -8,41 +8,47 @@ import (
 	"fmt"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
+	v1 "k8s.io/api/core/v1"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
 type CRD struct {
-	ReadyWaitInterval time.Duration `name:"ready_wait_interval" default:"4s"`
-	ReadyWaitTimeout  time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod      time.Duration `name:"resync_period" default:"30m"`
-	RepairPeriod      time.Duration `name:"repair_period" default:"5m"`
+	ReadyWaitInterval   time.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout    time.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod        time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod        time.Duration `name:"repair_period" default:"5m"`
+	EnableCRDValidation *bool         `name:"enable_crd_validation" default:"true"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
-	ResourceCheckInterval   time.Duration     `name:"resource_check_interval" default:"3s"`
-	ResourceCheckTimeout    time.Duration     `name:"resource_check_timeout" default:"10m"`
-	PodLabelWaitTimeout     time.Duration     `name:"pod_label_wait_timeout" default:"10m"`
-	PodDeletionWaitTimeout  time.Duration     `name:"pod_deletion_wait_timeout" default:"10m"`
-	PodTerminateGracePeriod time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
-	SpiloFSGroup            *int64            `name:"spilo_fsgroup"`
-	PodPriorityClassName    string            `name:"pod_priority_class_name"`
-	ClusterDomain           string            `name:"cluster_domain" default:"cluster.local"`
-	SpiloPrivileged         bool              `name:"spilo_privileged" default:"false"`
-	ClusterLabels           map[string]string `name:"cluster_labels" default:"application:spilo"`
-	InheritedLabels         []string          `name:"inherited_labels" default:""`
-	ClusterNameLabel        string            `name:"cluster_name_label" default:"cluster-name"`
-	PodRoleLabel            string            `name:"pod_role_label" default:"spilo-role"`
-	PodToleration           map[string]string `name:"toleration" default:""`
-	DefaultCPURequest       string            `name:"default_cpu_request" default:"100m"`
-	DefaultMemoryRequest    string            `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit         string            `name:"default_cpu_limit" default:"3"`
-	DefaultMemoryLimit      string            `name:"default_memory_limit" default:"1Gi"`
-	PodEnvironmentConfigMap string            `name:"pod_environment_configmap" default:""`
-	NodeReadinessLabel      map[string]string `name:"node_readiness_label" default:""`
-	MaxInstances            int32             `name:"max_instances" default:"-1"`
-	MinInstances            int32             `name:"min_instances" default:"-1"`
-	ShmVolume               *bool             `name:"enable_shm_volume" default:"true"`
+	ResourceCheckInterval   time.Duration       `name:"resource_check_interval" default:"3s"`
+	ResourceCheckTimeout    time.Duration       `name:"resource_check_timeout" default:"10m"`
+	PodLabelWaitTimeout     time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
+	PodDeletionWaitTimeout  time.Duration       `name:"pod_deletion_wait_timeout" default:"10m"`
+	PodTerminateGracePeriod time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
+	SpiloFSGroup            *int64              `name:"spilo_fsgroup"`
+	PodPriorityClassName    string              `name:"pod_priority_class_name"`
+	ClusterDomain           string              `name:"cluster_domain" default:"cluster.local"`
+	SpiloPrivileged         bool                `name:"spilo_privileged" default:"false"`
+	ClusterLabels           map[string]string   `name:"cluster_labels" default:"application:spilo"`
+	InheritedLabels         []string            `name:"inherited_labels" default:""`
+	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
+	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
+	PodRoleLabel            string              `name:"pod_role_label" default:"spilo-role"`
+	PodToleration           map[string]string   `name:"toleration" default:""`
+	DefaultCPURequest       string              `name:"default_cpu_request" default:"100m"`
+	DefaultMemoryRequest    string              `name:"default_memory_request" default:"100Mi"`
+	DefaultCPULimit         string              `name:"default_cpu_limit" default:"1"`
+	DefaultMemoryLimit      string              `name:"default_memory_limit" default:"500Mi"`
+	MinCPULimit             string              `name:"min_cpu_limit" default:"250m"`
+	MinMemoryLimit          string              `name:"min_memory_limit" default:"250Mi"`
+	PodEnvironmentConfigMap spec.NamespacedName `name:"pod_environment_configmap"`
+	NodeReadinessLabel      map[string]string   `name:"node_readiness_label" default:""`
+	MaxInstances            int32               `name:"max_instances" default:"-1"`
+	MinInstances            int32               `name:"min_instances" default:"-1"`
+	ShmVolume               *bool               `name:"enable_shm_volume" default:"true"`
 }
 
 // Auth describes authentication specific configuration parameters
@@ -65,14 +71,33 @@ type Scalyr struct {
 	ScalyrCPURequest    string `name:"scalyr_cpu_request" default:"100m"`
 	ScalyrMemoryRequest string `name:"scalyr_memory_request" default:"50Mi"`
 	ScalyrCPULimit      string `name:"scalyr_cpu_limit" default:"1"`
-	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"1Gi"`
+	ScalyrMemoryLimit   string `name:"scalyr_memory_limit" default:"500Mi"`
 }
 
-// LogicalBackup
+// LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
-	LogicalBackupSchedule    string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
-	LogicalBackupS3Bucket    string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupS3Bucket          string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3Region          string `name:"logical_backup_s3_region" default:""`
+	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
+	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
+	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
+	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:""`
+}
+
+// Operator options for connection pooler
+type ConnectionPooler struct {
+	NumberOfInstances                    *int32 `name:"connection_pooler_number_of_instances" default:"2"`
+	Schema                               string `name:"connection_pooler_schema" default:"pooler"`
+	User                                 string `name:"connection_pooler_user" default:"pooler"`
+	Image                                string `name:"connection_pooler_image" default:"registry.opensource.zalan.do/acid/pgbouncer"`
+	Mode                                 string `name:"connection_pooler_mode" default:"transaction"`
+	MaxDBConnections                     *int32 `name:"connection_pooler_max_db_connections" default:"60"`
+	ConnectionPoolerDefaultCPURequest    string `name:"connection_pooler_default_cpu_request" default:"500m"`
+	ConnectionPoolerDefaultMemoryRequest string `name:"connection_pooler_default_memory_request" default:"100Mi"`
+	ConnectionPoolerDefaultCPULimit      string `name:"connection_pooler_default_cpu_limit" default:"1"`
+	ConnectionPoolerDefaultMemoryLimit   string `name:"connection_pooler_default_memory_limit" default:"100Mi"`
 }
 
 // Config describes operator config
@@ -82,13 +107,16 @@ type Config struct {
 	Auth
 	Scalyr
 	LogicalBackup
+	ConnectionPooler
 
-	WatchedNamespace string            `name:"watched_namespace"`    // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	EtcdHost         string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage      string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-11:1.6-p1"`
-	Sidecars         map[string]string `name:"sidecar_docker_images"`
-	// default name `operator` enables backward compatibility with the older ServiceAccountName field
-	PodServiceAccountName string `name:"pod_service_account_name" default:"operator"`
+	WatchedNamespace        string `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	KubernetesUseConfigMaps bool   `name:"kubernetes_use_configmaps" default:"false"`
+	EtcdHost                string `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
+	DockerImage             string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-12:1.6-p3"`
+	// deprecated in favour of SidecarContainers
+	SidecarImages         map[string]string `name:"sidecar_docker_images"`
+	SidecarContainers     []v1.Container    `name:"sidecars"`
+	PodServiceAccountName string            `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`
@@ -109,6 +137,7 @@ type Config struct {
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
+	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	// deprecated and kept for backward compatibility
@@ -117,6 +146,8 @@ type Config struct {
 	ReplicaDNSNameFormat      StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat             StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
 	EnablePodDisruptionBudget *bool             `name:"enable_pod_disruption_budget" default:"true"`
+	EnableInitContainers      *bool             `name:"enable_init_containers" default:"true"`
+	EnableSidecars            *bool             `name:"enable_sidecars" default:"true"`
 	Workers                   uint32            `name:"workers" default:"4"`
 	APIPort                   int               `name:"api_port" default:"8080"`
 	RingLogLines              int               `name:"ring_log_lines" default:"100"`
@@ -127,6 +158,7 @@ type Config struct {
 	ProtectedRoles            []string          `name:"protected_role_names" default:"admin"`
 	PostgresSuperuserTeams    []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit   bool              `name:"set_memory_request_to_limit" default:"false"`
+	EnableLazySpiloUpgrade    bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 }
 
 // MustMarshal marshals the config or panics
@@ -186,5 +218,16 @@ func validate(cfg *Config) (err error) {
 	if cfg.Workers == 0 {
 		err = fmt.Errorf("number of workers should be higher than 0")
 	}
+
+	if *cfg.ConnectionPooler.NumberOfInstances < constants.ConnectionPoolerMinInstances {
+		msg := "number of connection pooler instances should be higher than %d"
+		err = fmt.Errorf(msg, constants.ConnectionPoolerMinInstances)
+	}
+
+	if cfg.ConnectionPooler.User == cfg.SuperUsername {
+		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		err = fmt.Errorf(msg, cfg.ConnectionPooler.User)
+	}
+
 	return
 }

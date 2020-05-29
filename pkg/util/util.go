@@ -2,8 +2,10 @@ package util
 
 import (
 	"crypto/md5" // #nosec we need it to for PostgreSQL md5 passwords
+	cryptoRand "crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"regexp"
 	"strings"
@@ -37,13 +39,17 @@ func False() *bool {
 	return &b
 }
 
-// RandomPassword generates random alphanumeric password of a given length.
+// RandomPassword generates a secure, random alphanumeric password of a given length.
 func RandomPassword(n int) string {
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = passwordChars[rand.Intn(len(passwordChars))]
+		maxN := big.NewInt(int64(len(passwordChars)))
+		if n, err := cryptoRand.Int(cryptoRand.Reader, maxN); err != nil {
+			panic(fmt.Errorf("Unable to generate secure, random password: %v", err))
+		} else {
+			b[i] = passwordChars[n.Int64()]
+		}
 	}
-
 	return string(b)
 }
 
@@ -141,17 +147,59 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
-// RequestIsSmallerThanLimit : ...
-func RequestIsSmallerThanLimit(requestStr, limitStr string) (bool, error) {
+// CoalesceInt32 works like coalesce but for *int32
+func CoalesceInt32(val, defaultVal *int32) *int32 {
+	if val == nil {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceBool works like coalesce but for *bool
+func CoalesceBool(val, defaultVal *bool) *bool {
+	if val == nil {
+		return defaultVal
+	}
+	return val
+}
+
+// Test if any of the values is nil
+func testNil(values ...*int32) bool {
+	for _, v := range values {
+		if v == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+// MaxInt32 : Return maximum of two integers provided via pointers. If one value
+// is not defined, return the other one. If both are not defined, result is also
+// undefined, caller needs to check for that.
+func MaxInt32(a, b *int32) *int32 {
+	if testNil(a, b) {
+		return nil
+	}
+
+	if *a > *b {
+		return a
+	}
+
+	return b
+}
+
+// IsSmallerQuantity : checks if first resource is of a smaller quantity than the second
+func IsSmallerQuantity(requestStr, limitStr string) (bool, error) {
 
 	request, err := resource.ParseQuantity(requestStr)
 	if err != nil {
-		return false, fmt.Errorf("could not parse memory request %v : %v", requestStr, err)
+		return false, fmt.Errorf("could not parse request %v : %v", requestStr, err)
 	}
 
 	limit, err2 := resource.ParseQuantity(limitStr)
 	if err2 != nil {
-		return false, fmt.Errorf("could not parse memory limit %v : %v", limitStr, err2)
+		return false, fmt.Errorf("could not parse limit %v : %v", limitStr, err2)
 	}
 
 	return request.Cmp(limit) == -1, nil

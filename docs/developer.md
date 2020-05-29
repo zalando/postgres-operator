@@ -33,14 +33,14 @@ by setting the `GO111MODULE` environment variable to `on`. The make targets do
 this for you, so simply run
 
 ```bash
-make tools deps
+make deps
 ```
 
 This would take a while to complete. You have to redo `make deps` every time
 your dependencies list changes, i.e. after adding a new library dependency.
 
 Build the operator with the `make docker` command. You may define the TAG
-variable to assign an explicit tag to your docker image and the IMAGE to set
+variable to assign an explicit tag to your Docker image and the IMAGE to set
 the image name. By default, the tag is computed with
 `git describe --tags --always --dirty` and the image is
 `registry.opensource.zalan.do/acid/postgres-operator`
@@ -60,10 +60,10 @@ The binary will be placed into the build directory.
 
 ## Deploying self build image
 
-The fastest way to run and test your docker image locally is to reuse the docker
-from [minikube](https://github.com/kubernetes/minikube/releases) or use the
-`load docker-image` from [kind](https://kind.sigs.k8s.io/). The following steps
-will get you the docker image built and deployed.
+The fastest way to run and test your Docker image locally is to reuse the Docker
+environment from [minikube](https://github.com/kubernetes/minikube/releases)
+or use the `load docker-image` from [kind](https://kind.sigs.k8s.io/). The
+following steps will get you the Docker image built and deployed.
 
 ```bash
 # minikube
@@ -162,7 +162,7 @@ The operator also supports pprof endpoints listed at the
 * /debug/pprof/trace
 
 It's possible to attach a debugger to troubleshoot postgres-operator inside a
-docker container. It's possible with [gdb](https://www.gnu.org/software/gdb/)
+Docker container. It's possible with [gdb](https://www.gnu.org/software/gdb/)
 and [delve](https://github.com/derekparker/delve). Since the latter one is a
 specialized debugger for Go, we will use it as an example. To use it you need:
 
@@ -284,6 +284,7 @@ manifest files:
 
 Postgres manifest parameters are defined in the [api package](../pkg/apis/acid.zalan.do/v1/postgresql_type.go).
 The operator behavior has to be implemented at least in [k8sres.go](../pkg/cluster/k8sres.go).
+Validation of CRD parameters is controlled in [crd.go](../pkg/apis/acid.zalan.do/v1/crds.go).
 Please, reflect your changes in tests, for example in:
 * [config_test.go](../pkg/util/config/config_test.go)
 * [k8sres_test.go](../pkg/cluster/k8sres_test.go)
@@ -294,6 +295,7 @@ Please, reflect your changes in tests, for example in:
 For the CRD-based configuration, please update the following files:
 * the default [OperatorConfiguration](../manifests/postgresql-operator-default-configuration.yaml)
 * the Helm chart's [values-crd file](../charts/postgres-operator/values.yaml)
+* the CRD's [validation](../manifests/operatorconfiguration.crd.yaml)
 
 Reflect the changes in the ConfigMap configuration as well (note that numeric
 and boolean parameters have to use double quotes here):

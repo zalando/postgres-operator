@@ -10,12 +10,12 @@ configuration.
   maps. String values containing ':' should be enclosed in quotes. The
   configuration is flat, parameter group names below are not reflected in the
   configuration structure. There is an
-  [example](../manifests/configmap.yaml)
+  [example](../../manifests/configmap.yaml)
 
 * CRD-based configuration. The configuration is stored in a custom YAML
   manifest. The manifest is an instance of the custom resource definition (CRD)
   called `OperatorConfiguration`. The operator registers this CRD during the
-  start and uses it for configuration if the [operator deployment manifest](../manifests/postgres-operator.yaml#L36)
+  start and uses it for configuration if the [operator deployment manifest](../../manifests/postgres-operator.yaml#L36)
   sets the `POSTGRES_OPERATOR_CONFIGURATION_OBJECT` env variable to a non-empty
   value. The variable should point to the `postgresql-operator-configuration`
   object in the operator's namespace.
@@ -24,26 +24,25 @@ configuration.
   simply represented in the usual YAML way. There are no default values built-in
   in the operator, each parameter that is not supplied in the configuration
   receives an empty value. In order to create your own configuration just copy
-  the [default one](../manifests/postgresql-operator-default-configuration.yaml)
+  the [default one](../../manifests/postgresql-operator-default-configuration.yaml)
   and change it.
 
   To test the CRD-based configuration locally, use the following
   ```bash
+  kubectl create -f manifests/operatorconfiguration.crd.yaml # registers the CRD
+  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+
   kubectl create -f manifests/operator-service-account-rbac.yaml
   kubectl create -f manifests/postgres-operator.yaml # set the env var as mentioned above
-  kubectl create -f manifests/postgresql-operator-default-configuration.yaml
+
   kubectl get operatorconfigurations postgresql-operator-default-configuration -o yaml
   ```
-  Note that the operator first attempts to register the CRD of the
-  `OperatorConfiguration` and then waits for an instance to be created. In
-  between these two event the operator pod may be failing since it cannot fetch
-  the not-yet-existing `OperatorConfiguration` instance.
 
 The CRD-based configuration is more powerful than the one based on ConfigMaps
 and should be used unless there is a compatibility requirement to use an already
 existing configuration. Even in that case, it should be rather straightforward
-to convert the configmap based configuration into the CRD-based one and restart
-the operator. The ConfigMaps-based configuration will be deprecated and
+to convert the ConfigMap-based configuration into the CRD-based one and restart
+the operator. The ConfigMap-based configuration will be deprecated and
 subsequently removed in future releases.
 
 Note that for the CRD-based configuration groups of configuration options below
@@ -58,11 +57,11 @@ parameters, those parameters have no effect and are replaced by the
 `CRD_READY_WAIT_INTERVAL` and `CRD_READY_WAIT_TIMEOUT` environment variables.
 They will be deprecated and removed in the future.
 
-For the configmap configuration, the [default parameter values](../pkg/util/config/config.go#L14)
+For the configmap configuration, the [default parameter values](../../pkg/util/config/config.go#L14)
 mentioned here are likely to be overwritten in your local operator installation
 via your local version of the operator configmap. In the case you use the
 operator CRD, all the CRD defaults are provided in the
-[operator's default configuration manifest](../manifests/postgresql-operator-default-configuration.yaml)
+[operator's default configuration manifest](../../manifests/postgresql-operator-default-configuration.yaml)
 
 Variable names are underscore-separated words.
 
@@ -71,21 +70,45 @@ Variable names are underscore-separated words.
 
 Those are top-level keys, containing both leaf keys and groups.
 
+* **enable_crd_validation**
+  toggles if the operator will create or update CRDs with
+  [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)
+  The default is `true`.
+
+* **enable_lazy_spilo_upgrade**
+  Instruct operator to update only the statefulsets with the new image without immediately doing the rolling update. The assumption is pods will be re-started later with the new image, for example due to the node rotation.
+  The default is `false`.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use
   Kubernetes-native DCS).
 
+* **kubernetes_use_configmaps**
+  Select if setup uses endpoints (default), or configmaps to manage leader when
+  DCS is kubernetes (not etcd or similar). In OpenShift it is not possible to
+  use endpoints option, and configmaps is required. By default,
+  `kubernetes_use_configmaps: false`, meaning endpoints will be used.
+
 * **docker_image**
-  Spilo docker image for Postgres instances. For production, don't rely on the
+  Spilo Docker image for Postgres instances. For production, don't rely on the
   default image, as it might be not the most up-to-date one. Instead, build
   your own Spilo image from the [github
   repository](https://github.com/zalando/spilo).
 
 * **sidecar_docker_images**
-  a map of sidecar names to docker images for the containers to run alongside
-  Spilo. In case of the name conflict with the definition in the cluster
-  manifest the cluster-specific one is preferred.
+  *deprecated*: use **sidecars** instead. A map of sidecar names to Docker
+  images to run with Spilo. In case of the name conflict with the definition in
+  the cluster manifest the cluster-specific one is preferred.
+
+* **sidecars**
+  a list of sidecars to run with Spilo, for any cluster (i.e. globally defined
+  sidecars). Each item in the list is of type
+  [Container](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core).
+  Globally defined sidecars can be overwritten by specifying a sidecar in the
+  Postgres manifest with the same name.
+  Note: This field is not part of the schema validation. If the container
+  specification is invalid, then the operator fails to create the statefulset.
 
 * **enable_shm_volume**
   Instruct operator to start any new database pod without limitations on shm
@@ -106,8 +129,10 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **min_instances**
   operator will run at least the number of instances for any given Postgres
-  cluster equal to the value of this parameter. When `-1` is specified, no
-  limits are applied. The default is `-1`.
+  cluster equal to the value of this parameter. Standby clusters can still run
+  with `numberOfInstances: 1` as this is the [recommended setup](../user.md#setting-up-a-standby-cluster).
+  When `-1` is specified for `min_instances`, no limits are applied. The default
+  is `-1`.
 
 * **resync_period**
   period between consecutive sync requests. The default is `30m`.
@@ -121,8 +146,9 @@ Those are top-level keys, containing both leaf keys and groups.
   at the cost of overprovisioning memory and potential scheduling problems for
   containers with high memory limits due to the lack of memory on Kubernetes
   cluster nodes. This affects all containers created by the operator (Postgres,
-  Scalyr sidecar, and other sidecars); to set resources for the operator's own
-  container, change the [operator deployment manually](../manifests/postgres-operator.yaml#L20).
+  Scalyr sidecar, and other sidecars except **sidecars** defined in the operator
+  configuration); to set resources for the operator's own container, change the
+  [operator deployment manually](../../manifests/postgres-operator.yaml#L20).
   The default is `false`.
 
 ## Postgres users
@@ -148,25 +174,37 @@ configuration they are grouped under the `kubernetes` key.
   service account used by Patroni running on individual Pods to communicate
   with the operator. Required even if native Kubernetes support in Patroni is
   not used, because Patroni keeps pod labels in sync with the instance role.
-  The default is `operator`.
+  The default is `postgres-pod`.
 
 * **pod_service_account_definition**
-  The operator tries to create the pod Service Account in the namespace that
-  doesn't define such an account using the YAML definition provided by this
-  option. If not defined, a simple definition that contains only the name will
-  be used. The default is empty.
+  On Postgres cluster creation the operator tries to create the service account
+  for the Postgres pods if it does not exist in the namespace. The internal
+  default service account definition (defines only the name) can be overwritten
+  with this parameter. Make sure to provide a valid YAML or JSON string. The
+  default is empty.
 
 * **pod_service_account_role_binding_definition**
-  This definition must bind pod service account to a role with permission
+  This definition must bind the pod service account to a role with permission
   sufficient for the pods to start and for Patroni to access K8s endpoints;
   service account on its own lacks any such rights starting with K8s v1.8. If
   not explicitly defined by the user, a simple definition that binds the
-  account to the operator's own 'zalando-postgres-operator' cluster role will
-  be used. The default is empty.
+  account to the 'postgres-pod' [cluster role](../../manifests/operator-service-account-rbac.yaml#L198)
+  will be used. The default is empty.
 
 * **pod_terminate_grace_period**
   Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)
   after this timeout. The default is `5m`.
+
+* **custom_pod_annotations**
+  This key/value map provides a list of annotations that get attached to each pod
+  of a database created by the operator. If the annotation key is also provided
+  by the database definition, the database definition value is used.
+
+* **downscaler_annotations**
+  An array of annotations that should be passed from Postgres CRD on to the
+  statefulset and, if exists, to the connection pooler deployment as well.
+  Regular expressions like `downscaler/*` etc. are also accepted. Can be used
+  with [kube-downscaler](https://github.com/hjacobs/kube-downscaler).
 
 * **watched_namespace**
   The operator watches for Postgres objects in the given namespace. If not
@@ -187,6 +225,15 @@ configuration they are grouped under the `kubernetes` key.
   [admin docs](../administrator.md#pod-disruption-budget) for more information.
   Default is true.
 
+* **enable_init_containers**
+  global option to allow for creating init containers in the cluster manifest to
+  run actions before Spilo is started. Default is true.
+
+* **enable_sidecars**
+  global option to allow for creating sidecar containers in the cluster manifest
+  to run alongside Spilo on the same pod. Globally defined sidecars are always
+  enabled. Default is true.
+
 * **secret_name_template**
   a template for the name of the database user secrets generated by the
   operator. `{username}` is replaced with name of the secret, `{cluster}` with
@@ -201,11 +248,12 @@ configuration they are grouped under the `kubernetes` key.
   to the Postgres clusters after creation.
 
 * **oauth_token_secret_name**
-  a name of the secret containing the `OAuth2` token to pass to the teams API.
-  The default is `postgresql-operator`.
+  namespaced name of the secret containing the `OAuth2` token to pass to the
+  teams API. The default is `postgresql-operator`.
 
 * **infrastructure_roles_secret_name**
-  name of the secret containing infrastructure roles names and passwords.
+  namespaced name of the secret containing infrastructure roles names and
+  passwords.
 
 * **pod_role_label**
   name of the label assigned to the Postgres pods (and services/endpoints) by
@@ -242,11 +290,11 @@ configuration they are grouped under the `kubernetes` key.
   for details on taints and tolerations. The default is empty.
 
 * **pod_environment_configmap**
-  a name of the ConfigMap with environment variables to populate on every pod.
-  Right now this ConfigMap is searched in the namespace of the Postgres cluster.
-  All variables from that ConfigMap are injected to the pod's environment, on
-  conflicts they are overridden by the environment variables generated by the
-  operator. The default is empty.
+  namespaced name of the ConfigMap with environment variables to populate on
+  every pod. Right now this ConfigMap is searched in the namespace of the
+  Postgres cluster. All variables from that ConfigMap are injected to the pod's
+  environment, on conflicts they are overridden by the environment variables
+  generated by the operator. The default is empty.
 
 * **pod_priority_class_name**
   a name of the [priority class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
@@ -264,12 +312,12 @@ configuration they are grouped under the `kubernetes` key.
   used for AWS volume resizing and not required if you don't need that
   capability. The default is `false`.
 
- * **master_pod_move_timeout**
-   The period of time to wait for the success of migration of master pods from
-   an unschedulable node. The migration includes Patroni switchovers to
-   respective replicas on healthy nodes. The situation where master pods still
-   exist on the old node after this timeout expires has to be fixed manually.
-   The default is 20 minutes.
+* **master_pod_move_timeout**
+  The period of time to wait for the success of migration of master pods from
+  an unschedulable node. The migration includes Patroni switchovers to
+  respective replicas on healthy nodes. The situation where master pods still
+  exist on the old node after this timeout expires has to be fixed manually.
+  The default is 20 minutes.
 
 * **enable_pod_antiaffinity**
   toggles [pod anti affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
@@ -301,11 +349,19 @@ CRD-based configuration.
 
 * **default_cpu_limit**
   CPU limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `3`.
+  settings. The default is `1`.
 
 * **default_memory_limit**
   memory limits for the Postgres containers, unless overridden by cluster-specific
-  settings. The default is `1Gi`.
+  settings. The default is `500Mi`.
+
+* **min_cpu_limit**
+  hard CPU minimum what we consider to be required to properly run Postgres
+  clusters with Patroni on Kubernetes. The default is `250m`.
+
+* **min_memory_limit**
+  hard memory minimum what we consider to be required to properly run Postgres
+  clusters with Patroni on Kubernetes. The default is `250Mi`.
 
 ## Operator timeouts
 
@@ -363,8 +419,9 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   `false`.
 
 * **custom_service_annotations**
-  when load balancing is enabled, LoadBalancer service is created and
-  this parameter takes service annotations that are applied to service.
+  This key/value map provides a list of annotations that get attached to each
+  service of a cluster created by the operator. If the annotation key is also
+  provided by the cluster definition, the manifest value is used.
   Optional.
 
 * **master_dns_name_format** defines the DNS name string template for the
@@ -435,6 +492,22 @@ grouped under the `logical_backup` key.
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
+
+* **logical_backup_s3_region**
+  Specifies the region of the bucket which is required with some non-AWS S3 storage services. The default is empty.
+
+* **logical_backup_s3_endpoint**
+  When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.
+
+* **logical_backup_s3_sse**
+  Specify server side encryption that S3 storage is using. If empty string
+  is specified, no argument will be passed to `aws s3` command. Default: "AES256".
+
+* **logical_backup_s3_access_key_id**
+  When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
+
+* **logical_backup_s3_secret_access_key**
+  When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
 
 ## Debugging the operator
 
@@ -524,11 +597,12 @@ configuration they are grouped under the `logging_rest_api` key.
 * **cluster_history_entries**
   number of entries in the cluster history ring buffer. The default is `1000`.
 
-## Scalyr options
+## Scalyr options (*deprecated*)
 
 Those parameters define the resource requests/limits and properties of the
 scalyr sidecar. In the CRD-based configuration they are grouped under the
-`scalyr` key.
+`scalyr` key. Note, that this section is deprecated. Instead, define Scalyr as
+a global sidecar under the `sidecars` key in the configuration.
 
 * **scalyr_api_key**
   API key for the Scalyr sidecar. The default is empty.
@@ -549,4 +623,44 @@ scalyr sidecar. In the CRD-based configuration they are grouped under the
   CPU limit value for the Scalyr sidecar. The default is `1`.
 
 * **scalyr_memory_limit**
-  Memory limit value for the Scalyr sidecar. The default is `1Gi`.
+  Memory limit value for the Scalyr sidecar. The default is `500Mi`.
+
+## Connection pooler configuration
+
+Parameters are grouped under the `connection_pooler` top-level key and specify
+default configuration for connection pooler, if a postgres manifest requests it
+but do not specify some of the parameters. All of them are optional with the
+operator being able to provide some reasonable defaults.
+
+* **connection_pooler_number_of_instances**
+  How many instances of connection pooler to create. Default is 2 which is also
+  the required minimum.
+
+* **connection_pooler_schema**
+  Database schema to create for credentials lookup function to be used by the
+  connection pooler. Is is created in every database of the Postgres cluster.
+  You can also choose an existing schema. Default schema is `pooler`.
+
+* **connection_pooler_user**
+  User to create for connection pooler to be able to connect to a database.
+  You can also choose an existing role, but make sure it has the `LOGIN`
+  privilege. Default role is `pooler`.
+
+* **connection_pooler_image**
+  Docker image to use for connection pooler deployment.
+  Default: "registry.opensource.zalan.do/acid/pgbouncer"
+
+* **connection_pooler_max_db_connections**
+  How many connections the pooler can max hold. This value is divided among the
+  pooler pods. Default is 60 which will make up 30 connections per pod for the
+  default setup with two instances.
+
+* **connection_pooler_mode**
+  Default pooler mode, `session` or `transaction`. Default is `transaction`.
+
+* **connection_pooler_default_cpu_request**
+  **connection_pooler_default_memory_reques**
+  **connection_pooler_default_cpu_limit**
+  **connection_pooler_default_memory_limit**
+  Default resource configuration for connection pooler deployment. The internal
+  default for memory request and limit is `100Mi`, for CPU it is `500m` and `1`.

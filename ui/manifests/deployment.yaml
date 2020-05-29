@@ -4,23 +4,23 @@ metadata:
   name: "postgres-operator-ui"
   namespace: "default"
   labels:
-    application: "postgres-operator-ui"
+    name: "postgres-operator-ui"
     team: "acid"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      application: "postgres-operator-ui"
+      name: "postgres-operator-ui"
   template:
     metadata:
       labels:
-        application: "postgres-operator-ui"
+        name: "postgres-operator-ui"
         team: "acid"
     spec:
       serviceAccountName: postgres-operator-ui
       containers:
         - name: "service"
-          image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.2.0
+          image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.5.0-dirty
           ports:
             - containerPort: 8081
               protocol: "TCP"
@@ -32,8 +32,8 @@ spec:
             timeoutSeconds: 1
           resources:
             limits:
-              cpu: "300m"
-              memory: "3000Mi"
+              cpu: "200m"
+              memory: "200Mi"
             requests:
               cpu: "100m"
               memory: "100Mi"
@@ -41,7 +41,11 @@ spec:
             - name: "APP_URL"
               value: "http://localhost:8081"
             - name: "OPERATOR_API_URL"
-              value: "http://localhost:8080"
+              value: "http://postgres-operator:8080"
+            - name: "OPERATOR_CLUSTER_NAME_LABEL"
+              value: "cluster-name"
+            - name: "RESOURCES_VISIBLE"
+              value: "False"
             - name: "TARGET_NAMESPACE"
               value: "default"
             - name: "TEAMS"
@@ -60,9 +64,14 @@ spec:
                   "replica_load_balancer_visible": true,
                   "resources_visible": true,
                   "users_visible": true,
+                  "cost_ebs": 0.119,
+                  "cost_core": 0.0575,
+                  "cost_memory": 0.014375,
                   "postgresql_versions": [
+                    "12",
                     "11",
                     "10",
-                    "9.6"
+                    "9.6",
+                    "9.5"
                   ]
                 }

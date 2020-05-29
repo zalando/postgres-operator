@@ -52,18 +52,19 @@ cd postgres-operator
 kubectl create -f manifests/configmap.yaml  # configuration
 kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
 kubectl create -f manifests/postgres-operator.yaml  # deployment
+kubectl create -f manifests/api-service.yaml  # operator API to be used by UI
 ```
 
 There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest that [combines the mentioned resources](../manifests/kustomization.yaml) -
-it can be used with kubectl 1.14 or newer as easy as:
+manifest that [combines the mentioned resources](../manifests/kustomization.yaml)
+(except for the CRD) - it can be used with kubectl 1.14 or newer as easy as:
 
 ```bash
 kubectl apply -k github.com/zalando/postgres-operator/manifests
 ```
 
 For convenience, we have automated starting the operator with minikube using the
-`run_operator_locally` script. It applies the [`acid-minimal-cluster`](../manifests/minimal-postgres-manifest).
+`run_operator_locally` script. It applies the [`acid-minimal-cluster`](../manifests/minimal-postgres-manifest.yaml).
 manifest.
 
 ```bash
@@ -73,21 +74,22 @@ manifest.
 ### Helm chart
 
 Alternatively, the operator can be installed by using the provided [Helm](https://helm.sh/)
-chart which saves you the manual steps. Therefore, install the helm CLI on your
-machine. After initializing helm (and its server component Tiller) in your local
-cluster you can install the operator chart. You can define a release name that
-is prepended to the operator resource's names.
-
-Use `--name zalando` to match with the default service account name as older
-operator versions do not support custom names for service accounts. To use
-CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
+chart which saves you the manual steps. Clone this repo and change directory to
+the repo root. With Helm v3 installed you should be able to run:
 
 ```bash
-# 1) initialize helm
-helm init
-# 2) install postgres-operator chart
-helm install --name zalando ./charts/postgres-operator
+helm install postgres-operator ./charts/postgres-operator
 ```
+
+To use CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
+
+```bash
+helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-crd.yaml
+```
+
+The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
+be skipped with warning when using v3. Documentation for installing applications
+with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
 
 ### Operator Lifecycle Manager (OLM)
 
@@ -103,7 +105,7 @@ kubectl create -f https://operatorhub.io/install/postgres-operator.yaml
 This installs the operator in the `operators` namespace. More information can be
 found on [operatorhub.io](https://operatorhub.io/operator/postgres-operator).
 
-## Create a Postgres cluster
+## Check if Postgres Operator is running
 
 Starting the operator may take a few seconds. Check if the operator pod is
 running before applying a Postgres cluster manifest.
@@ -114,20 +116,74 @@ kubectl get pod -l name=postgres-operator
 
 # if you've created the operator using helm chart
 kubectl get pod -l app.kubernetes.io/name=postgres-operator
+```
 
+If the operator doesn't get into `Running` state, either check the latest K8s
+events of the deployment or pod with `kubectl describe` or inspect the operator
+logs:
+
+```bash
+kubectl logs "$(kubectl get pod -l name=postgres-operator --output='name')"
+```
+
+## Deploy the operator UI
+
+In the following paragraphs we describe how to access and manage PostgreSQL
+clusters from the command line with kubectl. But it can also be done from the
+browser-based [Postgres Operator UI](operator-ui.md). Before deploying the UI
+make sure the operator is running and its REST API is reachable through a
+[K8s service](../manifests/api-service.yaml). The URL to this API must be
+configured in the [deployment manifest](../ui/manifests/deployment.yaml#L43)
+of the UI.
+
+To deploy the UI simply apply all its manifests files or use the UI helm chart:
+
+```bash
+# manual deployment
+kubectl apply -f ui/manifests/
+
+# or helm chart
+helm install postgres-operator-ui ./charts/postgres-operator-ui
+```
+
+Like with the operator, check if the UI pod gets into `Running` state:
+
+```bash
+# if you've created the operator using yaml manifests
+kubectl get pod -l name=postgres-operator-ui
+
+# if you've created the operator using helm chart
+kubectl get pod -l app.kubernetes.io/name=postgres-operator-ui
+```
+
+You can now access the web interface by port forwarding the UI pod (mind the
+label selector) and enter `localhost:8081` in your browser:
+
+```bash
+kubectl port-forward "$(kubectl get pod -l name=postgres-operator-ui --output='name')" 8081
+```
+
+Available option are explained in detail in the [UI docs](operator-ui.md).
+
+## Create a Postgres cluster
+
+If the operator pod is running it listens to new events regarding `postgresql`
+resources. Now, it's time to submit your first Postgres cluster manifest.
+
+```bash
 # create a Postgres cluster
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-After the cluster manifest is submitted the operator will create Service and
-Endpoint resources and a StatefulSet which spins up new Pod(s) given the number
-of instances specified in the manifest. All resources are named like the
-cluster. The database pods can be identified by their number suffix, starting
-from `-0`. They run the [Spilo](https://github.com/zalando/spilo) container
-image by Zalando. As for the services and endpoints, there will be one for the
-master pod and another one for all the replicas (`-repl` suffix). Check if all
-components are coming up. Use the label `application=spilo` to filter and list
-the label `spilo-role` to see who is currently the master.
+After the cluster manifest is submitted and passed the validation the operator
+will create Service and Endpoint resources and a StatefulSet which spins up new
+Pod(s) given the number of instances specified in the manifest. All resources
+are named like the cluster. The database pods can be identified by their number
+suffix, starting from `-0`. They run the [Spilo](https://github.com/zalando/spilo)
+container image by Zalando. As for the services and endpoints, there will be one
+for the master pod and another one for all the replicas (`-repl` suffix). Check
+if all components are coming up. Use the label `application=spilo` to filter and
+list the label `spilo-role` to see who is currently the master.
 
 ```bash
 # check the deployed cluster
@@ -154,9 +210,12 @@ export PGPORT=$(echo $HOST_PORT | cut -d: -f 2)
 ```
 
 Retrieve the password from the K8s Secret that is created in your cluster.
+Non-encrypted connections are rejected by default, so set the SSL mode to
+require:
 
 ```bash
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
+export PGSSLMODE=require
 psql -U postgres
 ```
 

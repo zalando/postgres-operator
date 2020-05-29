@@ -3,16 +3,22 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  etcd_host: ""
-  docker_image: registry.opensource.zalan.do/acid/spilo-11:1.6-p1
+  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
+  # enable_crd_validation: true
+  # enable_lazy_spilo_upgrade: false
   # enable_shm_volume: true
+  etcd_host: ""
+  # kubernetes_use_configmaps: false
   max_instances: -1
   min_instances: -1
   resync_period: 30m
   repair_period: 5m
   # set_memory_request_to_limit: false
-  # sidecar_docker_images:
-  #   example: "exampleimage:exampletag"
+  # sidecars:
+  # - image: image:123
+  #   name: global-sidecar-1
+  #   ports:
+  #   - containerPort: 80
   workers: 4
   users:
     replication_username: standby
@@ -20,33 +26,48 @@ configuration:
   kubernetes:
     cluster_domain: cluster.local
     cluster_labels:
-        application: spilo
+      application: spilo
     cluster_name_label: cluster-name
+    # custom_pod_annotations:
+    #   keya: valuea
+    #   keyb: valueb
+    # downscaler_annotations:
+    # - deployment-time
+    # - downscaler/*
+    enable_init_containers: true
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
-    # infrastructure_roles_secret_name: ""
+    enable_sidecars: true
+    # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
     # inherited_labels:
     # - application
     # - environment
-    # node_readiness_label: ""
+    master_pod_move_timeout: 20m
+    # node_readiness_label:
+    #   status: ready
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-    # pod_environment_configmap: ""
+    # pod_environment_configmap: "default/my-custom-config"
     pod_management_policy: "ordered_ready"
+    # pod_priority_class_name: ""
     pod_role_label: spilo-role
+    # pod_service_account_definition: ""
     pod_service_account_name: zalando-postgres-operator
+    # pod_service_account_role_binding_definition: ""
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
     # spilo_fsgroup: 103
     spilo_privileged: false
     # toleration: {}
-    # watched_namespace:""
+    # watched_namespace: ""
   postgres_pod_resources:
-    default_cpu_limit: "3"
+    default_cpu_limit: "1"
     default_cpu_request: 100m
-    default_memory_limit: 1Gi
+    default_memory_limit: 500Mi
     default_memory_request: 100Mi
+    # min_cpu_limit: 250m
+    # min_memory_limit: 250Mi
   timeouts:
     pod_label_wait_timeout: 10m
     pod_deletion_wait_timeout: 10m
@@ -71,9 +92,14 @@ configuration:
     # log_s3_bucket: ""
     # wal_s3_bucket: ""
   logical_backup:
-    logical_backup_schedule: "30 00 * * *"
-    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:master-58"
+    # logical_backup_s3_access_key_id: ""
     logical_backup_s3_bucket: "my-bucket-url"
+    # logical_backup_s3_endpoint: ""
+    # logical_backup_s3_region: ""
+    # logical_backup_s3_secret_access_key: ""
+    logical_backup_s3_sse: "AES256"
+    logical_backup_schedule: "30 00 * * *"
   debug:
     debug_logging: true
     enable_database_access: true
@@ -83,22 +109,26 @@ configuration:
     enable_teams_api: false
     # pam_configuration: ""
     pam_role_name: zalandos
-    # postgres_superuser_teams: "postgres_superusers"
+    # postgres_superuser_teams:
+    # - postgres_superusers
     protected_role_names:
-      - admin
+    - admin
     team_admin_role: admin
     team_api_role_configuration:
       log_statement: all
     # teams_api_url: ""
   logging_rest_api:
-    api_port: 8008
+    api_port: 8080
     cluster_history_entries: 1000
     ring_log_lines: 100
-  scalyr:
-    # scalyr_api_key: ""
-    scalyr_cpu_limit: "1"
-    scalyr_cpu_request: 100m
-    # scalyr_image: ""
-    scalyr_memory_limit: 1Gi
-    scalyr_memory_request: 50Mi
-    # scalyr_server_url: ""
+  connection_pooler:
+    connection_pooler_default_cpu_limit: "1"
+    connection_pooler_default_cpu_request: "500m"
+    connection_pooler_default_memory_limit: 100Mi
+    connection_pooler_default_memory_request: 100Mi
+    connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-7"
+    # connection_pooler_max_db_connections: 60
+    connection_pooler_mode: "transaction"
+    connection_pooler_number_of_instances: 2
+    # connection_pooler_schema: "pooler"
+    # connection_pooler_user: "pooler"

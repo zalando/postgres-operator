@@ -79,7 +79,8 @@ scm-source.json: .git
 
 tools:
 	GO111MODULE=on go get -u honnef.co/go/tools/cmd/staticcheck
-	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.16.0
+	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.16.3
+	GO111MODULE=on go mod tidy
 
 fmt:
 	@gofmt -l -w -s $(DIRS)
@@ -88,12 +89,12 @@ vet:
 	@go vet $(PKG)
 	@staticcheck $(PKG)
 
-deps:
+deps: tools
 	GO111MODULE=on go mod vendor
 
 test:
 	hack/verify-codegen.sh
-	@go test ./pkg/...
+	GO111MODULE=on go test ./...
 
 e2e: docker # build operator image to be tested
-	cd e2e; make tools test clean
+	cd e2e; make tools e2etest clean

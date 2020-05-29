@@ -240,6 +240,18 @@ new
                   | Enable replica ELB
 
             tr
+              td Enable Connection Pool
+              td
+                label
+                  input(
+                    type='checkbox'
+                    value='{ enableConnectionPooler }'
+                    onchange='{ toggleEnableConnectionPooler }'
+                  )
+                  |
+                  | Enable Connection Pool (using PGBouncer)
+
+            tr
               td Volume size
               td
                 .input-group
@@ -408,7 +420,7 @@ new
                           ref='cpuLimit'
                           type='number'
                           placeholder='{ cpu.state.limit.initialValue }'
-                          min='1'
+                          min='250'
                           required
                           value='{ cpu.state.limit.state }'
                           onchange='{ cpu.state.limit.edit }'
@@ -434,7 +446,7 @@ new
                           onkeyup='{ memory.state.request.edit }'
                         )
                         .input-group-addon
-                          .input-units Gi
+                          .input-units Mi
 
                       .input-group
                         .input-group-addon.resource-type Limit
@@ -442,14 +454,14 @@ new
                           ref='memoryLimit'
                           type='number'
                           placeholder='{ memory.state.limit.initialValue }'
-                          min='1'
+                          min='250'
                           required
                           value='{ memory.state.limit.state }'
                           onchange='{ memory.state.limit.edit }'
                           onkeyup='{ memory.state.limit.edit }'
                         )
                         .input-group-addon
-                          .input-units Gi
+                          .input-units Mi
 
       .col-lg-3
         help-general(config='{ opts.config }')
@@ -493,6 +505,9 @@ new
         {{#if enableReplicaLoadBalancer}}
         enableReplicaLoadBalancer: true
         {{/if}}
+        {{#if enableConnectionPooler}}
+        enableConnectionPooler: true
+        {{/if}}
         volume:
           size: "{{ volumeSize }}Gi"
         {{#if users}}
@@ -516,13 +531,14 @@ new
           - {{ odd }}/32
         {{/if}}
 
+        {{#if resourcesVisible}}
         resources:
           requests:
             cpu: {{ cpu.state.request.state }}m
-            memory: {{ memory.state.request.state }}Gi
+            memory: {{ memory.state.request.state }}Mi
           limits:
             cpu: {{ cpu.state.limit.state }}m
-            memory: {{ memory.state.limit.state }}Gi{{#if restoring}}
+            memory: {{ memory.state.limit.state }}Mi{{/if}}{{#if restoring}}
 
         clone:
           cluster: "{{ backup.state.name.state }}"
@@ -542,6 +558,7 @@ new
         instanceCount: this.instanceCount,
         enableMasterLoadBalancer: this.enableMasterLoadBalancer,
         enableReplicaLoadBalancer: this.enableReplicaLoadBalancer,
+        enableConnectionPooler: this.enableConnectionPooler,
         volumeSize: this.volumeSize,
         users: this.users.valids,
         databases: this.databases.valids,
@@ -552,6 +569,7 @@ new
         memory: this.memory,
         backup: this.backup,
         namespace: this.namespace,
+        resourcesVisible: this.config.resources_visible,
         restoring: this.backup.state.type.state !== 'empty',
         pitr: this.backup.state.type.state === 'pitr',
       }
@@ -596,6 +614,10 @@ new
 
     this.toggleEnableReplicaLoadBalancer = e => {
       this.enableReplicaLoadBalancer = !this.enableReplicaLoadBalancer
+    }
+
+    this.toggleEnableConnectionPooler = e => {
+      this.enableConnectionPooler = !this.enableConnectionPooler
     }
 
     this.volumeChange = e => {
@@ -786,8 +808,8 @@ new
       return instance
     }
 
-    this.cpu = DynamicResource({ request: 100, limit: 1000 })
-    this.memory = DynamicResource({ request: 1, limit: 1 })
+    this.cpu = DynamicResource({ request: 100, limit: 500 })
+    this.memory = DynamicResource({ request: 100, limit: 500 })
 
     this.backup = DynamicSet({
       type: () => 'empty',
@@ -892,6 +914,7 @@ new
       this.odd = ''
       this.enableMasterLoadBalancer = false
       this.enableReplicaLoadBalancer = false
+      this.enableConnectionPooler = false
 
       this.postgresqlVersion = this.postgresqlVersion = (
         this.config.postgresql_versions[0]
