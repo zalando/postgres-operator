@@ -114,7 +114,7 @@ func TestNameFromMeta(t *testing.T) {
 
 func TestPGUserPassword(t *testing.T) {
 	for _, tt := range pgUsers {
-		e := NewEncryptor("md5")
+		e := NewEncryptor("default")
 		pwd := e.PGUserPassword(tt.in)
 		if pwd != tt.outmd5 {
 			t.Errorf("PgUserPassword expected: %q, got: %q", tt.outmd5, pwd)

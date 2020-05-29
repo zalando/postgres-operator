@@ -19,5 +19,5 @@ install:
 script:
   - hack/verify-codegen.sh
   - travis_wait 20 go test -race -covermode atomic -coverprofile=profile.cov ./pkg/... -v
-  - travis_wait 20 goveralls -coverprofile=profile.cov -service=travis-ci -v
+  - goveralls -coverprofile=profile.cov -service=travis-ci -v
   - make e2e
