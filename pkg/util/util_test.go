@@ -12,8 +12,8 @@ import (
 )
 
 var pgUsers = []struct {
-	in  spec.PgUser
-	outmd5 string
+	in             spec.PgUser
+	outmd5         string
 	outscramsha256 string
 }{{spec.PgUser{
 	Name:     "test",
@@ -120,7 +120,7 @@ func TestPGUserPassword(t *testing.T) {
 			t.Errorf("PgUserPassword expected: %q, got: %q", tt.outmd5, pwd)
 		}
 		e = NewEncryptor("scram-sha-256")
-		e.random = func(n int) string {return "salt"}
+		e.random = func(n int) string { return "salt" }
 		pwd = e.PGUserPassword(tt.in)
 		if pwd != tt.outscramsha256 {
 			t.Errorf("PgUserPassword expected: %q, got: %q", tt.outscramsha256, pwd)
