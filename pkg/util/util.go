@@ -67,16 +67,17 @@ func NameFromMeta(meta metav1.ObjectMeta) spec.NamespacedName {
 		Name:      meta.Name,
 	}
 }
+
 type Hasher func(user spec.PgUser) string
 type Random func(n int) string
 
 type Encryptor struct {
 	encrypt Hasher
-	random Random
+	random  Random
 }
 
 func NewEncryptor(encryption string) *Encryptor {
-	e := Encryptor{random:RandomPassword}
+	e := Encryptor{random: RandomPassword}
 	m := map[string]Hasher{
 		"md5":           e.PGUserPasswordMD5,
 		"scram-sha-256": e.PGUserPasswordScramSHA256,
