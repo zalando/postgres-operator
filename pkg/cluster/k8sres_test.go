@@ -20,8 +20,16 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+// For testing purposes
+type ExpectedValue struct {
+	envIndex       int
+	envVarConstant string
+	envVarValue    string
+}
 
 func toIntStr(val int) *intstr.IntOrString {
 	b := intstr.FromInt(val)
@@ -89,6 +97,119 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		if tt.result != result {
 			t.Errorf("%s %s: Spilo Config is %v, expected %v for role %#v and param %#v",
 				testName, tt.subtest, result, tt.result, tt.role, tt.pgParam)
+		}
+	}
+}
+
+func TestGenerateSpiloPodEnvVars(t *testing.T) {
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				WALGSBucket:    "wale-gs-bucket",
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	expectedValuesGSBucket := []ExpectedValue{
+		ExpectedValue{
+			envIndex:       14,
+			envVarConstant: "WAL_GS_BUCKET",
+			envVarValue:    "wale-gs-bucket",
+		},
+		ExpectedValue{
+			envIndex:       15,
+			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/SomeUUID",
+		},
+		ExpectedValue{
+			envIndex:       16,
+			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "",
+		},
+	}
+
+	expectedValuesGCPCreds := []ExpectedValue{
+		ExpectedValue{
+			envIndex:       14,
+			envVarConstant: "WAL_GS_BUCKET",
+			envVarValue:    "wale-gs-bucket",
+		},
+		ExpectedValue{
+			envIndex:       15,
+			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/SomeUUID",
+		},
+		ExpectedValue{
+			envIndex:       16,
+			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "",
+		},
+		ExpectedValue{
+			envIndex:       17,
+			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
+			envVarValue:    "some_path_to_credentials",
+		},
+	}
+
+	testName := "TestGenerateSpiloPodEnvVars"
+	tests := []struct {
+		subTest            string
+		opConfig           config.Config
+		uid                types.UID
+		spiloConfig        string
+		cloneDescription   *acidv1.CloneDescription
+		standbyDescription *acidv1.StandbyDescription
+		customEnvList      []v1.EnvVar
+		expectedValues     []ExpectedValue
+	}{
+		{
+			subTest: "Will set WAL_GS_BUCKET env",
+			opConfig: config.Config{
+				WALGSBucket: "wale-gs-bucket",
+			},
+			uid:                "SomeUUID",
+			spiloConfig:        "someConfig",
+			cloneDescription:   &acidv1.CloneDescription{},
+			standbyDescription: &acidv1.StandbyDescription{},
+			customEnvList:      []v1.EnvVar{},
+			expectedValues:     expectedValuesGSBucket,
+		},
+		{
+			subTest: "Will set GOOGLE_APPLICATION_CREDENTIALS env",
+			opConfig: config.Config{
+				WALGSBucket:    "wale-gs-bucket",
+				GCPCredentials: "some_path_to_credentials",
+			},
+			uid:                "SomeUUID",
+			spiloConfig:        "someConfig",
+			cloneDescription:   &acidv1.CloneDescription{},
+			standbyDescription: &acidv1.StandbyDescription{},
+			customEnvList:      []v1.EnvVar{},
+			expectedValues:     expectedValuesGCPCreds,
+		},
+	}
+
+	for _, tt := range tests {
+		cluster.OpConfig = tt.opConfig
+
+		actualEnvs := cluster.generateSpiloPodEnvVars(tt.uid, tt.spiloConfig, tt.cloneDescription, tt.standbyDescription, tt.customEnvList)
+
+		for _, ev := range tt.expectedValues {
+			env := actualEnvs[ev.envIndex]
+
+			if env.Name != ev.envVarConstant {
+				t.Errorf("%s %s: Expected env name %s, have %s instead",
+					testName, tt.subTest, ev.envVarConstant, env.Name)
+			}
+
+			if env.Value != ev.envVarValue {
+				t.Errorf("%s %s: Expected env value %s, have %s instead",
+					testName, tt.subTest, ev.envVarValue, env.Value)
+			}
 		}
 	}
 }

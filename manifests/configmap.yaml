@@ -45,6 +45,7 @@ data:
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
+  # gcp_credentials: ""
   # kubernetes_use_configmaps: "false"
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
   # inherited_labels: application,environment
@@ -100,6 +101,7 @@ data:
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
   # toleration: ""
+  # wal_gs_bucket: ""
   # wal_s3_bucket: ""
   watched_namespace: "*"  # listen to all namespaces
   workers: "4"

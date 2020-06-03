@@ -216,9 +216,13 @@ spec:
                   type: string
                 aws_region:
                   type: string
+                gcp_credentials:
+                  type: string
                 kube_iam_role:
                   type: string
                 log_s3_bucket:
+                  type: string
+                wal_gs_bucket:
                   type: string
                 wal_s3_bucket:
                   type: string

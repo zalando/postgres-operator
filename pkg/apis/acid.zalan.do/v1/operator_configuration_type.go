@@ -111,6 +111,8 @@ type LoadBalancerConfiguration struct {
 type AWSGCPConfiguration struct {
 	WALES3Bucket              string `json:"wal_s3_bucket,omitempty"`
 	AWSRegion                 string `json:"aws_region,omitempty"`
+	WALGSBucket               string `json:"wal_gs_bucket,omitempty"`
+	GCPCredentials            string `json:"gcp_credentials,omitempty"`
 	LogS3Bucket               string `json:"log_s3_bucket,omitempty"`
 	KubeIAMRole               string `json:"kube_iam_role,omitempty"`
 	AdditionalSecretMount     string `json:"additional_secret_mount,omitempty"`

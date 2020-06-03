@@ -518,6 +518,57 @@ A secret can be pre-provisioned in different ways:
 * Automatically provisioned via a custom K8s controller like
   [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)
 
+## Google Cloud Platform setup
+
+To configure the operator on GCP there are some prerequisites that are needed:
+
+* A service account with the proper IAM setup to access the GCS bucket for the WAL-E logs
+* The credentials file for the service account.
+
+The configuration paramaters that we will be using are:
+
+* `additional_secret_mount`
+* `additional_secret_mount_path`
+* `gcp_credentials`
+* `wal_gs_bucket`
+
+### Generate a K8 secret resource
+
+Generate the K8 secret resource that will contain your service account's 
+credentials. It's highly recommended to use a service account and limit its
+scope to just the WAL-E bucket. 
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: psql-wale-creds
+  namespace: default
+type: Opaque
+stringData:
+  key.json: |-
+    <GCP .json credentials>
+```
+
+### Setup your operator configuration values
+
+With the `psql-wale-creds` resource applied to your cluster, ensure that
+the operator's configuration is set up like the following:
+
+```yml
+...
+aws_or_gcp:
+  additional_secret_mount: "pgsql-wale-creds"
+  additional_secret_mount_path: "/var/secrets/google" # or where ever you want to mount the file
+  # aws_region: eu-central-1
+  # kube_iam_role: ""
+  # log_s3_bucket: ""
+  # wal_s3_bucket: ""
+  wal_gs_bucket: "postgres-backups-bucket-28302F2" # name of bucket on where to save the WAL-E logs
+  gcp_credentials: "/var/secrets/google/key.json" # combination of the mount path & key in the K8 resource. (i.e. key.json)
+...
+```
+
 ## Sidecars for Postgres clusters
 
 A list of sidecars is added to each cluster created by the operator. The default

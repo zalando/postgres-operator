@@ -88,8 +88,10 @@ configuration:
     # additional_secret_mount: "some-secret-name"
     # additional_secret_mount_path: "/some/dir"
     aws_region: eu-central-1
+    # gcp_credentials: ""
     # kube_iam_role: ""
     # log_s3_bucket: ""
+    # wal_gs_bucket: ""
     # wal_s3_bucket: ""
   logical_backup:
     logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:master-58"
