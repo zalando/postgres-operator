@@ -126,6 +126,8 @@ type Config struct {
 	WALES3Bucket                           string            `name:"wal_s3_bucket"`
 	LogS3Bucket                            string            `name:"log_s3_bucket"`
 	KubeIAMRole                            string            `name:"kube_iam_role"`
+	WALGSBucket                            string            `name:"wal_gs_bucket"`
+	GCPCredentials                         string            `name:"gcp_credentials"`
 	AdditionalSecretMount                  string            `name:"additional_secret_mount"`
 	AdditionalSecretMountPath              string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
 	DebugLogging                           bool              `name:"debug_logging" default:"true"`
