@@ -727,7 +727,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1beta1.JSONSchemaProps{
 								Type:     "object",
-								Required: []string{"size"},
+								Required: []string{"size", "name", "mountPath"},
 								Properties: map[string]apiextv1beta1.JSONSchemaProps{
 									"name": {
 										Type: "string",
@@ -745,6 +745,14 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 									},
 									"subPath": {
 										Type: "string",
+									},
+									"targetContainers": {
+										Type: "array",
+										Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
 									},
 								},
 							},

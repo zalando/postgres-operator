@@ -447,6 +447,8 @@ spec:
                 type: object
                 required:
                   - size
+                  - name
+                  - mountPath
                 properties:
                   name:
                     type: string
@@ -460,6 +462,11 @@ spec:
                     type: string
                   subPath:
                     type: string
+                  targetContainers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
         status:
           type: object
           additionalProperties:
