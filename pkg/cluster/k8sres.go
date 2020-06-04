@@ -1523,7 +1523,7 @@ func generateAdditionalPersistentVolumeClaimTemplates(additionalTemplates []acid
 			additionalTemplate.StorageClass,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("persistent volume claim %+v could not be created", additionalTemplate, err)
+			return nil, fmt.Errorf("persistent volume claim %+v could not be created: %v", additionalTemplate, err)
 		}
 
 		templates = append(templates, *template)
