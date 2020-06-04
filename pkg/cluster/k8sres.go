@@ -1988,7 +1988,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 		// Bucket env vars
 		{
-
 			Name:  "LOGICAL_BACKUP_S3_BUCKET",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
 		},
