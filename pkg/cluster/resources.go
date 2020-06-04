@@ -544,7 +544,8 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 	oldServiceType := c.Services[role].Spec.Type
 	newServiceType := newService.Spec.Type
 	if (newServiceType == "ClusterIP" && newServiceType != oldServiceType) ||
-		newServiceType == "LoadBalancer" && len(newService.Annotations) != len(c.Services[role].Annotations) {
+		newServiceType == "LoadBalancer" && newServiceType == oldServiceType &&
+			len(newService.ObjectMeta.Annotations) != len(c.Services[role].ObjectMeta.Annotations) {
 		newService.ResourceVersion = c.Services[role].ResourceVersion
 		newService.Spec.ClusterIP = c.Services[role].Spec.ClusterIP
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
