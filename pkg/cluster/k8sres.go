@@ -569,7 +569,7 @@ func (c *Cluster) generatePodTemplate(
 	additionalSecretMount string,
 	additionalSecretMountPath string,
 	additionalVolumes []acidv1.AdditionalVolume,
-	addAdditionalVolumeClaimTemplates []acidv1.AdditionalVolumeClaimTempate,
+	additionalVolumeClaimTemplates []acidv1.AdditionalVolumeClaimTempate,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -612,8 +612,8 @@ func (c *Cluster) generatePodTemplate(
 		c.addAdditionalVolumes(&podSpec, additionalVolumes)
 	}
 
-	if addAdditionalVolumeClaimTemplates != nil {
-		c.addAdditionalVolumeClaimTemplateMounts(&podSpec, addAdditionalVolumeClaimTemplates)
+	if additionalVolumeClaimTemplates != nil {
+		c.addAdditionalVolumeClaimTemplateMounts(&podSpec, additionalVolumeClaimTemplates)
 	}
 
 	template := v1.PodTemplateSpec{
