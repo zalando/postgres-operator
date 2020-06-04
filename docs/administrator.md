@@ -406,6 +406,10 @@ internal ELB:
 
 - `service.beta.kubernetes.io/aws-load-balancer-internal: "true"`
 
+Note, that changing between public and internal load balancers might require to
+toggle the `enable<Role>LoadBalancer` fields as some cloud infrastructures do
+not support switching the type on-the-fly.
+
 To limit the range of IP addresses that can reach a load balancer, specify the
 desired ranges in the `allowedSourceRanges` field (applies to both master and
 replica load balancers). To prevent exposing load balancers to the entire
@@ -540,9 +544,9 @@ The configuration paramaters that we will be using are:
 
 ### Generate a K8 secret resource
 
-Generate the K8 secret resource that will contain your service account's 
+Generate the K8 secret resource that will contain your service account's
 credentials. It's highly recommended to use a service account and limit its
-scope to just the WAL-E bucket. 
+scope to just the WAL-E bucket.
 
 ```yaml
 apiVersion: v1

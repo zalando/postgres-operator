@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
@@ -520,32 +521,14 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 
 	serviceName := util.NameFromMeta(c.Services[role].ObjectMeta)
 
-	// update the service annotation in order to propagate ELB notation.
-	if len(newService.ObjectMeta.Annotations) > 0 {
-		if annotationsPatchData, err := metaAnnotationsPatch(newService.ObjectMeta.Annotations); err == nil {
-			_, err = c.KubeClient.Services(serviceName.Namespace).Patch(
-				context.TODO(),
-				serviceName.Name,
-				types.MergePatchType,
-				[]byte(annotationsPatchData),
-				metav1.PatchOptions{},
-				"")
-
-			if err != nil {
-				return fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
-			}
-		} else {
-			return fmt.Errorf("could not form patch for the service metadata: %v", err)
-		}
-	}
-
-	// now, patch the service spec, but when disabling LoadBalancers do update instead
-	// patch does not work because of LoadBalancerSourceRanges field (even if set to nil)
+	// update service when disabling LoadBalancers or changing from internal LBs to public LBs
+	// because patch does not remove fields from the service resource
 	oldServiceType := c.Services[role].Spec.Type
 	newServiceType := newService.Spec.Type
+	_, oldInternal := c.Services[role].ObjectMeta.Annotations[constants.ElbInternal]
+	_, newInternal := newService.ObjectMeta.Annotations[constants.ElbInternal]
 	if (newServiceType == "ClusterIP" && newServiceType != oldServiceType) ||
-		newServiceType == "LoadBalancer" && newServiceType == oldServiceType &&
-			len(newService.ObjectMeta.Annotations) != len(c.Services[role].ObjectMeta.Annotations) {
+		(oldInternal && !newInternal) {
 		newService.ResourceVersion = c.Services[role].ResourceVersion
 		newService.Spec.ClusterIP = c.Services[role].Spec.ClusterIP
 		svc, err = c.KubeClient.Services(serviceName.Namespace).Update(context.TODO(), newService, metav1.UpdateOptions{})
@@ -553,6 +536,25 @@ func (c *Cluster) updateService(role PostgresRole, newService *v1.Service) error
 			return fmt.Errorf("could not update service %q: %v", serviceName, err)
 		}
 	} else {
+		// update the service annotation in order to propagate ELB notation.
+		if len(newService.ObjectMeta.Annotations) > 0 {
+			if annotationsPatchData, err := metaAnnotationsPatch(newService.ObjectMeta.Annotations); err == nil {
+				_, err = c.KubeClient.Services(serviceName.Namespace).Patch(
+					context.TODO(),
+					serviceName.Name,
+					types.MergePatchType,
+					[]byte(annotationsPatchData),
+					metav1.PatchOptions{},
+					"")
+
+				if err != nil {
+					return fmt.Errorf("could not replace annotations for the service %q: %v", serviceName, err)
+				}
+			} else {
+				return fmt.Errorf("could not form patch for the service metadata: %v", err)
+			}
+		}
+
 		patchData, err := specPatch(newService.Spec)
 		if err != nil {
 			return fmt.Errorf("could not form patch for the service %q: %v", serviceName, err)
