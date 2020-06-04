@@ -1211,7 +1211,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			Selector:             c.labelsSelector(),
 			ServiceName:          c.serviceName(Master),
 			Template:             *podTemplate,
-			VolumeClaimTemplates: []v1.PersistentVolumeClaim{*volumeClaimTemplate},
+			VolumeClaimTemplates: volumeClaimTemplates,
 			UpdateStrategy:       updateStrategy,
 			PodManagementPolicy:  podManagementPolicy,
 		},
