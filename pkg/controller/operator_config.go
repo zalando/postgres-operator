@@ -38,11 +38,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
 	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-12:1.6-p3")
-	result.Workers = fromCRD.Workers
+	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
-	result.ResyncPeriod = time.Duration(fromCRD.ResyncPeriod)
-	result.RepairPeriod = time.Duration(fromCRD.RepairPeriod)
+	result.ResyncPeriod = util.CoalesceDuration(time.Duration(fromCRD.ResyncPeriod), "30m")
+	result.RepairPeriod = util.CoalesceDuration(time.Duration(fromCRD.RepairPeriod), "5m")
 	result.SetMemoryRequestToLimit = fromCRD.SetMemoryRequestToLimit
 	result.ShmVolume = util.CoalesceBool(fromCRD.ShmVolume, util.True())
 	result.SidecarImages = fromCRD.SidecarImages
@@ -58,7 +58,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
 	result.PodEnvironmentConfigMap = fromCRD.Kubernetes.PodEnvironmentConfigMap
-	result.PodTerminateGracePeriod = time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod)
+	result.PodTerminateGracePeriod = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod), "5m")
 	result.SpiloPrivileged = fromCRD.Kubernetes.SpiloPrivileged
 	result.SpiloFSGroup = fromCRD.Kubernetes.SpiloFSGroup
 	result.ClusterDomain = util.Coalesce(fromCRD.Kubernetes.ClusterDomain, "cluster.local")
@@ -71,14 +71,14 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
 	result.PodRoleLabel = util.Coalesce(fromCRD.Kubernetes.PodRoleLabel, "spilo-role")
-	result.ClusterLabels = fromCRD.Kubernetes.ClusterLabels
+	result.ClusterLabels = util.CoalesceStrMap(fromCRD.Kubernetes.ClusterLabels, map[string]string{"application": "spilo"})
 	result.InheritedLabels = fromCRD.Kubernetes.InheritedLabels
 	result.DownscalerAnnotations = fromCRD.Kubernetes.DownscalerAnnotations
 	result.ClusterNameLabel = util.Coalesce(fromCRD.Kubernetes.ClusterNameLabel, "cluster-name")
 	result.NodeReadinessLabel = fromCRD.Kubernetes.NodeReadinessLabel
 	result.PodPriorityClassName = fromCRD.Kubernetes.PodPriorityClassName
 	result.PodManagementPolicy = util.Coalesce(fromCRD.Kubernetes.PodManagementPolicy, "ordered_ready")
-	result.MasterPodMoveTimeout = time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout)
+	result.MasterPodMoveTimeout = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout), "10m")
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
 	result.PodAntiAffinityTopologyKey = util.Coalesce(fromCRD.Kubernetes.PodAntiAffinityTopologyKey, "kubernetes.io/hostname")
 
@@ -91,15 +91,15 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.MinMemoryLimit = util.Coalesce(fromCRD.PostgresPodResources.MinMemoryLimit, "250Mi")
 
 	// timeout config
-	result.ResourceCheckInterval = time.Duration(fromCRD.Timeouts.ResourceCheckInterval)
-	result.ResourceCheckTimeout = time.Duration(fromCRD.Timeouts.ResourceCheckTimeout)
-	result.PodLabelWaitTimeout = time.Duration(fromCRD.Timeouts.PodLabelWaitTimeout)
-	result.PodDeletionWaitTimeout = time.Duration(fromCRD.Timeouts.PodDeletionWaitTimeout)
-	result.ReadyWaitInterval = time.Duration(fromCRD.Timeouts.ReadyWaitInterval)
-	result.ReadyWaitTimeout = time.Duration(fromCRD.Timeouts.ReadyWaitTimeout)
+	result.ResourceCheckInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ResourceCheckInterval), "3s")
+	result.ResourceCheckTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ResourceCheckTimeout), "10m")
+	result.PodLabelWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PodLabelWaitTimeout), "10m")
+	result.PodDeletionWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.PodDeletionWaitTimeout), "10m")
+	result.ReadyWaitInterval = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ReadyWaitInterval), "4s")
+	result.ReadyWaitTimeout = util.CoalesceDuration(time.Duration(fromCRD.Timeouts.ReadyWaitTimeout), "30s")
 
 	// load balancer config
-	result.DbHostedZone = fromCRD.LoadBalancer.DbHostedZone
+	result.DbHostedZone = util.Coalesce(fromCRD.LoadBalancer.DbHostedZone, "db.example.com")
 	result.EnableMasterLoadBalancer = fromCRD.LoadBalancer.EnableMasterLoadBalancer
 	result.EnableReplicaLoadBalancer = fromCRD.LoadBalancer.EnableReplicaLoadBalancer
 	result.CustomServiceAnnotations = fromCRD.LoadBalancer.CustomServiceAnnotations
@@ -114,7 +114,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.WALGSBucket = fromCRD.AWSGCP.WALGSBucket
 	result.GCPCredentials = fromCRD.AWSGCP.GCPCredentials
 	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
-	result.AdditionalSecretMountPath = fromCRD.AWSGCP.AdditionalSecretMountPath
+	result.AdditionalSecretMountPath = util.Coalesce(fromCRD.AWSGCP.AdditionalSecretMountPath, "/meta/credentials")
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
@@ -132,20 +132,20 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// Teams API config
 	result.EnableTeamsAPI = fromCRD.TeamsAPI.EnableTeamsAPI
-	result.TeamsAPIUrl = fromCRD.TeamsAPI.TeamsAPIUrl
-	result.TeamAPIRoleConfiguration = fromCRD.TeamsAPI.TeamAPIRoleConfiguration
+	result.TeamsAPIUrl = util.Coalesce(fromCRD.TeamsAPI.TeamsAPIUrl, "https://teams.example.com/api/")
+	result.TeamAPIRoleConfiguration = util.CoalesceStrMap(fromCRD.TeamsAPI.TeamAPIRoleConfiguration, map[string]string{"log_statement": "all"})
 	result.EnableTeamSuperuser = fromCRD.TeamsAPI.EnableTeamSuperuser
 	result.EnableAdminRoleForUsers = fromCRD.TeamsAPI.EnableAdminRoleForUsers
 	result.TeamAdminRole = fromCRD.TeamsAPI.TeamAdminRole
-	result.PamRoleName = fromCRD.TeamsAPI.PamRoleName
-	result.PamConfiguration = fromCRD.TeamsAPI.PamConfiguration
-	result.ProtectedRoles = fromCRD.TeamsAPI.ProtectedRoles
+	result.PamRoleName = util.Coalesce(fromCRD.TeamsAPI.PamRoleName, "zalandos")
+	result.PamConfiguration = util.Coalesce(fromCRD.TeamsAPI.PamConfiguration, "https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees")
+	result.ProtectedRoles = util.CoalesceStrArr(fromCRD.TeamsAPI.ProtectedRoles, []string{"admin"})
 	result.PostgresSuperuserTeams = fromCRD.TeamsAPI.PostgresSuperuserTeams
 
 	// logging REST API config
-	result.APIPort = fromCRD.LoggingRESTAPI.APIPort
-	result.RingLogLines = fromCRD.LoggingRESTAPI.RingLogLines
-	result.ClusterHistoryEntries = fromCRD.LoggingRESTAPI.ClusterHistoryEntries
+	result.APIPort = util.CoalesceInt(fromCRD.LoggingRESTAPI.APIPort, 8080)
+	result.RingLogLines = util.CoalesceInt(fromCRD.LoggingRESTAPI.RingLogLines, 100)
+	result.ClusterHistoryEntries = util.CoalesceInt(fromCRD.LoggingRESTAPI.ClusterHistoryEntries, 1000)
 
 	// Scalyr config
 	result.ScalyrAPIKey = fromCRD.Scalyr.ScalyrAPIKey
