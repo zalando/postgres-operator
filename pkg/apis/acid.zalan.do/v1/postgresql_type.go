@@ -116,11 +116,12 @@ type Volume struct {
 
 // AdditionalVolumeClaimTempate describes a additional volume claim template
 type AdditionalVolumeClaimTempate struct {
-	Name         string `json:"name"`
-	Size         string `json:"size"`
-	StorageClass string `json:"storageClass"`
-	MountPath    string `json:"mountPath"`
-	SubPath      string `json:"subPath,omitempty"`
+	Name             string   `json:"name"`
+	Size             string   `json:"size"`
+	StorageClass     string   `json:"storageClass"`
+	MountPath        string   `json:"mountPath"`
+	SubPath          string   `json:"subPath,omitempty"`
+	TargetContainers []string `json:"targetContainers"`
 }
 
 type AdditionalVolume struct {
