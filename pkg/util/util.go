@@ -147,9 +147,41 @@ func Coalesce(val, defaultVal string) string {
 	return val
 }
 
+// CoalesceStrArr returns the first argument if it is not null, otherwise the second one.
+func CoalesceStrArr(val, defaultVal []string) []string {
+	if len(val) == 0 {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceStrMap returns the first argument if it is not null, otherwise the second one.
+func CoalesceStrMap(val, defaultVal map[string]string) map[string]string {
+	if len(val) == 0 {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceInt works like coalesce but for int
+func CoalesceInt(val, defaultVal int) int {
+	if val == 0 {
+		return defaultVal
+	}
+	return val
+}
+
 // CoalesceInt32 works like coalesce but for *int32
 func CoalesceInt32(val, defaultVal *int32) *int32 {
 	if val == nil {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceUInt32 works like coalesce but for uint32
+func CoalesceUInt32(val, defaultVal uint32) uint32 {
+	if val == 0 {
 		return defaultVal
 	}
 	return val
@@ -159,6 +191,18 @@ func CoalesceInt32(val, defaultVal *int32) *int32 {
 func CoalesceBool(val, defaultVal *bool) *bool {
 	if val == nil {
 		return defaultVal
+	}
+	return val
+}
+
+// CoalesceDuration works like coalesce but for time.Duration
+func CoalesceDuration(val time.Duration, defaultVal string) time.Duration {
+	if val == 0 {
+		duration, err := time.ParseDuration(defaultVal)
+		if err != nil {
+			panic(err)
+		}
+		return duration
 	}
 	return val
 }

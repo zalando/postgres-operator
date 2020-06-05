@@ -150,7 +150,7 @@ type Config struct {
 	EnablePodDisruptionBudget *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers      *bool             `name:"enable_init_containers" default:"true"`
 	EnableSidecars            *bool             `name:"enable_sidecars" default:"true"`
-	Workers                   uint32            `name:"workers" default:"4"`
+	Workers                   uint32            `name:"workers" default:"8"`
 	APIPort                   int               `name:"api_port" default:"8080"`
 	RingLogLines              int               `name:"ring_log_lines" default:"100"`
 	ClusterHistoryEntries     int               `name:"cluster_history_entries" default:"1000"`
