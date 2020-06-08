@@ -1282,6 +1282,7 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	max := c.OpConfig.MaxInstances
 	cur := spec.NumberOfInstances
 	newcur := cur
+	var extra_pods int32 = 0
 
 	if spec.StandbyCluster != nil {
 		if newcur == 1 {
@@ -1300,8 +1301,11 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 	if newcur != cur {
 		c.logger.Infof("adjusted number of instances from %d to %d (min: %d, max: %d)", cur, newcur, min, max)
 	}
+	if c.OpConfig.PodManagementPolicy == "parallel" {
+		extra_pods = c.getTerminatingPodsCount()
+	}
 
-	return newcur
+	return newcur + extra_pods
 }
 
 // To avoid issues with limited /dev/shm inside docker environment, when
