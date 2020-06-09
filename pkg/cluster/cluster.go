@@ -455,6 +455,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		needsRollUpdate = true
 		reasons = append(reasons, "new statefulset's pod template metadata annotations doesn't match the current one")
 	}
+	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.SecurityContext, statefulSet.Spec.Template.Spec.SecurityContext) {
+		match = false
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod template security context in spec doesn't match the current one")
+	}
 	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
 		needsReplace = true
 		reasons = append(reasons, "new statefulset's volumeClaimTemplates contains different number of volumes to the old one")
