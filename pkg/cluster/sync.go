@@ -57,16 +57,26 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	// potentially enlarge volumes before changing the statefulset. By doing that
-	// in this order we make sure the operator is not stuck waiting for a pod that
-	// cannot start because it ran out of disk space.
-	// TODO: handle the case of the cluster that is downsized and enlarged again
-	// (there will be a volume from the old pod for which we can't act before the
-	//  the statefulset modification is concluded)
-	c.logger.Debugf("syncing persistent volumes")
-	if err = c.syncVolumes(); err != nil {
-		err = fmt.Errorf("could not sync persistent volumes: %v", err)
-		return err
+	if c.OpConfig.EnableStorageResize == "pvc" {
+		c.logger.Debugf("syncing persistent volume claims")
+		if err = c.syncVolumeClaims(); err != nil {
+			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
+			return err
+		}
+	} else if c.OpConfig.EnableStorageResize == "ebs" {
+		// potentially enlarge volumes before changing the statefulset. By doing that
+		// in this order we make sure the operator is not stuck waiting for a pod that
+		// cannot start because it ran out of disk space.
+		// TODO: handle the case of the cluster that is downsized and enlarged again
+		// (there will be a volume from the old pod for which we can't act before the
+		//  the statefulset modification is concluded)
+		c.logger.Debugf("syncing persistent volumes")
+		if err = c.syncVolumes(); err != nil {
+			err = fmt.Errorf("could not sync persistent volumes: %v", err)
+			return err
+		}
+	} else {
+		c.logger.Infof("Storage resize is disabled (enable_storage_resize is off). Skipping volume sync.")
 	}
 
 	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
@@ -571,6 +581,26 @@ func (c *Cluster) syncRoles() (err error) {
 	return nil
 }
 
+// syncVolumeClaims reads all persistent volume claims and checks that their size matches the one declared in the statefulset.
+func (c *Cluster) syncVolumeClaims() error {
+	c.setProcessName("syncing volume claims")
+
+	act, err := c.volumeClaimsNeedResizing(c.Spec.Volume)
+	if err != nil {
+		return fmt.Errorf("could not compare size of the volume claims: %v", err)
+	}
+	if !act {
+		return nil
+	}
+	if err := c.resizeVolumeClaims(c.Spec.Volume); err != nil {
+		return fmt.Errorf("could not sync volume claims: %v", err)
+	}
+
+	c.logger.Infof("volume claims have been synced successfully")
+
+	return nil
+}
+
 // syncVolumes reads all persistent volumes and checks that their size matches the one declared in the statefulset.
 func (c *Cluster) syncVolumes() error {
 	c.setProcessName("syncing volumes")
@@ -582,14 +612,8 @@ func (c *Cluster) syncVolumes() error {
 	if !act {
 		return nil
 	}
-	if c.OpConfig.EnablePvcResize {
-		if err := c.resizeVolumeClaims(c.Spec.Volume); err != nil {
-			return fmt.Errorf("could not sync volume claims: %v", err)
-		}
-	} else {
-		if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{AWSRegion: c.OpConfig.AWSRegion}}); err != nil {
-			return fmt.Errorf("could not sync volumes: %v", err)
-		}
+	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{AWSRegion: c.OpConfig.AWSRegion}}); err != nil {
+		return fmt.Errorf("could not sync volumes: %v", err)
 	}
 
 	c.logger.Infof("volumes have been synced successfully")

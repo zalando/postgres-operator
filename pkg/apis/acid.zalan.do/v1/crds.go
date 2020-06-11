@@ -905,8 +905,19 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"enable_pod_disruption_budget": {
 								Type: "boolean",
 							},
-							"enable_pvc_resize": {
-								Type: "boolean",
+							"enable_storage_resize": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"ebs"`),
+									},
+									{
+										Raw: []byte(`"pvc"`),
+									},
+									{
+										Raw: []byte(`"off"`),
+									},
+								},
 							},
 							"enable_sidecars": {
 								Type: "boolean",

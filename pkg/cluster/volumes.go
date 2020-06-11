@@ -189,6 +189,25 @@ func (c *Cluster) resizeVolumes(newVolume acidv1.Volume, resizers []volumes.Volu
 	return nil
 }
 
+func (c *Cluster) volumeClaimsNeedResizing(newVolume acidv1.Volume) (bool, error) {
+	newSize, err := resource.ParseQuantity(newVolume.Size)
+	manifestSize := quantityToGigabyte(newSize)
+	if err != nil {
+		return false, fmt.Errorf("could not parse volume size from the manifest: %v", err)
+	}
+	pvcs, err := c.listPersistentVolumeClaims()
+	if err != nil {
+		return false, fmt.Errorf("could not receive persistent volume claims: %v", err)
+	}
+	for _, pvc := range pvcs {
+		currentSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
+		if currentSize != manifestSize {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (c *Cluster) volumesNeedResizing(newVolume acidv1.Volume) (bool, error) {
 	vols, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
 	if err != nil {
