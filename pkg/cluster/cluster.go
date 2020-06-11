@@ -532,7 +532,7 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 	}
 
-	if !c.OpConfig.EnableLazySpiloUpgrade || description == "initContainers" {
+	if !c.OpConfig.EnableLazySpiloUpgrade {
 		checks = append(checks, newCheck("new statefulset %s's %s (index %d) image doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Image != b.Image }))
 	}
