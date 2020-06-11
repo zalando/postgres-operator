@@ -488,7 +488,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	// until they are re-created for other reasons, for example node rotation
 	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Containers[0].Image, statefulSet.Spec.Template.Spec.Containers[0].Image) {
 		needsReplace = true
-		needsRollUpdate = false
 		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image doesn't match the current one")
 	}
 
@@ -533,7 +532,7 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 	}
 
-	if !c.OpConfig.EnableLazySpiloUpgrade {
+	if !c.OpConfig.EnableLazySpiloUpgrade || description == "initContainers" {
 		checks = append(checks, newCheck("new statefulset %s's %s (index %d) image doesn't match the current one",
 			func(a, b v1.Container) bool { return a.Image != b.Image }))
 	}
