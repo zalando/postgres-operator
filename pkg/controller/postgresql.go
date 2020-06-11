@@ -14,7 +14,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/reference"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/cluster"
@@ -420,18 +422,23 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		clusterError = informerNewSpec.Error
 	}
 
+	workerID := c.clusterWorkerID(clusterName)
+	lg := c.logger.WithField("worker", workerID).WithField("cluster-name", clusterName)
+
 	if clusterError != "" && eventType != EventDelete {
-		c.logger.
-			WithField("cluster-name", clusterName).
-			Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
+		lg.Errorf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
+		ref, err := reference.GetReference(scheme.Scheme, informerNewSpec)
+		if err != nil {
+			lg.Errorf("could not get reference for Postgresql CR %v/%v: %v", informerNewSpec.Namespace, informerNewSpec.Name, err)
+		}
+		c.eventRecorder.Eventf(ref, v1.EventTypeWarning, strings.Title(strings.ToLower(string(eventType))), "%v", clusterError)
 		return
 	}
 
 	// Don't pass the spec directly from the informer, since subsequent modifications of it would be reflected
-	// in the informer internal state, making it incohherent with the actual Kubernetes object (and, as a side
+	// in the informer internal state, making it incoherent with the actual Kubernetes object (and, as a side
 	// effect, the modified state will be returned together with subsequent events).
 
-	workerID := c.clusterWorkerID(clusterName)
 	clusterEvent := ClusterEvent{
 		EventTime: time.Now(),
 		EventType: eventType,
@@ -441,7 +448,6 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		WorkerID:  workerID,
 	}
 
-	lg := c.logger.WithField("worker", workerID).WithField("cluster-name", clusterName)
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		lg.Errorf("error while queueing cluster event: %v", clusterEvent)
 	}
