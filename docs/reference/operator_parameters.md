@@ -76,7 +76,7 @@ Those are top-level keys, containing both leaf keys and groups.
   The default is `true`.
 
 * **enable_lazy_spilo_upgrade**
-  Instruct operator to update only the statefulsets with the new image without immediately doing the rolling update. The assumption is pods will be re-started later with the new image, for example due to the node rotation.
+  Instruct operator to update only the statefulsets with new images (Spilo and InitContainers) without immediately doing the rolling update. The assumption is pods will be re-started later with new images, for example due to the node rotation.
   The default is `false`.
 
 * **etcd_host**

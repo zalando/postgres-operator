@@ -488,7 +488,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	// until they are re-created for other reasons, for example node rotation
 	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Containers[0].Image, statefulSet.Spec.Template.Spec.Containers[0].Image) {
 		needsReplace = true
-		needsRollUpdate = false
 		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image doesn't match the current one")
 	}
 
