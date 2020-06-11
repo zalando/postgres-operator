@@ -14,9 +14,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/reference"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/cluster"
@@ -236,6 +234,15 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
+		// if there are already issues skip creation
+		if cl.Error != "" {
+			cl.SetStatus(acidv1.ClusterStatusInvalid)
+			lg.Errorf("could not create cluster: %v", cl.Error)
+			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Create", "%v", cl.Error)
+
+			return
+		}
+
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
 			lg.Error(cl.Error)
@@ -422,16 +429,10 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		clusterError = informerNewSpec.Error
 	}
 
-	workerID := c.clusterWorkerID(clusterName)
-	lg := c.logger.WithField("worker", workerID).WithField("cluster-name", clusterName)
-
-	if clusterError != "" && eventType != EventDelete {
-		lg.Errorf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
-		ref, err := reference.GetReference(scheme.Scheme, informerNewSpec)
-		if err != nil {
-			lg.Errorf("could not get reference for Postgresql CR %v/%v: %v", informerNewSpec.Namespace, informerNewSpec.Name, err)
-		}
-		c.eventRecorder.Eventf(ref, v1.EventTypeWarning, strings.Title(strings.ToLower(string(eventType))), "%v", clusterError)
+	if clusterError != "" && eventType != EventDelete && eventType != EventAdd {
+		c.logger.
+			WithField("cluster-name", clusterName).
+			Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
 		return
 	}
 
@@ -439,6 +440,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	// in the informer internal state, making it incoherent with the actual Kubernetes object (and, as a side
 	// effect, the modified state will be returned together with subsequent events).
 
+	workerID := c.clusterWorkerID(clusterName)
 	clusterEvent := ClusterEvent{
 		EventTime: time.Now(),
 		EventType: eventType,
@@ -448,6 +450,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		WorkerID:  workerID,
 	}
 
+	lg := c.logger.WithField("worker", workerID).WithField("cluster-name", clusterName)
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		lg.Errorf("error while queueing cluster event: %v", clusterEvent)
 	}

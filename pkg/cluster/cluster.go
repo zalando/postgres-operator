@@ -183,7 +183,7 @@ func (c *Cluster) GetReference() *v1.ObjectReference {
 
 // SetStatus of Postgres cluster
 // TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
-func (c *Cluster) setStatus(status string) {
+func (c *Cluster) SetStatus(status string) {
 	var pgStatus acidv1.PostgresStatus
 	pgStatus.PostgresClusterStatus = status
 
@@ -257,13 +257,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.setStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			c.SetStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.setStatus(acidv1.ClusterStatusAddFailed)
+			c.SetStatus(acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.setStatus(acidv1.ClusterStatusCreating)
+	c.SetStatus(acidv1.ClusterStatusCreating)
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
 	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
@@ -630,14 +630,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setStatus(acidv1.ClusterStatusUpdating)
+	c.SetStatus(acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.setStatus(acidv1.ClusterStatusUpdateFailed)
+			c.SetStatus(acidv1.ClusterStatusUpdateFailed)
 		} else {
-			c.setStatus(acidv1.ClusterStatusRunning)
+			c.SetStatus(acidv1.ClusterStatusRunning)
 		}
 	}()
 
