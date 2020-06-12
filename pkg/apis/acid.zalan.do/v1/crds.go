@@ -132,7 +132,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 			},
 			"spec": {
 				Type:     "object",
-				Required: []string{"numberOfInstances", "teamId", "postgresql"},
+				Required: []string{"numberOfInstances", "teamId", "postgresql", "volume"},
 				Properties: map[string]apiextv1beta1.JSONSchemaProps{
 					"allowedSourceRanges": {
 						Type:     "array",

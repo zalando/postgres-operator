@@ -69,6 +69,7 @@ spec:
             - numberOfInstances
             - teamId
             - postgresql
+            - volume
           properties:
             additionalVolumes:
               type: array
