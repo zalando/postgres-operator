@@ -42,6 +42,7 @@ data:
   enable_replica_load_balancer: "false"
   # enable_shm_volume: "true"
   # enable_sidecars: "true"
+  # enable_storage_resize: "ebs"
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""

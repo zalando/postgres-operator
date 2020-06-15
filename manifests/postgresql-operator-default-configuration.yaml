@@ -38,6 +38,7 @@ configuration:
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
     enable_sidecars: true
+    enable_storage_resize: ebs
     # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
     # inherited_labels:
     # - application

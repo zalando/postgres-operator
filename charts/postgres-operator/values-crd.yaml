@@ -80,6 +80,8 @@ configKubernetes:
   enable_pod_disruption_budget: true
   # enables sidecar containers to run alongside Spilo in the same pod
   enable_sidecars: true
+  # storage resize strategy, available options are: ebs, pvc, off
+  enable_storage_resize: ebs
   # namespaced name of the secret containing infrastructure roles names and passwords
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
