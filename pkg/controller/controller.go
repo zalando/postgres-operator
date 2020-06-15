@@ -25,6 +25,7 @@ import (
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/reference"
 )
 
 // Controller represents operator controller
@@ -440,6 +441,16 @@ func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFr
 	}
 
 	return namespace
+}
+
+// GetReference of Postgres CR object
+// i.e. required to emit events to this resource
+func (c *Controller) GetReference(postgresql *acidv1.Postgresql) *v1.ObjectReference {
+	ref, err := reference.GetReference(scheme.Scheme, postgresql)
+	if err != nil {
+		c.logger.Errorf("could not get reference for Postgresql CR %v/%v: %v", postgresql.Namespace, postgresql.Name, err)
+	}
+	return ref
 }
 
 // hasOwnership returns true if the controller is the "owner" of the postgresql.

@@ -234,15 +234,6 @@ func (c *Controller) processEvent(event ClusterEvent) {
 
 		c.curWorkerCluster.Store(event.WorkerID, cl)
 
-		// if there are already issues skip creation
-		if cl.Error != "" {
-			cl.SetStatus(acidv1.ClusterStatusInvalid)
-			lg.Errorf("could not create cluster: %v", cl.Error)
-			c.eventRecorder.Eventf(cl.GetReference(), v1.EventTypeWarning, "Create", "%v", cl.Error)
-
-			return
-		}
-
 		if err := cl.Create(); err != nil {
 			cl.Error = fmt.Sprintf("could not create cluster: %v", err)
 			lg.Error(cl.Error)
@@ -429,10 +420,21 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		clusterError = informerNewSpec.Error
 	}
 
-	if clusterError != "" && eventType != EventDelete && eventType != EventAdd {
-		c.logger.
-			WithField("cluster-name", clusterName).
-			Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
+	if clusterError != "" && eventType != EventDelete {
+		c.logger.WithField("cluster-name", clusterName).Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
+
+		switch eventType {
+		case EventAdd:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusAddFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Create", "%v", clusterError)
+		case EventUpdate:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusUpdateFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Update", "%v", clusterError)
+		default:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusSyncFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Sync", "%v", clusterError)
+		}
+
 		return
 	}
 
