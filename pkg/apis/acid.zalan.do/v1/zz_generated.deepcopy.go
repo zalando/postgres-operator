@@ -567,7 +567,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	in.Clone.DeepCopyInto(&out.Clone)
+	if in.Clone != nil {
+		in, out := &in.Clone, &out.Clone
+		*out = new(CloneDescription)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Databases != nil {
 		in, out := &in.Databases, &out.Databases
 		*out = make(map[string]string, len(*in))

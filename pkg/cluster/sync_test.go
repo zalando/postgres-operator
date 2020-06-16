@@ -87,20 +87,20 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 		},
 	}
 
-	clusterMissingObjects := *cluster
+	clusterMissingObjects := cluster
 	clusterMissingObjects.KubeClient = k8sutil.ClientMissingObjects()
 
-	clusterMock := *cluster
+	clusterMock := cluster
 	clusterMock.KubeClient = k8sutil.NewMockKubernetesClient()
 
-	clusterDirtyMock := *cluster
+	clusterDirtyMock := cluster
 	clusterDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
 	clusterDirtyMock.ConnectionPooler = &ConnectionPoolerObjects{
 		Deployment: &appsv1.Deployment{},
 		Service:    &v1.Service{},
 	}
 
-	clusterNewDefaultsMock := *cluster
+	clusterNewDefaultsMock := cluster
 	clusterNewDefaultsMock.KubeClient = k8sutil.NewMockKubernetesClient()
 
 	tests := []struct {
@@ -124,7 +124,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          &clusterMissingObjects,
+			cluster:          clusterMissingObjects,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreSaved,
@@ -139,7 +139,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					EnableConnectionPooler: boolToPointer(true),
 				},
 			},
-			cluster:          &clusterMissingObjects,
+			cluster:          clusterMissingObjects,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreSaved,
@@ -154,7 +154,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          &clusterMissingObjects,
+			cluster:          clusterMissingObjects,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreSaved,
@@ -169,7 +169,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
-			cluster:          &clusterMock,
+			cluster:          clusterMock,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreDeleted,
@@ -182,7 +182,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
-			cluster:          &clusterDirtyMock,
+			cluster:          clusterDirtyMock,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreDeleted,
@@ -203,7 +203,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					},
 				},
 			},
-			cluster:          &clusterMock,
+			cluster:          clusterMock,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            deploymentUpdated,
@@ -220,7 +220,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          &clusterNewDefaultsMock,
+			cluster:          clusterNewDefaultsMock,
 			defaultImage:     "pooler:2.0",
 			defaultInstances: 2,
 			check:            deploymentUpdated,
@@ -239,7 +239,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler:       &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          &clusterMock,
+			cluster:          clusterMock,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            noEmptySync,
