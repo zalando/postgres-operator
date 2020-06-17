@@ -6,10 +6,13 @@ import (
 	"reflect"
 
 	b64 "encoding/base64"
+	"encoding/json"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -154,6 +157,33 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.AcidV1ClientSet = acidv1client.NewForConfigOrDie(cfg)
 
 	return kubeClient, nil
+}
+
+// SetPostgresCRDStatus of Postgres cluster
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string) (*acidv1.Postgresql, error) {
+	var pg *acidv1.Postgresql
+	var pgStatus acidv1.PostgresStatus
+	pgStatus.PostgresClusterStatus = status
+
+	patch, err := json.Marshal(struct {
+		PgStatus interface{} `json:"status"`
+	}{&pgStatus})
+
+	if err != nil {
+		return pg, fmt.Errorf("could not marshal status: %v", err)
+	}
+
+	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
+	// we should take advantage of it.
+	pg, err = client.AcidV1ClientSet.AcidV1().Postgresqls(clusterName.Namespace).Patch(
+		context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+	if err != nil {
+		return pg, fmt.Errorf("could not update status: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	return pg, nil
 }
 
 // SameService compares the Services
