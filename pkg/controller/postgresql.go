@@ -421,14 +421,25 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	}
 
 	if clusterError != "" && eventType != EventDelete {
-		c.logger.
-			WithField("cluster-name", clusterName).
-			Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
+		c.logger.WithField("cluster-name", clusterName).Debugf("skipping %q event for the invalid cluster: %s", eventType, clusterError)
+
+		switch eventType {
+		case EventAdd:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusAddFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Create", "%v", clusterError)
+		case EventUpdate:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusUpdateFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Update", "%v", clusterError)
+		default:
+			c.KubeClient.SetPostgresCRDStatus(clusterName, acidv1.ClusterStatusSyncFailed)
+			c.eventRecorder.Eventf(c.GetReference(informerNewSpec), v1.EventTypeWarning, "Sync", "%v", clusterError)
+		}
+
 		return
 	}
 
 	// Don't pass the spec directly from the informer, since subsequent modifications of it would be reflected
-	// in the informer internal state, making it incohherent with the actual Kubernetes object (and, as a side
+	// in the informer internal state, making it incoherent with the actual Kubernetes object (and, as a side
 	// effect, the modified state will be returned together with subsequent events).
 
 	workerID := c.clusterWorkerID(clusterName)
