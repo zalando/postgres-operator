@@ -16,10 +16,10 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 ### Operator features
 
 * Rolling updates on Postgres cluster changes, incl. quick minor version updates
-* Volume resize without Pod restarts
+* Live volume resize without pod restarts (AWS EBS, others pending)
 * Database connection pooler with PGBouncer
-* Restore and Cloning Postgres clusters (incl. major version upgrade)
-* Additionally logical backups to S3 Bucket can be configured
+* Restore and cloning Postgres clusters (incl. major version upgrade)
+* Additionally logical backups to S3 bucket can be configured
 * Standby cluster from S3 WAL archive
 * Configurable for non-cloud environments
 * Basic credential and user management on K8s, eases application deployments
@@ -57,7 +57,7 @@ production for over two years.
 For a quick first impression follow the instructions of this
 [tutorial](docs/quickstart.md).
 
-## Supported setups of Postgres and Apps
+## Supported setups of Postgres and Applications
 
 ![Features](neutral_operator.png)
 
