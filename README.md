@@ -57,7 +57,7 @@ production for over two years.
 For a quick first impression follow the instructions of this
 [tutorial](docs/quickstart.md).
 
-## Illustrated Features
+## Supported setups of Postgres and Apps
 
 ![Features](neutral_operator.png)
 
