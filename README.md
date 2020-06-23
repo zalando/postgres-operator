@@ -59,7 +59,7 @@ For a quick first impression follow the instructions of this
 
 ## Supported setups of Postgres and Applications
 
-![Features](neutral_operator.png)
+![Features](docs/diagrams/neutral_operator.png)
 
 ## Documentation
 
