@@ -168,16 +168,16 @@ spec:
                   type: integer
                 spilo_privileged:
                   type: boolean
-                toleration:
-                  type: object
-                  additionalProperties:
-                    type: string
-                volume_resize_mode:
+                storage_resize_mode:
                   type: string
                   enum:
                     - "ebs"
                     - "pvc"
                     - "off"
+                toleration:
+                  type: object
+                  additionalProperties:
+                    type: string
                 watched_namespace:
                   type: string
             postgres_pod_resources:

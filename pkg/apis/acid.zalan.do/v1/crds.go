@@ -980,14 +980,6 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"spilo_privileged": {
 								Type: "boolean",
 							},
-							"toleration": {
-								Type: "object",
-								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
-									Schema: &apiextv1beta1.JSONSchemaProps{
-										Type: "string",
-									},
-								},
-							},
                                                         "volume_resize_mode": {
 								Type: "string",
 								Enum: []apiextv1beta1.JSON{
@@ -999,6 +991,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 									{
 										Raw: []byte(`"off"`),
+									},
+								},
+							},
+							"toleration": {
+								Type: "object",
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Schema: &apiextv1beta1.JSONSchemaProps{
+										Type: "string",
 									},
 								},
 							},
