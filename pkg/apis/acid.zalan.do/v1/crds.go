@@ -905,20 +905,6 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"enable_pod_disruption_budget": {
 								Type: "boolean",
 							},
-							"enable_storage_resize": {
-								Type: "string",
-								Enum: []apiextv1beta1.JSON{
-									{
-										Raw: []byte(`"ebs"`),
-									},
-									{
-										Raw: []byte(`"pvc"`),
-									},
-									{
-										Raw: []byte(`"off"`),
-									},
-								},
-							},
 							"enable_sidecars": {
 								Type: "boolean",
 							},
@@ -999,6 +985,20 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 									Schema: &apiextv1beta1.JSONSchemaProps{
 										Type: "string",
+									},
+								},
+							},
+                                                        "volume_resize_mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"ebs"`),
+									},
+									{
+										Raw: []byte(`"pvc"`),
+									},
+									{
+										Raw: []byte(`"off"`),
 									},
 								},
 							},

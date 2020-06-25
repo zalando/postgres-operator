@@ -57,13 +57,13 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	if c.OpConfig.EnableStorageResize == "pvc" {
+	if c.OpConfig.VolumeResizeMode == "pvc" {
 		c.logger.Debugf("syncing persistent volume claims")
 		if err = c.syncVolumeClaims(); err != nil {
 			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
 			return err
 		}
-	} else if c.OpConfig.EnableStorageResize == "ebs" {
+	} else if c.OpConfig.VolumeResizeMode == "ebs" {
 		// potentially enlarge volumes before changing the statefulset. By doing that
 		// in this order we make sure the operator is not stuck waiting for a pod that
 		// cannot start because it ran out of disk space.
@@ -76,7 +76,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 			return err
 		}
 	} else {
-		c.logger.Infof("Storage resize is disabled (enable_storage_resize is off). Skipping volume sync.")
+		c.logger.Infof("Storage resize is disabled (volume_resize_mode is off). Skipping volume sync.")
 	}
 
 	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {

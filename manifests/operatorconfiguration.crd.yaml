@@ -123,12 +123,6 @@ spec:
                   type: boolean
                 enable_pod_disruption_budget:
                   type: boolean
-                enable_storage_resize:
-                  type: string
-                  enum:
-                    - "ebs"
-                    - "pvc"
-                    - "off"
                 enable_sidecars:
                   type: boolean
                 infrastructure_roles_secret_name:
@@ -178,6 +172,12 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+                volume_resize_mode:
+                  type: string
+                  enum:
+                    - "ebs"
+                    - "pvc"
+                    - "off"
                 watched_namespace:
                   type: string
             postgres_pod_resources:

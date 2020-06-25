@@ -38,7 +38,6 @@ configuration:
     enable_pod_antiaffinity: false
     enable_pod_disruption_budget: true
     enable_sidecars: true
-    enable_storage_resize: ebs
     # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
     # inherited_labels:
     # - application
@@ -61,6 +60,7 @@ configuration:
     # spilo_fsgroup: 103
     spilo_privileged: false
     # toleration: {}
+    volume_resize_mode: off
     # watched_namespace: ""
   postgres_pod_resources:
     default_cpu_limit: "1"
