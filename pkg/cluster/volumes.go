@@ -179,7 +179,7 @@ func (c *Cluster) resizeVolumes(newVolume acidv1.Volume, resizers []volumes.Volu
 			c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
 		}
 		if !compatible {
-			c.logger.Warningf("volume %q is incompatible with all available resizing providers, consider switching enanble_storage_resize to pvc or off", pv.Name)
+			c.logger.Warningf("volume %q is incompatible with all available resizing providers, consider switching storage_resize_mode to pvc or off", pv.Name)
 			totalIncompatible++
 		}
 	}
