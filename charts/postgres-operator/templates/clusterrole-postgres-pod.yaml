@@ -13,7 +13,11 @@ rules:
 - apiGroups:
   - ""
   resources:
+{{- if toString .Values.configGeneral.kubernetes_use_configmaps | eq "true" }}
+  - configmaps
+{{- else }}
   - endpoints
+{{- end }}
   verbs:
   - create
   - delete
