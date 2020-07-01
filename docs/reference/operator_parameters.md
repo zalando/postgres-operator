@@ -337,7 +337,7 @@ configuration they are grouped under the `kubernetes` key.
   defines how operator handels the difference between requested volume size and
   actual size. Available options are: ebs - tries to resize EBS volume, pvc -
   changes PVC definition, off - disables resize of the volumes. Default is "ebs".
-  When using OpenShift please use on of the other options.
+  When using OpenShift please use one of the other available options.
 
 ## Kubernetes resource requests
 
