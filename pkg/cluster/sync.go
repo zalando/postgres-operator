@@ -590,6 +590,7 @@ func (c *Cluster) syncVolumeClaims() error {
 		return fmt.Errorf("could not compare size of the volume claims: %v", err)
 	}
 	if !act {
+		c.logger.Infof("volume claims don't require changes")
 		return nil
 	}
 	if err := c.resizeVolumeClaims(c.Spec.Volume); err != nil {
