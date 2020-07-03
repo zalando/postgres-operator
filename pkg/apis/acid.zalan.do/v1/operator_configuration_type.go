@@ -53,6 +53,7 @@ type KubernetesMetaConfiguration struct {
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
 	EnablePodDisruptionBudget              *bool                 `json:"enable_pod_disruption_budget,omitempty"`
+	StorageResizeMode                      string                `json:"storage_resize_mode,omitempty"`
 	EnableInitContainers                   *bool                 `json:"enable_init_containers,omitempty"`
 	EnableSidecars                         *bool                 `json:"enable_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`

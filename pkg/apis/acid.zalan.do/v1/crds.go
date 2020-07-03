@@ -980,6 +980,20 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"spilo_privileged": {
 								Type: "boolean",
 							},
+                                                      "storage_resize_mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"ebs"`),
+									},
+									{
+										Raw: []byte(`"pvc"`),
+									},
+									{
+										Raw: []byte(`"off"`),
+									},
+								},
+							},
 							"toleration": {
 								Type: "object",
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{

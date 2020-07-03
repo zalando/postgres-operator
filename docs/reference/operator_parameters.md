@@ -333,6 +333,12 @@ configuration they are grouped under the `kubernetes` key.
   of stateful sets of PG clusters. The default is `ordered_ready`, the second
   possible value is `parallel`.
 
+* **storage_resize_mode**
+  defines how operator handels the difference between requested volume size and
+  actual size. Available options are: ebs - tries to resize EBS volume, pvc -
+  changes PVC definition, off - disables resize of the volumes. Default is "ebs".
+  When using OpenShift please use one of the other available options.
+
 ## Kubernetes resource requests
 
 This group allows you to configure resource requests for the Postgres pods.

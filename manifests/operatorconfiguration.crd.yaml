@@ -168,6 +168,12 @@ spec:
                   type: integer
                 spilo_privileged:
                   type: boolean
+                storage_resize_mode:
+                  type: string
+                  enum:
+                    - "ebs"
+                    - "pvc"
+                    - "off"
                 toleration:
                   type: object
                   additionalProperties:

@@ -97,6 +97,7 @@ data:
   # set_memory_request_to_limit: "false"
   # spilo_fsgroup: 103
   spilo_privileged: "false"
+  # storage_resize_mode: "off"
   super_username: postgres
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
