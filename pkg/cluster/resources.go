@@ -725,7 +725,19 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	return nil
 }
 
-func (c *Cluster) deleteSecret(secret *v1.Secret) error {
+func (c *Cluster) deleteSecrets() error {
+	c.setProcessName("deleting secrets")
+	for uid := range c.Secrets {
+		if err := c.deleteSecret(uid); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) deleteSecret(uid types.UID) error {
+	secret := c.Secrets[uid]
 	c.setProcessName("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
 	c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
@@ -733,7 +745,7 @@ func (c *Cluster) deleteSecret(secret *v1.Secret) error {
 		return err
 	}
 	c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
-	delete(c.Secrets, secret.UID)
+	c.Secrets[uid] = nil
 
 	return err
 }
