@@ -797,10 +797,8 @@ func (c *Cluster) Delete() {
 		c.logger.Warningf("could not delete statefulset: %v", err)
 	}
 
-	for _, obj := range c.Secrets {
-		if err := c.deleteSecret(obj); err != nil {
-			c.logger.Warningf("could not delete secret: %v", err)
-		}
+	if err := c.deleteSecrets(); err != nil {
+		c.logger.Warningf("could not delete secrets: %v", err)
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
