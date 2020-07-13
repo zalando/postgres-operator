@@ -8,29 +8,45 @@ replicaCount: 1
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator-ui
-  tag: v1.2.0
+  tag: v1.5.0-dirty
   pullPolicy: "IfNotPresent"
+
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+
+serviceAccount:
+  # Specifies whether a ServiceAccount should be created
+  create: true
+  # The name of the ServiceAccount to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
 
 # configure UI pod resources
 resources:
   limits:
-    cpu: 300m
-    memory: 3000Mi
+    cpu: 200m
+    memory: 200Mi
   requests:
     cpu: 100m
     memory: 100Mi
 
 # configure UI ENVs
 envs:
-  # IMPORTANT: While operator chart and UI chart are idendependent, this is the interface between 
+  # IMPORTANT: While operator chart and UI chart are idendependent, this is the interface between
   # UI and operator API. Insert the service name of the operator API here!
   operatorApiUrl: "http://postgres-operator:8080"
+  operatorClusterNameLabel: "cluster-name"
+  resourcesVisible: "False"
   targetNamespace: "default"
 
 # configure UI service
 service:
   type: "ClusterIP"
-  port: "8080"
+  port: "8081"
+  # If the type of the service is NodePort a port can be specified using the nodePort field
+  # If the nodePort field is not specified, or if it has no value, then a random port is used
+  # notePort: 32521
 
 # configure UI ingress. If needed: "enabled: true"
 ingress:

@@ -12,7 +12,7 @@ pipeline:
         - desc: 'Install go'
           cmd: |
             cd /tmp
-            wget -q https://storage.googleapis.com/golang/go1.12.linux-amd64.tar.gz -O go.tar.gz
+            wget -q https://storage.googleapis.com/golang/go1.14.linux-amd64.tar.gz -O go.tar.gz
             tar -xf go.tar.gz
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
@@ -66,20 +66,13 @@ pipeline:
         - desc: 'Build and push Docker image'
           cmd: |
             cd ui
-            image_base='registry-write.opensource.zalan.do/acid/postgres-operator-ui'
-            if [[ "${CDP_TARGET_BRANCH}" == 'master' && -z "${CDP_PULL_REQUEST_NUMBER}" ]]
+            IS_PR_BUILD=${CDP_PULL_REQUEST_NUMBER+"true"}
+            if [[ ${CDP_TARGET_BRANCH} == "master" && ${IS_PR_BUILD} != "true" ]]
             then
-              image="${image_base}"
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui
             else
-              image="${image_base}-test"
+              IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-ui-test
             fi
-            image_with_tag="${image}:c${CDP_BUILD_VERSION}"
-
-            if docker pull "${image}"
-            then
-              docker build --cache-from="${image}" -t "${image_with_tag}" .
-            else
-              docker build -t "${image_with_tag}" .
-            fi
-
-            docker push "${image_with_tag}"
+            export IMAGE
+            make docker
+            make push

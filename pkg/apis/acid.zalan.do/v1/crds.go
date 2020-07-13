@@ -21,48 +21,48 @@ const (
 
 // PostgresCRDResourceColumns definition of AdditionalPrinterColumns for postgresql CRD
 var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Team",
 		Type:        "string",
 		Description: "Team responsible for Postgres cluster",
 		JSONPath:    ".spec.teamId",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Version",
 		Type:        "string",
 		Description: "PostgreSQL version",
 		JSONPath:    ".spec.postgresql.version",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Pods",
 		Type:        "integer",
 		Description: "Number of Pods per Postgres cluster",
 		JSONPath:    ".spec.numberOfInstances",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Volume",
 		Type:        "string",
 		Description: "Size of the bound volume",
 		JSONPath:    ".spec.volume.size",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "CPU-Request",
 		Type:        "string",
 		Description: "Requested CPU for Postgres containers",
 		JSONPath:    ".spec.resources.requests.cpu",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Memory-Request",
 		Type:        "string",
 		Description: "Requested memory for Postgres containers",
 		JSONPath:    ".spec.resources.requests.memory",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:     "Age",
 		Type:     "date",
 		JSONPath: ".metadata.creationTimestamp",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Status",
 		Type:        "string",
 		Description: "Current sync status of postgresql resource",
@@ -72,31 +72,31 @@ var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
 
 // OperatorConfigCRDResourceColumns definition of AdditionalPrinterColumns for OperatorConfiguration CRD
 var OperatorConfigCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Image",
 		Type:        "string",
 		Description: "Spilo image to be used for Pods",
 		JSONPath:    ".configuration.docker_image",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Cluster-Label",
 		Type:        "string",
 		Description: "Label for K8s resources created by operator",
 		JSONPath:    ".configuration.kubernetes.cluster_name_label",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Service-Account",
 		Type:        "string",
 		Description: "Name of service account to be used",
 		JSONPath:    ".configuration.kubernetes.pod_service_account_name",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Min-Instances",
 		Type:        "integer",
 		Description: "Minimum number of instances per Postgres cluster",
 		JSONPath:    ".configuration.min_instances",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:     "Age",
 		Type:     "date",
 		JSONPath: ".metadata.creationTimestamp",
@@ -105,6 +105,7 @@ var OperatorConfigCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefin
 
 var min0 = 0.0
 var min1 = 1.0
+var min2 = 2.0
 var minDisable = -1.0
 
 // PostgresCRDResourceValidation to check applied manifest parameters
@@ -131,7 +132,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 			},
 			"spec": {
 				Type:     "object",
-				Required: []string{"numberOfInstances", "teamId", "postgresql"},
+				Required: []string{"numberOfInstances", "teamId", "postgresql", "volume"},
 				Properties: map[string]apiextv1beta1.JSONSchemaProps{
 					"allowedSourceRanges": {
 						Type:     "array",
@@ -160,7 +161,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								Type: "string",
 							},
 							"s3_force_path_style": {
-								Type: "string",
+								Type: "boolean",
 							},
 							"s3_wal_path": {
 								Type: "string",
@@ -176,6 +177,76 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"connectionPooler": {
+						Type: "object",
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"dockerImage": {
+								Type: "string",
+							},
+							"maxDBConnections": {
+								Type: "integer",
+							},
+							"mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"session"`),
+									},
+									{
+										Raw: []byte(`"transaction"`),
+									},
+								},
+							},
+							"numberOfInstances": {
+								Type:    "integer",
+								Minimum: &min2,
+							},
+							"resources": {
+								Type:     "object",
+								Required: []string{"requests", "limits"},
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"limits": {
+										Type:     "object",
+										Required: []string{"cpu", "memory"},
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"cpu": {
+												Type:        "string",
+												Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
+												Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+											},
+											"memory": {
+												Type:        "string",
+												Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
+												Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+											},
+										},
+									},
+									"requests": {
+										Type:     "object",
+										Required: []string{"cpu", "memory"},
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"cpu": {
+												Type:        "string",
+												Description: "Decimal natural followed by m, or decimal natural followed by dot followed by up to three decimal digits (precision used by Kubernetes). Must be greater than 0",
+												Pattern:     "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+											},
+											"memory": {
+												Type:        "string",
+												Description: "Plain integer or fixed-point integer using one of these suffixes: E, P, T, G, M, k (with or without a tailing i). Must be greater than 0",
+												Pattern:     "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+											},
+										},
+									},
+								},
+							},
+							"schema": {
+								Type: "string",
+							},
+							"user": {
+								Type: "string",
+							},
+						},
+					},
 					"databases": {
 						Type: "object",
 						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
@@ -187,6 +258,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					},
 					"dockerImage": {
 						Type: "string",
+					},
+					"enableConnectionPooler": {
+						Type: "boolean",
 					},
 					"enableLogicalBackup": {
 						Type: "boolean",
@@ -284,6 +358,12 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"maximum_lag_on_failover": {
 								Type: "integer",
 							},
+							"synchronous_mode": {
+								Type: "boolean",
+							},
+							"synchronous_mode_strict": {
+								Type: "boolean",
+							},
 						},
 					},
 					"podAnnotations": {
@@ -336,6 +416,43 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 									Schema: &apiextv1beta1.JSONSchemaProps{
 										Type: "string",
+									},
+								},
+							},
+						},
+					},
+					"preparedDatabases": {
+						Type: "object",
+						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"defaultUsers": {
+										Type: "boolean",
+									},
+									"extensions": {
+										Type: "object",
+										AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"schemas": {
+										Type: "object",
+										AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"defaultUsers": {
+														Type: "boolean",
+													},
+													"defaultRoles": {
+														Type: "boolean",
+													},
+												},
+											},
+										},
 									},
 								},
 							},
@@ -418,6 +535,27 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					},
 					"teamId": {
 						Type: "string",
+					},
+					"tls": {
+						Type:     "object",
+						Required: []string{"secretName"},
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"secretName": {
+								Type: "string",
+							},
+							"certificateFile": {
+								Type: "string",
+							},
+							"privateKeyFile": {
+								Type: "string",
+							},
+							"caFile": {
+								Type: "string",
+							},
+							"caSecretName": {
+								Type: "string",
+							},
+						},
 					},
 					"tolerations": {
 						Type: "array",
@@ -586,6 +724,37 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"additionalVolumes": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"name", "mountPath", "volumeSource"},
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"mountPath": {
+										Type: "string",
+									},
+									"targetContainers": {
+										Type: "array",
+										Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"volumeSource": {
+										Type: "object",
+									},
+									"subPath": {
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			"status": {
@@ -631,11 +800,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"enable_crd_validation": {
 						Type: "boolean",
 					},
+					"enable_lazy_spilo_upgrade": {
+						Type: "boolean",
+					},
 					"enable_shm_volume": {
 						Type: "boolean",
 					},
 					"etcd_host": {
 						Type: "string",
+					},
+					"kubernetes_use_configmaps": {
+						Type: "boolean",
 					},
 					"max_instances": {
 						Type:        "integer",
@@ -661,6 +836,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 							Schema: &apiextv1beta1.JSONSchemaProps{
 								Type: "string",
+							},
+						},
+					},
+					"sidecars": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Allows: true,
+								},
 							},
 						},
 					},
@@ -699,6 +885,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"custom_pod_annotations": {
 								Type: "object",
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Schema: &apiextv1beta1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
+							"downscaler_annotations": {
+								Type: "array",
+								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1beta1.JSONSchemaProps{
 										Type: "string",
 									},
@@ -787,6 +981,20 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 							"spilo_privileged": {
 								Type: "boolean",
+							},
+                                                      "storage_resize_mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"ebs"`),
+									},
+									{
+										Raw: []byte(`"pvc"`),
+									},
+									{
+										Raw: []byte(`"off"`),
+									},
+								},
 							},
 							"toleration": {
 								Type: "object",
@@ -1035,6 +1243,54 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
 							},
 							"scalyr_server_url": {
+								Type: "string",
+							},
+						},
+					},
+					"connection_pooler": {
+						Type: "object",
+						Properties: map[string]apiextv1beta1.JSONSchemaProps{
+							"connection_pooler_default_cpu_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"connection_pooler_default_cpu_request": {
+								Type:    "string",
+								Pattern: "^(\\d+m|\\d+(\\.\\d{1,3})?)$",
+							},
+							"connection_pooler_default_memory_limit": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"connection_pooler_default_memory_request": {
+								Type:    "string",
+								Pattern: "^(\\d+(e\\d+)?|\\d+(\\.\\d+)?(e\\d+)?[EPTGMK]i?)$",
+							},
+							"connection_pooler_image": {
+								Type: "string",
+							},
+							"connection_pooler_max_db_connections": {
+								Type: "integer",
+							},
+							"connection_pooler_mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"session"`),
+									},
+									{
+										Raw: []byte(`"transaction"`),
+									},
+								},
+							},
+							"connection_pooler_number_of_instances": {
+								Type:    "integer",
+								Minimum: &min2,
+							},
+							"connection_pooler_schema": {
+								Type: "string",
+							},
+							"connection_pooler_user": {
 								Type: "string",
 							},
 						},

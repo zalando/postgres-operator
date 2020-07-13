@@ -11,7 +11,14 @@ rules:
   - postgresqls
   - postgresqls/status
   verbs:
-  - "*"
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -48,4 +55,3 @@ rules:
   - get
   - list
   - watch
-

@@ -69,3 +69,12 @@ type ClusterStatus struct {
 	Spec           acidv1.PostgresSpec
 	Error          error
 }
+
+type TemplateParams map[string]interface{}
+
+type InstallFunction func(schema string, user string) error
+
+type SyncReason []string
+
+// no sync happened, empty value
+var NoSync SyncReason = []string{}

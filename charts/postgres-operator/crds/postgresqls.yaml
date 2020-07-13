@@ -73,7 +73,30 @@ spec:
             - numberOfInstances
             - teamId
             - postgresql
+            - volume
           properties:
+            additionalVolumes:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                  - mountPath
+                  - volumeSource
+                properties:
+                  name:
+                    type: string
+                  mountPath:
+                    type: string
+                  targetContainers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
+                  volumeSource:
+                    type: object
+                  subPath:
+                    type: string
             allowedSourceRanges:
               type: array
               nullable: true
@@ -94,7 +117,7 @@ spec:
                 s3_secret_access_key:
                   type: string
                 s3_force_path_style:
-                  type: string
+                  type: boolean
                 s3_wal_path:
                   type: string
                 timestamp:
@@ -106,6 +129,55 @@ spec:
                 uid:
                   format: uuid
                   type: string
+            connectionPooler:
+              type: object
+              properties:
+                dockerImage:
+                  type: string
+                maxDBConnections:
+                  type: integer
+                mode:
+                  type: string
+                  enum:
+                    - "session"
+                    - "transaction"
+                numberOfInstances:
+                  type: integer
+                  minimum: 2
+                resources:
+                  type: object
+                  required:
+                    - requests
+                    - limits
+                  properties:
+                    limits:
+                      type: object
+                      required:
+                        - cpu
+                        - memory
+                      properties:
+                        cpu:
+                          type: string
+                          pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                        memory:
+                          type: string
+                          pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                    requests:
+                      type: object
+                      required:
+                        - cpu
+                        - memory
+                      properties:
+                        cpu:
+                          type: string
+                          pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
+                        memory:
+                          type: string
+                          pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                schema:
+                  type: string
+                user:
+                  type: string
             databases:
               type: object
               additionalProperties:
@@ -113,6 +185,8 @@ spec:
               # Note: usernames specified here as database owners must be declared in the users key of the spec key.
             dockerImage:
               type: string
+            enableConnectionPooler:
+              type: boolean
             enableLogicalBackup:
               type: boolean
             enableMasterLoadBalancer:
@@ -167,6 +241,10 @@ spec:
                   type: integer
                 retry_timeout:
                   type: integer
+                synchronous_mode:
+                  type: boolean
+                synchronous_mode_strict:
+                  type: boolean
                 maximum_lag_on_failover:
                   type: integer
             podAnnotations:
@@ -196,6 +274,26 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+            preparedDatabases:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  defaultUsers:
+                    type: boolean
+                  extensions:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  schemas:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        defaultUsers:
+                          type: boolean
+                        defaultRoles:
+                          type: boolean
             replicaLoadBalancer:  # deprecated
               type: boolean
             resources:
@@ -287,6 +385,21 @@ spec:
                   type: string
             teamId:
               type: string
+            tls:
+              type: object
+              required:
+                - secretName
+              properties:
+                secretName:
+                  type: string
+                certificateFile:
+                  type: string
+                privateKeyFile:
+                  type: string
+                caFile:
+                  type: string
+                caSecretName:
+                  type: string
             tolerations:
               type: array
               items:

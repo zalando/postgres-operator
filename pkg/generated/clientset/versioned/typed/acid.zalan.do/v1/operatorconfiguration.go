@@ -25,6 +25,8 @@ SOFTWARE.
 package v1
 
 import (
+	"context"
+
 	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	scheme "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +41,7 @@ type OperatorConfigurationsGetter interface {
 
 // OperatorConfigurationInterface has methods to work with OperatorConfiguration resources.
 type OperatorConfigurationInterface interface {
-	Get(name string, options v1.GetOptions) (*acidzalandov1.OperatorConfiguration, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*acidzalandov1.OperatorConfiguration, error)
 	OperatorConfigurationExpansion
 }
 
@@ -58,14 +60,14 @@ func newOperatorConfigurations(c *AcidV1Client, namespace string) *operatorConfi
 }
 
 // Get takes name of the operatorConfiguration, and returns the corresponding operatorConfiguration object, and an error if there is any.
-func (c *operatorConfigurations) Get(name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
+func (c *operatorConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
 	result = &acidzalandov1.OperatorConfiguration{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("operatorconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }

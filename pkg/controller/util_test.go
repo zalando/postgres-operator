@@ -17,8 +17,8 @@ const (
 	testInfrastructureRolesSecretName = "infrastructureroles-test"
 )
 
-func newMockController() *Controller {
-	controller := NewController(&spec.ControllerConfig{})
+func newUtilTestController() *Controller {
+	controller := NewController(&spec.ControllerConfig{}, "util-test")
 	controller.opConfig.ClusterNameLabel = "cluster-name"
 	controller.opConfig.InfrastructureRolesSecretName =
 		spec.NamespacedName{Namespace: v1.NamespaceDefault, Name: testInfrastructureRolesSecretName}
@@ -27,7 +27,7 @@ func newMockController() *Controller {
 	return controller
 }
 
-var mockController = newMockController()
+var utilTestController = newUtilTestController()
 
 func TestPodClusterName(t *testing.T) {
 	var testTable = []struct {
@@ -43,7 +43,7 @@ func TestPodClusterName(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: v1.NamespaceDefault,
 					Labels: map[string]string{
-						mockController.opConfig.ClusterNameLabel: "testcluster",
+						utilTestController.opConfig.ClusterNameLabel: "testcluster",
 					},
 				},
 			},
@@ -51,7 +51,7 @@ func TestPodClusterName(t *testing.T) {
 		},
 	}
 	for _, test := range testTable {
-		resp := mockController.podClusterName(test.in)
+		resp := utilTestController.podClusterName(test.in)
 		if resp != test.expected {
 			t.Errorf("expected response %v does not match the actual %v", test.expected, resp)
 		}
@@ -73,7 +73,7 @@ func TestClusterWorkerID(t *testing.T) {
 		},
 	}
 	for _, test := range testTable {
-		resp := mockController.clusterWorkerID(test.in)
+		resp := utilTestController.clusterWorkerID(test.in)
 		if resp != test.expected {
 			t.Errorf("expected response %v does not match the actual %v", test.expected, resp)
 		}
@@ -116,7 +116,7 @@ func TestGetInfrastructureRoles(t *testing.T) {
 		},
 	}
 	for _, test := range testTable {
-		roles, err := mockController.getInfrastructureRoles(&test.secretName)
+		roles, err := utilTestController.getInfrastructureRoles(&test.secretName)
 		if err != test.expectedError {
 			if err != nil && test.expectedError != nil && err.Error() == test.expectedError.Error() {
 				continue

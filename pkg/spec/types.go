@@ -23,13 +23,16 @@ const fileWithNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespa
 // RoleOrigin contains the code of the origin of a role
 type RoleOrigin int
 
-// The rolesOrigin constant values must be sorted by the role priority for resolveNameConflict(...) to work.
+// The rolesOrigin constant values must be sorted by the role priority for
+// resolveNameConflict(...) to work.
 const (
 	RoleOriginUnknown RoleOrigin = iota
 	RoleOriginManifest
 	RoleOriginInfrastructure
 	RoleOriginTeamsAPI
 	RoleOriginSystem
+	RoleOriginBootstrap
+	RoleConnectionPooler
 )
 
 type syncUserOperation int
@@ -178,6 +181,10 @@ func (r RoleOrigin) String() string {
 		return "teams API role"
 	case RoleOriginSystem:
 		return "system role"
+	case RoleOriginBootstrap:
+		return "bootstrapped role"
+	case RoleConnectionPooler:
+		return "connection pooler role"
 	default:
 		panic(fmt.Sprintf("bogus role origin value %d", r))
 	}

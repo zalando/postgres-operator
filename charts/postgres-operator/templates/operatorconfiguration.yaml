@@ -13,8 +13,8 @@ configuration:
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   kubernetes:
+    pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
     oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
-    pod_service_account_name: {{ include "postgres-operator.serviceAccountName" . }}
 {{ toYaml .Values.configKubernetes | indent 4 }}
   postgres_pod_resources:
 {{ toYaml .Values.configPostgresPodResources | indent 4 }}
@@ -32,6 +32,6 @@ configuration:
 {{ toYaml .Values.configTeamsApi | indent 4 }}
   logging_rest_api:
 {{ toYaml .Values.configLoggingRestApi | indent 4 }}
-  scalyr:
-{{ toYaml .Values.configScalyr | indent 4 }}
+  connection_pooler:
+{{ toYaml .Values.configConnectionPooler | indent 4 }}
 {{- end }}

@@ -15,5 +15,7 @@ spec:
     foo_user: []  # role for application foo
   databases:
     foo: zalando  # dbname: owner
+  preparedDatabases:
+    bar: {}
   postgresql:
-    version: "11"
+    version: "12"
