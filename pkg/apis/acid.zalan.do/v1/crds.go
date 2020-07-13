@@ -413,7 +413,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 							"gs_wal_path": {
 								Type: "string",
-							}
+							},
 						},
 					},
 					"teamId": {
