@@ -8,7 +8,7 @@ branches:
 language: go
 
 go:
-  - "1.12.x"
+  - "1.14.x"
 
 before_install:
   - go get github.com/mattn/goveralls
@@ -18,5 +18,6 @@ install:
 
 script:
   - hack/verify-codegen.sh
-  - travis_wait 20 goveralls -service=travis-ci -package ./pkg/... -v
+  - travis_wait 20 go test -race -covermode atomic -coverprofile=profile.cov ./pkg/... -v
+  - goveralls -coverprofile=profile.cov -service=travis-ci -v
   - make e2e

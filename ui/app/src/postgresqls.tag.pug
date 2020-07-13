@@ -45,12 +45,14 @@ postgresqls
         thead
           tr
             th(style='width: 120px') Team
+            th(style='width: 130px') Namespace
+            th Name
             th(style='width: 50px') Pods
             th(style='width: 140px') CPU
             th(style='width: 130px') Memory
             th(style='width: 100px') Size
-            th(style='width: 130px') Namespace
-            th Name
+            th(style='width: 120px') Cost/Month
+            th(stlye='width: 120px')
 
         tbody
           tr(
@@ -58,19 +60,21 @@ postgresqls
             hidden='{ !namespaced_name.toLowerCase().includes(filter.state.toLowerCase()) }'
           )
             td { team }
-            td { nodes }
-            td { cpu } / { cpu_limit }
-            td { memory } / { memory_limit }
-            td { volume_size }
-
             td(style='white-space: pre')
               | { namespace }
-
             td
               a(
                 href='/#/status/{ cluster_path(this) }'
               )
                 | { name }
+            td { nodes }
+            td { cpu } / { cpu_limit }
+            td { memory } / { memory_limit }
+            td { volume_size }
+            td { calcCosts(nodes, cpu, memory, volume_size) }$
+
+            td
+
 
               .btn-group.pull-right(
                 aria-label='Cluster { qname } actions'
@@ -124,12 +128,14 @@ postgresqls
         thead
           tr
             th(style='width: 120px') Team
+            th(style='width: 130px') Namespace
+            th Name
             th(style='width: 50px') Pods
             th(style='width: 140px') CPU
             th(style='width: 130px') Memory
             th(style='width: 100px') Size
-            th(style='width: 130px') Namespace
-            th Name
+            th(style='width: 120px') Cost/Month
+            th(stlye='width: 120px')
 
         tbody
           tr(
@@ -137,20 +143,20 @@ postgresqls
             hidden='{ !namespaced_name.toLowerCase().includes(filter.state.toLowerCase()) }'
           )
             td { team }
-            td { nodes }
-            td { cpu } / { cpu_limit }
-            td { memory } / { memory_limit }
-            td { volume_size }
-
             td(style='white-space: pre')
               | { namespace }
-
             td
-
               a(
                 href='/#/status/{ cluster_path(this) }'
               )
                 | { name }
+            td { nodes }
+            td { cpu } / { cpu_limit }
+            td { memory } / { memory_limit }
+            td { volume_size }
+            td { calcCosts(nodes, cpu, memory, volume_size) }$
+
+            td
 
               .btn-group.pull-right(
                 aria-label='Cluster { qname } actions'
@@ -222,6 +228,45 @@ postgresqls
       encodeURI(cluster.namespace)
       + '/' + encodeURI(cluster.name)
     )
+
+    const calcCosts = this.calcCosts = (nodes, cpu, memory, disk) => {
+        costs = nodes * (toCores(cpu) * opts.config.cost_core + toMemory(memory) * opts.config.cost_memory + toDisk(disk) * opts.config.cost_ebs)
+        return costs.toFixed(2)
+    }
+
+    const toDisk = this.toDisk = value => {
+      if(value.endsWith("Gi")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value)
+        return value
+      }
+      
+      return value
+    }    
+
+    const toMemory = this.toMemory = value => {
+      if (value.endsWith("Mi")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value) / 1000.
+        return value
+      }
+      else if(value.endsWith("Gi")) {
+        value = value.substring(0, value.length-2)
+        value = Number(value)
+        return value
+      }
+
+      return value
+    }
+
+    const toCores = this.toCores = value => {
+      if (value.endsWith("m")) {
+        value = value.substring(0, value.length-1)
+        value = Number(value) / 1000.
+        return value
+      }
+      return value
+    }
 
     this.on('mount', () =>
       jQuery

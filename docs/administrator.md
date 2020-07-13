@@ -11,11 +11,11 @@ switchover (planned failover) of the master to the Pod with new minor version.
 The switch should usually take less than 5 seconds, still clients have to
 reconnect.
 
-Major version upgrades are supported via [cloning](user.md#clone-directly). The
-new cluster manifest must have a higher `version` string than the source cluster
-and will be created from a basebackup. Depending of the cluster size, downtime
-in this case can be significant as writes to the database should be stopped and
-all WAL files should be archived first before cloning is started.
+Major version upgrades are supported via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster).
+The new cluster manifest must have a higher `version` string than the source
+cluster and will be created from a basebackup. Depending of the cluster size,
+downtime in this case can be significant as writes to the database should be
+stopped and all WAL files should be archived first before cloning is started.
 
 Note, that simply changing the version string in the `postgresql` manifest does
 not work at present and leads to errors. Neither Patroni nor Postgres Operator
@@ -46,6 +46,12 @@ patching the CRD manifest:
 ```bash
 zk8 patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
 ```
+
+## Non-default cluster domain
+
+If your cluster uses a DNS domain other than the default `cluster.local`, this
+needs to be set in the operator configuration (`cluster_domain` variable). This
+is used by the operator to connect to the clusters after creation.
 
 ## Namespaces
 
@@ -89,36 +95,41 @@ lacks access rights to any of them (except K8s system namespaces like
 'list pods' execute at the cluster scope and fail at the first violation of
 access rights.
 
-The watched namespace also needs to have a (possibly different) service account
-in the case database pods need to talk to the K8s API (e.g. when using
-K8s-native configuration of Patroni). The operator checks that the
-`pod_service_account_name` exists in the target namespace, and, if not, deploys
-there the `pod_service_account_definition` from the operator
-[`Config`](../pkg/util/config/config.go) with the default value of:
+## Operators with defined ownership of certain Postgres clusters
+
+By default, multiple operators can only run together in one K8s cluster when
+isolated into their [own namespaces](administrator.md#specify-the-namespace-to-watch).
+But, it is also possible to define ownership between operator instances and
+Postgres clusters running all in the same namespace or K8s cluster without
+interfering.
+
+First, define the [`CONTROLLER_ID`](../../manifests/postgres-operator.yaml#L38)
+environment variable in the operator deployment manifest. Then specify the ID
+in every Postgres cluster manifest you want this operator to watch using the
+`"acid.zalan.do/controller"` annotation:
 
 ```yaml
-apiVersion: v1
-kind: ServiceAccount
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
 metadata:
- name: operator
+  name: demo-cluster
+  annotations:
+    "acid.zalan.do/controller": "second-operator"
+spec:
+  ...
 ```
 
-In this definition, the operator overwrites the account's name to match
-`pod_service_account_name` and the `default` namespace to match the target
-namespace. The operator performs **no** further syncing of this account.
-
-## Non-default cluster domain
-
-If your cluster uses a DNS domain other than the default `cluster.local`, this
-needs to be set in the operator configuration (`cluster_domain` variable). This
-is used by the operator to connect to the clusters after creation.
+Every other Postgres cluster which lacks the annotation will be ignored by this
+operator. Conversely, operators without a defined `CONTROLLER_ID` will ignore
+clusters with defined ownership of another operator.
 
 ## Role-based access control for the operator
 
 The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
 defines the service account, cluster roles and bindings needed for the operator
-to function under access control restrictions. To deploy the operator with this
-RBAC policy use:
+to function under access control restrictions. The file also includes a cluster
+role `postgres-pod` with privileges for Patroni to watch and manage pods and
+endpoints. To deploy the operator with this RBAC policies use:
 
 ```bash
 kubectl create -f manifests/configmap.yaml
@@ -127,14 +138,14 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-### Service account and cluster roles
+### Namespaced service account and role binding
 
-Note that the service account is named `zalando-postgres-operator`. You may have
-to change the `service_account_name` in the operator ConfigMap and
-`serviceAccountName` in the `postgres-operator` deployment appropriately. This
-is done intentionally to avoid breaking those setups that already work with the
-default `operator` account. In the future the operator should ideally be run
-under the `zalando-postgres-operator` service account.
+For each namespace the operator watches it creates (or reads) a service account
+and role binding to be used by the Postgres Pods. The service account is bound
+to the `postgres-pod` cluster role. The name and definitions of these resources
+can be [configured](reference/operator_parameters.md#kubernetes-resources).
+Note, that the operator performs **no** further syncing of namespaced service
+accounts and role bindings.
 
 ### Give K8s users access to create/list `postgresqls`
 
@@ -310,11 +321,12 @@ spec:
 ## Custom Pod Environment Variables
 
 It is possible to configure a ConfigMap which is used by the Postgres pods as
-an additional provider for environment variables.
-
-One use case is to customize the Spilo image and configure it with environment
-variables. The ConfigMap with the additional settings is configured in the
-operator's main ConfigMap:
+an additional provider for environment variables. One use case is to customize
+the Spilo image and configure it with environment variables. The ConfigMap with
+the additional settings is referenced in the operator's main configuration.
+A namespace can be specified along with the name. If left out, the configured
+default namespace of your K8s client will be used and if the ConfigMap is not
+found there, the Postgres cluster's namespace is taken when different:
 
 **postgres-operator ConfigMap**
 
@@ -325,7 +337,7 @@ metadata:
   name: postgres-operator
 data:
   # referencing config map with custom settings
-  pod_environment_configmap: postgres-pod-config
+  pod_environment_configmap: default/postgres-pod-config
 ```
 
 **OperatorConfiguration**
@@ -338,7 +350,7 @@ metadata:
 configuration:
   kubernetes:
     # referencing config map with custom settings
-    pod_environment_configmap: postgres-pod-config
+    pod_environment_configmap: default/postgres-pod-config
 ```
 
 **referenced ConfigMap `postgres-pod-config`**
@@ -446,6 +458,17 @@ from numerous escape characters in the latter log entry, view it in CLI with
 `PodTemplate` used by the operator is yet to be updated with the default values
 used internally in K8s.
 
+The operator also support lazy updates of the Spilo image. That means the pod
+template of a PG cluster's stateful set is updated immediately with the new
+image, but no rolling update follows. This feature saves you a switchover - and
+hence downtime - when you know pods are re-started later anyway, for instance
+due to the node rotation. To force a rolling update, disable this mode by
+setting the `enable_lazy_spilo_upgrade` to `false` in the operator configuration
+and restart the operator pod. With the standard eager rolling updates the
+operator checks during Sync all pods run images specified in their respective
+statefulsets. The operator triggers a rolling upgrade for PG clusters that
+violate this condition.
+
 ## Logical backups
 
 The operator can manage K8s cron jobs to run logical backups of Postgres
@@ -495,39 +518,151 @@ A secret can be pre-provisioned in different ways:
 * Automatically provisioned via a custom K8s controller like
   [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)
 
+## Google Cloud Platform setup
+
+To configure the operator on GCP there are some prerequisites that are needed:
+
+* A service account with the proper IAM setup to access the GCS bucket for the WAL-E logs
+* The credentials file for the service account.
+
+The configuration paramaters that we will be using are:
+
+* `additional_secret_mount`
+* `additional_secret_mount_path`
+* `gcp_credentials`
+* `wal_gs_bucket`
+
+### Generate a K8 secret resource
+
+Generate the K8 secret resource that will contain your service account's 
+credentials. It's highly recommended to use a service account and limit its
+scope to just the WAL-E bucket. 
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: psql-wale-creds
+  namespace: default
+type: Opaque
+stringData:
+  key.json: |-
+    <GCP .json credentials>
+```
+
+### Setup your operator configuration values
+
+With the `psql-wale-creds` resource applied to your cluster, ensure that
+the operator's configuration is set up like the following:
+
+```yml
+...
+aws_or_gcp:
+  additional_secret_mount: "pgsql-wale-creds"
+  additional_secret_mount_path: "/var/secrets/google" # or where ever you want to mount the file
+  # aws_region: eu-central-1
+  # kube_iam_role: ""
+  # log_s3_bucket: ""
+  # wal_s3_bucket: ""
+  wal_gs_bucket: "postgres-backups-bucket-28302F2" # name of bucket on where to save the WAL-E logs
+  gcp_credentials: "/var/secrets/google/key.json" # combination of the mount path & key in the K8 resource. (i.e. key.json)
+...
+```
+
+## Sidecars for Postgres clusters
+
+A list of sidecars is added to each cluster created by the operator. The default
+is empty.
+
+```yaml
+kind: OperatorConfiguration
+configuration:
+  sidecars:
+  - image: image:123
+    name: global-sidecar
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - mountPath: /custom-pgdata-mountpoint
+      name: pgdata
+  - ...
+```
+
+In addition to any environment variables you specify, the following environment
+variables are always passed to sidecars:
+
+  - `POD_NAME` - field reference to `metadata.name`
+  - `POD_NAMESPACE` - field reference to `metadata.namespace`
+  - `POSTGRES_USER` - the superuser that can be used to connect to the database
+  - `POSTGRES_PASSWORD` - the password for the superuser
+
 ## Setting up the Postgres Operator UI
 
-With the v1.2 release the Postgres Operator is shipped with a browser-based
+Since the v1.2 release the Postgres Operator is shipped with a browser-based
 configuration user interface (UI) that simplifies managing Postgres clusters
-with the operator. The UI runs with Node.js and comes with it's own Docker
-image.
+with the operator.
 
-Run NPM to continuously compile `tags/js` code. Basically, it creates an
-`app.js` file in: `static/build/app.js`
+### Building the UI image
 
-```
-(cd ui/app && npm start)
-```
-
-To build the Docker image open a shell and change to the `ui` folder. Then run:
+The UI runs with Node.js and comes with it's own Docker
+image. However, installing Node.js to build the operator UI is not required. It
+is handled via Docker containers when running:
 
 ```bash
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.2.0 .
+make docker
 ```
 
-Apply all manifests for the `ui/manifests` folder to deploy the Postgres
-Operator UI on K8s. For local tests you don't need the Ingress resource.
+### Configure endpoints and options
+
+The UI talks to the K8s API server as well as the Postgres Operator [REST API](developer.md#debugging-the-operator).
+K8s API server URLs are loaded from the machine's kubeconfig environment by
+default. Alternatively, a list can also be passed when starting the Python
+application with the `--cluster` option.
+
+The Operator API endpoint can be configured via the `OPERATOR_API_URL`
+environment variables in the [deployment manifest](../ui/manifests/deployment.yaml#L40).
+You can also expose the operator API through a [service](../manifests/api-service.yaml).
+Some displayed options can be disabled from UI using simple flags under the
+`OPERATOR_UI_CONFIG` field in the deployment.
+
+### Deploy the UI on K8s
+
+Now, apply all manifests from the `ui/manifests` folder to deploy the Postgres
+Operator UI on K8s. Replace the image tag in the deployment manifest if you
+want to test the image you've built with `make docker`. Make sure the pods for
+the operator and the UI are both running.
 
 ```bash
-kubectl apply -f ui/manifests
+sed -e "s/\(image\:.*\:\).*$/\1$TAG/" manifests/deployment.yaml | kubectl apply -f manifests/
+kubectl get all -l application=postgres-operator-ui
 ```
 
-Make sure the pods for the operator and the UI are both running. For local
-testing you need to apply proxying and port forwarding so that the UI can talk
-to the K8s and Postgres Operator REST API. You can use the provided
-`run_local.sh` script for this. Make sure it uses the correct URL to your K8s
-API server, e.g. for minikube it would be `https://192.168.99.100:8443`.
+### Local testing
+
+For local testing you need to apply K8s proxying and operator pod port
+forwarding so that the UI can talk to the K8s and Postgres Operator REST API.
+The Ingress resource is not needed. You can use the provided `run_local.sh`
+script for this. Make sure that:
+
+* Python dependencies are installed on your machine
+* the K8s API server URL is set for kubectl commands, e.g. for minikube it would usually be `https://192.168.99.100:8443`.
+* the pod label selectors for port forwarding are correct
+
+When testing with minikube you have to build the image in its docker environment
+(running `make docker` doesn't do it for you). From the `ui` directory execute:
 
 ```bash
+# compile and build operator UI
+make docker
+
+# build in image in minikube docker env
+eval $(minikube docker-env)
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.3.0 .
+
+# apply UI manifests next to a running Postgres Operator
+kubectl apply -f manifests/
+
+# install python dependencies to run UI locally
+pip3 install -r requirements
 ./run_local.sh
 ```

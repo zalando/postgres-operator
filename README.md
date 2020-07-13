@@ -8,24 +8,27 @@
 
 <img src="docs/diagrams/logo.png" width="200">
 
-The Postgres Operator enables highly-available [PostgreSQL](https://www.postgresql.org/)
+The Postgres Operator delivers an easy to run highly-available [PostgreSQL](https://www.postgresql.org/)
 clusters on Kubernetes (K8s) powered by [Patroni](https://github.com/zalando/spilo).
-It is configured only through manifests to ease integration into automated CI/CD
-pipelines with no access to Kubernetes directly.
+It is configured only through Postgres manifests (CRDs) to ease integration into automated CI/CD
+pipelines with no access to Kubernetes API directly, promoting infrastructure as code vs manual operations.
 
 ### Operator features
 
-* Rolling updates on Postgres cluster changes
-* Volume resize without Pod restarts
-* Cloning Postgres clusters
-* Logical Backups to S3 Bucket
+* Rolling updates on Postgres cluster changes, incl. quick minor version updates
+* Live volume resize without pod restarts (AWS EBS, others pending)
+* Database connection pooler with PGBouncer
+* Restore and cloning Postgres clusters (incl. major version upgrade)
+* Additionally logical backups to S3 bucket can be configured
 * Standby cluster from S3 WAL archive
 * Configurable for non-cloud environments
+* Basic credential and user management on K8s, eases application deployments
 * UI to create and edit Postgres cluster manifests
+* Works well on Amazon AWS, Google Cloud, OpenShift and locally on Kind
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 9.6+
+* Supports PostgreSQL 12, starting from 9.6+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
@@ -53,6 +56,10 @@ production for over two years.
 
 For a quick first impression follow the instructions of this
 [tutorial](docs/quickstart.md).
+
+## Supported setups of Postgres and Applications
+
+![Features](docs/diagrams/neutral_operator.png)
 
 ## Documentation
 

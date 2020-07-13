@@ -25,6 +25,8 @@ SOFTWARE.
 package fake
 
 import (
+	"context"
+
 	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,7 +44,7 @@ var operatorconfigurationsResource = schema.GroupVersionResource{Group: "acid.za
 var operatorconfigurationsKind = schema.GroupVersionKind{Group: "acid.zalan.do", Version: "v1", Kind: "OperatorConfiguration"}
 
 // Get takes name of the operatorConfiguration, and returns the corresponding operatorConfiguration object, and an error if there is any.
-func (c *FakeOperatorConfigurations) Get(name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
+func (c *FakeOperatorConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *acidzalandov1.OperatorConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(operatorconfigurationsResource, c.ns, name), &acidzalandov1.OperatorConfiguration{})
 

@@ -25,6 +25,8 @@ SOFTWARE.
 package fake
 
 import (
+	"context"
+
 	acidzalandov1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -45,7 +47,7 @@ var postgresqlsResource = schema.GroupVersionResource{Group: "acid.zalan.do", Ve
 var postgresqlsKind = schema.GroupVersionKind{Group: "acid.zalan.do", Version: "v1", Kind: "Postgresql"}
 
 // Get takes name of the postgresql, and returns the corresponding postgresql object, and an error if there is any.
-func (c *FakePostgresqls) Get(name string, options v1.GetOptions) (result *acidzalandov1.Postgresql, err error) {
+func (c *FakePostgresqls) Get(ctx context.Context, name string, options v1.GetOptions) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(postgresqlsResource, c.ns, name), &acidzalandov1.Postgresql{})
 
@@ -56,7 +58,7 @@ func (c *FakePostgresqls) Get(name string, options v1.GetOptions) (result *acidz
 }
 
 // List takes label and field selectors, and returns the list of Postgresqls that match those selectors.
-func (c *FakePostgresqls) List(opts v1.ListOptions) (result *acidzalandov1.PostgresqlList, err error) {
+func (c *FakePostgresqls) List(ctx context.Context, opts v1.ListOptions) (result *acidzalandov1.PostgresqlList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(postgresqlsResource, postgresqlsKind, c.ns, opts), &acidzalandov1.PostgresqlList{})
 
@@ -78,14 +80,14 @@ func (c *FakePostgresqls) List(opts v1.ListOptions) (result *acidzalandov1.Postg
 }
 
 // Watch returns a watch.Interface that watches the requested postgresqls.
-func (c *FakePostgresqls) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakePostgresqls) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(postgresqlsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a postgresql and creates it.  Returns the server's representation of the postgresql, and an error, if there is any.
-func (c *FakePostgresqls) Create(postgresql *acidzalandov1.Postgresql) (result *acidzalandov1.Postgresql, err error) {
+func (c *FakePostgresqls) Create(ctx context.Context, postgresql *acidzalandov1.Postgresql, opts v1.CreateOptions) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(postgresqlsResource, c.ns, postgresql), &acidzalandov1.Postgresql{})
 
@@ -96,7 +98,7 @@ func (c *FakePostgresqls) Create(postgresql *acidzalandov1.Postgresql) (result *
 }
 
 // Update takes the representation of a postgresql and updates it. Returns the server's representation of the postgresql, and an error, if there is any.
-func (c *FakePostgresqls) Update(postgresql *acidzalandov1.Postgresql) (result *acidzalandov1.Postgresql, err error) {
+func (c *FakePostgresqls) Update(ctx context.Context, postgresql *acidzalandov1.Postgresql, opts v1.UpdateOptions) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(postgresqlsResource, c.ns, postgresql), &acidzalandov1.Postgresql{})
 
@@ -108,7 +110,7 @@ func (c *FakePostgresqls) Update(postgresql *acidzalandov1.Postgresql) (result *
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePostgresqls) UpdateStatus(postgresql *acidzalandov1.Postgresql) (*acidzalandov1.Postgresql, error) {
+func (c *FakePostgresqls) UpdateStatus(ctx context.Context, postgresql *acidzalandov1.Postgresql, opts v1.UpdateOptions) (*acidzalandov1.Postgresql, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(postgresqlsResource, "status", c.ns, postgresql), &acidzalandov1.Postgresql{})
 
@@ -119,7 +121,7 @@ func (c *FakePostgresqls) UpdateStatus(postgresql *acidzalandov1.Postgresql) (*a
 }
 
 // Delete takes name of the postgresql and deletes it. Returns an error if one occurs.
-func (c *FakePostgresqls) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakePostgresqls) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(postgresqlsResource, c.ns, name), &acidzalandov1.Postgresql{})
 
@@ -127,15 +129,15 @@ func (c *FakePostgresqls) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakePostgresqls) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(postgresqlsResource, c.ns, listOptions)
+func (c *FakePostgresqls) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(postgresqlsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &acidzalandov1.PostgresqlList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched postgresql.
-func (c *FakePostgresqls) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *acidzalandov1.Postgresql, err error) {
+func (c *FakePostgresqls) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *acidzalandov1.Postgresql, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(postgresqlsResource, c.ns, name, pt, data, subresources...), &acidzalandov1.Postgresql{})
 

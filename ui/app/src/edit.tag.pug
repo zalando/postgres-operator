@@ -137,6 +137,7 @@ edit
         o.spec.numberOfInstances = i.spec.numberOfInstances
         o.spec.enableMasterLoadBalancer = i.spec.enableMasterLoadBalancer || false
         o.spec.enableReplicaLoadBalancer = i.spec.enableReplicaLoadBalancer || false
+        o.spec.enableConnectionPooler = i.spec.enableConnectionPooler || false
         o.spec.volume = { size: i.spec.volume.size }
 
         if ('users' in i.spec && typeof i.spec.users === 'object') {

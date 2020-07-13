@@ -4,12 +4,11 @@ metadata:
   name: acid-test-cluster
 #  labels:
 #    environment: demo
+#  annotations:
+#    "acid.zalan.do/controller": "second-operator"
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p16
+  dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
   teamId: "acid"
-  volume:
-    size: 1Gi
-#    storageClass: my-sc
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:
@@ -17,16 +16,54 @@ spec:
     - createdb
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
+#  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
     foo: zalando
+  preparedDatabases:
+    bar:
+      defaultUsers: true
+      extensions:
+        pg_partman: public
+        pgcrypto: public
+      schemas:
+        data: {}
+        history:
+          defaultRoles: true
+          defaultUsers: false
   postgresql:
-    version: "11"
+    version: "12"
     parameters: # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
+  volume:
+    size: 1Gi
+#    storageClass: my-sc
+  additionalVolumes:
+    - name: empty
+      mountPath: /opt/empty
+      targetContainers:
+        - all
+      volumeSource:
+        emptyDir: {}
+#    - name: data
+#      mountPath: /home/postgres/pgdata/partitions
+#      targetContainers:
+#        - postgres
+#      volumeSource:
+#        PersistentVolumeClaim:
+#          claimName: pvc-postgresql-data-partitions
+#          readyOnly: false
+#    - name: conf
+#      mountPath: /etc/telegraf
+#      subPath: telegraf.conf
+#      targetContainers:
+#        - telegraf-sidecar
+#      volumeSource:
+#        configMap:
+#          name: my-config-map
 
   enableShmVolume: true
 #  spiloFSGroup: 103
@@ -64,6 +101,8 @@ spec:
     ttl: 30
     loop_wait: &loop_wait 10
     retry_timeout: 10
+    synchronous_mode: false
+    synchronous_mode_strict: false
     maximum_lag_on_failover: 33554432
 
 # restore a Postgres DB with point-in-time-recovery
@@ -83,6 +122,19 @@ spec:
 #  - 01:00-06:00  #UTC
 #  - Sat:00:00-04:00
 
+  connectionPooler:
+    numberOfInstances: 2
+    mode: "transaction"
+    schema: "pooler"
+    user: "pooler"
+    resources:
+      requests:
+        cpu: 300m
+        memory: 100Mi
+      limits:
+        cpu: "1"
+        memory: 100Mi
+
   initContainers:
   - name: date
     image: busybox
@@ -100,3 +152,17 @@ spec:
 #      env:
 #        - name: "USEFUL_VAR"
 #          value: "perhaps-true"
+
+# Custom TLS certificate. Disabled unless tls.secretName has a value.
+  tls:
+    secretName: ""  # should correspond to a Kubernetes Secret resource to load
+    certificateFile: "tls.crt"
+    privateKeyFile: "tls.key"
+    caFile: ""  # optionally configure Postgres with a CA certificate
+    caSecretName: "" # optionally the ca.crt can come from this secret instead.
+# file names can be also defined with absolute path, and will no longer be relative
+# to the "/tls/" path where the secret is being mounted by default, and "/tlsca/"
+# where the caSecret is mounted by default.
+# When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
+# if unknown, set it to 103 which is the usual value in the default spilo images.
+# In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.
