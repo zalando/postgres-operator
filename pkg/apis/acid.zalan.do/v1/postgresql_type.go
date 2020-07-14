@@ -53,7 +53,7 @@ type PostgresSpec struct {
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
 	Users                 map[string]UserFlags        `json:"users"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                 CloneDescription            `json:"clone",omitempty`
+	Clone                 CloneDescription            `json:"clone,omitempty"`
 	ClusterName           string                      `json:"-"`
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
@@ -64,10 +64,10 @@ type PostgresSpec struct {
 	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription         `json:"standby",omitempty`
-	PodAnnotations        map[string]string           `json:"podAnnotations",omitempty`
-	ServiceAnnotations    map[string]string           `json:"serviceAnnotations",omitempty`
-	TLS                   *TLSDescription             `json:"tls",omitempty`
+	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
+	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
+	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
+	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 
 	// deprecated json tags
@@ -124,7 +124,7 @@ type AdditionalVolume struct {
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
 type PostgresqlParam struct {
 	PgVersion  string            `json:"version"`
-	Parameters map[string]string `json:"parameters",omitempty`
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
