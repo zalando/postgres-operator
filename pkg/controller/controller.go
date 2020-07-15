@@ -188,6 +188,8 @@ func (c *Controller) modifyConfigFromEnvironment() {
 	if scalyrAPIKey != "" {
 		c.opConfig.ScalyrAPIKey = scalyrAPIKey
 	}
+	c.opConfig.LogicalBackupS3AccessKeyID = os.Getenv("S3_ACCESS_KEY_ID")
+	c.opConfig.LogicalBackupS3SecretAccessKey = os.Getenv("S3_SECRET_ACCESS_KEY")
 }
 
 // warningOnDeprecatedParameters emits warnings upon finding deprecated parmaters
