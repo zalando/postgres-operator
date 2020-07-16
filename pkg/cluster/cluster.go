@@ -124,6 +124,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
 	})
+	password_encryption, ok :=  pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
+	if !ok {
+		password_encryption = "md5"
+	}
 
 	cluster := &Cluster{
 		Config:         cfg,
@@ -135,7 +139,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy: users.DefaultUserSyncStrategy{},
+		userSyncStrategy: users.DefaultUserSyncStrategy{password_encryption},
 		deleteOptions:    metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
