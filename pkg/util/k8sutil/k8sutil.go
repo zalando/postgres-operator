@@ -325,7 +325,7 @@ func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.Get
 	newFormatConfigmap := &v1.ConfigMap{}
 	newFormatConfigmap.Name = "testcluster"
 	newFormatConfigmap.Data = map[string]string{
-		"new-foobar": "{}",
+		"new-foobar": "{\"user_flags\": [\"createdb\"]}",
 	}
 
 	configmaps := map[string]*v1.ConfigMap{

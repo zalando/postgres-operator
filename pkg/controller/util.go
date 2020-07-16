@@ -110,7 +110,7 @@ func readDecodedRole(s string) (*spec.PgUser, error) {
 	return &result, nil
 }
 
-var emptyNamespacedName = (spec.NamespacedName{})
+var emptyName = (spec.NamespacedName{})
 
 // Return information about what secrets we need to use to create
 // infrastructure roles and in which format are they. This is done in
@@ -120,7 +120,7 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 	var roleDef config.InfrastructureRole
 	rolesDefs := c.opConfig.InfrastructureRoles
 
-	if c.opConfig.InfrastructureRolesSecretName == emptyNamespacedName {
+	if c.opConfig.InfrastructureRolesSecretName == emptyName {
 		// All the other possibilities require secret name to be present, so if
 		// it is not, then nothing else to be done here.
 		return rolesDefs
@@ -140,8 +140,8 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 		properties := strings.Split(c.opConfig.InfrastructureRolesDefs, propertySep)
 
 		roleDef = config.InfrastructureRole{
-			Secret:   c.opConfig.InfrastructureRolesSecretName,
-			Template: false,
+			SecretName: c.opConfig.InfrastructureRolesSecretName,
+			Template:   false,
 		}
 
 		for _, property := range properties {
@@ -169,11 +169,11 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 		// via existing definition structure and remember that it's just a
 		// template, the real values are in user1,password1,inrole1 etc.
 		roleDef = config.InfrastructureRole{
-			Secret:   c.opConfig.InfrastructureRolesSecretName,
-			Name:     "user",
-			Password: "password",
-			Role:     "inrole",
-			Template: true,
+			SecretName: c.opConfig.InfrastructureRolesSecretName,
+			Name:       "user",
+			Password:   "password",
+			Role:       "inrole",
+			Template:   true,
 		}
 	}
 
@@ -201,7 +201,7 @@ func (c *Controller) getInfrastructureRoles(
 	// current implementation is an empty rolesSecrets slice or all its items
 	// are empty.
 	for _, role := range rolesSecrets {
-		if role.Secret != emptyNamespacedName {
+		if role.SecretName != emptyName {
 			noRolesProvided = false
 		}
 	}
@@ -258,10 +258,10 @@ func (c *Controller) getInfrastructureRole(
 	infraRole *config.InfrastructureRole) (
 	[]spec.PgUser, error) {
 
-	rolesSecret := infraRole.Secret
+	rolesSecret := infraRole.SecretName
 	roles := []spec.PgUser{}
 
-	if rolesSecret == (spec.NamespacedName{}) {
+	if rolesSecret == emptyName {
 		// we don't have infrastructure roles defined, bail out
 		return nil, nil
 	}
@@ -312,7 +312,12 @@ func (c *Controller) getInfrastructureRole(
 				delete(secretData, key)
 			}
 
-			roles = append(roles, t)
+			if t.Valid() {
+				roles = append(roles, t)
+			} else {
+				msg := "infrastructure role %q is not complete and ignored"
+				c.logger.Warningf(msg, t)
+			}
 		}
 	} else {
 		roleDescr := &spec.PgUser{Origin: spec.RoleOriginInfrastructure}
@@ -325,6 +330,15 @@ func (c *Controller) getInfrastructureRole(
 			roleDescr.Name = string(secretData[infraRole.Name])
 			roleDescr.Password = string(secretData[infraRole.Password])
 			roleDescr.MemberOf = append(roleDescr.MemberOf, string(secretData[infraRole.Role]))
+		}
+
+		if roleDescr.Valid() {
+			roles = append(roles, *roleDescr)
+		} else {
+			msg := "infrastructure role %q is not complete and ignored"
+			c.logger.Warningf(msg, roleDescr)
+
+			return nil, nil
 		}
 
 		if roleDescr.Name == "" {

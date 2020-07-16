@@ -54,7 +54,7 @@ type Resources struct {
 type InfrastructureRole struct {
 	// Name of a secret which describes the role, and optionally name of a
 	// configmap with an extra information
-	Secret spec.NamespacedName
+	SecretName spec.NamespacedName
 
 	Name     string
 	Password string
