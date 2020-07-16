@@ -51,16 +51,42 @@ type Resources struct {
 	ShmVolume               *bool               `name:"enable_shm_volume" default:"true"`
 }
 
+type InfrastructureRole struct {
+	// Name of a secret which describes the role, and optionally name of a
+	// configmap with an extra information
+	Secret spec.NamespacedName
+
+	Name     string
+	Password string
+	Role     string
+
+	// This field point out the detailed yaml definition of the role, if exists
+	Details string
+
+	// Specify if a secret contains multiple fields in the following format:
+	//
+	// 	%(name)idx: ...
+	// 	%(password)idx: ...
+	// 	%(role)idx: ...
+	//
+	// If it does, Name/Password/Role are interpreted not as unique field
+	// names, but as a template.
+
+	Template bool
+}
+
 // Auth describes authentication specific configuration parameters
 type Auth struct {
-	SecretNameTemplate            StringTemplate      `name:"secret_name_template" default:"{username}.{cluster}.credentials.{tprkind}.{tprgroup}"`
-	PamRoleName                   string              `name:"pam_role_name" default:"zalandos"`
-	PamConfiguration              string              `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
-	TeamsAPIUrl                   string              `name:"teams_api_url" default:"https://teams.example.com/api/"`
-	OAuthTokenSecretName          spec.NamespacedName `name:"oauth_token_secret_name" default:"postgresql-operator"`
-	InfrastructureRolesSecretName spec.NamespacedName `name:"infrastructure_roles_secret_name"`
-	SuperUsername                 string              `name:"super_username" default:"postgres"`
-	ReplicationUsername           string              `name:"replication_username" default:"standby"`
+	SecretNameTemplate            StringTemplate        `name:"secret_name_template" default:"{username}.{cluster}.credentials.{tprkind}.{tprgroup}"`
+	PamRoleName                   string                `name:"pam_role_name" default:"zalandos"`
+	PamConfiguration              string                `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
+	TeamsAPIUrl                   string                `name:"teams_api_url" default:"https://teams.example.com/api/"`
+	OAuthTokenSecretName          spec.NamespacedName   `name:"oauth_token_secret_name" default:"postgresql-operator"`
+	InfrastructureRolesSecretName spec.NamespacedName   `name:"infrastructure_roles_secret_name"`
+	InfrastructureRoles           []*InfrastructureRole `name:"-"`
+	InfrastructureRolesDefs       string                `name:"infrastructure_roles_secrets"`
+	SuperUsername                 string                `name:"super_username" default:"postgres"`
+	ReplicationUsername           string                `name:"replication_username" default:"standby"`
 }
 
 // Scalyr holds the configuration for the Scalyr Agent sidecar for log shipping:

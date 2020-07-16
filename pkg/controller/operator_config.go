@@ -70,7 +70,22 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSidecars = util.CoalesceBool(fromCRD.Kubernetes.EnableSidecars, util.True())
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
+
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
+	if fromCRD.Kubernetes.InfrastructureRolesDefs != nil {
+		result.InfrastructureRoles = []*config.InfrastructureRole{}
+		for _, secret := range fromCRD.Kubernetes.InfrastructureRolesDefs {
+			result.InfrastructureRoles = append(
+				result.InfrastructureRoles,
+				&config.InfrastructureRole{
+					Secret:   secret.Secret,
+					Name:     secret.Name,
+					Role:     secret.Role,
+					Password: secret.Password,
+				})
+		}
+	}
+
 	result.PodRoleLabel = util.Coalesce(fromCRD.Kubernetes.PodRoleLabel, "spilo-role")
 	result.ClusterLabels = util.CoalesceStrMap(fromCRD.Kubernetes.ClusterLabels, map[string]string{"application": "spilo"})
 	result.InheritedLabels = fromCRD.Kubernetes.InheritedLabels

@@ -300,7 +300,8 @@ func (c *Controller) initController() {
 
 	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
 
-	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
+	roleDefs := c.getInfrastructureRoleDefinitions()
+	if infraRoles, err := c.getInfrastructureRoles(roleDefs); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.config.InfrastructureRoles = infraRoles
