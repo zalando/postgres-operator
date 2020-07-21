@@ -1496,6 +1496,21 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 		}
 		podSpec.Containers[i].VolumeMounts = mounts
 	}
+	for i := range podSpec.InitContainers {
+		mounts := podSpec.InitContainers[i].VolumeMounts
+		for _, v := range additionalVolumes {
+			for _, target := range v.TargetContainers {
+				if podSpec.InitContainers[i].Name == target || target == "all" {
+					mounts = append(mounts, v1.VolumeMount{
+						Name:      v.Name,
+						MountPath: v.MountPath,
+						SubPath:   v.SubPath,
+					})
+				}
+			}
+		}
+		podSpec.InitContainers[i].VolumeMounts = mounts
+	}
 
 	podSpec.Volumes = volumes
 }
