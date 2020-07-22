@@ -3,6 +3,13 @@
 Read this guide if you want to debug the operator, fix bugs or contribute new
 features and tests.
 
+## Simple build
+
+To simply build the code and create an image, follow the instructions at:
+[docker based code and image build](../docker/README.md)
+
+For setting a full development environment, follow the steps below.
+
 ## Setting up Go
 
 Postgres Operator is written in Go. Use the [installation instructions](https://golang.org/doc/install#install)
