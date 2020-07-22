@@ -7,17 +7,15 @@
 Most Dockerfiles both build the code as well as the image.
 
 # Choose the desired build flavour:
-- Dockerfile -> builds more secure version of the image (from scratch instead of basing on alpine)
-- DebugDockerfile -> builds a debug version of the image, based on alpine and uses "github.com/derekparker/delve/cmd/dlv". Port :7777
+- WithBuildDockerfile -> builds code as well as more secure a version of the image (from scratch instead of basing on alpine)
+- WithBuildDebugDockerfile -> builds a debug version of the image, based on alpine and uses "github.com/derekparker/delve/cmd/dlv". exposes port :7777
 - NotFromScrachDockerfile -> alpine based image (notFromScratch like in Dockerfile )
-- NoBuildDockerfile -> alpine based image, without the build, it expects binary is build outside. This is the older version of the Dockerfile file.
-- NoBuildDebugDockerfile -> alpine based image, without the build, it expects binary is build outside. This is the older version of the DebugDocker file.
+- Dockerfile -> alpine based image, without the build, it expects binary is build outside. This is used by Makefile (& Travis)
+- DebugDockerfile -> alpine based image, without the build, it expects binary is build outside. This is used by Makefile (& Travis) to make debug image.
 
-# Command:
+# Command example:
 ```shell
-docker build -f docker/Dockerfile .
-docker build -f docker/DebugDockerfile .
-docker build -f docker/NotFromScrachDockerfile .
+docker build -f docker/WithBuildDockerfile .
 ```
 
 # docker.io
@@ -25,6 +23,6 @@ This solution works also when you want to build your fork using docker hub (dock
 
 For automating docker build. Make sure you pass the context to root of it project.     
 Same for for docker hub (docker.io) builds:      
-set the **Dockerfile** column to `docker/DebugDockerfile` and **context** column to `/`     
+set the **Dockerfile** column to `docker/WithBuildDockerfile` and **context** column to `/`     
 
 
