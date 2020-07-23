@@ -46,6 +46,12 @@ var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
 		JSONPath:    ".spec.volume.size",
 	},
 	{
+		Name:        "KeepPVC",
+		Type:        "boolean",
+		Description: "Determines whether the PersistentVolumeClaim should be kept when the manifest is deleted",
+		JSONPath:    ".spec.volume.keepPVC",
+	},
+	{
 		Name:        "CPU-Request",
 		Type:        "string",
 		Description: "Requested CPU for Postgres containers",
@@ -720,6 +726,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"subPath": {
 								Type: "string",
 							},
+							"keepPVC": {
+								Type: "boolean",
+							},
 						},
 					},
 					"additionalVolumes": {
@@ -980,7 +989,7 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"spilo_privileged": {
 								Type: "boolean",
 							},
-                                                      "storage_resize_mode": {
+							"storage_resize_mode": {
 								Type: "string",
 								Enum: []apiextv1beta1.JSON{
 									{

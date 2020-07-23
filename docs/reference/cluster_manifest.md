@@ -154,6 +154,9 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Optional. Default is: "30 00 \* \* \*"
 
+* **volume**
+  Specifies the size and StorageClass of the PersistentVolumeClaim. By default, this PVC is deleted when the manifest is uninstalled. To keep the PVC, set the volume's `keepPVC` attribute to `true`.
+
 * **additionalVolumes**
   List of additional volumes to mount in each container of the statefulset pod.
   Each item must contain a `name`, `mountPath`, and `volumeSource` which is a
