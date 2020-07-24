@@ -729,24 +729,27 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 }
 
 func (c *Cluster) deleteSecrets() error {
-	c.setProcessName("deleting secrets")
-	var errors []string
-	errorCount := 0
-	for uid, secret := range c.Secrets {
-		c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
-		err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("could not delete secret %q: %v", util.NameFromMeta(secret.ObjectMeta), err))
-			errorCount++
+	if c.Postgresql.Spec.Volume.KeepPVC == false {
+		c.setProcessName("deleting secrets")
+		var errors []string
+		errorCount := 0
+		for uid, secret := range c.Secrets {
+			c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
+			err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("could not delete secret %q: %v", util.NameFromMeta(secret.ObjectMeta), err))
+				errorCount++
+			}
+			c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
+			c.Secrets[uid] = nil
 		}
-		c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
-		c.Secrets[uid] = nil
-	}
 
-	if errorCount > 0 {
-		return fmt.Errorf("could not delete all secrets: %v", errors)
+		if errorCount > 0 {
+			return fmt.Errorf("could not delete all secrets: %v", errors)
+		}
+	} else {
+		c.logger.Infoln("not deleting secrets because keepPVC is true")
 	}
-
 	return nil
 }
 

@@ -569,6 +569,9 @@ aws_or_gcp:
 ...
 ```
 
+## Retain state of Postgres cluster when the resource is deleted
+By default, deleting the Postgresql custom resource will also explicitly delete its PersistentVolumeClaim. If your environment allows Postgresql custom resources to be deleted occasionally, and you don't want to lose your users and database contents, you can set the `.spec.volume.keepPVC` to true. This will make sure that the secrets and PVCs linked to this cluster are retained, so when you redeploy your cluster, the users and data are not lost.
+
 ## Sidecars for Postgres clusters
 
 A list of sidecars is added to each cluster created by the operator. The default
