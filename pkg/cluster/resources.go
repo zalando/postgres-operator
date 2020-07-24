@@ -486,8 +486,11 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("could not delete pods: %v", err)
 	}
 
-	if err := c.deletePersistentVolumeClaims(); err != nil {
-		return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+	c.logger.Debugf("c.Postgresql.Spec.Volume.KeepPVC = %t", c.Postgresql.Spec.Volume.KeepPVC)
+	if c.Postgresql.Spec.Volume.KeepPVC == false {
+		if err := c.deletePersistentVolumeClaims(); err != nil {
+			return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
+		}
 	}
 
 	return nil

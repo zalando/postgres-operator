@@ -46,12 +46,6 @@ var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
 		JSONPath:    ".spec.volume.size",
 	},
 	{
-		Name:        "KeepPVC",
-		Type:        "boolean",
-		Description: "Determines whether the PersistentVolumeClaim should be kept when the manifest is deleted",
-		JSONPath:    ".spec.volume.keepPVC",
-	},
-	{
 		Name:        "CPU-Request",
 		Type:        "string",
 		Description: "Requested CPU for Postgres containers",

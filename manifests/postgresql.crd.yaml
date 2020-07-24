@@ -28,10 +28,6 @@ spec:
     type: string
     description: Size of the bound volume
     JSONPath: .spec.volume.size
-  - name: KeepPVC
-    type: boolean
-    description: Determines whether the PersistentVolumeClaim should be kept when the manifest is deleted
-    JSONPath: .spec.volume.keepPVC
   - name: CPU-Request
     type: string
     description: Requested CPU for Postgres containers
