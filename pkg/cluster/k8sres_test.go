@@ -18,9 +18,18 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+// For testing purposes
+type ExpectedValue struct {
+	envIndex       int
+	envVarConstant string
+	envVarValue    string
+}
 
 func toIntStr(val int) *intstr.IntOrString {
 	b := intstr.FromInt(val)
@@ -37,7 +46,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	testName := "TestGenerateSpiloConfig"
 	tests := []struct {
@@ -92,6 +101,119 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}
 }
 
+func TestGenerateSpiloPodEnvVars(t *testing.T) {
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				WALGSBucket:    "wale-gs-bucket",
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	expectedValuesGSBucket := []ExpectedValue{
+		ExpectedValue{
+			envIndex:       14,
+			envVarConstant: "WAL_GS_BUCKET",
+			envVarValue:    "wale-gs-bucket",
+		},
+		ExpectedValue{
+			envIndex:       15,
+			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/SomeUUID",
+		},
+		ExpectedValue{
+			envIndex:       16,
+			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "",
+		},
+	}
+
+	expectedValuesGCPCreds := []ExpectedValue{
+		ExpectedValue{
+			envIndex:       14,
+			envVarConstant: "WAL_GS_BUCKET",
+			envVarValue:    "wale-gs-bucket",
+		},
+		ExpectedValue{
+			envIndex:       15,
+			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/SomeUUID",
+		},
+		ExpectedValue{
+			envIndex:       16,
+			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "",
+		},
+		ExpectedValue{
+			envIndex:       17,
+			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
+			envVarValue:    "some_path_to_credentials",
+		},
+	}
+
+	testName := "TestGenerateSpiloPodEnvVars"
+	tests := []struct {
+		subTest            string
+		opConfig           config.Config
+		uid                types.UID
+		spiloConfig        string
+		cloneDescription   *acidv1.CloneDescription
+		standbyDescription *acidv1.StandbyDescription
+		customEnvList      []v1.EnvVar
+		expectedValues     []ExpectedValue
+	}{
+		{
+			subTest: "Will set WAL_GS_BUCKET env",
+			opConfig: config.Config{
+				WALGSBucket: "wale-gs-bucket",
+			},
+			uid:                "SomeUUID",
+			spiloConfig:        "someConfig",
+			cloneDescription:   &acidv1.CloneDescription{},
+			standbyDescription: &acidv1.StandbyDescription{},
+			customEnvList:      []v1.EnvVar{},
+			expectedValues:     expectedValuesGSBucket,
+		},
+		{
+			subTest: "Will set GOOGLE_APPLICATION_CREDENTIALS env",
+			opConfig: config.Config{
+				WALGSBucket:    "wale-gs-bucket",
+				GCPCredentials: "some_path_to_credentials",
+			},
+			uid:                "SomeUUID",
+			spiloConfig:        "someConfig",
+			cloneDescription:   &acidv1.CloneDescription{},
+			standbyDescription: &acidv1.StandbyDescription{},
+			customEnvList:      []v1.EnvVar{},
+			expectedValues:     expectedValuesGCPCreds,
+		},
+	}
+
+	for _, tt := range tests {
+		cluster.OpConfig = tt.opConfig
+
+		actualEnvs := cluster.generateSpiloPodEnvVars(tt.uid, tt.spiloConfig, tt.cloneDescription, tt.standbyDescription, tt.customEnvList)
+
+		for _, ev := range tt.expectedValues {
+			env := actualEnvs[ev.envIndex]
+
+			if env.Name != ev.envVarConstant {
+				t.Errorf("%s %s: Expected env name %s, have %s instead",
+					testName, tt.subTest, ev.envVarConstant, env.Name)
+			}
+
+			if env.Value != ev.envVarValue {
+				t.Errorf("%s %s: Expected env value %s, have %s instead",
+					testName, tt.subTest, ev.envVarValue, env.Value)
+			}
+		}
+	}
+}
+
 func TestCreateLoadBalancerLogic(t *testing.T) {
 	var cluster = New(
 		Config{
@@ -102,7 +224,7 @@ func TestCreateLoadBalancerLogic(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	testName := "TestCreateLoadBalancerLogic"
 	tests := []struct {
@@ -164,7 +286,8 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
-				logger),
+				logger,
+				eventRecorder),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
@@ -187,7 +310,8 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 0}},
-				logger),
+				logger,
+				eventRecorder),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
@@ -210,7 +334,8 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
-				logger),
+				logger,
+				eventRecorder),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-pdb",
@@ -233,7 +358,8 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 				acidv1.Postgresql{
 					ObjectMeta: metav1.ObjectMeta{Name: "myapp-database", Namespace: "myapp"},
 					Spec:       acidv1.PostgresSpec{TeamID: "myapp", NumberOfInstances: 3}},
-				logger),
+				logger,
+				eventRecorder),
 			policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "postgres-myapp-database-databass-budget",
@@ -368,7 +494,7 @@ func TestCloneEnv(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	for _, tt := range tests {
 		envs := cluster.generateCloneEnvironment(tt.cloneOpts)
@@ -502,7 +628,7 @@ func TestGetPgVersion(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	for _, tt := range tests {
 		pgVersion, err := cluster.getNewPgVersion(tt.pgContainer, tt.newPgVersion)
@@ -678,7 +804,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	var clusterNoDefaultRes = New(
 		Config{
@@ -690,7 +816,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				},
 				ConnectionPooler: config.ConnectionPooler{},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec) error { return nil }
 
@@ -803,7 +929,7 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 	cluster.Statefulset = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-sts",
@@ -904,7 +1030,7 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 	cluster.Statefulset = &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-sts",
@@ -961,6 +1087,7 @@ func TestTLS(t *testing.T) {
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
 	var spiloFSGroup = int64(103)
+	var additionalVolumes = spec.AdditionalVolumes
 
 	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
@@ -989,7 +1116,7 @@ func TestTLS(t *testing.T) {
 					SpiloFSGroup: &spiloFSGroup,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger)
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 	spec = makeSpec(acidv1.TLSDescription{SecretName: "my-secret", CAFile: "ca.crt"})
 	s, err := cluster.generateStatefulSet(&spec)
 	if err != nil {
@@ -1000,8 +1127,20 @@ func TestTLS(t *testing.T) {
 	assert.Equal(t, &fsGroup, s.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
 
 	defaultMode := int32(0640)
+	mountPath := "/tls"
+	additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
+		Name:      spec.TLS.SecretName,
+		MountPath: mountPath,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  spec.TLS.SecretName,
+				DefaultMode: &defaultMode,
+			},
+		},
+	})
+
 	volume := v1.Volume{
-		Name: "tls-secret",
+		Name: "my-secret",
 		VolumeSource: v1.VolumeSource{
 			Secret: &v1.SecretVolumeSource{
 				SecretName:  "my-secret",
@@ -1013,11 +1152,377 @@ func TestTLS(t *testing.T) {
 
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
 		MountPath: "/tls",
-		Name:      "tls-secret",
-		ReadOnly:  true,
+		Name:      "my-secret",
 	}, "the volume gets mounted in /tls")
 
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
 	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
+}
+
+func TestAdditionalVolume(t *testing.T) {
+	testName := "TestAdditionalVolume"
+	tests := []struct {
+		subTest   string
+		podSpec   *v1.PodSpec
+		volumePos int
+	}{
+		{
+			subTest: "empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{},
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{},
+					},
+				},
+			},
+			volumePos: 0,
+		},
+		{
+			subTest: "non empty PodSpec",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			volumePos: 1,
+		},
+		{
+			subTest: "non empty PodSpec with sidecar",
+			podSpec: &v1.PodSpec{
+				Volumes: []v1.Volume{{}},
+				Containers: []v1.Container{
+					{
+						Name: "postgres",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+					{
+						Name: "sidecar",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "data",
+								ReadOnly:  false,
+								MountPath: "/data",
+							},
+						},
+					},
+				},
+			},
+			volumePos: 1,
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	for _, tt := range tests {
+		// Test with additional volume mounted in all containers
+		additionalVolumeMount := []acidv1.AdditionalVolume{
+			{
+				Name:             "test",
+				MountPath:        "/test",
+				TargetContainers: []string{"all"},
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
+
+		if volumeName != additionalVolumeMount[0].Name {
+			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
+				testName, tt.subTest, additionalVolumeMount, volumeName)
+		}
+
+		for i := range tt.podSpec.Containers {
+			volumeMountName := tt.podSpec.Containers[i].VolumeMounts[tt.volumePos].Name
+
+			if volumeMountName != additionalVolumeMount[0].Name {
+				t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
+					testName, tt.subTest, additionalVolumeMount, volumeMountName)
+			}
+
+		}
+
+		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		if numMountsCheck != numMounts+1 {
+			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+				numMountsCheck, numMounts+1)
+		}
+	}
+
+	for _, tt := range tests {
+		// Test with additional volume mounted only in first container
+		additionalVolumeMount := []acidv1.AdditionalVolume{
+			{
+				Name:             "test",
+				MountPath:        "/test",
+				TargetContainers: []string{"postgres"},
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		}
+
+		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+
+		cluster.addAdditionalVolumes(tt.podSpec, additionalVolumeMount)
+		volumeName := tt.podSpec.Volumes[tt.volumePos].Name
+
+		if volumeName != additionalVolumeMount[0].Name {
+			t.Errorf("%s %s: Expected volume %v was not created, have %s instead",
+				testName, tt.subTest, additionalVolumeMount, volumeName)
+		}
+
+		for _, container := range tt.podSpec.Containers {
+			if container.Name == "postgres" {
+				volumeMountName := container.VolumeMounts[tt.volumePos].Name
+
+				if volumeMountName != additionalVolumeMount[0].Name {
+					t.Errorf("%s %s: Expected mount %v was not created, have %s instead",
+						testName, tt.subTest, additionalVolumeMount, volumeMountName)
+				}
+
+				numMountsCheck := len(container.VolumeMounts)
+				if numMountsCheck != numMounts+1 {
+					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+						numMountsCheck, numMounts+1)
+				}
+			} else {
+				numMountsCheck := len(container.VolumeMounts)
+				if numMountsCheck == numMounts+1 {
+					t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
+						numMountsCheck, numMounts)
+				}
+			}
+		}
+	}
+}
+
+// inject sidecars through all available mechanisms and check the resulting container specs
+func TestSidecars(t *testing.T) {
+	var err error
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+
+	generateKubernetesResources := func(cpuRequest string, cpuLimit string, memoryRequest string, memoryLimit string) v1.ResourceRequirements {
+		parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
+		assert.NoError(t, err)
+		parsedCPULimit, err := resource.ParseQuantity(cpuLimit)
+		assert.NoError(t, err)
+		parsedMemoryRequest, err := resource.ParseQuantity(memoryRequest)
+		assert.NoError(t, err)
+		parsedMemoryLimit, err := resource.ParseQuantity(memoryLimit)
+		assert.NoError(t, err)
+		return v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:    parsedCPURequest,
+				v1.ResourceMemory: parsedMemoryRequest,
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU:    parsedCPULimit,
+				v1.ResourceMemory: parsedMemoryLimit,
+			},
+		}
+	}
+
+	spec = acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+		Sidecars: []acidv1.Sidecar{
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar",
+			},
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar-with-resources",
+				Resources: acidv1.Resources{
+					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
+					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
+				},
+			},
+			acidv1.Sidecar{
+				Name:        "replace-sidecar",
+				DockerImage: "overwrite-image",
+			},
+		},
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					DefaultCPURequest:    "200m",
+					DefaultCPULimit:      "500m",
+					DefaultMemoryRequest: "0.7Gi",
+					DefaultMemoryLimit:   "1.3Gi",
+				},
+				SidecarImages: map[string]string{
+					"deprecated-global-sidecar": "image:123",
+				},
+				SidecarContainers: []v1.Container{
+					v1.Container{
+						Name: "global-sidecar",
+					},
+					// will be replaced by a cluster specific sidecar with the same name
+					v1.Container{
+						Name:  "replace-sidecar",
+						Image: "replaced-image",
+					},
+				},
+				Scalyr: config.Scalyr{
+					ScalyrAPIKey:        "abc",
+					ScalyrImage:         "scalyr-image",
+					ScalyrCPURequest:    "220m",
+					ScalyrCPULimit:      "520m",
+					ScalyrMemoryRequest: "0.9Gi",
+					// ise default memory limit
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	s, err := cluster.generateStatefulSet(&spec)
+	assert.NoError(t, err)
+
+	env := []v1.EnvVar{
+		{
+			Name: "POD_NAME",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "POSTGRES_USER",
+			Value: superUserName,
+		},
+		{
+			Name: "POSTGRES_PASSWORD",
+			ValueFrom: &v1.EnvVarSource{
+				SecretKeyRef: &v1.SecretKeySelector{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: "",
+					},
+					Key: "password",
+				},
+			},
+		},
+	}
+	mounts := []v1.VolumeMount{
+		v1.VolumeMount{
+			Name:      "pgdata",
+			MountPath: "/home/postgres/pgdata",
+		},
+	}
+
+	// deduplicated sidecars and Patroni
+	assert.Equal(t, 7, len(s.Spec.Template.Spec.Containers), "wrong number of containers")
+
+	// cluster specific sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "cluster-specific-sidecar",
+		Env:             env,
+		Resources:       generateKubernetesResources("200m", "500m", "0.7Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts:    mounts,
+	})
+
+	// container specific resources
+	expectedResources := generateKubernetesResources("210m", "510m", "0.8Gi", "1.4Gi")
+	assert.Equal(t, expectedResources.Requests[v1.ResourceCPU], s.Spec.Template.Spec.Containers[2].Resources.Requests[v1.ResourceCPU])
+	assert.Equal(t, expectedResources.Limits[v1.ResourceCPU], s.Spec.Template.Spec.Containers[2].Resources.Limits[v1.ResourceCPU])
+	assert.Equal(t, expectedResources.Requests[v1.ResourceMemory], s.Spec.Template.Spec.Containers[2].Resources.Requests[v1.ResourceMemory])
+	assert.Equal(t, expectedResources.Limits[v1.ResourceMemory], s.Spec.Template.Spec.Containers[2].Resources.Limits[v1.ResourceMemory])
+
+	// deprecated global sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "deprecated-global-sidecar",
+		Image:           "image:123",
+		Env:             env,
+		Resources:       generateKubernetesResources("200m", "500m", "0.7Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		VolumeMounts:    mounts,
+	})
+
+	// global sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:         "global-sidecar",
+		Env:          env,
+		VolumeMounts: mounts,
+	})
+
+	// replaced sidecar
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "replace-sidecar",
+		Image:           "overwrite-image",
+		Resources:       generateKubernetesResources("200m", "500m", "0.7Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Env:             env,
+		VolumeMounts:    mounts,
+	})
+
+	// replaced sidecar
+	// the order in env is important
+	scalyrEnv := append(env, v1.EnvVar{Name: "SCALYR_API_KEY", Value: "abc"}, v1.EnvVar{Name: "SCALYR_SERVER_HOST", Value: ""})
+	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
+		Name:            "scalyr-sidecar",
+		Image:           "scalyr-image",
+		Resources:       generateKubernetesResources("220m", "520m", "0.9Gi", "1.3Gi"),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Env:             scalyrEnv,
+		VolumeMounts:    mounts,
+	})
+
 }

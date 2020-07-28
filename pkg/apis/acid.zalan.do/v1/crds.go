@@ -21,48 +21,48 @@ const (
 
 // PostgresCRDResourceColumns definition of AdditionalPrinterColumns for postgresql CRD
 var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Team",
 		Type:        "string",
 		Description: "Team responsible for Postgres cluster",
 		JSONPath:    ".spec.teamId",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Version",
 		Type:        "string",
 		Description: "PostgreSQL version",
 		JSONPath:    ".spec.postgresql.version",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Pods",
 		Type:        "integer",
 		Description: "Number of Pods per Postgres cluster",
 		JSONPath:    ".spec.numberOfInstances",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Volume",
 		Type:        "string",
 		Description: "Size of the bound volume",
 		JSONPath:    ".spec.volume.size",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "CPU-Request",
 		Type:        "string",
 		Description: "Requested CPU for Postgres containers",
 		JSONPath:    ".spec.resources.requests.cpu",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Memory-Request",
 		Type:        "string",
 		Description: "Requested memory for Postgres containers",
 		JSONPath:    ".spec.resources.requests.memory",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:     "Age",
 		Type:     "date",
 		JSONPath: ".metadata.creationTimestamp",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Status",
 		Type:        "string",
 		Description: "Current sync status of postgresql resource",
@@ -72,31 +72,31 @@ var PostgresCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
 
 // OperatorConfigCRDResourceColumns definition of AdditionalPrinterColumns for OperatorConfiguration CRD
 var OperatorConfigCRDResourceColumns = []apiextv1beta1.CustomResourceColumnDefinition{
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Image",
 		Type:        "string",
 		Description: "Spilo image to be used for Pods",
 		JSONPath:    ".configuration.docker_image",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Cluster-Label",
 		Type:        "string",
 		Description: "Label for K8s resources created by operator",
 		JSONPath:    ".configuration.kubernetes.cluster_name_label",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Service-Account",
 		Type:        "string",
 		Description: "Name of service account to be used",
 		JSONPath:    ".configuration.kubernetes.pod_service_account_name",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:        "Min-Instances",
 		Type:        "integer",
 		Description: "Minimum number of instances per Postgres cluster",
 		JSONPath:    ".configuration.min_instances",
 	},
-	apiextv1beta1.CustomResourceColumnDefinition{
+	{
 		Name:     "Age",
 		Type:     "date",
 		JSONPath: ".metadata.creationTimestamp",
@@ -132,7 +132,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 			},
 			"spec": {
 				Type:     "object",
-				Required: []string{"numberOfInstances", "teamId", "postgresql"},
+				Required: []string{"numberOfInstances", "teamId", "postgresql", "volume"},
 				Properties: map[string]apiextv1beta1.JSONSchemaProps{
 					"allowedSourceRanges": {
 						Type:     "array",
@@ -421,6 +421,43 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"preparedDatabases": {
+						Type: "object",
+						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"defaultUsers": {
+										Type: "boolean",
+									},
+									"extensions": {
+										Type: "object",
+										AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"schemas": {
+										Type: "object",
+										AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "object",
+												Properties: map[string]apiextv1beta1.JSONSchemaProps{
+													"defaultUsers": {
+														Type: "boolean",
+													},
+													"defaultRoles": {
+														Type: "boolean",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					"replicaLoadBalancer": {
 						Type:        "boolean",
 						Description: "Deprecated",
@@ -511,6 +548,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 								Type: "string",
 							},
 							"caFile": {
+								Type: "string",
+							},
+							"caSecretName": {
 								Type: "string",
 							},
 						},
@@ -682,6 +722,37 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"additionalVolumes": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"name", "mountPath", "volumeSource"},
+								Properties: map[string]apiextv1beta1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"mountPath": {
+										Type: "string",
+									},
+									"targetContainers": {
+										Type: "array",
+										Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1beta1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"volumeSource": {
+										Type: "object",
+									},
+									"subPath": {
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			"status": {
@@ -727,6 +798,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 					"enable_crd_validation": {
 						Type: "boolean",
 					},
+					"enable_lazy_spilo_upgrade": {
+						Type: "boolean",
+					},
 					"enable_shm_volume": {
 						Type: "boolean",
 					},
@@ -760,6 +834,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
 							Schema: &apiextv1beta1.JSONSchemaProps{
 								Type: "string",
+							},
+						},
+					},
+					"sidecars": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "object",
+								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Allows: true,
+								},
 							},
 						},
 					},
@@ -798,6 +883,14 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"custom_pod_annotations": {
 								Type: "object",
 								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+									Schema: &apiextv1beta1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
+							"downscaler_annotations": {
+								Type: "array",
+								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1beta1.JSONSchemaProps{
 										Type: "string",
 									},
@@ -886,6 +979,20 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 							"spilo_privileged": {
 								Type: "boolean",
+							},
+                                                      "storage_resize_mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"ebs"`),
+									},
+									{
+										Raw: []byte(`"pvc"`),
+									},
+									{
+										Raw: []byte(`"off"`),
+									},
+								},
 							},
 							"toleration": {
 								Type: "object",

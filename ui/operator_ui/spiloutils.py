@@ -1,7 +1,7 @@
 from boto3 import client
 from datetime import datetime, timezone
 from furl import furl
-from json import dumps
+from json import dumps, loads
 from logging import getLogger
 from os import environ, getenv
 from requests import Session
@@ -17,6 +17,15 @@ logger = getLogger(__name__)
 session = Session()
 
 OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
+
+COMMON_CLUSTER_LABEL = getenv('COMMON_CLUSTER_LABEL', '{"application":"spilo"}')
+COMMON_POOLER_LABEL = getenv('COMMONG_POOLER_LABEL', '{"application":"db-connection-pooler"}')
+
+logger.info("Common Cluster Label: {}".format(COMMON_CLUSTER_LABEL))
+logger.info("Common Pooler Label: {}".format(COMMON_POOLER_LABEL))
+
+COMMON_CLUSTER_LABEL = loads(COMMON_CLUSTER_LABEL)
+COMMON_POOLER_LABEL = loads(COMMON_POOLER_LABEL)
 
 
 def request(cluster, path, **kwargs):
@@ -85,6 +94,7 @@ def resource_api_version(resource_type):
     return {
         'postgresqls': 'apis/acid.zalan.do/v1',
         'statefulsets': 'apis/apps/v1',
+        'deployments': 'apis/apps/v1',
     }.get(resource_type, 'api/v1')
 
 
@@ -149,7 +159,7 @@ def read_pod(cluster, namespace, resource_name):
         resource_type='pods',
         namespace=namespace,
         resource_name=resource_name,
-        label_selector={'application': 'spilo'},
+        label_selector=COMMON_CLUSTER_LABEL,
     )
 
 
@@ -159,7 +169,17 @@ def read_service(cluster, namespace, resource_name):
         resource_type='services',
         namespace=namespace,
         resource_name=resource_name,
-        label_selector={'application': 'spilo'},
+        label_selector=COMMON_CLUSTER_LABEL,
+    )
+
+
+def read_pooler(cluster, namespace, resource_name):
+    return kubernetes_get(
+        cluster=cluster,
+        resource_type='deployments',
+        namespace=namespace,
+        resource_name=resource_name,
+        label_selector=COMMON_POOLER_LABEL,
     )
 
 
@@ -169,7 +189,7 @@ def read_statefulset(cluster, namespace, resource_name):
         resource_type='statefulsets',
         namespace=namespace,
         resource_name=resource_name,
-        label_selector={'application': 'spilo'},
+        label_selector=COMMON_CLUSTER_LABEL,
     )
 
 
@@ -302,7 +322,7 @@ def read_basebackups(
             f=configure_backup_cxt,
             aws_instance_profile=use_aws_instance_profile,
             s3_prefix=f's3://{bucket}/{prefix}{pg_cluster}{suffix}/wal/',
-        )._backup_list(detail=True)
+        )._backup_list(detail=True)._backup_list(prefix=f"{prefix}{pg_cluster}{suffix}/wal/")
     ]
 
 

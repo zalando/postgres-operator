@@ -12,20 +12,27 @@ import (
 )
 
 var pgUsers = []struct {
-	in  spec.PgUser
-	out string
+	in             spec.PgUser
+	outmd5         string
+	outscramsha256 string
 }{{spec.PgUser{
 	Name:     "test",
 	Password: "password",
 	Flags:    []string{},
 	MemberOf: []string{}},
-	"md587f77988ccb5aa917c93201ba314fcd4"},
+	"md587f77988ccb5aa917c93201ba314fcd4", "SCRAM-SHA-256$4096:c2FsdA==$lF4cRm/Jky763CN4HtxdHnjV4Q8AWTNlKvGmEFFU8IQ=:ub8OgRsftnk2ccDMOt7ffHXNcikRkQkq1lh4xaAqrSw="},
 	{spec.PgUser{
 		Name:     "test",
 		Password: "md592f413f3974bdf3799bb6fecb5f9f2c6",
 		Flags:    []string{},
 		MemberOf: []string{}},
-		"md592f413f3974bdf3799bb6fecb5f9f2c6"}}
+		"md592f413f3974bdf3799bb6fecb5f9f2c6", "md592f413f3974bdf3799bb6fecb5f9f2c6"},
+	{spec.PgUser{
+		Name:     "test",
+		Password: "SCRAM-SHA-256$4096:S1ByZWhvYVV5VDlJNGZoVw==$ozLevu5k0pAQYRrSY+vZhetO6+/oB+qZvuutOdXR94U=:yADwhy0LGloXzh5RaVwLMFyUokwI17VkHVfKVuHu0Zs=",
+		Flags:    []string{},
+		MemberOf: []string{}},
+		"SCRAM-SHA-256$4096:S1ByZWhvYVV5VDlJNGZoVw==$ozLevu5k0pAQYRrSY+vZhetO6+/oB+qZvuutOdXR94U=:yADwhy0LGloXzh5RaVwLMFyUokwI17VkHVfKVuHu0Zs=", "SCRAM-SHA-256$4096:S1ByZWhvYVV5VDlJNGZoVw==$ozLevu5k0pAQYRrSY+vZhetO6+/oB+qZvuutOdXR94U=:yADwhy0LGloXzh5RaVwLMFyUokwI17VkHVfKVuHu0Zs="}}
 
 var prettyDiffTest = []struct {
 	inA interface{}
@@ -107,9 +114,16 @@ func TestNameFromMeta(t *testing.T) {
 
 func TestPGUserPassword(t *testing.T) {
 	for _, tt := range pgUsers {
-		pwd := PGUserPassword(tt.in)
-		if pwd != tt.out {
-			t.Errorf("PgUserPassword expected: %q, got: %q", tt.out, pwd)
+		e := NewEncryptor("md5")
+		pwd := e.PGUserPassword(tt.in)
+		if pwd != tt.outmd5 {
+			t.Errorf("PgUserPassword expected: %q, got: %q", tt.outmd5, pwd)
+		}
+		e = NewEncryptor("scram-sha-256")
+		e.random = func(n int) string { return "salt" }
+		pwd = e.PGUserPassword(tt.in)
+		if pwd != tt.outscramsha256 {
+			t.Errorf("PgUserPassword expected: %q, got: %q", tt.outscramsha256, pwd)
 		}
 	}
 }

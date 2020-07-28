@@ -28,6 +28,7 @@ const (
 // an existing roles of another role membership, nor it removes the already assigned flag
 // (except for the NOLOGIN). TODO: process other NOflags, i.e. NOSUPERUSER correctly.
 type DefaultUserSyncStrategy struct {
+	PasswordEncryption string
 }
 
 // ProduceSyncRequests figures out the types of changes that need to happen with the given users.
@@ -45,7 +46,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 			}
 		} else {
 			r := spec.PgSyncUserRequest{}
-			newMD5Password := util.PGUserPassword(newUser)
+			newMD5Password := util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(newUser)
 
 			if dbUser.Password != newMD5Password {
 				r.User.Password = newMD5Password
@@ -73,26 +74,44 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 }
 
 // ExecuteSyncRequests makes actual database changes from the requests passed in its arguments.
-func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(reqs []spec.PgSyncUserRequest, db *sql.DB) error {
-	for _, r := range reqs {
-		switch r.Kind {
+func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSyncUserRequest, db *sql.DB) error {
+	var reqretries []spec.PgSyncUserRequest
+	var errors []string
+	for _, request := range requests {
+		switch request.Kind {
 		case spec.PGSyncUserAdd:
-			if err := strategy.createPgUser(r.User, db); err != nil {
-				return fmt.Errorf("could not create user %q: %v", r.User.Name, err)
+			if err := strategy.createPgUser(request.User, db); err != nil {
+				reqretries = append(reqretries, request)
+				errors = append(errors, fmt.Sprintf("could not create user %q: %v", request.User.Name, err))
 			}
 		case spec.PGsyncUserAlter:
-			if err := strategy.alterPgUser(r.User, db); err != nil {
-				return fmt.Errorf("could not alter user %q: %v", r.User.Name, err)
+			if err := strategy.alterPgUser(request.User, db); err != nil {
+				reqretries = append(reqretries, request)
+				errors = append(errors, fmt.Sprintf("could not alter user %q: %v", request.User.Name, err))
 			}
 		case spec.PGSyncAlterSet:
-			if err := strategy.alterPgUserSet(r.User, db); err != nil {
-				return fmt.Errorf("could not set custom user %q parameters: %v", r.User.Name, err)
+			if err := strategy.alterPgUserSet(request.User, db); err != nil {
+				reqretries = append(reqretries, request)
+				errors = append(errors, fmt.Sprintf("could not set custom user %q parameters: %v", request.User.Name, err))
 			}
 		default:
-			return fmt.Errorf("unrecognized operation: %v", r.Kind)
+			return fmt.Errorf("unrecognized operation: %v", request.Kind)
 		}
 
 	}
+
+	// creating roles might fail if group role members are created before the parent role
+	// retry adding roles as long as the number of failed attempts is shrinking
+	if len(reqretries) > 0 {
+		if len(reqretries) < len(requests) {
+			if err := strategy.ExecuteSyncRequests(reqretries, db); err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("could not execute sync requests for users: %v", errors)
+		}
+	}
+
 	return nil
 }
 func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql.DB) (err error) {
@@ -122,7 +141,7 @@ func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.D
 	if user.Password == "" {
 		userPassword = "PASSWORD NULL"
 	} else {
-		userPassword = fmt.Sprintf(passwordTemplate, util.PGUserPassword(user))
+		userPassword = fmt.Sprintf(passwordTemplate, util.NewEncryptor(strategy.PasswordEncryption).PGUserPassword(user))
 	}
 	query := fmt.Sprintf(createUserSQL, user.Name, strings.Join(userFlags, " "), userPassword)
 
@@ -137,7 +156,7 @@ func (strategy DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB
 	var resultStmt []string
 
 	if user.Password != "" || len(user.Flags) > 0 {
-		alterStmt := produceAlterStmt(user)
+		alterStmt := produceAlterStmt(user, strategy.PasswordEncryption)
 		resultStmt = append(resultStmt, alterStmt)
 	}
 	if len(user.MemberOf) > 0 {
@@ -156,14 +175,14 @@ func (strategy DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB
 	return nil
 }
 
-func produceAlterStmt(user spec.PgUser) string {
+func produceAlterStmt(user spec.PgUser, encryption string) string {
 	// ALTER ROLE ... LOGIN ENCRYPTED PASSWORD ..
 	result := make([]string, 0)
 	password := user.Password
 	flags := user.Flags
 
 	if password != "" {
-		result = append(result, fmt.Sprintf(passwordTemplate, util.PGUserPassword(user)))
+		result = append(result, fmt.Sprintf(passwordTemplate, util.NewEncryptor(encryption).PGUserPassword(user)))
 	}
 	if len(flags) != 0 {
 		result = append(result, strings.Join(flags, " "))

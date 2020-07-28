@@ -9,6 +9,7 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
+	v1 "k8s.io/api/core/v1"
 )
 
 // CRD describes CustomResourceDefinition specific configuration parameters
@@ -33,6 +34,7 @@ type Resources struct {
 	SpiloPrivileged         bool                `name:"spilo_privileged" default:"false"`
 	ClusterLabels           map[string]string   `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels         []string            `name:"inherited_labels" default:""`
+	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
 	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
 	PodRoleLabel            string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration           map[string]string   `name:"toleration" default:""`
@@ -81,7 +83,7 @@ type LogicalBackup struct {
 	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
 	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
 	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
-	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:"AES256"`
+	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:""`
 }
 
 // Operator options for connection pooler
@@ -107,12 +109,14 @@ type Config struct {
 	LogicalBackup
 	ConnectionPooler
 
-	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
-	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-12:1.6-p2"`
-	Sidecars                map[string]string `name:"sidecar_docker_images"`
-	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
+	WatchedNamespace        string `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	KubernetesUseConfigMaps bool   `name:"kubernetes_use_configmaps" default:"false"`
+	EtcdHost                string `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
+	DockerImage             string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-12:1.6-p3"`
+	// deprecated in favour of SidecarContainers
+	SidecarImages         map[string]string `name:"sidecar_docker_images"`
+	SidecarContainers     []v1.Container    `name:"sidecars"`
+	PodServiceAccountName string            `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`
@@ -122,6 +126,8 @@ type Config struct {
 	WALES3Bucket                           string            `name:"wal_s3_bucket"`
 	LogS3Bucket                            string            `name:"log_s3_bucket"`
 	KubeIAMRole                            string            `name:"kube_iam_role"`
+	WALGSBucket                            string            `name:"wal_gs_bucket"`
+	GCPCredentials                         string            `name:"gcp_credentials"`
 	AdditionalSecretMount                  string            `name:"additional_secret_mount"`
 	AdditionalSecretMountPath              string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
 	DebugLogging                           bool              `name:"debug_logging" default:"true"`
@@ -136,6 +142,7 @@ type Config struct {
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
+	StorageResizeMode                      string            `name:"storage_resize_mode" default:"ebs"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer        *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat       StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
@@ -144,7 +151,7 @@ type Config struct {
 	EnablePodDisruptionBudget *bool             `name:"enable_pod_disruption_budget" default:"true"`
 	EnableInitContainers      *bool             `name:"enable_init_containers" default:"true"`
 	EnableSidecars            *bool             `name:"enable_sidecars" default:"true"`
-	Workers                   uint32            `name:"workers" default:"4"`
+	Workers                   uint32            `name:"workers" default:"8"`
 	APIPort                   int               `name:"api_port" default:"8080"`
 	RingLogLines              int               `name:"ring_log_lines" default:"100"`
 	ClusterHistoryEntries     int               `name:"cluster_history_entries" default:"1000"`
@@ -154,6 +161,7 @@ type Config struct {
 	ProtectedRoles            []string          `name:"protected_role_names" default:"admin"`
 	PostgresSuperuserTeams    []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit   bool              `name:"set_memory_request_to_limit" default:"false"`
+	EnableLazySpiloUpgrade    bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 }
 
 // MustMarshal marshals the config or panics
@@ -218,5 +226,11 @@ func validate(cfg *Config) (err error) {
 		msg := "number of connection pooler instances should be higher than %d"
 		err = fmt.Errorf(msg, constants.ConnectionPoolerMinInstances)
 	}
+
+	if cfg.ConnectionPooler.User == cfg.SuperUsername {
+		msg := "Connection pool user is not allowed to be the same as super user, username: %s"
+		err = fmt.Errorf(msg, cfg.ConnectionPooler.User)
+	}
+
 	return
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -52,6 +53,7 @@ type KubernetesMetaConfiguration struct {
 	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
 	EnablePodDisruptionBudget              *bool                 `json:"enable_pod_disruption_budget,omitempty"`
+	StorageResizeMode                      string                `json:"storage_resize_mode,omitempty"`
 	EnableInitContainers                   *bool                 `json:"enable_init_containers,omitempty"`
 	EnableSidecars                         *bool                 `json:"enable_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
@@ -61,6 +63,7 @@ type KubernetesMetaConfiguration struct {
 	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
+	DownscalerAnnotations                  []string              `json:"downscaler_annotations,omitempty"`
 	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
 	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
 	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`
@@ -109,6 +112,8 @@ type LoadBalancerConfiguration struct {
 type AWSGCPConfiguration struct {
 	WALES3Bucket              string `json:"wal_s3_bucket,omitempty"`
 	AWSRegion                 string `json:"aws_region,omitempty"`
+	WALGSBucket               string `json:"wal_gs_bucket,omitempty"`
+	GCPCredentials            string `json:"gcp_credentials,omitempty"`
 	LogS3Bucket               string `json:"log_s3_bucket,omitempty"`
 	KubeIAMRole               string `json:"kube_iam_role,omitempty"`
 	AdditionalSecretMount     string `json:"additional_secret_mount,omitempty"`
@@ -181,18 +186,21 @@ type OperatorLogicalBackupConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
-	EtcdHost                   string                             `json:"etcd_host,omitempty"`
-	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
-	DockerImage                string                             `json:"docker_image,omitempty"`
-	Workers                    uint32                             `json:"workers,omitempty"`
-	MinInstances               int32                              `json:"min_instances,omitempty"`
-	MaxInstances               int32                              `json:"max_instances,omitempty"`
-	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
-	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
-	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
-	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
-	Sidecars                   map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	EnableCRDValidation     *bool    `json:"enable_crd_validation,omitempty"`
+	EnableLazySpiloUpgrade  bool     `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EtcdHost                string   `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps bool     `json:"kubernetes_use_configmaps,omitempty"`
+	DockerImage             string   `json:"docker_image,omitempty"`
+	Workers                 uint32   `json:"workers,omitempty"`
+	MinInstances            int32    `json:"min_instances,omitempty"`
+	MaxInstances            int32    `json:"max_instances,omitempty"`
+	ResyncPeriod            Duration `json:"resync_period,omitempty"`
+	RepairPeriod            Duration `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit bool     `json:"set_memory_request_to_limit,omitempty"`
+	ShmVolume               *bool    `json:"enable_shm_volume,omitempty"`
+	// deprecated in favour of SidecarContainers
+	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	SidecarContainers          []v1.Container                     `json:"sidecars,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`
 	PostgresPodResources       PostgresPodResourcesDefaults       `json:"postgres_pod_resources"`

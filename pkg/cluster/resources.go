@@ -105,7 +105,12 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 	var msg string
 	c.setProcessName("creating connection pooler")
 
+	if c.ConnectionPooler == nil {
+		c.ConnectionPooler = &ConnectionPoolerObjects{}
+	}
+
 	schema := c.Spec.ConnectionPooler.Schema
+
 	if schema == "" {
 		schema = c.OpConfig.ConnectionPooler.Schema
 	}
@@ -186,7 +191,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 		Deployments(c.Namespace).
 		Delete(context.TODO(), deploymentName, options)
 
-	if !k8sutil.ResourceNotFound(err) {
+	if k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("Connection pooler deployment was already deleted")
 	} else if err != nil {
 		return fmt.Errorf("could not delete deployment: %v", err)
@@ -208,7 +213,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 		Services(c.Namespace).
 		Delete(context.TODO(), serviceName, options)
 
-	if !k8sutil.ResourceNotFound(err) {
+	if k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("Connection pooler service was already deleted")
 	} else if err != nil {
 		return fmt.Errorf("could not delete service: %v", err)
@@ -720,17 +725,26 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 	return nil
 }
 
-func (c *Cluster) deleteSecret(secret *v1.Secret) error {
-	c.setProcessName("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
-	c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
-	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
-	if err != nil {
-		return err
+func (c *Cluster) deleteSecrets() error {
+	c.setProcessName("deleting secrets")
+	var errors []string
+	errorCount := 0
+	for uid, secret := range c.Secrets {
+		c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
+		err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("could not delete secret %q: %v", util.NameFromMeta(secret.ObjectMeta), err))
+			errorCount++
+		}
+		c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
+		c.Secrets[uid] = nil
 	}
-	c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
-	delete(c.Secrets, secret.UID)
 
-	return err
+	if errorCount > 0 {
+		return fmt.Errorf("could not delete all secrets: %v", errors)
+	}
+
+	return nil
 }
 
 func (c *Cluster) createRoles() (err error) {
@@ -847,4 +861,25 @@ func (c *Cluster) updateConnectionPoolerDeployment(oldDeploymentSpec, newDeploym
 	c.ConnectionPooler.Deployment = deployment
 
 	return deployment, nil
+}
+
+//updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
+func (c *Cluster) updateConnectionPoolerAnnotations(annotations map[string]string) (*appsv1.Deployment, error) {
+	c.logger.Debugf("updating connection pooler annotations")
+	patchData, err := metaAnnotationsPatch(annotations)
+	if err != nil {
+		return nil, fmt.Errorf("could not form patch for the deployment metadata: %v", err)
+	}
+	result, err := c.KubeClient.Deployments(c.ConnectionPooler.Deployment.Namespace).Patch(
+		context.TODO(),
+		c.ConnectionPooler.Deployment.Name,
+		types.MergePatchType,
+		[]byte(patchData),
+		metav1.PatchOptions{},
+		"")
+	if err != nil {
+		return nil, fmt.Errorf("could not patch connection pooler annotations %q: %v", patchData, err)
+	}
+	return result, nil
+
 }

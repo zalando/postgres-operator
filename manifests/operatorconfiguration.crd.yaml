@@ -11,6 +11,26 @@ spec:
     singular: operatorconfiguration
     shortNames:
     - opconfig
+  additionalPrinterColumns:
+  - name: Image
+    type: string
+    description: Spilo image to be used for Pods
+    JSONPath: .configuration.docker_image
+  - name: Cluster-Label
+    type: string
+    description: Label for K8s resources created by operator
+    JSONPath: .configuration.kubernetes.cluster_name_label
+  - name: Service-Account
+    type: string
+    description: Name of service account to be used
+    JSONPath: .configuration.kubernetes.pod_service_account_name
+  - name: Min-Instances
+    type: integer
+    description: Minimum number of instances per Postgres cluster
+    JSONPath: .configuration.min_instances
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
   scope: Namespaced
   subresources:
     status: {}
@@ -38,6 +58,8 @@ spec:
               type: string
             enable_crd_validation:
               type: boolean
+            enable_lazy_spilo_upgrade:
+              type: boolean
             enable_shm_volume:
               type: boolean
             etcd_host:
@@ -60,6 +82,12 @@ spec:
               type: object
               additionalProperties:
                 type: string
+            sidecars:
+              type: array
+              nullable: true
+              items:
+                type: object
+                additionalProperties: true
             workers:
               type: integer
               minimum: 1
@@ -84,6 +112,10 @@ spec:
                 custom_pod_annotations:
                   type: object
                   additionalProperties:
+                    type: string
+                downscaler_annotations:
+                  type: array
+                  items:
                     type: string
                 enable_init_containers:
                   type: boolean
@@ -136,6 +168,12 @@ spec:
                   type: integer
                 spilo_privileged:
                   type: boolean
+                storage_resize_mode:
+                  type: string
+                  enum:
+                    - "ebs"
+                    - "pvc"
+                    - "off"
                 toleration:
                   type: object
                   additionalProperties:
@@ -204,9 +242,13 @@ spec:
                   type: string
                 aws_region:
                   type: string
+                gcp_credentials:
+                  type: string
                 kube_iam_role:
                   type: string
                 log_s3_bucket:
+                  type: string
+                wal_gs_bucket:
                   type: string
                 wal_s3_bucket:
                   type: string
@@ -275,7 +317,7 @@ spec:
                   type: integer
                 ring_log_lines:
                   type: integer
-            scalyr:
+            scalyr:  # deprecated
               type: object
               properties:
                 scalyr_api_key:

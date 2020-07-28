@@ -8,7 +8,7 @@ metadata:
 spec:
   type: "ClusterIP"
   selector:
-    application: "postgres-operator-ui"
+    name: "postgres-operator-ui"
   ports:
     - port: 80
       protocol: "TCP"

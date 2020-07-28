@@ -50,23 +50,25 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	NumberOfInstances     int32                `json:"numberOfInstances"`
-	Users                 map[string]UserFlags `json:"users"`
-	MaintenanceWindows    []MaintenanceWindow  `json:"maintenanceWindows,omitempty"`
-	Clone                 CloneDescription     `json:"clone"`
-	ClusterName           string               `json:"-"`
-	Databases             map[string]string    `json:"databases,omitempty"`
-	Tolerations           []v1.Toleration      `json:"tolerations,omitempty"`
-	Sidecars              []Sidecar            `json:"sidecars,omitempty"`
-	InitContainers        []v1.Container       `json:"initContainers,omitempty"`
-	PodPriorityClassName  string               `json:"podPriorityClassName,omitempty"`
-	ShmVolume             *bool                `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup   bool                 `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupSchedule string               `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription  `json:"standby"`
-	PodAnnotations        map[string]string    `json:"podAnnotations"`
-	ServiceAnnotations    map[string]string    `json:"serviceAnnotations"`
-	TLS                   *TLSDescription      `json:"tls"`
+	NumberOfInstances     int32                       `json:"numberOfInstances"`
+	Users                 map[string]UserFlags        `json:"users"`
+	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
+	Clone                 CloneDescription            `json:"clone"`
+	ClusterName           string                      `json:"-"`
+	Databases             map[string]string           `json:"databases,omitempty"`
+	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
+	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
+	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
+	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
+	PodPriorityClassName  string                      `json:"podPriorityClassName,omitempty"`
+	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster        *StandbyDescription         `json:"standby"`
+	PodAnnotations        map[string]string           `json:"podAnnotations"`
+	ServiceAnnotations    map[string]string           `json:"serviceAnnotations"`
+	TLS                   *TLSDescription             `json:"tls"`
+	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -83,6 +85,19 @@ type PostgresqlList struct {
 	Items []Postgresql `json:"items"`
 }
 
+// PreparedDatabase describes elements to be bootstrapped
+type PreparedDatabase struct {
+	PreparedSchemas map[string]PreparedSchema `json:"schemas,omitempty"`
+	DefaultUsers    bool                      `json:"defaultUsers,omitempty" defaults:"false"`
+	Extensions      map[string]string         `json:"extensions,omitempty"`
+}
+
+// PreparedSchema describes elements to be bootstrapped per schema
+type PreparedSchema struct {
+	DefaultRoles *bool `json:"defaultRoles,omitempty" defaults:"true"`
+	DefaultUsers bool  `json:"defaultUsers,omitempty" defaults:"false"`
+}
+
 // MaintenanceWindow describes the time window when the operator is allowed to do maintenance on a cluster.
 type MaintenanceWindow struct {
 	Everyday  bool
@@ -96,6 +111,14 @@ type Volume struct {
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass"`
 	SubPath      string `json:"subPath,omitempty"`
+}
+
+type AdditionalVolume struct {
+	Name             string          `json:"name"`
+	MountPath        string          `json:"mountPath"`
+	SubPath          string          `json:"subPath"`
+	TargetContainers []string        `json:"targetContainers"`
+	VolumeSource     v1.VolumeSource `json:"volumeSource"`
 }
 
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
@@ -143,6 +166,7 @@ type TLSDescription struct {
 	CertificateFile string `json:"certificateFile,omitempty"`
 	PrivateKeyFile  string `json:"privateKeyFile,omitempty"`
 	CAFile          string `json:"caFile,omitempty"`
+	CASecretName    string `json:"caSecretName,omitempty"`
 }
 
 // CloneDescription describes which cluster the new should clone and up to which point in time

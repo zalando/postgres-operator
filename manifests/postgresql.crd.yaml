@@ -11,6 +11,38 @@ spec:
     singular: postgresql
     shortNames:
     - pg
+  additionalPrinterColumns:
+  - name: Team
+    type: string
+    description: Team responsible for Postgres CLuster
+    JSONPath: .spec.teamId
+  - name: Version
+    type: string
+    description: PostgreSQL version
+    JSONPath: .spec.postgresql.version
+  - name: Pods
+    type: integer
+    description: Number of Pods per Postgres cluster
+    JSONPath: .spec.numberOfInstances
+  - name: Volume
+    type: string
+    description: Size of the bound volume
+    JSONPath: .spec.volume.size
+  - name: CPU-Request
+    type: string
+    description: Requested CPU for Postgres containers
+    JSONPath: .spec.resources.requests.cpu
+  - name: Memory-Request
+    type: string
+    description: Requested memory for Postgres containers
+    JSONPath: .spec.resources.requests.memory
+  - name: Age
+    type: date
+    JSONPath: .metadata.creationTimestamp
+  - name: Status
+    type: string
+    description: Current sync status of postgresql resource
+    JSONPath: .status.PostgresClusterStatus
   scope: Namespaced
   subresources:
     status: {}
@@ -37,7 +69,30 @@ spec:
             - numberOfInstances
             - teamId
             - postgresql
+            - volume
           properties:
+            additionalVolumes:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                  - mountPath
+                  - volumeSource
+                properties:
+                  name:
+                    type: string
+                  mountPath:
+                    type: string
+                  targetContainers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
+                  volumeSource:
+                    type: object
+                  subPath:
+                    type: string
             allowedSourceRanges:
               type: array
               nullable: true
@@ -215,6 +270,26 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+            preparedDatabases:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  defaultUsers:
+                    type: boolean
+                  extensions:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  schemas:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        defaultUsers:
+                          type: boolean
+                        defaultRoles:
+                          type: boolean
             replicaLoadBalancer:  # deprecated
               type: boolean
             resources:
@@ -326,6 +401,8 @@ spec:
                 privateKeyFile:
                   type: string
                 caFile:
+                  type: string
+                caSecretName:
                   type: string
             tolerations:
               type: array
