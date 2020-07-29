@@ -486,11 +486,14 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("could not delete pods: %v", err)
 	}
 
-	c.logger.Debugf("c.Postgresql.Spec.Volume.KeepPVC = %t", c.Postgresql.Spec.Volume.KeepPVC)
-	if c.Postgresql.Spec.Volume.KeepPVC == false {
+	keepPVC := (c.Postgresql.Spec.Volume.KeepPVC != nil && *c.Postgresql.Spec.Volume.KeepPVC) || (c.Postgresql.Spec.Volume.KeepPVC == nil && c.OpConfig.KeepPVC)
+	c.logger.Debugf("keepPVC = %t", keepPVC)
+	if keepPVC == false {
 		if err := c.deletePersistentVolumeClaims(); err != nil {
 			return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
 		}
+	} else {
+		c.logger.Infoln("not deleting PVCs because keepPVC is true")
 	}
 
 	return nil
@@ -729,7 +732,8 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 }
 
 func (c *Cluster) deleteSecrets() error {
-	if c.Postgresql.Spec.Volume.KeepPVC == false {
+	keepPVC := (c.Postgresql.Spec.Volume.KeepPVC != nil && *c.Postgresql.Spec.Volume.KeepPVC) || (c.Postgresql.Spec.Volume.KeepPVC == nil && c.OpConfig.KeepPVC)
+	if keepPVC == false {
 		c.setProcessName("deleting secrets")
 		var errors []string
 		errorCount := 0

@@ -178,6 +178,8 @@ spec:
                     type: string
                 watched_namespace:
                   type: string
+                keepPVC:
+                  type: boolean
             postgres_pod_resources:
               type: object
               properties:
