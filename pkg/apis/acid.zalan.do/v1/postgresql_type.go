@@ -50,25 +50,26 @@ type PostgresSpec struct {
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
-	NumberOfInstances     int32                       `json:"numberOfInstances"`
-	Users                 map[string]UserFlags        `json:"users"`
-	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                 CloneDescription            `json:"clone"`
-	ClusterName           string                      `json:"-"`
-	Databases             map[string]string           `json:"databases,omitempty"`
-	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
-	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
-	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
-	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
-	PodPriorityClassName  string                      `json:"podPriorityClassName,omitempty"`
-	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
-	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
-	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription         `json:"standby"`
-	PodAnnotations        map[string]string           `json:"podAnnotations"`
-	ServiceAnnotations    map[string]string           `json:"serviceAnnotations"`
-	TLS                   *TLSDescription             `json:"tls"`
-	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
+	NumberOfInstances             int32                          `json:"numberOfInstances"`
+	Users                         map[string]UserFlags           `json:"users"`
+	MaintenanceWindows            []MaintenanceWindow            `json:"maintenanceWindows,omitempty"`
+	Clone                         CloneDescription               `json:"clone"`
+	ClusterName                   string                         `json:"-"`
+	Databases                     map[string]string              `json:"databases,omitempty"`
+	PreparedDatabases             map[string]PreparedDatabase    `json:"preparedDatabases,omitempty"`
+	Tolerations                   []v1.Toleration                `json:"tolerations,omitempty"`
+	Sidecars                      []Sidecar                      `json:"sidecars,omitempty"`
+	InitContainers                []v1.Container                 `json:"initContainers,omitempty"`
+	PodPriorityClassName          string                         `json:"podPriorityClassName,omitempty"`
+	ShmVolume                     *bool                          `json:"enableShmVolume,omitempty"`
+	EnableLogicalBackup           bool                           `json:"enableLogicalBackup,omitempty"`
+	LogicalBackupSchedule         string                         `json:"logicalBackupSchedule,omitempty"`
+	StandbyCluster                *StandbyDescription            `json:"standby"`
+	PodAnnotations                map[string]string              `json:"podAnnotations"`
+	ServiceAnnotations            map[string]string              `json:"serviceAnnotations"`
+	TLS                           *TLSDescription                `json:"tls"`
+	AdditionalVolumes             []AdditionalVolume             `json:"additionalVolumes,omitempty"`
+	AdditionalVolumeClaimTempates []AdditionalVolumeClaimTempate `json:"additionalVolumeClaimTempates,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -111,6 +112,16 @@ type Volume struct {
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass"`
 	SubPath      string `json:"subPath,omitempty"`
+}
+
+// AdditionalVolumeClaimTempate describes a additional volume claim template
+type AdditionalVolumeClaimTempate struct {
+	Name             string   `json:"name"`
+	Size             string   `json:"size"`
+	StorageClass     string   `json:"storageClass"`
+	MountPath        string   `json:"mountPath"`
+	SubPath          string   `json:"subPath,omitempty"`
+	TargetContainers []string `json:"targetContainers"`
 }
 
 type AdditionalVolume struct {

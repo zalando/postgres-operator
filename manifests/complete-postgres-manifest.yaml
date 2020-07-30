@@ -41,6 +41,11 @@ spec:
   volume:
     size: 1Gi
 #    storageClass: my-sc
+  additionalVolumeClaimTempates:
+    - mountPath: /home/postgres/extra-tablespace
+      name: extra-tablespace
+      size: 1Gi
+#     storageClass: my-sc
   additionalVolumes:
     - name: empty
       mountPath: /opt/empty

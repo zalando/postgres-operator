@@ -441,6 +441,12 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		reasons = append(reasons, "new statefulset's volumeClaimTemplates contains different number of volumes to the old one")
 	}
 	for i := 0; i < len(c.Statefulset.Spec.VolumeClaimTemplates); i++ {
+		// break if new spec has more VolumeClaimTemplates than the old one.
+		// Prevent index out of range and no point in checking if the new volume claim template has chnaged
+		if i == len(statefulSet.Spec.VolumeClaimTemplates) {
+			break
+		}
+
 		name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
 		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
 		if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {

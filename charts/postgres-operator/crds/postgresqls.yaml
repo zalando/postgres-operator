@@ -478,3 +478,29 @@ spec:
                   type: string
                 subPath:
                   type: string
+            additionalVolumeClaimTemplates:
+              type: array
+              items:
+                type: object
+                required:
+                  - size
+                  - name
+                  - mountPath
+                properties:
+                  name:
+                    type: string
+                  size:
+                    type: string
+                    pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+                    # Note: the value specified here must not be zero.
+                  storageClass:
+                    type: string
+                  mountPath:
+                    type: string
+                  subPath:
+                    type: string
+                  targetContainers:
+                    type: array
+                    nullable: true
+                    items:
+                      type: string
