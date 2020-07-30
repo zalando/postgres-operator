@@ -780,7 +780,7 @@ func deduplicateEnvVars(input []v1.EnvVar, containerName string, logger *logrus.
 		} else if names[va.Name] == 1 {
 			names[va.Name]++
 
-			// Some variables (those to configure the WAL_ and LOG_ shipping) may be overriden, only log as info
+			// Some variables (those to configure the WAL_ and LOG_ shipping) may be overwritten, only log as info
 			if strings.HasPrefix(va.Name, "WAL_") || strings.HasPrefix(va.Name, "LOG_") {
 				logger.Infof("global variable %q has been overwritten by configmap/secret for container %q",
 					va.Name, containerName)
