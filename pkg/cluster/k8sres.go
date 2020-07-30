@@ -725,7 +725,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_USE_CONFIGMAPS", Value: "true"})
 	}
 
-	if cloneDescription.ClusterName != "" {
+	if cloneDescription != nil && cloneDescription.ClusterName != "" {
 		envVars = append(envVars, c.generateCloneEnvironment(cloneDescription)...)
 	}
 
@@ -1065,7 +1065,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	spiloEnvVars := c.generateSpiloPodEnvVars(
 		c.Postgresql.GetUID(),
 		spiloConfiguration,
-		&spec.Clone,
+		spec.Clone,
 		spec.StandbyCluster,
 		customPodEnvVarsList,
 	)

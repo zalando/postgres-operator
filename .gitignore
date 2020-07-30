@@ -30,6 +30,7 @@ _testmain.go
 /docker/build/
 /github.com/
 .idea
+.vscode
 
 scm-source.json
 
