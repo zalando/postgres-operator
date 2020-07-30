@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"testing"
 
@@ -749,7 +750,8 @@ func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.Get
 	configmap := &v1.ConfigMap{}
 	configmap.Name = testPodEnvironmentConfigMapName
 	configmap.Data = map[string]string{
-		"foo": "bar",
+		"foo1": "bar1",
+		"foo2": "bar2",
 	}
 	return configmap, nil
 }
@@ -816,8 +818,12 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 			},
 			envVars: []v1.EnvVar{
 				{
-					Name:  "foo",
-					Value: "bar",
+					Name:  "foo1",
+					Value: "bar1",
+				},
+				{
+					Name:  "foo2",
+					Value: "bar2",
 				},
 			},
 		},
@@ -825,6 +831,7 @@ func TestPodEnvironmentConfigMapVariables(t *testing.T) {
 	for _, tt := range tests {
 		c := newMockCluster(tt.opConfig)
 		vars, err := c.getPodEnvironmentConfigMapVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 		if !reflect.DeepEqual(vars, tt.envVars) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
 				testName, tt.subTest, tt.envVars, vars)
@@ -902,6 +909,7 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 	for _, tt := range tests {
 		c := newMockCluster(tt.opConfig)
 		vars, err := c.getPodEnvironmentSecretVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 		if !reflect.DeepEqual(vars, tt.envVars) {
 			t.Errorf("%s %s: expected `%v` but got `%v`",
 				testName, tt.subTest, tt.envVars, vars)
