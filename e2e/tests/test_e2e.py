@@ -861,7 +861,7 @@ class K8s:
             stderr=subprocess.PIPE)
 
     def exec_with_kubectl(self, pod, cmd):
-        return subprocess.run(["exec.sh", pod, cmd],
+        return subprocess.run(["e2e/exec.sh", pod, cmd],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
 
