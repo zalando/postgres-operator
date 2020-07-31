@@ -53,7 +53,7 @@ type PostgresSpec struct {
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
 	Users                 map[string]UserFlags        `json:"users"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                 CloneDescription            `json:"clone"`
+	Clone                 *CloneDescription           `json:"clone"`
 	ClusterName           string                      `json:"-"`
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`

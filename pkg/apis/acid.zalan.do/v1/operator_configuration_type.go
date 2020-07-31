@@ -70,6 +70,7 @@ type KubernetesMetaConfiguration struct {
 	// TODO: use a proper toleration structure?
 	PodToleration              map[string]string   `json:"toleration,omitempty"`
 	PodEnvironmentConfigMap    spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
+	PodEnvironmentSecret       string              `json:"pod_environment_secret,omitempty"`
 	PodPriorityClassName       string              `json:"pod_priority_class_name,omitempty"`
 	MasterPodMoveTimeout       Duration            `json:"master_pod_move_timeout,omitempty"`
 	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
