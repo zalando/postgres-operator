@@ -319,11 +319,18 @@ spec:
 
 
 ## Custom Pod Environment Variables
-
-It is possible to configure a ConfigMap which is used by the Postgres pods as
+It is possible to configure a ConfigMap as well as a Secret which are used by the Postgres pods as
 an additional provider for environment variables. One use case is to customize
-the Spilo image and configure it with environment variables. The ConfigMap with
-the additional settings is referenced in the operator's main configuration.
+the Spilo image and configure it with environment variables. Another case could be to provide custom
+cloud provider or backup settings.
+
+In general the Operator will give preference to the globally configured variables, to not have the custom
+ones interfere with core functionality. Variables with the 'WAL_' and 'LOG_' prefix can be overwritten though, to allow
+backup and logshipping to be specified differently.
+
+
+### Via ConfigMap
+The ConfigMap with the additional settings is referenced in the operator's main configuration.
 A namespace can be specified along with the name. If left out, the configured
 default namespace of your K8s client will be used and if the ConfigMap is not
 found there, the Postgres cluster's namespace is taken when different:
@@ -365,7 +372,54 @@ data:
   MY_CUSTOM_VAR: value
 ```
 
-This ConfigMap is then added as a source of environment variables to the
+The key-value pairs of the ConfigMap are then added as environment variables to the
+Postgres StatefulSet/pods.
+
+
+### Via Secret
+The Secret with the additional variables is referenced in the operator's main configuration.
+To protect the values of the secret from being exposed in the pod spec they are each referenced
+as SecretKeyRef.
+This does not allow for the secret to be in a different namespace as the pods though
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  # referencing secret with custom environment variables
+  pod_environment_secret: postgres-pod-secrets
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    # referencing secret with custom environment variables
+    pod_environment_secret: postgres-pod-secrets
+```
+
+**referenced Secret `postgres-pod-secrets`**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-pod-secrets
+  namespace: default
+data:
+  MY_CUSTOM_VAR: dmFsdWU=
+```
+
+The key-value pairs of the Secret are all accessible as environment variables to the
 Postgres StatefulSet/pods.
 
 ## Limiting the number of min and max instances in clusters
