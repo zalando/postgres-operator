@@ -252,8 +252,15 @@ configuration they are grouped under the `kubernetes` key.
   teams API. The default is `postgresql-operator`.
 
 * **infrastructure_roles_secret_name**
-  namespaced name of the secret containing infrastructure roles names and
-  passwords.
+  *deprecated*: namespaced name of the secret containing infrastructure roles
+  names and passwords.
+
+* **infrastructure_roles_secrets**
+  array of infrastructure role definitions which reference existing secrets
+  and specify the keys for extract credentials from them such as user name,
+  password and role membership. For the configmap this has to be a string
+  which allows referencing only one infrastructure roles secret.
+  The default is empty.
 
 * **pod_role_label**
   name of the label assigned to the Postgres pods (and services/endpoints) by
