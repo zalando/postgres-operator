@@ -1,3 +1,4 @@
+import json
 import unittest
 import time
 import timeout_decorator
@@ -570,6 +571,45 @@ class EndToEndTestCase(unittest.TestCase):
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_infrastructure_roles(self):
+        '''
+            Test using external secrets for infrastructure roles
+        '''
+        k8s = self.k8s
+        # update docker image in config and enable the lazy upgrade
+        secret_name = "postgresql-infrastructure-roles-new"
+        roles = "name: user, role: role, password: password"
+        patch_infrastructure_roles = {
+            "data": {
+                "infrastructure_roles_secret_name": secret_name,
+                "infrastructure_roles_secrets": roles,
+            },
+        }
+        k8s.update_config(patch_infrastructure_roles)
+
+        # wait a little before proceeding
+        time.sleep(30)
+
+        # check that new roles are represented in the config by requesting the
+        # operator configuration via API
+        operator_pod = k8s.get_operator_pod()
+        get_config_cmd = "wget --quiet -O - localhost:8080/config"
+        result = k8s.exec_with_kubectl(operator_pod, get_config_cmd)
+        roles_dict = (json.loads(result.stdout)
+                    .get("controller", {})
+                    .get("InfrastructureRoles"))
+
+        self.assertTrue("robot_zmon_acid_monitoring_new" in roles_dict)
+        roles_dict.pop("Password", None)
+        self.assertDictEqual(roles_dict, {
+            "Name": "robot_zmon_acid_monitoring_new",
+            "Flags": None,
+            "MemberOf": ["robot_zmon_new"],
+            "Parameters": None,
+            "AdminRole": "",
+        })
+
     def get_failover_targets(self, master_node, replica_nodes):
         '''
            If all pods live on the same node, failover will happen to other worker(s)
@@ -817,6 +857,11 @@ class K8s:
     def create_with_kubectl(self, path):
         return subprocess.run(
             ["kubectl", "create", "-f", path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+
+    def exec_with_kubectl(self, pod, cmd):
+        return subprocess.run(["exec.sh", pod, cmd],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
 
