@@ -578,8 +578,8 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
         # update docker image in config and enable the lazy upgrade
-        secret_name = "postgresql-infrastructure-roles-new"
-        roles = "name: user, role: role, password: password"
+        secret_name = "postgresql-infrastructure-roles-old"
+        roles = "secretname: postgresql-infrastructure-roles-new, userkey: user, rolekey: role, passwordkey: password"
         patch_infrastructure_roles = {
             "data": {
                 "infrastructure_roles_secret_name": secret_name,
