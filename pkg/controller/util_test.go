@@ -132,11 +132,11 @@ func TestOldInfrastructureRoleFormat(t *testing.T) {
 		roles, errors := utilTestController.getInfrastructureRoles(
 			[]*config.InfrastructureRole{
 				&config.InfrastructureRole{
-					SecretName: test.secretName,
-					Name:       "user",
-					Password:   "password",
-					Role:       "inrole",
-					Template:   true,
+					SecretName:  test.secretName,
+					UserKey:     "user",
+					PasswordKey: "password",
+					RoleKey:     "inrole",
+					Template:    true,
 				},
 			})
 
@@ -231,11 +231,11 @@ func TestNewInfrastructureRoleFormat(t *testing.T) {
 		definitions := []*config.InfrastructureRole{}
 		for _, secret := range test.secrets {
 			definitions = append(definitions, &config.InfrastructureRole{
-				SecretName: secret,
-				Name:       "user",
-				Password:   "password",
-				Role:       "inrole",
-				Template:   false,
+				SecretName:  secret,
+				UserKey:     "user",
+				PasswordKey: "password",
+				RoleKey:     "inrole",
+				Template:    false,
 			})
 		}
 
@@ -287,10 +287,10 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 						Namespace: v1.NamespaceDefault,
 						Name:      testInfrastructureRolesNewSecretName,
 					},
-					Name:     "user",
-					Password: "password",
-					Role:     "inrole",
-					Template: false,
+					UserKey:     "user",
+					PasswordKey: "password",
+					RoleKey:     "inrole",
+					Template:    false,
 				},
 			},
 			spec.NamespacedName{},
@@ -301,10 +301,10 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 						Namespace: v1.NamespaceDefault,
 						Name:      testInfrastructureRolesNewSecretName,
 					},
-					Name:     "user",
-					Password: "password",
-					Role:     "inrole",
-					Template: false,
+					UserKey:     "user",
+					PasswordKey: "password",
+					RoleKey:     "inrole",
+					Template:    false,
 				},
 			},
 		},
@@ -322,10 +322,10 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 						Namespace: v1.NamespaceDefault,
 						Name:      testInfrastructureRolesOldSecretName,
 					},
-					Name:     "user",
-					Password: "password",
-					Role:     "inrole",
-					Template: true,
+					UserKey:     "user",
+					PasswordKey: "password",
+					RoleKey:     "inrole",
+					Template:    true,
 				},
 			},
 		},
@@ -336,17 +336,17 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 				Namespace: v1.NamespaceDefault,
 				Name:      testInfrastructureRolesOldSecretName,
 			},
-			"name: test-user, password: test-password, role: test-role",
+			"secretname: infrastructureroles-old-test, userkey: test-user, passwordkey: test-password, rolekey: test-role, template: false",
 			[]*config.InfrastructureRole{
 				&config.InfrastructureRole{
 					SecretName: spec.NamespacedName{
 						Namespace: v1.NamespaceDefault,
 						Name:      testInfrastructureRolesOldSecretName,
 					},
-					Name:     "test-user",
-					Password: "test-password",
-					Role:     "test-role",
-					Template: false,
+					UserKey:     "test-user",
+					PasswordKey: "test-password",
+					RoleKey:     "test-role",
+					Template:    false,
 				},
 			},
 		},
@@ -364,7 +364,7 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 		{
 			[]*config.InfrastructureRole{},
 			spec.NamespacedName{},
-			"name: test-user, password: test-password, role: test-role",
+			"userkey: test-user, passwordkey: test-password, rolekey: test-role, template: false",
 			[]*config.InfrastructureRole{},
 		},
 	}

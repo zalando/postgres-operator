@@ -79,10 +79,10 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 			result.InfrastructureRoles = append(
 				result.InfrastructureRoles,
 				&config.InfrastructureRole{
-					SecretName: secret.SecretName,
-					Name:       secret.Name,
-					Role:       secret.Role,
-					Password:   secret.Password,
+					SecretName:  secret.SecretName,
+					UserKey:     secret.UserKey,
+					RoleKey:     secret.RoleKey,
+					PasswordKey: secret.PasswordKey,
 				})
 		}
 	}

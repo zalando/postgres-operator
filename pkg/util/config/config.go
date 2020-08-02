@@ -57,18 +57,18 @@ type InfrastructureRole struct {
 	// configmap with an extra information
 	SecretName spec.NamespacedName
 
-	Name     string
-	Password string
-	Role     string
+	UserKey     string
+	PasswordKey string
+	RoleKey     string
 
 	// This field point out the detailed yaml definition of the role, if exists
 	Details string
 
 	// Specify if a secret contains multiple fields in the following format:
 	//
-	// 	%(name)idx: ...
-	// 	%(password)idx: ...
-	// 	%(role)idx: ...
+	// 	%(userkey)idx: ...
+	// 	%(passwordkey)idx: ...
+	// 	%(rolekey)idx: ...
 	//
 	// If it does, Name/Password/Role are interpreted not as unique field
 	// names, but as a template.

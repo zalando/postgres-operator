@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -132,17 +133,14 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 		// form key1: value1, key2: value2), which has to be used together with
 		// an old secret name.
 
+		var secretName spec.NamespacedName
+		var err error
 		propertySep := ","
 		valueSep := ":"
 
 		// The field contains the format in which secret is written, let's
 		// convert it to a proper definition
 		properties := strings.Split(c.opConfig.InfrastructureRolesDefs, propertySep)
-
-		roleDef = config.InfrastructureRole{
-			SecretName: c.opConfig.InfrastructureRolesSecretName,
-			Template:   false,
-		}
 
 		for _, property := range properties {
 			values := strings.Split(property, valueSep)
@@ -153,15 +151,24 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 			value := strings.TrimSpace(values[1])
 
 			switch name {
-			case "name":
-				roleDef.Name = value
-			case "password":
-				roleDef.Password = value
-			case "role":
-				roleDef.Role = value
+			case "secretname":
+				if err = secretName.DecodeWorker(value, "default"); err != nil {
+					c.logger.Warningf("Could not marshal secret name %s: %v", value, err)
+				} else {
+					roleDef.SecretName = secretName
+				}
+			case "userkey":
+				roleDef.UserKey = value
+			case "passwordkey":
+				roleDef.PasswordKey = value
+			case "rolekey":
+				roleDef.RoleKey = value
+			case "template":
+				if roleDef.Template, err = strconv.ParseBool(value); err != nil {
+					c.logger.Warningf("Could not extract template information %s: %v", value, err)
+				}
 			default:
-				c.logger.Warningf("Role description is not known: %s",
-					c.opConfig.InfrastructureRolesSecretName)
+				c.logger.Warningf("Role description is not known: %s", properties)
 			}
 		}
 	} else {
@@ -169,17 +176,17 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 		// via existing definition structure and remember that it's just a
 		// template, the real values are in user1,password1,inrole1 etc.
 		roleDef = config.InfrastructureRole{
-			SecretName: c.opConfig.InfrastructureRolesSecretName,
-			Name:       "user",
-			Password:   "password",
-			Role:       "inrole",
-			Template:   true,
+			SecretName:  c.opConfig.InfrastructureRolesSecretName,
+			UserKey:     "user",
+			PasswordKey: "password",
+			RoleKey:     "inrole",
+			Template:    true,
 		}
 	}
 
-	if roleDef.Name != "" &&
-		roleDef.Password != "" &&
-		roleDef.Role != "" {
+	if roleDef.UserKey != "" &&
+		roleDef.PasswordKey != "" &&
+		roleDef.RoleKey != "" {
 		rolesDefs = append(rolesDefs, &roleDef)
 	}
 
@@ -280,9 +287,9 @@ func (c *Controller) getInfrastructureRole(
 	Users:
 		for i := 1; i <= len(secretData); i++ {
 			properties := []string{
-				infraRole.Name,
-				infraRole.Password,
-				infraRole.Role,
+				infraRole.UserKey,
+				infraRole.PasswordKey,
+				infraRole.RoleKey,
 			}
 			t := spec.PgUser{Origin: spec.RoleOriginInfrastructure}
 			for _, p := range properties {
@@ -327,9 +334,9 @@ func (c *Controller) getInfrastructureRole(
 				return nil, fmt.Errorf("could not decode yaml role: %v", err)
 			}
 		} else {
-			roleDescr.Name = string(secretData[infraRole.Name])
-			roleDescr.Password = string(secretData[infraRole.Password])
-			roleDescr.MemberOf = append(roleDescr.MemberOf, string(secretData[infraRole.Role]))
+			roleDescr.Name = string(secretData[infraRole.UserKey])
+			roleDescr.Password = string(secretData[infraRole.PasswordKey])
+			roleDescr.MemberOf = append(roleDescr.MemberOf, string(secretData[infraRole.RoleKey]))
 		}
 
 		if roleDescr.Valid() {

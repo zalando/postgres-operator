@@ -150,21 +150,44 @@ user. There are two ways to define them:
 
 #### Infrastructure roles secret
 
-The infrastructure roles secret is specified by the `infrastructure_roles_secret_name`
-parameter. The role definition looks like this (values are base64 encoded):
+Infrastructure roles can be specified by the `infrastructure_roles_secrets`
+parameter where you can reference multiple existing secrets. Prior to `v1.6.0`
+the operator could only reference one secret with the
+`infrastructure_roles_secret_name` option. However, this secret could contain
+multiple roles using the same set of keys with incremented indexes.
 
 ```yaml
-user1: ZGJ1c2Vy
-password1: c2VjcmV0
-inrole1: b3BlcmF0b3I=
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-infrastructure-roles
+data:
+  user1: ZGJ1c2Vy
+  password1: c2VjcmV0
+  inrole1: b3BlcmF0b3I=
+  user2: ...
 ```
 
 The block above describes the infrastructure role 'dbuser' with password
-'secret' that is a member of the 'operator' role. For the following definitions
-one must increase the index, i.e. the next role will be defined as 'user2' and
-so on. The resulting role will automatically be a login role.
+'secret' that is a member of the 'operator' role. The resulting role will
+automatically be a login role.
 
-Note that with definitions that solely use the infrastructure roles secret
+With the new option the user can configure the names of secret keys that
+contain the user name, password etc. If the secret uses a template for
+multiple roles as described above, the `template` flag must be set to `true`.
+The secret itself is referenced by the `secretname` key. Please, refer to the
+example manifests to understand who `infrastructure_roles_secrets` has to be
+configured for the [configmap](../manifests/configmap.yaml) (can only
+reference one existing secret) or [CRD configuration](../manifests/postgresql-operator-default-configuration.yaml)
+(reference multiple secret definitions in an array).
+
+If both `infrastructure_roles_secret_name` and `infrastructure_roles_secrets`
+are defined the operator will create roles for both of them. So make sure,
+they do not collide. To migrate to the new format use the same names for the
+secret keys as in the example above and unset the
+`infrastructure_roles_secret_name`.
+
+Note, that with definitions that solely use the infrastructure roles secret
 there is no way to specify role options (like superuser or nologin) or role
 memberships. This is where the ConfigMap comes into play.
 
