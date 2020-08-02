@@ -595,7 +595,7 @@ class EndToEndTestCase(unittest.TestCase):
         # operator configuration via API
         operator_pod = k8s.get_operator_pod()
         get_config_cmd = "wget --quiet -O - localhost:8080/config"
-        result = k8s.exec_with_kubectl(operator_pod, get_config_cmd)
+        result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
         roles_dict = (json.loads(result.stdout)
                     .get("controller", {})
                     .get("InfrastructureRoles"))
@@ -861,7 +861,7 @@ class K8s:
             stderr=subprocess.PIPE)
 
     def exec_with_kubectl(self, pod, cmd):
-        return subprocess.run(["exec.sh", pod, cmd],
+        return subprocess.run(["e2e/exec.sh", pod, cmd],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
 
