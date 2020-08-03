@@ -44,11 +44,9 @@ configuration:
     #   userkey: "user"
     #   passwordkey: "password"
     #   rolekey: "inrole"
-    #   template: true
     # - secretname: "other-infrastructure-role"
     #   userkey: "other-user-key"
     #   passwordkey: "other-password-key"
-    #   template: false
     # inherited_labels:
     # - application
     # - environment

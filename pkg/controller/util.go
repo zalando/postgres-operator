@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -141,6 +140,7 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 		// The field contains the format in which secret is written, let's
 		// convert it to a proper definition
 		properties := strings.Split(c.opConfig.InfrastructureRolesDefs, propertySep)
+		roleDef = config.InfrastructureRole{Template: false}
 
 		for _, property := range properties {
 			values := strings.Split(property, valueSep)
@@ -163,10 +163,6 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 				roleDef.PasswordKey = value
 			case "rolekey":
 				roleDef.RoleKey = value
-			case "template":
-				if roleDef.Template, err = strconv.ParseBool(value); err != nil {
-					c.logger.Warningf("Could not extract template information %s: %v", value, err)
-				}
 			default:
 				c.logger.Warningf("Role description is not known: %s", properties)
 			}
