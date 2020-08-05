@@ -27,6 +27,7 @@ SOFTWARE.
 package v1
 
 import (
+	config "github.com/zalando/postgres-operator/pkg/util/config"
 	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -168,6 +169,17 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 	}
 	out.OAuthTokenSecretName = in.OAuthTokenSecretName
 	out.InfrastructureRolesSecretName = in.InfrastructureRolesSecretName
+	if in.InfrastructureRolesDefs != nil {
+		in, out := &in.InfrastructureRolesDefs, &out.InfrastructureRolesDefs
+		*out = make([]*config.InfrastructureRole, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(config.InfrastructureRole)
+				**out = **in
+			}
+		}
+	}
 	if in.ClusterLabels != nil {
 		in, out := &in.ClusterLabels, &out.ClusterLabels
 		*out = make(map[string]string, len(*in))

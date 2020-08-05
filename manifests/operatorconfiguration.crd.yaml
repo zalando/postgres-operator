@@ -127,6 +127,28 @@ spec:
                   type: boolean
                 infrastructure_roles_secret_name:
                   type: string
+                infrastructure_roles_secrets:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - secretname
+                      - userkey
+                      - passwordkey
+                    properties:
+                      secretname:
+                        type: string
+                      userkey:
+                        type: string
+                      passwordkey:
+                        type: string
+                      rolekey:
+                        type: string
+                      details:
+                        type: string
+                      template:
+                        type: boolean
                 inherited_labels:
                   type: array
                   items:

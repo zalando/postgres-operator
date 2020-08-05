@@ -911,6 +911,35 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"infrastructure_roles_secret_name": {
 								Type: "string",
 							},
+							"infrastructure_roles_secrets": {
+								Type: "array",
+								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1beta1.JSONSchemaProps{
+										Type:     "object",
+										Required: []string{"secretname", "userkey", "passwordkey"},
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"secretname": {
+												Type: "string",
+											},
+											"userkey": {
+												Type: "string",
+											},
+											"passwordkey": {
+												Type: "string",
+											},
+											"rolekey": {
+												Type: "string",
+											},
+											"details": {
+												Type: "string",
+											},
+											"template": {
+												Type: "boolean",
+											},
+										},
+									},
+								},
+							},
 							"inherited_labels": {
 								Type: "array",
 								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
@@ -983,7 +1012,7 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"spilo_privileged": {
 								Type: "boolean",
 							},
-                                                      "storage_resize_mode": {
+							"storage_resize_mode": {
 								Type: "string",
 								Enum: []apiextv1beta1.JSON{
 									{

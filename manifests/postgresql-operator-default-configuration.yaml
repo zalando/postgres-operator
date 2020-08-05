@@ -39,6 +39,14 @@ configuration:
     enable_pod_disruption_budget: true
     enable_sidecars: true
     # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
+    # infrastructure_roles_secrets:
+    # - secretname: "monitoring-roles"
+    #   userkey: "user"
+    #   passwordkey: "password"
+    #   rolekey: "inrole"
+    # - secretname: "other-infrastructure-role"
+    #   userkey: "other-user-key"
+    #   passwordkey: "other-password-key"
     # inherited_labels:
     # - application
     # - environment
