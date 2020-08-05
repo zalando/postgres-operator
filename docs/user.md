@@ -173,23 +173,39 @@ The block above describes the infrastructure role 'dbuser' with password
 automatically be a login role.
 
 With the new option the user can configure the names of secret keys that
-contain the user name, password etc. If the secret uses a template for
-multiple roles as described above, the `template` flag must be set to `true`.
-The secret itself is referenced by the `secretname` key. Please, refer to the
-example manifests to understand who `infrastructure_roles_secrets` has to be
-configured for the [configmap](../manifests/configmap.yaml) (can only
-reference one existing secret) or [CRD configuration](../manifests/postgresql-operator-default-configuration.yaml)
-(reference multiple secret definitions in an array).
+contain the user name, password etc. The secret itself is referenced by the
+`secretname` key. If the secret uses a template for multiple roles as described
+above, list them as separately.
+
+```yaml
+apiVersion: v1
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    infrastructure_roles_secrets:
+    - secretname: "postgresql-infrastructure-roles"
+      userkey: "user1"
+      passwordkey: "password1"
+      rolekey: "inrole1"
+    - secretname: "postgresql-infrastructure-roles"
+      userkey: "user2"
+      ...
+```
+
+Note, only the CRD-based configuration allows for referencing multiple secrets.
+As of now, the ConfigMap is restricted to either one or the existing template
+option with `infrastructure_roles_secret_name`. Please, refer to the example
+manifests to understand how `infrastructure_roles_secrets` has to be configured
+for the [configmap](../manifests/configmap.yaml) or [CRD configuration](../manifests/postgresql-operator-default-configuration.yaml).
 
 If both `infrastructure_roles_secret_name` and `infrastructure_roles_secrets`
 are defined the operator will create roles for both of them. So make sure,
-they do not collide. To migrate to the new format use the same names for the
-secret keys as in the example above and unset the
-`infrastructure_roles_secret_name`.
-
-Note, that with definitions that solely use the infrastructure roles secret
-there is no way to specify role options (like superuser or nologin) or role
-memberships. This is where the ConfigMap comes into play.
+they do not collide. Note also, that with definitions that solely use the
+infrastructure roles secret there is no way to specify role options (like
+superuser or nologin) or role memberships. This is where the additional
+ConfigMap comes into play.
 
 #### Secret plus ConfigMap
 

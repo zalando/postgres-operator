@@ -916,18 +916,18 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1beta1.JSONSchemaProps{
 										Type:     "object",
-										Required: []string{"secretname"},
+										Required: []string{"secretname", "userkey", "passwordkey"},
 										Properties: map[string]apiextv1beta1.JSONSchemaProps{
 											"secretname": {
 												Type: "string",
 											},
-											"name": {
+											"userkey": {
 												Type: "string",
 											},
-											"password": {
+											"passwordkey": {
 												Type: "string",
 											},
-											"role": {
+											"rolekey": {
 												Type: "string",
 											},
 											"details": {

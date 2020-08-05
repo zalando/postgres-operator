@@ -138,14 +138,16 @@ spec:
                     type: object
                     required:
                       - secretname
+                      - userkey
+                      - passwordkey
                     properties:
                       secretname:
                         type: string
-                      name:
+                      userkey:
                         type: string
-                      password:
+                      passwordkey:
                         type: string
-                      role:
+                      rolekey:
                         type: string
                       details:
                         type: string
