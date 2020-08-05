@@ -253,14 +253,13 @@ configuration they are grouped under the `kubernetes` key.
 
 * **infrastructure_roles_secret_name**
   *deprecated*: namespaced name of the secret containing infrastructure roles
-  names and passwords.
+  with user names, passwords and role membership.
 
 * **infrastructure_roles_secrets**
   array of infrastructure role definitions which reference existing secrets
-  and specify the keys for extract credentials from them such as user name,
-  password and role membership. For the configmap this has to be a string
-  which allows referencing only one infrastructure roles secret.
-  The default is empty.
+  and specify the key names from which user name, password and role membership
+  are extracted. For the ConfigMap this has to be a string which allows
+  referencing only one infrastructure roles secret. The default is empty.
 
 * **pod_role_label**
   name of the label assigned to the Postgres pods (and services/endpoints) by

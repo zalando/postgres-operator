@@ -154,7 +154,7 @@ Infrastructure roles can be specified by the `infrastructure_roles_secrets`
 parameter where you can reference multiple existing secrets. Prior to `v1.6.0`
 the operator could only reference one secret with the
 `infrastructure_roles_secret_name` option. However, this secret could contain
-multiple roles using the same set of keys with incremented indexes.
+multiple roles using the same set of keys plus incrementing index.
 
 ```yaml
 apiVersion: v1
@@ -172,10 +172,10 @@ The block above describes the infrastructure role 'dbuser' with password
 'secret' that is a member of the 'operator' role. The resulting role will
 automatically be a login role.
 
-With the new option the user can configure the names of secret keys that
-contain the user name, password etc. The secret itself is referenced by the
+With the new option users can configure the names of secret keys that contain
+the user name, password etc. The secret itself is referenced by the
 `secretname` key. If the secret uses a template for multiple roles as described
-above, list them as separately.
+above list them separately.
 
 ```yaml
 apiVersion: v1
