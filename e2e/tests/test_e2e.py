@@ -52,6 +52,7 @@ class EndToEndTestCase(unittest.TestCase):
         for filename in ["operator-service-account-rbac.yaml",
                          "configmap.yaml",
                          "postgres-operator.yaml",
+                         "infrastructure-roles.yaml",
                          "infrastructure-roles-new.yaml"]:
             result = k8s.create_with_kubectl("manifests/" + filename)
             print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))

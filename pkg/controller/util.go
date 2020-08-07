@@ -124,7 +124,7 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 	rolesDefs := c.opConfig.InfrastructureRoles
 
 	// check if we can extract something from the configmap config option
-	if c.opConfig.InfrastructureRolesDefs != "" {
+	if len(rolesDefs) == 0 && c.opConfig.InfrastructureRolesDefs != "" {
 		// The configmap option could contain either a role description (in the
 		// form key1: value1, key2: value2), which has to be used together with
 		// an old secret name.
