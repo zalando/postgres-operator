@@ -72,7 +72,7 @@ func extractClusterName(clusterName string, teamName string) (string, error) {
 
 func validateCloneClusterDescription(clone *CloneDescription) error {
 	// when cloning from the basebackup (no end timestamp) check that the cluster name is a valid service name
-	if clone.ClusterName != "" && clone.EndTimestamp == "" {
+	if clone != nil && clone.ClusterName != "" && clone.EndTimestamp == "" {
 		if !serviceNameRegex.MatchString(clone.ClusterName) {
 			return fmt.Errorf("clone cluster name must confirm to DNS-1035, regex used for validation is %q",
 				serviceNameRegexString)

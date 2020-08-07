@@ -58,6 +58,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodServiceAccountDefinition = fromCRD.Kubernetes.PodServiceAccountDefinition
 	result.PodServiceAccountRoleBindingDefinition = fromCRD.Kubernetes.PodServiceAccountRoleBindingDefinition
 	result.PodEnvironmentConfigMap = fromCRD.Kubernetes.PodEnvironmentConfigMap
+	result.PodEnvironmentSecret = fromCRD.Kubernetes.PodEnvironmentSecret
 	result.PodTerminateGracePeriod = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod), "5m")
 	result.SpiloPrivileged = fromCRD.Kubernetes.SpiloPrivileged
 	result.SpiloFSGroup = fromCRD.Kubernetes.SpiloFSGroup
