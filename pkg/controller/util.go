@@ -118,13 +118,9 @@ var emptyName = (spec.NamespacedName{})
 // configuration in ConfigMap & CRD.
 func (c *Controller) getInfrastructureRoleDefinitions() []*config.InfrastructureRole {
 	var roleDef config.InfrastructureRole
-	rolesDefs := c.opConfig.InfrastructureRoles
 
-	if c.opConfig.InfrastructureRolesSecretName == emptyName {
-		// All the other possibilities require secret name to be present, so if
-		// it is not, then nothing else to be done here.
-		return rolesDefs
-	}
+	// take from CRD configuration
+	rolesDefs := c.opConfig.InfrastructureRoles
 
 	// check if we can extract something from the configmap config option
 	if c.opConfig.InfrastructureRolesDefs != "" {
@@ -167,23 +163,25 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 				c.logger.Warningf("Role description is not known: %s", properties)
 			}
 		}
-	} else {
+
+		if roleDef.SecretName != emptyName &&
+			roleDef.UserKey != "" &&
+			roleDef.PasswordKey != "" {
+			rolesDefs = append(rolesDefs, &roleDef)
+		}
+	}
+
+	if c.opConfig.InfrastructureRolesSecretName != emptyName {
 		// At this point we deal with the old format, let's replicate it
 		// via existing definition structure and remember that it's just a
 		// template, the real values are in user1,password1,inrole1 etc.
-		roleDef = config.InfrastructureRole{
+		rolesDefs = append(rolesDefs, &config.InfrastructureRole{
 			SecretName:  c.opConfig.InfrastructureRolesSecretName,
 			UserKey:     "user",
 			PasswordKey: "password",
 			RoleKey:     "inrole",
 			Template:    true,
-		}
-	}
-
-	if roleDef.UserKey != "" &&
-		roleDef.PasswordKey != "" &&
-		roleDef.RoleKey != "" {
-		rolesDefs = append(rolesDefs, &roleDef)
+		})
 	}
 
 	return rolesDefs
