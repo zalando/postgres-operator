@@ -4,7 +4,7 @@ data:
   # robot_zmon_acid_monitoring_new
   user: cm9ib3Rfem1vbl9hY2lkX21vbml0b3JpbmdfbmV3
   # robot_zmon
-  inrole: cm9ib3Rfem1vbg==
+  role: cm9ib3Rfem1vbg==
   # foobar_new
   password: Zm9vYmFyX25ldw==
 kind: Secret
