@@ -593,6 +593,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # wait a little before proceeding
         time.sleep(30)
+        print('Operator log: {}'.format(k8s.get_operator_log()))
 
         # check that new roles are represented in the config by requesting the
         # operator configuration via API
