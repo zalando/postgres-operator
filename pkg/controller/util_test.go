@@ -326,6 +326,25 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 				},
 			},
 		},
+		// new configmap format with defaultRoleValue
+		{
+			[]*config.InfrastructureRole{},
+			spec.NamespacedName{},
+			"secretname: infrastructureroles-new-test, userkey: test-user, passwordkey: test-password, defaultrolevalue: test-role",
+			[]*config.InfrastructureRole{
+				&config.InfrastructureRole{
+					SecretName: spec.NamespacedName{
+						Namespace: v1.NamespaceDefault,
+						Name:      testInfrastructureRolesNewSecretName,
+					},
+					UserKey:          "test-user",
+					PasswordKey:      "test-password",
+					RoleKey:          "",
+					DefaultRoleValue: "test-role",
+					Template:         false,
+				},
+			},
+		},
 		// only old CRD and configmap format
 		{
 			[]*config.InfrastructureRole{},

@@ -500,6 +500,7 @@ func (c *Cluster) syncSecrets() error {
 				c.logger.Warningf("secret %q does not contain the role %q", secretSpec.Name, secretUsername)
 				continue
 			}
+			c.Secrets[secret.UID] = secret
 			c.logger.Debugf("secret %q already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName

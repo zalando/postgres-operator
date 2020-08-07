@@ -134,7 +134,6 @@ spec:
                     type: object
                     required:
                       - secretname
-                      - userkey
                       - passwordkey
                     properties:
                       secretname:
@@ -144,6 +143,10 @@ spec:
                       passwordkey:
                         type: string
                       rolekey:
+                        type: string
+                      defaultuservalue:
+                        type: string
+                      defaultrolevalue:
                         type: string
                       details:
                         type: string

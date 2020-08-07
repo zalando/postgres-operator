@@ -61,6 +61,9 @@ type InfrastructureRole struct {
 	PasswordKey string
 	RoleKey     string
 
+	DefaultUserValue string
+	DefaultRoleValue string
+
 	// This field point out the detailed yaml definition of the role, if exists
 	Details string
 
