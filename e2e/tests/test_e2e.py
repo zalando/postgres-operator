@@ -581,7 +581,7 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
         # update infrastructure roles description
-        secret_name = "postgresql-infrastructure-roles-old"
+        secret_name = "postgresql-infrastructure-roles"
         roles = "secretname: postgresql-infrastructure-roles-new, userkey: user, rolekey: role, passwordkey: password"
         patch_infrastructure_roles = {
             "data": {
