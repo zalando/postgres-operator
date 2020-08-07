@@ -720,8 +720,8 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							"subPath": {
 								Type: "string",
 							},
-							"keepPVC": {
-								Type: "boolean",
+							"deletePVC": {
+								Type: "string",
 							},
 						},
 					},

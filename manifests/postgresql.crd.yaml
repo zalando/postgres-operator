@@ -474,5 +474,5 @@ spec:
                   type: string
                 subPath:
                   type: string
-                keepPVC:
-                  type: boolean
+                deletePVC:
+                  type: string

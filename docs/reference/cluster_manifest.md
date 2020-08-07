@@ -155,7 +155,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   into account. Optional. Default is: "30 00 \* \* \*"
 
 * **volume**
-  Specifies the size and StorageClass of the PersistentVolumeClaim. By default, this PVC is deleted when the manifest is uninstalled. To keep the PVC, set the volume's `keepPVC` attribute to `true`.
+  Specifies the size and StorageClass of the PersistentVolumeClaim. By default, this PVC is deleted when the manifest is uninstalled. To keep the PVC, set the operator's `enable_pvc_deletion` attribute to `false`. You can then still delete PVCs and secrets by setting `volume.deletePVC` in your manifest to the name of your cluster.
 
 * **additionalVolumes**
   List of additional volumes to mount in each container of the statefulset pod.

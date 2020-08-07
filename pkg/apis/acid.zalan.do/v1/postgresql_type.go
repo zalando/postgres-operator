@@ -111,7 +111,7 @@ type Volume struct {
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass"`
 	SubPath      string `json:"subPath,omitempty"`
-	KeepPVC      *bool  `json:"keepPVC,omitempty"`
+	DeletePVC    string `json:"deletePVC,omitempty"`
 }
 
 type AdditionalVolume struct {

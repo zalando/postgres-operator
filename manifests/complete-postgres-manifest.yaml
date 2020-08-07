@@ -40,7 +40,6 @@ spec:
       log_statement: "all"
   volume:
     size: 1Gi
-    keepPVC: false
 #    storageClass: my-sc
   additionalVolumes:
     - name: empty

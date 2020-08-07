@@ -143,7 +143,7 @@ type Config struct {
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	StorageResizeMode                      string            `name:"storage_resize_mode" default:"ebs"`
-	KeepPVC                                bool              `name:"keep_pvc" default:"false"`
+	EnablePVCDeletion                      *bool             `name:"enable_pvc_deletion" default:"false"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer        *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat       StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`

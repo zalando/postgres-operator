@@ -486,14 +486,11 @@ func (c *Cluster) deleteStatefulSet() error {
 		return fmt.Errorf("could not delete pods: %v", err)
 	}
 
-	keepPVC := (c.Postgresql.Spec.Volume.KeepPVC != nil && *c.Postgresql.Spec.Volume.KeepPVC) || (c.Postgresql.Spec.Volume.KeepPVC == nil && c.OpConfig.KeepPVC)
-	c.logger.Debugf("keepPVC = %t", keepPVC)
-	if keepPVC == false {
+	deletePVC := c.getPVCDeletion()
+	if deletePVC {
 		if err := c.deletePersistentVolumeClaims(); err != nil {
 			return fmt.Errorf("could not delete PersistentVolumeClaims: %v", err)
 		}
-	} else {
-		c.logger.Infoln("not deleting PVCs because keepPVC is true")
 	}
 
 	return nil
@@ -732,8 +729,8 @@ func (c *Cluster) deleteEndpoint(role PostgresRole) error {
 }
 
 func (c *Cluster) deleteSecrets() error {
-	keepPVC := (c.Postgresql.Spec.Volume.KeepPVC != nil && *c.Postgresql.Spec.Volume.KeepPVC) || (c.Postgresql.Spec.Volume.KeepPVC == nil && c.OpConfig.KeepPVC)
-	if keepPVC == false {
+	deletePVC := c.getPVCDeletion()
+	if deletePVC {
 		c.setProcessName("deleting secrets")
 		var errors []string
 		errorCount := 0
@@ -752,7 +749,7 @@ func (c *Cluster) deleteSecrets() error {
 			return fmt.Errorf("could not delete all secrets: %v", errors)
 		}
 	} else {
-		c.logger.Infoln("not deleting secrets because keepPVC is true")
+		c.logger.Infoln("not deleting secrets because PVCs are kept")
 	}
 	return nil
 }
@@ -892,4 +889,18 @@ func (c *Cluster) updateConnectionPoolerAnnotations(annotations map[string]strin
 	}
 	return result, nil
 
+}
+
+func (c *Cluster) getPVCDeletion() bool {
+	deletePVC := true
+	if c.OpConfig.EnablePVCDeletion != nil && *c.OpConfig.EnablePVCDeletion == false {
+		if c.Postgresql.Spec.Volume.DeletePVC != c.Postgresql.Name {
+			// Delete PVC does not match name of cluster --> keepPVC is true
+			c.logger.Infof("not deleting PVCs because Spec.Volume.DeletePVC value \"%s\" does not match cluster name \"%s\"", c.Postgresql.Spec.Volume.DeletePVC, c.Postgresql.Name)
+			deletePVC = false
+		} else {
+			c.logger.Infof("cluster name matches Spec.Volume.DeletePVC; deleting PVCs and secrets")
+		}
+	}
+	return deletePVC
 }
