@@ -13,9 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
@@ -222,17 +220,11 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 	c.logger.Infof("Connection pooler service %q has been deleted", serviceName)
 
 	// Repeat the same for the secret object
-	connectionPoolerUser := spec.PgUser{
-		Origin:   spec.RoleConnectionPooler,
-		Name:     c.OpConfig.ConnectionPooler.User,
-		Flags:    []string{constants.RoleFlagLogin},
-		Password: util.RandomPassword(constants.PasswordLength),
-	}
+	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
 
-	secretTemplate := c.generateSingleUserSecret(c.Namespace, connectionPoolerUser)
 	secret, err := c.KubeClient.
 		Secrets(c.Namespace).
-		Get(context.TODO(), secretTemplate.Name, metav1.GetOptions{})
+		Get(context.TODO(), secretName, metav1.GetOptions{})
 
 	if err != nil {
 		c.logger.Debugf("could not get connection pooler secret %q: %v", secretTemplate.Name, err)
