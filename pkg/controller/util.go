@@ -15,6 +15,7 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"gopkg.in/yaml.v2"
@@ -118,13 +119,9 @@ var emptyName = (spec.NamespacedName{})
 // configuration in ConfigMap & CRD.
 func (c *Controller) getInfrastructureRoleDefinitions() []*config.InfrastructureRole {
 	var roleDef config.InfrastructureRole
-	rolesDefs := c.opConfig.InfrastructureRoles
 
-	if c.opConfig.InfrastructureRolesSecretName == emptyName {
-		// All the other possibilities require secret name to be present, so if
-		// it is not, then nothing else to be done here.
-		return rolesDefs
-	}
+	// take from CRD configuration
+	rolesDefs := c.opConfig.InfrastructureRoles
 
 	// check if we can extract something from the configmap config option
 	if c.opConfig.InfrastructureRolesDefs != "" {
@@ -163,27 +160,33 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 				roleDef.PasswordKey = value
 			case "rolekey":
 				roleDef.RoleKey = value
+			case "defaultuservalue":
+				roleDef.DefaultUserValue = value
+			case "defaultrolevalue":
+				roleDef.DefaultRoleValue = value
 			default:
 				c.logger.Warningf("Role description is not known: %s", properties)
 			}
 		}
-	} else {
+
+		if roleDef.SecretName != emptyName &&
+			(roleDef.UserKey != "" || roleDef.DefaultUserValue != "") &&
+			roleDef.PasswordKey != "" {
+			rolesDefs = append(rolesDefs, &roleDef)
+		}
+	}
+
+	if c.opConfig.InfrastructureRolesSecretName != emptyName {
 		// At this point we deal with the old format, let's replicate it
 		// via existing definition structure and remember that it's just a
 		// template, the real values are in user1,password1,inrole1 etc.
-		roleDef = config.InfrastructureRole{
+		rolesDefs = append(rolesDefs, &config.InfrastructureRole{
 			SecretName:  c.opConfig.InfrastructureRolesSecretName,
 			UserKey:     "user",
 			PasswordKey: "password",
 			RoleKey:     "inrole",
 			Template:    true,
-		}
-	}
-
-	if roleDef.UserKey != "" &&
-		roleDef.PasswordKey != "" &&
-		roleDef.RoleKey != "" {
-		rolesDefs = append(rolesDefs, &roleDef)
+		})
 	}
 
 	return rolesDefs
@@ -330,9 +333,10 @@ func (c *Controller) getInfrastructureRole(
 				return nil, fmt.Errorf("could not decode yaml role: %v", err)
 			}
 		} else {
-			roleDescr.Name = string(secretData[infraRole.UserKey])
+			roleDescr.Name = util.Coalesce(string(secretData[infraRole.UserKey]), infraRole.DefaultUserValue)
 			roleDescr.Password = string(secretData[infraRole.PasswordKey])
-			roleDescr.MemberOf = append(roleDescr.MemberOf, string(secretData[infraRole.RoleKey]))
+			roleDescr.MemberOf = append(roleDescr.MemberOf,
+				util.Coalesce(string(secretData[infraRole.RoleKey]), infraRole.DefaultRoleValue))
 		}
 
 		if roleDescr.Valid() {

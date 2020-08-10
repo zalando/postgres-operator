@@ -279,7 +279,7 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 		roleSecrets    string
 		expectedDefs   []*config.InfrastructureRole
 	}{
-		// only new format
+		// only new CRD format
 		{
 			[]*config.InfrastructureRole{
 				&config.InfrastructureRole{
@@ -287,9 +287,9 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 						Namespace: v1.NamespaceDefault,
 						Name:      testInfrastructureRolesNewSecretName,
 					},
-					UserKey:     "user",
-					PasswordKey: "password",
-					RoleKey:     "inrole",
+					UserKey:     "test-user",
+					PasswordKey: "test-password",
+					RoleKey:     "test-role",
 					Template:    false,
 				},
 			},
@@ -301,14 +301,50 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 						Namespace: v1.NamespaceDefault,
 						Name:      testInfrastructureRolesNewSecretName,
 					},
-					UserKey:     "user",
-					PasswordKey: "password",
-					RoleKey:     "inrole",
+					UserKey:     "test-user",
+					PasswordKey: "test-password",
+					RoleKey:     "test-role",
 					Template:    false,
 				},
 			},
 		},
-		// only old format
+		// only new configmap format
+		{
+			[]*config.InfrastructureRole{},
+			spec.NamespacedName{},
+			"secretname: infrastructureroles-new-test, userkey: test-user, passwordkey: test-password, rolekey: test-role",
+			[]*config.InfrastructureRole{
+				&config.InfrastructureRole{
+					SecretName: spec.NamespacedName{
+						Namespace: v1.NamespaceDefault,
+						Name:      testInfrastructureRolesNewSecretName,
+					},
+					UserKey:     "test-user",
+					PasswordKey: "test-password",
+					RoleKey:     "test-role",
+					Template:    false,
+				},
+			},
+		},
+		// new configmap format with defaultRoleValue
+		{
+			[]*config.InfrastructureRole{},
+			spec.NamespacedName{},
+			"secretname: infrastructureroles-new-test, userkey: test-user, passwordkey: test-password, defaultrolevalue: test-role",
+			[]*config.InfrastructureRole{
+				&config.InfrastructureRole{
+					SecretName: spec.NamespacedName{
+						Namespace: v1.NamespaceDefault,
+						Name:      testInfrastructureRolesNewSecretName,
+					},
+					UserKey:          "test-user",
+					PasswordKey:      "test-password",
+					DefaultRoleValue: "test-role",
+					Template:         false,
+				},
+			},
+		},
+		// only old CRD and configmap format
 		{
 			[]*config.InfrastructureRole{},
 			spec.NamespacedName{
@@ -329,19 +365,13 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 				},
 			},
 		},
-		// only configmap format
+		// both formats for CRD
 		{
-			[]*config.InfrastructureRole{},
-			spec.NamespacedName{
-				Namespace: v1.NamespaceDefault,
-				Name:      testInfrastructureRolesOldSecretName,
-			},
-			"secretname: infrastructureroles-old-test, userkey: test-user, passwordkey: test-password, rolekey: test-role, template: false",
 			[]*config.InfrastructureRole{
 				&config.InfrastructureRole{
 					SecretName: spec.NamespacedName{
 						Namespace: v1.NamespaceDefault,
-						Name:      testInfrastructureRolesOldSecretName,
+						Name:      testInfrastructureRolesNewSecretName,
 					},
 					UserKey:     "test-user",
 					PasswordKey: "test-password",
@@ -349,14 +379,69 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 					Template:    false,
 				},
 			},
+			spec.NamespacedName{
+				Namespace: v1.NamespaceDefault,
+				Name:      testInfrastructureRolesOldSecretName,
+			},
+			"",
+			[]*config.InfrastructureRole{
+				&config.InfrastructureRole{
+					SecretName: spec.NamespacedName{
+						Namespace: v1.NamespaceDefault,
+						Name:      testInfrastructureRolesNewSecretName,
+					},
+					UserKey:     "test-user",
+					PasswordKey: "test-password",
+					RoleKey:     "test-role",
+					Template:    false,
+				},
+				&config.InfrastructureRole{
+					SecretName: spec.NamespacedName{
+						Namespace: v1.NamespaceDefault,
+						Name:      testInfrastructureRolesOldSecretName,
+					},
+					UserKey:     "user",
+					PasswordKey: "password",
+					RoleKey:     "inrole",
+					Template:    true,
+				},
+			},
 		},
-		// incorrect configmap format
+		// both formats for configmap
 		{
 			[]*config.InfrastructureRole{},
 			spec.NamespacedName{
 				Namespace: v1.NamespaceDefault,
 				Name:      testInfrastructureRolesOldSecretName,
 			},
+			"secretname: infrastructureroles-new-test, userkey: test-user, passwordkey: test-password, rolekey: test-role",
+			[]*config.InfrastructureRole{
+				&config.InfrastructureRole{
+					SecretName: spec.NamespacedName{
+						Namespace: v1.NamespaceDefault,
+						Name:      testInfrastructureRolesNewSecretName,
+					},
+					UserKey:     "test-user",
+					PasswordKey: "test-password",
+					RoleKey:     "test-role",
+					Template:    false,
+				},
+				&config.InfrastructureRole{
+					SecretName: spec.NamespacedName{
+						Namespace: v1.NamespaceDefault,
+						Name:      testInfrastructureRolesOldSecretName,
+					},
+					UserKey:     "user",
+					PasswordKey: "password",
+					RoleKey:     "inrole",
+					Template:    true,
+				},
+			},
+		},
+		// incorrect configmap format
+		{
+			[]*config.InfrastructureRole{},
+			spec.NamespacedName{},
 			"wrong-format",
 			[]*config.InfrastructureRole{},
 		},
@@ -364,7 +449,7 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 		{
 			[]*config.InfrastructureRole{},
 			spec.NamespacedName{},
-			"userkey: test-user, passwordkey: test-password, rolekey: test-role, template: false",
+			"userkey: test-user, passwordkey: test-password, rolekey: test-role",
 			[]*config.InfrastructureRole{},
 		},
 	}

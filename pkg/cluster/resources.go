@@ -229,11 +229,9 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 	if err != nil {
 		c.logger.Debugf("could not get connection pooler secret %q: %v", secretName, err)
 	} else {
-		uid := secret.UID
-		if err = c.deleteSecret(uid, *secret); err != nil {
+		if err = c.deleteSecret(secret.UID, *secret); err != nil {
 			return fmt.Errorf("could not delete pooler secret: %v", err)
 		}
-		c.Secrets[uid] = nil
 	}
 
 	c.ConnectionPooler = nil
@@ -761,12 +759,13 @@ func (c *Cluster) deleteSecrets() error {
 
 func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
 	c.setProcessName("deleting secret")
-	c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
+	secretName := util.NameFromMeta(secret.ObjectMeta)
+	c.logger.Debugf("deleting secret %q", secretName)
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
 	if err != nil {
-		return fmt.Errorf("could not delete secret %q: %v", util.NameFromMeta(secret.ObjectMeta), err)
+		return fmt.Errorf("could not delete secret %q: %v", secretName, err)
 	}
-	c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
+	c.logger.Infof("secret %q has been deleted", secretName)
 	c.Secrets[uid] = nil
 
 	return nil

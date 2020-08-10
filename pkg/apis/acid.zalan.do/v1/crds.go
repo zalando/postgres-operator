@@ -930,6 +930,12 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 											"rolekey": {
 												Type: "string",
 											},
+											"defaultuservalue": {
+												Type: "string",
+											},
+											"defaultrolevalue": {
+												Type: "string",
+											},
 											"details": {
 												Type: "string",
 											},
