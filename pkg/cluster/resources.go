@@ -227,7 +227,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 		Get(context.TODO(), secretName, metav1.GetOptions{})
 
 	if err != nil {
-		c.logger.Debugf("could not get connection pooler secret %q: %v", secretTemplate.Name, err)
+		c.logger.Debugf("could not get connection pooler secret %q: %v", secretName, err)
 	} else {
 		uid := secret.UID
 		if err = c.deleteSecret(uid, *secret); err != nil {
