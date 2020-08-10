@@ -3,8 +3,6 @@ data:
   # infrastructure role definition in the new format
   # robot_zmon_acid_monitoring_new
   user: cm9ib3Rfem1vbl9hY2lkX21vbml0b3JpbmdfbmV3
-  # robot_zmon
-  memberof: cm9ib3Rfem1vbg==
   # foobar_new
   password: Zm9vYmFyX25ldw==
 kind: Secret

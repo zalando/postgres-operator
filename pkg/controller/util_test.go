@@ -339,7 +339,6 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 					},
 					UserKey:          "test-user",
 					PasswordKey:      "test-password",
-					RoleKey:          "",
 					DefaultRoleValue: "test-role",
 					Template:         false,
 				},
@@ -450,7 +449,7 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 		{
 			[]*config.InfrastructureRole{},
 			spec.NamespacedName{},
-			"userkey: test-user, passwordkey: test-password, rolekey: test-role, template: false",
+			"userkey: test-user, passwordkey: test-password, rolekey: test-role",
 			[]*config.InfrastructureRole{},
 		},
 	}

@@ -134,6 +134,7 @@ spec:
                     type: object
                     required:
                       - secretname
+                      - userkey
                       - passwordkey
                     properties:
                       secretname:
