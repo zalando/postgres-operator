@@ -771,9 +771,7 @@ func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
 	c.setProcessName("deleting secret")
 	c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
 	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
-	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("Connection pooler secret was already deleted")
-	} else if err != nil {
+	if err != nil {
 		return fmt.Errorf("could not delete secret %q: %v", util.NameFromMeta(secret.ObjectMeta), err)
 	}
 	c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
