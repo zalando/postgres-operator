@@ -124,7 +124,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
 	})
-	password_encryption, ok :=  pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
+	password_encryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
 	if !ok {
 		password_encryption = "md5"
 	}
