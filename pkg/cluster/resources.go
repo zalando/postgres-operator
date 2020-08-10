@@ -207,7 +207,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 		serviceName = service.Name
 	}
 
-	// set delete propagation policy to foreground, so that all the dependant
+	// set delete propagation policy to foreground, so that all the dependent
 	// will be deleted.
 	err = c.KubeClient.
 		Services(c.Namespace).

@@ -7,12 +7,14 @@ data:
   # provide other options in the configmap.
   # robot_zmon_acid_monitoring
   user1: cm9ib3Rfem1vbl9hY2lkX21vbml0b3Jpbmc=
+  # foobar
+  password1: Zm9vYmFy
   # robot_zmon
   inrole1: cm9ib3Rfem1vbg==
   # testuser
   user2: dGVzdHVzZXI=
-  # foobar
-  password2: Zm9vYmFy
+  # testpassword
+  password2: dGVzdHBhc3N3b3Jk
   # user batman with the password justice
   # look for other fields in the infrastructure roles configmap
   batman: anVzdGljZQ==

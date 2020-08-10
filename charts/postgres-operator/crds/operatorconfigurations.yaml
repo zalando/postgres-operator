@@ -149,6 +149,10 @@ spec:
                         type: string
                       rolekey:
                         type: string
+                      defaultuservalue:
+                        type: string
+                      defaultrolevalue:
+                        type: string
                       details:
                         type: string
                       template:
