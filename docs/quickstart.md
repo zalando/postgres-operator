@@ -160,7 +160,7 @@ You can now access the web interface by port forwarding the UI pod (mind the
 label selector) and enter `localhost:8081` in your browser:
 
 ```bash
-kubectl port-forward svc/postgres-operator-ui 8081:8081
+kubectl port-forward svc/postgres-operator-ui 8081:80
 ```
 
 Available option are explained in detail in the [UI docs](operator-ui.md).
