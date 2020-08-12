@@ -18,6 +18,7 @@ import (
 const (
 	failoverPath = "/failover"
 	configPath   = "/config"
+	restartPath  = "/restart"
 	apiPort      = 8008
 	timeout      = 30 * time.Second
 )
@@ -27,6 +28,7 @@ type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 	GetPatroniMemberState(pod *v1.Pod) (string, error)
+	Restart(server *v1.Pod) error
 }
 
 // Patroni API client
@@ -124,6 +126,16 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 		return err
 	}
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
+}
+
+//Restart method restarts instance via Patroni POST API call.
+func (p *Patroni) Restart(server *v1.Pod) error {
+	buf := &bytes.Buffer{}
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return err
+	}
+	return p.httpPostOrPatch(http.MethodPost, apiURLString+restartPath, buf)
 }
 
 //GetPatroniMemberState returns a state of member of a Patroni cluster
