@@ -48,6 +48,8 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+ui/app/node_modules
+ui/operator_ui/static/build
 build/
 develop-eggs/
 dist/
