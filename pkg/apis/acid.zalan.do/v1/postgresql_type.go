@@ -68,6 +68,7 @@ type PostgresSpec struct {
 	PodAnnotations        map[string]string           `json:"podAnnotations"`
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations"`
 	TLS                   *TLSDescription             `json:"tls"`
+	Env                   []v1.EnvVar                 `json:"env,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 
 	// deprecated json tags
