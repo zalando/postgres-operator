@@ -24,13 +24,14 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"log"
 	"strconv"
 	"time"
+
+	"github.com/spf13/cobra"
+	v1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -95,8 +96,12 @@ func listAll(listPostgres *v1.PostgresqlList) {
 	template := "%-32s%-16s%-12s%-12s%-12s%-12s%-12s\n"
 	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME", "NAMESPACE")
 	for _, pgObjs := range listPostgres.Items {
-		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp), pgObjs.Spec.Size, pgObjs.Namespace)
+		fmt.Printf(template, pgObjs.Name,
+			pgObjs.Status.PostgresClusterStatus,
+			strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
+			pgObjs.Spec.PostgresqlParam.PgVersion,
+			time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp),
+			pgObjs.Spec.Size, pgObjs.Namespace)
 	}
 }
 
@@ -104,8 +109,12 @@ func listWithNamespace(listPostgres *v1.PostgresqlList) {
 	template := "%-32s%-16s%-12s%-12s%-12s%-12s\n"
 	fmt.Printf(template, "NAME", "STATUS", "INSTANCES", "VERSION", "AGE", "VOLUME")
 	for _, pgObjs := range listPostgres.Items {
-		fmt.Printf(template, pgObjs.Name, pgObjs.Status.PostgresClusterStatus, strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
-			pgObjs.Spec.PgVersion, time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp), pgObjs.Spec.Size)
+		fmt.Printf(template, pgObjs.Name,
+			pgObjs.Status.PostgresClusterStatus,
+			strconv.Itoa(int(pgObjs.Spec.NumberOfInstances)),
+			pgObjs.Spec.PostgresqlParam.PgVersion,
+			time.Since(pgObjs.CreationTimestamp.Time).Truncate(TrimCreateTimestamp),
+			pgObjs.Spec.Size)
 	}
 }
 

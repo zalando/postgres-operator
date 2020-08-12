@@ -1,5 +1,5 @@
-apiVersion: "apps/v1"
-kind: "Deployment"
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   labels:
     app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
@@ -41,8 +41,12 @@ spec:
               value: "http://localhost:8081"
             - name: "OPERATOR_API_URL"
               value: {{ .Values.envs.operatorApiUrl }}
+            - name: "OPERATOR_CLUSTER_NAME_LABEL"
+              value: {{ .Values.envs.operatorClusterNameLabel }}
+            - name: "RESOURCES_VISIBLE"
+              value: "{{ .Values.envs.resourcesVisible }}"
             - name: "TARGET_NAMESPACE"
-              value: {{ .Values.envs.targetNamespace }}
+              value: "{{ .Values.envs.targetNamespace }}"
             - name: "TEAMS"
               value: |-
                 [

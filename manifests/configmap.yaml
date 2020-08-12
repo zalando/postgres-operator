@@ -11,6 +11,16 @@ data:
   cluster_history_entries: "1000"
   cluster_labels: application:spilo
   cluster_name_label: cluster-name
+  # connection_pooler_default_cpu_limit: "1"
+  # connection_pooler_default_cpu_request: "500m"
+  # connection_pooler_default_memory_limit: 100Mi
+  # connection_pooler_default_memory_request: 100Mi
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-9"
+  # connection_pooler_max_db_connections: 60
+  # connection_pooler_mode: "transaction"
+  # connection_pooler_number_of_instances: 2
+  # connection_pooler_schema: "pooler"
+  # connection_pooler_user: "pooler"
   # custom_service_annotations: "keyx:valuez,keya:valuea"
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
   db_hosted_zone: db.example.com
@@ -19,11 +29,13 @@ data:
   # default_cpu_request: 100m
   # default_memory_limit: 500Mi
   # default_memory_request: 100Mi
-  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
+  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
+  # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_validation: "true"
   # enable_database_access: "true"
   # enable_init_containers: "true"
+  # enable_lazy_spilo_upgrade: "false"
   enable_master_load_balancer: "false"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
@@ -33,20 +45,23 @@ data:
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
-  # infrastructure_roles_secret_name: postgresql-infrastructure-roles
+  # gcp_credentials: ""
+  # kubernetes_use_configmaps: "false"
+  # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
+  # infrastructure_roles_secrets: "secretname:monitoring-roles,userkey:user,passwordkey:password,rolekey:inrole"
   # inherited_labels: application,environment
   # kube_iam_role: ""
   # log_s3_bucket: ""
-  # logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
   # logical_backup_s3_access_key_id: ""
-  # logical_backup_s3_bucket: "my-bucket-url"
+  logical_backup_s3_bucket: "my-bucket-url"
   # logical_backup_s3_region: ""
   # logical_backup_s3_endpoint: ""
   # logical_backup_s3_secret_access_key: ""
-  # logical_backup_s3_sse: "AES256"
-  # logical_backup_schedule: "30 00 * * *"
+  logical_backup_s3_sse: "AES256"
+  logical_backup_schedule: "30 00 * * *"
   master_dns_name_format: "{cluster}.{team}.{hostedzone}"
-  # master_pod_move_timeout: 10m
+  # master_pod_move_timeout: 20m
   # max_instances: "-1"
   # min_instances: "-1"
   # min_cpu_limit: 250m
@@ -59,7 +74,8 @@ data:
   pdb_name_format: "postgres-{cluster}-pdb"
   # pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   pod_deletion_wait_timeout: 10m
-  # pod_environment_configmap: ""
+  # pod_environment_configmap: "default/my-custom-config"
+  # pod_environment_secret: "my-custom-secret"
   pod_label_wait_timeout: 10m
   pod_management_policy: "ordered_ready"
   pod_role_label: spilo-role
@@ -81,12 +97,15 @@ data:
   secret_name_template: "{username}.{cluster}.credentials"
   # sidecar_docker_images: ""
   # set_memory_request_to_limit: "false"
+  # spilo_fsgroup: 103
   spilo_privileged: "false"
+  # storage_resize_mode: "off"
   super_username: postgres
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
   # toleration: ""
+  # wal_gs_bucket: ""
   # wal_s3_bucket: ""
   watched_namespace: "*"  # listen to all namespaces
-  workers: "4"
+  workers: "8"

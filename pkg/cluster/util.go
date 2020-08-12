@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
@@ -47,7 +48,7 @@ func (g *SecretOauthTokenGetter) getOAuthToken() (string, error) {
 	// Temporary getting postgresql-operator secret from the NamespaceDefault
 	credentialsSecret, err := g.kubeClient.
 		Secrets(g.OAuthTokenSecretName.Namespace).
-		Get(g.OAuthTokenSecretName.Name, metav1.GetOptions{})
+		Get(context.TODO(), g.OAuthTokenSecretName.Name, metav1.GetOptions{})
 
 	if err != nil {
 		return "", fmt.Errorf("could not get credentials secret: %v", err)
@@ -278,7 +279,7 @@ func (c *Cluster) waitStatefulsetReady() error {
 			listOptions := metav1.ListOptions{
 				LabelSelector: c.labelsSet(false).String(),
 			}
-			ss, err := c.KubeClient.StatefulSets(c.Namespace).List(listOptions)
+			ss, err := c.KubeClient.StatefulSets(c.Namespace).List(context.TODO(), listOptions)
 			if err != nil {
 				return false, err
 			}
@@ -313,7 +314,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 	}
 	podsNumber = 1
 	if !anyReplica {
-		pods, err := c.KubeClient.Pods(namespace).List(listOptions)
+		pods, err := c.KubeClient.Pods(namespace).List(context.TODO(), listOptions)
 		if err != nil {
 			return err
 		}
@@ -327,7 +328,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 		func() (bool, error) {
 			masterCount := 0
 			if !anyReplica {
-				masterPods, err2 := c.KubeClient.Pods(namespace).List(masterListOption)
+				masterPods, err2 := c.KubeClient.Pods(namespace).List(context.TODO(), masterListOption)
 				if err2 != nil {
 					return false, err2
 				}
@@ -337,7 +338,7 @@ func (c *Cluster) _waitPodLabelsReady(anyReplica bool) error {
 				}
 				masterCount = len(masterPods.Items)
 			}
-			replicaPods, err2 := c.KubeClient.Pods(namespace).List(replicaListOption)
+			replicaPods, err2 := c.KubeClient.Pods(namespace).List(context.TODO(), replicaListOption)
 			if err2 != nil {
 				return false, err2
 			}
@@ -408,7 +409,32 @@ func (c *Cluster) labelsSet(shouldAddExtraLabels bool) labels.Set {
 }
 
 func (c *Cluster) labelsSelector() *metav1.LabelSelector {
-	return &metav1.LabelSelector{MatchLabels: c.labelsSet(false), MatchExpressions: nil}
+	return &metav1.LabelSelector{
+		MatchLabels:      c.labelsSet(false),
+		MatchExpressions: nil,
+	}
+}
+
+// Return connection pooler labels selector, which should from one point of view
+// inherit most of the labels from the cluster itself, but at the same time
+// have e.g. different `application` label, so that recreatePod operation will
+// not interfere with it (it lists all the pods via labels, and if there would
+// be no difference, it will recreate also pooler pods).
+func (c *Cluster) connectionPoolerLabelsSelector() *metav1.LabelSelector {
+	connectionPoolerLabels := labels.Set(map[string]string{})
+
+	extraLabels := labels.Set(map[string]string{
+		"connection-pooler": c.connectionPoolerName(),
+		"application":       "db-connection-pooler",
+	})
+
+	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, c.labelsSet(false))
+	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, extraLabels)
+
+	return &metav1.LabelSelector{
+		MatchLabels:      connectionPoolerLabels,
+		MatchExpressions: nil,
+	}
 }
 
 func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) labels.Set {
@@ -482,4 +508,44 @@ func (c *Cluster) GetSpec() (*acidv1.Postgresql, error) {
 
 func (c *Cluster) patroniUsesKubernetes() bool {
 	return c.OpConfig.EtcdHost == ""
+}
+
+func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
+	if !c.patroniUsesKubernetes() {
+		return false
+	}
+
+	// otherwise, follow the operator configuration
+	return c.OpConfig.KubernetesUseConfigMaps
+}
+
+func (c *Cluster) needConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
+	if spec.EnableConnectionPooler == nil {
+		return spec.ConnectionPooler != nil
+	} else {
+		return *spec.EnableConnectionPooler
+	}
+}
+
+func (c *Cluster) needConnectionPooler() bool {
+	return c.needConnectionPoolerWorker(&c.Spec)
+}
+
+// Earlier arguments take priority
+func mergeContainers(containers ...[]v1.Container) ([]v1.Container, []string) {
+	containerNameTaken := map[string]bool{}
+	result := make([]v1.Container, 0)
+	conflicts := make([]string, 0)
+
+	for _, containerArray := range containers {
+		for _, container := range containerArray {
+			if _, taken := containerNameTaken[container.Name]; taken {
+				conflicts = append(conflicts, container.Name)
+			} else {
+				containerNameTaken[container.Name] = true
+				result = append(result, container)
+			}
+		}
+	}
+	return result, conflicts
 }

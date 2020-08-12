@@ -1,11 +1,12 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -23,7 +24,7 @@ func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, erro
 		LabelSelector: c.labelsSet(false).String(),
 	}
 
-	pvcs, err := c.KubeClient.PersistentVolumeClaims(ns).List(listOptions)
+	pvcs, err := c.KubeClient.PersistentVolumeClaims(ns).List(context.TODO(), listOptions)
 	if err != nil {
 		return nil, fmt.Errorf("could not list of PersistentVolumeClaims: %v", err)
 	}
@@ -38,7 +39,7 @@ func (c *Cluster) deletePersistentVolumeClaims() error {
 	}
 	for _, pvc := range pvcs {
 		c.logger.Debugf("deleting PVC %q", util.NameFromMeta(pvc.ObjectMeta))
-		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, c.deleteOptions); err != nil {
+		if err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, c.deleteOptions); err != nil {
 			c.logger.Warningf("could not delete PersistentVolumeClaim: %v", err)
 		}
 	}
@@ -48,6 +49,35 @@ func (c *Cluster) deletePersistentVolumeClaims() error {
 		c.logger.Debugln("no PVCs to delete")
 	}
 
+	return nil
+}
+
+func (c *Cluster) resizeVolumeClaims(newVolume acidv1.Volume) error {
+	c.logger.Debugln("resizing PVCs")
+	pvcs, err := c.listPersistentVolumeClaims()
+	if err != nil {
+		return err
+	}
+	newQuantity, err := resource.ParseQuantity(newVolume.Size)
+	if err != nil {
+		return fmt.Errorf("could not parse volume size: %v", err)
+	}
+	_, newSize, err := c.listVolumesWithManifestSize(newVolume)
+	for _, pvc := range pvcs {
+		volumeSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
+		if volumeSize >= newSize {
+			if volumeSize > newSize {
+				c.logger.Warningf("cannot shrink persistent volume")
+			}
+			continue
+		}
+		pvc.Spec.Resources.Requests[v1.ResourceStorage] = newQuantity
+		c.logger.Debugf("updating persistent volume claim definition for volume %q", pvc.Name)
+		if _, err := c.KubeClient.PersistentVolumeClaims(pvc.Namespace).Update(context.TODO(), &pvc, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("could not update persistent volume claim: %q", err)
+		}
+		c.logger.Debugf("successfully updated persistent volume claim %q", pvc.Name)
+	}
 	return nil
 }
 
@@ -78,7 +108,7 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 				continue
 			}
 		}
-		pv, err := c.KubeClient.PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+		pv, err := c.KubeClient.PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("could not get PersistentVolume: %v", err)
 		}
@@ -143,13 +173,13 @@ func (c *Cluster) resizeVolumes(newVolume acidv1.Volume, resizers []volumes.Volu
 			c.logger.Debugf("filesystem resize successful on volume %q", pv.Name)
 			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
 			c.logger.Debugf("updating persistent volume definition for volume %q", pv.Name)
-			if _, err := c.KubeClient.PersistentVolumes().Update(pv); err != nil {
+			if _, err := c.KubeClient.PersistentVolumes().Update(context.TODO(), pv, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("could not update persistent volume: %q", err)
 			}
 			c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
 		}
 		if !compatible {
-			c.logger.Warningf("volume %q is incompatible with all available resizing providers", pv.Name)
+			c.logger.Warningf("volume %q is incompatible with all available resizing providers, consider switching storage_resize_mode to pvc or off", pv.Name)
 			totalIncompatible++
 		}
 	}
@@ -157,6 +187,25 @@ func (c *Cluster) resizeVolumes(newVolume acidv1.Volume, resizers []volumes.Volu
 		return fmt.Errorf("could not resize EBS volumes: some persistent volumes are not compatible with existing resizing providers")
 	}
 	return nil
+}
+
+func (c *Cluster) volumeClaimsNeedResizing(newVolume acidv1.Volume) (bool, error) {
+	newSize, err := resource.ParseQuantity(newVolume.Size)
+	manifestSize := quantityToGigabyte(newSize)
+	if err != nil {
+		return false, fmt.Errorf("could not parse volume size from the manifest: %v", err)
+	}
+	pvcs, err := c.listPersistentVolumeClaims()
+	if err != nil {
+		return false, fmt.Errorf("could not receive persistent volume claims: %v", err)
+	}
+	for _, pvc := range pvcs {
+		currentSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
+		if currentSize != manifestSize {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *Cluster) volumesNeedResizing(newVolume acidv1.Volume) (bool, error) {

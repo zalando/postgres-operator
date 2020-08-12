@@ -1,9 +1,14 @@
 package util
 
 import (
+	"crypto/hmac"
 	"crypto/md5" // #nosec we need it to for PostgreSQL md5 passwords
+	cryptoRand "crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"regexp"
 	"strings"
@@ -14,10 +19,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 const (
-	md5prefix = "md5"
+	md5prefix         = "md5"
+	scramsha256prefix = "SCRAM-SHA-256"
+	saltlength        = 16
+	iterations        = 4096
 )
 
 var passwordChars = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
@@ -37,13 +46,17 @@ func False() *bool {
 	return &b
 }
 
-// RandomPassword generates random alphanumeric password of a given length.
+// RandomPassword generates a secure, random alphanumeric password of a given length.
 func RandomPassword(n int) string {
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = passwordChars[rand.Intn(len(passwordChars))]
+		maxN := big.NewInt(int64(len(passwordChars)))
+		if n, err := cryptoRand.Int(cryptoRand.Reader, maxN); err != nil {
+			panic(fmt.Errorf("Unable to generate secure, random password: %v", err))
+		} else {
+			b[i] = passwordChars[n.Int64()]
+		}
 	}
-
 	return string(b)
 }
 
@@ -55,14 +68,60 @@ func NameFromMeta(meta metav1.ObjectMeta) spec.NamespacedName {
 	}
 }
 
-// PGUserPassword is used to generate md5 password hash for a given user. It does nothing for already hashed passwords.
-func PGUserPassword(user spec.PgUser) string {
-	if (len(user.Password) == md5.Size*2+len(md5prefix) && user.Password[:3] == md5prefix) || user.Password == "" {
+type Hasher func(user spec.PgUser) string
+type Random func(n int) string
+
+type Encryptor struct {
+	encrypt Hasher
+	random  Random
+}
+
+func NewEncryptor(encryption string) *Encryptor {
+	e := Encryptor{random: RandomPassword}
+	m := map[string]Hasher{
+		"md5":           e.PGUserPasswordMD5,
+		"scram-sha-256": e.PGUserPasswordScramSHA256,
+	}
+	hasher, ok := m[encryption]
+	if !ok {
+		hasher = e.PGUserPasswordMD5
+	}
+	e.encrypt = hasher
+	return &e
+}
+
+func (e *Encryptor) PGUserPassword(user spec.PgUser) string {
+	if (len(user.Password) == md5.Size*2+len(md5prefix) && user.Password[:3] == md5prefix) ||
+		(len(user.Password) > len(scramsha256prefix) && user.Password[:len(scramsha256prefix)] == scramsha256prefix) || user.Password == "" {
 		// Avoid processing already encrypted or empty passwords
 		return user.Password
 	}
+	return e.encrypt(user)
+}
+
+func (e *Encryptor) PGUserPasswordMD5(user spec.PgUser) string {
 	s := md5.Sum([]byte(user.Password + user.Name)) // #nosec, using md5 since PostgreSQL uses it for hashing passwords.
 	return md5prefix + hex.EncodeToString(s[:])
+}
+
+func (e *Encryptor) PGUserPasswordScramSHA256(user spec.PgUser) string {
+	salt := []byte(e.random(saltlength))
+	key := pbkdf2.Key([]byte(user.Password), salt, iterations, 32, sha256.New)
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte("Server Key"))
+	serverKey := mac.Sum(nil)
+	mac = hmac.New(sha256.New, key)
+	mac.Write([]byte("Client Key"))
+	clientKey := mac.Sum(nil)
+	storedKey := sha256.Sum256(clientKey)
+	pass := fmt.Sprintf("%s$%v:%s$%s:%s",
+		scramsha256prefix,
+		iterations,
+		base64.StdEncoding.EncodeToString(salt),
+		base64.StdEncoding.EncodeToString(storedKey[:]),
+		base64.StdEncoding.EncodeToString(serverKey),
+	)
+	return pass
 }
 
 // Diff returns diffs between 2 objects
@@ -139,6 +198,92 @@ func Coalesce(val, defaultVal string) string {
 		return defaultVal
 	}
 	return val
+}
+
+// CoalesceStrArr returns the first argument if it is not null, otherwise the second one.
+func CoalesceStrArr(val, defaultVal []string) []string {
+	if len(val) == 0 {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceStrMap returns the first argument if it is not null, otherwise the second one.
+func CoalesceStrMap(val, defaultVal map[string]string) map[string]string {
+	if len(val) == 0 {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceInt works like coalesce but for int
+func CoalesceInt(val, defaultVal int) int {
+	if val == 0 {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceInt32 works like coalesce but for *int32
+func CoalesceInt32(val, defaultVal *int32) *int32 {
+	if val == nil {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceUInt32 works like coalesce but for uint32
+func CoalesceUInt32(val, defaultVal uint32) uint32 {
+	if val == 0 {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceBool works like coalesce but for *bool
+func CoalesceBool(val, defaultVal *bool) *bool {
+	if val == nil {
+		return defaultVal
+	}
+	return val
+}
+
+// CoalesceDuration works like coalesce but for time.Duration
+func CoalesceDuration(val time.Duration, defaultVal string) time.Duration {
+	if val == 0 {
+		duration, err := time.ParseDuration(defaultVal)
+		if err != nil {
+			panic(err)
+		}
+		return duration
+	}
+	return val
+}
+
+// Test if any of the values is nil
+func testNil(values ...*int32) bool {
+	for _, v := range values {
+		if v == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+// MaxInt32 : Return maximum of two integers provided via pointers. If one value
+// is not defined, return the other one. If both are not defined, result is also
+// undefined, caller needs to check for that.
+func MaxInt32(a, b *int32) *int32 {
+	if testNil(a, b) {
+		return nil
+	}
+
+	if *a > *b {
+		return a
+	}
+
+	return b
 }
 
 // IsSmallerQuantity : checks if first resource is of a smaller quantity than the second
