@@ -63,6 +63,12 @@ configKubernetes:
   # annotations attached to each database pod
   # custom_pod_annotations: "keya:valuea,keyb:valueb"
 
+  # key name for annotation that compares manifest value with current date
+  # delete_annotation_date_key: "delete-date"
+
+  # key name for annotation that compares manifest value with cluster name
+  # delete_annotation_name_key: "delete-clustername"
+
   # list of annotations propagated from cluster manifest to statefulset and deployment
   # downscaler_annotations: "deployment-time,downscaler/*"
 
