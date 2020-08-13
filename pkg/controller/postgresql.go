@@ -429,9 +429,9 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 			c.logger.WithField("cluster-name", clusterName).Warnf(
 				"please, recreate Postgresql resource %q and set annotations to delete properly", clusterName)
 			if currentManifest, marshalErr := json.Marshal(informerOldSpec); marshalErr != nil {
-				c.logger.WithField("cluster-name", clusterName).Debugf("could not marshal current manifest:\n%+v", informerOldSpec)
+				c.logger.WithField("cluster-name", clusterName).Warnf("could not marshal current manifest:\n%+v", informerOldSpec)
 			} else {
-				c.logger.WithField("cluster-name", clusterName).Debugf("%s\n", string(currentManifest))
+				c.logger.WithField("cluster-name", clusterName).Warnf("%s\n", string(currentManifest))
 			}
 			return
 		}

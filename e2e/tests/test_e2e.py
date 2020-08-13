@@ -671,8 +671,6 @@ class EndToEndTestCase(unittest.TestCase):
         # wait until cluster is deleted
         time.sleep(120)
 
-        print('Operator log: {}'.format(k8s.get_operator_log()))
-
         # check if everything has been deleted
         self.assertEqual(0, k8s.count_pods_with_label(cluster_label))
         self.assertEqual(0, k8s.count_services_with_label(cluster_label))
@@ -830,7 +828,6 @@ class K8s:
                     name=pod_name,
                     namespace=namespace
                 )
-                print("Pod description {}".format(response))
 
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
