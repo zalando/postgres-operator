@@ -822,13 +822,6 @@ class K8s:
             if pods:
                 pod_phase = pods[0].status.phase
 
-            if pods and pod_phase != 'Running':
-                pod_name = pods[0].metadata.name
-                response = self.api.core_v1.read_namespaced_pod(
-                    name=pod_name,
-                    namespace=namespace
-                )
-
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_service_type(self, svc_labels, namespace='default'):
