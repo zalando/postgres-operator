@@ -684,53 +684,58 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_delete_annotations)
 
-        # this delete attempt should be omitted because of missing annotations
-        k8s.api.custom_objects_api.delete_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
+        try:
+            # this delete attempt should be omitted because of missing annotations
+            k8s.api.custom_objects_api.delete_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
 
-        # check that pods and services are still there
-        k8s.wait_for_running_pods(cluster_label, 2)
-        k8s.wait_for_service(cluster_label)
+            # check that pods and services are still there
+            k8s.wait_for_running_pods(cluster_label, 2)
+            k8s.wait_for_service(cluster_label)
 
-        # recreate Postgres cluster resource
-        k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
+            # recreate Postgres cluster resource
+            k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
 
-        # wait a little before proceeding
-        time.sleep(10)
+            # wait a little before proceeding
+            time.sleep(10)
 
-        # add annotations to manifest
-        deleteDate = datetime.today().strftime('%Y-%m-%d')
-        pg_patch_delete_annotations = {
-            "metadata": {
-                "annotations": {
-                    "delete-date": deleteDate,
-                    "delete-clustername": "acid-minimal-cluster",
+            # add annotations to manifest
+            deleteDate = datetime.today().strftime('%Y-%m-%d')
+            pg_patch_delete_annotations = {
+                "metadata": {
+                    "annotations": {
+                        "delete-date": deleteDate,
+                        "delete-clustername": "acid-minimal-cluster",
+                    }
                 }
             }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
 
-        # wait a little before proceeding
-        time.sleep(10)
-        k8s.wait_for_running_pods(cluster_label, 2)
-        k8s.wait_for_service(cluster_label)
+            # wait a little before proceeding
+            time.sleep(10)
+            k8s.wait_for_running_pods(cluster_label, 2)
+            k8s.wait_for_service(cluster_label)
 
-        # now delete process should be triggered
-        k8s.api.custom_objects_api.delete_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
+            # now delete process should be triggered
+            k8s.api.custom_objects_api.delete_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
 
-        # wait until cluster is deleted
-        time.sleep(120)
+            # wait until cluster is deleted
+            time.sleep(120)
 
-        # check if everything has been deleted
-        self.assertEqual(0, k8s.count_pods_with_label(cluster_label))
-        self.assertEqual(0, k8s.count_services_with_label(cluster_label))
-        self.assertEqual(0, k8s.count_endpoints_with_label(cluster_label))
-        self.assertEqual(0, k8s.count_statefulsets_with_label(cluster_label))
-        self.assertEqual(0, k8s.count_deployments_with_label(cluster_label))
-        self.assertEqual(0, k8s.count_pdbs_with_label(cluster_label))
-        self.assertEqual(0, k8s.count_secrets_with_label(cluster_label))
+            # check if everything has been deleted
+            self.assertEqual(0, k8s.count_pods_with_label(cluster_label))
+            self.assertEqual(0, k8s.count_services_with_label(cluster_label))
+            self.assertEqual(0, k8s.count_endpoints_with_label(cluster_label))
+            self.assertEqual(0, k8s.count_statefulsets_with_label(cluster_label))
+            self.assertEqual(0, k8s.count_deployments_with_label(cluster_label))
+            self.assertEqual(0, k8s.count_pdbs_with_label(cluster_label))
+            self.assertEqual(0, k8s.count_secrets_with_label(cluster_label))
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
     def get_failover_targets(self, master_node, replica_nodes):
         '''
