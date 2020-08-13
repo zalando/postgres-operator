@@ -888,6 +888,12 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 								},
 							},
+							"delete_annotation_date_key": {
+								Type: "string",
+							},
+							"delete_annotation_name_key": {
+								Type: "string",
+							},
 							"downscaler_annotations": {
 								Type: "array",
 								Items: &apiextv1beta1.JSONSchemaPropsOrArray{

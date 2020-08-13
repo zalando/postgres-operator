@@ -113,6 +113,10 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+                delete_annotation_date_key:
+                  type: string
+                delete_annotation_name_key:
+                  type: string
                 downscaler_annotations:
                   type: array
                   items:

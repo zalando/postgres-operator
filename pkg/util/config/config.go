@@ -36,6 +36,8 @@ type Resources struct {
 	InheritedLabels         []string            `name:"inherited_labels" default:""`
 	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
 	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
+	DeleteAnnotationDateKey string              `name:"delete_annotation_date_key"`
+	DeleteAnnotationNameKey string              `name:"delete_annotation_name_key"`
 	PodRoleLabel            string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration           map[string]string   `name:"toleration" default:""`
 	DefaultCPURequest       string              `name:"default_cpu_request" default:"100m"`
