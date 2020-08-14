@@ -566,7 +566,7 @@ func compareEnv(a, b []v1.EnvVar) bool {
 		for _, envb := range b {
 			if enva.Name == envb.Name {
 				hasmatch = true
-				if enva.Name == "SPILO_CONFIGUARTION" {
+				if enva.Name == "SPILO_CONFIGURATION" {
 					equal = compareSpiloConfiguration(enva.Value, envb.Value)
 				} else {
 					if enva.Value == "" && envb.Value == "" {

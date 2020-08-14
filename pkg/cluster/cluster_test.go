@@ -13,6 +13,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 )
 
@@ -842,6 +843,159 @@ func TestPreparedDatabases(t *testing.T) {
 		}
 		if user.AdminRole != tt.admin {
 			t.Errorf("%s, incorrect admin role for default role %q. Expected %q, got %q", tt.subTest, tt.role, tt.admin, user.AdminRole)
+		}
+	}
+}
+
+func TestCompareSpiloConfiguration(t *testing.T) {
+	testCases := []struct {
+		Config         string
+		ExpectedResult bool
+	}{
+		{
+			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+			true,
+		},
+		{
+			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"200","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+			true,
+		},
+		{
+			`{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"200","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+			false,
+		},
+		{
+			`{}`,
+			false,
+		},
+		{
+			`invalidjson`,
+			false,
+		},
+	}
+	refCase := testCases[0]
+	for _, testCase := range testCases {
+		if result := compareSpiloConfiguration(refCase.Config, testCase.Config); result != testCase.ExpectedResult {
+			t.Errorf("expected %v got %v", testCase.ExpectedResult, result)
+		}
+	}
+}
+
+func TestCompareEnv(t *testing.T) {
+	testCases := []struct {
+		Envs     []v1.EnvVar
+		ExpectedResult bool
+	}{
+		{
+			Envs: []v1.EnvVar{
+				{
+					Name:  "VARIABLE1",
+					Value: "value1",
+				},
+				{
+					Name:  "VARIABLE2",
+					Value: "value2",
+				},
+				{
+					Name:  "VARIABLE3",
+					Value: "value3",
+				},
+				{
+					Name:  "SPILO_CONFIGURATION",
+					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+				},
+			},
+			ExpectedResult: true,
+		},
+		{
+			Envs: []v1.EnvVar{
+				{
+					Name:  "VARIABLE1",
+					Value: "value1",
+				},
+				{
+					Name:  "VARIABLE2",
+					Value: "value2",
+				},
+				{
+					Name:  "VARIABLE3",
+					Value: "value3",
+				},
+				{
+					Name:  "SPILO_CONFIGURATION",
+					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+				},
+			},
+			ExpectedResult: true,
+		},
+		{
+			Envs: []v1.EnvVar{
+				{
+					Name:  "VARIABLE4",
+					Value: "value4",
+				},
+				{
+					Name:  "VARIABLE2",
+					Value: "value2",
+				},
+				{
+					Name:  "VARIABLE3",
+					Value: "value3",
+				},
+				{
+					Name:  "SPILO_CONFIGURATION",
+					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+				},
+			},
+			ExpectedResult: false,
+		},
+		{
+			Envs: []v1.EnvVar{
+				{
+					Name:  "VARIABLE1",
+					Value: "value1",
+				},
+				{
+					Name:  "VARIABLE2",
+					Value: "value2",
+				},
+				{
+					Name:  "VARIABLE3",
+					Value: "value3",
+				},
+				{
+					Name:  "VARIABLE4",
+					Value: "value4",
+				},
+				{
+					Name:  "SPILO_CONFIGURATION",
+					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+				},
+			},
+			ExpectedResult: false,
+		},
+		{
+			Envs: []v1.EnvVar{
+				{
+					Name:  "VARIABLE1",
+					Value: "value1",
+				},
+				{
+					Name:  "VARIABLE2",
+					Value: "value2",
+				},
+				{
+					Name:  "SPILO_CONFIGURATION",
+					Value: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/12/bin","parameters":{"autovacuum_analyze_scale_factor":"0.1"},"pg_hba":["hostssl all all 0.0.0.0/0 md5","host all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"test":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"postgresql":{"parameters":{"max_connections":"100","max_locks_per_transaction":"64","max_worker_processes":"4"}}}}}`,
+				},
+			},
+			ExpectedResult: false,
+		},
+	}
+	refCase := testCases[0]
+	for _, testCase := range testCases {
+		if result := compareEnv(refCase.Envs, testCase.Envs); result != testCase.ExpectedResult {
+			t.Errorf("expected %v got %v", testCase.ExpectedResult, result)
 		}
 	}
 }
