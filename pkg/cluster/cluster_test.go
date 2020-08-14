@@ -12,8 +12,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 )
 
@@ -883,7 +883,7 @@ func TestCompareSpiloConfiguration(t *testing.T) {
 
 func TestCompareEnv(t *testing.T) {
 	testCases := []struct {
-		Envs     []v1.EnvVar
+		Envs           []v1.EnvVar
 		ExpectedResult bool
 	}{
 		{
