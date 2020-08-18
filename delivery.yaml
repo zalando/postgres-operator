@@ -3,6 +3,9 @@ pipeline:
     - id: build-postgres-operator
       type: script
       vm: large
+      cache:
+        paths:
+          - $GOPATH/pkg/mod
       commands:
         - desc: 'Update'
           cmd: |
