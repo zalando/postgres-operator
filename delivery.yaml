@@ -5,7 +5,7 @@ pipeline:
       vm: large
       cache:
         paths:
-          - $GOPATH/pkg/mod
+          - /go/pkg/mod
       commands:
         - desc: 'Update'
           cmd: |
