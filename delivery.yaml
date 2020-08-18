@@ -2,6 +2,7 @@ version: "2017-09-20"
 pipeline:
     - id: build-postgres-operator
       type: script
+      vm: large
       commands:
         - desc: 'Update'
           cmd: |
