@@ -756,8 +756,14 @@ class EndToEndTestCase(unittest.TestCase):
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
         labels = 'spilo-role=master,' + cluster_label
         new_max_connections_value = "99"
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector=labels).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+        creationTimestamp = masterPod.metadata.creation_timestamp
 
-        # enable load balancer services
+
+        # adjust max_connection
         pg_patch_max_connections = {
             "spec": {
                 "postgresql": {
@@ -769,19 +775,19 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
-        # wait for service recreation
+        # wait for patroni to restart postgres
         time.sleep(60)
 
-        pods = k8s.api.core_v1.list_namespaced_pod(
-            'default', label_selector=labels).items
-        self.assert_master_is_unique()
-        masterPod = pods[0]
         get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
-        result = k8s.exec_with_kubectl(masterPpod.metadata.name, get_max_connections_cmd)
+        result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
         max_connections_value = int(result.stdout)
 
+        #Make sure that max_connections decreased
         self.assertEqual(int(new_max_connections_value), max_connections_value,
                          "Expected {} max_connections, found {}".format(int(new_max_connections_value), max_connections_value))
+        #Make sure that pod didn't restart
+        self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
+                         "Master pod creation timestamp is updated")
 
     def get_failover_targets(self, master_node, replica_nodes):
         '''
