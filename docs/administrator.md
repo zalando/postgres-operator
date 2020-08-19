@@ -585,6 +585,10 @@ operator checks during Sync all pods run images specified in their respective
 statefulsets. The operator triggers a rolling upgrade for PG clusters that
 violate this condition.
 
+Changes in $SPILO\_CONFIGURATION under path bootstrap.dcs are ignored when
+StatefulSets are being compared, if there are changes under this path, they are
+applied through rest api interface and following restart of patroni instance
+
 ## Logical backups
 
 The operator can manage K8s cron jobs to run logical backups of Postgres
