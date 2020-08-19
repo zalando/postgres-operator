@@ -23,6 +23,7 @@ ifndef GOPATH
 	GOPATH := $(HOME)/go
 endif
 
+KIND_PATH := $(GOPATH)/bin
 PATH := $(GOPATH)/bin:$(PATH)
 
 default: tools
@@ -42,7 +43,10 @@ push: docker
 
 tools: docker
 	# install pinned version of 'kind'
-	GO111MODULE=on go get sigs.k8s.io/kind@v0.5.1
+	# leave the name as is to avoid overwriting official binary named `kind`
+	wget https://github.com/kubernetes-sigs/kind/releases/download/v0.5.1/kind-linux-amd64
+	chmod +x kind-linux-amd64
+	mv kind-linux-amd64 $(KIND_PATH)
 
 e2etest:
 	./run.sh
