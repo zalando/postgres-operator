@@ -8,6 +8,8 @@ IFS=$'\n\t'
 
 cd $(dirname "$0");
 
+alias kind='kind-linux-amd64'
+
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 
