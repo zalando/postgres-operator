@@ -18,10 +18,6 @@ function pull_images(){
   then
     docker pull registry.opensource.zalan.do/acid/postgres-operator:latest
   fi
-  if [[ -z $(docker images -q registry.opensource.zalan.do/acid/postgres-operator-e2e-tests:${operator_tag}) ]]
-  then
-    docker pull registry.opensource.zalan.do/acid/postgres-operator-e2e-tests:latest
-  fi
 
   operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
   e2e_test_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests" --format "{{.Repository}}:{{.Tag}}" | head -1)
