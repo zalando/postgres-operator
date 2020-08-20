@@ -778,13 +778,13 @@ class EndToEndTestCase(unittest.TestCase):
         # wait for patroni to restart postgres
         time.sleep(60)
 
-        max_connections_value = int(result.stdout)
         pods = k8s.api.core_v1.list_namespaced_pod(
             'default', label_selector=labels).items
         self.assert_master_is_unique()
         masterPod = pods[0]
         get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
         result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
+        max_connections_value = int(result.stdout)
 
         #Make sure that max_connections decreased
         self.assertEqual(int(new_max_connections_value), max_connections_value,
