@@ -8,8 +8,6 @@ IFS=$'\n\t'
 
 cd $(dirname "$0");
 
-alias kind='kind-linux-amd64'
-
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 
@@ -30,12 +28,12 @@ function start_kind(){
   # avoid interference with previous test runs
   if [[ $(kind get clusters | grep "^${cluster_name}*") != "" ]]
   then
-    kind delete cluster --name ${cluster_name}
+    kind-linux-amd64 delete cluster --name ${cluster_name}
   fi
 
-  kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
-  kind load docker-image "${operator_image}" --name ${cluster_name}
-  kind load docker-image "${e2e_test_image}" --name ${cluster_name}
+  kind-linux-amd64 create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
+  kind-linux-amd64 load docker-image "${operator_image}" --name ${cluster_name}
+  kind-linux-amd64 load docker-image "${e2e_test_image}" --name ${cluster_name}
   KUBECONFIG="$(kind get kubeconfig-path --name=${cluster_name})"
   export KUBECONFIG
 }
@@ -56,7 +54,7 @@ function run_tests(){
 
 function clean_up(){
   unset KUBECONFIG
-  kind delete cluster --name ${cluster_name}
+  kind-linux-amd64 delete cluster --name ${cluster_name}
   rm -rf ${kubeconfig_path}
 }
 
