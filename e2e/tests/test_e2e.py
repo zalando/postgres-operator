@@ -762,7 +762,6 @@ class EndToEndTestCase(unittest.TestCase):
         masterPod = pods[0]
         creationTimestamp = masterPod.metadata.creation_timestamp
 
-
         # adjust max_connection
         pg_patch_max_connections = {
             "spec": {
@@ -782,14 +781,16 @@ class EndToEndTestCase(unittest.TestCase):
             'default', label_selector=labels).items
         self.assert_master_is_unique()
         masterPod = pods[0]
-        get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
+        get_max_connections_cmd = ('psql -At -U postgres -c '
+                                   '''"SELECT setting FROM pg_settings WHERE name = 'max_connections';"''')
         result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
         max_connections_value = int(result.stdout)
 
-        #Make sure that max_connections decreased
+        # Make sure that max_connections decreased
         self.assertEqual(int(new_max_connections_value), max_connections_value,
-                         "Expected {} max_connections, found {}".format(int(new_max_connections_value), max_connections_value))
-        #Make sure that pod didn't restart
+                         "Expected {} max_connections, found {}".format(
+                             int(new_max_connections_value), max_connections_value))
+        # Make sure that pod didn't restart
         self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
                          "Master pod creation timestamp is updated")
 
