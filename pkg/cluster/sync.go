@@ -388,13 +388,13 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 	if instancesRestartRequired {
-		c.logger.Debugln("performing instance restart")
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing instance restart")
+		c.logger.Debugln("restarting Postgres server within pods")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
 		if err := c.restartInstances(); err != nil {
-			return fmt.Errorf("could not restart instances: %v", err)
+			return fmt.Errorf("could not restart Postgres server within pods: %v", err)
 		}
-		c.logger.Infof("instances have been restarted")
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Instance restart done - instances have been restarted")
+		c.logger.Infof("Postgres server successfuly restarted on all pods")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done - all instances have been restarted")
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
@@ -411,7 +411,7 @@ func (c *Cluster) syncStatefulSet() error {
 }
 
 func (c *Cluster) restartInstances() error {
-	c.setProcessName("starting to recreate pods")
+	c.setProcessName("starting to restart Postgres servers")
 	ls := c.labelsSet(false)
 	namespace := c.Namespace
 
@@ -423,11 +423,7 @@ func (c *Cluster) restartInstances() error {
 	if err != nil {
 		return fmt.Errorf("could not get the list of pods: %v", err)
 	}
-	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
-
-	if !c.isSafeToRecreatePods(pods) {
-		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initialized")
-	}
+	c.logger.Infof("there are %d pods in the cluster which resquire POstgres server restart", len(pods.Items))
 
 	var (
 		masterPod *v1.Pod
@@ -442,14 +438,14 @@ func (c *Cluster) restartInstances() error {
 
 		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
 		if err = c.patroni.Restart(&pod); err != nil {
-			return fmt.Errorf("could not restart pod %s: %v", podName, err)
+			return fmt.Errorf("could not restart Postgres server on pod %s: %v", podName, err)
 		}
 	}
 
 	if masterPod != nil {
 		podName := util.NameFromMeta(masterPod.ObjectMeta)
 		if err = c.patroni.Restart(masterPod); err != nil {
-			return fmt.Errorf("could not restart masterPod %s: %v", podName, err)
+			return fmt.Errorf("could not restart postgres server on masterPod %s: %v", podName, err)
 		}
 	}
 

@@ -1398,7 +1398,6 @@ class EndToEndTestCase(unittest.TestCase):
         masterPod = pods[0]
         creationTimestamp = masterPod.metadata.creation_timestamp
 
-
         # adjust max_connection
         pg_patch_max_connections = {
             "spec": {
