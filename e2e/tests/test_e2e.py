@@ -646,7 +646,7 @@ class EndToEndTestCase(unittest.TestCase):
         # wait a little before proceeding
         time.sleep(10)
 
-        # add annotations to manifest
+        # add annotations to the postgresql object
         deleteDate = datetime.today().strftime('%Y-%m-%d')
         pg_patch_delete_annotations = {
             "metadata": {

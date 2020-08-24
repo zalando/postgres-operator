@@ -49,7 +49,13 @@ function set_kind_api_server_ip(){
 
 function run_tests(){
 
-  docker run --rm --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_image}"
+  docker run --rm \
+  --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
+  --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
+  --mount type=bind,source="$(readlink -f tests)",target=/tests \
+  --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
+  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_image}"
+  
 }
 
 function clean_up(){

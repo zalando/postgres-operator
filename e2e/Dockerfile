@@ -3,9 +3,12 @@
 FROM ubuntu:18.04
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
-COPY manifests ./manifests
-COPY exec.sh ./exec.sh
-COPY requirements.txt tests ./
+
+#COPY manifests ./manifests
+#COPY exec.sh ./exec.sh
+#COPY requirements.txt tests ./
+
+COPY requirements.txt ./
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
@@ -20,7 +23,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-ARG VERSION=dev
-RUN sed -i "s/__version__ = .*/__version__ = '${VERSION}'/" ./__init__.py
+#ARG VERSION=dev
+#RUN sed -i "s/__version__ = .*/__version__ = '${VERSION}'/" /tests/__init__.py
 
 CMD ["python3", "-m", "unittest", "discover", "--start-directory", ".", "-v"]
