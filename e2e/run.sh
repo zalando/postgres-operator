@@ -20,7 +20,10 @@ function pull_images(){
   fi
 
   operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
-  e2e_test_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests" --format "{{.Repository}}:{{.Tag}}" | head -1)
+
+  e2e_test_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
+  docker pull ${e2e_test_image}
+  #e2e_test_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests" --format "{{.Repository}}:{{.Tag}}" | head -1)
 }
 
 function start_kind(){
@@ -28,12 +31,12 @@ function start_kind(){
   # avoid interference with previous test runs
   if [[ $(kind get clusters | grep "^${cluster_name}*") != "" ]]
   then
-    kind-linux-amd64 delete cluster --name ${cluster_name}
+    kind delete cluster --name ${cluster_name}
   fi
 
-  kind-linux-amd64 create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
-  kind-linux-amd64 load docker-image "${operator_image}" --name ${cluster_name}
-  kind-linux-amd64 load docker-image "${e2e_test_image}" --name ${cluster_name}
+  kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
+  kind load docker-image "${operator_image}" --name ${cluster_name}
+  kind load docker-image "${e2e_test_image}" --name ${cluster_name}
   KUBECONFIG="$(kind-linux-amd64 get kubeconfig-path --name=${cluster_name})"
   export KUBECONFIG
 }
@@ -51,7 +54,7 @@ function run_tests(){
 
   docker run --rm \
   --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
-  --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
+  --mount type=bind,source="$(readlink -f ../manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
   -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_image}"
@@ -60,7 +63,7 @@ function run_tests(){
 
 function clean_up(){
   unset KUBECONFIG
-  kind-linux-amd64 delete cluster --name ${cluster_name}
+  kind delete cluster --name ${cluster_name}
   rm -rf ${kubeconfig_path}
 }
 

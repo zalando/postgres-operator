@@ -34,8 +34,8 @@ copy: clean
 	mkdir manifests
 	cp ../manifests -r .
 
-docker: copy
-	docker build --build-arg "VERSION=$(VERSION)" -t "$(IMAGE):$(TAG)" .
+docker:
+	docker build -t "$(IMAGE):$(TAG)" .
 
 push: docker
 	docker push "$(IMAGE):$(TAG)"
@@ -44,5 +44,5 @@ tools:
 	# install pinned version of 'kind'
 	GO111MODULE=on go get sigs.k8s.io/kind@v0.5.1
 
-e2etest: docker
+e2etest:
 	./run.sh

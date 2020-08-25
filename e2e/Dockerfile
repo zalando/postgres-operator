@@ -1,12 +1,7 @@
-# An image to perform the actual test. Do not forget to copy all necessary test
-# files here.
+# An image to run e2e tests.
+# The image does not include the tests; all necessary files are bind-mounted when a container starts.
 FROM ubuntu:18.04
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
-
-
-#COPY manifests ./manifests
-#COPY exec.sh ./exec.sh
-#COPY requirements.txt tests ./
 
 COPY requirements.txt ./
 
@@ -22,8 +17,5 @@ RUN apt-get update \
     && mv ./kubectl /usr/local/bin/kubectl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-#ARG VERSION=dev
-#RUN sed -i "s/__version__ = .*/__version__ = '${VERSION}'/" /tests/__init__.py
 
 CMD ["python3", "-m", "unittest", "discover", "--start-directory", ".", "-v"]
