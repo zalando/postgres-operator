@@ -1,6 +1,6 @@
 .PHONY: clean copy docker push tools test
 
-BINARY ?= postgres-operator-e2e-tests
+BINARY ?= postgres-operator-e2e-tests-runner
 BUILD_FLAGS ?= -v
 CGO_ENABLED ?= 0
 ifeq ($(RACE),1)
@@ -34,8 +34,11 @@ copy: clean
 	mkdir manifests
 	cp ../manifests -r .
 
-docker:
+docker: scm-source.json
 	docker build -t "$(IMAGE):$(TAG)" .
+
+scm-source.json: ../.git
+	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
 push: docker
 	docker push "$(IMAGE):$(TAG)"

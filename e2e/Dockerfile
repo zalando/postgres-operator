@@ -4,6 +4,7 @@ FROM ubuntu:18.04
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 COPY requirements.txt ./
+COPY scm-source.json ./
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
