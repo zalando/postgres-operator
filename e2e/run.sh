@@ -44,7 +44,6 @@ function start_kind(){
 function set_kind_api_server_ip(){
   # use the actual kubeconfig to connect to the 'kind' API server
   # but update the IP address of the API server to the one from the Docker 'bridge' network
-  cp "${KUBECONFIG}" /tmp
   readonly local kind_api_server_port=6443 # well-known in the 'kind' codebase
   readonly local kind_api_server=$(docker inspect --format "{{ .NetworkSettings.Networks.kind.IPAddress }}:${kind_api_server_port}" "${cluster_name}"-control-plane)
   sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
