@@ -604,8 +604,8 @@ class EndToEndTestCase(unittest.TestCase):
         get_config_cmd = "wget --quiet -O - localhost:8080/config"
         result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
         roles_dict = (json.loads(result.stdout)
-                    .get("controller", {})
-                    .get("InfrastructureRoles"))
+                      .get("controller", {})
+                      .get("InfrastructureRoles"))
 
         self.assertTrue("robot_zmon_acid_monitoring_new" in roles_dict)
         role = roles_dict["robot_zmon_acid_monitoring_new"]
@@ -733,7 +733,6 @@ class EndToEndTestCase(unittest.TestCase):
            Toggle pod anti affinty to distribute pods accross nodes (replica in particular).
         '''
         k8s = self.k8s
-        failover_targets = self.get_failover_targets(master_node, replica_nodes)
 
         # enable pod anti affintiy in config map which should trigger movement of replica
         patch_enable_antiaffinity = {
@@ -742,8 +741,12 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_enable_antiaffinity)
-        self.assert_failover(
-            master_node, len(replica_nodes), failover_targets, cluster_label)
+        k8s.wait_for_pod_start('spilo-role=master')
+        k8s.wait_for_pod_start('spilo-role=replica')
+
+        current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
+        self.assertNotEqual(current_master_node, current_replica_nodes,
+                            "Both pods are still on the same node {}".format(current_master_node))
 
         # now disable pod anti affintiy again which will cause yet another failover
         patch_disable_antiaffinity = {
@@ -949,8 +952,8 @@ class K8s:
 
     def exec_with_kubectl(self, pod, cmd):
         return subprocess.run(["./exec.sh", pod, cmd],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE)
 
     def get_effective_pod_image(self, pod_name, namespace='default'):
         '''
