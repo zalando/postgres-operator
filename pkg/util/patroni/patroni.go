@@ -29,7 +29,8 @@ type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 	GetMemberData(server *v1.Pod) (MemberData, error)
-	Restart(server *v1.Pod) error
+	Restart(server *v1.Pod, force_restart bool) error
+	GetConfig(server *v1.Pod) (map[string]interface{}, error)
 }
 
 // Patroni API client
@@ -105,6 +106,32 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 	return nil
 }
 
+func (p *Patroni) httpGet(url string) (string, error) {
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("could not create request: %v", err)
+	}
+
+	p.logger.Debugf("making GET http request: %s", request.URL.String())
+
+	resp, err := p.httpClient.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("could not make request: %v", err)
+	}
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("could not read response: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		return "", fmt.Errorf("could not close request: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return string(bodyBytes), fmt.Errorf("patroni returned '%d'", resp.StatusCode)
+	}
+	return string(bodyBytes), nil
+}
+
 // Switchover by calling Patroni REST API
 func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 	buf := &bytes.Buffer{}
@@ -151,9 +178,28 @@ type MemberData struct {
 	Patroni         MemberDataPatroni `json:"patroni"`
 }
 
+func (p *Patroni) GetConfig(server *v1.Pod) (map[string]interface{}, error) {
+	config := make(map[string]interface{})
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return config, err
+	}
+	body, err := p.httpGet(apiURLString+configPath)
+	err = json.Unmarshal([]byte(body), &config)
+	if err != nil {
+		return config, err
+	}
+
+	return config, err
+}
+
 //Restart method restarts instance via Patroni POST API call.
-func (p *Patroni) Restart(server *v1.Pod) error {
+func (p *Patroni) Restart(server *v1.Pod, force_restart bool) error {
 	buf := &bytes.Buffer{}
+	err := json.NewEncoder(buf).Encode(map[string]interface{}{"restart_pending": !(force_restart)})
+	if err != nil {
+		return fmt.Errorf("could not encode json: %v", err)
+	}
 	apiURLString, err := apiURL(server)
 	if err != nil {
 		return err

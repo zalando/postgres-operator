@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -437,14 +438,23 @@ func (c *Cluster) restartInstances() error {
 		}
 
 		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
-		if err = c.patroni.Restart(&pod); err != nil {
+		config, err := c.patroni.GetConfig(&pod)
+		if err != nil {
+			return fmt.Errorf("could not get config for pod %s: %v", podName, err)
+		}
+		ttl, ok := config["ttl"].(int32)
+		if !ok {
+			ttl = 30
+		}
+		if err = c.patroni.Restart(&pod, false); err != nil {
 			return fmt.Errorf("could not restart Postgres server on pod %s: %v", podName, err)
 		}
+		time.Sleep(time.Duration(ttl) * time.Second)
 	}
 
 	if masterPod != nil {
 		podName := util.NameFromMeta(masterPod.ObjectMeta)
-		if err = c.patroni.Restart(masterPod); err != nil {
+		if err = c.patroni.Restart(masterPod, false); err != nil {
 			return fmt.Errorf("could not restart postgres server on masterPod %s: %v", podName, err)
 		}
 	}
