@@ -77,7 +77,6 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
-    """
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
         '''
@@ -534,7 +533,6 @@ class EndToEndTestCase(unittest.TestCase):
             "downscaler/downtime_replicas": "0",
         }
         self.assertTrue(k8s.check_statefulset_annotations(cluster_label, annotations))
-    """
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
