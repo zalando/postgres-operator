@@ -1,3 +1,4 @@
+import json
 import unittest
 import time
 import timeout_decorator
@@ -6,6 +7,7 @@ import warnings
 import os
 import yaml
 
+from datetime import datetime
 from kubernetes import client, config
 
 
@@ -50,7 +52,9 @@ class EndToEndTestCase(unittest.TestCase):
 
         for filename in ["operator-service-account-rbac.yaml",
                          "configmap.yaml",
-                         "postgres-operator.yaml"]:
+                         "postgres-operator.yaml",
+                         "infrastructure-roles.yaml",
+                         "infrastructure-roles-new.yaml"]:
             result = k8s.create_with_kubectl("manifests/" + filename)
             print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
 
@@ -570,6 +574,112 @@ class EndToEndTestCase(unittest.TestCase):
         # toggle pod anti affinity to move replica away from master node
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_infrastructure_roles(self):
+        '''
+            Test using external secrets for infrastructure roles
+        '''
+        k8s = self.k8s
+        # update infrastructure roles description
+        secret_name = "postgresql-infrastructure-roles"
+        roles = "secretname: postgresql-infrastructure-roles-new, userkey: user, rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
+        patch_infrastructure_roles = {
+            "data": {
+                "infrastructure_roles_secret_name": secret_name,
+                "infrastructure_roles_secrets": roles,
+            },
+        }
+        k8s.update_config(patch_infrastructure_roles)
+
+        # wait a little before proceeding
+        time.sleep(30)
+
+        # check that new roles are represented in the config by requesting the
+        # operator configuration via API
+        operator_pod = k8s.get_operator_pod()
+        get_config_cmd = "wget --quiet -O - localhost:8080/config"
+        result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
+        roles_dict = (json.loads(result.stdout)
+                    .get("controller", {})
+                    .get("InfrastructureRoles"))
+
+        self.assertTrue("robot_zmon_acid_monitoring_new" in roles_dict)
+        role = roles_dict["robot_zmon_acid_monitoring_new"]
+        role.pop("Password", None)
+        self.assertDictEqual(role, {
+            "Name": "robot_zmon_acid_monitoring_new",
+            "Flags": None,
+            "MemberOf": ["robot_zmon"],
+            "Parameters": None,
+            "AdminRole": "",
+            "Origin": 2,
+        })
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_x_cluster_deletion(self):
+        '''
+           Test deletion with configured protection
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # configure delete protection
+        patch_delete_annotations = {
+            "data": {
+                "delete_annotation_date_key": "delete-date",
+                "delete_annotation_name_key": "delete-clustername"
+            }
+        }
+        k8s.update_config(patch_delete_annotations)
+
+        # this delete attempt should be omitted because of missing annotations
+        k8s.api.custom_objects_api.delete_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
+
+        # check that pods and services are still there
+        k8s.wait_for_running_pods(cluster_label, 2)
+        k8s.wait_for_service(cluster_label)
+
+        # recreate Postgres cluster resource
+        k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
+
+        # wait a little before proceeding
+        time.sleep(10)
+
+        # add annotations to manifest
+        deleteDate = datetime.today().strftime('%Y-%m-%d')
+        pg_patch_delete_annotations = {
+            "metadata": {
+                "annotations": {
+                    "delete-date": deleteDate,
+                    "delete-clustername": "acid-minimal-cluster",
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
+
+        # wait a little before proceeding
+        time.sleep(10)
+        k8s.wait_for_running_pods(cluster_label, 2)
+        k8s.wait_for_service(cluster_label)
+
+        # now delete process should be triggered
+        k8s.api.custom_objects_api.delete_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
+
+        # wait until cluster is deleted
+        time.sleep(120)
+
+        # check if everything has been deleted
+        self.assertEqual(0, k8s.count_pods_with_label(cluster_label))
+        self.assertEqual(0, k8s.count_services_with_label(cluster_label))
+        self.assertEqual(0, k8s.count_endpoints_with_label(cluster_label))
+        self.assertEqual(0, k8s.count_statefulsets_with_label(cluster_label))
+        self.assertEqual(0, k8s.count_deployments_with_label(cluster_label))
+        self.assertEqual(0, k8s.count_pdbs_with_label(cluster_label))
+        self.assertEqual(0, k8s.count_secrets_with_label(cluster_label))
+
     def get_failover_targets(self, master_node, replica_nodes):
         '''
            If all pods live on the same node, failover will happen to other worker(s)
@@ -656,11 +766,12 @@ class K8sApi:
         self.apps_v1 = client.AppsV1Api()
         self.batch_v1_beta1 = client.BatchV1beta1Api()
         self.custom_objects_api = client.CustomObjectsApi()
+        self.policy_v1_beta1 = client.PolicyV1beta1Api()
 
 
 class K8s:
     '''
-    Wraps around K8 api client and helper methods.
+    Wraps around K8s api client and helper methods.
     '''
 
     RETRY_TIMEOUT_SEC = 10
@@ -710,14 +821,6 @@ class K8s:
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=pod_labels).items
             if pods:
                 pod_phase = pods[0].status.phase
-
-            if pods and pod_phase != 'Running':
-                pod_name = pods[0].metadata.name
-                response = self.api.core_v1.read_namespaced_pod(
-                    name=pod_name,
-                    namespace=namespace
-                )
-                print("Pod description {}".format(response))
 
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
@@ -780,6 +883,25 @@ class K8s:
     def count_pods_with_label(self, labels, namespace='default'):
         return len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items)
 
+    def count_services_with_label(self, labels, namespace='default'):
+        return len(self.api.core_v1.list_namespaced_service(namespace, label_selector=labels).items)
+
+    def count_endpoints_with_label(self, labels, namespace='default'):
+        return len(self.api.core_v1.list_namespaced_endpoints(namespace, label_selector=labels).items)
+
+    def count_secrets_with_label(self, labels, namespace='default'):
+        return len(self.api.core_v1.list_namespaced_secret(namespace, label_selector=labels).items)
+
+    def count_statefulsets_with_label(self, labels, namespace='default'):
+        return len(self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=labels).items)
+
+    def count_deployments_with_label(self, labels, namespace='default'):
+        return len(self.api.apps_v1.list_namespaced_deployment(namespace, label_selector=labels).items)
+
+    def count_pdbs_with_label(self, labels, namespace='default'):
+        return len(self.api.policy_v1_beta1.list_namespaced_pod_disruption_budget(
+            namespace, label_selector=labels).items)
+
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
         new_pod_node = ''
@@ -817,6 +939,11 @@ class K8s:
     def create_with_kubectl(self, path):
         return subprocess.run(
             ["kubectl", "create", "-f", path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+
+    def exec_with_kubectl(self, pod, cmd):
+        return subprocess.run(["./exec.sh", pod, cmd],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
 

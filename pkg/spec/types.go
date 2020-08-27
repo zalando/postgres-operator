@@ -55,6 +55,10 @@ type PgUser struct {
 	AdminRole  string            `yaml:"admin_role"`
 }
 
+func (user *PgUser) Valid() bool {
+	return user.Name != "" && user.Password != ""
+}
+
 // PgUserMap maps user names to the definitions.
 type PgUserMap map[string]PgUser
 

@@ -6,6 +6,8 @@ metadata:
 #    environment: demo
 #  annotations:
 #    "acid.zalan.do/controller": "second-operator"
+#    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
+#    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
   teamId: "acid"
@@ -34,7 +36,7 @@ spec:
           defaultUsers: false
   postgresql:
     version: "12"
-    parameters: # Expert section
+    parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"

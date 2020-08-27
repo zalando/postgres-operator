@@ -6,10 +6,13 @@ import (
 	"reflect"
 
 	b64 "encoding/base64"
+	"encoding/json"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -156,6 +159,33 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	return kubeClient, nil
 }
 
+// SetPostgresCRDStatus of Postgres cluster
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string) (*acidv1.Postgresql, error) {
+	var pg *acidv1.Postgresql
+	var pgStatus acidv1.PostgresStatus
+	pgStatus.PostgresClusterStatus = status
+
+	patch, err := json.Marshal(struct {
+		PgStatus interface{} `json:"status"`
+	}{&pgStatus})
+
+	if err != nil {
+		return pg, fmt.Errorf("could not marshal status: %v", err)
+	}
+
+	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
+	// we should take advantage of it.
+	pg, err = client.AcidV1ClientSet.AcidV1().Postgresqls(clusterName.Namespace).Patch(
+		context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+	if err != nil {
+		return pg, fmt.Errorf("could not update status: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	return pg, nil
+}
+
 // SameService compares the Services
 func SameService(cur, new *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
@@ -241,31 +271,73 @@ func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason st
 }
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
-	if name != "infrastructureroles-test" {
-		return nil, fmt.Errorf("NotFound")
-	}
-	secret := &v1.Secret{}
-	secret.Name = "testcluster"
-	secret.Data = map[string][]byte{
+	oldFormatSecret := &v1.Secret{}
+	oldFormatSecret.Name = "testcluster"
+	oldFormatSecret.Data = map[string][]byte{
 		"user1":     []byte("testrole"),
 		"password1": []byte("testpassword"),
 		"inrole1":   []byte("testinrole"),
 		"foobar":    []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
 	}
-	return secret, nil
+
+	newFormatSecret := &v1.Secret{}
+	newFormatSecret.Name = "test-secret-new-format"
+	newFormatSecret.Data = map[string][]byte{
+		"user":       []byte("new-test-role"),
+		"password":   []byte("new-test-password"),
+		"inrole":     []byte("new-test-inrole"),
+		"new-foobar": []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
+	}
+
+	secrets := map[string]*v1.Secret{
+		"infrastructureroles-old-test": oldFormatSecret,
+		"infrastructureroles-new-test": newFormatSecret,
+	}
+
+	for idx := 1; idx <= 2; idx++ {
+		newFormatStandaloneSecret := &v1.Secret{}
+		newFormatStandaloneSecret.Name = fmt.Sprintf("test-secret-new-format%d", idx)
+		newFormatStandaloneSecret.Data = map[string][]byte{
+			"user":     []byte(fmt.Sprintf("new-test-role%d", idx)),
+			"password": []byte(fmt.Sprintf("new-test-password%d", idx)),
+			"inrole":   []byte(fmt.Sprintf("new-test-inrole%d", idx)),
+		}
+
+		secrets[fmt.Sprintf("infrastructureroles-new-test%d", idx)] =
+			newFormatStandaloneSecret
+	}
+
+	if secret, exists := secrets[name]; exists {
+		return secret, nil
+	}
+
+	return nil, fmt.Errorf("NotFound")
 
 }
 
 func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
-	if name != "infrastructureroles-test" {
-		return nil, fmt.Errorf("NotFound")
-	}
-	configmap := &v1.ConfigMap{}
-	configmap.Name = "testcluster"
-	configmap.Data = map[string]string{
+	oldFormatConfigmap := &v1.ConfigMap{}
+	oldFormatConfigmap.Name = "testcluster"
+	oldFormatConfigmap.Data = map[string]string{
 		"foobar": "{}",
 	}
-	return configmap, nil
+
+	newFormatConfigmap := &v1.ConfigMap{}
+	newFormatConfigmap.Name = "testcluster"
+	newFormatConfigmap.Data = map[string]string{
+		"new-foobar": "{\"user_flags\": [\"createdb\"]}",
+	}
+
+	configmaps := map[string]*v1.ConfigMap{
+		"infrastructureroles-old-test": oldFormatConfigmap,
+		"infrastructureroles-new-test": newFormatConfigmap,
+	}
+
+	if configmap, exists := configmaps[name]; exists {
+		return configmap, nil
+	}
+
+	return nil, fmt.Errorf("NotFound")
 }
 
 // Secrets to be mocked

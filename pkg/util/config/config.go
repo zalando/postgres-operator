@@ -36,6 +36,8 @@ type Resources struct {
 	InheritedLabels         []string            `name:"inherited_labels" default:""`
 	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
 	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
+	DeleteAnnotationDateKey string              `name:"delete_annotation_date_key"`
+	DeleteAnnotationNameKey string              `name:"delete_annotation_name_key"`
 	PodRoleLabel            string              `name:"pod_role_label" default:"spilo-role"`
 	PodToleration           map[string]string   `name:"toleration" default:""`
 	DefaultCPURequest       string              `name:"default_cpu_request" default:"100m"`
@@ -45,22 +47,52 @@ type Resources struct {
 	MinCPULimit             string              `name:"min_cpu_limit" default:"250m"`
 	MinMemoryLimit          string              `name:"min_memory_limit" default:"250Mi"`
 	PodEnvironmentConfigMap spec.NamespacedName `name:"pod_environment_configmap"`
+	PodEnvironmentSecret    string              `name:"pod_environment_secret"`
 	NodeReadinessLabel      map[string]string   `name:"node_readiness_label" default:""`
 	MaxInstances            int32               `name:"max_instances" default:"-1"`
 	MinInstances            int32               `name:"min_instances" default:"-1"`
 	ShmVolume               *bool               `name:"enable_shm_volume" default:"true"`
 }
 
+type InfrastructureRole struct {
+	// Name of a secret which describes the role, and optionally name of a
+	// configmap with an extra information
+	SecretName spec.NamespacedName
+
+	UserKey     string
+	PasswordKey string
+	RoleKey     string
+
+	DefaultUserValue string
+	DefaultRoleValue string
+
+	// This field point out the detailed yaml definition of the role, if exists
+	Details string
+
+	// Specify if a secret contains multiple fields in the following format:
+	//
+	// 	%(userkey)idx: ...
+	// 	%(passwordkey)idx: ...
+	// 	%(rolekey)idx: ...
+	//
+	// If it does, Name/Password/Role are interpreted not as unique field
+	// names, but as a template.
+
+	Template bool
+}
+
 // Auth describes authentication specific configuration parameters
 type Auth struct {
-	SecretNameTemplate            StringTemplate      `name:"secret_name_template" default:"{username}.{cluster}.credentials.{tprkind}.{tprgroup}"`
-	PamRoleName                   string              `name:"pam_role_name" default:"zalandos"`
-	PamConfiguration              string              `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
-	TeamsAPIUrl                   string              `name:"teams_api_url" default:"https://teams.example.com/api/"`
-	OAuthTokenSecretName          spec.NamespacedName `name:"oauth_token_secret_name" default:"postgresql-operator"`
-	InfrastructureRolesSecretName spec.NamespacedName `name:"infrastructure_roles_secret_name"`
-	SuperUsername                 string              `name:"super_username" default:"postgres"`
-	ReplicationUsername           string              `name:"replication_username" default:"standby"`
+	SecretNameTemplate            StringTemplate        `name:"secret_name_template" default:"{username}.{cluster}.credentials.{tprkind}.{tprgroup}"`
+	PamRoleName                   string                `name:"pam_role_name" default:"zalandos"`
+	PamConfiguration              string                `name:"pam_configuration" default:"https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees"`
+	TeamsAPIUrl                   string                `name:"teams_api_url" default:"https://teams.example.com/api/"`
+	OAuthTokenSecretName          spec.NamespacedName   `name:"oauth_token_secret_name" default:"postgresql-operator"`
+	InfrastructureRolesSecretName spec.NamespacedName   `name:"infrastructure_roles_secret_name"`
+	InfrastructureRoles           []*InfrastructureRole `name:"-"`
+	InfrastructureRolesDefs       string                `name:"infrastructure_roles_secrets"`
+	SuperUsername                 string                `name:"super_username" default:"postgres"`
+	ReplicationUsername           string                `name:"replication_username" default:"standby"`
 }
 
 // Scalyr holds the configuration for the Scalyr Agent sidecar for log shipping:
@@ -142,6 +174,7 @@ type Config struct {
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
+	StorageResizeMode                      string            `name:"storage_resize_mode" default:"ebs"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer        *bool             `name:"enable_load_balancer"`
 	MasterDNSNameFormat       StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`

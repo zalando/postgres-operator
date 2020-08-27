@@ -5,7 +5,6 @@ package cluster
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -125,6 +124,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
 	})
+	password_encryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
+	if !ok {
+		password_encryption = "md5"
+	}
 
 	cluster := &Cluster{
 		Config:         cfg,
@@ -136,7 +139,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy: users.DefaultUserSyncStrategy{},
+		userSyncStrategy: users.DefaultUserSyncStrategy{password_encryption},
 		deleteOptions:    metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
@@ -179,34 +182,6 @@ func (c *Cluster) GetReference() *v1.ObjectReference {
 		c.logger.Errorf("could not get reference for Postgresql CR %v/%v: %v", c.Postgresql.Namespace, c.Postgresql.Name, err)
 	}
 	return ref
-}
-
-// SetStatus of Postgres cluster
-// TODO: eventually switch to updateStatus() for kubernetes 1.11 and above
-func (c *Cluster) setStatus(status string) {
-	var pgStatus acidv1.PostgresStatus
-	pgStatus.PostgresClusterStatus = status
-
-	patch, err := json.Marshal(struct {
-		PgStatus interface{} `json:"status"`
-	}{&pgStatus})
-
-	if err != nil {
-		c.logger.Errorf("could not marshal status: %v", err)
-	}
-
-	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
-	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
-	// we should take advantage of it.
-	newspec, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.clusterNamespace()).Patch(
-		context.TODO(), c.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
-	if err != nil {
-		c.logger.Errorf("could not update status: %v", err)
-		// return as newspec is empty, see PR654
-		return
-	}
-	// update the spec, maintaining the new resourceVersion.
-	c.setSpec(newspec)
 }
 
 func (c *Cluster) isNewCluster() bool {
@@ -257,13 +232,13 @@ func (c *Cluster) Create() error {
 
 	defer func() {
 		if err == nil {
-			c.setStatus(acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
+			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning) //TODO: are you sure it's running?
 		} else {
-			c.setStatus(acidv1.ClusterStatusAddFailed)
+			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusAddFailed)
 		}
 	}()
 
-	c.setStatus(acidv1.ClusterStatusCreating)
+	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusCreating)
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Create", "Started creation of new cluster resources")
 
 	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {
@@ -630,14 +605,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.setStatus(acidv1.ClusterStatusUpdating)
+	c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdating)
 	c.setSpec(newSpec)
 
 	defer func() {
 		if updateFailed {
-			c.setStatus(acidv1.ClusterStatusUpdateFailed)
+			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusUpdateFailed)
 		} else {
-			c.setStatus(acidv1.ClusterStatusRunning)
+			c.KubeClient.SetPostgresCRDStatus(c.clusterName(), acidv1.ClusterStatusRunning)
 		}
 	}()
 
@@ -826,10 +801,8 @@ func (c *Cluster) Delete() {
 		c.logger.Warningf("could not delete statefulset: %v", err)
 	}
 
-	for _, obj := range c.Secrets {
-		if err := c.deleteSecret(obj); err != nil {
-			c.logger.Warningf("could not delete secret: %v", err)
-		}
+	if err := c.deleteSecrets(); err != nil {
+		c.logger.Warningf("could not delete secrets: %v", err)
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
@@ -986,32 +959,42 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 	}
 
 	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
+		// get list of prepared schemas to set in search_path
+		preparedSchemas := preparedDB.PreparedSchemas
+		if len(preparedDB.PreparedSchemas) == 0 {
+			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
+		}
+
+		var searchPath strings.Builder
+		searchPath.WriteString(constants.DefaultSearchPath)
+		for preparedSchemaName := range preparedSchemas {
+			searchPath.WriteString(", " + preparedSchemaName)
+		}
+
 		// default roles per database
-		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName); err != nil {
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String()); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
 		if preparedDB.DefaultUsers {
-			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName); err != nil {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String()); err != nil {
 				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 			}
 		}
 
 		// default roles per database schema
-		preparedSchemas := preparedDB.PreparedSchemas
-		if len(preparedDB.PreparedSchemas) == 0 {
-			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
-		}
 		for preparedSchemaName, preparedSchema := range preparedSchemas {
 			if preparedSchema.DefaultRoles == nil || *preparedSchema.DefaultRoles {
 				if err := c.initDefaultRoles(defaultRoles,
 					preparedDbName+constants.OwnerRoleNameSuffix,
-					preparedDbName+"_"+preparedSchemaName); err != nil {
+					preparedDbName+"_"+preparedSchemaName,
+					constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
 					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
 				}
 				if preparedSchema.DefaultUsers {
 					if err := c.initDefaultRoles(defaultUsers,
 						preparedDbName+constants.OwnerRoleNameSuffix,
-						preparedDbName+"_"+preparedSchemaName); err != nil {
+						preparedDbName+"_"+preparedSchemaName,
+						constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
 						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
 					}
 				}
@@ -1021,7 +1004,7 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 	return nil
 }
 
-func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string) error {
+func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string, searchPath string) error {
 
 	for defaultRole, inherits := range defaultRoles {
 
@@ -1045,12 +1028,13 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		}
 
 		newRole := spec.PgUser{
-			Origin:    spec.RoleOriginBootstrap,
-			Name:      roleName,
-			Password:  util.RandomPassword(constants.PasswordLength),
-			Flags:     flags,
-			MemberOf:  memberOf,
-			AdminRole: adminRole,
+			Origin:     spec.RoleOriginBootstrap,
+			Name:       roleName,
+			Password:   util.RandomPassword(constants.PasswordLength),
+			Flags:      flags,
+			MemberOf:   memberOf,
+			Parameters: map[string]string{"search_path": searchPath},
+			AdminRole:  adminRole,
 		}
 		if currentRole, present := c.pgUsers[roleName]; present {
 			c.pgUsers[roleName] = c.resolveNameConflict(&currentRole, &newRole)

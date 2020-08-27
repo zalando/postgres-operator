@@ -1,7 +1,10 @@
+# An image to perform the actual test. Do not forget to copy all necessary test
+# files here.
 FROM ubuntu:18.04
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 COPY manifests ./manifests
+COPY exec.sh ./exec.sh
 COPY requirements.txt tests ./
 
 RUN apt-get update \

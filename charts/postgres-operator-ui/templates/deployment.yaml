@@ -46,7 +46,7 @@ spec:
             - name: "RESOURCES_VISIBLE"
               value: "{{ .Values.envs.resourcesVisible }}"
             - name: "TARGET_NAMESPACE"
-              value: {{ .Values.envs.targetNamespace }}
+              value: "{{ .Values.envs.targetNamespace }}"
             - name: "TEAMS"
               value: |-
                 [
