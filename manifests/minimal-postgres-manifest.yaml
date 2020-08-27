@@ -7,7 +7,7 @@ spec:
   teamId: "acid"
   volume:
     size: 1Gi
-    storageClass: standard
+    storageClass: e2e-standard
   numberOfInstances: 2
   users:
     zalando:  # database owner
