@@ -77,6 +77,7 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
+    """
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
         '''
@@ -98,7 +99,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             # enable connection pooler
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            k8s.api.custom_objec-tileserverts_api.patch_namespaced_custom_object(
                 'acid.zalan.do', 'v1', 'default',
                 'postgresqls', 'acid-minimal-cluster',
                 {
@@ -533,6 +534,7 @@ class EndToEndTestCase(unittest.TestCase):
             "downscaler/downtime_replicas": "0",
         }
         self.assertTrue(k8s.check_statefulset_annotations(cluster_label, annotations))
+    """
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
@@ -689,10 +691,11 @@ class EndToEndTestCase(unittest.TestCase):
            If all pods live on the same node, failover will happen to other worker(s)
         '''
         k8s = self.k8s
+        k8s_master_exclusion = 'kubernetes.io/hostname!=postgres-operator-e2e-tests-control-plane'
 
         failover_targets = [x for x in replica_nodes if x != master_node]
         if len(failover_targets) == 0:
-            nodes = k8s.api.core_v1.list_node()
+            nodes = k8s.api.core_v1.list_node(label_selector=k8s_master_exclusion)
             for n in nodes.items:
                 if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != master_node:
                     failover_targets.append(n.metadata.name)
