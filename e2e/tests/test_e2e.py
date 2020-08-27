@@ -98,7 +98,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             # enable connection pooler
-            k8s.api.custom_objec-tileserverts_api.patch_namespaced_custom_object(
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 'acid.zalan.do', 'v1', 'default',
                 'postgresqls', 'acid-minimal-cluster',
                 {
