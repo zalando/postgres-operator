@@ -38,6 +38,9 @@ class EndToEndTestCase(unittest.TestCase):
         # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
 
+        # remove existing local storage class and create hostpath class
+        k8s.api.storage_v1_api.delete_storage_class("standard")
+
         # operator deploys pod service account there on start up
         # needed for test_multi_namespace_support()
         cls.namespace = "test"
@@ -768,6 +771,7 @@ class K8sApi:
         self.batch_v1_beta1 = client.BatchV1beta1Api()
         self.custom_objects_api = client.CustomObjectsApi()
         self.policy_v1_beta1 = client.PolicyV1beta1Api()
+        self.storage_v1_api = client.StorageV1Api()
 
 
 class K8s:
