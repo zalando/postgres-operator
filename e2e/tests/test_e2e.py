@@ -159,45 +159,50 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
 
-        # enable load balancer services
-        pg_patch_enable_lbs = {
-            "spec": {
-                "enableMasterLoadBalancer": True,
-                "enableReplicaLoadBalancer": True
+        try:
+            # enable load balancer services
+            pg_patch_enable_lbs = {
+                "spec": {
+                    "enableMasterLoadBalancer": True,
+                    "enableReplicaLoadBalancer": True
+                }
             }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_lbs)
-        # wait for service recreation
-        time.sleep(60)
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_lbs)
+            # wait for service recreation
+            time.sleep(60)
 
-        master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
-        self.assertEqual(master_svc_type, 'LoadBalancer',
-                         "Expected LoadBalancer service type for master, found {}".format(master_svc_type))
+            master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
+            self.assertEqual(master_svc_type, 'LoadBalancer',
+                             "Expected LoadBalancer service type for master, found {}".format(master_svc_type))
 
-        repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
-        self.assertEqual(repl_svc_type, 'LoadBalancer',
-                         "Expected LoadBalancer service type for replica, found {}".format(repl_svc_type))
+            repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
+            self.assertEqual(repl_svc_type, 'LoadBalancer',
+                             "Expected LoadBalancer service type for replica, found {}".format(repl_svc_type))
 
-        # disable load balancer services again
-        pg_patch_disable_lbs = {
-            "spec": {
-                "enableMasterLoadBalancer": False,
-                "enableReplicaLoadBalancer": False
+            # disable load balancer services again
+            pg_patch_disable_lbs = {
+                "spec": {
+                    "enableMasterLoadBalancer": False,
+                    "enableReplicaLoadBalancer": False
+                }
             }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_lbs)
-        # wait for service recreation
-        time.sleep(60)
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_lbs)
+            # wait for service recreation
+            time.sleep(60)
 
-        master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
-        self.assertEqual(master_svc_type, 'ClusterIP',
-                         "Expected ClusterIP service type for master, found {}".format(master_svc_type))
+            master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
+            self.assertEqual(master_svc_type, 'ClusterIP',
+                             "Expected ClusterIP service type for master, found {}".format(master_svc_type))
 
-        repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
-        self.assertEqual(repl_svc_type, 'ClusterIP',
-                         "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
+            repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
+            self.assertEqual(repl_svc_type, 'ClusterIP',
+                             "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
@@ -234,7 +239,8 @@ class EndToEndTestCase(unittest.TestCase):
             # lazy update works if the restarted pod and older pods run different Spilo versions
             new_image = k8s.get_effective_pod_image(pod0)
             old_image = k8s.get_effective_pod_image(pod1)
-            self.assertNotEqual(new_image, old_image, "Lazy updated failed: pods have the same image {}".format(new_image))
+            self.assertNotEqual(new_image, old_image,
+                                "Lazy updated failed: pods have the same image {}".format(new_image))
 
             # sanity check
             assert_msg = "Image {} of a new pod differs from {} in operator conf".format(new_image, conf_image)
@@ -648,8 +654,8 @@ class EndToEndTestCase(unittest.TestCase):
             get_config_cmd = "wget --quiet -O - localhost:8080/config"
             result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
             roles_dict = (json.loads(result.stdout)
-                        .get("controller", {})
-                        .get("InfrastructureRoles"))
+                          .get("controller", {})
+                          .get("InfrastructureRoles"))
 
             self.assertTrue("robot_zmon_acid_monitoring_new" in roles_dict)
             role = roles_dict["robot_zmon_acid_monitoring_new"]
@@ -1001,8 +1007,8 @@ class K8s:
 
     def exec_with_kubectl(self, pod, cmd):
         return subprocess.run(["./exec.sh", pod, cmd],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE)
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE)
 
     def get_effective_pod_image(self, pod_name, namespace='default'):
         '''
