@@ -2089,10 +2089,6 @@ func (c *Cluster) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.Env
 			Value: fmt.Sprint(pgPort),
 		},
 		{
-			Name:  "CONNECTION_POOLER_REPLICA_PORT",
-			Value: fmt.Sprint(5433),
-		},
-		{
 			Name:  "CONNECTION_POOLER_MODE",
 			Value: effectiveMode,
 		},
@@ -2308,41 +2304,19 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1
 	if spec.ConnectionPooler == nil {
 		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
-	var serviceSpec = v1.ServiceSpec{}
 
-	if *spec.EnableReplicaConnectionPooler == false {
-		serviceSpec = v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Name:       c.connectionPoolerName(),
-					Port:       pgPort,
-					TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
-				},
+	serviceSpec := v1.ServiceSpec{
+		Ports: []v1.ServicePort{
+			{
+				Name:       c.connectionPoolerName(),
+				Port:       pgPort,
+				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
 			},
-			Type: v1.ServiceTypeClusterIP,
-			Selector: map[string]string{
-				"connection-pooler": c.connectionPoolerName(),
-			},
-		}
-	} else {
-		serviceSpec = v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Name:       c.connectionPoolerName(),
-					Port:       pgPort,
-					TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
-				},
-				{
-					Name:       c.connectionPoolerName() + "-repl",
-					Port:       5433,
-					TargetPort: intstr.IntOrString{StrVal: c.servicePort(Replica)},
-				},
-			},
-			Type: v1.ServiceTypeClusterIP,
-			Selector: map[string]string{
-				"connection-pooler": c.connectionPoolerName(),
-			},
-		}
+		},
+		Type: v1.ServiceTypeClusterIP,
+		Selector: map[string]string{
+			"connection-pooler-repl": c.connectionPoolerName(),
+		},
 	}
 
 	service := &v1.Service{
@@ -2360,6 +2334,42 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: serviceSpec,
+	}
+
+	return service
+}
+
+func (c *Cluster) generateReplicaConnectionPoolerService(spec *acidv1.PostgresSpec) *v1.Service {
+
+	replicaserviceSpec := v1.ServiceSpec{
+		Ports: []v1.ServicePort{
+			{
+				Name:       c.connectionPoolerName() + "-repl",
+				Port:       pgPort,
+				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Replica)},
+			},
+		},
+		Type: v1.ServiceTypeClusterIP,
+		Selector: map[string]string{
+			"connection-pooler-repl": c.connectionPoolerName() + "-repl",
+		},
+	}
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.connectionPoolerName() + "-repl",
+			Namespace:   c.Namespace,
+			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
+			Annotations: map[string]string{},
+			// make StatefulSet object its owner to represent the dependency.
+			// By itself StatefulSet is being deleted with "Orphaned"
+			// propagation policy, which means that it's deletion will not
+			// clean up this service, but there is a hope that this object will
+			// be garbage collected if something went wrong and operator didn't
+			// deleted it.
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: replicaserviceSpec,
 	}
 
 	return service

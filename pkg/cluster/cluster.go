@@ -55,8 +55,9 @@ type Config struct {
 
 // K8S objects that are belongs to a connection pooler
 type ConnectionPoolerObjects struct {
-	Deployment *appsv1.Deployment
-	Service    *v1.Service
+	Deployment  *appsv1.Deployment
+	Service     *v1.Service
+	ReplService *v1.Service
 
 	// It could happen that a connection pooler was enabled, but the operator
 	// was not able to properly process a corresponding event or was restarted.
