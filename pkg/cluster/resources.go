@@ -152,11 +152,27 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 	if err != nil {
 		return nil, err
 	}
+	if c.Spec.EnableReplicaConnectionPooler != nil && *c.Spec.EnableReplicaConnectionPooler == true {
+		replServiceSpec := c.generateReplicaConnectionPoolerService(&c.Spec)
+		replService, err := c.KubeClient.
+			Services(serviceSpec.Namespace).
+			Create(context.TODO(), replServiceSpec, metav1.CreateOptions{})
 
-	c.ConnectionPooler = &ConnectionPoolerObjects{
-		Deployment: deployment,
-		Service:    service,
+		if err != nil {
+			return nil, err
+		}
+		c.ConnectionPooler = &ConnectionPoolerObjects{
+			Deployment:  deployment,
+			Service:     service,
+			ReplService: replService,
+		}
+	} else {
+		c.ConnectionPooler = &ConnectionPoolerObjects{
+			Deployment: deployment,
+			Service:    service,
+		}
 	}
+
 	c.logger.Debugf("created new connection pooler %q, uid: %q",
 		util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
 
