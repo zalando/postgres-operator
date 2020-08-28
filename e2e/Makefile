@@ -47,5 +47,5 @@ tools:
 	# install pinned version of 'kind'
 	GO111MODULE=on go get sigs.k8s.io/kind@v0.5.1
 
-e2etest:
+e2etest: tools
 	./run.sh
