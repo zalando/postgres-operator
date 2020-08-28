@@ -695,7 +695,7 @@ class EndToEndTestCase(unittest.TestCase):
         if len(failover_targets) == 0:
             nodes = k8s.api.core_v1.list_node(label_selector=k8s_master_exclusion)
             for n in nodes.items:
-                if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != master_node:
+                if n.metadata.name != master_node:
                     failover_targets.append(n.metadata.name)
 
         return failover_targets
@@ -734,6 +734,7 @@ class EndToEndTestCase(unittest.TestCase):
            Toggle pod anti affinty to distribute pods accross nodes (replica in particular).
         '''
         k8s = self.k8s
+        failover_targets = self.get_failover_targets(master_node, replica_nodes)
 
         # enable pod anti affintiy in config map which should trigger movement of replica
         patch_enable_antiaffinity = {
@@ -742,12 +743,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_enable_antiaffinity)
-        k8s.wait_for_pod_start('spilo-role=master')
-        k8s.wait_for_pod_start('spilo-role=replica')
-
-        current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
-        self.assertNotEqual(current_master_node, current_replica_nodes,
-                            "Both pods are still on the same node {}".format(current_master_node))
+        self.assert_failover(master_node, len(replica_nodes), failover_targets, cluster_label)
 
         # now disable pod anti affintiy again which will cause yet another failover
         patch_disable_antiaffinity = {
