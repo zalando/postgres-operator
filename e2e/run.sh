@@ -23,7 +23,6 @@ function pull_images(){
 
   e2e_test_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
   docker pull ${e2e_test_image}
-  #e2e_test_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests" --format "{{.Repository}}:{{.Tag}}" | head -1)
 }
 
 function start_kind(){
@@ -52,9 +51,11 @@ function set_kind_api_server_ip(){
 
 function run_tests(){
 
+  # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
+
   docker run --rm \
   --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
-  --mount type=bind,source="$(readlink -f ../manifests)",target=/manifests \
+  --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
   -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_image}"
