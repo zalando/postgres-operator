@@ -79,8 +79,7 @@ scm-source.json: .git
 
 tools:
 	GO111MODULE=on go get -u honnef.co/go/tools/cmd/staticcheck
-	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.16.3
-	cd e2e; make tools
+	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.18.8
 	GO111MODULE=on go mod tidy
 
 fmt:
