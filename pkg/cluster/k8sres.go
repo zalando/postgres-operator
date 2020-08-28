@@ -2085,8 +2085,12 @@ func (c *Cluster) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.Env
 
 	return []v1.EnvVar{
 		{
-			Name:  "CONNECTION_POOLER_PORT",
+			Name:  "CONNECTION_POOLER_MASTER_PORT",
 			Value: fmt.Sprint(pgPort),
+		},
+		{
+			Name:  "CONNECTION_POOLER_REPLICA_PORT",
+			Value: fmt.Sprint(5433),
 		},
 		{
 			Name:  "CONNECTION_POOLER_MODE",
@@ -2304,19 +2308,41 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1
 	if spec.ConnectionPooler == nil {
 		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
+	var serviceSpec = v1.ServiceSpec{}
 
-	serviceSpec := v1.ServiceSpec{
-		Ports: []v1.ServicePort{
-			{
-				Name:       c.connectionPoolerName(),
-				Port:       pgPort,
-				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
+	if *spec.EnableReplicaConnectionPooler == false {
+		serviceSpec = v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:       c.connectionPoolerName(),
+					Port:       pgPort,
+					TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
+				},
 			},
-		},
-		Type: v1.ServiceTypeClusterIP,
-		Selector: map[string]string{
-			"connection-pooler": c.connectionPoolerName(),
-		},
+			Type: v1.ServiceTypeClusterIP,
+			Selector: map[string]string{
+				"connection-pooler": c.connectionPoolerName(),
+			},
+		}
+	} else {
+		serviceSpec = v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Name:       c.connectionPoolerName(),
+					Port:       pgPort,
+					TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
+				},
+				{
+					Name:       c.connectionPoolerName() + "-repl",
+					Port:       5433,
+					TargetPort: intstr.IntOrString{StrVal: c.servicePort(Replica)},
+				},
+			},
+			Type: v1.ServiceTypeClusterIP,
+			Selector: map[string]string{
+				"connection-pooler": c.connectionPoolerName(),
+			},
+		}
 	}
 
 	service := &v1.Service{

@@ -1,7 +1,7 @@
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
-  name: acid-test-cluster
+  name: acid-test-cluster2
 #  labels:
 #    environment: demo
 #  annotations:
@@ -18,7 +18,8 @@ spec:
     - createdb
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
-#  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
+  #enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
+  enableReplicaConnectionPooler: true # set to enable connectionPooler for replica endpoints
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:

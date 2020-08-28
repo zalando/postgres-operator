@@ -262,6 +262,9 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"enableConnectionPooler": {
 						Type: "boolean",
 					},
+					"enableReplicaConnectionPooler": {
+						Type: "boolean",
+					},
 					"enableLogicalBackup": {
 						Type: "boolean",
 					},
