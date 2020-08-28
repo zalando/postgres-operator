@@ -38,6 +38,9 @@ class EndToEndTestCase(unittest.TestCase):
         # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
 
+        # remove existing local storage class and create hostpath class
+        k8s.api.storage_v1_api.delete_storage_class("standard")
+
         # operator deploys pod service account there on start up
         # needed for test_multi_namespace_support()
         cls.namespace = "test"
@@ -54,7 +57,8 @@ class EndToEndTestCase(unittest.TestCase):
                          "configmap.yaml",
                          "postgres-operator.yaml",
                          "infrastructure-roles.yaml",
-                         "infrastructure-roles-new.yaml"]:
+                         "infrastructure-roles-new.yaml",
+                         "e2e-storage-class.yaml"]:
             result = k8s.create_with_kubectl("manifests/" + filename)
             print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
 
@@ -199,6 +203,52 @@ class EndToEndTestCase(unittest.TestCase):
             repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
             self.assertEqual(repl_svc_type, 'ClusterIP',
                              "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_infrastructure_roles(self):
+        '''
+            Test using external secrets for infrastructure roles
+        '''
+        k8s = self.k8s
+        # update infrastructure roles description
+        secret_name = "postgresql-infrastructure-roles"
+        roles = "secretname: postgresql-infrastructure-roles-new, userkey: user, rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
+        patch_infrastructure_roles = {
+            "data": {
+                "infrastructure_roles_secret_name": secret_name,
+                "infrastructure_roles_secrets": roles,
+            },
+        }
+        k8s.update_config(patch_infrastructure_roles)
+
+        # wait a little before proceeding
+        time.sleep(30)
+
+        try:
+            # check that new roles are represented in the config by requesting the
+            # operator configuration via API
+            operator_pod = k8s.get_operator_pod()
+            get_config_cmd = "wget --quiet -O - localhost:8080/config"
+            result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
+            roles_dict = (json.loads(result.stdout)
+                          .get("controller", {})
+                          .get("InfrastructureRoles"))
+
+            self.assertTrue("robot_zmon_acid_monitoring_new" in roles_dict)
+            role = roles_dict["robot_zmon_acid_monitoring_new"]
+            role.pop("Password", None)
+            self.assertDictEqual(role, {
+                "Name": "robot_zmon_acid_monitoring_new",
+                "Flags": None,
+                "MemberOf": ["robot_zmon"],
+                "Parameters": None,
+                "AdminRole": "",
+                "Origin": 2,
+            })
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -628,52 +678,6 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_infrastructure_roles(self):
-        '''
-            Test using external secrets for infrastructure roles
-        '''
-        k8s = self.k8s
-        # update infrastructure roles description
-        secret_name = "postgresql-infrastructure-roles"
-        roles = "secretname: postgresql-infrastructure-roles-new, userkey: user, rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
-        patch_infrastructure_roles = {
-            "data": {
-                "infrastructure_roles_secret_name": secret_name,
-                "infrastructure_roles_secrets": roles,
-            },
-        }
-        k8s.update_config(patch_infrastructure_roles)
-
-        # wait a little before proceeding
-        time.sleep(30)
-
-        try:
-            # check that new roles are represented in the config by requesting the
-            # operator configuration via API
-            operator_pod = k8s.get_operator_pod()
-            get_config_cmd = "wget --quiet -O - localhost:8080/config"
-            result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
-            roles_dict = (json.loads(result.stdout)
-                          .get("controller", {})
-                          .get("InfrastructureRoles"))
-
-            self.assertTrue("robot_zmon_acid_monitoring_new" in roles_dict)
-            role = roles_dict["robot_zmon_acid_monitoring_new"]
-            role.pop("Password", None)
-            self.assertDictEqual(role, {
-                "Name": "robot_zmon_acid_monitoring_new",
-                "Flags": None,
-                "MemberOf": ["robot_zmon"],
-                "Parameters": None,
-                "AdminRole": "",
-                "Origin": 2,
-            })
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
-
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_x_cluster_deletion(self):
         '''
            Test deletion with configured protection
@@ -748,12 +752,13 @@ class EndToEndTestCase(unittest.TestCase):
            If all pods live on the same node, failover will happen to other worker(s)
         '''
         k8s = self.k8s
+        k8s_master_exclusion = 'kubernetes.io/hostname!=postgres-operator-e2e-tests-control-plane'
 
         failover_targets = [x for x in replica_nodes if x != master_node]
         if len(failover_targets) == 0:
-            nodes = k8s.api.core_v1.list_node()
+            nodes = k8s.api.core_v1.list_node(label_selector=k8s_master_exclusion)
             for n in nodes.items:
-                if "node-role.kubernetes.io/master" not in n.metadata.labels and n.metadata.name != master_node:
+                if n.metadata.name != master_node:
                     failover_targets.append(n.metadata.name)
 
         return failover_targets
@@ -801,8 +806,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_enable_antiaffinity)
-        self.assert_failover(
-            master_node, len(replica_nodes), failover_targets, cluster_label)
+        self.assert_failover(master_node, len(replica_nodes), failover_targets, cluster_label)
 
         # now disable pod anti affintiy again which will cause yet another failover
         patch_disable_antiaffinity = {
@@ -830,6 +834,7 @@ class K8sApi:
         self.batch_v1_beta1 = client.BatchV1beta1Api()
         self.custom_objects_api = client.CustomObjectsApi()
         self.policy_v1_beta1 = client.PolicyV1beta1Api()
+        self.storage_v1_api = client.StorageV1Api()
 
 
 class K8s:
