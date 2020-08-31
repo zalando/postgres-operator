@@ -21,8 +21,9 @@ function pull_images(){
 
   operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
 
-  e2e_test_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
-  docker pull ${e2e_test_image}
+  # this image does not contain the tests; a container mounts them from a local "./tests" dir at start time
+  e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
+  docker pull ${e2e_test_runner_image}
 }
 
 function start_kind(){
@@ -36,7 +37,6 @@ function start_kind(){
   export KUBECONFIG="${kubeconfig_path}"
   kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
   kind load docker-image "${operator_image}" --name ${cluster_name}
-  kind load docker-image "${e2e_test_image}" --name ${cluster_name}
 }
 
 function set_kind_api_server_ip(){
@@ -56,7 +56,7 @@ function run_tests(){
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
-  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_image}"
+  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}"
   
 }
 
