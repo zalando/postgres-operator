@@ -45,7 +45,9 @@ push: docker
 
 tools:
 	# install pinned version of 'kind'
-	GO111MODULE=on go get sigs.k8s.io/kind@v0.8.1
+	# go get must run outside of a dir with a (module-based) Go project !
+	# otherwise go get updates project's dependencies and/or behaves differently
+	cd "/tmp" && GO111MODULE=on go get sigs.k8s.io/kind@v0.8.1
 
 e2etest: tools copy clean
 	./run.sh
