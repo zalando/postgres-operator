@@ -762,6 +762,7 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
+
     def get_failover_targets(self, master_node, replica_nodes):
         '''
            If all pods live on the same node, failover will happen to other worker(s)
