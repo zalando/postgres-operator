@@ -960,7 +960,7 @@ func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	poolerLabels := podSpec.ObjectMeta.Labels["connection-pooler"]
 
-	if poolerLabels != cluster.connectionPoolerLabelsSelector().MatchLabels["connection-pooler"] {
+	if poolerLabels != cluster.connectionPoolerLabelsSelector(Master).MatchLabels["connection-pooler"] {
 		return fmt.Errorf("Pod labels do not match, got %+v, expected %+v",
 			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector().MatchLabels)
 	}
@@ -1118,7 +1118,7 @@ func testDeploymentOwnwerReference(cluster *Cluster, deployment *appsv1.Deployme
 
 func testSelector(cluster *Cluster, deployment *appsv1.Deployment) error {
 	labels := deployment.Spec.Selector.MatchLabels
-	expected := cluster.connectionPoolerLabelsSelector().MatchLabels
+	expected := cluster.connectionPoolerLabelsSelector(Master).MatchLabels
 
 	if labels["connection-pooler"] != expected["connection-pooler"] {
 		return fmt.Errorf("Labels are incorrect, got %+v, expected %+v",

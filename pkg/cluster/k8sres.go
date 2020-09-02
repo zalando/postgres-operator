@@ -2199,7 +2199,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec,
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
 			Namespace:   c.Namespace,
 			Annotations: c.generatePodAnnotations(spec),
 		},
@@ -2280,7 +2280,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec, 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   c.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
@@ -2292,59 +2292,13 @@ func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec, 
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: numberOfInstances,
-			Selector: c.connectionPoolerLabelsSelector(),
+			Selector: c.connectionPoolerLabelsSelector(role),
 			Template: *podTemplate,
 		},
 	}
 
 	return deployment, nil
 }
-
-/* func (c *Cluster) generateReplicaConnectionPoolerDeployment(spec *acidv1.PostgresSpec) (
-	*appsv1.Deployment, error) {
-
-	podTemplate, err := c.generateConnectionPoolerPodTemplate(spec, Replica)
-	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
-	if numberOfInstances == nil {
-		numberOfInstances = util.CoalesceInt32(
-			c.OpConfig.ConnectionPooler.NumberOfInstances,
-			k8sutil.Int32ToPointer(1))
-	}
-
-	if *numberOfInstances < constants.ConnectionPoolerMinInstances {
-		msg := "Adjusted number of connection pooler instances from %d to %d"
-		c.logger.Warningf(msg, numberOfInstances, constants.ConnectionPoolerMinInstances)
-
-		*numberOfInstances = constants.ConnectionPoolerMinInstances
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connectionPoolerName() + "-repl",
-			Namespace:   c.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
-			Annotations: map[string]string{},
-			// make StatefulSet object its owner to represent the dependency.
-			// By itself StatefulSet is being deleted with "Orphaned"
-			// propagation policy, which means that it's deletion will not
-			// clean up this deployment, but there is a hope that this object
-			// will be garbage collected if something went wrong and operator
-			// didn't deleted it.
-			OwnerReferences: c.ownerReferences(),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: numberOfInstances,
-			Selector: c.connectionPoolerLabelsSelector(),
-			Template: *podTemplate,
-		},
-	}
-
-	return deployment, nil
-} */
 
 func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, role PostgresRole) *v1.Service {
 
@@ -2378,7 +2332,7 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, rol
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   c.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
@@ -2393,40 +2347,6 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, rol
 
 	return service
 }
-
-/* func (c *Cluster) generateReplicaConnectionPoolerService(spec *acidv1.PostgresSpec) *v1.Service {
-
-	replicaserviceSpec := v1.ServiceSpec{
-		Ports: []v1.ServicePort{
-			{
-				Name:       c.connectionPoolerName() + "-repl",
-				Port:       pgPort,
-				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Replica)},
-			},
-		},
-		Type:     v1.ServiceTypeClusterIP,
-		Selector: c.roleLabelsSet(false, Replica),
-	}
-
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connectionPoolerName() + "-repl",
-			Namespace:   c.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
-			Annotations: map[string]string{},
-			// make StatefulSet object its owner to represent the dependency.
-			// By itself StatefulSet is being deleted with "Orphaned"
-			// propagation policy, which means that it's deletion will not
-			// clean up this service, but there is a hope that this object will
-			// be garbage collected if something went wrong and operator didn't
-			// deleted it.
-			OwnerReferences: c.ownerReferences(),
-		},
-		Spec: replicaserviceSpec,
-	}
-
-	return service
-} */
 
 func ensurePath(file string, defaultDir string, defaultFile string) string {
 	if file == "" {
