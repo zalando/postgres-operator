@@ -420,11 +420,11 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 // have e.g. different `application` label, so that recreatePod operation will
 // not interfere with it (it lists all the pods via labels, and if there would
 // be no difference, it will recreate also pooler pods).
-func (c *Cluster) connectionPoolerLabelsSelector() *metav1.LabelSelector {
+func (c *Cluster) connectionPoolerLabelsSelector(role PostgresRole) *metav1.LabelSelector {
 	connectionPoolerLabels := labels.Set(map[string]string{})
 
 	extraLabels := labels.Set(map[string]string{
-		"connection-pooler": c.connectionPoolerName(Master),
+		"connection-pooler": c.connectionPoolerName(role),
 		"application":       "db-connection-pooler",
 	})
 
