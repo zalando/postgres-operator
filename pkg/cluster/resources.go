@@ -126,55 +126,73 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 		msg = "could not prepare database for connection pooler: %v"
 		return nil, fmt.Errorf(msg, err)
 	}
+	if c.Spec.EnableMasterConnectionPooler != nil || c.ConnectionPooler != nil {
+		deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, Master)
+		if err != nil {
+			msg = "could not generate deployment for connection pooler: %v"
+			return nil, fmt.Errorf(msg, err)
+		}
 
-	deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec)
-	if err != nil {
-		msg = "could not generate deployment for connection pooler: %v"
-		return nil, fmt.Errorf(msg, err)
-	}
+		// client-go does retry 10 times (with NoBackoff by default) when the API
+		// believe a request can be retried and returns Retry-After header. This
+		// should be good enough to not think about it here.
+		deployment, err := c.KubeClient.
+			Deployments(deploymentSpec.Namespace).
+			Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
 
-	// client-go does retry 10 times (with NoBackoff by default) when the API
-	// believe a request can be retried and returns Retry-After header. This
-	// should be good enough to not think about it here.
-	deployment, err := c.KubeClient.
-		Deployments(deploymentSpec.Namespace).
-		Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
 
-	if err != nil {
-		return nil, err
-	}
-
-	serviceSpec := c.generateConnectionPoolerService(&c.Spec)
-	service, err := c.KubeClient.
-		Services(serviceSpec.Namespace).
-		Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-	if c.Spec.EnableReplicaConnectionPooler != nil && *c.Spec.EnableReplicaConnectionPooler == true {
-		replServiceSpec := c.generateReplicaConnectionPoolerService(&c.Spec)
-		replService, err := c.KubeClient.
+		serviceSpec := c.generateConnectionPoolerService(&c.Spec, Master)
+		service, err := c.KubeClient.
 			Services(serviceSpec.Namespace).
+			Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
+
+		if err != nil {
+			return nil, err
+		}
+		c.ConnectionPooler = &ConnectionPoolerObjects{
+			Deployment: deployment,
+			Service:    service,
+		}
+		c.logger.Debugf("created new connection pooler %q, uid: %q",
+			util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
+	}
+
+	if c.Spec.EnableReplicaConnectionPooler != nil && *c.Spec.EnableReplicaConnectionPooler == true {
+		repldeploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, Replica)
+		if err != nil {
+			msg = "could not generate deployment for connection pooler: %v"
+			return nil, fmt.Errorf(msg, err)
+		}
+
+		// client-go does retry 10 times (with NoBackoff by default) when the API
+		// believe a request can be retried and returns Retry-After header. This
+		// should be good enough to not think about it here.
+		repldeployment, err := c.KubeClient.
+			Deployments(repldeploymentSpec.Namespace).
+			Create(context.TODO(), repldeploymentSpec, metav1.CreateOptions{})
+
+		if err != nil {
+			return nil, err
+		}
+
+		replServiceSpec := c.generateConnectionPoolerService(&c.Spec, Replica)
+		replService, err := c.KubeClient.
+			Services(replServiceSpec.Namespace).
 			Create(context.TODO(), replServiceSpec, metav1.CreateOptions{})
 
 		if err != nil {
 			return nil, err
 		}
 		c.ConnectionPooler = &ConnectionPoolerObjects{
-			Deployment:  deployment,
-			Service:     service,
-			ReplService: replService,
+			ReplDeployment: repldeployment,
+			ReplService:    replService,
 		}
-	} else {
-		c.ConnectionPooler = &ConnectionPoolerObjects{
-			Deployment: deployment,
-			Service:    service,
-		}
+		c.logger.Debugf("created new connection pooler for replica %q, uid: %q",
+			util.NameFromMeta(repldeployment.ObjectMeta), repldeployment.UID)
 	}
-
-	c.logger.Debugf("created new connection pooler %q, uid: %q",
-		util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
 
 	return c.ConnectionPooler, nil
 }
@@ -192,7 +210,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
-	deploymentName := c.connectionPoolerName()
+	deploymentName := c.connectionPoolerName(Master)
 	deployment := c.ConnectionPooler.Deployment
 
 	if deployment != nil {
@@ -217,7 +235,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 
 	// Repeat the same for the service object
 	service := c.ConnectionPooler.Service
-	serviceName := c.connectionPoolerName()
+	serviceName := c.connectionPoolerName(Master)
 
 	if service != nil {
 		serviceName = service.Name

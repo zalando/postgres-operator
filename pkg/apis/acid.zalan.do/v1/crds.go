@@ -259,7 +259,7 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 					"dockerImage": {
 						Type: "string",
 					},
-					"enableConnectionPooler": {
+					"enableMasterConnectionPooler": {
 						Type: "boolean",
 					},
 					"enableReplicaConnectionPooler": {

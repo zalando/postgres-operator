@@ -75,8 +75,12 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) connectionPoolerName() string {
-	return c.Name + "-pooler"
+func (c *Cluster) connectionPoolerName(role PostgresRole) string {
+	name := c.Name + "-pooler"
+	if role == Replica {
+		name = name + "-repl"
+	}
+	return name
 }
 
 func (c *Cluster) endpointName(role PostgresRole) string {
@@ -2085,7 +2089,7 @@ func (c *Cluster) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.Env
 
 	return []v1.EnvVar{
 		{
-			Name:  "CONNECTION_POOLER_MASTER_PORT",
+			Name:  "CONNECTION_POOLER_PORT",
 			Value: fmt.Sprint(pgPort),
 		},
 		{
@@ -2115,7 +2119,7 @@ func (c *Cluster) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.Env
 	}
 }
 
-func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec) (
+func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec, role PostgresRole) (
 	*v1.PodTemplateSpec, error) {
 
 	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
@@ -2151,11 +2155,11 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec)
 	envVars := []v1.EnvVar{
 		{
 			Name:  "PGHOST",
-			Value: c.serviceAddress(Master),
+			Value: c.serviceAddress(role),
 		},
 		{
 			Name:  "PGPORT",
-			Value: c.servicePort(Master),
+			Value: c.servicePort(role),
 		},
 		{
 			Name: "PGUSER",
@@ -2237,7 +2241,7 @@ func (c *Cluster) ownerReferences() []metav1.OwnerReference {
 	}
 }
 
-func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec) (
+func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec, role PostgresRole) (
 	*appsv1.Deployment, error) {
 
 	// there are two ways to enable connection pooler, either to specify a
@@ -2250,7 +2254,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec) 
 		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
 
-	podTemplate, err := c.generateConnectionPoolerPodTemplate(spec)
+	podTemplate, err := c.generateConnectionPoolerPodTemplate(spec, role)
 	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
@@ -2269,9 +2273,12 @@ func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec) 
 		return nil, err
 	}
 
+	var name string
+	name = c.connectionPoolerName(role)
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connectionPoolerName(),
+			Name:        name,
 			Namespace:   c.Namespace,
 			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
 			Annotations: map[string]string{},
@@ -2293,7 +2300,53 @@ func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec) 
 	return deployment, nil
 }
 
-func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1.Service {
+/* func (c *Cluster) generateReplicaConnectionPoolerDeployment(spec *acidv1.PostgresSpec) (
+	*appsv1.Deployment, error) {
+
+	podTemplate, err := c.generateConnectionPoolerPodTemplate(spec, Replica)
+	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
+	if numberOfInstances == nil {
+		numberOfInstances = util.CoalesceInt32(
+			c.OpConfig.ConnectionPooler.NumberOfInstances,
+			k8sutil.Int32ToPointer(1))
+	}
+
+	if *numberOfInstances < constants.ConnectionPoolerMinInstances {
+		msg := "Adjusted number of connection pooler instances from %d to %d"
+		c.logger.Warningf(msg, numberOfInstances, constants.ConnectionPoolerMinInstances)
+
+		*numberOfInstances = constants.ConnectionPoolerMinInstances
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        c.connectionPoolerName() + "-repl",
+			Namespace:   c.Namespace,
+			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
+			Annotations: map[string]string{},
+			// make StatefulSet object its owner to represent the dependency.
+			// By itself StatefulSet is being deleted with "Orphaned"
+			// propagation policy, which means that it's deletion will not
+			// clean up this deployment, but there is a hope that this object
+			// will be garbage collected if something went wrong and operator
+			// didn't deleted it.
+			OwnerReferences: c.ownerReferences(),
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: numberOfInstances,
+			Selector: c.connectionPoolerLabelsSelector(),
+			Template: *podTemplate,
+		},
+	}
+
+	return deployment, nil
+} */
+
+func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, role PostgresRole) *v1.Service {
 
 	// there are two ways to enable connection pooler, either to specify a
 	// connectionPooler section or enableConnectionPooler. In the second case
@@ -2304,24 +2357,26 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1
 	if spec.ConnectionPooler == nil {
 		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
+	name := c.connectionPoolerName(role)
 
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{
-				Name:       c.connectionPoolerName(),
+				Name:       name,
 				Port:       pgPort,
-				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
+				TargetPort: intstr.IntOrString{StrVal: c.servicePort(role)},
 			},
 		},
 		Type: v1.ServiceTypeClusterIP,
-		Selector: map[string]string{
-			"connection-pooler-repl": c.connectionPoolerName(),
-		},
 	}
-
+	if role == Replica {
+		serviceSpec.Selector = c.roleLabelsSet(false, Replica)
+	} else {
+		serviceSpec.Selector = map[string]string{"connection-pooler": name}
+	}
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connectionPoolerName(),
+			Name:        name,
 			Namespace:   c.Namespace,
 			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
 			Annotations: map[string]string{},
@@ -2339,7 +2394,7 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1
 	return service
 }
 
-func (c *Cluster) generateReplicaConnectionPoolerService(spec *acidv1.PostgresSpec) *v1.Service {
+/* func (c *Cluster) generateReplicaConnectionPoolerService(spec *acidv1.PostgresSpec) *v1.Service {
 
 	replicaserviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{
@@ -2349,10 +2404,8 @@ func (c *Cluster) generateReplicaConnectionPoolerService(spec *acidv1.PostgresSp
 				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Replica)},
 			},
 		},
-		Type: v1.ServiceTypeClusterIP,
-		Selector: map[string]string{
-			"connection-pooler-repl": c.connectionPoolerName() + "-repl",
-		},
+		Type:     v1.ServiceTypeClusterIP,
+		Selector: c.roleLabelsSet(false, Replica),
 	}
 
 	service := &v1.Service{
@@ -2373,7 +2426,7 @@ func (c *Cluster) generateReplicaConnectionPoolerService(spec *acidv1.PostgresSp
 	}
 
 	return service
-}
+} */
 
 func ensurePath(file string, defaultDir string, defaultFile string) string {
 	if file == "" {

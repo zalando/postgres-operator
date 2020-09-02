@@ -922,34 +922,18 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql) (
 	SyncReason, error) {
 
-	deployment, err := c.KubeClient.
-		Deployments(c.Namespace).
-		Get(context.TODO(), c.connectionPoolerName(), metav1.GetOptions{})
-
-	if err != nil && k8sutil.ResourceNotFound(err) {
-		msg := "Deployment %s for connection pooler synchronization is not found, create it"
-		c.logger.Warningf(msg, c.connectionPoolerName())
-
-		deploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec)
-		if err != nil {
-			msg = "could not generate deployment for connection pooler: %v"
-			return NoSync, fmt.Errorf(msg, err)
-		}
-
-		deployment, err := c.KubeClient.
-			Deployments(deploymentSpec.Namespace).
-			Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
-
-		if err != nil {
-			return NoSync, err
-		}
-
-		c.ConnectionPooler.Deployment = deployment
-	} else if err != nil {
+	masterdeployment, err := c.checkAndCreateConnectionPoolerDeployment(Master, newSpec)
+	if err != nil {
+		msg := "could not get connection pooler deployment to sync: %v"
+		return NoSync, fmt.Errorf(msg, err)
+	}
+	replicadeployment, err := c.checkAndCreateConnectionPoolerDeployment(Replica, newSpec)
+	if err != nil {
 		msg := "could not get connection pooler deployment to sync: %v"
 		return NoSync, fmt.Errorf(msg, err)
 	} else {
-		c.ConnectionPooler.Deployment = deployment
+		c.ConnectionPooler.Deployment = masterdeployment
+		c.ConnectionPooler.ReplDeployment = replicadeployment
 
 		// actual synchronization
 		oldConnectionPooler := oldSpec.Spec.ConnectionPooler
@@ -968,32 +952,28 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			newConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		c.logger.Infof("Old: %+v, New %+v", oldConnectionPooler, newConnectionPooler)
+		c.logger.Infof("Old: %+v, New: %+v", oldConnectionPooler, newConnectionPooler)
 
 		specSync, specReason := c.needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
-		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, deployment)
+		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, masterdeployment)
 		reason := append(specReason, defaultsReason...)
 		if specSync || defaultsSync {
-			c.logger.Infof("Update connection pooler deployment %s, reason: %+v",
-				c.connectionPoolerName(), reason)
-
-			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec)
-			if err != nil {
-				msg := "could not generate deployment for connection pooler: %v"
-				return reason, fmt.Errorf(msg, err)
-			}
-
-			oldDeploymentSpec := c.ConnectionPooler.Deployment
-
-			deployment, err := c.updateConnectionPoolerDeployment(
-				oldDeploymentSpec,
-				newDeploymentSpec)
-
+			newmasterdeployment, err := c.UpdateConnectionPoolerDeploymentSub(Master, reason[:], newSpec)
 			if err != nil {
 				return reason, err
 			}
+			c.ConnectionPooler.Deployment = newmasterdeployment
+			return reason, nil
+		}
 
-			c.ConnectionPooler.Deployment = deployment
+		defaultsSync, defaultsReason = c.needSyncConnectionPoolerDefaults(newConnectionPooler, replicadeployment)
+		reason = append(specReason, defaultsReason...)
+		if specSync || defaultsSync {
+			newreplicadeployment, err := c.UpdateConnectionPoolerDeploymentSub(Replica, reason[:], newSpec)
+			if err != nil {
+				return reason, err
+			}
+			c.ConnectionPooler.Deployment = newreplicadeployment
 			return reason, nil
 		}
 	}
@@ -1002,32 +982,95 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	if newAnnotations != nil {
 		c.updateConnectionPoolerAnnotations(newAnnotations)
 	}
+	masterservice, err := c.checkAndCreateConnectionPoolerService(Master, newSpec)
+	if err != nil {
+		msg := "could not get connection pooler service to sync: %v"
+		return NoSync, fmt.Errorf(msg, err)
+	}
+	replicaservice, err := c.checkAndCreateConnectionPoolerService(Replica, newSpec)
+	if err != nil {
+		msg := "could not get connection pooler service to sync: %v"
+		return NoSync, fmt.Errorf(msg, err)
+	} else {
+		// Service updates are not supported and probably not that useful anyway
+		c.ConnectionPooler.Service = masterservice
+		c.ConnectionPooler.ReplService = replicaservice
+	}
+
+	return NoSync, nil
+}
+
+func (c *Cluster) UpdateConnectionPoolerDeploymentSub(role PostgresRole, reason []string, newSpec *acidv1.Postgresql) (*appsv1.Deployment, error) {
+
+	c.logger.Infof("Update connection pooler deployment %s, reason: %+v",
+		c.connectionPoolerName(role), reason)
+
+	newDeploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec, role)
+	if err != nil {
+		msg := "could not generate deployment for connection pooler: %v"
+		return nil, fmt.Errorf(msg, err)
+	}
+
+	oldDeploymentSpec := c.ConnectionPooler.Deployment
+
+	deployment, err := c.updateConnectionPoolerDeployment(
+		oldDeploymentSpec,
+		newDeploymentSpec)
+
+	if err != nil {
+		return nil, err
+	}
+	return deployment, nil
+}
+
+func (c *Cluster) checkAndCreateConnectionPoolerDeployment(role PostgresRole, newSpec *acidv1.Postgresql) (*appsv1.Deployment, error) {
+
+	deployment, err := c.KubeClient.
+		Deployments(c.Namespace).
+		Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{})
+
+	if err != nil && k8sutil.ResourceNotFound(err) {
+		msg := "Deployment %s for connection pooler synchronization is not found, create it"
+		c.logger.Warningf(msg, c.connectionPoolerName(role))
+
+		deploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec, role)
+		if err != nil {
+			msg = "could not generate deployment for connection pooler: %v"
+			return nil, fmt.Errorf(msg, err)
+		}
+
+		deployment, err := c.KubeClient.
+			Deployments(deploymentSpec.Namespace).
+			Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+
+		if err != nil {
+			return nil, err
+		}
+		return deployment, nil
+	}
+	return deployment, nil
+}
+
+func (c *Cluster) checkAndCreateConnectionPoolerService(role PostgresRole, newSpec *acidv1.Postgresql) (*v1.Service, error) {
 
 	service, err := c.KubeClient.
 		Services(c.Namespace).
-		Get(context.TODO(), c.connectionPoolerName(), metav1.GetOptions{})
+		Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{})
 
 	if err != nil && k8sutil.ResourceNotFound(err) {
 		msg := "Service %s for connection pooler synchronization is not found, create it"
-		c.logger.Warningf(msg, c.connectionPoolerName())
+		c.logger.Warningf(msg, c.connectionPoolerName(role))
 
-		serviceSpec := c.generateConnectionPoolerService(&newSpec.Spec)
+		serviceSpec := c.generateConnectionPoolerService(&newSpec.Spec, role)
 		service, err := c.KubeClient.
 			Services(serviceSpec.Namespace).
 			Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
 
 		if err != nil {
-			return NoSync, err
+			return nil, err
 		}
 
-		c.ConnectionPooler.Service = service
-	} else if err != nil {
-		msg := "could not get connection pooler service to sync: %v"
-		return NoSync, fmt.Errorf(msg, err)
-	} else {
-		// Service updates are not supported and probably not that useful anyway
-		c.ConnectionPooler.Service = service
+		return service, nil
 	}
-
-	return NoSync, nil
+	return service, nil
 }

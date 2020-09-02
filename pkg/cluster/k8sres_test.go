@@ -1090,7 +1090,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(tt.spec)
+		podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(tt.spec, Master)
 
 		if err != tt.expected && err.Error() != tt.expected.Error() {
 			t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
@@ -1192,7 +1192,7 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		deployment, err := tt.cluster.generateConnectionPoolerDeployment(tt.spec)
+		deployment, err := tt.cluster.generateConnectionPoolerDeployment(tt.spec, Master)
 
 		if err != tt.expected && err.Error() != tt.expected.Error() {
 			t.Errorf("%s [%s]: Could not generate deployment spec,\n %+v, expected\n %+v",
@@ -1221,9 +1221,9 @@ func testServiceOwnwerReference(cluster *Cluster, service *v1.Service) error {
 func testServiceSelector(cluster *Cluster, service *v1.Service) error {
 	selector := service.Spec.Selector
 
-	if selector["connection-pooler"] != cluster.connectionPoolerName() {
+	if selector["connection-pooler"] != cluster.connectionPoolerName(Master) {
 		return fmt.Errorf("Selector is incorrect, got %s, expected %s",
-			selector["connection-pooler"], cluster.connectionPoolerName())
+			selector["connection-pooler"], cluster.connectionPoolerName(Master))
 	}
 
 	return nil
@@ -1289,7 +1289,7 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		service := tt.cluster.generateConnectionPoolerService(tt.spec)
+		service := tt.cluster.generateConnectionPoolerService(tt.spec, Master)
 
 		if err := tt.check(cluster, service); err != nil {
 			t.Errorf("%s [%s]: Service spec is incorrect, %+v",

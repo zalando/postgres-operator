@@ -736,7 +736,7 @@ manifest:
 
 ```yaml
 spec:
-  enableConnectionPooler: true
+  enableMasterConnectionPooler: true
 ```
 
 This will tell the operator to create a connection pooler with default
@@ -772,7 +772,7 @@ spec:
         memory: 100Mi
 ```
 
-The `enableConnectionPooler` flag is not required when the `connectionPooler`
+The `enableMasterConnectionPooler` flag is not required when the `connectionPooler`
 section is present in the manifest. But, it can be used to disable/remove the
 pooler while keeping its configuration.
 

@@ -29,7 +29,7 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	EnableConnectionPooler        *bool             `json:"enableConnectionPooler,omitempty"`
+	EnableMasterConnectionPooler  *bool             `json:"enableMasterConnectionPooler,omitempty"`
 	EnableReplicaConnectionPooler *bool             `json:"enableReplicaConnectionPooler,omitempty"`
 	ConnectionPooler              *ConnectionPooler `json:"connectionPooler,omitempty"`
 
