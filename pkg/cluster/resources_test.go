@@ -97,7 +97,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableConnectionPooler: boolToPointer(true),
+		EnableMasterConnectionPooler: boolToPointer(true),
 	}
 
 	if !cluster.needConnectionPooler() {
@@ -106,8 +106,8 @@ func TestNeedConnectionPooler(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableConnectionPooler: boolToPointer(false),
-		ConnectionPooler:       &acidv1.ConnectionPooler{},
+		EnableMasterConnectionPooler: boolToPointer(false),
+		ConnectionPooler:             &acidv1.ConnectionPooler{},
 	}
 
 	if cluster.needConnectionPooler() {
@@ -116,8 +116,8 @@ func TestNeedConnectionPooler(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableConnectionPooler: boolToPointer(true),
-		ConnectionPooler:       &acidv1.ConnectionPooler{},
+		EnableMasterConnectionPooler: boolToPointer(true),
+		ConnectionPooler:             &acidv1.ConnectionPooler{},
 	}
 
 	if !cluster.needConnectionPooler() {

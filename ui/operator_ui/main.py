@@ -607,16 +607,27 @@ def update_postgresql(namespace: str, cluster: str):
 
         spec['volume'] = {'size': size}
 
-    if 'enableConnectionPooler' in postgresql['spec']:
-        cp = postgresql['spec']['enableConnectionPooler']
+    if 'enableMasterConnectionPooler' in postgresql['spec']:
+        cp = postgresql['spec']['enableMasterConnectionPooler']
         if not cp:
-            if 'enableConnectionPooler' in o['spec']:
-                del o['spec']['enableConnectionPooler']
+            if 'enableMasterConnectionPooler' in o['spec']:
+                del o['spec']['enableMasterConnectionPooler']
         else:
-            spec['enableConnectionPooler'] = True
+            spec['enableMasterConnectionPooler'] = True
     else:
-        if 'enableConnectionPooler' in o['spec']:
-            del o['spec']['enableConnectionPooler']
+        if 'enableMasterConnectionPooler' in o['spec']:
+            del o['spec']['enableMasterConnectionPooler']
+
+    if 'enableReplicaConnectionPooler' in postgresql['spec']:
+        cp = postgresql['spec']['enableReplicaConnectionPooler']
+        if not cp:
+            if 'enableReplicaConnectionPooler' in o['spec']:
+                del o['spec']['enableReplicaConnectionPooler']
+        else:
+            spec['enableReplicaConnectionPooler'] = True
+    else:
+        if 'enableReplicaConnectionPooler' in o['spec']:
+            del o['spec']['enableReplicaConnectionPooler']
 
     if 'enableReplicaLoadBalancer' in postgresql['spec']:
         rlb = postgresql['spec']['enableReplicaLoadBalancer']

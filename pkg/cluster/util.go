@@ -424,7 +424,7 @@ func (c *Cluster) connectionPoolerLabelsSelector() *metav1.LabelSelector {
 	connectionPoolerLabels := labels.Set(map[string]string{})
 
 	extraLabels := labels.Set(map[string]string{
-		"connection-pooler": c.connectionPoolerName(),
+		"connection-pooler": c.connectionPoolerName(Master),
 		"application":       "db-connection-pooler",
 	})
 
@@ -520,11 +520,16 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 }
 
 func (c *Cluster) needConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	if spec.EnableConnectionPooler == nil {
+	if spec.EnableMasterConnectionPooler != nil {
+		return *spec.EnableMasterConnectionPooler
+	} else if spec.EnableReplicaConnectionPooler != nil {
+		return *spec.EnableReplicaConnectionPooler
+	} else if spec.ConnectionPooler == nil {
 		return spec.ConnectionPooler != nil
-	} else {
-		return *spec.EnableConnectionPooler
 	}
+	// if the connectionPooler section is there, then we enable even though the
+	// flags are not there
+	return true
 }
 
 func (c *Cluster) needConnectionPooler() bool {

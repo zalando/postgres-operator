@@ -462,7 +462,7 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 }
 
 // Creates a connection pool credentials lookup function in every database to
-// perform remote authentification.
+// perform remote authentication.
 func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 	var stmtBytes bytes.Buffer
 	c.logger.Info("Installing lookup function")
