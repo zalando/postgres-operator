@@ -962,7 +962,7 @@ func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 
 	if poolerLabels != cluster.connectionPoolerLabelsSelector(Master).MatchLabels["connection-pooler"] {
 		return fmt.Errorf("Pod labels do not match, got %+v, expected %+v",
-			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector().MatchLabels)
+			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector(Master).MatchLabels)
 	}
 
 	return nil
