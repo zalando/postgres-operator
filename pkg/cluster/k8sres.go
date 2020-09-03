@@ -2323,11 +2323,9 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, rol
 		},
 		Type: v1.ServiceTypeClusterIP,
 	}
-	if role == Replica {
-		serviceSpec.Selector = c.roleLabelsSet(false, Replica)
-	} else {
-		serviceSpec.Selector = map[string]string{"connection-pooler": name}
-	}
+
+	serviceSpec.Selector = map[string]string{"connection-pooler": name}
+
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
