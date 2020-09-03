@@ -18,7 +18,7 @@ spec:
     - createdb
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
-  enableMasterConnectionPooler: true  # not needed when connectionPooler section is present (see below)
+  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
   enableReplicaConnectionPooler: true # set to enable connectionPooler for replica endpoints
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32

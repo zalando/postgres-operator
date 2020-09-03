@@ -126,7 +126,7 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 		msg = "could not prepare database for connection pooler: %v"
 		return nil, fmt.Errorf(msg, err)
 	}
-	if c.Spec.EnableMasterConnectionPooler != nil || c.ConnectionPooler != nil {
+	if c.Spec.EnableConnectionPooler != nil || c.ConnectionPooler != nil {
 		deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, Master)
 		if err != nil {
 			msg = "could not generate deployment for connection pooler: %v"
@@ -197,7 +197,7 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 	return c.ConnectionPooler, nil
 }
 
-func (c *Cluster) deleteConnectionPooler() (err error) {
+func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	c.setProcessName("deleting connection pooler")
 	c.logger.Debugln("deleting connection pooler")
 
@@ -210,7 +210,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
-	deploymentName := c.connectionPoolerName(Master)
+	deploymentName := c.connectionPoolerName(role)
 	deployment := c.ConnectionPooler.Deployment
 
 	if deployment != nil {
@@ -235,7 +235,7 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 
 	// Repeat the same for the service object
 	service := c.ConnectionPooler.Service
-	serviceName := c.connectionPoolerName(Master)
+	serviceName := c.connectionPoolerName(role)
 
 	if service != nil {
 		serviceName = service.Name

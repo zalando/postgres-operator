@@ -139,7 +139,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					EnableMasterConnectionPooler: boolToPointer(true),
+					EnableConnectionPooler: boolToPointer(true),
 				},
 			},
 			cluster:          clusterMissingObjects,
@@ -232,14 +232,14 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			subTest: "there is no sync from nil to an empty spec",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					EnableMasterConnectionPooler: boolToPointer(true),
-					ConnectionPooler:             nil,
+					EnableConnectionPooler: boolToPointer(true),
+					ConnectionPooler:       nil,
 				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					EnableMasterConnectionPooler: boolToPointer(true),
-					ConnectionPooler:             &acidv1.ConnectionPooler{},
+					EnableConnectionPooler: boolToPointer(true),
+					ConnectionPooler:       &acidv1.ConnectionPooler{},
 				},
 			},
 			cluster:          clusterMock,

@@ -719,7 +719,7 @@ func TestInitSystemUsers(t *testing.T) {
 	}
 
 	// cluster with connection pooler
-	cl.Spec.EnableMasterConnectionPooler = boolToPointer(true)
+	cl.Spec.EnableConnectionPooler = boolToPointer(true)
 	cl.initSystemUsers()
 	if _, exist := cl.systemUsers[constants.ConnectionPoolerUserKeyName]; !exist {
 		t.Errorf("%s, connection pooler user is not present", testName)
