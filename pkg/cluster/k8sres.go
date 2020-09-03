@@ -2273,12 +2273,9 @@ func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec, 
 		return nil, err
 	}
 
-	var name string
-	name = c.connectionPoolerName(role)
-
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
+			Name:        c.connectionPoolerName(role),
 			Namespace:   c.Namespace,
 			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
 			Annotations: map[string]string{},
@@ -2311,24 +2308,22 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, rol
 	if spec.ConnectionPooler == nil {
 		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
-	name := c.connectionPoolerName(role)
 
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{
-				Name:       name,
+				Name:       c.connectionPoolerName(role),
 				Port:       pgPort,
 				TargetPort: intstr.IntOrString{StrVal: c.servicePort(role)},
 			},
 		},
-		Type: v1.ServiceTypeClusterIP,
+		Type:     v1.ServiceTypeClusterIP,
+		Selector: map[string]string{"connection-pooler": c.connectionPoolerName(role)},
 	}
-
-	serviceSpec.Selector = map[string]string{"connection-pooler": name}
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
+			Name:        c.connectionPoolerName(role),
 			Namespace:   c.Namespace,
 			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
 			Annotations: map[string]string{},

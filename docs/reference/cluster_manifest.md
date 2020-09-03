@@ -140,7 +140,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   is `false`, then no volume will be mounted no matter how operator was
   configured (so you can override the operator configuration). Optional.
 
-* **enableMasterConnectionPooler**
+* **enableConnectionPooler**
   Tells the operator to create a connection pooler with a database. If this
   field is true, a connection pooler deployment will be created even if
   `connectionPooler` section is empty. Optional, not set by default.
@@ -387,7 +387,7 @@ CPU and memory limits for the sidecar container.
 
 Parameters are grouped under the `connectionPooler` top-level key and specify
 configuration for connection pooler. If this section is not empty, a connection
-pooler will be created for a database even if `enableMasterConnectionPooler` is not
+pooler will be created for a database even if `enableConnectionPooler` is not
 present.
 
 * **numberOfInstances**

@@ -520,8 +520,8 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 }
 
 func (c *Cluster) needConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	if spec.EnableMasterConnectionPooler != nil {
-		return *spec.EnableMasterConnectionPooler
+	if spec.EnableConnectionPooler != nil {
+		return *spec.EnableConnectionPooler
 	} else if spec.EnableReplicaConnectionPooler != nil {
 		return *spec.EnableReplicaConnectionPooler
 	} else if spec.ConnectionPooler == nil {

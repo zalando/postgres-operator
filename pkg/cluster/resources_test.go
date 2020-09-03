@@ -62,7 +62,7 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 		t.Errorf("%s: Connection pooler service is empty", testName)
 	}
 
-	err = cluster.deleteConnectionPooler()
+	err = cluster.deleteConnectionPooler(Master)
 	if err != nil {
 		t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
 	}
@@ -97,7 +97,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableMasterConnectionPooler: boolToPointer(true),
+		EnableConnectionPooler: boolToPointer(true),
 	}
 
 	if !cluster.needConnectionPooler() {
@@ -106,8 +106,8 @@ func TestNeedConnectionPooler(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableMasterConnectionPooler: boolToPointer(false),
-		ConnectionPooler:             &acidv1.ConnectionPooler{},
+		EnableConnectionPooler: boolToPointer(false),
+		ConnectionPooler:       &acidv1.ConnectionPooler{},
 	}
 
 	if cluster.needConnectionPooler() {
@@ -116,8 +116,8 @@ func TestNeedConnectionPooler(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		EnableMasterConnectionPooler: boolToPointer(true),
-		ConnectionPooler:             &acidv1.ConnectionPooler{},
+		EnableConnectionPooler: boolToPointer(true),
+		ConnectionPooler:       &acidv1.ConnectionPooler{},
 	}
 
 	if !cluster.needConnectionPooler() {

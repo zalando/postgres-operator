@@ -831,9 +831,12 @@ func (c *Cluster) Delete() {
 	// Delete connection pooler objects anyway, even if it's not mentioned in the
 	// manifest, just to not keep orphaned components in case if something went
 	// wrong
-	if err := c.deleteConnectionPooler(); err != nil {
-		c.logger.Warningf("could not remove connection pooler: %v", err)
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		if err := c.deleteConnectionPooler(role); err != nil {
+			c.logger.Warningf("could not remove connection pooler: %v", err)
+		}
 	}
+
 }
 
 //NeedsRepair returns true if the cluster should be included in the repair scan (based on its in-memory status).

@@ -99,7 +99,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'enableMasterConnectionPooler': True,
+                        'enableConnectionPooler': True,
                     }
                 })
             k8s.wait_for_pod_start(pod_selector)
@@ -141,7 +141,7 @@ class EndToEndTestCase(unittest.TestCase):
                 'postgresqls', 'acid-minimal-cluster',
                 {
                     'spec': {
-                        'enableMasterConnectionPooler': False,
+                        'enableConnectionPooler': False,
                     }
                 })
             k8s.wait_for_pods_to_stop(pod_selector)

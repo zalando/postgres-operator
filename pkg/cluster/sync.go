@@ -895,8 +895,10 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 
 	if oldNeedConnectionPooler && !newNeedConnectionPooler {
 		// delete and cleanup resources
-		if err = c.deleteConnectionPooler(); err != nil {
-			c.logger.Warningf("could not remove connection pooler: %v", err)
+		for _, role := range [2]PostgresRole{Master, Replica} {
+			if err = c.deleteConnectionPooler(role); err != nil {
+				c.logger.Warningf("could not remove connection pooler: %v", err)
+			}
 		}
 	}
 
@@ -905,9 +907,10 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 		if c.ConnectionPooler != nil &&
 			(c.ConnectionPooler.Deployment != nil ||
 				c.ConnectionPooler.Service != nil) {
-
-			if err = c.deleteConnectionPooler(); err != nil {
-				c.logger.Warningf("could not remove connection pooler: %v", err)
+			for _, role := range [2]PostgresRole{Master, Replica} {
+				if err = c.deleteConnectionPooler(role); err != nil {
+					c.logger.Warningf("could not remove connection pooler: %v", err)
+				}
 			}
 		}
 	}
