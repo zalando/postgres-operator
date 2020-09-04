@@ -126,7 +126,8 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 		msg = "could not prepare database for connection pooler: %v"
 		return nil, fmt.Errorf(msg, err)
 	}
-	if c.Spec.EnableConnectionPooler != nil || c.ConnectionPooler != nil {
+	if c.needMasterConnectionPooler() {
+
 		deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, Master)
 		if err != nil {
 			msg = "could not generate deployment for connection pooler: %v"
@@ -158,9 +159,11 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 		}
 		c.logger.Debugf("created new connection pooler %q, uid: %q",
 			util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
+
 	}
 
-	if c.Spec.EnableReplicaConnectionPooler != nil && *c.Spec.EnableReplicaConnectionPooler == true {
+	if c.needReplicaConnectionPooler() {
+
 		repldeploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, Replica)
 		if err != nil {
 			msg = "could not generate deployment for connection pooler: %v"
@@ -192,6 +195,7 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 		}
 		c.logger.Debugf("created new connection pooler for replica %q, uid: %q",
 			util.NameFromMeta(repldeployment.ObjectMeta), repldeployment.UID)
+
 	}
 
 	return c.ConnectionPooler, nil
@@ -211,8 +215,13 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
 	deploymentName := c.connectionPoolerName(role)
-	deployment := c.ConnectionPooler.Deployment
+	var deployment *appsv1.Deployment
 
+	if role == Master {
+		deployment = c.ConnectionPooler.Deployment
+	} else {
+		deployment = c.ConnectionPooler.ReplDeployment
+	}
 	if deployment != nil {
 		deploymentName = deployment.Name
 	}
@@ -234,7 +243,12 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	c.logger.Infof("Connection pooler deployment %q has been deleted", deploymentName)
 
 	// Repeat the same for the service object
-	service := c.ConnectionPooler.Service
+	var service *v1.Service
+	if role == Master {
+		service = c.ConnectionPooler.Service
+	} else {
+		service = c.ConnectionPooler.ReplService
+	}
 	serviceName := c.connectionPoolerName(role)
 
 	if service != nil {

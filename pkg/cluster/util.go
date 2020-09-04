@@ -519,21 +519,21 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 	return c.OpConfig.KubernetesUseConfigMaps
 }
 
-func (c *Cluster) needConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	if spec.EnableConnectionPooler != nil {
-		return *spec.EnableConnectionPooler
-	} else if spec.EnableReplicaConnectionPooler != nil {
-		return *spec.EnableReplicaConnectionPooler
-	} else if spec.ConnectionPooler == nil {
-		return spec.ConnectionPooler != nil
-	}
-	// if the connectionPooler section is there, then we enable even though the
-	// flags are not there
-	return true
+// isConnectionPoolerEnabled
+func (c *Cluster) needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
+	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) || (spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
 }
 
-func (c *Cluster) needConnectionPooler() bool {
-	return c.needConnectionPoolerWorker(&c.Spec)
+func (c *Cluster) needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
+	return nil != spec.EnableReplicaConnectionPooler && *spec.EnableReplicaConnectionPooler
+}
+
+func (c *Cluster) needMasterConnectionPooler() bool {
+	return c.needMasterConnectionPoolerWorker(&c.Spec)
+}
+
+func (c *Cluster) needReplicaConnectionPooler() bool {
+	return c.needReplicaConnectionPoolerWorker(&c.Spec)
 }
 
 // Earlier arguments take priority
