@@ -560,7 +560,7 @@ func (c *Cluster) syncRoles() (err error) {
 		userNames = append(userNames, u.Name)
 	}
 
-	if c.needConnectionPooler() {
+	if c.needMasterConnectionPooler() || c.needReplicaConnectionPooler() {
 		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
 		userNames = append(userNames, connectionPoolerUser.Name)
 
@@ -845,78 +845,107 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 
 	var reason SyncReason
 	var err error
+	var newNeedConnectionPooler, oldNeedConnectionPooler bool
 
 	if c.ConnectionPooler == nil {
 		c.ConnectionPooler = &ConnectionPoolerObjects{}
 	}
 
-	newNeedConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
-	oldNeedConnectionPooler := c.needConnectionPoolerWorker(&oldSpec.Spec)
-
-	if newNeedConnectionPooler {
-		// Try to sync in any case. If we didn't needed connection pooler before,
-		// it means we want to create it. If it was already present, still sync
-		// since it could happen that there is no difference in specs, and all
-		// the resources are remembered, but the deployment was manually deleted
-		// in between
-		c.logger.Debug("syncing connection pooler")
-
-		// in this case also do not forget to install lookup function as for
-		// creating cluster
-		if !oldNeedConnectionPooler || !c.ConnectionPooler.LookupFunction {
-			newConnectionPooler := newSpec.Spec.ConnectionPooler
-
-			specSchema := ""
-			specUser := ""
-
-			if newConnectionPooler != nil {
-				specSchema = newConnectionPooler.Schema
-				specUser = newConnectionPooler.User
-			}
-
-			schema := util.Coalesce(
-				specSchema,
-				c.OpConfig.ConnectionPooler.Schema)
-
-			user := util.Coalesce(
-				specUser,
-				c.OpConfig.ConnectionPooler.User)
-
-			if err = lookup(schema, user); err != nil {
-				return NoSync, err
-			}
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		if role == Master {
+			newNeedConnectionPooler = c.needMasterConnectionPoolerWorker(&newSpec.Spec)
+			oldNeedConnectionPooler = c.needMasterConnectionPoolerWorker(&oldSpec.Spec)
+		} else {
+			newNeedConnectionPooler = c.needReplicaConnectionPoolerWorker(&newSpec.Spec)
+			oldNeedConnectionPooler = c.needReplicaConnectionPoolerWorker(&oldSpec.Spec)
 		}
 
-		if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec, Master); err != nil {
-			c.logger.Errorf("could not sync connection pooler: %v", err)
-			return reason, err
-		}
-		if newSpec.Spec.EnableReplicaConnectionPooler != nil &&
-			*newSpec.Spec.EnableReplicaConnectionPooler == true {
-			if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec, Replica); err != nil {
+		if newNeedConnectionPooler {
+			// Try to sync in any case. If we didn't needed connection pooler before,
+			// it means we want to create it. If it was already present, still sync
+			// since it could happen that there is no difference in specs, and all
+			// the resources are remembered, but the deployment was manually deleted
+			// in between
+			c.logger.Debug("syncing connection pooler")
+
+			// in this case also do not forget to install lookup function as for
+			// creating cluster
+			if !oldNeedConnectionPooler || !c.ConnectionPooler.LookupFunction {
+				newConnectionPooler := newSpec.Spec.ConnectionPooler
+
+				specSchema := ""
+				specUser := ""
+
+				if newConnectionPooler != nil {
+					specSchema = newConnectionPooler.Schema
+					specUser = newConnectionPooler.User
+				}
+
+				schema := util.Coalesce(
+					specSchema,
+					c.OpConfig.ConnectionPooler.Schema)
+
+				user := util.Coalesce(
+					specUser,
+					c.OpConfig.ConnectionPooler.User)
+
+				if err = lookup(schema, user); err != nil {
+					return NoSync, err
+				}
+			}
+
+			if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec, role); err != nil {
 				c.logger.Errorf("could not sync connection pooler: %v", err)
 				return reason, err
 			}
 		}
-	}
 
-	if oldNeedConnectionPooler && !newNeedConnectionPooler {
-		// delete and cleanup resources
-		for _, role := range [2]PostgresRole{Master, Replica} {
-			if err = c.deleteConnectionPooler(role); err != nil {
-				c.logger.Warningf("could not remove connection pooler: %v", err)
+		if oldNeedConnectionPooler && !newNeedConnectionPooler {
+			// delete and cleanup resources
+			if role == Master {
+
+				if c.ConnectionPooler != nil &&
+					(c.ConnectionPooler.Deployment != nil ||
+						c.ConnectionPooler.Service != nil) {
+
+					if err = c.deleteConnectionPooler(role); err != nil {
+						c.logger.Warningf("could not remove connection pooler: %v", err)
+					}
+				}
+
+			} else {
+
+				if c.ConnectionPooler != nil &&
+					(c.ConnectionPooler.ReplDeployment != nil ||
+						c.ConnectionPooler.ReplService != nil) {
+
+					if err = c.deleteConnectionPooler(role); err != nil {
+						c.logger.Warningf("could not remove connection pooler: %v", err)
+					}
+				}
 			}
 		}
-	}
 
-	if !oldNeedConnectionPooler && !newNeedConnectionPooler {
-		// delete and cleanup resources if not empty
-		if c.ConnectionPooler != nil &&
-			(c.ConnectionPooler.Deployment != nil ||
-				c.ConnectionPooler.Service != nil) {
-			for _, role := range [2]PostgresRole{Master, Replica} {
-				if err = c.deleteConnectionPooler(role); err != nil {
-					c.logger.Warningf("could not remove connection pooler: %v", err)
+		if !oldNeedConnectionPooler && !newNeedConnectionPooler {
+			// delete and cleanup resources if not empty
+			if role == Master {
+				if c.ConnectionPooler != nil &&
+					(c.ConnectionPooler.Deployment != nil ||
+						c.ConnectionPooler.Service != nil) {
+
+					if err = c.deleteConnectionPooler(role); err != nil {
+						c.logger.Warningf("could not remove connection pooler: %v", err)
+					}
+
+				}
+			} else {
+				if c.ConnectionPooler != nil &&
+					(c.ConnectionPooler.ReplDeployment != nil ||
+						c.ConnectionPooler.ReplService != nil) {
+
+					if err = c.deleteConnectionPooler(role); err != nil {
+						c.logger.Warningf("could not remove connection pooler: %v", err)
+					}
 				}
 			}
 		}
@@ -954,13 +983,20 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			return NoSync, err
 		}
 
-		c.ConnectionPooler.Deployment = deployment
+		if role == Master {
+			c.ConnectionPooler.Deployment = deployment
+		} else {
+			c.ConnectionPooler.ReplDeployment = deployment
+		}
 	} else if err != nil {
 		msg := "could not get connection pooler deployment to sync: %v"
 		return NoSync, fmt.Errorf(msg, err)
 	} else {
-		c.ConnectionPooler.Deployment = deployment
-
+		if role == Master {
+			c.ConnectionPooler.Deployment = deployment
+		} else {
+			c.ConnectionPooler.ReplDeployment = deployment
+		}
 		// actual synchronization
 		oldConnectionPooler := oldSpec.Spec.ConnectionPooler
 		newConnectionPooler := newSpec.Spec.ConnectionPooler
@@ -983,6 +1019,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		specSync, specReason := c.needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, deployment)
 		reason := append(specReason, defaultsReason...)
+		c.logger.Warningf("role and reason %v, %v", role, reason)
 		if specSync || defaultsSync {
 			c.logger.Infof("Update connection pooler deployment %s, reason: %+v",
 				c.connectionPoolerName(role), reason)
@@ -1002,8 +1039,11 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			if err != nil {
 				return reason, err
 			}
-
-			c.ConnectionPooler.Deployment = deployment
+			if role == Master {
+				c.ConnectionPooler.Deployment = deployment
+			} else {
+				c.ConnectionPooler.ReplDeployment = deployment
+			}
 			return reason, nil
 		}
 	}
@@ -1029,14 +1069,22 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		if err != nil {
 			return NoSync, err
 		}
+		if role == Master {
+			c.ConnectionPooler.Service = service
+		} else {
+			c.ConnectionPooler.ReplService = service
+		}
 
-		c.ConnectionPooler.Service = service
 	} else if err != nil {
 		msg := "could not get connection pooler service to sync: %v"
 		return NoSync, fmt.Errorf(msg, err)
 	} else {
 		// Service updates are not supported and probably not that useful anyway
-		c.ConnectionPooler.Service = service
+		if role == Master {
+			c.ConnectionPooler.Service = service
+		} else {
+			c.ConnectionPooler.ReplService = service
+		}
 	}
 
 	return NoSync, nil

@@ -348,7 +348,7 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	if c.needConnectionPooler() {
+	if c.needMasterConnectionPooler() || c.needReplicaConnectionPooler() {
 		if c.ConnectionPooler != nil {
 			c.logger.Warning("Connection pooler already exists in the cluster")
 			return nil
@@ -650,7 +650,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// initUsers. Check if it needs to be called.
 	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
 		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
-	needConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
+	needConnectionPooler := c.needMasterConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {
@@ -915,7 +915,7 @@ func (c *Cluster) initSystemUsers() {
 
 	// Connection pooler user is an exception, if requested it's going to be
 	// created by operator as a normal pgUser
-	if c.needConnectionPooler() {
+	if c.needMasterConnectionPooler() || c.needReplicaConnectionPooler() {
 		// initialize empty connection pooler if not done yet
 		if c.Spec.ConnectionPooler == nil {
 			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
