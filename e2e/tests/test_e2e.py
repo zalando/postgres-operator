@@ -10,7 +10,6 @@ import yaml
 from datetime import datetime
 from kubernetes import client, config
 
-
 def to_selector(labels):
     return ",".join(["=".join(l) for l in labels.items()])
 
@@ -34,6 +33,7 @@ class EndToEndTestCase(unittest.TestCase):
         In the case of test failure the cluster will stay to enable manual examination;
         next invocation of "make test" will re-create it.
         '''
+        print("Test Setup being executed")
 
         # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
