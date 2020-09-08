@@ -11,8 +11,10 @@ cd $(dirname "$0");
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 
-function pull_images(){
+echo "Clustername: ${cluster_name}"
+echo "Kubeconfig path: ${kubeconfig_path}"
 
+function pull_images(){
   operator_tag=$(git describe --tags --always --dirty)
   if [[ -z $(docker images -q registry.opensource.zalan.do/acid/postgres-operator:${operator_tag}) ]]
   then
@@ -27,7 +29,7 @@ function pull_images(){
 }
 
 function start_kind(){
-
+  echo "Starting kind for e2e tests"
   # avoid interference with previous test runs
   if [[ $(kind get clusters | grep "^${cluster_name}*") != "" ]]
   then
@@ -40,6 +42,7 @@ function start_kind(){
 }
 
 function set_kind_api_server_ip(){
+  echo "Setting up kind API server ip"
   # use the actual kubeconfig to connect to the 'kind' API server
   # but update the IP address of the API server to the one from the Docker 'bridge' network
   readonly local kind_api_server_port=6443 # well-known in the 'kind' codebase
@@ -48,10 +51,11 @@ function set_kind_api_server_ip(){
 }
 
 function run_tests(){
+  echo "Running tests..."
 
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
 
-  docker run --rm \
+  docker run --rm --network=host \
   --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
@@ -61,6 +65,7 @@ function run_tests(){
 }
 
 function clean_up(){
+  echo "Executing cleanup"
   unset KUBECONFIG
   kind delete cluster --name ${cluster_name}
   rm -rf ${kubeconfig_path}
