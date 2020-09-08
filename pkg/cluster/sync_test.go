@@ -225,9 +225,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPooler:              &acidv1.ConnectionPooler{},
 					EnableReplicaConnectionPooler: boolToPointer(true),
-					EnableConnectionPooler:        boolToPointer(false),
 				},
 			},
 			cluster:          clusterMock,
