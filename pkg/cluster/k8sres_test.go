@@ -929,7 +929,7 @@ func TestPodEnvironmentSecretVariables(t *testing.T) {
 
 }
 
-func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
 	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
 		return fmt.Errorf("CPU request doesn't match, got %s, expected %s",
@@ -957,18 +957,18 @@ func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	return nil
 }
 
-func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	poolerLabels := podSpec.ObjectMeta.Labels["connection-pooler"]
 
-	if poolerLabels != cluster.connectionPoolerLabelsSelector(Master).MatchLabels["connection-pooler"] {
+	if poolerLabels != cluster.connectionPoolerLabelsSelector(role).MatchLabels["connection-pooler"] {
 		return fmt.Errorf("Pod labels do not match, got %+v, expected %+v",
-			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector(Master).MatchLabels)
+			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector(role).MatchLabels)
 	}
 
 	return nil
 }
 
-func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	required := map[string]bool{
 		"PGHOST":                 false,
 		"PGPORT":                 false,
@@ -1034,14 +1034,14 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
-	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec) error { return nil }
+	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error { return nil }
 
 	tests := []struct {
 		subTest  string
 		spec     *acidv1.PostgresSpec
 		expected error
 		cluster  *Cluster
-		check    func(cluster *Cluster, podSpec *v1.PodTemplateSpec) error
+		check    func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error
 	}{
 		{
 			subTest: "default configuration",
@@ -1073,7 +1073,8 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 		{
 			subTest: "labels for service",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
+				ConnectionPooler:              &acidv1.ConnectionPooler{},
+				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -1089,20 +1090,23 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 			check:    testEnvs,
 		},
 	}
-	for _, tt := range tests {
-		podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(tt.spec, Master)
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		for _, tt := range tests {
+			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(tt.spec, role)
 
-		if err != tt.expected && err.Error() != tt.expected.Error() {
-			t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
-				testName, tt.subTest, err, tt.expected)
-		}
+			if err != tt.expected && err.Error() != tt.expected.Error() {
+				t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
+					testName, tt.subTest, err, tt.expected)
+			}
 
-		err = tt.check(cluster, podSpec)
-		if err != nil {
-			t.Errorf("%s [%s]: Pod spec is incorrect, %+v",
-				testName, tt.subTest, err)
+			err = tt.check(cluster, podSpec, role)
+			if err != nil {
+				t.Errorf("%s [%s]: Pod spec is incorrect, %+v",
+					testName, tt.subTest, err)
+			}
 		}
 	}
+
 }
 
 func testDeploymentOwnwerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
@@ -1166,7 +1170,8 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 		{
 			subTest: "default configuration",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
+				ConnectionPooler:              &acidv1.ConnectionPooler{},
+				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -1175,7 +1180,8 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 		{
 			subTest: "owner reference",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
+				ConnectionPooler:              &acidv1.ConnectionPooler{},
+				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -1184,7 +1190,8 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 		{
 			subTest: "selector",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
+				ConnectionPooler:              &acidv1.ConnectionPooler{},
+				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
 			expected: nil,
 			cluster:  cluster,
@@ -1205,9 +1212,10 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 				testName, tt.subTest, err)
 		}
 	}
+
 }
 
-func testServiceOwnwerReference(cluster *Cluster, service *v1.Service) error {
+func testServiceOwnwerReference(cluster *Cluster, service *v1.Service, role PostgresRole) error {
 	owner := service.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
@@ -1218,12 +1226,12 @@ func testServiceOwnwerReference(cluster *Cluster, service *v1.Service) error {
 	return nil
 }
 
-func testServiceSelector(cluster *Cluster, service *v1.Service) error {
+func testServiceSelector(cluster *Cluster, service *v1.Service, role PostgresRole) error {
 	selector := service.Spec.Selector
 
-	if selector["connection-pooler"] != cluster.connectionPoolerName(Master) {
+	if selector["connection-pooler"] != cluster.connectionPoolerName(role) {
 		return fmt.Errorf("Selector is incorrect, got %s, expected %s",
-			selector["connection-pooler"], cluster.connectionPoolerName(Master))
+			selector["connection-pooler"], cluster.connectionPoolerName(role))
 	}
 
 	return nil
@@ -1253,7 +1261,7 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 		},
 	}
 
-	noCheck := func(cluster *Cluster, deployment *v1.Service) error {
+	noCheck := func(cluster *Cluster, deployment *v1.Service, role PostgresRole) error {
 		return nil
 	}
 
@@ -1261,7 +1269,7 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 		subTest string
 		spec    *acidv1.PostgresSpec
 		cluster *Cluster
-		check   func(cluster *Cluster, deployment *v1.Service) error
+		check   func(cluster *Cluster, deployment *v1.Service, role PostgresRole) error
 	}{
 		{
 			subTest: "default configuration",
@@ -1282,18 +1290,21 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 		{
 			subTest: "selector",
 			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
+				ConnectionPooler:              &acidv1.ConnectionPooler{},
+				EnableReplicaConnectionPooler: boolToPointer(true),
 			},
 			cluster: cluster,
 			check:   testServiceSelector,
 		},
 	}
-	for _, tt := range tests {
-		service := tt.cluster.generateConnectionPoolerService(tt.spec, Master)
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		for _, tt := range tests {
+			service := tt.cluster.generateConnectionPoolerService(tt.spec, role)
 
-		if err := tt.check(cluster, service); err != nil {
-			t.Errorf("%s [%s]: Service spec is incorrect, %+v",
-				testName, tt.subTest, err)
+			if err := tt.check(cluster, service, role); err != nil {
+				t.Errorf("%s [%s]: Service spec is incorrect, %+v",
+					testName, tt.subTest, err)
+			}
 		}
 	}
 }

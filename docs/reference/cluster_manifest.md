@@ -151,9 +151,14 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   configured (so you can override the operator configuration). Optional.
 
 * **enableConnectionPooler**
-  Tells the operator to create a connection pooler with a database. If this
-  field is true, a connection pooler deployment will be created even if
+  Tells the operator to create a connection pooler with a database for the master
+  service. If this field is true, a connection pooler deployment will be created even if
   `connectionPooler` section is empty. Optional, not set by default.
+
+* **enableReplicaConnectionPooler**
+  Tells the operator to create a connection pooler with a database for the replica
+  service. If this field is true, a connection pooler deployment for replica
+  will be created even if `connectionPooler` section is empty. Optional, not set by default.
 
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
