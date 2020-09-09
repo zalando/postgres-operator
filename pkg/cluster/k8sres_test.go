@@ -1207,6 +1207,12 @@ func TestSidecars(t *testing.T) {
 	}
 
 	spec = acidv1.PostgresSpec{
+		PostgresqlParam: acidv1.PostgresqlParam{
+			PgVersion: "12.1",
+			Parameters: map[string]string{
+				"max_connections": "100",
+			},
+		},
 		TeamID: "myapp", NumberOfInstances: 1,
 		Resources: acidv1.Resources{
 			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
