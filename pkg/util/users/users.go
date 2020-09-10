@@ -114,14 +114,14 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 
 	return nil
 }
-func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql.DB) (err error) {
+
+func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql.DB) error {
 	queries := produceAlterRoleSetStmts(user)
 	query := fmt.Sprintf(doBlockStmt, strings.Join(queries, ";"))
-	if _, err = db.Exec(query); err != nil {
-		err = fmt.Errorf("dB error: %v, query: %s", err, query)
-		return
+	if _, err := db.Exec(query); err != nil {
+		return fmt.Errorf("dB error: %v, query: %s", err, query)
 	}
-	return
+	return nil
 }
 
 func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.DB) error {
@@ -147,6 +147,12 @@ func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.D
 
 	if _, err := db.Exec(query); err != nil { // TODO: Try several times
 		return fmt.Errorf("dB error: %v, query: %s", err, query)
+	}
+
+	if len(user.Parameters) > 0 {
+		if err := strategy.alterPgUserSet(user, db); err != nil {
+			return fmt.Errorf("incomplete setup for user %s: %v", user.Name, err)
+		}
 	}
 
 	return nil

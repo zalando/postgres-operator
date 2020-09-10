@@ -271,31 +271,73 @@ func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason st
 }
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
-	if name != "infrastructureroles-test" {
-		return nil, fmt.Errorf("NotFound")
-	}
-	secret := &v1.Secret{}
-	secret.Name = "testcluster"
-	secret.Data = map[string][]byte{
+	oldFormatSecret := &v1.Secret{}
+	oldFormatSecret.Name = "testcluster"
+	oldFormatSecret.Data = map[string][]byte{
 		"user1":     []byte("testrole"),
 		"password1": []byte("testpassword"),
 		"inrole1":   []byte("testinrole"),
 		"foobar":    []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
 	}
-	return secret, nil
+
+	newFormatSecret := &v1.Secret{}
+	newFormatSecret.Name = "test-secret-new-format"
+	newFormatSecret.Data = map[string][]byte{
+		"user":       []byte("new-test-role"),
+		"password":   []byte("new-test-password"),
+		"inrole":     []byte("new-test-inrole"),
+		"new-foobar": []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
+	}
+
+	secrets := map[string]*v1.Secret{
+		"infrastructureroles-old-test": oldFormatSecret,
+		"infrastructureroles-new-test": newFormatSecret,
+	}
+
+	for idx := 1; idx <= 2; idx++ {
+		newFormatStandaloneSecret := &v1.Secret{}
+		newFormatStandaloneSecret.Name = fmt.Sprintf("test-secret-new-format%d", idx)
+		newFormatStandaloneSecret.Data = map[string][]byte{
+			"user":     []byte(fmt.Sprintf("new-test-role%d", idx)),
+			"password": []byte(fmt.Sprintf("new-test-password%d", idx)),
+			"inrole":   []byte(fmt.Sprintf("new-test-inrole%d", idx)),
+		}
+
+		secrets[fmt.Sprintf("infrastructureroles-new-test%d", idx)] =
+			newFormatStandaloneSecret
+	}
+
+	if secret, exists := secrets[name]; exists {
+		return secret, nil
+	}
+
+	return nil, fmt.Errorf("NotFound")
 
 }
 
 func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
-	if name != "infrastructureroles-test" {
-		return nil, fmt.Errorf("NotFound")
-	}
-	configmap := &v1.ConfigMap{}
-	configmap.Name = "testcluster"
-	configmap.Data = map[string]string{
+	oldFormatConfigmap := &v1.ConfigMap{}
+	oldFormatConfigmap.Name = "testcluster"
+	oldFormatConfigmap.Data = map[string]string{
 		"foobar": "{}",
 	}
-	return configmap, nil
+
+	newFormatConfigmap := &v1.ConfigMap{}
+	newFormatConfigmap.Name = "testcluster"
+	newFormatConfigmap.Data = map[string]string{
+		"new-foobar": "{\"user_flags\": [\"createdb\"]}",
+	}
+
+	configmaps := map[string]*v1.ConfigMap{
+		"infrastructureroles-old-test": oldFormatConfigmap,
+		"infrastructureroles-new-test": newFormatConfigmap,
+	}
+
+	if configmap, exists := configmaps[name]; exists {
+		return configmap, nil
+	}
+
+	return nil, fmt.Errorf("NotFound")
 }
 
 // Secrets to be mocked

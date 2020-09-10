@@ -200,6 +200,16 @@ configuration they are grouped under the `kubernetes` key.
   of a database created by the operator. If the annotation key is also provided
   by the database definition, the database definition value is used.
 
+* **delete_annotation_date_key**
+  key name for annotation that compares manifest value with current date in the
+  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
+  The default is empty which also disables this delete protection check.
+
+* **delete_annotation_name_key**
+  key name for annotation that compares manifest value with Postgres cluster name.
+  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
+  empty which also disables this delete protection check.
+
 * **downscaler_annotations**
   An array of annotations that should be passed from Postgres CRD on to the
   statefulset and, if exists, to the connection pooler deployment as well.
@@ -252,8 +262,14 @@ configuration they are grouped under the `kubernetes` key.
   teams API. The default is `postgresql-operator`.
 
 * **infrastructure_roles_secret_name**
-  namespaced name of the secret containing infrastructure roles names and
-  passwords.
+  *deprecated*: namespaced name of the secret containing infrastructure roles
+  with user names, passwords and role membership.
+
+* **infrastructure_roles_secrets**
+  array of infrastructure role definitions which reference existing secrets
+  and specify the key names from which user name, password and role membership
+  are extracted. For the ConfigMap this has to be a string which allows
+  referencing only one infrastructure roles secret. The default is empty.
 
 * **pod_role_label**
   name of the label assigned to the Postgres pods (and services/endpoints) by

@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -87,6 +89,91 @@ func TestMergeDeprecatedPostgreSQLSpecParameters(t *testing.T) {
 		result := postgresqlTestController.mergeDeprecatedPostgreSQLSpecParameters(tt.in)
 		if !reflect.DeepEqual(result, tt.out) {
 			t.Errorf("%s: %v", tt.name, tt.error)
+		}
+	}
+}
+
+func TestMeetsClusterDeleteAnnotations(t *testing.T) {
+	// set delete annotations in configuration
+	postgresqlTestController.opConfig.DeleteAnnotationDateKey = "delete-date"
+	postgresqlTestController.opConfig.DeleteAnnotationNameKey = "delete-clustername"
+
+	currentTime := time.Now()
+	today := currentTime.Format("2006-01-02") // go's reference date
+	clusterName := "acid-test-cluster"
+
+	tests := []struct {
+		name  string
+		pg    *acidv1.Postgresql
+		error string
+	}{
+		{
+			"Postgres cluster with matching delete annotations",
+			&acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName,
+					Annotations: map[string]string{
+						"delete-date":        today,
+						"delete-clustername": clusterName,
+					},
+				},
+			},
+			"",
+		},
+		{
+			"Postgres cluster with violated delete date annotation",
+			&acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName,
+					Annotations: map[string]string{
+						"delete-date":        "2020-02-02",
+						"delete-clustername": clusterName,
+					},
+				},
+			},
+			fmt.Sprintf("annotation delete-date not matching the current date: got 2020-02-02, expected %s", today),
+		},
+		{
+			"Postgres cluster with violated delete cluster name annotation",
+			&acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName,
+					Annotations: map[string]string{
+						"delete-date":        today,
+						"delete-clustername": "acid-minimal-cluster",
+					},
+				},
+			},
+			fmt.Sprintf("annotation delete-clustername not matching the cluster name: got acid-minimal-cluster, expected %s", clusterName),
+		},
+		{
+			"Postgres cluster with missing delete annotations",
+			&acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        clusterName,
+					Annotations: map[string]string{},
+				},
+			},
+			"annotation delete-date not set in manifest to allow cluster deletion",
+		},
+		{
+			"Postgres cluster with missing delete cluster name annotation",
+			&acidv1.Postgresql{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: clusterName,
+					Annotations: map[string]string{
+						"delete-date": today,
+					},
+				},
+			},
+			"annotation delete-clustername not set in manifest to allow cluster deletion",
+		},
+	}
+	for _, tt := range tests {
+		if err := postgresqlTestController.meetsClusterDeleteAnnotations(tt.pg); err != nil {
+			if !reflect.DeepEqual(err.Error(), tt.error) {
+				t.Errorf("Expected error %q, got: %v", tt.error, err)
+			}
 		}
 	}
 }

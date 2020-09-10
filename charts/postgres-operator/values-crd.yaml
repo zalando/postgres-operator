@@ -67,6 +67,12 @@ configKubernetes:
   #   keya: valuea
   #   keyb: valueb
 
+  # key name for annotation that compares manifest value with current date
+  # delete_annotation_date_key: "delete-date"
+
+  # key name for annotation that compares manifest value with cluster name
+  # delete_annotation_name_key: "delete-clustername"
+
   # list of annotations propagated from cluster manifest to statefulset and deployment
   # downscaler_annotations:
   #   - deployment-time
@@ -104,6 +110,8 @@ configKubernetes:
   pod_antiaffinity_topology_key: "kubernetes.io/hostname"
   # namespaced name of the ConfigMap with environment variables to populate on every pod
   # pod_environment_configmap: "default/my-custom-config"
+  # name of the Secret (in cluster namespace) with environment variables to populate on every pod
+  # pod_environment_secret: "my-custom-secret"
 
   # specify the pod management policy of stateful sets of Postgres clusters
   pod_management_policy: "ordered_ready"

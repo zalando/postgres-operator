@@ -113,6 +113,10 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+                delete_annotation_date_key:
+                  type: string
+                delete_annotation_name_key:
+                  type: string
                 downscaler_annotations:
                   type: array
                   items:
@@ -127,6 +131,32 @@ spec:
                   type: boolean
                 infrastructure_roles_secret_name:
                   type: string
+                infrastructure_roles_secrets:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - secretname
+                      - userkey
+                      - passwordkey
+                    properties:
+                      secretname:
+                        type: string
+                      userkey:
+                        type: string
+                      passwordkey:
+                        type: string
+                      rolekey:
+                        type: string
+                      defaultuservalue:
+                        type: string
+                      defaultrolevalue:
+                        type: string
+                      details:
+                        type: string
+                      template:
+                        type: boolean
                 inherited_labels:
                   type: array
                   items:
@@ -144,6 +174,8 @@ spec:
                 pod_antiaffinity_topology_key:
                   type: string
                 pod_environment_configmap:
+                  type: string
+                pod_environment_secret:
                   type: string
                 pod_management_policy:
                   type: string

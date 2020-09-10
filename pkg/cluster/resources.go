@@ -207,8 +207,6 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 		serviceName = service.Name
 	}
 
-	// set delete propagation policy to foreground, so that all the dependant
-	// will be deleted.
 	err = c.KubeClient.
 		Services(c.Namespace).
 		Delete(context.TODO(), serviceName, options)
@@ -220,6 +218,21 @@ func (c *Cluster) deleteConnectionPooler() (err error) {
 	}
 
 	c.logger.Infof("Connection pooler service %q has been deleted", serviceName)
+
+	// Repeat the same for the secret object
+	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
+
+	secret, err := c.KubeClient.
+		Secrets(c.Namespace).
+		Get(context.TODO(), secretName, metav1.GetOptions{})
+
+	if err != nil {
+		c.logger.Debugf("could not get connection pooler secret %q: %v", secretName, err)
+	} else {
+		if err = c.deleteSecret(secret.UID, *secret); err != nil {
+			return fmt.Errorf("could not delete pooler secret: %v", err)
+		}
+	}
 
 	c.ConnectionPooler = nil
 	return nil
@@ -730,19 +743,30 @@ func (c *Cluster) deleteSecrets() error {
 	var errors []string
 	errorCount := 0
 	for uid, secret := range c.Secrets {
-		c.logger.Debugf("deleting secret %q", util.NameFromMeta(secret.ObjectMeta))
-		err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
+		err := c.deleteSecret(uid, *secret)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("could not delete secret %q: %v", util.NameFromMeta(secret.ObjectMeta), err))
+			errors = append(errors, fmt.Sprintf("%v", err))
 			errorCount++
 		}
-		c.logger.Infof("secret %q has been deleted", util.NameFromMeta(secret.ObjectMeta))
-		c.Secrets[uid] = nil
 	}
 
 	if errorCount > 0 {
 		return fmt.Errorf("could not delete all secrets: %v", errors)
 	}
+
+	return nil
+}
+
+func (c *Cluster) deleteSecret(uid types.UID, secret v1.Secret) error {
+	c.setProcessName("deleting secret")
+	secretName := util.NameFromMeta(secret.ObjectMeta)
+	c.logger.Debugf("deleting secret %q", secretName)
+	err := c.KubeClient.Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, c.deleteOptions)
+	if err != nil {
+		return fmt.Errorf("could not delete secret %q: %v", secretName, err)
+	}
+	c.logger.Infof("secret %q has been deleted", secretName)
+	c.Secrets[uid] = nil
 
 	return nil
 }

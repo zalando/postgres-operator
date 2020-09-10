@@ -44,7 +44,7 @@ Once the validation is enabled it can only be disabled manually by editing or
 patching the CRD manifest:
 
 ```bash
-zk8 patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
+kubectl patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
 ```
 
 ## Non-default cluster domain
@@ -122,6 +122,68 @@ spec:
 Every other Postgres cluster which lacks the annotation will be ignored by this
 operator. Conversely, operators without a defined `CONTROLLER_ID` will ignore
 clusters with defined ownership of another operator.
+
+## Delete protection via annotations
+
+To avoid accidental deletes of Postgres clusters the operator can check the
+manifest for two existing annotations containing the cluster name and/or the
+current date (in YYYY-MM-DD format). The name of the annotation keys can be
+defined in the configuration. By default, they are not set which disables the
+delete protection. Thus, one could choose to only go with one annotation.
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  delete_annotation_date_key: "delete-date"
+  delete_annotation_name_key: "delete-clustername"
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    delete_annotation_date_key: "delete-date"
+    delete_annotation_name_key: "delete-clustername"
+```
+
+Now, every cluster manifest must contain the configured annotation keys to
+trigger the delete process when running `kubectl delete pg`. Note, that the
+`Postgresql` resource would still get deleted as K8s' API server does not
+block it. Only the operator logs will tell, that the delete criteria wasn't
+met.
+
+**cluster manifest**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: demo-cluster
+  annotations:
+    delete-date: "2020-08-31"
+    delete-clustername: "demo-cluster"
+spec:
+  ...
+```
+
+In case, the resource has been deleted accidentally or the annotations were
+simply forgotten, it's safe to recreate the cluster with `kubectl create`.
+Existing Postgres cluster are not replaced by the operator. But, as the
+original cluster still exists the status will show `CreateFailed` at first.
+On the next sync event it should change to `Running`. However, as it is in
+fact a new resource for K8s, the UID will differ which can trigger a rolling
+update of the pods because the UID is used as part of backup path to S3.
+
 
 ## Role-based access control for the operator
 
@@ -319,11 +381,18 @@ spec:
 
 
 ## Custom Pod Environment Variables
-
-It is possible to configure a ConfigMap which is used by the Postgres pods as
+It is possible to configure a ConfigMap as well as a Secret which are used by the Postgres pods as
 an additional provider for environment variables. One use case is to customize
-the Spilo image and configure it with environment variables. The ConfigMap with
-the additional settings is referenced in the operator's main configuration.
+the Spilo image and configure it with environment variables. Another case could be to provide custom
+cloud provider or backup settings.
+
+In general the Operator will give preference to the globally configured variables, to not have the custom
+ones interfere with core functionality. Variables with the 'WAL_' and 'LOG_' prefix can be overwritten though, to allow
+backup and logshipping to be specified differently.
+
+
+### Via ConfigMap
+The ConfigMap with the additional settings is referenced in the operator's main configuration.
 A namespace can be specified along with the name. If left out, the configured
 default namespace of your K8s client will be used and if the ConfigMap is not
 found there, the Postgres cluster's namespace is taken when different:
@@ -365,7 +434,54 @@ data:
   MY_CUSTOM_VAR: value
 ```
 
-This ConfigMap is then added as a source of environment variables to the
+The key-value pairs of the ConfigMap are then added as environment variables to the
+Postgres StatefulSet/pods.
+
+
+### Via Secret
+The Secret with the additional variables is referenced in the operator's main configuration.
+To protect the values of the secret from being exposed in the pod spec they are each referenced
+as SecretKeyRef.
+This does not allow for the secret to be in a different namespace as the pods though
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  # referencing secret with custom environment variables
+  pod_environment_secret: postgres-pod-secrets
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    # referencing secret with custom environment variables
+    pod_environment_secret: postgres-pod-secrets
+```
+
+**referenced Secret `postgres-pod-secrets`**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-pod-secrets
+  namespace: default
+data:
+  MY_CUSTOM_VAR: dmFsdWU=
+```
+
+The key-value pairs of the Secret are all accessible as environment variables to the
 Postgres StatefulSet/pods.
 
 ## Limiting the number of min and max instances in clusters
@@ -532,11 +648,11 @@ The configuration paramaters that we will be using are:
 * `gcp_credentials`
 * `wal_gs_bucket`
 
-### Generate a K8 secret resource
+### Generate a K8s secret resource
 
-Generate the K8 secret resource that will contain your service account's 
+Generate the K8s secret resource that will contain your service account's
 credentials. It's highly recommended to use a service account and limit its
-scope to just the WAL-E bucket. 
+scope to just the WAL-E bucket.
 
 ```yaml
 apiVersion: v1
@@ -559,13 +675,13 @@ the operator's configuration is set up like the following:
 ...
 aws_or_gcp:
   additional_secret_mount: "pgsql-wale-creds"
-  additional_secret_mount_path: "/var/secrets/google" # or where ever you want to mount the file
+  additional_secret_mount_path: "/var/secrets/google"  # or where ever you want to mount the file
   # aws_region: eu-central-1
   # kube_iam_role: ""
   # log_s3_bucket: ""
   # wal_s3_bucket: ""
-  wal_gs_bucket: "postgres-backups-bucket-28302F2" # name of bucket on where to save the WAL-E logs
-  gcp_credentials: "/var/secrets/google/key.json" # combination of the mount path & key in the K8 resource. (i.e. key.json)
+  wal_gs_bucket: "postgres-backups-bucket-28302F2"  # name of bucket on where to save the WAL-E logs
+  gcp_credentials: "/var/secrets/google/key.json"  # combination of the mount path & key in the K8s resource. (i.e. key.json)
 ...
 ```
 
