@@ -460,6 +460,9 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   replaced with the hosted zone (the value of the `db_hosted_zone` parameter).
   No other placeholders are allowed.
 
+* **external_traffic_policy** define external traffic policy for the load
+balancer, it will default to `Cluster` if undefined.
+
 ## AWS or GCP interaction
 
 The options in this group configure operator interactions with non-Kubernetes

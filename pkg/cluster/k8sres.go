@@ -1639,12 +1639,10 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		}
 
 		c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
-		// spec.externalTrafficPolicy can define externalTrafficPolicy for the service
-		// if spec.externalTrafficPolicy is not defined default value is "Cluster"
-		if spec.ExternalTrafficPolicy != nil {
-			serviceSpec.ExternalTrafficPolicy = *spec.ExternalTrafficPolicy
+		if c.OpConfig.ExternalTrafficPolicy == "" {
+			serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType("Cluster")
 		} else {
-			serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+			serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy)
 		}
 		serviceSpec.Type = v1.ServiceTypeLoadBalancer
 	} else if role == Replica {
