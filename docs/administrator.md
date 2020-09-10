@@ -527,8 +527,6 @@ lead to K8s removing this field from the manifest due to its
 [handling of null fields](https://kubernetes.io/docs/concepts/overview/object-management-kubectl/declarative-config/#how-apply-calculates-differences-and-merges-changes).
 Then the resultant manifest will not contain the necessary change, and the
 operator will respectively do nothing with the existing source ranges.
-To define external traffic policy for the load balancer set the option
- externalTrafficPolicy, it will default to `Cluster` if undefined.
 
 ## Running periodic 'autorepair' scans of K8s objects
 

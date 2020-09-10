@@ -1746,7 +1746,6 @@ func TestSidecars(t *testing.T) {
 func TestGenerateService(t *testing.T) {
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
-	var policy v1.ServiceExternalTrafficPolicyType = "Local"
 	var enableLB bool = true
 	spec = acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
@@ -1773,7 +1772,6 @@ func TestGenerateService(t *testing.T) {
 				DockerImage: "overwrite-image",
 			},
 		},
-		ExternalTrafficPolicy:    &policy,
 		EnableMasterLoadBalancer: &enableLB,
 	}
 
@@ -1817,10 +1815,9 @@ func TestGenerateService(t *testing.T) {
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	service := cluster.generateService(Master, &spec)
-	fmt.Printf("%+v\n", service)
-	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
-	spec.ExternalTrafficPolicy = nil
-	service = cluster.generateService(Master, &spec)
 	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeCluster, service.Spec.ExternalTrafficPolicy)
+	cluster.OpConfig.ExternalTrafficPolicy = "Local"
+	service = cluster.generateService(Master, &spec)
+	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
 
 }

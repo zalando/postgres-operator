@@ -1129,6 +1129,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"replica_dns_name_format": {
 								Type: "string",
 							},
+							"external_traffic_policy": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"Cluster"`),
+									},
+									{
+										Raw: []byte(`"Local"`),
+									},
+								},
+							},
 						},
 					},
 					"aws_or_gcp": {
