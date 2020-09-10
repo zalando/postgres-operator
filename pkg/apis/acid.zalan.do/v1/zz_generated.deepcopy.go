@@ -557,6 +557,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ExternalTrafficPolicy != nil {
+		in, out := &in.ExternalTrafficPolicy, &out.ExternalTrafficPolicy
+		*out = new(corev1.ServiceExternalTrafficPolicyType)
+		**out = **in
+	}
 	if in.Users != nil {
 		in, out := &in.Users, &out.Users
 		*out = make(map[string]UserFlags, len(*in))
