@@ -49,8 +49,6 @@ type PostgresSpec struct {
 
 	// load balancers' source ranges are the same for master and replica services
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
-	// load balancer external traffic policy
-	ExternalTrafficPolicy *v1.ServiceExternalTrafficPolicyType `json:"externalTrafficPolicy,omitempty"`
 
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
 	Users                 map[string]UserFlags        `json:"users"`
