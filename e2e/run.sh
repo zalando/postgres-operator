@@ -6,10 +6,9 @@ set -o nounset
 set -o pipefail
 IFS=$'\n\t'
 
-cd $(dirname "$0");
-
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
+readonly spilo_image="registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
 
 echo "Clustername: ${cluster_name}"
 echo "Kubeconfig path: ${kubeconfig_path}"
@@ -39,6 +38,8 @@ function start_kind(){
   export KUBECONFIG="${kubeconfig_path}"
   kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
   kind load docker-image "${operator_image}" --name ${cluster_name}
+  docker pull "${spilo_image}"
+  kind load docker-image "${spilo_image}" --name ${cluster_name}
 }
 
 function set_kind_api_server_ip(){
@@ -55,7 +56,7 @@ function run_tests(){
 
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
 
-  docker run -it --rm --network=host \
+  docker run --rm --network=host -e "TERM=xterm-256color" \
   --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
@@ -75,11 +76,11 @@ function main(){
 
   trap "clean_up" QUIT TERM EXIT
 
-  pull_images
-  start_kind
-  set_kind_api_server_ip
+  time pull_images
+  time start_kind
+  time set_kind_api_server_ip
   run_tests
   exit 0
 }
 
-main "$@"
+"$@"
