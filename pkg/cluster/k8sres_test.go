@@ -1811,6 +1811,7 @@ func TestGenerateService(t *testing.T) {
 					ScalyrMemoryRequest: "0.9Gi",
 					// ise default memory limit
 				},
+				ExternalTrafficPolicy: "Cluster",
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
