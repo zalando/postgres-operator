@@ -189,13 +189,18 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 		if err != nil {
 			return nil, err
 		}
-		c.ConnectionPooler = &ConnectionPoolerObjects{
-			ReplDeployment: repldeployment,
-			ReplService:    replService,
+
+		if c.needMasterConnectionPooler() {
+			c.ConnectionPooler.ReplDeployment = repldeployment
+			c.ConnectionPooler.ReplService = replService
+		} else {
+			c.ConnectionPooler = &ConnectionPoolerObjects{
+				ReplDeployment: repldeployment,
+				ReplService:    replService,
+			}
 		}
 		c.logger.Debugf("created new connection pooler for replica %q, uid: %q",
 			util.NameFromMeta(repldeployment.ObjectMeta), repldeployment.UID)
-
 	}
 
 	return c.ConnectionPooler, nil
@@ -214,7 +219,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
-	deploymentName := c.connectionPoolerName(role)
+	var deploymentName string
 	var deployment *appsv1.Deployment
 
 	if role == Master {
