@@ -2342,8 +2342,10 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, rol
 				TargetPort: intstr.IntOrString{StrVal: c.servicePort(role)},
 			},
 		},
-		Type:     v1.ServiceTypeClusterIP,
-		Selector: map[string]string{"connection-pooler": c.connectionPoolerName(role)},
+		Type: v1.ServiceTypeClusterIP,
+		Selector: map[string]string{
+			"connection-pooler": c.connectionPoolerName(role),
+		},
 	}
 
 	service := &v1.Service{
