@@ -446,7 +446,7 @@ func (c *Cluster) restartInstances() error {
 		if !ok {
 			ttl = 30
 		}
-		if err = c.patroni.Restart(&pod, false); err != nil {
+		if err = c.patroni.Restart(&pod); err != nil {
 			return fmt.Errorf("could not restart Postgres server on pod %s: %v", podName, err)
 		}
 		time.Sleep(time.Duration(ttl) * time.Second)
@@ -454,7 +454,7 @@ func (c *Cluster) restartInstances() error {
 
 	if masterPod != nil {
 		podName := util.NameFromMeta(masterPod.ObjectMeta)
-		if err = c.patroni.Restart(masterPod, false); err != nil {
+		if err = c.patroni.Restart(masterPod); err != nil {
 			return fmt.Errorf("could not restart postgres server on masterPod %s: %v", podName, err)
 		}
 	}
