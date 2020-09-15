@@ -1619,6 +1619,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 		}
 
 		c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)
+		serviceSpec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(c.OpConfig.ExternalTrafficPolicy)
 		serviceSpec.Type = v1.ServiceTypeLoadBalancer
 	} else if role == Replica {
 		// before PR #258, the replica service was only created if allocated a LB
