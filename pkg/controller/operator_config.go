@@ -61,6 +61,8 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodEnvironmentSecret = fromCRD.Kubernetes.PodEnvironmentSecret
 	result.PodTerminateGracePeriod = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod), "5m")
 	result.SpiloPrivileged = fromCRD.Kubernetes.SpiloPrivileged
+	result.SpiloRunAsUser = fromCRD.Kubernetes.SpiloRunAsUser
+	result.SpiloRunAsGroup = fromCRD.Kubernetes.SpiloRunAsGroup
 	result.SpiloFSGroup = fromCRD.Kubernetes.SpiloFSGroup
 	result.ClusterDomain = util.Coalesce(fromCRD.Kubernetes.ClusterDomain, "cluster.local")
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace

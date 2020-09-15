@@ -65,6 +65,16 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   custom Docker image that overrides the **docker_image** operator parameter.
   It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
+* **spiloRunAsUser**
+  sets the user ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
+* **spiloRunAsGroup**
+  sets the group ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
 * **spiloFSGroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This will override the **spilo_fsgroup**

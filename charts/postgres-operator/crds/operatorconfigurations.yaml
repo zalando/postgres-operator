@@ -200,6 +200,10 @@ spec:
                   type: string
                 secret_name_template:
                   type: string
+                spilo_runasuser:
+                  type: integer
+                spilo_runasgroup:
+                  type: integer
                 spilo_fsgroup:
                   type: integer
                 spilo_privileged:

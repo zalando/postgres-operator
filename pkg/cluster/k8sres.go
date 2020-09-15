@@ -557,6 +557,8 @@ func (c *Cluster) generatePodTemplate(
 	initContainers []v1.Container,
 	sidecarContainers []v1.Container,
 	tolerationsSpec *[]v1.Toleration,
+	spiloRunAsUser *int64,
+	spiloRunAsGroup *int64,
 	spiloFSGroup *int64,
 	nodeAffinity *v1.Affinity,
 	terminateGracePeriod int64,
@@ -575,6 +577,14 @@ func (c *Cluster) generatePodTemplate(
 	containers := []v1.Container{*spiloContainer}
 	containers = append(containers, sidecarContainers...)
 	securityContext := v1.PodSecurityContext{}
+
+	if spiloRunAsUser != nil {
+		securityContext.RunAsUser = spiloRunAsUser
+	}
+
+	if spiloRunAsGroup != nil {
+		securityContext.RunAsGroup = spiloRunAsGroup
+	}
 
 	if spiloFSGroup != nil {
 		securityContext.FSGroup = spiloFSGroup
@@ -1073,7 +1083,17 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
 
-	// determine the FSGroup for the spilo pod
+	// determine the User, Group and FSGroup for the spilo pod
+	effectiveRunAsUser := c.OpConfig.Resources.SpiloRunAsUser
+	if spec.SpiloRunAsUser != nil {
+		effectiveRunAsUser = spec.SpiloRunAsUser
+	}
+
+	effectiveRunAsGroup := c.OpConfig.Resources.SpiloRunAsGroup
+	if spec.SpiloRunAsGroup != nil {
+		effectiveRunAsGroup = spec.SpiloRunAsGroup
+	}
+
 	effectiveFSGroup := c.OpConfig.Resources.SpiloFSGroup
 	if spec.SpiloFSGroup != nil {
 		effectiveFSGroup = spec.SpiloFSGroup
@@ -1217,6 +1237,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers,
 		sidecarContainers,
 		&tolerationSpec,
+		effectiveRunAsUser,
+		effectiveRunAsGroup,
 		effectiveFSGroup,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
@@ -1896,6 +1918,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		[]v1.Container{},
 		[]v1.Container{},
 		&[]v1.Toleration{},
+		nil,
+		nil,
 		nil,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),

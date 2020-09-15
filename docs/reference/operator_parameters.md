@@ -317,6 +317,16 @@ configuration they are grouped under the `kubernetes` key.
   that should be assigned to the Postgres pods. The priority class itself must
   be defined in advance. Default is empty (use the default priority class).
 
+* **spilo_runasuser**
+  sets the user ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
+* **spilo_runasgroup**
+  sets the group ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
 * **spilo_fsgroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This is required to run Spilo as a

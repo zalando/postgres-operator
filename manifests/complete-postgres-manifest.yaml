@@ -68,6 +68,8 @@ spec:
 #          name: my-config-map
 
   enableShmVolume: true
+#  spiloRunAsUser: 101
+#  spiloRunAsGroup: 103
 #  spiloFSGroup: 103
 #  podAnnotations:
 #    annotation.key: value
