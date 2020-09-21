@@ -521,15 +521,34 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 
 // isConnectionPoolerEnabled
 func (c *Cluster) needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) || (spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
+	return (spec.EnableConnectionPooler != nil && *spec.EnableConnectionPooler) || (spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
 }
 
 func (c *Cluster) needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return nil != spec.EnableReplicaConnectionPooler && *spec.EnableReplicaConnectionPooler
+	return spec.EnableReplicaConnectionPooler != nil && *spec.EnableReplicaConnectionPooler
 }
 
 func (c *Cluster) needMasterConnectionPooler() bool {
 	return c.needMasterConnectionPoolerWorker(&c.Spec)
+}
+
+func (c *Cluster) needConnectionPooler() bool {
+	return c.needMasterConnectionPoolerWorker(&c.Spec) || c.needReplicaConnectionPoolerWorker(&c.Spec)
+}
+
+// RolesConnectionPooler gives the list of roles which need connection pooler
+func (c *Cluster) RolesConnectionPooler() []PostgresRole {
+	roles := []PostgresRole{}
+	i := 0
+
+	if c.needMasterConnectionPoolerWorker(&c.Spec) {
+		roles[i] = Master
+		i = i + 1
+	}
+	if c.needMasterConnectionPoolerWorker(&c.Spec) {
+		roles[i] = Replica
+	}
+	return roles
 }
 
 func (c *Cluster) needReplicaConnectionPooler() bool {
