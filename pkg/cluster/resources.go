@@ -107,6 +107,8 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 
 	if c.ConnectionPooler == nil {
 		c.ConnectionPooler = &ConnectionPoolerObjects{}
+		c.ConnectionPooler.Deployment = make(map[PostgresRole]*appsv1.Deployment)
+		c.ConnectionPooler.Service = make(map[PostgresRole]*v1.Service)
 	}
 
 	schema := c.Spec.ConnectionPooler.Schema
