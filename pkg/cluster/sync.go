@@ -699,7 +699,7 @@ func (c *Cluster) syncPreparedDatabases() error {
 			c.logger.Debugf("opened preparedDbName: %s", preparedDbName)
 		}
 
-		c.logger.Debugf("working on preparedDbName: %s", preparedDbName)
+		c.logger.Debugf("syncing prepared database %q", preparedDbName)
 		// now, prepare defined schemas
 		preparedSchemas := preparedDB.PreparedSchemas
 		if len(preparedDB.PreparedSchemas) == 0 {
