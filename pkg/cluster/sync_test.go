@@ -19,11 +19,13 @@ func int32ToPointer(value int32) *int32 {
 }
 
 func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
-	if cluster.ConnectionPooler.Deployment.Spec.Replicas == nil ||
-		*cluster.ConnectionPooler.Deployment.Spec.Replicas != 2 {
-		return fmt.Errorf("Wrong nubmer of instances")
+	for _, role := range cluster.RolesConnectionPooler() {
+		if cluster.ConnectionPooler.Deployment[role] != nil &&
+			(cluster.ConnectionPooler.Deployment[role].Spec.Replicas == nil ||
+				*cluster.ConnectionPooler.Deployment[role].Spec.Replicas != 2) {
+			return fmt.Errorf("Wrong number of instances")
+		}
 	}
-
 	return nil
 }
 
@@ -32,12 +34,16 @@ func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	if cluster.ConnectionPooler.Deployment == nil && cluster.ConnectionPooler.ReplDeployment == nil {
-		return fmt.Errorf("Deployment was not saved")
-	}
+	for _, role := range cluster.RolesConnectionPooler() {
+		if role != "" {
+			if cluster.ConnectionPooler.Deployment[role] == nil {
+				return fmt.Errorf("Deployment was not saved %s", role)
+			}
 
-	if cluster.ConnectionPooler.Service == nil && cluster.ConnectionPooler.ReplService == nil {
-		return fmt.Errorf("Service was not saved")
+			if cluster.ConnectionPooler.Service[role] == nil {
+				return fmt.Errorf("Service was not saved %s", role)
+			}
+		}
 	}
 
 	return nil
@@ -52,20 +58,24 @@ func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
 }
 
 func OnlyMasterDeleted(cluster *Cluster, err error, reason SyncReason) error {
-	if cluster.ConnectionPooler != nil &&
-		(cluster.ConnectionPooler.Deployment != nil && cluster.ConnectionPooler.Service != nil) {
-		return fmt.Errorf("Connection pooler master was not deleted")
-	}
 
+	for _, role := range cluster.RolesConnectionPooler() {
+		if cluster.ConnectionPooler != nil &&
+			(cluster.ConnectionPooler.Deployment[role] != nil && cluster.ConnectionPooler.Service[role] != nil) {
+			return fmt.Errorf("Connection pooler master was not deleted")
+		}
+	}
 	return nil
 }
 
 func OnlyReplicaDeleted(cluster *Cluster, err error, reason SyncReason) error {
-	if cluster.ConnectionPooler != nil &&
-		(cluster.ConnectionPooler.ReplDeployment != nil && cluster.ConnectionPooler.ReplService != nil) {
-		return fmt.Errorf("Connection pooler replica was not deleted")
-	}
 
+	for _, role := range cluster.RolesConnectionPooler() {
+		if cluster.ConnectionPooler != nil &&
+			(cluster.ConnectionPooler.Deployment[role] != nil && cluster.ConnectionPooler.Service[role] != nil) {
+			return fmt.Errorf("Connection pooler replica was not deleted")
+		}
+	}
 	return nil
 }
 
@@ -117,16 +127,20 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 	clusterDirtyMock := newCluster()
 	clusterDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
 	clusterDirtyMock.ConnectionPooler = &ConnectionPoolerObjects{
-		Deployment: &appsv1.Deployment{},
-		Service:    &v1.Service{},
+		Deployment: make(map[PostgresRole]*appsv1.Deployment),
+		Service:    make(map[PostgresRole]*v1.Service),
 	}
+	clusterDirtyMock.ConnectionPooler.Deployment[Master] = &appsv1.Deployment{}
+	clusterDirtyMock.ConnectionPooler.Service[Master] = &v1.Service{}
 	clusterReplicaDirtyMock := newCluster()
 	clusterReplicaDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
 	clusterReplicaDirtyMock.ConnectionPooler = &ConnectionPoolerObjects{
-		ReplDeployment: &appsv1.Deployment{},
-		ReplService:    &v1.Service{},
+		Deployment: make(map[PostgresRole]*appsv1.Deployment),
+		Service:    make(map[PostgresRole]*v1.Service),
 	}
 
+	clusterDirtyMock.ConnectionPooler.Deployment[Replica] = &appsv1.Deployment{}
+	clusterDirtyMock.ConnectionPooler.Service[Replica] = &v1.Service{}
 	clusterNewDefaultsMock := newCluster()
 	clusterNewDefaultsMock.KubeClient = k8sutil.NewMockKubernetesClient()
 

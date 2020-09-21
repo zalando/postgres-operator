@@ -521,7 +521,7 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 
 // isConnectionPoolerEnabled
 func (c *Cluster) needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return (spec.EnableConnectionPooler != nil && *spec.EnableConnectionPooler) || (spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
+	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) || (spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
 }
 
 func (c *Cluster) needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
@@ -538,15 +538,13 @@ func (c *Cluster) needConnectionPooler() bool {
 
 // RolesConnectionPooler gives the list of roles which need connection pooler
 func (c *Cluster) RolesConnectionPooler() []PostgresRole {
-	roles := []PostgresRole{}
-	i := 0
+	roles := make([]PostgresRole, 2)
 
 	if c.needMasterConnectionPoolerWorker(&c.Spec) {
-		roles[i] = Master
-		i = i + 1
+		roles = append(roles, Master)
 	}
 	if c.needMasterConnectionPoolerWorker(&c.Spec) {
-		roles[i] = Replica
+		roles = append(roles, Replica)
 	}
 	return roles
 }

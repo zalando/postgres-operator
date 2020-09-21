@@ -54,42 +54,19 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 			testName, err, poolerResources)
 	}
 
-	if poolerResources.Deployment == nil {
-		t.Errorf("%s: Connection pooler deployment is empty", testName)
-	}
+	for _, role := range cluster.RolesConnectionPooler() {
+		if poolerResources.Deployment[role] == nil {
+			t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
+		}
 
-	if poolerResources.Service == nil {
-		t.Errorf("%s: Connection pooler service is empty", testName)
-	}
+		if poolerResources.Service[role] == nil {
+			t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
+		}
 
-	err = cluster.deleteConnectionPooler(Master)
-	if err != nil {
-		t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
-	}
-
-	//Check if Replica connection pooler can be create and deleted successfully
-	cluster.Spec = acidv1.PostgresSpec{
-		EnableReplicaConnectionPooler: boolToPointer(true),
-		ConnectionPooler:              &acidv1.ConnectionPooler{},
-	}
-	replpoolerResources, err := cluster.createConnectionPooler(mockInstallLookupFunction)
-
-	if err != nil {
-		t.Errorf("%s: Cannot create replica connection pooler, %s, %+v",
-			testName, err, replpoolerResources)
-	}
-
-	if replpoolerResources.ReplDeployment == nil {
-		t.Errorf("%s: Connection pooler replica deployment is empty", testName)
-	}
-
-	if replpoolerResources.ReplService == nil {
-		t.Errorf("%s: Connection pooler replica service is empty", testName)
-	}
-
-	err = cluster.deleteConnectionPooler(Replica)
-	if err != nil {
-		t.Errorf("%s: Cannot delete replica connection pooler, %s", testName, err)
+		err = cluster.deleteConnectionPooler(role)
+		if err != nil {
+			t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
+		}
 	}
 }
 
