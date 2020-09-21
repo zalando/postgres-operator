@@ -55,10 +55,8 @@ type Config struct {
 
 // K8S objects that are belongs to a connection pooler
 type ConnectionPoolerObjects struct {
-	Deployment     *appsv1.Deployment
-	ReplDeployment *appsv1.Deployment
-	Service        *v1.Service
-	ReplService    *v1.Service
+	Deployment map[PostgresRole]*appsv1.Deployment
+	Service    map[PostgresRole]*v1.Service
 
 	// It could happen that a connection pooler was enabled, but the operator
 	// was not able to properly process a corresponding event or was restarted.
@@ -348,7 +346,8 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	if c.needMasterConnectionPooler() || c.needReplicaConnectionPooler() {
+	roles := c.RolesConnectionPooler()
+	for _, r := range roles {
 		if c.ConnectionPooler != nil {
 			c.logger.Warning("Connection pooler already exists in the cluster")
 			return nil
@@ -359,7 +358,7 @@ func (c *Cluster) Create() error {
 			return nil
 		}
 		c.logger.Infof("connection pooler %q has been successfully created",
-			util.NameFromMeta(connectionPooler.Deployment.ObjectMeta))
+			util.NameFromMeta(connectionPooler.Deployment[r].ObjectMeta))
 	}
 
 	return nil
