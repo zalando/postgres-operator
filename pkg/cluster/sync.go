@@ -714,8 +714,6 @@ func (c *Cluster) syncPreparedDatabases() error {
 
 		if err := c.closeDbConn(); err != nil {
 			c.logger.Errorf("could not close database connection: %v", err)
-		} else {
-			c.logger.Debugf("closed preparedDbName: %s", preparedDbName)
 		}
 	}
 
