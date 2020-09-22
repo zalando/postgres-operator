@@ -695,8 +695,6 @@ func (c *Cluster) syncPreparedDatabases() error {
 	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
 		if err := c.initDbConnWithName(preparedDbName); err != nil {
 			return fmt.Errorf("could not init connection to database %s: %v", preparedDbName, err)
-		} else {
-			c.logger.Debugf("opened preparedDbName: %s", preparedDbName)
 		}
 
 		c.logger.Debugf("syncing prepared database %q", preparedDbName)
