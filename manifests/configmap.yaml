@@ -85,6 +85,7 @@ data:
   pod_service_account_name: "postgres-pod"
   # pod_service_account_role_binding_definition: ""
   pod_terminate_grace_period: 5m
+  # pod_priority_class_name: "postgres-pod-priority"
   # postgres_superuser_teams: "postgres_superusers"
   # protected_role_names: "admin"
   ready_wait_interval: 3s
