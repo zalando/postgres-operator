@@ -329,8 +329,7 @@ func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, sc
 	if !c.databaseSchemaNameValid(schemaName) {
 		return nil
 	}
-	//c.logger.Infof("%s %q owner %q", doing, schemaName, schemaOwner)
-	c.logger.Debugf("%s with schemaName:%q schemaOwner:%q dbOwner:%q databaseName:%q statement:%q operation:%q", doing, schemaName, schemaOwner, dbOwner, databaseName, statement , operation)
+	c.logger.Infof("%s %q owner %q", doing, schemaName, schemaOwner)
 	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, dbOwner, schemaName, schemaOwner)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
