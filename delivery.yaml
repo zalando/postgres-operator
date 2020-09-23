@@ -2,6 +2,10 @@ version: "2017-09-20"
 pipeline:
     - id: build-postgres-operator
       type: script
+      vm: large
+      cache:
+        paths:
+          - /go/pkg/mod
       commands:
         - desc: 'Update'
           cmd: |
