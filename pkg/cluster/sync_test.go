@@ -216,6 +216,23 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			check:            objectsAreSaved,
 		},
 		{
+			subTest: "create both master and replica",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPooler:              &acidv1.ConnectionPooler{},
+					EnableReplicaConnectionPooler: boolToPointer(true),
+					EnableConnectionPooler:        boolToPointer(true),
+				},
+			},
+			cluster:          clusterMissingObjects,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            objectsAreSaved,
+		},
+		{
 			subTest: "delete if not needed",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
@@ -234,7 +251,8 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			subTest: "delete only master if not needed",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPooler: &acidv1.ConnectionPooler{},
+					ConnectionPooler:       &acidv1.ConnectionPooler{},
+					EnableConnectionPooler: boolToPointer(true),
 				},
 			},
 			newSpec: &acidv1.Postgresql{
