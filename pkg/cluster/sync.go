@@ -912,8 +912,13 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 					otherRole = Master
 				}
 			}
-			if err = c.deleteConnectionPooler(role); err != nil {
-				c.logger.Warningf("could not remove connection pooler: %v", err)
+			if c.ConnectionPooler != nil &&
+				(c.ConnectionPooler.Deployment[role] != nil ||
+					c.ConnectionPooler.Service[role] != nil) {
+
+				if err = c.deleteConnectionPooler(role); err != nil {
+					c.logger.Warningf("could not remove connection pooler: %v", err)
+				}
 			}
 			if c.ConnectionPooler != nil && c.ConnectionPooler.Deployment[otherRole] == nil && c.ConnectionPooler.Service[otherRole] == nil {
 				c.ConnectionPooler = nil

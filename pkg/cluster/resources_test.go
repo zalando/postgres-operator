@@ -45,7 +45,8 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 	}
 
 	cluster.Spec = acidv1.PostgresSpec{
-		ConnectionPooler: &acidv1.ConnectionPooler{},
+		ConnectionPooler:              &acidv1.ConnectionPooler{},
+		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
 	poolerResources, err := cluster.createConnectionPooler(mockInstallLookupFunction)
 
