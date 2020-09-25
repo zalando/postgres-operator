@@ -76,12 +76,6 @@ There is a browser-friendly version of this documentation at
 * [Postgres manifest reference](docs/reference/cluster_manifest.md)
 * [Command-line options and environment variables](docs/reference/command_line_and_environment.md)
 
-## Google Summer of Code
-
-The Postgres Operator made it to the [Google Summer of Code 2019](https://summerofcode.withgoogle.com/organizations/5429926902104064/)!
-Check [our ideas](docs/gsoc-2019/ideas.md#google-summer-of-code-2019)
-and start discussions in [the issue tracker](https://github.com/zalando/postgres-operator/issues).
-
 ## Community
 
 There are two places to get in touch with the community:
