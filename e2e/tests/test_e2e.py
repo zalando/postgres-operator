@@ -34,6 +34,7 @@ class EndToEndTestCase(unittest.TestCase):
         In the case of test failure the cluster will stay to enable manual examination;
         next invocation of "make test" will re-create it.
         '''
+        print("Test Setup being executed")
 
         # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
@@ -216,7 +217,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         # update infrastructure roles description
         secret_name = "postgresql-infrastructure-roles"
-        roles = "secretname: postgresql-infrastructure-roles-new, userkey: user, rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
+        roles = "secretname: postgresql-infrastructure-roles-new, \
+            userkey: user, rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
         patch_infrastructure_roles = {
             "data": {
                 "infrastructure_roles_secret_name": secret_name,
@@ -313,7 +315,8 @@ class EndToEndTestCase(unittest.TestCase):
             image0 = k8s.get_effective_pod_image(pod0)
             image1 = k8s.get_effective_pod_image(pod1)
 
-            assert_msg = "Disabling lazy upgrade failed: pods still have different images {} and {}".format(image0, image1)
+            assert_msg = "Disabling lazy upgrade failed: pods still have different \
+                images {} and {}".format(image0, image1)
             self.assertEqual(image0, image1, assert_msg)
 
         except timeout_decorator.TimeoutError:
@@ -710,11 +713,11 @@ class EndToEndTestCase(unittest.TestCase):
             time.sleep(10)
 
             # add annotations to manifest
-            deleteDate = datetime.today().strftime('%Y-%m-%d')
+            delete_date = datetime.today().strftime('%Y-%m-%d')
             pg_patch_delete_annotations = {
                 "metadata": {
                     "annotations": {
-                        "delete-date": deleteDate,
+                        "delete-date": delete_date,
                         "delete-clustername": "acid-minimal-cluster",
                     }
                 }
