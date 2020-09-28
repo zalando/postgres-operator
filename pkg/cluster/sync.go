@@ -388,15 +388,6 @@ func (c *Cluster) syncStatefulSet() error {
 		return fmt.Errorf("could not set cluster-wide PostgreSQL configuration options: %v", err)
 	}
 
-	if instancesRestartRequired {
-		c.logger.Debugln("restarting Postgres server within pods")
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
-		if err := c.restartInstances(); err != nil {
-			return fmt.Errorf("could not restart Postgres server within pods: %v", err)
-		}
-		c.logger.Infof("Postgres server successfuly restarted on all pods")
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done - all instances have been restarted")
-	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
@@ -407,6 +398,17 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
+		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
+			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
+		}
+	} else if instancesRestartRequired {
+		c.logger.Debugln("restarting Postgres server within pods")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
+		if err := c.restartInstances(); err != nil {
+			return fmt.Errorf("could not restart Postgres server within pods: %v", err)
+		}
+		c.logger.Infof("Postgres server successfuly restarted on all pods")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done - all instances have been restarted")
 	}
 	return nil
 }
@@ -424,7 +426,7 @@ func (c *Cluster) restartInstances() error {
 	if err != nil {
 		return fmt.Errorf("could not get the list of pods: %v", err)
 	}
-	c.logger.Infof("there are %d pods in the cluster which resquire POstgres server restart", len(pods.Items))
+	c.logger.Infof("there are %d pods in the cluster which resquire Postgres server restart", len(pods.Items))
 
 	var (
 		masterPod *v1.Pod
