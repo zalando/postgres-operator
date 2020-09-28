@@ -58,7 +58,7 @@ filter and list the label `spilo-role` to see when the master is promoted and
 replicas get their labels.
 
 ```bash
-kubectl get pods -l application=spilo -L spilo-role -w
+kubectl get pods -l application=spilo -L spilo-role -o wide
 ```
 
 The operator also emits K8s events to the Postgresql CRD which can be inspected
