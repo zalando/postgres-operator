@@ -401,7 +401,8 @@ func (c *Cluster) syncStatefulSet() error {
 		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
 			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
 		}
-	} else if instancesRestartRequired {
+	}
+	if instancesRestartRequired {
 		c.logger.Debugln("restarting Postgres server within pods")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
 		if err := c.restartInstances(); err != nil {
