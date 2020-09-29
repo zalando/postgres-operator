@@ -47,6 +47,7 @@ data:
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
+  external_traffic_policy: "Cluster"
   # gcp_credentials: ""
   # kubernetes_use_configmaps: "false"
   # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
@@ -80,12 +81,12 @@ data:
   # pod_environment_secret: "my-custom-secret"
   pod_label_wait_timeout: 10m
   pod_management_policy: "ordered_ready"
+  # pod_priority_class_name: "postgres-pod-priority"
   pod_role_label: spilo-role
   # pod_service_account_definition: ""
   pod_service_account_name: "postgres-pod"
   # pod_service_account_role_binding_definition: ""
   pod_terminate_grace_period: 5m
-  # pod_priority_class_name: "postgres-pod-priority"
   # postgres_superuser_teams: "postgres_superusers"
   # protected_role_names: "admin"
   ready_wait_interval: 3s

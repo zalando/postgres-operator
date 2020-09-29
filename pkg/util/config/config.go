@@ -177,10 +177,9 @@ type Config struct {
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	StorageResizeMode                      string            `name:"storage_resize_mode" default:"ebs"`
-	// ExternalTrafficPolicy for load balancer
-	ExternalTrafficPolicy string `name:"external_traffic_policy" default:"Cluster"`
 	// deprecated and kept for backward compatibility
 	EnableLoadBalancer        *bool             `name:"enable_load_balancer"`
+	ExternalTrafficPolicy     string            `name:"external_traffic_policy" default:"Cluster"`
 	MasterDNSNameFormat       StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
 	ReplicaDNSNameFormat      StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
 	PDBNameFormat             StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`

@@ -1135,12 +1135,6 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"enable_replica_load_balancer": {
 								Type: "boolean",
 							},
-							"master_dns_name_format": {
-								Type: "string",
-							},
-							"replica_dns_name_format": {
-								Type: "string",
-							},
 							"external_traffic_policy": {
 								Type: "string",
 								Enum: []apiextv1beta1.JSON{
@@ -1151,6 +1145,12 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 										Raw: []byte(`"Local"`),
 									},
 								},
+							},
+							"master_dns_name_format": {
+								Type: "string",
+							},
+							"replica_dns_name_format": {
+								Type: "string",
 							},
 						},
 					},
