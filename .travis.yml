@@ -20,4 +20,4 @@ script:
   - hack/verify-codegen.sh
   - travis_wait 20 go test -race -covermode atomic -coverprofile=profile.cov ./pkg/... -v
   - goveralls -coverprofile=profile.cov -service=travis-ci -v
-  - travis_wait 20 make e2e
+  - make e2e
