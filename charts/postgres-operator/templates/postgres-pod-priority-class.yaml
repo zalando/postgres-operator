@@ -1,4 +1,4 @@
-{{- if .Values.priorityClassName }}
+{{- if .Values.podPriorityClassName }}
 apiVersion: scheduling.k8s.io/v1
 description: 'Use only for databases controlled by Postgres operator'
 kind: PriorityClass
@@ -8,7 +8,7 @@ metadata:
     helm.sh/chart: {{ template "postgres-operator.chart" . }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-  name: {{ .Values.priorityClassName }}
+  name: {{ .Values.podPriorityClassName }}
 preemptionPolicy: PreemptLowerPriority
 globalDefault: false
 value: 1000000

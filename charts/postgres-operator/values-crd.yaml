@@ -320,7 +320,11 @@ podServiceAccount:
   # If not set a name is generated using the fullname template and "-pod" suffix
   name: "postgres-pod"
 
+# priority class for operator pod
 priorityClassName: ""
+
+# priority class for database pods
+podPriorityClassName: ""
 
 resources:
   limits:
