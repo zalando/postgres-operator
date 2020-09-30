@@ -9,6 +9,9 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 data:
+  {{- if .Values.podPriorityClassName }}
+  pod_priority_class_name: {{ .Values.podPriorityClassName }}
+  {{- end }}
   pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
 {{ toYaml .Values.configGeneral | indent 2 }}
 {{ toYaml .Values.configUsers | indent 2 }}

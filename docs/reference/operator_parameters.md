@@ -434,6 +434,12 @@ CRD-based configuration.
 Those options affect the behavior of load balancers created by the operator.
 In the CRD-based configuration they are grouped under the `load_balancer` key.
 
+* **custom_service_annotations**
+  This key/value map provides a list of annotations that get attached to each
+  service of a cluster created by the operator. If the annotation key is also
+  provided by the cluster definition, the manifest value is used.
+  Optional.
+
 * **db_hosted_zone**
   DNS zone for the cluster DNS name when the load balancer is configured for
   the cluster. Only used when combined with
@@ -450,11 +456,8 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   cluster.  Can be overridden by individual cluster settings. The default is
   `false`.
 
-* **custom_service_annotations**
-  This key/value map provides a list of annotations that get attached to each
-  service of a cluster created by the operator. If the annotation key is also
-  provided by the cluster definition, the manifest value is used.
-  Optional.
+* **external_traffic_policy** defines external traffic policy for load
+  balancers. Allowed values are `Cluster` (default) and `Local`.
 
 * **master_dns_name_format** defines the DNS name string template for the
   master load balancer cluster.  The default is
@@ -469,9 +472,6 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   cluster name, `{team}` is replaced with the team name and `{hostedzone}` is
   replaced with the hosted zone (the value of the `db_hosted_zone` parameter).
   No other placeholders are allowed.
-
-* **external_traffic_policy** define external traffic policy for the load
-balancer, it will default to `Cluster` if undefined.
 
 ## AWS or GCP interaction
 

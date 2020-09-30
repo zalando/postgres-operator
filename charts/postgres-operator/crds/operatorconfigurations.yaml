@@ -263,6 +263,11 @@ spec:
                   type: boolean
                 enable_replica_load_balancer:
                   type: boolean
+                external_traffic_policy:
+                  type: string
+                  enum:
+                    - "Cluster"
+                    - "Local"
                 master_dns_name_format:
                   type: string
                 replica_dns_name_format:

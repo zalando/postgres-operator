@@ -143,14 +143,13 @@ type Config struct {
 	LogicalBackup
 	ConnectionPooler
 
-	WatchedNamespace        string `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
-	KubernetesUseConfigMaps bool   `name:"kubernetes_use_configmaps" default:"false"`
-	EtcdHost                string `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-12:1.6-p3"`
-	// deprecated in favour of SidecarContainers
-	SidecarImages         map[string]string `name:"sidecar_docker_images"`
-	SidecarContainers     []v1.Container    `name:"sidecars"`
-	PodServiceAccountName string            `name:"pod_service_account_name" default:"postgres-pod"`
+	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
+	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
+	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
+	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-12:1.6-p3"`
+	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
+	SidecarContainers       []v1.Container    `name:"sidecars"`
+	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
 	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`
@@ -177,27 +176,25 @@ type Config struct {
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	StorageResizeMode                      string            `name:"storage_resize_mode" default:"ebs"`
-	// ExternalTrafficPolicy for load balancer
-	ExternalTrafficPolicy string `name:"external_traffic_policy" default:"Cluster"`
-	// deprecated and kept for backward compatibility
-	EnableLoadBalancer        *bool             `name:"enable_load_balancer"`
-	MasterDNSNameFormat       StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
-	ReplicaDNSNameFormat      StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
-	PDBNameFormat             StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
-	EnablePodDisruptionBudget *bool             `name:"enable_pod_disruption_budget" default:"true"`
-	EnableInitContainers      *bool             `name:"enable_init_containers" default:"true"`
-	EnableSidecars            *bool             `name:"enable_sidecars" default:"true"`
-	Workers                   uint32            `name:"workers" default:"8"`
-	APIPort                   int               `name:"api_port" default:"8080"`
-	RingLogLines              int               `name:"ring_log_lines" default:"100"`
-	ClusterHistoryEntries     int               `name:"cluster_history_entries" default:"1000"`
-	TeamAPIRoleConfiguration  map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
-	PodTerminateGracePeriod   time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
-	PodManagementPolicy       string            `name:"pod_management_policy" default:"ordered_ready"`
-	ProtectedRoles            []string          `name:"protected_role_names" default:"admin"`
-	PostgresSuperuserTeams    []string          `name:"postgres_superuser_teams" default:""`
-	SetMemoryRequestToLimit   bool              `name:"set_memory_request_to_limit" default:"false"`
-	EnableLazySpiloUpgrade    bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
+	EnableLoadBalancer                     *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
+	ExternalTrafficPolicy                  string            `name:"external_traffic_policy" default:"Cluster"`
+	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
+	ReplicaDNSNameFormat                   StringTemplate    `name:"replica_dns_name_format" default:"{cluster}-repl.{team}.{hostedzone}"`
+	PDBNameFormat                          StringTemplate    `name:"pdb_name_format" default:"postgres-{cluster}-pdb"`
+	EnablePodDisruptionBudget              *bool             `name:"enable_pod_disruption_budget" default:"true"`
+	EnableInitContainers                   *bool             `name:"enable_init_containers" default:"true"`
+	EnableSidecars                         *bool             `name:"enable_sidecars" default:"true"`
+	Workers                                uint32            `name:"workers" default:"8"`
+	APIPort                                int               `name:"api_port" default:"8080"`
+	RingLogLines                           int               `name:"ring_log_lines" default:"100"`
+	ClusterHistoryEntries                  int               `name:"cluster_history_entries" default:"1000"`
+	TeamAPIRoleConfiguration               map[string]string `name:"team_api_role_configuration" default:"log_statement:all"`
+	PodTerminateGracePeriod                time.Duration     `name:"pod_terminate_grace_period" default:"5m"`
+	PodManagementPolicy                    string            `name:"pod_management_policy" default:"ordered_ready"`
+	ProtectedRoles                         []string          `name:"protected_role_names" default:"admin"`
+	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
+	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
+	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 }
 
 // MustMarshal marshals the config or panics
