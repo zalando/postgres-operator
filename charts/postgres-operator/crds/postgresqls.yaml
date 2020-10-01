@@ -270,6 +270,7 @@ spec:
                     - "10"
                     - "11"
                     - "12"
+                    - "13"
                 parameters:
                   type: object
                   additionalProperties:
