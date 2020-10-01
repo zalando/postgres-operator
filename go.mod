@@ -10,7 +10,7 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/tools v0.0.0-20200928201943-a0ef9b62deab // indirect
+	golang.org/x/tools v0.0.0-20200930213115-e57f6d466a48 // indirect
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.18.8
 	k8s.io/apiextensions-apiserver v0.18.0
