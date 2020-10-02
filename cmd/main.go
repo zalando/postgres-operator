@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"sync"
@@ -36,6 +36,8 @@ func init() {
 	flag.BoolVar(&config.NoTeamsAPI, "noteamsapi", false, "Disable all access to the teams API")
 	flag.Parse()
 
+	config.EnableJsonLogging = os.Getenv("ENABLE_JSON_LOGGING") == "true"
+
 	configMapRawName := os.Getenv("CONFIG_MAP_NAME")
 	if configMapRawName != "" {
 
@@ -63,6 +65,9 @@ func init() {
 func main() {
 	var err error
 
+	if config.EnableJsonLogging {
+		log.SetFormatter(&log.JSONFormatter{})
+	}
 	log.SetOutput(os.Stdout)
 	log.Printf("Spilo operator %s\n", version)
 

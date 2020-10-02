@@ -15,6 +15,9 @@ podLabels: {}
 
 configTarget: "ConfigMap"
 
+# JSON logging format
+enableJsonLogging: false
+
 # general configuration parameters
 configGeneral:
   # choose if deployment creates/updates CRDs with OpenAPIV3Validation
