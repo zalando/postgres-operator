@@ -101,15 +101,9 @@ func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 //
 // After that create all the objects for connection pooler, namely a deployment
 // with a chosen pooler and a service to expose it.
-func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoolerObjects, error) {
+func (c *Cluster) createConnectionPooler(lookup InstallFunction, role PostgresRole) (*ConnectionPoolerObjects, error) {
 	var msg string
 	c.setProcessName("creating connection pooler")
-
-	if c.ConnectionPooler == nil {
-		c.ConnectionPooler = &ConnectionPoolerObjects{}
-		c.ConnectionPooler.Deployment = make(map[PostgresRole]*appsv1.Deployment)
-		c.ConnectionPooler.Service = make(map[PostgresRole]*v1.Service)
-	}
 
 	schema := c.Spec.ConnectionPooler.Schema
 
@@ -122,49 +116,47 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoo
 		user = c.OpConfig.ConnectionPooler.User
 	}
 
-	err := lookup(schema, user)
+	err := lookup(schema, user, role)
 
 	if err != nil {
 		msg = "could not prepare database for connection pooler: %v"
 		return nil, fmt.Errorf(msg, err)
 	}
-	if c.needConnectionPooler() {
-		roles := c.RolesConnectionPooler()
-		for _, r := range roles {
-			deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, r)
-			if err != nil {
-				msg = "could not generate deployment for connection pooler: %v"
-				return nil, fmt.Errorf(msg, err)
-			}
-
-			// client-go does retry 10 times (with NoBackoff by default) when the API
-			// believe a request can be retried and returns Retry-After header. This
-			// should be good enough to not think about it here.
-			deployment, err := c.KubeClient.
-				Deployments(deploymentSpec.Namespace).
-				Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
-
-			if err != nil {
-				return nil, err
-			}
-
-			serviceSpec := c.generateConnectionPoolerService(&c.Spec, r)
-			service, err := c.KubeClient.
-				Services(serviceSpec.Namespace).
-				Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
-
-			if err != nil {
-				return nil, err
-			}
-			c.ConnectionPooler.Deployment[r] = deployment
-			c.ConnectionPooler.Service[r] = service
-
-			c.logger.Debugf("created new connection pooler %q, uid: %q",
-				util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
-		}
+	if c.ConnectionPooler[role] == nil {
+		c.ConnectionPooler = make(map[PostgresRole]*ConnectionPoolerObjects)
+	}
+	deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, role)
+	if err != nil {
+		msg = "could not generate deployment for connection pooler: %v"
+		return nil, fmt.Errorf(msg, err)
 	}
 
-	return c.ConnectionPooler, nil
+	// client-go does retry 10 times (with NoBackoff by default) when the API
+	// believe a request can be retried and returns Retry-After header. This
+	// should be good enough to not think about it here.
+	deployment, err := c.KubeClient.
+		Deployments(deploymentSpec.Namespace).
+		Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
+
+	if err != nil {
+		return nil, err
+	}
+
+	serviceSpec := c.generateConnectionPoolerService(&c.Spec, role)
+	service, err := c.KubeClient.
+		Services(serviceSpec.Namespace).
+		Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
+
+	if err != nil {
+		return nil, err
+	}
+	c.ConnectionPooler[role].Deployment = deployment
+	c.ConnectionPooler[role].Service = service
+
+	c.logger.Debugf("created new connection pooler %q, uid: %q",
+		util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
+
+	return c.ConnectionPooler[role], nil
 }
 
 func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
@@ -181,7 +173,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
 	var deployment *appsv1.Deployment
-	deployment = c.ConnectionPooler.Deployment[role]
+	deployment = c.ConnectionPooler[role].Deployment
 
 	policy := metav1.DeletePropagationForeground
 	options := metav1.DeleteOptions{PropagationPolicy: &policy}
@@ -206,7 +198,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 	// Repeat the same for the service object
 	var service *v1.Service
-	service = c.ConnectionPooler.Service[role]
+	service = c.ConnectionPooler[role].Service
 
 	if service != nil {
 
@@ -861,7 +853,7 @@ func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 // the check were already done before.
 func (c *Cluster) updateConnectionPoolerDeployment(oldDeploymentSpec, newDeployment *appsv1.Deployment, role PostgresRole) (*appsv1.Deployment, error) {
 	c.setProcessName("updating connection pooler")
-	if c.ConnectionPooler == nil || c.ConnectionPooler.Deployment[role] == nil {
+	if c.ConnectionPooler == nil || c.ConnectionPooler[role].Deployment == nil {
 		return nil, fmt.Errorf("there is no connection pooler in the cluster")
 	}
 
@@ -874,9 +866,9 @@ func (c *Cluster) updateConnectionPoolerDeployment(oldDeploymentSpec, newDeploym
 	// worker at one time will try to update it chances of conflicts are
 	// minimal.
 	deployment, err := c.KubeClient.
-		Deployments(c.ConnectionPooler.Deployment[role].Namespace).Patch(
+		Deployments(c.ConnectionPooler[role].Deployment.Namespace).Patch(
 		context.TODO(),
-		c.ConnectionPooler.Deployment[role].Name,
+		c.ConnectionPooler[role].Deployment.Name,
 		types.MergePatchType,
 		patchData,
 		metav1.PatchOptions{},
@@ -885,7 +877,7 @@ func (c *Cluster) updateConnectionPoolerDeployment(oldDeploymentSpec, newDeploym
 		return nil, fmt.Errorf("could not patch deployment: %v", err)
 	}
 
-	c.ConnectionPooler.Deployment[role] = deployment
+	c.ConnectionPooler[role].Deployment = deployment
 
 	return deployment, nil
 }
@@ -897,9 +889,9 @@ func (c *Cluster) updateConnectionPoolerAnnotations(annotations map[string]strin
 	if err != nil {
 		return nil, fmt.Errorf("could not form patch for the deployment metadata: %v", err)
 	}
-	result, err := c.KubeClient.Deployments(c.ConnectionPooler.Deployment[role].Namespace).Patch(
+	result, err := c.KubeClient.Deployments(c.ConnectionPooler[role].Deployment.Namespace).Patch(
 		context.TODO(),
-		c.ConnectionPooler.Deployment[role].Name,
+		c.ConnectionPooler[role].Deployment.Name,
 		types.MergePatchType,
 		[]byte(patchData),
 		metav1.PatchOptions{},
