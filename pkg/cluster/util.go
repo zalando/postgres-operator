@@ -424,8 +424,10 @@ func (c *Cluster) connectionPoolerLabelsSelector(role PostgresRole) *metav1.Labe
 	connectionPoolerLabels := labels.Set(map[string]string{})
 
 	extraLabels := labels.Set(map[string]string{
-		"connection-pooler": c.connectionPoolerName(role),
-		"application":       "db-connection-pooler",
+		"connection-pooler-name": c.connectionPoolerName(role),
+		"application":            "db-connection-pooler",
+		"role":                   string(role),
+		"cluster-name":           c.ClusterName,
 	})
 
 	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, c.labelsSet(false))
