@@ -180,52 +180,48 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
-	var deploymentName string
 	var deployment *appsv1.Deployment
 	deployment = c.ConnectionPooler.Deployment[role]
 
-	if deployment != nil {
-		deploymentName = deployment.Name
-	}
-
-	// set delete propagation policy to foreground, so that replica set will be
-	// also deleted.
 	policy := metav1.DeletePropagationForeground
 	options := metav1.DeleteOptions{PropagationPolicy: &policy}
-	err = c.KubeClient.
-		Deployments(c.Namespace).
-		Delete(context.TODO(), deploymentName, options)
 
-	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("Connection pooler deployment was already deleted")
-	} else if err != nil {
-		return fmt.Errorf("could not delete deployment: %v", err)
+	if deployment != nil {
+
+		// set delete propagation policy to foreground, so that replica set will be
+		// also deleted.
+
+		err = c.KubeClient.
+			Deployments(c.Namespace).
+			Delete(context.TODO(), c.connectionPoolerName(role), options)
+
+		if k8sutil.ResourceNotFound(err) {
+			c.logger.Debugf("Connection pooler deployment was already deleted")
+		} else if err != nil {
+			return fmt.Errorf("could not delete deployment: %v", err)
+		}
+
+		c.logger.Infof("Connection pooler deployment %q has been deleted", c.connectionPoolerName(role))
 	}
-
-	c.logger.Infof("Connection pooler deployment %q has been deleted", deploymentName)
 
 	// Repeat the same for the service object
 	var service *v1.Service
 	service = c.ConnectionPooler.Service[role]
 
-	serviceName := c.connectionPoolerName(role)
-
 	if service != nil {
-		serviceName = service.Name
+
+		err = c.KubeClient.
+			Services(c.Namespace).
+			Delete(context.TODO(), c.connectionPoolerName(role), options)
+
+		if k8sutil.ResourceNotFound(err) {
+			c.logger.Debugf("Connection pooler service was already deleted")
+		} else if err != nil {
+			return fmt.Errorf("could not delete service: %v", err)
+		}
+
+		c.logger.Infof("Connection pooler service %q has been deleted", c.connectionPoolerName(role))
 	}
-
-	err = c.KubeClient.
-		Services(c.Namespace).
-		Delete(context.TODO(), serviceName, options)
-
-	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("Connection pooler service was already deleted")
-	} else if err != nil {
-		return fmt.Errorf("could not delete service: %v", err)
-	}
-
-	c.logger.Infof("Connection pooler service %q has been deleted", serviceName)
-
 	// Repeat the same for the secret object
 	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
 
