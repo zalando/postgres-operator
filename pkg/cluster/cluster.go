@@ -55,8 +55,8 @@ type Config struct {
 
 // K8S objects that are belongs to a connection pooler
 type ConnectionPoolerObjects struct {
-	Deployment map[PostgresRole]*appsv1.Deployment
-	Service    map[PostgresRole]*v1.Service
+	Deployment *appsv1.Deployment
+	Service    *v1.Service
 
 	// It could happen that a connection pooler was enabled, but the operator
 	// was not able to properly process a corresponding event or was restarted.
@@ -72,7 +72,6 @@ type kubeResources struct {
 	Endpoints           map[PostgresRole]*v1.Endpoints
 	Secrets             map[types.UID]*v1.Secret
 	Statefulset         *appsv1.StatefulSet
-	ConnectionPooler    *ConnectionPoolerObjects
 	PodDisruptionBudget *policybeta1.PodDisruptionBudget
 	//Pods are treated separately
 	//PVCs are treated separately
@@ -102,7 +101,7 @@ type Cluster struct {
 	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-
+	ConnectionPooler map[PostgresRole]*ConnectionPoolerObjects
 }
 
 type compareStatefulsetResult struct {
@@ -346,19 +345,19 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	roles := c.RolesConnectionPooler()
-	for _, r := range roles {
-		if c.ConnectionPooler != nil {
+	for _, r := range c.RolesConnectionPooler() {
+		if c.ConnectionPooler[r] != nil {
 			c.logger.Warning("Connection pooler already exists in the cluster")
 			return nil
+
+			connectionPooler, err := c.createConnectionPooler(c.installLookupFunction, r)
+			if err != nil {
+				c.logger.Warningf("could not create connection pooler: %v", err)
+				return nil
+			}
+			c.logger.Infof("connection pooler %q has been successfully created for the role %v",
+				util.NameFromMeta(connectionPooler.Deployment.ObjectMeta), r)
 		}
-		connectionPooler, err := c.createConnectionPooler(c.installLookupFunction)
-		if err != nil {
-			c.logger.Warningf("could not create connection pooler: %v", err)
-			return nil
-		}
-		c.logger.Infof("connection pooler %q has been successfully created",
-			util.NameFromMeta(connectionPooler.Deployment[r].ObjectMeta))
 	}
 
 	return nil
