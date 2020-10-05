@@ -1313,6 +1313,8 @@ func TestTLS(t *testing.T) {
 	var err error
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
 	var spiloFSGroup = int64(103)
 	var additionalVolumes = spec.AdditionalVolumes
 
@@ -1340,7 +1342,9 @@ func TestTLS(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				Resources: config.Resources{
-					SpiloFSGroup: &spiloFSGroup,
+					SpiloRunAsUser:  &spiloRunAsUser,
+					SpiloRunAsGroup: &spiloRunAsGroup,
+					SpiloFSGroup:    &spiloFSGroup,
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
@@ -1751,5 +1755,85 @@ func TestSidecars(t *testing.T) {
 		Env:             scalyrEnv,
 		VolumeMounts:    mounts,
 	})
+
+}
+
+func TestGenerateService(t *testing.T) {
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+	var enableLB bool = true
+	spec = acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+		Sidecars: []acidv1.Sidecar{
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar",
+			},
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar-with-resources",
+				Resources: acidv1.Resources{
+					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
+					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
+				},
+			},
+			acidv1.Sidecar{
+				Name:        "replace-sidecar",
+				DockerImage: "overwrite-image",
+			},
+		},
+		EnableMasterLoadBalancer: &enableLB,
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					DefaultCPURequest:    "200m",
+					DefaultCPULimit:      "500m",
+					DefaultMemoryRequest: "0.7Gi",
+					DefaultMemoryLimit:   "1.3Gi",
+				},
+				SidecarImages: map[string]string{
+					"deprecated-global-sidecar": "image:123",
+				},
+				SidecarContainers: []v1.Container{
+					v1.Container{
+						Name: "global-sidecar",
+					},
+					// will be replaced by a cluster specific sidecar with the same name
+					v1.Container{
+						Name:  "replace-sidecar",
+						Image: "replaced-image",
+					},
+				},
+				Scalyr: config.Scalyr{
+					ScalyrAPIKey:        "abc",
+					ScalyrImage:         "scalyr-image",
+					ScalyrCPURequest:    "220m",
+					ScalyrCPULimit:      "520m",
+					ScalyrMemoryRequest: "0.9Gi",
+					// ise default memory limit
+				},
+				ExternalTrafficPolicy: "Cluster",
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	service := cluster.generateService(Master, &spec)
+	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeCluster, service.Spec.ExternalTrafficPolicy)
+	cluster.OpConfig.ExternalTrafficPolicy = "Local"
+	service = cluster.generateService(Master, &spec)
+	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
 
 }

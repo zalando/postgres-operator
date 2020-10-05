@@ -696,12 +696,8 @@ func (c *Cluster) syncPreparedDatabases() error {
 		if err := c.initDbConnWithName(preparedDbName); err != nil {
 			return fmt.Errorf("could not init connection to database %s: %v", preparedDbName, err)
 		}
-		defer func() {
-			if err := c.closeDbConn(); err != nil {
-				c.logger.Errorf("could not close database connection: %v", err)
-			}
-		}()
 
+		c.logger.Debugf("syncing prepared database %q", preparedDbName)
 		// now, prepare defined schemas
 		preparedSchemas := preparedDB.PreparedSchemas
 		if len(preparedDB.PreparedSchemas) == 0 {
@@ -714,6 +710,10 @@ func (c *Cluster) syncPreparedDatabases() error {
 		// install extensions
 		if err := c.syncExtensions(preparedDB.Extensions); err != nil {
 			return err
+		}
+
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
 		}
 	}
 

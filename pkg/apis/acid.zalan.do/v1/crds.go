@@ -522,6 +522,12 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"spiloRunAsUser": {
+						Type: "integer",
+					},
+					"spiloRunAsGroup": {
+						Type: "integer",
+					},
 					"spiloFSGroup": {
 						Type: "integer",
 					},
@@ -1021,6 +1027,12 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"secret_name_template": {
 								Type: "string",
 							},
+							"spilo_runasuser": {
+								Type: "integer",
+							},
+							"spilo_runasgroup": {
+								Type: "integer",
+							},
 							"spilo_fsgroup": {
 								Type: "integer",
 							},
@@ -1125,6 +1137,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 							"enable_replica_load_balancer": {
 								Type: "boolean",
+							},
+							"external_traffic_policy": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"Cluster"`),
+									},
+									{
+										Raw: []byte(`"Local"`),
+									},
+								},
 							},
 							"master_dns_name_format": {
 								Type: "string",

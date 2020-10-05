@@ -196,6 +196,10 @@ spec:
                   type: string
                 secret_name_template:
                   type: string
+                spilo_runasuser:
+                  type: integer
+                spilo_runasgroup:
+                  type: integer
                 spilo_fsgroup:
                   type: integer
                 spilo_privileged:
@@ -261,6 +265,11 @@ spec:
                   type: boolean
                 enable_replica_load_balancer:
                   type: boolean
+                external_traffic_policy:
+                  type: string
+                  enum:
+                    - "Cluster"
+                    - "Local"
                 master_dns_name_format:
                   type: string
                 replica_dns_name_format:

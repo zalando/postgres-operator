@@ -372,6 +372,10 @@ spec:
               items:
                 type: object
                 additionalProperties: true
+            spiloRunAsUser:
+              type: integer
+            spiloRunAsGroup:
+              type: integer
             spiloFSGroup:
               type: integer
             standby:

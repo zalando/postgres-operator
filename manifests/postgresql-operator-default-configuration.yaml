@@ -61,13 +61,15 @@ configuration:
     # pod_environment_configmap: "default/my-custom-config"
     # pod_environment_secret: "my-custom-secret"
     pod_management_policy: "ordered_ready"
-    # pod_priority_class_name: ""
+    # pod_priority_class_name: "postgres-pod-priority"
     pod_role_label: spilo-role
     # pod_service_account_definition: ""
     pod_service_account_name: postgres-pod
     # pod_service_account_role_binding_definition: ""
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+    # spilo_runasuser: 101
+    # spilo_runasgroup: 103
     # spilo_fsgroup: 103
     spilo_privileged: false
     storage_resize_mode: ebs
@@ -88,12 +90,13 @@ configuration:
     resource_check_interval: 3s
     resource_check_timeout: 10m
   load_balancer:
-    # db_hosted_zone: ""
-    enable_master_load_balancer: false
-    enable_replica_load_balancer: false
     # custom_service_annotations:
     #   keyx: valuex
     #   keyy: valuey
+    # db_hosted_zone: ""
+    enable_master_load_balancer: false
+    enable_replica_load_balancer: false
+    external_traffic_policy: "Cluster"
     master_dns_name_format: "{cluster}.{team}.{hostedzone}"
     replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
   aws_or_gcp:
