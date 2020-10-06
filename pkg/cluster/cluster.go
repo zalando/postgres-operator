@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -25,6 +24,8 @@ import (
 	"k8s.io/client-go/tools/reference"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+
+	"github.com/zalando/postgres-operator/pkg/connection_pooler"
 	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -34,6 +35,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	"github.com/zalando/postgres-operator/pkg/util/users"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 
@@ -51,20 +53,6 @@ type Config struct {
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
-}
-
-// K8S objects that are belongs to a connection pooler
-type ConnectionPoolerObjects struct {
-	Deployment *appsv1.Deployment
-	Service    *v1.Service
-
-	// It could happen that a connection pooler was enabled, but the operator
-	// was not able to properly process a corresponding event or was restarted.
-	// In this case we will miss missing/require situation and a lookup function
-	// will not be installed. To avoid synchronizing it all the time to prevent
-	// this, we can remember the result in memory at least until the next
-	// restart.
-	LookupFunction bool
 }
 
 type kubeResources struct {
@@ -101,9 +89,8 @@ type Cluster struct {
 	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	ConnectionPooler map[PostgresRole]*ConnectionPoolerObjects
+	ConnectionPooler map[PostgresRole]*connection_pooler.ConnectionPoolerObjects
 }
-
 type compareStatefulsetResult struct {
 	match         bool
 	replace       bool
@@ -345,12 +332,19 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	for _, r := range c.RolesConnectionPooler() {
-		if c.ConnectionPooler[r] != nil {
-			c.logger.Warning("Connection pooler already exists in the cluster")
-			return nil
+	if c.needConnectionPooler() {
 
-			connectionPooler, err := c.createConnectionPooler(c.installLookupFunction, r)
+		roles := c.RolesConnectionPooler()
+		for _, r := range roles {
+			c.logger.Warningf("found roles are %v", r)
+		}
+
+		for _, r := range c.RolesConnectionPooler() {
+			if c.ConnectionPooler[r] != nil {
+				c.logger.Warning("Connection pooler already exists in the cluster")
+				return nil
+			}
+			connectionPooler, err := c.ConnectionPooler[r].createConnectionPooler(c.installLookupFunction, r)
 			if err != nil {
 				c.logger.Warningf("could not create connection pooler: %v", err)
 				return nil
@@ -359,7 +353,6 @@ func (c *Cluster) Create() error {
 				util.NameFromMeta(connectionPooler.Deployment.ObjectMeta), r)
 		}
 	}
-
 	return nil
 }
 
@@ -781,13 +774,29 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pooler
-	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
-		c.installLookupFunction); err != nil {
-		c.logger.Errorf("could not sync connection pooler: %v", err)
-		updateFailed = true
+	for _, role := range c.RolesConnectionPooler() {
+		if _, err := c.ConnectionPooler[role].syncConnectionPooler(oldSpec, newSpec,
+			c.installLookupFunction); err != nil {
+			c.logger.Errorf("could not sync connection pooler: %v", err)
+			updateFailed = true
+		}
 	}
 
 	return nil
+}
+
+func syncResources(a, b *v1.ResourceRequirements) bool {
+	for _, res := range []v1.ResourceName{
+		v1.ResourceCPU,
+		v1.ResourceMemory,
+	} {
+		if !a.Limits[res].Equal(b.Limits[res]) ||
+			!a.Requests[res].Equal(b.Requests[res]) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Delete deletes the cluster and cleans up all objects associated with it (including statefulsets).
@@ -839,7 +848,7 @@ func (c *Cluster) Delete() {
 	// manifest, just to not keep orphaned components in case if something went
 	// wrong
 	for _, role := range [2]PostgresRole{Master, Replica} {
-		if err := c.deleteConnectionPooler(role); err != nil {
+		if err := c.ConnectionPooler[role].deleteConnectionPooler(role); err != nil {
 			c.logger.Warningf("could not remove connection pooler: %v", err)
 		}
 	}
@@ -1386,120 +1395,4 @@ func (c *Cluster) deletePatroniClusterConfigMaps() error {
 	}
 
 	return c.deleteClusterObject(get, deleteConfigMapFn, "configmap")
-}
-
-// Test if two connection pooler configuration needs to be synced. For simplicity
-// compare not the actual K8S objects, but the configuration itself and request
-// sync if there is any difference.
-func (c *Cluster) needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler) (sync bool, reasons []string) {
-	reasons = []string{}
-	sync = false
-
-	changelog, err := diff.Diff(oldSpec, newSpec)
-	if err != nil {
-		c.logger.Infof("Cannot get diff, do not do anything, %+v", err)
-		return false, reasons
-	}
-
-	if len(changelog) > 0 {
-		sync = true
-	}
-
-	for _, change := range changelog {
-		msg := fmt.Sprintf("%s %+v from '%+v' to '%+v'",
-			change.Type, change.Path, change.From, change.To)
-		reasons = append(reasons, msg)
-	}
-
-	return sync, reasons
-}
-
-func syncResources(a, b *v1.ResourceRequirements) bool {
-	for _, res := range []v1.ResourceName{
-		v1.ResourceCPU,
-		v1.ResourceMemory,
-	} {
-		if !a.Limits[res].Equal(b.Limits[res]) ||
-			!a.Requests[res].Equal(b.Requests[res]) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// Check if we need to synchronize connection pooler deployment due to new
-// defaults, that are different from what we see in the DeploymentSpec
-func (c *Cluster) needSyncConnectionPoolerDefaults(
-	spec *acidv1.ConnectionPooler,
-	deployment *appsv1.Deployment) (sync bool, reasons []string) {
-
-	reasons = []string{}
-	sync = false
-
-	config := c.OpConfig.ConnectionPooler
-	podTemplate := deployment.Spec.Template
-	poolerContainer := podTemplate.Spec.Containers[constants.ConnectionPoolerContainer]
-
-	if spec == nil {
-		spec = &acidv1.ConnectionPooler{}
-	}
-
-	if spec.NumberOfInstances == nil &&
-		*deployment.Spec.Replicas != *config.NumberOfInstances {
-
-		sync = true
-		msg := fmt.Sprintf("NumberOfInstances is different (having %d, required %d)",
-			*deployment.Spec.Replicas, *config.NumberOfInstances)
-		reasons = append(reasons, msg)
-	}
-
-	if spec.DockerImage == "" &&
-		poolerContainer.Image != config.Image {
-
-		sync = true
-		msg := fmt.Sprintf("DockerImage is different (having %s, required %s)",
-			poolerContainer.Image, config.Image)
-		reasons = append(reasons, msg)
-	}
-
-	expectedResources, err := generateResourceRequirements(spec.Resources,
-		c.makeDefaultConnectionPoolerResources())
-
-	// An error to generate expected resources means something is not quite
-	// right, but for the purpose of robustness do not panic here, just report
-	// and ignore resources comparison (in the worst case there will be no
-	// updates for new resource values).
-	if err == nil && syncResources(&poolerContainer.Resources, expectedResources) {
-		sync = true
-		msg := fmt.Sprintf("Resources are different (having %+v, required %+v)",
-			poolerContainer.Resources, expectedResources)
-		reasons = append(reasons, msg)
-	}
-
-	if err != nil {
-		c.logger.Warningf("Cannot generate expected resources, %v", err)
-	}
-
-	for _, env := range poolerContainer.Env {
-		if spec.User == "" && env.Name == "PGUSER" {
-			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
-
-			if ref.Name != c.credentialSecretName(config.User) {
-				sync = true
-				msg := fmt.Sprintf("pooler user is different (having %s, required %s)",
-					ref.Name, config.User)
-				reasons = append(reasons, msg)
-			}
-		}
-
-		if spec.Schema == "" && env.Name == "PGSCHEMA" && env.Value != config.Schema {
-			sync = true
-			msg := fmt.Sprintf("pooler schema is different (having %s, required %s)",
-				env.Value, config.Schema)
-			reasons = append(reasons, msg)
-		}
-	}
-
-	return sync, reasons
 }
