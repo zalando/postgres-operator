@@ -7,7 +7,7 @@ import (
 	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/pooler_interface"
+	"github.com/zalando/postgres-operator/pkg/cluster"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"github.com/zalando/postgres-operator/pkg/resources"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -146,12 +147,12 @@ func (cp *ConnectionPoolerObjects) createConnectionPooler(lookup InstallFunction
 	schema := c.Spec.ConnectionPooler.Schema
 
 	if schema == "" {
-		schema = c.OpConfig.ConnectionPooler.Schema
+		schema = resources.OpConfig.ConnectionPooler.Schema
 	}
 
 	user := c.Spec.ConnectionPooler.User
 	if user == "" {
-		user = c.OpConfig.ConnectionPooler.User
+		user = resources.OpConfig.ConnectionPooler.User
 	}
 
 	err := lookup(schema, user, role)
@@ -200,7 +201,6 @@ func (cp *ConnectionPoolerObjects) createConnectionPooler(lookup InstallFunction
 	return c.ConnectionPooler[role], nil
 }
 
-//TODO: Figure out how can we go about for the opconfig required here!
 //
 // Generate pool size related environment variables.
 //
@@ -222,18 +222,18 @@ func (cp *ConnectionPoolerObjects) createConnectionPooler(lookup InstallFunction
 func (cp *ConnectionPoolerObjects) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
 	effectiveMode := util.Coalesce(
 		spec.ConnectionPooler.Mode,
-		c.OpConfig.ConnectionPooler.Mode)
+		resources.OpConfig.ConnectionPooler.Mode)
 
 	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
-			c.OpConfig.ConnectionPooler.NumberOfInstances,
+			resources.OpConfig.ConnectionPooler.NumberOfInstances,
 			k8sutil.Int32ToPointer(1))
 	}
 
 	effectiveMaxDBConn := util.CoalesceInt32(
 		spec.ConnectionPooler.MaxDBConnections,
-		c.OpConfig.ConnectionPooler.MaxDBConnections)
+		resources.OpConfig.ConnectionPooler.MaxDBConnections)
 
 	if effectiveMaxDBConn == nil {
 		effectiveMaxDBConn = k8sutil.Int32ToPointer(
@@ -278,22 +278,21 @@ func (cp *ConnectionPoolerObjects) getConnectionPoolerEnvVars(spec *acidv1.Postg
 	}
 }
 
-// TODO: Figure out how can we go about for the opconfig  required here!
 func (cp *ConnectionPoolerObjects) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec, role PostgresRole) (
 	*v1.PodTemplateSpec, error) {
 
-	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
+	gracePeriod := int64(resources.OpConfig.PodTerminateGracePeriod.Seconds())
 	resources, err := pooler_interface.pooler.pooler.generateResourceRequirements(
 		spec.ConnectionPooler.Resources,
 		cp.makeDefaultConnectionPoolerResources())
 
 	effectiveDockerImage := util.Coalesce(
 		spec.ConnectionPooler.DockerImage,
-		c.OpConfig.ConnectionPooler.Image)
+		resources.OpConfig.ConnectionPooler.Image)
 
 	effectiveSchema := util.Coalesce(
 		spec.ConnectionPooler.Schema,
-		c.OpConfig.ConnectionPooler.Schema)
+		resources.OpConfig.ConnectionPooler.Schema)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
@@ -302,7 +301,7 @@ func (cp *ConnectionPoolerObjects) generateConnectionPoolerPodTemplate(spec *aci
 	secretSelector := func(key string) *v1.SecretKeySelector {
 		effectiveUser := util.Coalesce(
 			spec.ConnectionPooler.User,
-			c.OpConfig.ConnectionPooler.User)
+			resources.OpConfig.ConnectionPooler.User)
 
 		return &v1.SecretKeySelector{
 			LocalObjectReference: v1.LocalObjectReference{
@@ -364,7 +363,7 @@ func (cp *ConnectionPoolerObjects) generateConnectionPoolerPodTemplate(spec *aci
 			Annotations: pooler_interface.pooler.pooler.generatePodAnnotations(spec),
 		},
 		Spec: v1.PodSpec{
-			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
+			ServiceAccountName:            resources.OpConfig.PodServiceAccountName,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers:                    []v1.Container{poolerContainer},
 			// TODO: add tolerations to scheduler pooler on the same node
@@ -376,7 +375,6 @@ func (cp *ConnectionPoolerObjects) generateConnectionPoolerPodTemplate(spec *aci
 	return podTemplate, nil
 }
 
-//TODO: How to use opconfig from cluster type
 func (cp *ConnectionPoolerObjects) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec, role PostgresRole) (
 	*appsv1.Deployment, error) {
 
@@ -394,7 +392,7 @@ func (cp *ConnectionPoolerObjects) generateConnectionPoolerDeployment(spec *acid
 	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
-			c.OpConfig.ConnectionPooler.NumberOfInstances,
+			resources.OpConfig.ConnectionPooler.NumberOfInstances,
 			k8sutil.Int32ToPointer(1))
 	}
 
@@ -537,7 +535,7 @@ func (cp *ConnectionPoolerObjects) deleteConnectionPooler(role PostgresRole) (er
 		cp.logger.Infof("Connection pooler service %q has been deleted", c.connectionPoolerName(role))
 	}
 	// Repeat the same for the secret object
-	secretName := pooler_interface.pooler.credentialSecretName(c.OpConfig.ConnectionPooler.User)
+	secretName := pooler_interface.pooler.credentialSecretName(resources.OpConfig.ConnectionPooler.User)
 
 	secret, err := c.KubeClient.
 		Secrets(cp.Namespace).
@@ -555,7 +553,6 @@ func (cp *ConnectionPoolerObjects) deleteConnectionPooler(role PostgresRole) (er
 	return nil
 }
 
-//TODO: use KubeClient from cluster package
 // Perform actual patching of a connection pooler deployment, assuming that all
 // the check were already done before.
 func (cp *ConnectionPoolerObjects) updateConnectionPoolerDeployment(oldDeploymentSpec, newDeployment *appsv1.Deployment, role PostgresRole) (*appsv1.Deployment, error) {
@@ -589,7 +586,6 @@ func (cp *ConnectionPoolerObjects) updateConnectionPoolerDeployment(oldDeploymen
 	return deployment, nil
 }
 
-//TODO use Kubeclient
 //updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
 func (cp *ConnectionPoolerObjects) updateConnectionPoolerAnnotations(annotations map[string]string, role PostgresRole) (*appsv1.Deployment, error) {
 	cp.logger.Debugf("updating connection pooler annotations")
@@ -637,7 +633,6 @@ func (cp *ConnectionPoolerObjects) needSyncConnectionPoolerSpecs(oldSpec, newSpe
 	return sync, reasons
 }
 
-//TODO use opConfig from cluster package
 // Check if we need to synchronize connection pooler deployment due to new
 // defaults, that are different from what we see in the DeploymentSpec
 func (cp *ConnectionPoolerObjects) needSyncConnectionPoolerDefaults(spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment) (sync bool, reasons []string) {
@@ -645,7 +640,7 @@ func (cp *ConnectionPoolerObjects) needSyncConnectionPoolerDefaults(spec *acidv1
 	reasons = []string{}
 	sync = false
 
-	config := c.OpConfig.ConnectionPooler
+	config := resources.OpConfig.ConnectionPooler
 	podTemplate := deployment.Spec.Template
 	poolerContainer := podTemplate.Spec.Containers[constants.ConnectionPoolerContainer]
 
@@ -712,11 +707,10 @@ func (cp *ConnectionPoolerObjects) needSyncConnectionPoolerDefaults(spec *acidv1
 	return sync, reasons
 }
 
-//TODO use OpConfig from cluster package
 // Generate default resource section for connection pooler deployment, to be
 // used if nothing custom is specified in the manifest
 func (cp ConnectionPoolerObjects) makeDefaultConnectionPoolerResources() acidv1.Resources {
-	config := c.OpConfig
+	config := resources.OpConfig
 
 	defaultRequests := acidv1.ResourceDescription{
 		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPURequest,
@@ -733,7 +727,6 @@ func (cp ConnectionPoolerObjects) makeDefaultConnectionPoolerResources() acidv1.
 	}
 }
 
-//TODO use opConfig
 func (cp *ConnectionPoolerObjects) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, lookup InstallFunction) (SyncReason, error) {
 
 	var reason SyncReason
@@ -778,11 +771,11 @@ func (cp *ConnectionPoolerObjects) syncConnectionPooler(oldSpec, newSpec *acidv1
 
 				schema := util.Coalesce(
 					specSchema,
-					c.OpConfig.ConnectionPooler.Schema)
+					resources.OpConfig.ConnectionPooler.Schema)
 
 				user := util.Coalesce(
 					specUser,
-					c.OpConfig.ConnectionPooler.User)
+					resources.OpConfig.ConnectionPooler.User)
 
 				if err = lookup(schema, user, role); err != nil {
 					return NoSync, err

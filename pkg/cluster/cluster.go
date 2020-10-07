@@ -18,7 +18,6 @@ import (
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
@@ -27,16 +26,14 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/connection_pooler"
 	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
+	"github.com/zalando/postgres-operator/pkg/resources"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	"github.com/zalando/postgres-operator/pkg/util/users"
-
-	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 var (
@@ -45,15 +42,6 @@ var (
 	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 	patroniObjectSuffixes = []string{"config", "failover", "sync"}
 )
-
-// Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
-type Config struct {
-	OpConfig                     config.Config
-	RestConfig                   *rest.Config
-	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
-	PodServiceAccount            *v1.ServiceAccount
-	PodServiceAccountRoleBinding *rbacv1.RoleBinding
-}
 
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
@@ -69,7 +57,7 @@ type kubeResources struct {
 type Cluster struct {
 	kubeResources
 	acidv1.Postgresql
-	Config
+	resources.Config
 	logger           *logrus.Entry
 	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
@@ -99,7 +87,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
+func New(cfg resources.Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
