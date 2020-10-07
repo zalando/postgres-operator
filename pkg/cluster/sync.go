@@ -332,18 +332,6 @@ func (c *Cluster) syncStatefulSet() error {
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
-		// check if there is no Postgres version mismatch
-		for _, container := range c.Statefulset.Spec.Template.Spec.Containers {
-			if container.Name != "postgres" {
-				continue
-			}
-			pgVersion, err := c.getNewPgVersion(container, c.Spec.PostgresqlParam.PgVersion)
-			if err != nil {
-				return fmt.Errorf("could not parse current Postgres version: %v", err)
-			}
-			c.Spec.PostgresqlParam.PgVersion = pgVersion
-		}
-
 		desiredSS, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)

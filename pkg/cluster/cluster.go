@@ -625,13 +625,16 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
-	if oldSpec.Spec.PostgresqlParam.PgVersion != newSpec.Spec.PostgresqlParam.PgVersion { // PG versions comparison
+	if oldSpec.Spec.PostgresqlParam.PgVersion >= newSpec.Spec.PostgresqlParam.PgVersion {
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "PostgreSQL", "postgresql version change(%q -> %q) has no effect",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
 		//we need that hack to generate statefulset with the old version
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	} else {
+		c.logger.Infof("postgresql version increased (%q -> %q), major version upgrade will start after StatefulSet Sync",
+			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
 	}
 
 	// Service
@@ -785,6 +788,18 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
 		updateFailed = true
+	}
+
+	// major version upgrade should run only when all changes to pods have completed
+	if oldSpec.Spec.PostgresqlParam.PgVersion < newSpec.Spec.PostgresqlParam.PgVersion {
+		c.logger.Infof("postgresql version increased (%q -> %q), triggering major version upgrade",
+			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "PostgreSQL", "postgresql version increased (%q -> %q), triggering major version upgrade",
+			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
+		if err := c.triggerMajorVersionUpgrade(&newSpec.Spec); err != nil {
+			c.logger.Errorf("major version upgrade failed: %v", err)
+			updateFailed = true
+		}
 	}
 
 	return nil
@@ -1499,4 +1514,15 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(
 	}
 
 	return sync, reasons
+}
+
+func (c *Cluster) triggerMajorVersionUpgrade(newSpec *acidv1.PostgresSpec) (err error) {
+	masterPod, err := c.getRolePods(Master)
+	if err != nil {
+		return fmt.Errorf("could not get master pod: %v", err)
+	}
+	masterNamespacedName := spec.NamespacedName{Namespace: masterPod[0].Namespace, Name: masterPod[0].Name}
+
+	_, err = c.ExecCommand(&masterNamespacedName, "python3", "/scripts/inplace_upgrade.py ", fmt.Sprintf("%d", c.getNumberOfInstances(newSpec)))
+	return err
 }
