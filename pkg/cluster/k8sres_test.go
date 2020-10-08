@@ -557,7 +557,7 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 	}
 }
 
-func TestGetPgVersion(t *testing.T) {
+func GetPgVersion(t *testing.T) {
 	testName := "TestGetPgVersion"
 	tests := []struct {
 		subTest          string

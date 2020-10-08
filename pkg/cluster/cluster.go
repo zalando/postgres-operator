@@ -1523,6 +1523,6 @@ func (c *Cluster) triggerMajorVersionUpgrade(newSpec *acidv1.PostgresSpec) (err 
 	}
 	masterNamespacedName := spec.NamespacedName{Namespace: masterPod[0].Namespace, Name: masterPod[0].Name}
 
-	_, err = c.ExecCommand(&masterNamespacedName, "python3", "/scripts/inplace_upgrade.py ", fmt.Sprintf("%d", c.getNumberOfInstances(newSpec)))
+	_, err = c.ExecCommand(&masterNamespacedName, "python3", "/scripts/inplace_upgrade.py", fmt.Sprintf("%d", c.getNumberOfInstances(newSpec)))
 	return err
 }
