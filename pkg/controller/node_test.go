@@ -63,3 +63,36 @@ func TestNodeIsReady(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeIsReadyWithoutReadyLabel(t *testing.T) {
+	testName := "TestNodeIsReady"
+	var testTable = []struct {
+		in  *v1.Node
+		out bool
+	}{
+		{
+			in:  makeNode(map[string]string{"foo": "bar"}, true),
+			out: true,
+		},
+		{
+			in:  makeNode(map[string]string{"foo": "bar"}, false),
+			out: false,
+		},
+		{
+			in:  makeNode(map[string]string{readyLabel: readyValue}, false),
+			out: false,
+		},
+		{
+			in:  makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
+			out: true,
+		},
+	}
+	nodeTestController.opConfig.NodeReadinessLabel = map[string]string{}
+
+	for _, tt := range testTable {
+		if isReady := nodeTestController.nodeIsReady(tt.in); isReady != tt.out {
+			t.Errorf("%s: expected response %t doesn't match the actual %t for the node %#v",
+				testName, tt.out, isReady, tt.in)
+		}
+	}
+}

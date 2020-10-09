@@ -76,7 +76,7 @@ func (c *Controller) nodeUpdate(prev, cur interface{}) {
 }
 
 func (c *Controller) nodeIsReady(node *v1.Node) bool {
-	return (!node.Spec.Unschedulable || util.MapContains(node.Labels, c.opConfig.NodeReadinessLabel) ||
+	return (!node.Spec.Unschedulable || (len(c.opConfig.NodeReadinessLabel) > 0 && util.MapContains(node.Labels, c.opConfig.NodeReadinessLabel)) ||
 		util.MapContains(node.Labels, map[string]string{"master": "true"}))
 }
 
