@@ -864,6 +864,31 @@ func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) 
 	return nil
 }
 
+func testNodeAffinity(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+	required := &v1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				v1.NodeSelectorTerm{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						v1.NodeSelectorRequirement{
+							Key:      "test-label",
+							Operator: v1.NodeSelectorOpIn,
+							Values: []string{
+								"test-value",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(podSpec.Spec.Affinity.NodeAffinity, required) {
+		return fmt.Errorf("Pod spec nodeAffinity is incorrect. %+v", podSpec.Spec.Affinity.NodeAffinity)
+	}
+	return nil
+}
+
 func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	if podSpec.ObjectMeta.Name != "test-pod-template" {
 		return fmt.Errorf("Custom pod template is not used, current spec %+v",
