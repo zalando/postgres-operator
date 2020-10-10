@@ -150,23 +150,62 @@ user. There are two ways to define them:
 
 #### Infrastructure roles secret
 
-The infrastructure roles secret is specified by the `infrastructure_roles_secret_name`
-parameter. The role definition looks like this (values are base64 encoded):
+Infrastructure roles can be specified by the `infrastructure_roles_secrets`
+parameter where you can reference multiple existing secrets. Prior to `v1.6.0`
+the operator could only reference one secret with the
+`infrastructure_roles_secret_name` option. However, this secret could contain
+multiple roles using the same set of keys plus incrementing index.
 
 ```yaml
-user1: ZGJ1c2Vy
-password1: c2VjcmV0
-inrole1: b3BlcmF0b3I=
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-infrastructure-roles
+data:
+  user1: ZGJ1c2Vy
+  password1: c2VjcmV0
+  inrole1: b3BlcmF0b3I=
+  user2: ...
 ```
 
 The block above describes the infrastructure role 'dbuser' with password
-'secret' that is a member of the 'operator' role. For the following definitions
-one must increase the index, i.e. the next role will be defined as 'user2' and
-so on. The resulting role will automatically be a login role.
+'secret' that is a member of the 'operator' role. The resulting role will
+automatically be a login role.
 
-Note that with definitions that solely use the infrastructure roles secret
-there is no way to specify role options (like superuser or nologin) or role
-memberships. This is where the ConfigMap comes into play.
+With the new option users can configure the names of secret keys that contain
+the user name, password etc. The secret itself is referenced by the
+`secretname` key. If the secret uses a template for multiple roles as described
+above list them separately.
+
+```yaml
+apiVersion: v1
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    infrastructure_roles_secrets:
+    - secretname: "postgresql-infrastructure-roles"
+      userkey: "user1"
+      passwordkey: "password1"
+      rolekey: "inrole1"
+    - secretname: "postgresql-infrastructure-roles"
+      userkey: "user2"
+      ...
+```
+
+Note, only the CRD-based configuration allows for referencing multiple secrets.
+As of now, the ConfigMap is restricted to either one or the existing template
+option with `infrastructure_roles_secret_name`. Please, refer to the example
+manifests to understand how `infrastructure_roles_secrets` has to be configured
+for the [configmap](../manifests/configmap.yaml) or [CRD configuration](../manifests/postgresql-operator-default-configuration.yaml).
+
+If both `infrastructure_roles_secret_name` and `infrastructure_roles_secrets`
+are defined the operator will create roles for both of them. So make sure,
+they do not collide. Note also, that with definitions that solely use the
+infrastructure roles secret there is no way to specify role options (like
+superuser or nologin) or role memberships. This is where the additional
+ConfigMap comes into play.
 
 #### Secret plus ConfigMap
 

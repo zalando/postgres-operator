@@ -519,6 +519,12 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"spiloRunAsUser": {
+						Type: "integer",
+					},
+					"spiloRunAsGroup": {
+						Type: "integer",
+					},
 					"spiloFSGroup": {
 						Type: "integer",
 					},
@@ -888,6 +894,12 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 									},
 								},
 							},
+							"delete_annotation_date_key": {
+								Type: "string",
+							},
+							"delete_annotation_name_key": {
+								Type: "string",
+							},
 							"downscaler_annotations": {
 								Type: "array",
 								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
@@ -910,6 +922,41 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 							"infrastructure_roles_secret_name": {
 								Type: "string",
+							},
+							"infrastructure_roles_secrets": {
+								Type: "array",
+								Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1beta1.JSONSchemaProps{
+										Type:     "object",
+										Required: []string{"secretname", "userkey", "passwordkey"},
+										Properties: map[string]apiextv1beta1.JSONSchemaProps{
+											"secretname": {
+												Type: "string",
+											},
+											"userkey": {
+												Type: "string",
+											},
+											"passwordkey": {
+												Type: "string",
+											},
+											"rolekey": {
+												Type: "string",
+											},
+											"defaultuservalue": {
+												Type: "string",
+											},
+											"defaultrolevalue": {
+												Type: "string",
+											},
+											"details": {
+												Type: "string",
+											},
+											"template": {
+												Type: "boolean",
+											},
+										},
+									},
+								},
 							},
 							"inherited_labels": {
 								Type: "array",
@@ -940,6 +987,9 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 								Type: "string",
 							},
 							"pod_environment_configmap": {
+								Type: "string",
+							},
+							"pod_environment_secret": {
 								Type: "string",
 							},
 							"pod_management_policy": {
@@ -974,11 +1024,31 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"secret_name_template": {
 								Type: "string",
 							},
+							"spilo_runasuser": {
+								Type: "integer",
+							},
+							"spilo_runasgroup": {
+								Type: "integer",
+							},
 							"spilo_fsgroup": {
 								Type: "integer",
 							},
 							"spilo_privileged": {
 								Type: "boolean",
+							},
+							"storage_resize_mode": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"ebs"`),
+									},
+									{
+										Raw: []byte(`"pvc"`),
+									},
+									{
+										Raw: []byte(`"off"`),
+									},
+								},
 							},
 							"toleration": {
 								Type: "object",
@@ -1064,6 +1134,17 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							},
 							"enable_replica_load_balancer": {
 								Type: "boolean",
+							},
+							"external_traffic_policy": {
+								Type: "string",
+								Enum: []apiextv1beta1.JSON{
+									{
+										Raw: []byte(`"Cluster"`),
+									},
+									{
+										Raw: []byte(`"Local"`),
+									},
+								},
 							},
 							"master_dns_name_format": {
 								Type: "string",

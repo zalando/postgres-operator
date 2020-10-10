@@ -113,6 +113,10 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+                delete_annotation_date_key:
+                  type: string
+                delete_annotation_name_key:
+                  type: string
                 downscaler_annotations:
                   type: array
                   items:
@@ -127,6 +131,32 @@ spec:
                   type: boolean
                 infrastructure_roles_secret_name:
                   type: string
+                infrastructure_roles_secrets:
+                  type: array
+                  nullable: true
+                  items:
+                    type: object
+                    required:
+                      - secretname
+                      - userkey
+                      - passwordkey
+                    properties:
+                      secretname:
+                        type: string
+                      userkey:
+                        type: string
+                      passwordkey:
+                        type: string
+                      rolekey:
+                        type: string
+                      defaultuservalue:
+                        type: string
+                      defaultrolevalue:
+                        type: string
+                      details:
+                        type: string
+                      template:
+                        type: boolean
                 inherited_labels:
                   type: array
                   items:
@@ -144,6 +174,8 @@ spec:
                 pod_antiaffinity_topology_key:
                   type: string
                 pod_environment_configmap:
+                  type: string
+                pod_environment_secret:
                   type: string
                 pod_management_policy:
                   type: string
@@ -164,10 +196,20 @@ spec:
                   type: string
                 secret_name_template:
                   type: string
+                spilo_runasuser:
+                  type: integer
+                spilo_runasgroup:
+                  type: integer
                 spilo_fsgroup:
                   type: integer
                 spilo_privileged:
                   type: boolean
+                storage_resize_mode:
+                  type: string
+                  enum:
+                    - "ebs"
+                    - "pvc"
+                    - "off"
                 toleration:
                   type: object
                   additionalProperties:
@@ -223,6 +265,11 @@ spec:
                   type: boolean
                 enable_replica_load_balancer:
                   type: boolean
+                external_traffic_policy:
+                  type: string
+                  enum:
+                    - "Cluster"
+                    - "Local"
                 master_dns_name_format:
                   type: string
                 replica_dns_name_format:

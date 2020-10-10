@@ -79,7 +79,7 @@ scm-source.json: .git
 
 tools:
 	GO111MODULE=on go get -u honnef.co/go/tools/cmd/staticcheck
-	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.16.3
+	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.18.8
 	GO111MODULE=on go mod tidy
 
 fmt:
@@ -97,4 +97,4 @@ test:
 	GO111MODULE=on go test ./...
 
 e2e: docker # build operator image to be tested
-	cd e2e; make tools e2etest clean
+	cd e2e; make e2etest

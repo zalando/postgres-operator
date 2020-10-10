@@ -35,7 +35,9 @@ type PostgresSpec struct {
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
 
-	SpiloFSGroup *int64 `json:"spiloFSGroup,omitempty"`
+	SpiloRunAsUser  *int64 `json:"spiloRunAsUser,omitempty"`
+	SpiloRunAsGroup *int64 `json:"spiloRunAsGroup,omitempty"`
+	SpiloFSGroup    *int64 `json:"spiloFSGroup,omitempty"`
 
 	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
 	// in that case the var evaluates to nil and the value is taken from the operator config
@@ -53,7 +55,7 @@ type PostgresSpec struct {
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
 	Users                 map[string]UserFlags        `json:"users"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                 CloneDescription            `json:"clone"`
+	Clone                 *CloneDescription           `json:"clone,omitempty"`
 	ClusterName           string                      `json:"-"`
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
@@ -64,10 +66,10 @@ type PostgresSpec struct {
 	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription         `json:"standby"`
-	PodAnnotations        map[string]string           `json:"podAnnotations"`
-	ServiceAnnotations    map[string]string           `json:"serviceAnnotations"`
-	TLS                   *TLSDescription             `json:"tls"`
+	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
+	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
+	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
+	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 
 	// deprecated json tags

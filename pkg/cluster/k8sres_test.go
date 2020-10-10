@@ -1,15 +1,18 @@
 package cluster
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -22,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 // For testing purposes
@@ -116,17 +120,17 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	expectedValuesGSBucket := []ExpectedValue{
 		ExpectedValue{
-			envIndex:       14,
+			envIndex:       15,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
 		ExpectedValue{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
 		ExpectedValue{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
@@ -134,22 +138,22 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	expectedValuesGCPCreds := []ExpectedValue{
 		ExpectedValue{
-			envIndex:       14,
+			envIndex:       15,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
 		ExpectedValue{
-			envIndex:       15,
+			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
 		ExpectedValue{
-			envIndex:       16,
+			envIndex:       17,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 		ExpectedValue{
-			envIndex:       17,
+			envIndex:       18,
 			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
 			envVarValue:    "some_path_to_credentials",
 		},
@@ -713,6 +717,218 @@ func TestSecretVolume(t *testing.T) {
 	}
 }
 
+const (
+	testPodEnvironmentConfigMapName = "pod_env_cm"
+	testPodEnvironmentSecretName    = "pod_env_sc"
+)
+
+type mockSecret struct {
+	v1core.SecretInterface
+}
+
+type mockConfigMap struct {
+	v1core.ConfigMapInterface
+}
+
+func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
+	if name != testPodEnvironmentSecretName {
+		return nil, fmt.Errorf("Secret PodEnvironmentSecret not found")
+	}
+	secret := &v1.Secret{}
+	secret.Name = testPodEnvironmentSecretName
+	secret.Data = map[string][]byte{
+		"minio_access_key": []byte("alpha"),
+		"minio_secret_key": []byte("beta"),
+	}
+	return secret, nil
+}
+
+func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
+	if name != testPodEnvironmentConfigMapName {
+		return nil, fmt.Errorf("NotFound")
+	}
+	configmap := &v1.ConfigMap{}
+	configmap.Name = testPodEnvironmentConfigMapName
+	configmap.Data = map[string]string{
+		"foo1": "bar1",
+		"foo2": "bar2",
+	}
+	return configmap, nil
+}
+
+type MockSecretGetter struct {
+}
+
+type MockConfigMapsGetter struct {
+}
+
+func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
+	return &mockSecret{}
+}
+
+func (c *MockConfigMapsGetter) ConfigMaps(namespace string) v1core.ConfigMapInterface {
+	return &mockConfigMap{}
+}
+
+func newMockKubernetesClient() k8sutil.KubernetesClient {
+	return k8sutil.KubernetesClient{
+		SecretsGetter:    &MockSecretGetter{},
+		ConfigMapsGetter: &MockConfigMapsGetter{},
+	}
+}
+func newMockCluster(opConfig config.Config) *Cluster {
+	cluster := &Cluster{
+		Config:     Config{OpConfig: opConfig},
+		KubeClient: newMockKubernetesClient(),
+	}
+	return cluster
+}
+
+func TestPodEnvironmentConfigMapVariables(t *testing.T) {
+	testName := "TestPodEnvironmentConfigMapVariables"
+	tests := []struct {
+		subTest  string
+		opConfig config.Config
+		envVars  []v1.EnvVar
+		err      error
+	}{
+		{
+			subTest: "no PodEnvironmentConfigMap",
+			envVars: []v1.EnvVar{},
+		},
+		{
+			subTest: "missing PodEnvironmentConfigMap",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentConfigMap: spec.NamespacedName{
+						Name: "idonotexist",
+					},
+				},
+			},
+			err: fmt.Errorf("could not read PodEnvironmentConfigMap: NotFound"),
+		},
+		{
+			subTest: "simple PodEnvironmentConfigMap",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentConfigMap: spec.NamespacedName{
+						Name: testPodEnvironmentConfigMapName,
+					},
+				},
+			},
+			envVars: []v1.EnvVar{
+				{
+					Name:  "foo1",
+					Value: "bar1",
+				},
+				{
+					Name:  "foo2",
+					Value: "bar2",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		vars, err := c.getPodEnvironmentConfigMapVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+		if !reflect.DeepEqual(vars, tt.envVars) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.envVars, vars)
+		}
+		if tt.err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s %s: expected error `%v` but got `%v`",
+					testName, tt.subTest, tt.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s %s: expected no error but got error: `%v`",
+					testName, tt.subTest, err)
+			}
+		}
+	}
+}
+
+// Test if the keys of an existing secret are properly referenced
+func TestPodEnvironmentSecretVariables(t *testing.T) {
+	testName := "TestPodEnvironmentSecretVariables"
+	tests := []struct {
+		subTest  string
+		opConfig config.Config
+		envVars  []v1.EnvVar
+		err      error
+	}{
+		{
+			subTest: "No PodEnvironmentSecret configured",
+			envVars: []v1.EnvVar{},
+		},
+		{
+			subTest: "Secret referenced by PodEnvironmentSecret does not exist",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentSecret: "idonotexist",
+				},
+			},
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret not found"),
+		},
+		{
+			subTest: "Pod environment vars reference all keys from secret configured by PodEnvironmentSecret",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentSecret: testPodEnvironmentSecretName,
+				},
+			},
+			envVars: []v1.EnvVar{
+				{
+					Name: "minio_access_key",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "minio_access_key",
+						},
+					},
+				},
+				{
+					Name: "minio_secret_key",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "minio_secret_key",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		vars, err := c.getPodEnvironmentSecretVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+		if !reflect.DeepEqual(vars, tt.envVars) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.envVars, vars)
+		}
+		if tt.err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s %s: expected error `%v` but got `%v`",
+					testName, tt.subTest, tt.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s %s: expected no error but got error: `%v`",
+					testName, tt.subTest, err)
+			}
+		}
+	}
+
+}
+
 func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
 	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
@@ -1086,6 +1302,8 @@ func TestTLS(t *testing.T) {
 	var err error
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
 	var spiloFSGroup = int64(103)
 	var additionalVolumes = spec.AdditionalVolumes
 
@@ -1113,7 +1331,9 @@ func TestTLS(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				Resources: config.Resources{
-					SpiloFSGroup: &spiloFSGroup,
+					SpiloRunAsUser:  &spiloRunAsUser,
+					SpiloRunAsGroup: &spiloRunAsGroup,
+					SpiloFSGroup:    &spiloFSGroup,
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
@@ -1524,5 +1744,85 @@ func TestSidecars(t *testing.T) {
 		Env:             scalyrEnv,
 		VolumeMounts:    mounts,
 	})
+
+}
+
+func TestGenerateService(t *testing.T) {
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+	var enableLB bool = true
+	spec = acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+		Sidecars: []acidv1.Sidecar{
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar",
+			},
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar-with-resources",
+				Resources: acidv1.Resources{
+					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
+					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
+				},
+			},
+			acidv1.Sidecar{
+				Name:        "replace-sidecar",
+				DockerImage: "overwrite-image",
+			},
+		},
+		EnableMasterLoadBalancer: &enableLB,
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					DefaultCPURequest:    "200m",
+					DefaultCPULimit:      "500m",
+					DefaultMemoryRequest: "0.7Gi",
+					DefaultMemoryLimit:   "1.3Gi",
+				},
+				SidecarImages: map[string]string{
+					"deprecated-global-sidecar": "image:123",
+				},
+				SidecarContainers: []v1.Container{
+					v1.Container{
+						Name: "global-sidecar",
+					},
+					// will be replaced by a cluster specific sidecar with the same name
+					v1.Container{
+						Name:  "replace-sidecar",
+						Image: "replaced-image",
+					},
+				},
+				Scalyr: config.Scalyr{
+					ScalyrAPIKey:        "abc",
+					ScalyrImage:         "scalyr-image",
+					ScalyrCPURequest:    "220m",
+					ScalyrCPULimit:      "520m",
+					ScalyrMemoryRequest: "0.9Gi",
+					// ise default memory limit
+				},
+				ExternalTrafficPolicy: "Cluster",
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	service := cluster.generateService(Master, &spec)
+	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeCluster, service.Spec.ExternalTrafficPolicy)
+	cluster.OpConfig.ExternalTrafficPolicy = "Local"
+	service = cluster.generateService(Master, &spec)
+	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
 
 }

@@ -124,6 +124,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
 	})
+	password_encryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
+	if !ok {
+		password_encryption = "md5"
+	}
 
 	cluster := &Cluster{
 		Config:         cfg,
@@ -135,7 +139,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy: users.DefaultUserSyncStrategy{},
+		userSyncStrategy: users.DefaultUserSyncStrategy{password_encryption},
 		deleteOptions:    metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
@@ -453,6 +457,15 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 			needsReplace = true
 			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q doesn't match the current one", name))
 		}
+	}
+
+	// we assume any change in priority happens by rolling out a new priority class
+	// changing the priority value in an existing class is not supproted
+	if c.Statefulset.Spec.Template.Spec.PriorityClassName != statefulSet.Spec.Template.Spec.PriorityClassName {
+		match = false
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod priority class in spec doesn't match the current one")
 	}
 
 	// lazy Spilo update: modify the image in the statefulset itself but let its pods run with the old image
@@ -797,10 +810,8 @@ func (c *Cluster) Delete() {
 		c.logger.Warningf("could not delete statefulset: %v", err)
 	}
 
-	for _, obj := range c.Secrets {
-		if err := c.deleteSecret(obj); err != nil {
-			c.logger.Warningf("could not delete secret: %v", err)
-		}
+	if err := c.deleteSecrets(); err != nil {
+		c.logger.Warningf("could not delete secrets: %v", err)
 	}
 
 	if err := c.deletePodDisruptionBudget(); err != nil {
@@ -957,32 +968,42 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 	}
 
 	for preparedDbName, preparedDB := range c.Spec.PreparedDatabases {
+		// get list of prepared schemas to set in search_path
+		preparedSchemas := preparedDB.PreparedSchemas
+		if len(preparedDB.PreparedSchemas) == 0 {
+			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
+		}
+
+		var searchPath strings.Builder
+		searchPath.WriteString(constants.DefaultSearchPath)
+		for preparedSchemaName := range preparedSchemas {
+			searchPath.WriteString(", " + preparedSchemaName)
+		}
+
 		// default roles per database
-		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName); err != nil {
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String()); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
 		if preparedDB.DefaultUsers {
-			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName); err != nil {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String()); err != nil {
 				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 			}
 		}
 
 		// default roles per database schema
-		preparedSchemas := preparedDB.PreparedSchemas
-		if len(preparedDB.PreparedSchemas) == 0 {
-			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
-		}
 		for preparedSchemaName, preparedSchema := range preparedSchemas {
 			if preparedSchema.DefaultRoles == nil || *preparedSchema.DefaultRoles {
 				if err := c.initDefaultRoles(defaultRoles,
 					preparedDbName+constants.OwnerRoleNameSuffix,
-					preparedDbName+"_"+preparedSchemaName); err != nil {
+					preparedDbName+"_"+preparedSchemaName,
+					constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
 					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
 				}
 				if preparedSchema.DefaultUsers {
 					if err := c.initDefaultRoles(defaultUsers,
 						preparedDbName+constants.OwnerRoleNameSuffix,
-						preparedDbName+"_"+preparedSchemaName); err != nil {
+						preparedDbName+"_"+preparedSchemaName,
+						constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
 						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
 					}
 				}
@@ -992,7 +1013,7 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 	return nil
 }
 
-func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string) error {
+func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string, searchPath string) error {
 
 	for defaultRole, inherits := range defaultRoles {
 
@@ -1016,12 +1037,13 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		}
 
 		newRole := spec.PgUser{
-			Origin:    spec.RoleOriginBootstrap,
-			Name:      roleName,
-			Password:  util.RandomPassword(constants.PasswordLength),
-			Flags:     flags,
-			MemberOf:  memberOf,
-			AdminRole: adminRole,
+			Origin:     spec.RoleOriginBootstrap,
+			Name:       roleName,
+			Password:   util.RandomPassword(constants.PasswordLength),
+			Flags:      flags,
+			MemberOf:   memberOf,
+			Parameters: map[string]string{"search_path": searchPath},
+			AdminRole:  adminRole,
 		}
 		if currentRole, present := c.pgUsers[roleName]; present {
 			c.pgUsers[roleName] = c.resolveNameConflict(&currentRole, &newRole)

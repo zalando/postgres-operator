@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -70,6 +71,9 @@ type Controller struct {
 // NewController creates a new controller
 func NewController(controllerConfig *spec.ControllerConfig, controllerId string) *Controller {
 	logger := logrus.New()
+	if controllerConfig.EnableJsonLogging {
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	}
 
 	var myComponentName = "postgres-operator"
 	if controllerId != "" {
@@ -300,7 +304,8 @@ func (c *Controller) initController() {
 
 	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
 
-	if infraRoles, err := c.getInfrastructureRoles(&c.opConfig.InfrastructureRolesSecretName); err != nil {
+	roleDefs := c.getInfrastructureRoleDefinitions()
+	if infraRoles, err := c.getInfrastructureRoles(roleDefs); err != nil {
 		c.logger.Warningf("could not get infrastructure roles: %v", err)
 	} else {
 		c.config.InfrastructureRoles = infraRoles
@@ -451,6 +456,37 @@ func (c *Controller) GetReference(postgresql *acidv1.Postgresql) *v1.ObjectRefer
 		c.logger.Errorf("could not get reference for Postgresql CR %v/%v: %v", postgresql.Namespace, postgresql.Name, err)
 	}
 	return ref
+}
+
+func (c *Controller) meetsClusterDeleteAnnotations(postgresql *acidv1.Postgresql) error {
+
+	deleteAnnotationDateKey := c.opConfig.DeleteAnnotationDateKey
+	currentTime := time.Now()
+	currentDate := currentTime.Format("2006-01-02") // go's reference date
+
+	if deleteAnnotationDateKey != "" {
+		if deleteDate, ok := postgresql.Annotations[deleteAnnotationDateKey]; ok {
+			if deleteDate != currentDate {
+				return fmt.Errorf("annotation %s not matching the current date: got %s, expected %s", deleteAnnotationDateKey, deleteDate, currentDate)
+			}
+		} else {
+			return fmt.Errorf("annotation %s not set in manifest to allow cluster deletion", deleteAnnotationDateKey)
+		}
+	}
+
+	deleteAnnotationNameKey := c.opConfig.DeleteAnnotationNameKey
+
+	if deleteAnnotationNameKey != "" {
+		if clusterName, ok := postgresql.Annotations[deleteAnnotationNameKey]; ok {
+			if clusterName != postgresql.Name {
+				return fmt.Errorf("annotation %s not matching the cluster name: got %s, expected %s", deleteAnnotationNameKey, clusterName, postgresql.Name)
+			}
+		} else {
+			return fmt.Errorf("annotation %s not set in manifest to allow cluster deletion", deleteAnnotationNameKey)
+		}
+	}
+
+	return nil
 }
 
 // hasOwnership returns true if the controller is the "owner" of the postgresql.

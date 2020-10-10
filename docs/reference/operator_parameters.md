@@ -200,6 +200,16 @@ configuration they are grouped under the `kubernetes` key.
   of a database created by the operator. If the annotation key is also provided
   by the database definition, the database definition value is used.
 
+* **delete_annotation_date_key**
+  key name for annotation that compares manifest value with current date in the
+  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
+  The default is empty which also disables this delete protection check.
+
+* **delete_annotation_name_key**
+  key name for annotation that compares manifest value with Postgres cluster name.
+  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
+  empty which also disables this delete protection check.
+
 * **downscaler_annotations**
   An array of annotations that should be passed from Postgres CRD on to the
   statefulset and, if exists, to the connection pooler deployment as well.
@@ -252,8 +262,14 @@ configuration they are grouped under the `kubernetes` key.
   teams API. The default is `postgresql-operator`.
 
 * **infrastructure_roles_secret_name**
-  namespaced name of the secret containing infrastructure roles names and
-  passwords.
+  *deprecated*: namespaced name of the secret containing infrastructure roles
+  with user names, passwords and role membership.
+
+* **infrastructure_roles_secrets**
+  array of infrastructure role definitions which reference existing secrets
+  and specify the key names from which user name, password and role membership
+  are extracted. For the ConfigMap this has to be a string which allows
+  referencing only one infrastructure roles secret. The default is empty.
 
 * **pod_role_label**
   name of the label assigned to the Postgres pods (and services/endpoints) by
@@ -301,6 +317,16 @@ configuration they are grouped under the `kubernetes` key.
   that should be assigned to the Postgres pods. The priority class itself must
   be defined in advance. Default is empty (use the default priority class).
 
+* **spilo_runasuser**
+  sets the user ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
+* **spilo_runasgroup**
+  sets the group ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
 * **spilo_fsgroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This is required to run Spilo as a
@@ -332,6 +358,12 @@ configuration they are grouped under the `kubernetes` key.
   specify the [pod management policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-management-policies)
   of stateful sets of PG clusters. The default is `ordered_ready`, the second
   possible value is `parallel`.
+
+* **storage_resize_mode**
+  defines how operator handels the difference between requested volume size and
+  actual size. Available options are: ebs - tries to resize EBS volume, pvc -
+  changes PVC definition, off - disables resize of the volumes. Default is "ebs".
+  When using OpenShift please use one of the other available options.
 
 ## Kubernetes resource requests
 
@@ -402,6 +434,12 @@ CRD-based configuration.
 Those options affect the behavior of load balancers created by the operator.
 In the CRD-based configuration they are grouped under the `load_balancer` key.
 
+* **custom_service_annotations**
+  This key/value map provides a list of annotations that get attached to each
+  service of a cluster created by the operator. If the annotation key is also
+  provided by the cluster definition, the manifest value is used.
+  Optional.
+
 * **db_hosted_zone**
   DNS zone for the cluster DNS name when the load balancer is configured for
   the cluster. Only used when combined with
@@ -418,11 +456,8 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   cluster.  Can be overridden by individual cluster settings. The default is
   `false`.
 
-* **custom_service_annotations**
-  This key/value map provides a list of annotations that get attached to each
-  service of a cluster created by the operator. If the annotation key is also
-  provided by the cluster definition, the manifest value is used.
-  Optional.
+* **external_traffic_policy** defines external traffic policy for load
+  balancers. Allowed values are `Cluster` (default) and `Local`.
 
 * **master_dns_name_format** defines the DNS name string template for the
   master load balancer cluster.  The default is
