@@ -24,6 +24,14 @@ SOFTWARE.
 
 package v1
 
+// PostgresTeamListerExpansion allows custom methods to be added to
+// PostgresTeamLister.
+type PostgresTeamListerExpansion interface{}
+
+// PostgresTeamNamespaceListerExpansion allows custom methods to be added to
+// PostgresTeamNamespaceLister.
+type PostgresTeamNamespaceListerExpansion interface{}
+
 // PostgresqlListerExpansion allows custom methods to be added to
 // PostgresqlLister.
 type PostgresqlListerExpansion interface{}

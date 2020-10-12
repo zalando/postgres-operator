@@ -14,6 +14,7 @@ import (
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/cluster"
+	"github.com/zalando/postgres-operator/pkg/postgresteams"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
@@ -392,6 +393,26 @@ func (c *Controller) getInfrastructureRole(
 
 	// TODO: check for role collisions
 	return roles, nil
+}
+
+func (c *Controller) loadPostgresTeams(obj interface{}) {
+	var pgTeamMap postgresteams.PostgresTeamMap
+
+	pgTeam, ok := obj.(*acidv1.PostgresTeam)
+	if !ok {
+		c.logger.Errorf("could not cast to PostgresTeam spec")
+	}
+
+	pgTeams, err := c.KubeClient.AcidV1ClientSet.AcidV1().PostgresTeams(pgTeam.Namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		c.logger.Errorf("could not list postgres team objects: %v", err)
+	}
+
+	pgTeamMap.Load(pgTeams)
+}
+
+func (c *Controller) updatePostgresTeams(prev, obj interface{}) {
+	c.loadPostgresTeams(obj)
 }
 
 func (c *Controller) podClusterName(pod *v1.Pod) spec.NamespacedName {

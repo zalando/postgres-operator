@@ -1,0 +1,63 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: postgresteams.acid.zalan.do
+spec:
+  group: acid.zalan.do
+  names:
+    kind: PostgresTeam
+    listKind: PostgresTeamList
+    plural: postgresteams
+    singular: postgresteam
+    shortNames:
+    - pgteam
+  scope: Namespaced
+  subresources:
+    status: {}
+  version: v1
+  validation:
+    openAPIV3Schema:
+      type: object
+      required:
+        - kind
+        - apiVersion
+        - spec
+      properties:
+        kind:
+          type: string
+          enum:
+            - postgresteam
+        apiVersion:
+          type: string
+          enum:
+            - acid.zalan.do/v1
+        spec:
+          type: object
+          properties:
+            additionalAdminTeams:
+              type: object
+              description: "Map for teamId and associted additional admin teams"
+              additionalProperties:
+                type: array
+                nullable: true
+                description: "List of teams to become Postgres admins"
+                items:
+                  type: string
+            additionalTeams:
+              type: object
+              description: "Map for teamId and associted additional teams"
+              additionalProperties:
+                type: array
+                nullable: true
+                description: "List of teams whose members will also be added to the Postgres cluster"
+                items:
+                  type: string
+            additionalUsers:
+              type: object
+              description: "Map for teamId and associted additional users"
+              additionalProperties:
+                type: array
+                nullable: true
+                description: "List of users who will also be added to the Postgres cluster"
+                items:
+                  type: string

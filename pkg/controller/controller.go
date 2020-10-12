@@ -12,6 +12,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/apiserver"
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/postgresteams"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
@@ -31,8 +32,9 @@ import (
 
 // Controller represents operator controller
 type Controller struct {
-	config   spec.ControllerConfig
-	opConfig *config.Config
+	config    spec.ControllerConfig
+	opConfig  *config.Config
+	pgTeamMap *postgresteams.PostgresTeamMap
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
@@ -53,10 +55,11 @@ type Controller struct {
 	clusterHistory   map[spec.NamespacedName]ringlog.RingLogger // history of the cluster changes
 	teamClusters     map[string][]spec.NamespacedName
 
-	postgresqlInformer cache.SharedIndexInformer
-	podInformer        cache.SharedIndexInformer
-	nodesInformer      cache.SharedIndexInformer
-	podCh              chan cluster.PodEvent
+	postgresqlInformer   cache.SharedIndexInformer
+	postgresTeamInformer cache.SharedIndexInformer
+	podInformer          cache.SharedIndexInformer
+	nodesInformer        cache.SharedIndexInformer
+	podCh                chan cluster.PodEvent
 
 	clusterEventQueues    []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime   int64
@@ -338,6 +341,17 @@ func (c *Controller) initSharedInformers() {
 		DeleteFunc: c.postgresqlDelete,
 	})
 
+	c.postgresTeamInformer = acidv1informer.NewPostgresTeamInformer(
+		c.KubeClient.AcidV1ClientSet,
+		c.opConfig.WatchedNamespace,
+		constants.QueueResyncPeriodTPR,
+		cache.Indexers{})
+
+	c.postgresTeamInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.loadPostgresTeams,
+		UpdateFunc: c.updatePostgresTeams,
+	})
+
 	// Pods
 	podLw := &cache.ListWatch{
 		ListFunc:  c.podListFunc,
@@ -394,6 +408,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	wg.Add(5)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
+	go c.runPostgresTeamInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
 	go c.apiserver.Run(stopCh, wg)
 	go c.kubeNodesInformer(stopCh, wg)
@@ -411,6 +426,12 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 	defer wg.Done()
 
 	c.postgresqlInformer.Run(stopCh)
+}
+
+func (c *Controller) runPostgresTeamInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	c.postgresTeamInformer.Run(stopCh)
 }
 
 func queueClusterKey(eventType EventType, uid types.UID) string {
