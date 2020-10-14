@@ -294,7 +294,6 @@ PatroniInitDBParams:
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
-	config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
 	if len(pg.Parameters) > 0 {
 		local, bootstrap := getLocalAndBoostrapPostgreSQLParameters(pg.Parameters)
 
@@ -649,6 +648,10 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		{
 			Name:  "PGROOT",
 			Value: constants.PostgresDataPath,
+		},
+		{
+			Name:  "PGVERSION",
+			Value: c.Spec.PgVersion,
 		},
 		{
 			Name: "POD_IP",
