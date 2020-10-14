@@ -916,10 +916,20 @@ func (c *Cluster) getNewPgVersion(container v1.Container, newPgVersion string) (
 	var (
 		spiloConfiguration spiloConfiguration
 		runningPgVersion   string
+		version            string
 		err                error
 	)
 
 	for _, env := range container.Env {
+
+		if env.Name == "PGVERSION" {
+			err = json.Unmarshal([]byte(env.Value), &version)
+			if err != nil {
+				return newPgVersion, err
+			}
+			return version, nil
+		}
+
 		if env.Name != "SPILO_CONFIGURATION" {
 			continue
 		}
