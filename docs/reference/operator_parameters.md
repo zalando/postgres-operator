@@ -538,6 +538,10 @@ grouped under the `logical_backup` key.
   The default image is the same image built with the Zalando-internal CI
   pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
 
+* **logical_backup_provider**
+  Specifies the storage provider to which the backup should be uploaded (`s3` or `gcs`).
+  Default: "s3"
+
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
@@ -557,6 +561,9 @@ grouped under the `logical_backup` key.
 
 * **logical_backup_s3_secret_access_key**
   When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
+
+* **logical_backup_google_application_credentials**
+  Specifies the path of the google cloud service account json file. Default is empty.
 
 ## Debugging the operator
 

@@ -110,14 +110,16 @@ type Scalyr struct {
 
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
-	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
-	LogicalBackupS3Bucket          string `name:"logical_backup_s3_bucket" default:""`
-	LogicalBackupS3Region          string `name:"logical_backup_s3_region" default:""`
-	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
-	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
-	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
-	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:""`
+	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
+	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
+	LogicalBackupS3Endpoint                   string `name:"logical_backup_s3_endpoint" default:""`
+	LogicalBackupS3AccessKeyID                string `name:"logical_backup_s3_access_key_id" default:""`
+	LogicalBackupS3SecretAccessKey            string `name:"logical_backup_s3_secret_access_key" default:""`
+	LogicalBackupS3SSE                        string `name:"logical_backup_s3_sse" default:""`
+	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 }
 
 // Operator options for connection pooler
