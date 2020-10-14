@@ -67,7 +67,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			patroni:  &acidv1.Patroni{},
 			role:     "zalandos",
 			opConfig: config.Config{},
-			result:   `{"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			result:   `{"postgresql":{},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",

@@ -650,10 +650,6 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 			Value: constants.PostgresDataPath,
 		},
 		{
-			Name:  "PGVERSION",
-			Value: c.Spec.PgVersion,
-		},
-		{
 			Name: "POD_IP",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
@@ -716,6 +712,10 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		{
 			Name:  "HUMAN_ROLE",
 			Value: c.OpConfig.PamRoleName,
+		},
+		{
+			Name:  "PGVERSION",
+			Value: c.Spec.PgVersion,
 		},
 	}
 	// Spilo expects cluster labels as JSON
