@@ -1,4 +1,4 @@
-package postgresteams
+package teams
 
 import (
 	"reflect"
@@ -14,7 +14,7 @@ var (
 )
 
 // PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
-func TestLoadinngPostgresTeamCRD(t *testing.T) {
+func TestLoadingPostgresTeamCRD(t *testing.T) {
 	tests := []struct {
 		name  string
 		crd   acidv1.PostgresTeamList
@@ -60,41 +60,29 @@ func TestLoadinngPostgresTeamCRD(t *testing.T) {
 			},
 			PostgresTeamMap{
 				"teamA": {
-					AdditionalTeams: map[additionalTeam]struct{}{
-						additionalTeam{Name: "teamB", IsAdmin: True}:    {},
-						additionalTeam{Name: "team24/7", IsAdmin: True}: {},
-						additionalTeam{Name: "teamC", IsAdmin: False}:   {},
-					},
-					AdditionalMembers: map[string]struct{}{},
+					AdditionalAdminTeams: []string{"teamB", "team24/7"},
+					AdditionalTeams:      []string{"teamC"},
+					AdditionalMembers:    nil,
 				},
 				"teamB": {
-					AdditionalTeams: map[additionalTeam]struct{}{
-						additionalTeam{Name: "teamA", IsAdmin: True}:    {},
-						additionalTeam{Name: "team24/7", IsAdmin: True}: {},
-					},
-					AdditionalMembers: map[string]struct{}{
-						"drno": {},
-					},
+					AdditionalAdminTeams: []string{"teamA", "team24/7"},
+					AdditionalTeams:      []string{},
+					AdditionalMembers:    []string{"drno"},
 				},
 				"teamC": {
-					AdditionalTeams: map[additionalTeam]struct{}{
-						additionalTeam{Name: "team24/7", IsAdmin: True}: {},
-						additionalTeam{Name: "teamA", IsAdmin: False}:   {},
-						additionalTeam{Name: "teamB", IsAdmin: False}:   {},
-					},
-					AdditionalMembers: map[string]struct{}{},
+					AdditionalAdminTeams: []string{"team24/7"},
+					AdditionalTeams:      []string{"teamA", "teamB"},
+					AdditionalMembers:    nil,
 				},
 				"team24/7": {
-					AdditionalTeams: map[additionalTeam]struct{}{},
-					AdditionalMembers: map[string]struct{}{
-						"optimusprime": {},
-					},
+					AdditionalAdminTeams: nil,
+					AdditionalTeams:      nil,
+					AdditionalMembers:    []string{"optimusprime"},
 				},
 				"acid": {
-					AdditionalTeams: map[additionalTeam]struct{}{},
-					AdditionalMembers: map[string]struct{}{
-						"batman": {},
-					},
+					AdditionalAdminTeams: nil,
+					AdditionalTeams:      nil,
+					AdditionalMembers:    []string{"batman"},
 				},
 			},
 			"Mismatch between PostgresTeam CRD and internal map",
@@ -104,8 +92,9 @@ func TestLoadinngPostgresTeamCRD(t *testing.T) {
 	for _, tt := range tests {
 		postgresTeamMap := PostgresTeamMap{}
 		postgresTeamMap.Load(&tt.crd)
+		// TODO order in slice is not deterministic so choose other compare method
 		if !reflect.DeepEqual(postgresTeamMap, tt.pgt) {
-			t.Errorf("%s: %v", tt.name, tt.error)
+			t.Errorf("%s: %v: expected %#v, got %#v", tt.name, tt.error, tt.pgt, postgresTeamMap)
 		}
 	}
 }

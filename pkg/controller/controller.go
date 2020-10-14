@@ -12,8 +12,8 @@ import (
 	"github.com/zalando/postgres-operator/pkg/apiserver"
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/postgresteams"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -34,7 +34,7 @@ import (
 type Controller struct {
 	config    spec.ControllerConfig
 	opConfig  *config.Config
-	pgTeamMap *postgresteams.PostgresTeamMap
+	pgTeamMap *teams.PostgresTeamMap
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient

@@ -16,8 +16,8 @@ import (
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
-	"github.com/zalando/postgres-operator/pkg/postgresteams"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	pgteams "github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -48,7 +48,7 @@ var (
 type Config struct {
 	OpConfig                     config.Config
 	RestConfig                   *rest.Config
-	PgTeamMap                    postgresteams.PostgresTeamMap
+	PgTeamMap                    pgteams.PostgresTeamMap
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
@@ -1130,22 +1130,27 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 
 func (c *Cluster) initHumanUsers() error {
 
+	adminTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
 	var clusterIsOwnedBySuperuserTeam bool
 	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
+		isAdditionalAdminTeam := false
+		for _, adminTeam := range adminTeams {
+			if postgresSuperuserTeam == adminTeam {
+				isAdditionalAdminTeam = true
+			}
+		}
+		if !(isAdditionalAdminTeam) {
+			adminTeams = append(adminTeams, postgresSuperuserTeam)
+		}
 		if postgresSuperuserTeam == c.Spec.TeamID {
 			clusterIsOwnedBySuperuserTeam = true
 		}
 	}
 
-	c.PgTeamMap.MergeTeams(c.Spec.TeamID, c.OpConfig.PostgresSuperuserTeams, true)
-	for additionalTeam := range c.PgTeamMap[c.Spec.TeamID].AdditionalTeams {
-		err := c.initTeamMembers(additionalTeam.Name, additionalTeam.IsAdmin)
+	for _, adminTeam := range adminTeams {
+		err := c.initTeamMembers(adminTeam, true)
 		if err != nil {
-			errorMsg := fmt.Sprintf("Cannot create team %q", additionalTeam.Name)
-			if additionalTeam.IsAdmin {
-				errorMsg = errorMsg + " of Postgres superusers"
-			}
-			return fmt.Errorf(errorMsg+": %v", err)
+			return fmt.Errorf("Cannot create team %q of Postgres superusers: %v", adminTeam, err)
 		}
 	}
 
@@ -1157,6 +1162,14 @@ func (c *Cluster) initHumanUsers() error {
 	err := c.initTeamMembers(c.Spec.TeamID, false)
 	if err != nil {
 		return fmt.Errorf("Cannot create a team %q of admins owning the PG cluster: %v", c.Spec.TeamID, err)
+	}
+
+	additionalTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
+	for _, additionalTeam := range additionalTeams {
+		err := c.initTeamMembers(additionalTeam, false)
+		if err != nil {
+			return fmt.Errorf("Cannot create additional team %q for cluster owner by %q: %v", additionalTeam, c.Spec.TeamID, err)
+		}
 	}
 
 	return nil

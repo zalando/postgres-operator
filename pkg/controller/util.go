@@ -14,8 +14,8 @@ import (
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/cluster"
-	"github.com/zalando/postgres-operator/pkg/postgresteams"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -396,7 +396,7 @@ func (c *Controller) getInfrastructureRole(
 }
 
 func (c *Controller) loadPostgresTeams(obj interface{}) {
-	var pgTeamMap postgresteams.PostgresTeamMap
+	var pgTeamMap teams.PostgresTeamMap
 
 	pgTeam, ok := obj.(*acidv1.PostgresTeam)
 	if !ok {
