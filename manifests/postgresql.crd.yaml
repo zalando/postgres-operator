@@ -71,7 +71,7 @@ spec:
           properties:
             name:
               type: string
-              maxLength: 50
+              maxLength: 53
         spec:
           type: object
           required:

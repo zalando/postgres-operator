@@ -107,7 +107,7 @@ var min0 = 0.0
 var min1 = 1.0
 var min2 = 2.0
 var minDisable = -1.0
-var maxLength = int64(50)
+var maxLength = int64(53)
 
 // PostgresCRDResourceValidation to check applied manifest parameters
 var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
