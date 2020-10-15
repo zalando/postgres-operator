@@ -53,6 +53,7 @@ function set_kind_api_server_ip(){
 
 function deploy_minio(){
  echo "Deploying MinIO object storage..."
+ /tmp/helm-postgres-operator-e2e-tests/helm repo update
  /tmp/helm-postgres-operator-e2e-tests/helm install --generate-name minio/minio
 }
 
