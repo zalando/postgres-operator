@@ -48,6 +48,10 @@ tools:
 	# go get must run outside of a dir with a (module-based) Go project !
 	# otherwise go get updates project's dependencies and/or behaves differently
 	cd "/tmp" && GO111MODULE=on go get sigs.k8s.io/kind@v0.9.0
+	# install helm to be able to deploy MinIO Helm Chart
+	wget -P /tmp https://get.helm.sh/helm-v3.3.4-linux-amd64.tar.gz
+	mkdir /tmp/helm-postgres-operator-e2e-tests
+	tar -C /tmp/helm-postgres-operator-e2e-tests --strip-components 1 -zxvf /tmp/helm-v3.3.4-linux-amd64.tar.gz
 
 e2etest: tools copy clean
 	./run.sh main

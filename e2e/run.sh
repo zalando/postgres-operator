@@ -20,10 +20,10 @@ function pull_images(){
     docker pull registry.opensource.zalan.do/acid/postgres-operator:latest
   fi
 
-  operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
+  readonly operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
 
   # this image does not contain the tests; a container mounts them from a local "./tests" dir at start time
-  e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
+  readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
   docker pull ${e2e_test_runner_image}
 }
 
@@ -51,17 +51,26 @@ function set_kind_api_server_ip(){
   sed -i "s/server.*$/server: https:\/\/$kind_api_server/g" "${kubeconfig_path}"
 }
 
+function deploy_minio(){
+ echo "Deploying MinIO object storage..."
+ /tmp/helm-postgres-operator-e2e-tests/helm install --generate-name minio/minio
+}
+
 function run_tests(){
   echo "Running tests..."
 
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
+  # for MinIO we use default secret values
 
   docker run --rm --network=host -e "TERM=xterm-256color" \
   --mount type=bind,source="$(readlink -f ${kubeconfig_path})",target=/root/.kube/config \
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
-  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}"
+  -e OPERATOR_IMAGE="${operator_image}" \
+  -e MINIO_ACCESS_KEY="YOURACCESSKEY" \
+  -e MINIO_SECRET_KEY="YOURSECRETKEY" \
+  "${e2e_test_runner_image}"
   
 }
 
@@ -70,6 +79,7 @@ function clean_up(){
   unset KUBECONFIG
   kind delete cluster --name ${cluster_name}
   rm -rf ${kubeconfig_path}
+  rm -rf /tmp/helm-postgres-operator-e2e-tests/
 }
 
 function main(){
@@ -79,6 +89,7 @@ function main(){
   time pull_images
   time start_kind
   time set_kind_api_server_ip
+  time deploy_minio
   run_tests
   exit 0
 }
