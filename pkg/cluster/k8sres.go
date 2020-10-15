@@ -2216,6 +2216,13 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec)
 			},
 		},
 		Env: envVars,
+		ReadinessProbe: &v1.Probe{
+			Handler: v1.Handler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.IntOrString{IntVal: pgPort},
+				},
+			},
+		},
 	}
 
 	podTemplate := &v1.PodTemplateSpec{
