@@ -1766,6 +1766,10 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 						Name:  "CLONE_WAL_GS_BUCKET",
 						Value: c.OpConfig.WALGSBucket,
 					},
+					{
+						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
+						Value: c.OpConfig.GCPCredentials,
+					},
 				}
 				result = append(result, envs...)
 			} else {
