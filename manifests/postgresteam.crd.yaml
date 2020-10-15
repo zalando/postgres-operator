@@ -34,7 +34,7 @@ spec:
         spec:
           type: object
           properties:
-            additionalAdminTeams:
+            additionalSuperuserTeams:
               type: object
               description: "Map for teamId and associted additional admin teams"
               additionalProperties:

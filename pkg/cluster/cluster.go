@@ -1130,27 +1130,24 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 
 func (c *Cluster) initHumanUsers() error {
 
-	adminTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
+	superuserTeams := c.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
 	var clusterIsOwnedBySuperuserTeam bool
 	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
-		isAdditionalAdminTeam := false
-		for _, adminTeam := range adminTeams {
-			if postgresSuperuserTeam == adminTeam {
-				isAdditionalAdminTeam = true
+		isAdditionalSuperuserTeam := false
+		for _, superuserTeam := range superuserTeams {
+			if postgresSuperuserTeam == superuserTeam {
+				isAdditionalSuperuserTeam = true
 			}
-		}
-		if !(isAdditionalAdminTeam) {
-			adminTeams = append(adminTeams, postgresSuperuserTeam)
-		}
-		if postgresSuperuserTeam == c.Spec.TeamID {
-			clusterIsOwnedBySuperuserTeam = true
 		}
 	}
 
-	for _, adminTeam := range adminTeams {
+	for _, superuserTeam := range superuserTeams {
 		err := c.initTeamMembers(adminTeam, true)
 		if err != nil {
-			return fmt.Errorf("Cannot create team %q of Postgres superusers: %v", adminTeam, err)
+			return fmt.Errorf("Cannot create team %q of Postgres superusers: %v", superuserTeam, err)
+		}
+		if superuserTeam == c.Spec.TeamID {
+			clusterIsOwnedBySuperuserTeam = true
 		}
 	}
 

@@ -8,9 +8,9 @@ import (
 type PostgresTeamMap map[string]postgresTeamMembership
 
 type postgresTeamMembership struct {
-	AdditionalAdminTeams []string
-	AdditionalTeams      []string
-	AdditionalMembers    []string
+	AdditionalSuperuserTeams []string
+	AdditionalTeams          []string
+	AdditionalMembers        []string
 }
 
 type teamHashSet map[string]map[string]struct{}
@@ -55,26 +55,18 @@ func fetchTeams(teamset *map[string]struct{}, set teamHashSet) {
 	}
 }
 
-func (ptm *PostgresTeamMap) fetchAdditionalTeams(team string, adminTeams bool, transitive bool, exclude *[]string) []string {
+func (ptm *PostgresTeamMap) fetchAdditionalTeams(team string, superuserTeams bool, transitive bool, exclude *[]string) []string {
 
-	var teams, allTeams []string
+	var teams []string
 
-	if adminTeams {
-		teams = (*ptm)[team].AdditionalAdminTeams
-		allTeams = teams
-		for _, otherPrivilegedTeam := range (*ptm)[team].AdditionalTeams {
-			allTeams = append(allTeams, otherPrivilegedTeam)
-		}
+	if superuserTeams {
+		teams = (*ptm)[team].AdditionalSuperuserTeams
 	} else {
 		teams = (*ptm)[team].AdditionalTeams
-		allTeams = teams
-		for _, otherPrivilegedTeam := range (*ptm)[team].AdditionalAdminTeams {
-			allTeams = append(allTeams, otherPrivilegedTeam)
-		}
 	}
 	if transitive {
 		*exclude = append(*exclude, team)
-		for _, additionalTeam := range allTeams {
+		for _, additionalTeam := range teams {
 			getTransitiveTeams := true
 			for _, excludedTeam := range *exclude {
 				if additionalTeam == excludedTeam {
@@ -82,7 +74,7 @@ func (ptm *PostgresTeamMap) fetchAdditionalTeams(team string, adminTeams bool, t
 				}
 			}
 			if getTransitiveTeams {
-				transitiveTeams := (*ptm).fetchAdditionalTeams(additionalTeam, adminTeams, transitive, exclude)
+				transitiveTeams := (*ptm).fetchAdditionalTeams(additionalTeam, superuserTeams, transitive, exclude)
 
 				if len(transitiveTeams) > 0 {
 					for _, transitiveTeam := range transitiveTeams {
@@ -102,31 +94,31 @@ func (ptm *PostgresTeamMap) GetAdditionalTeams(team string, transitive bool) []s
 }
 
 // GetAdditionalTeams function to retrieve list of additional teams
-func (ptm *PostgresTeamMap) GetAdditionalAdminTeams(team string, transitive bool) []string {
+func (ptm *PostgresTeamMap) GetAdditionalSuperuserTeams(team string, transitive bool) []string {
 	return ptm.fetchAdditionalTeams(team, true, transitive, &[]string{})
 }
 
 // Load function to import data from PostgresTeam CRD
 func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
-	adminTeamSet := teamHashSet{}
+	superuserTeamSet := teamHashSet{}
 	teamSet := teamHashSet{}
 	teamMemberSet := teamHashSet{}
 	teamIDs := make(map[string]struct{})
 
 	for _, pgTeam := range pgTeams.Items {
-		adminTeamSet.mergeCrdMap(pgTeam.Spec.AdditionalAdminTeams)
+		superuserTeamSet.mergeCrdMap(pgTeam.Spec.AdditionalSuperuserTeams)
 		teamSet.mergeCrdMap(pgTeam.Spec.AdditionalTeams)
 		teamMemberSet.mergeCrdMap(pgTeam.Spec.AdditionalMembers)
 	}
-	fetchTeams(&teamIDs, adminTeamSet)
+	fetchTeams(&teamIDs, superuserTeamSet)
 	fetchTeams(&teamIDs, teamSet)
 	fetchTeams(&teamIDs, teamMemberSet)
 
 	for teamID := range teamIDs {
 		(*ptm)[teamID] = postgresTeamMembership{
-			AdditionalAdminTeams: adminTeamSet.toMap()[teamID],
-			AdditionalTeams:      teamSet.toMap()[teamID],
-			AdditionalMembers:    teamMemberSet.toMap()[teamID],
+			AdditionalSuperuserTeams: superuserTeamSet.toMap()[teamID],
+			AdditionalTeams:          teamSet.toMap()[teamID],
+			AdditionalMembers:        teamMemberSet.toMap()[teamID],
 		}
 	}
 }

@@ -17,9 +17,9 @@ type PostgresTeam struct {
 
 // PostgresTeamSpec defines the specification for the PostgresTeam TPR.
 type PostgresTeamSpec struct {
-	AdditionalAdminTeams map[string][]string `json:"additionalAdminTeams,omitempty"`
-	AdditionalTeams      map[string][]string `json:"additionalTeams,omitempty"`
-	AdditionalMembers    map[string][]string `json:"additionalMembers,omitempty"`
+	AdditionalSuperuserTeams map[string][]string `json:"additionalSuperuserTeams,omitempty"`
+	AdditionalTeams          map[string][]string `json:"additionalTeams,omitempty"`
+	AdditionalMembers        map[string][]string `json:"additionalMembers,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

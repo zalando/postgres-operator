@@ -38,7 +38,7 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 							Name: "teamAB",
 						},
 						Spec: acidv1.PostgresTeamSpec{
-							AdditionalAdminTeams: map[string][]string{"teamA": []string{"teamB", "team24/7"}, "teamB": []string{"teamA", "team24/7"}},
+							AdditionalSuperuserTeams: map[string][]string{"teamA": []string{"teamB", "team24/7"}, "teamB": []string{"teamA", "team24/7"}},
 							AdditionalTeams:      map[string][]string{"teamA": []string{"teamC"}, "teamB": []string{}},
 							AdditionalMembers:    map[string][]string{"team24/7": []string{"optimusprime"}, "teamB": []string{"drno"}},
 						},
@@ -51,7 +51,7 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 							Name: "teamC",
 						},
 						Spec: acidv1.PostgresTeamSpec{
-							AdditionalAdminTeams: map[string][]string{"teamC": []string{"team24/7"}},
+							AdditionalSuperuserTeams: map[string][]string{"teamC": []string{"team24/7"}},
 							AdditionalTeams:      map[string][]string{"teamA": []string{"teamC"}, "teamC": []string{"teamA", "teamB"}},
 							AdditionalMembers:    map[string][]string{"acid": []string{"batman"}},
 						},
@@ -60,27 +60,27 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 			},
 			PostgresTeamMap{
 				"teamA": {
-					AdditionalAdminTeams: []string{"teamB", "team24/7"},
+					AdditionalSuperuserTeams: []string{"teamB", "team24/7"},
 					AdditionalTeams:      []string{"teamC"},
 					AdditionalMembers:    nil,
 				},
 				"teamB": {
-					AdditionalAdminTeams: []string{"teamA", "team24/7"},
+					AdditionalSuperuserTeams: []string{"teamA", "team24/7"},
 					AdditionalTeams:      []string{},
 					AdditionalMembers:    []string{"drno"},
 				},
 				"teamC": {
-					AdditionalAdminTeams: []string{"team24/7"},
+					AdditionalSuperuserTeams: []string{"team24/7"},
 					AdditionalTeams:      []string{"teamA", "teamB"},
 					AdditionalMembers:    nil,
 				},
 				"team24/7": {
-					AdditionalAdminTeams: nil,
+					AdditionalSuperuserTeams: nil,
 					AdditionalTeams:      nil,
 					AdditionalMembers:    []string{"optimusprime"},
 				},
 				"acid": {
-					AdditionalAdminTeams: nil,
+					AdditionalSuperuserTeams: nil,
 					AdditionalTeams:      nil,
 					AdditionalMembers:    []string{"batman"},
 				},
