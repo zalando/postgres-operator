@@ -2,6 +2,7 @@ package teams
 
 import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/util"
 )
 
 // PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
@@ -55,7 +56,7 @@ func fetchTeams(teamset *map[string]struct{}, set teamHashSet) {
 	}
 }
 
-func (ptm *PostgresTeamMap) fetchAdditionalTeams(team string, superuserTeams bool, transitive bool, exclude *[]string) []string {
+func (ptm *PostgresTeamMap) fetchAdditionalTeams(team string, superuserTeams bool, transitive bool, exclude []string) []string {
 
 	var teams []string
 
@@ -65,19 +66,12 @@ func (ptm *PostgresTeamMap) fetchAdditionalTeams(team string, superuserTeams boo
 		teams = (*ptm)[team].AdditionalTeams
 	}
 	if transitive {
-		*exclude = append(*exclude, team)
+		exclude = append(exclude, team)
 		for _, additionalTeam := range teams {
-			getTransitiveTeams := true
-			for _, excludedTeam := range *exclude {
-				if additionalTeam == excludedTeam {
-					getTransitiveTeams = false
-				}
-			}
-			if getTransitiveTeams {
+			if !(util.SliceContains(exclude, additionalTeam)) {
 				transitiveTeams := (*ptm).fetchAdditionalTeams(additionalTeam, superuserTeams, transitive, exclude)
-
-				if len(transitiveTeams) > 0 {
-					for _, transitiveTeam := range transitiveTeams {
+				for _, transitiveTeam := range transitiveTeams {
+					if !(util.SliceContains(exclude, transitiveTeam)) && !(util.SliceContains(teams, transitiveTeam)) {
 						teams = append(teams, transitiveTeam)
 					}
 				}
@@ -90,12 +84,12 @@ func (ptm *PostgresTeamMap) fetchAdditionalTeams(team string, superuserTeams boo
 
 // GetAdditionalTeams function to retrieve list of additional teams
 func (ptm *PostgresTeamMap) GetAdditionalTeams(team string, transitive bool) []string {
-	return ptm.fetchAdditionalTeams(team, false, transitive, &[]string{})
+	return ptm.fetchAdditionalTeams(team, false, transitive, []string{})
 }
 
 // GetAdditionalTeams function to retrieve list of additional teams
 func (ptm *PostgresTeamMap) GetAdditionalSuperuserTeams(team string, transitive bool) []string {
-	return ptm.fetchAdditionalTeams(team, true, transitive, &[]string{})
+	return ptm.fetchAdditionalTeams(team, true, transitive, []string{})
 }
 
 // Load function to import data from PostgresTeam CRD
