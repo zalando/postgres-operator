@@ -151,7 +151,9 @@ func (c *Cluster) initDbConnWithName(dbname string) error {
 	conn.SetMaxIdleConns(-1)
 
 	if c.pgDb != nil {
-		c.logger.Warningf("Overwriting connection %v", c.pgDb)
+		msg := "Closing an existing connection before opening a new one to %s"
+		c.logger.Warningf(msg, dbname)
+		c.closeDbConn()
 	}
 
 	c.pgDb = conn
