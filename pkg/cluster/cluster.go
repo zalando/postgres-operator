@@ -1160,9 +1160,11 @@ func (c *Cluster) initHumanUsers() error {
 
 	additionalTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
 	for _, additionalTeam := range additionalTeams {
-		err := c.initTeamMembers(additionalTeam, false)
-		if err != nil {
-			return fmt.Errorf("Cannot create additional team %q for cluster owner by %q: %v", additionalTeam, c.Spec.TeamID, err)
+		if !(util.SliceContains(superuserTeams, additionalTeam)) {
+			err := c.initTeamMembers(additionalTeam, false)
+			if err != nil {
+				return fmt.Errorf("Cannot create additional team %q for cluster owner by %q: %v", additionalTeam, c.Spec.TeamID, err)
+			}
 		}
 	}
 

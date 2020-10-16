@@ -26,7 +26,7 @@ var (
 					Name: "teamAB",
 				},
 				Spec: acidv1.PostgresTeamSpec{
-					AdditionalSuperuserTeams: map[string][]string{"teamA": []string{"teamB", "team24/7"}, "teamB": []string{"teamA", "team24/7"}},
+					AdditionalSuperuserTeams: map[string][]string{"teamA": []string{"teamB", "team24/7"}, "teamB": []string{"teamA", "teamC", "team24/7"}},
 					AdditionalTeams:          map[string][]string{"teamA": []string{"teamC"}, "teamB": []string{}},
 					AdditionalMembers:        map[string][]string{"team24/7": []string{"optimusprime"}, "teamB": []string{"drno"}},
 				},
@@ -66,7 +66,7 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 					AdditionalMembers:        nil,
 				},
 				"teamB": {
-					AdditionalSuperuserTeams: []string{"teamA", "team24/7"},
+					AdditionalSuperuserTeams: []string{"teamA", "teamC", "team24/7"},
 					AdditionalTeams:          []string{},
 					AdditionalMembers:        []string{"drno"},
 				},
@@ -153,17 +153,17 @@ func TestGetAdditionalSuperuserTeams(t *testing.T) {
 		error      string
 	}{
 		{
-			"Check that additional teams are returned",
+			"Check that additional superuser teams are returned",
 			"teamA",
 			false,
 			[]string{"teamB", "team24/7"},
 			"GetAdditionalTeams returns wrong list",
 		},
 		{
-			"Check that additional teams are returned incl. transitive teams",
+			"Check that additional superuser teams are returned incl. transitive superuser teams",
 			"teamA",
 			true,
-			[]string{"teamB", "team24/7"},
+			[]string{"teamB", "teamC", "team24/7"},
 			"GetAdditionalTeams returns wrong list",
 		},
 	}
