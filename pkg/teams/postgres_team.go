@@ -87,7 +87,7 @@ func (ptm *PostgresTeamMap) GetAdditionalTeams(team string, transitive bool) []s
 	return ptm.fetchAdditionalTeams(team, false, transitive, []string{})
 }
 
-// GetAdditionalTeams function to retrieve list of additional teams
+// GetAdditionalSuperuserTeams function to retrieve list of additional superuser teams
 func (ptm *PostgresTeamMap) GetAdditionalSuperuserTeams(team string, transitive bool) []string {
 	return ptm.fetchAdditionalTeams(team, true, transitive, []string{})
 }

@@ -1133,16 +1133,13 @@ func (c *Cluster) initHumanUsers() error {
 	superuserTeams := c.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
 	var clusterIsOwnedBySuperuserTeam bool
 	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
-		isAdditionalSuperuserTeam := false
-		for _, superuserTeam := range superuserTeams {
-			if postgresSuperuserTeam == superuserTeam {
-				isAdditionalSuperuserTeam = true
-			}
+		if !(util.SliceContains(superuserTeams, postgresSuperuserTeam)) {
+			superuserTeams = append(superuserTeams, postgresSuperuserTeam)
 		}
 	}
 
 	for _, superuserTeam := range superuserTeams {
-		err := c.initTeamMembers(adminTeam, true)
+		err := c.initTeamMembers(superuserTeam, true)
 		if err != nil {
 			return fmt.Errorf("Cannot create team %q of Postgres superusers: %v", superuserTeam, err)
 		}
