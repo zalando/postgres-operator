@@ -951,7 +951,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             # patch current master node with the label
-            print('patching master node: %s'%current_master_node)
+            print('patching master node: %s', current_master_node)
             k8s.api.core_v1.patch_node(current_master_node, body)
 
             # add node affinity to cluster
