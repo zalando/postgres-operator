@@ -21,4 +21,4 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["python3", "-m", "unittest", "discover", "--start-directory", ".", "-v"]
+ENTRYPOINT ["python3", "-m", "unittest", "discover", "--failfast", "--start-directory", "/tests", "-v"]

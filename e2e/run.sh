@@ -9,6 +9,8 @@ IFS=$'\n\t'
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 readonly spilo_image="registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
+# readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
+readonly e2e_test_runner_image="operator-test-runner:0.1"
 
 echo "Clustername: ${cluster_name}"
 echo "Kubeconfig path: ${kubeconfig_path}"
@@ -19,12 +21,7 @@ function pull_images(){
   then
     docker pull registry.opensource.zalan.do/acid/postgres-operator:latest
   fi
-
   operator_image=$(docker images --filter=reference="registry.opensource.zalan.do/acid/postgres-operator" --format "{{.Repository}}:{{.Tag}}" | head -1)
-
-  # this image does not contain the tests; a container mounts them from a local "./tests" dir at start time
-  e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
-  docker pull ${e2e_test_runner_image}
 }
 
 function start_kind(){

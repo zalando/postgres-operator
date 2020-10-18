@@ -23,6 +23,29 @@ class EndToEndTestCase(unittest.TestCase):
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
 
+    def eventuallyEqual(self, f, x, m, retries=25, interval=2):
+        while True:
+            try:
+                y = f()
+                self.assertEqual(y, x, m.format(y))
+                return True
+            except AssertionError:
+                retries = retries -1
+                if not retries > 0:
+                    raise
+                time.sleep(interval)
+
+    def eventuallyTrue(self, f, m, retries=25, interval=2):
+        while True:
+            try:
+                self.assertTrue(f(), m)
+                return True
+            except AssertionError:
+                retries = retries -1
+                if not retries > 0:
+                    raise
+                time.sleep(interval)
+
     @classmethod
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def setUpClass(cls):
@@ -158,7 +181,7 @@ class EndToEndTestCase(unittest.TestCase):
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_load_balancer(self):
         '''
-        Test if services are updated when enabling/disabling load balancers
+        Test if services are updated when enabling/disabling load balancers in Postgres manifest
         '''
 
         k8s = self.k8s
@@ -174,12 +197,10 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_lbs)
-            # wait for service recreation
-            time.sleep(60)
-
-            master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
-            self.assertEqual(master_svc_type, 'LoadBalancer',
-                             "Expected LoadBalancer service type for master, found {}".format(master_svc_type))
+            
+            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label + ',spilo-role=master'),
+                                 'LoadBalancer',
+                                "Expected LoadBalancer service type for master, found {}")
 
             repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
             self.assertEqual(repl_svc_type, 'LoadBalancer',
@@ -194,9 +215,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_lbs)
-            # wait for service recreation
-            time.sleep(60)
-
+            
             master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
             self.assertEqual(master_svc_type, 'ClusterIP',
                              "Expected ClusterIP service type for master, found {}".format(master_svc_type))
@@ -513,11 +532,8 @@ class EndToEndTestCase(unittest.TestCase):
             # patch also node where master ran before
             k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
 
-            # wait a little before proceeding with the pod distribution test
-            time.sleep(30)
-
             # toggle pod anti affinity to move replica away from master node
-            self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
+            self.eventually(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label))
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -618,9 +634,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotations)
-
-            # wait a little before proceeding
-            time.sleep(60)
+            
             annotations = {
                 "deployment-time": "2020-04-30 12:00:00",
                 "downscaler/downtime_replicas": "0",
@@ -845,7 +859,7 @@ class K8s:
     Wraps around K8s api client and helper methods.
     '''
 
-    RETRY_TIMEOUT_SEC = 10
+    RETRY_TIMEOUT_SEC = 1
 
     def __init__(self):
         self.api = K8sApi()
@@ -863,10 +877,7 @@ class K8s:
         return master_pod_node, replica_pod_nodes
 
     def wait_for_operator_pod_start(self):
-        self. wait_for_pod_start("name=postgres-operator")
-        # HACK operator must register CRD and/or Sync existing PG clusters after start up
-        # for local execution ~ 10 seconds suffices
-        time.sleep(60)
+        self. wait_for_pod_start("name=postgres-operator")        
 
     def get_operator_pod(self):
         pods = self.api.core_v1.list_namespaced_pod(
