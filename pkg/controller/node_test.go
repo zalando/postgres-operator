@@ -35,8 +35,8 @@ var nodeTestController = newNodeTestController()
 func TestNodeIsReady(t *testing.T) {
 	testName := "TestNodeIsReady"
 	var testTable = []struct {
-		in  *v1.Node
-		out bool
+		in             *v1.Node
+		out            bool
 		readinessLabel map[string]string
 	}{
 		{
@@ -60,30 +60,30 @@ func TestNodeIsReady(t *testing.T) {
 			out: true,
 		},
 		{
-			in:  makeNode(map[string]string{"foo": "bar"}, true),
-			out: true,
+			in:             makeNode(map[string]string{"foo": "bar"}, true),
+			out:            true,
 			readinessLabel: map[string]string{},
 		},
 		{
-			in:  makeNode(map[string]string{"foo": "bar"}, false),
-			out: false,
+			in:             makeNode(map[string]string{"foo": "bar"}, false),
+			out:            false,
 			readinessLabel: map[string]string{},
 		},
 		{
-			in:  makeNode(map[string]string{readyLabel: readyValue}, false),
-			out: false,
+			in:             makeNode(map[string]string{readyLabel: readyValue}, false),
+			out:            false,
 			readinessLabel: map[string]string{},
 		},
 		{
-			in:  makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
-			out: true,
+			in:             makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
+			out:            true,
 			readinessLabel: map[string]string{},
 		},
 	}
 	for _, tt := range testTable {
-		if tt.readinessLabel != nil{
+		if tt.readinessLabel != nil {
 			nodeTestController.opConfig.NodeReadinessLabel = tt.readinessLabel
-		}else{
+		} else {
 			nodeTestController.opConfig.NodeReadinessLabel = map[string]string{readyLabel: readyValue}
 		}
 
