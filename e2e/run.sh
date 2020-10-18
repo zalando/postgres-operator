@@ -9,8 +9,7 @@ IFS=$'\n\t'
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 readonly spilo_image="registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
-# readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
-readonly e2e_test_runner_image="operator-test-runner:0.1"
+readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
 
 echo "Clustername: ${cluster_name}"
 echo "Kubeconfig path: ${kubeconfig_path}"
