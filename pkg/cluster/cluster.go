@@ -18,22 +18,23 @@ import (
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 
-	"github.com/zalando/postgres-operator/pkg/connection_pooler"
 	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
-	"github.com/zalando/postgres-operator/pkg/resources"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	"github.com/zalando/postgres-operator/pkg/util/users"
+	rbacv1 "k8s.io/api/rbac/v1"
 )
 
 var (
@@ -42,6 +43,15 @@ var (
 	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 	patroniObjectSuffixes = []string{"config", "failover", "sync"}
 )
+
+// Config contains operator-wide clients and configuration used from a cluster. TODO: remove struct duplication.
+type Config struct {
+	OpConfig                     config.Config
+	RestConfig                   *rest.Config
+	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
+	PodServiceAccount            *v1.ServiceAccount
+	PodServiceAccountRoleBinding *rbacv1.RoleBinding
+}
 
 type kubeResources struct {
 	Services            map[PostgresRole]*v1.Service
@@ -57,7 +67,7 @@ type kubeResources struct {
 type Cluster struct {
 	kubeResources
 	acidv1.Postgresql
-	resources.Config
+	Config
 	logger           *logrus.Entry
 	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
@@ -77,7 +87,7 @@ type Cluster struct {
 	currentProcess   Process
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	ConnectionPooler map[PostgresRole]*connection_pooler.ConnectionPoolerObjects
+	ConnectionPooler map[PostgresRole]*ConnectionPoolerObjects
 }
 type compareStatefulsetResult struct {
 	match         bool
@@ -87,7 +97,7 @@ type compareStatefulsetResult struct {
 }
 
 // New creates a new cluster. This function should be called from a controller.
-func New(cfg resources.Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
+func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -332,7 +342,7 @@ func (c *Cluster) Create() error {
 				c.logger.Warning("Connection pooler already exists in the cluster")
 				return nil
 			}
-			connectionPooler, err := c.ConnectionPooler[r].createConnectionPooler(c.installLookupFunction, r)
+			connectionPooler, err := c.createConnectionPooler(c.installLookupFunction, r)
 			if err != nil {
 				c.logger.Warningf("could not create connection pooler: %v", err)
 				return nil
@@ -762,12 +772,10 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pooler
-	for _, role := range c.RolesConnectionPooler() {
-		if _, err := c.ConnectionPooler[role].syncConnectionPooler(oldSpec, newSpec,
-			c.installLookupFunction); err != nil {
-			c.logger.Errorf("could not sync connection pooler: %v", err)
-			updateFailed = true
-		}
+	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
+		c.installLookupFunction); err != nil {
+		c.logger.Errorf("could not sync connection pooler: %v", err)
+		updateFailed = true
 	}
 
 	return nil
@@ -836,7 +844,7 @@ func (c *Cluster) Delete() {
 	// manifest, just to not keep orphaned components in case if something went
 	// wrong
 	for _, role := range [2]PostgresRole{Master, Replica} {
-		if err := c.ConnectionPooler[role].deleteConnectionPooler(role); err != nil {
+		if err := c.deleteConnectionPooler(role); err != nil {
 			c.logger.Warningf("could not remove connection pooler: %v", err)
 		}
 	}

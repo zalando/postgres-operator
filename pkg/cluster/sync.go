@@ -128,10 +128,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	// sync connection pooler
-	for _, role := range c.RolesConnectionPooler() {
-		if _, err = c.ConnectionPooler[role].syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
-			return fmt.Errorf("could not sync connection pooler: %v", err)
-		}
+	if _, err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
+		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
 	return err
