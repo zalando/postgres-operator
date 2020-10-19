@@ -617,6 +617,8 @@ of the backup cron job.
 `cronjobs` resource from the `batch` API group for the operator service account.
 See [example RBAC](../manifests/operator-service-account-rbac.yaml)
 
+You cannot use logical backups when you are cloning cluster. For that you need to setup WAL writing into S3 or GCS.
+
 ## Access to cloud resources from clusters in non-cloud environment
 
 To access cloud resources like S3 from a cluster on bare metal you can use
@@ -684,6 +686,31 @@ aws_or_gcp:
   gcp_credentials: "/var/secrets/google/key.json"  # combination of the mount path & key in the K8s resource. (i.e. key.json)
 ...
 ```
+
+### Setup pod environment configmap
+
+By default postgres-operator is using WAL-E to perform backup and restore. WAL-E doesn't work very well with GCS, so instead we want to use WAL-G. By providing custom pod environment, we can instruct Spilo to use WAL-G for backup and recovery.
+```yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-env-overrides
+  namespace: postgres-operator-system
+data:
+  # Any env variable used by spilo can be added
+  USE_WALG_BACKUP: "true"
+  USE_WALG_RESTORE: "true"
+  CLONE_USE_WALG_RESTORE: "true"
+```
+
+Then provide this configmap in postgres-operator settings:
+```yml
+...
+# namespaced name of the ConfigMap with environment variables to populate on every pod
+pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
+...
+```
+
 
 ## Sidecars for Postgres clusters
 
