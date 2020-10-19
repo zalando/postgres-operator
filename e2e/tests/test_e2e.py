@@ -10,6 +10,8 @@ import yaml
 from datetime import datetime
 from kubernetes import client, config
 
+SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
+SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
 
 def to_selector(labels):
     return ",".join(["=".join(l) for l in labels.items()])
@@ -75,13 +77,19 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = cls.k8s = K8s()
 
         # remove existing local storage class and create hostpath class
-        k8s.api.storage_v1_api.delete_storage_class("standard")
+        try:
+            k8s.api.storage_v1_api.delete_storage_class("standard")
+        except:
+            print("Storage class has already been remove")
 
         # operator deploys pod service account there on start up
         # needed for test_multi_namespace_support()
         cls.namespace = "test"
-        v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.namespace))
-        k8s.api.core_v1.create_namespace(v1_namespace)
+        try:
+            v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.namespace))
+            k8s.api.core_v1.create_namespace(v1_namespace)
+        except:
+            print("Namespace already present")
 
         # submit the most recent operator image built on the Docker host
         with open("manifests/postgres-operator.yaml", 'r+') as f:
@@ -313,27 +321,47 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s = self.k8s
 
+        pod0 = 'acid-minimal-cluster-0'
+        pod1 = 'acid-minimal-cluster-1'
+
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
+
+        patch_lazy_spilo_upgrade = {
+            "data": {
+                "docker_image": SPILO_CURRENT,
+                "enable_lazy_spilo_upgrade": "false"
+            }
+        }
+        k8s.update_config(patch_lazy_spilo_upgrade, step="Init baseline image version")
+
+        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), SPILO_CURRENT, "Stagefulset not updated initially")
+        
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
+        
+        self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), SPILO_CURRENT, "Rolling upgrade was not executed")
+        self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), SPILO_CURRENT, "Rolling upgrade was not executed")
+
         # update docker image in config and enable the lazy upgrade
-        conf_image = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
+        conf_image = SPILO_LAZY
         patch_lazy_spilo_upgrade = {
             "data": {
                 "docker_image": conf_image,
                 "enable_lazy_spilo_upgrade": "true"
             }
         }
-        k8s.update_config(patch_lazy_spilo_upgrade)
-
-        pod0 = 'acid-minimal-cluster-0'
-        pod1 = 'acid-minimal-cluster-1'
+        k8s.update_config(patch_lazy_spilo_upgrade,step="patch image and lazy upgrade")
+        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), conf_image, "Statefulset not updated to next Docker image")
 
         try:
             # restart the pod to get a container with the new image
             k8s.api.core_v1.delete_namespaced_pod(pod0, 'default')            
             
             # verify only pod-0 which was deleted got new image from statefulset
-            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Delete pod-0 did not get new spilo image")
-            old_image = k8s.get_effective_pod_image(pod1)
-            self.assertNotEqual(conf_image, old_image, "pod-1 should not have change Docker image to {}".format(old_image))
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Delete pod-0 did not get new spilo image")            
+            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
+            self.assertNotEqual(lambda: k8s.get_effective_pod_image(pod1), SPILO_CURRENT, "pod-1 should not have change Docker image to {}".format(SPILO_CURRENT))
 
             # clean up
             unpatch_lazy_spilo_upgrade = {
@@ -341,13 +369,12 @@ class EndToEndTestCase(unittest.TestCase):
                     "enable_lazy_spilo_upgrade": "false",
                 }
             }
-            k8s.update_config(unpatch_lazy_spilo_upgrade)
+            k8s.update_config(unpatch_lazy_spilo_upgrade, step="patch lazy upgrade")
 
             # at this point operator will complete the normal rolling upgrade
             # so we additonally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
-
-            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Rolling upgrade was not executed")
-            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), conf_image, "Rolling upgrade was not executed")
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Rolling upgrade was not executed", 50, 3)
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), conf_image, "Rolling upgrade was not executed", 50, 3)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -379,7 +406,7 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
 
         try:
-            self.eventuallyEqual(lambda: len(k8s.get_logical_backup_job()), 1, "failed to create logical backup job")
+            self.eventuallyEqual(lambda: len(k8s.get_logical_backup_job().items), 1, "failed to create logical backup job")
 
             job = k8s.get_logical_backup_job().items[0]
             self.assertEqual(job.metadata.name, "logical-backup-acid-minimal-cluster",
@@ -396,7 +423,7 @@ class EndToEndTestCase(unittest.TestCase):
                     "logical_backup_docker_image": image,
                 }
             }
-            k8s.update_config(patch_logical_backup_image)
+            k8s.update_config(patch_logical_backup_image, step="patch logical backup image")
 
             def get_docker_image():
                 jobs = k8s.get_logical_backup_job().items
@@ -414,7 +441,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
             
-            self.eventuallyEqual(lambda: len(self.get_logical_backup_job()), 0, "failed to create logical backup job")
+            self.eventuallyEqual(lambda: len(k8s.get_logical_backup_job().items), 0, "failed to create logical backup job")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -991,6 +1018,10 @@ class K8s:
     def count_pdbs_with_label(self, labels, namespace='default'):
         return len(self.api.policy_v1_beta1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
+  
+    def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
+        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
+        return len(list(filter(lambda x: x.status.phase=='Running', pods)))
 
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
@@ -1016,19 +1047,18 @@ class K8s:
     def wait_for_logical_backup_job_creation(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
-    def delete_operator_pod(self):
-        operator_pod = self.api.core_v1.list_namespaced_pod(
-            'default', label_selector="name=postgres-operator").items[0].metadata.name
-        self.api.core_v1.delete_namespaced_pod(operator_pod, "default")  # restart reloads the conf
+    def delete_operator_pod(self, step="Delete operator deplyment"):
+        operator_pod = self.api.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
+        self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, time.time())}}}}})
         self.wait_for_operator_pod_start()
 
-    def update_config(self, config_map_patch):
+    def update_config(self, config_map_patch, step="Updating operator deployment"):
         self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
-        self.delete_operator_pod()
+        self.delete_operator_pod(step=step)
 
     def create_with_kubectl(self, path):
         return subprocess.run(
-            ["kubectl", "create", "-f", path],
+            ["kubectl", "apply", "-f", path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
 
@@ -1036,6 +1066,19 @@ class K8s:
         return subprocess.run(["./exec.sh", pod, cmd],
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE)
+
+    def get_patroni_state(self, pod):
+        return json.loads(self.exec_with_kubectl(pod, "patronictl list -f json").stdout)
+
+    def get_patroni_running_members(self, pod):
+        result = self.get_patroni_state(pod)
+        return list(filter(lambda x: x["State"]=="running", result))
+    
+    def get_statefulset_image(self, label_selector="application=spilo,cluster-name=acid-minimal-cluster", namespace='default'):
+        ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=label_selector, limit=1)
+        if len(ssets.items) == 0:
+            return None
+        return ssets.items[0].spec.template.spec.containers[0].image
 
     def get_effective_pod_image(self, pod_name, namespace='default'):
         '''

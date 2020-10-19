@@ -58,7 +58,6 @@ function run_tests(){
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
   -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}"
-  
 }
 
 function clean_up(){
@@ -70,11 +69,10 @@ function clean_up(){
 
 function main(){
 
-  trap "clean_up" QUIT TERM EXIT
-
-  time pull_images
-  time start_kind
-  time set_kind_api_server_ip
+  [[ -z ${NOCLEANUP-} ]] && trap "clean_up" QUIT TERM EXIT
+  pull_images
+  [[ ! -f ${kubeconfig_path} ]] && start_kind
+  set_kind_api_server_ip
   run_tests
   exit 0
 }
