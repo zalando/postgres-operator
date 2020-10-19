@@ -242,14 +242,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	}
 
 	for _, member := range teamInfo.Members {
-		contains := false
-		for _, additionalMember := range members {
-			if member == additionalMember {
-				contains = true
-				break
-			}
-		}
-		if !(contains) {
+		if !(util.SliceContains(members, member)) {
 			members = append(members, member)
 		}
 	}

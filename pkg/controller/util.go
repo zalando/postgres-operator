@@ -396,7 +396,7 @@ func (c *Controller) getInfrastructureRole(
 }
 
 func (c *Controller) loadPostgresTeams(obj interface{}) {
-	var pgTeamMap teams.PostgresTeamMap
+	pgTeamMap := teams.PostgresTeamMap{}
 
 	pgTeam, ok := obj.(*acidv1.PostgresTeam)
 	if !ok {
@@ -412,6 +412,7 @@ func (c *Controller) loadPostgresTeams(obj interface{}) {
 }
 
 func (c *Controller) updatePostgresTeams(prev, obj interface{}) {
+	c.logger.Debugf("reloading postgres team CRDs and overwriting cached map")
 	c.loadPostgresTeams(obj)
 }
 
