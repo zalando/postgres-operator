@@ -475,6 +475,8 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 // Creates a connection pool credentials lookup function in every database to
 // perform remote authentification.
 func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
+	var stmtBytes bytes.Buffer
+
 	c.logger.Info("Installing lookup function")
 
 	// Open a new connection if not yet done. This connection will be used only
@@ -492,6 +494,10 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 		}
 	}()
 
+	// List of databases we failed to process. At the moment it function just
+	// like a flag to retry on the next sync, but in the future we may want to
+	// retry only necessary parts, so let's keep the list.
+	failedDatabases := []string{}
 	currentDatabases, err := c.getDatabases()
 	if err != nil {
 		msg := "could not get databases to install pooler lookup function: %v"
@@ -505,27 +511,23 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 	}
 
 	templater := template.Must(template.New("sql").Parse(connectionPoolerLookup))
+	params := TemplateParams{
+		"pooler_schema": poolerSchema,
+		"pooler_user":   poolerUser,
+	}
+
+	if err := templater.Execute(&stmtBytes, params); err != nil {
+		msg := "could not prepare sql statement %+v: %v"
+		return fmt.Errorf(msg, params, err)
+	}
 
 	for dbname := range currentDatabases {
-		var stmtBytes bytes.Buffer
 
 		if dbname == "template0" || dbname == "template1" {
 			continue
 		}
 
 		c.logger.Infof("Install pooler lookup function into %s", dbname)
-
-		params := TemplateParams{
-			"pooler_schema": poolerSchema,
-			"pooler_user":   poolerUser,
-		}
-
-		if err := templater.Execute(&stmtBytes, params); err != nil {
-			c.logger.Errorf("could not prepare sql statement %+v: %v",
-				params, err)
-			// process other databases
-			continue
-		}
 
 		// golang sql will do retries couple of times if pq driver reports
 		// connections issues (driver.ErrBadConn), but since our query is
@@ -562,12 +564,16 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 			c.logger.Errorf("could not execute after retries %s: %v",
 				stmtBytes.String(), err)
 			// process other databases
+			failedDatabases = append(failedDatabases, dbname)
 			continue
 		}
 
 		c.logger.Infof("pooler lookup function installed into %s", dbname)
 	}
 
-	c.ConnectionPooler.LookupFunction = true
+	if len(failedDatabases) == 0 {
+		c.ConnectionPooler.LookupFunction = true
+	}
+
 	return nil
 }
