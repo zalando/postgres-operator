@@ -1148,16 +1148,6 @@ func (c *Cluster) initHumanUsers() error {
 		}
 	}
 
-	if clusterIsOwnedBySuperuserTeam {
-		c.logger.Infof("Team %q owning the cluster is also a team of superusers. Created superuser roles for its members instead of admin roles.", c.Spec.TeamID)
-		return nil
-	}
-
-	err := c.initTeamMembers(c.Spec.TeamID, false)
-	if err != nil {
-		return fmt.Errorf("Cannot create a team %q of admins owning the PG cluster: %v", c.Spec.TeamID, err)
-	}
-
 	additionalTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
 	for _, additionalTeam := range additionalTeams {
 		if !(util.SliceContains(superuserTeams, additionalTeam)) {
@@ -1166,6 +1156,16 @@ func (c *Cluster) initHumanUsers() error {
 				return fmt.Errorf("Cannot create additional team %q for cluster owner by %q: %v", additionalTeam, c.Spec.TeamID, err)
 			}
 		}
+	}
+
+	if clusterIsOwnedBySuperuserTeam {
+		c.logger.Infof("Team %q owning the cluster is also a team of superusers. Created superuser roles for its members instead of admin roles.", c.Spec.TeamID)
+		return nil
+	}
+
+	err := c.initTeamMembers(c.Spec.TeamID, false)
+	if err != nil {
+		return fmt.Errorf("Cannot create a team %q of admins owning the PG cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil

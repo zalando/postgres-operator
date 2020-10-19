@@ -31,6 +31,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
 		RestConfig:          c.config.RestConfig,
 		OpConfig:            config.Copy(c.opConfig),
+		PgTeamMap:           c.pgTeamMap,
 		InfrastructureRoles: infrastructureRoles,
 		PodServiceAccount:   c.PodServiceAccount,
 	}
@@ -395,25 +396,34 @@ func (c *Controller) getInfrastructureRole(
 	return roles, nil
 }
 
-func (c *Controller) loadPostgresTeams(obj interface{}) {
-	pgTeamMap := teams.PostgresTeamMap{}
+func (c *Controller) loadPostgresTeams() {
+	// reset team map
+	c.pgTeamMap = teams.PostgresTeamMap{}
 
-	pgTeam, ok := obj.(*acidv1.PostgresTeam)
-	if !ok {
-		c.logger.Errorf("could not cast to PostgresTeam spec")
-	}
-
-	pgTeams, err := c.KubeClient.AcidV1ClientSet.AcidV1().PostgresTeams(pgTeam.Namespace).List(context.TODO(), metav1.ListOptions{})
+	pgTeams, err := c.KubeClient.AcidV1ClientSet.AcidV1().PostgresTeams(c.opConfig.WatchedNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		c.logger.Errorf("could not list postgres team objects: %v", err)
 	}
 
-	pgTeamMap.Load(pgTeams)
+	c.pgTeamMap.Load(pgTeams)
 }
 
-func (c *Controller) updatePostgresTeams(prev, obj interface{}) {
-	c.logger.Debugf("reloading postgres team CRDs and overwriting cached map")
-	c.loadPostgresTeams(obj)
+func (c *Controller) postgresTeamAdd(obj interface{}) {
+	pgTeam, ok := obj.(*acidv1.PostgresTeam)
+	if !ok {
+		c.logger.Errorf("could not cast to PostgresTeam spec")
+	}
+	c.logger.Debugf("PostgreTeam %q added. Reloading postgres team CRDs and overwriting cached map", pgTeam.Name)
+	c.loadPostgresTeams()
+}
+
+func (c *Controller) postgresTeamUpdate(prev, obj interface{}) {
+	pgTeam, ok := obj.(*acidv1.PostgresTeam)
+	if !ok {
+		c.logger.Errorf("could not cast to PostgresTeam spec")
+	}
+	c.logger.Debugf("PostgreTeam %q updated. Reloading postgres team CRDs and overwriting cached map", pgTeam.Name)
+	c.loadPostgresTeams()
 }
 
 func (c *Controller) podClusterName(pod *v1.Pod) spec.NamespacedName {
