@@ -185,7 +185,11 @@ class EndToEndTestCase(unittest.TestCase):
         '''
 
         k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster,spilo-role={}'
+
+        self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
+                                 'ClusterIP',
+                                "Expected ClusterIP type initially, found {}")
 
         try:
             # enable load balancer services
@@ -198,13 +202,13 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_lbs)
             
-            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label + ',spilo-role=master'),
+            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
                                  'LoadBalancer',
                                 "Expected LoadBalancer service type for master, found {}")
 
-            repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
-            self.assertEqual(repl_svc_type, 'LoadBalancer',
-                             "Expected LoadBalancer service type for replica, found {}".format(repl_svc_type))
+            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("replica")),
+                                 'LoadBalancer',
+                                "Expected LoadBalancer service type for master, found {}")
 
             # disable load balancer services again
             pg_patch_disable_lbs = {
@@ -216,13 +220,13 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_lbs)
             
-            master_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=master')
-            self.assertEqual(master_svc_type, 'ClusterIP',
-                             "Expected ClusterIP service type for master, found {}".format(master_svc_type))
+            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
+                                 'ClusterIP',
+                                "Expected LoadBalancer service type for master, found {}")
 
-            repl_svc_type = k8s.get_service_type(cluster_label + ',spilo-role=replica')
-            self.assertEqual(repl_svc_type, 'ClusterIP',
-                             "Expected ClusterIP service type for replica, found {}".format(repl_svc_type))
+            self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("replica")),
+                                 'ClusterIP',
+                                "Expected LoadBalancer service type for master, found {}")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
