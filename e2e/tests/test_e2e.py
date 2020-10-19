@@ -35,6 +35,18 @@ class EndToEndTestCase(unittest.TestCase):
                     raise
                 time.sleep(interval)
 
+    def eventuallyNotEqual(self, f, x, m, retries=25, interval=2):
+        while True:
+            try:
+                y = f()
+                self.assertNotEqual(y, x, m.format(y))
+                return True
+            except AssertionError:
+                retries = retries -1
+                if not retries > 0:
+                    raise
+                time.sleep(interval)
+
     def eventuallyTrue(self, f, m, retries=25, interval=2):
         while True:
             try:
@@ -250,30 +262,35 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_infrastructure_roles)
 
-        # wait a little before proceeding
-        time.sleep(30)
-
         try:
             # check that new roles are represented in the config by requesting the
             # operator configuration via API
-            operator_pod = k8s.get_operator_pod()
-            get_config_cmd = "wget --quiet -O - localhost:8080/config"
-            result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
-            roles_dict = (json.loads(result.stdout)
-                          .get("controller", {})
-                          .get("InfrastructureRoles"))
 
-            self.assertTrue("robot_zmon_acid_monitoring_new" in roles_dict)
-            role = roles_dict["robot_zmon_acid_monitoring_new"]
-            role.pop("Password", None)
-            self.assertDictEqual(role, {
-                "Name": "robot_zmon_acid_monitoring_new",
-                "Flags": None,
-                "MemberOf": ["robot_zmon"],
-                "Parameters": None,
-                "AdminRole": "",
-                "Origin": 2,
-            })
+            def verify_role():
+                operator_pod = k8s.get_operator_pod()
+                get_config_cmd = "wget --quiet -O - localhost:8080/config"
+                result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
+                roles_dict = (json.loads(result.stdout)
+                            .get("controller", {})
+                            .get("InfrastructureRoles"))
+
+                if "robot_zmon_acid_monitoring_new" in roles_dict:
+                    role = roles_dict["robot_zmon_acid_monitoring_new"]
+                    role.pop("Password", None)
+                    self.assertDictEqual(role, {
+                        "Name": "robot_zmon_acid_monitoring_new",
+                        "Flags": None,
+                        "MemberOf": ["robot_zmon"],
+                        "Parameters": None,
+                        "AdminRole": "",
+                        "Origin": 2,
+                    })
+                    return True
+                else:
+                    return False
+
+            self.eventuallyTrue(verify_role, "infrastructure role setup is not loaded")
+            
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -308,18 +325,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             # restart the pod to get a container with the new image
-            k8s.api.core_v1.delete_namespaced_pod(pod0, 'default')
-            time.sleep(60)
-
-            # lazy update works if the restarted pod and older pods run different Spilo versions
-            new_image = k8s.get_effective_pod_image(pod0)
+            k8s.api.core_v1.delete_namespaced_pod(pod0, 'default')            
+            
+            # verify only pod-0 which was deleted got new image from statefulset
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Delete pod-0 did not get new spilo image")
             old_image = k8s.get_effective_pod_image(pod1)
-            self.assertNotEqual(new_image, old_image,
-                                "Lazy updated failed: pods have the same image {}".format(new_image))
-
-            # sanity check
-            assert_msg = "Image {} of a new pod differs from {} in operator conf".format(new_image, conf_image)
-            self.assertEqual(new_image, conf_image, assert_msg)
+            self.assertNotEqual(conf_image, old_image, "pod-1 should not have change Docker image to {}".format(old_image))
 
             # clean up
             unpatch_lazy_spilo_upgrade = {
@@ -332,15 +343,8 @@ class EndToEndTestCase(unittest.TestCase):
             # at this point operator will complete the normal rolling upgrade
             # so we additonally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
 
-            # XXX there is no easy way to wait until the end of Sync()
-            time.sleep(60)
-
-            image0 = k8s.get_effective_pod_image(pod0)
-            image1 = k8s.get_effective_pod_image(pod1)
-
-            assert_msg = "Disabling lazy upgrade failed: pods still have different \
-                images {} and {}".format(image0, image1)
-            self.assertEqual(image0, image1, assert_msg)
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Rolling upgrade was not executed")
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), conf_image, "Rolling upgrade was not executed")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -372,12 +376,9 @@ class EndToEndTestCase(unittest.TestCase):
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_enable_backup)
 
         try:
-            k8s.wait_for_logical_backup_job_creation()
+            self.eventuallyEqual(lambda: len(k8s.get_logical_backup_job()), 1, "failed to create logical backup job")
 
-            jobs = k8s.get_logical_backup_job().items
-            self.assertEqual(1, len(jobs), "Expected 1 logical backup job, found {}".format(len(jobs)))
-
-            job = jobs[0]
+            job = k8s.get_logical_backup_job().items[0]
             self.assertEqual(job.metadata.name, "logical-backup-acid-minimal-cluster",
                              "Expected job name {}, found {}"
                              .format("logical-backup-acid-minimal-cluster", job.metadata.name))
@@ -394,10 +395,12 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.update_config(patch_logical_backup_image)
 
-            jobs = k8s.get_logical_backup_job().items
-            actual_image = jobs[0].spec.job_template.spec.template.spec.containers[0].image
-            self.assertEqual(actual_image, image,
-                             "Expected job image {}, found {}".format(image, actual_image))
+            def get_docker_image():
+                jobs = k8s.get_logical_backup_job().items
+                return jobs[0].spec.job_template.spec.template.spec.containers[0].image
+                
+            self.eventuallyEqual(get_docker_image, image,
+                             "Expected job image {}, found {}".format(image, "{}"))
 
             # delete the logical backup cron job
             pg_patch_disable_backup = {
@@ -407,10 +410,8 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_disable_backup)
-            k8s.wait_for_logical_backup_job_deletion()
-            jobs = k8s.get_logical_backup_job().items
-            self.assertEqual(0, len(jobs),
-                             "Expected 0 logical backup jobs, found {}".format(len(jobs)))
+            
+            self.eventuallyEqual(lambda: len(self.get_logical_backup_job()), 0, "failed to create logical backup job")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -1040,6 +1041,9 @@ class K8s:
         '''
         pod = self.api.core_v1.list_namespaced_pod(
             namespace, label_selector="statefulset.kubernetes.io/pod-name=" + pod_name)
+        
+        if len(pod.items) == 0:
+            return None
         return pod.items[0].spec.containers[0].image
 
 

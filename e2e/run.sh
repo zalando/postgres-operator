@@ -36,7 +36,7 @@ function start_kind(){
   kind load docker-image "${operator_image}" --name ${cluster_name}
   docker pull "${spilo_image}"
   kind load docker-image "${spilo_image}" --name ${cluster_name}
-}
+} 
 
 function set_kind_api_server_ip(){
   echo "Setting up kind API server ip"
