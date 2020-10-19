@@ -780,7 +780,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// sync connection pooler
+	// Sync connection pooler. Before actually doing sync reset lookup
+	// installation flag, since manifest updates could add another db which we
+	// need to process. In the future we may want to do this more careful and
+	// check which databases we need to process, but even repeating the whole
+	// installation process should be good enough.
+	c.ConnectionPooler.LookupFunction = false
+
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
 		c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
