@@ -339,7 +339,7 @@ class EndToEndTestCase(unittest.TestCase):
         
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
-        
+
         self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), SPILO_CURRENT, "Rolling upgrade was not executed")
         self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), SPILO_CURRENT, "Rolling upgrade was not executed")
 
@@ -568,7 +568,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
 
             # toggle pod anti affinity to move replica away from master node
-            self.eventually(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label))
+            self.eventuallyTrue(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label), "Pods are redistributed")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -869,6 +869,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.update_config(patch_disable_antiaffinity)
         k8s.wait_for_pod_start('spilo-role=master')
         k8s.wait_for_pod_start('spilo-role=replica')
+        return True
 
 
 class K8sApi:
