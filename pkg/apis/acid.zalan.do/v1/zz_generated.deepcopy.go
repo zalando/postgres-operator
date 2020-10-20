@@ -104,6 +104,7 @@ func (in *ConnectionPooler) DeepCopyInto(out *ConnectionPooler) {
 		*out = new(int32)
 		**out = **in
 	}
+	in.NodeAffinity.DeepCopyInto(&out.NodeAffinity)
 	out.Resources = in.Resources
 	return
 }
