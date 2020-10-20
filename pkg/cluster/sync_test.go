@@ -19,10 +19,10 @@ func int32ToPointer(value int32) *int32 {
 }
 
 func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
-	for _, role := range cluster.RolesConnectionPooler() {
-		if cluster.ConnectionPooler.Deployment[role] != nil &&
-			(cluster.ConnectionPooler.Deployment[role].Spec.Replicas == nil ||
-				*cluster.ConnectionPooler.Deployment[role].Spec.Replicas != 2) {
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		if cluster.ConnectionPooler[role] != nil && cluster.ConnectionPooler[role].Deployment != nil &&
+			(cluster.ConnectionPooler[role].Deployment.Spec.Replicas == nil ||
+				*cluster.ConnectionPooler[role].Deployment.Spec.Replicas != 2) {
 			return fmt.Errorf("Wrong number of instances")
 		}
 	}
@@ -35,11 +35,11 @@ func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
-		if cluster.ConnectionPooler.Deployment[role] == nil {
+		if cluster.ConnectionPooler[role].Deployment == nil {
 			return fmt.Errorf("Deployment was not saved %s", role)
 		}
 
-		if cluster.ConnectionPooler.Service[role] == nil {
+		if cluster.ConnectionPooler[role].Service == nil {
 			return fmt.Errorf("Service was not saved %s", role)
 		}
 	}
@@ -52,11 +52,11 @@ func MasterobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	if cluster.ConnectionPooler.Deployment[Master] == nil {
+	if cluster.ConnectionPooler[Master].Deployment == nil {
 		return fmt.Errorf("Deployment was not saved")
 	}
 
-	if cluster.ConnectionPooler.Service[Master] == nil {
+	if cluster.ConnectionPooler[Master].Service == nil {
 		return fmt.Errorf("Service was not saved")
 	}
 
@@ -68,11 +68,11 @@ func ReplicaobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) erro
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	if cluster.ConnectionPooler.Deployment[Replica] == nil {
+	if cluster.ConnectionPooler[Replica].Deployment == nil {
 		return fmt.Errorf("Deployment was not saved")
 	}
 
-	if cluster.ConnectionPooler.Service[Replica] == nil {
+	if cluster.ConnectionPooler[Replica].Service == nil {
 		return fmt.Errorf("Service was not saved")
 	}
 
@@ -80,8 +80,11 @@ func ReplicaobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) erro
 }
 
 func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
-	if cluster.ConnectionPooler != nil {
-		return fmt.Errorf("Connection pooler was not deleted")
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		if cluster.ConnectionPooler[role] != nil &&
+			(cluster.ConnectionPooler[role].Deployment != nil || cluster.ConnectionPooler[role].Service != nil) {
+			return fmt.Errorf("Connection pooler was not deleted for role %v", cluster.ConnectionPooler[role])
+		}
 	}
 
 	return nil
@@ -89,8 +92,8 @@ func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
 
 func OnlyMasterDeleted(cluster *Cluster, err error, reason SyncReason) error {
 
-	if cluster.ConnectionPooler != nil &&
-		(cluster.ConnectionPooler.Deployment[Master] != nil || cluster.ConnectionPooler.Service[Master] != nil) {
+	if cluster.ConnectionPooler[Master] != nil &&
+		(cluster.ConnectionPooler[Master].Deployment != nil || cluster.ConnectionPooler[Master].Service != nil) {
 		return fmt.Errorf("Connection pooler master was not deleted")
 	}
 	return nil
@@ -98,8 +101,8 @@ func OnlyMasterDeleted(cluster *Cluster, err error, reason SyncReason) error {
 
 func OnlyReplicaDeleted(cluster *Cluster, err error, reason SyncReason) error {
 
-	if cluster.ConnectionPooler != nil &&
-		(cluster.ConnectionPooler.Deployment[Replica] != nil || cluster.ConnectionPooler.Service[Replica] != nil) {
+	if cluster.ConnectionPooler[Replica] != nil &&
+		(cluster.ConnectionPooler[Replica].Deployment != nil || cluster.ConnectionPooler[Replica].Service != nil) {
 		return fmt.Errorf("Connection pooler replica was not deleted")
 	}
 	return nil
@@ -152,21 +155,38 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 
 	clusterDirtyMock := newCluster()
 	clusterDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
-	clusterDirtyMock.ConnectionPooler = &ConnectionPoolerObjects{
-		Deployment: make(map[PostgresRole]*appsv1.Deployment),
-		Service:    make(map[PostgresRole]*v1.Service),
-	}
-	clusterDirtyMock.ConnectionPooler.Deployment[Master] = &appsv1.Deployment{}
-	clusterDirtyMock.ConnectionPooler.Service[Master] = &v1.Service{}
-	clusterReplicaDirtyMock := newCluster()
-	clusterReplicaDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
-	clusterReplicaDirtyMock.ConnectionPooler = &ConnectionPoolerObjects{
-		Deployment: make(map[PostgresRole]*appsv1.Deployment),
-		Service:    make(map[PostgresRole]*v1.Service),
+	clusterDirtyMock.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+		},
+		Replica: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+		},
 	}
 
-	clusterDirtyMock.ConnectionPooler.Deployment[Replica] = &appsv1.Deployment{}
-	clusterDirtyMock.ConnectionPooler.Service[Replica] = &v1.Service{}
+	clusterDirtyMock.ConnectionPooler[Master].Deployment = &appsv1.Deployment{}
+	clusterDirtyMock.ConnectionPooler[Master].Service = &v1.Service{}
+	clusterReplicaDirtyMock := newCluster()
+	clusterReplicaDirtyMock.KubeClient = k8sutil.NewMockKubernetesClient()
+	clusterReplicaDirtyMock.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+		},
+		Replica: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+		},
+	}
+
+	clusterDirtyMock.ConnectionPooler[Replica].Deployment = &appsv1.Deployment{}
+	clusterDirtyMock.ConnectionPooler[Replica].Service = &v1.Service{}
 
 	clusterNewDefaultsMock := newCluster()
 	clusterNewDefaultsMock.KubeClient = k8sutil.NewMockKubernetesClient()
@@ -321,7 +341,7 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          clusterMock,
+			cluster:          clusterDirtyMock,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            OnlyReplicaDeleted,
@@ -338,6 +358,27 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
 			check:            objectsAreDeleted,
+		},
+		{
+			subTest: "update deployment",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPooler: &acidv1.ConnectionPooler{
+						NumberOfInstances: int32ToPointer(1),
+					},
+				},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPooler: &acidv1.ConnectionPooler{
+						NumberOfInstances: int32ToPointer(2),
+					},
+				},
+			},
+			cluster:          clusterMock,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            deploymentUpdated,
 		},
 		{
 			subTest: "update deployment",

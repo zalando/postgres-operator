@@ -32,6 +32,8 @@ type ConnectionPoolerObjects struct {
 	// this, we can remember the result in memory at least until the next
 	// restart.
 	LookupFunction bool
+	// Careful with referencing cluster.spec this object pointer changes during runtime and lifetime of cluster
+	// Cluster *cluster
 }
 
 func (c *Cluster) connectionPoolerName(role PostgresRole) string {
@@ -39,43 +41,42 @@ func (c *Cluster) connectionPoolerName(role PostgresRole) string {
 	if role == Replica {
 		name = name + "-repl"
 	}
-	c.logger.Warningf("found connection pooler name is %s , clustername is %s", name, c.Name)
 	return name
 }
 
 // isConnectionPoolerEnabled
-func (c *Cluster) needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
+func (c *Cluster) needConnectionPooler() bool {
+	return needMasterConnectionPoolerWorker(&c.Spec) || needReplicaConnectionPoolerWorker(&c.Spec)
+}
+
+func (c *Cluster) needMasterConnectionPooler() bool {
+	return needMasterConnectionPoolerWorker(&c.Spec)
+}
+
+func needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) || (spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
 }
 
-func (c *Cluster) needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
+func (c *Cluster) needReplicaConnectionPooler() bool {
+	return needReplicaConnectionPoolerWorker(&c.Spec)
+}
+
+func needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 	return spec.EnableReplicaConnectionPooler != nil && *spec.EnableReplicaConnectionPooler
-}
-
-//TODO: use spec from cluster, or include connection pooler related flags to connection pooler package itself
-func (c *Cluster) needMasterConnectionPooler() bool {
-	return c.needMasterConnectionPoolerWorker(&c.Spec)
-}
-
-func (c *Cluster) needConnectionPooler() bool {
-	return c.needMasterConnectionPoolerWorker(&c.Spec) || c.needReplicaConnectionPoolerWorker(&c.Spec)
 }
 
 // RolesConnectionPooler gives the list of roles which need connection pooler
 func (c *Cluster) RolesConnectionPooler() []PostgresRole {
 	roles := make([]PostgresRole, 2)
 
-	if c.needMasterConnectionPoolerWorker(&c.Spec) {
+	if needMasterConnectionPoolerWorker(&c.Spec) {
 		roles = append(roles, Master)
 	}
-	if c.needMasterConnectionPoolerWorker(&c.Spec) {
+	if needMasterConnectionPoolerWorker(&c.Spec) {
 		roles = append(roles, Replica)
 	}
+	c.logger.Warningf("roles found are %v", roles)
 	return roles
-}
-
-func (c *Cluster) needReplicaConnectionPooler() bool {
-	return c.needReplicaConnectionPoolerWorker(&c.Spec)
 }
 
 // Return connection pooler labels selector, which should from one point of view
@@ -91,7 +92,7 @@ func (c *Cluster) connectionPoolerLabelsSelector(role PostgresRole) *metav1.Labe
 		"application":            "db-connection-pooler",
 		"role":                   string(role),
 		"cluster-name":           c.Name,
-		"Namesapce":              c.Namespace,
+		"Namespace":              c.Namespace,
 	})
 
 	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, c.labelsSet(false))
@@ -136,12 +137,18 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction, role PostgresRo
 		return nil, fmt.Errorf(msg, err)
 	}
 	if c.ConnectionPooler == nil {
-		c.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{role: {
-			Deployment:     nil,
-			Service:        nil,
-			LookupFunction: false,
-		}}
-		c.logger.Warningf("in creation, now the initialised object is %v %v", c.ConnectionPooler, c.ConnectionPooler[role])
+		c.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+			Master: {
+				Deployment:     nil,
+				Service:        nil,
+				LookupFunction: false,
+			},
+			Replica: {
+				Deployment:     nil,
+				Service:        nil,
+				LookupFunction: false,
+			},
+		}
 	}
 	deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, role)
 	if err != nil {
@@ -466,7 +473,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 	// Lack of connection pooler objects is not a fatal error, just log it if
 	// it was present before in the manifest
-	if c == nil {
+	if c == nil || role == "" {
 		c.logger.Infof("No connection pooler to delete")
 		return nil
 	}
@@ -494,7 +501,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 			return fmt.Errorf("could not delete deployment: %v", err)
 		}
 
-		c.logger.Infof("Connection pooler deployment %q has been deleted", c.connectionPoolerName(role))
+		c.logger.Infof("Connection pooler deployment %q has been deleted for role %s", c.connectionPoolerName(role), role)
 	}
 
 	// Repeat the same for the service object
@@ -513,7 +520,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 			return fmt.Errorf("could not delete service: %v", err)
 		}
 
-		c.logger.Infof("Connection pooler service %q has been deleted", c.connectionPoolerName(role))
+		c.logger.Infof("Connection pooler service %q has been deleted for role %s", c.connectionPoolerName(role), role)
 	}
 	// Repeat the same for the secret object
 	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
@@ -530,7 +537,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 		}
 	}
 
-	c = nil
+	c.ConnectionPooler = nil
 	return nil
 }
 
@@ -717,14 +724,12 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 	// Check and perform the sync requirements for each of the roles.
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		if role == Master {
-			newNeedConnectionPooler = c.needMasterConnectionPoolerWorker(&newSpec.Spec)
-			oldNeedConnectionPooler = c.needMasterConnectionPoolerWorker(&oldSpec.Spec)
+			newNeedConnectionPooler = needMasterConnectionPoolerWorker(&newSpec.Spec)
+			oldNeedConnectionPooler = needMasterConnectionPoolerWorker(&oldSpec.Spec)
 		} else {
-			newNeedConnectionPooler = c.needReplicaConnectionPoolerWorker(&newSpec.Spec)
-			oldNeedConnectionPooler = c.needReplicaConnectionPoolerWorker(&oldSpec.Spec)
+			newNeedConnectionPooler = needReplicaConnectionPoolerWorker(&newSpec.Spec)
+			oldNeedConnectionPooler = needReplicaConnectionPoolerWorker(&oldSpec.Spec)
 		}
-		c.logger.Warningf("in sync, the current role is %s", role)
-		c.logger.Warningf("in sync, the current object is %v", c.ConnectionPooler)
 		if c.ConnectionPooler == nil {
 			c.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
 				Master: {
@@ -739,14 +744,13 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 				},
 			}
 		}
-		c.logger.Warningf("in sync, now the initialised object is %v %v", c.ConnectionPooler, c.ConnectionPooler[role])
 		if newNeedConnectionPooler {
 			// Try to sync in any case. If we didn't needed connection pooler before,
 			// it means we want to create it. If it was already present, still sync
 			// since it could happen that there is no difference in specs, and all
 			// the resources are remembered, but the deployment was manually deleted
 			// in between
-			c.logger.Debug("syncing connection pooler for the role %s", role)
+			c.logger.Debugf("syncing connection pooler for the role %s", role)
 
 			// in this case also do not forget to install lookup function as for
 			// creating cluster
@@ -780,23 +784,8 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 			}
 		}
 
-		if oldNeedConnectionPooler && !newNeedConnectionPooler {
+		if !newNeedConnectionPooler {
 			// delete and cleanup resources
-			if c.ConnectionPooler[role] != nil &&
-				(c.ConnectionPooler[role].Deployment != nil ||
-					c.ConnectionPooler[role].Service != nil) {
-
-				if err = c.deleteConnectionPooler(role); err != nil {
-					c.logger.Warningf("could not remove connection pooler: %v", err)
-				}
-			}
-			if c.ConnectionPooler[role] != nil && c.ConnectionPooler[role].Deployment == nil && c.ConnectionPooler[role].Service == nil {
-				c.ConnectionPooler[role] = nil
-			}
-		}
-
-		if !oldNeedConnectionPooler && !newNeedConnectionPooler {
-			// delete and cleanup resources if not empty
 			if c.ConnectionPooler[role] != nil &&
 				(c.ConnectionPooler[role].Deployment != nil ||
 					c.ConnectionPooler[role].Service != nil) {
@@ -811,7 +800,6 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 	return reason, nil
 }
 
-//TODO use Kubeclient, AnnotationsToPropagate from cluster package
 // Synchronize connection pooler resources. Effectively we're interested only in
 // synchronizing the corresponding deployment, but in case of deployment or
 // service is missing, create it. After checking, also remember an object for

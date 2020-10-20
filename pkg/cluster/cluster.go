@@ -330,27 +330,23 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	if c.needConnectionPooler() {
+	for _, r := range c.RolesConnectionPooler() {
+		c.logger.Infof("Enabling connection pooler for %s", r)
 
-		roles := c.RolesConnectionPooler()
-		for _, r := range roles {
-			c.logger.Warningf("found roles are %v", r)
+		if c.ConnectionPooler[r] != nil {
+			c.logger.Warningf("Connection pooler %s already exists in the cluster for the role %s", c.connectionPoolerName(r), r)
+			return nil
 		}
 
-		for _, r := range c.RolesConnectionPooler() {
-			if c.ConnectionPooler[r] != nil {
-				c.logger.Warning("Connection pooler already exists in the cluster")
-				return nil
-			}
-			connectionPooler, err := c.createConnectionPooler(c.installLookupFunction, r)
-			if err != nil {
-				c.logger.Warningf("could not create connection pooler: %v", err)
-				return nil
-			}
-			c.logger.Infof("connection pooler %q has been successfully created for the role %v",
-				util.NameFromMeta(connectionPooler.Deployment.ObjectMeta), r)
+		connectionPooler, err := c.createConnectionPooler(c.installLookupFunction, r)
+		if err != nil {
+			c.logger.Warningf("could not create connection pooler: %v", err)
+			return nil
 		}
+		c.logger.Infof("connection pooler %q has been successfully created for the role %v",
+			util.NameFromMeta(connectionPooler.Deployment.ObjectMeta), r)
 	}
+
 	return nil
 }
 
@@ -639,7 +635,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// initUsers. Check if it needs to be called.
 	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
 		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
-	needConnectionPooler := c.needMasterConnectionPoolerWorker(&newSpec.Spec)
+	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {

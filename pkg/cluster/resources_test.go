@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func mockInstallLookupFunction(schema string, user string) error {
+func mockInstallLookupFunction(schema string, user string, role PostgresRole) error {
 	return nil
 }
 
@@ -48,19 +48,19 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 		ConnectionPooler:              &acidv1.ConnectionPooler{},
 		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
-	poolerResources, err := cluster.createConnectionPooler(mockInstallLookupFunction)
-
-	if err != nil {
-		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
-			testName, err, poolerResources)
-	}
-
 	for _, role := range cluster.RolesConnectionPooler() {
-		if poolerResources.Deployment[role] == nil {
+		poolerResources, err := cluster.createConnectionPooler(mockInstallLookupFunction, Master)
+
+		if err != nil {
+			t.Errorf("%s: Cannot create connection pooler, %s, %+v",
+				testName, err, poolerResources)
+		}
+
+		if poolerResources.Deployment == nil {
 			t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
 		}
 
-		if poolerResources.Service[role] == nil {
+		if poolerResources.Service == nil {
 			t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
 		}
 
