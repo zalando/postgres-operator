@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio-configmap
+data:
+  MINIO_ACCESS_KEY: WU9VUkFDQ0VTU0tFWQo=
+  MINIO_SECRET_KEY: WU9VUlNFQ1JFVEtFWQo=

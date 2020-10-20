@@ -55,6 +55,7 @@ function deploy_minio(){
  echo "Deploying MinIO object storage..."
  /tmp/helm-postgres-operator-e2e-tests/helm repo update
  /tmp/helm-postgres-operator-e2e-tests/helm install --generate-name minio/minio
+ kubectl create file manifests/minio-configmap.yaml
 }
 
 function run_tests(){

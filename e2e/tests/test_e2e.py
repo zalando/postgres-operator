@@ -10,6 +10,9 @@ import yaml
 from datetime import datetime
 from kubernetes import client, config
 
+from minio import Minio
+from minio.error import ResponseError
+
 
 def to_selector(labels):
     return ",".join(["=".join(l) for l in labels.items()])
@@ -35,6 +38,18 @@ class EndToEndTestCase(unittest.TestCase):
         next invocation of "make test" will re-create it.
         '''
         print("Test Setup being executed")
+
+        # create Minio bucket to store WAL
+        minioClient = Minio(
+        'play.min.io',
+        access_key=os.environ['ACCESS_KEY'],
+        secret_key=os.environ['SECRET_KEY']
+        )
+
+        try:
+            minioClient.make_bucket("minio/wal", location="us-east-1")
+        except ResponseError as err:
+            raise
 
         # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
