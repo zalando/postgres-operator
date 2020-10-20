@@ -330,21 +330,10 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	for _, r := range c.RolesConnectionPooler() {
-		c.logger.Infof("Enabling connection pooler for %s", r)
-
-		if c.ConnectionPooler[r] != nil {
-			c.logger.Warningf("Connection pooler %s already exists in the cluster for the role %s", c.connectionPoolerName(r), r)
-			return nil
-		}
-
-		connectionPooler, err := c.createConnectionPooler(c.installLookupFunction, r)
-		if err != nil {
-			c.logger.Warningf("could not create connection pooler: %v", err)
-			return nil
-		}
-		c.logger.Infof("connection pooler %q has been successfully created for the role %v",
-			util.NameFromMeta(connectionPooler.Deployment.ObjectMeta), r)
+	c.createConnectionPooler(c.installLookupFunction)
+	if err != nil {
+		c.logger.Warningf("could not create connection pooler: %v", err)
+		return nil
 	}
 
 	return nil

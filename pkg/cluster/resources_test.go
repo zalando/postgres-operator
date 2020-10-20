@@ -49,18 +49,18 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
 	for _, role := range cluster.RolesConnectionPooler() {
-		poolerResources, err := cluster.createConnectionPooler(mockInstallLookupFunction, Master)
+		reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
 
 		if err != nil {
 			t.Errorf("%s: Cannot create connection pooler, %s, %+v",
-				testName, err, poolerResources)
+				testName, err, reason)
 		}
 
-		if poolerResources.Deployment == nil {
+		if cluster.ConnectionPooler[role].Deployment == nil {
 			t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
 		}
 
-		if poolerResources.Service == nil {
+		if cluster.ConnectionPooler[role].Service == nil {
 			t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
 		}
 

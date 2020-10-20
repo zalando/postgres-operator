@@ -1022,18 +1022,6 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
-	var clusterNoDefaultRes = New(
-		Config{
-			OpConfig: config.Config{
-				ProtectedRoles: []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-				ConnectionPooler: config.ConnectionPooler{},
-			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error { return nil }
 
 	tests := []struct {
@@ -1092,7 +1080,7 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 	}
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		for _, tt := range tests {
-			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(tt.spec, role)
+			podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(role)
 
 			if err != tt.expected && err.Error() != tt.expected.Error() {
 				t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
@@ -1199,7 +1187,7 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		deployment, err := tt.cluster.generateConnectionPoolerDeployment(tt.spec, Master)
+		deployment, err := tt.cluster.generateConnectionPoolerDeployment(Master)
 
 		if err != tt.expected && err.Error() != tt.expected.Error() {
 			t.Errorf("%s [%s]: Could not generate deployment spec,\n %+v, expected\n %+v",
