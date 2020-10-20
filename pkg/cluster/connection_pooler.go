@@ -150,7 +150,7 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction, role PostgresRo
 			},
 		}
 	}
-	deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec, role)
+	deploymentSpec, err := c.generateConnectionPoolerDeployment(role)
 	if err != nil {
 		msg = "could not generate deployment for connection pooler: %v"
 		return nil, fmt.Errorf(msg, err)
@@ -202,7 +202,8 @@ func (c *Cluster) createConnectionPooler(lookup InstallFunction, role PostgresRo
 // 	have to wait for spinning up a new connections.
 //
 // RESERVE_SIZE is how many additional connections to allow for a pooler.
-func (c *Cluster) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
+func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
+	spec := &c.Spec
 	effectiveMode := util.Coalesce(
 		spec.ConnectionPooler.Mode,
 		c.OpConfig.ConnectionPooler.Mode)
@@ -261,9 +262,9 @@ func (c *Cluster) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.Env
 	}
 }
 
-func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec, role PostgresRole) (
+func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	*v1.PodTemplateSpec, error) {
-
+	spec := &c.Spec
 	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
 	resources, err := generateResourceRequirements(
 		spec.ConnectionPooler.Resources,
@@ -322,7 +323,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec,
 			},
 		},
 	}
-	envVars = append(envVars, c.getConnectionPoolerEnvVars(spec)...)
+	envVars = append(envVars, c.getConnectionPoolerEnvVars()...)
 
 	poolerContainer := v1.Container{
 		Name:            connectionPoolerContainer,
@@ -364,8 +365,9 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec,
 	return podTemplate, nil
 }
 
-func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec, role PostgresRole) (
+func (c *Cluster) generateConnectionPoolerDeployment(role PostgresRole) (
 	*appsv1.Deployment, error) {
+	spec := &c.Spec
 
 	// there are two ways to enable connection pooler, either to specify a
 	// connectionPooler section or enableConnectionPooler. In the second case
@@ -377,7 +379,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec, 
 		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
 
-	podTemplate, err := c.generateConnectionPoolerPodTemplate(spec, role)
+	podTemplate, err := c.generateConnectionPoolerPodTemplate(role)
 	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
@@ -815,7 +817,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		msg := "Deployment %s for connection pooler synchronization is not found, create it"
 		c.logger.Warningf(msg, c.connectionPoolerName(role))
 
-		deploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec, role)
+		deploymentSpec, err := c.generateConnectionPoolerDeployment(role)
 		if err != nil {
 			msg = "could not generate deployment for connection pooler: %v"
 			return NoSync, fmt.Errorf(msg, err)
@@ -861,7 +863,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		if specSync || defaultsSync {
 			c.logger.Infof("Update connection pooler deployment %s, reason: %+v",
 				c.connectionPoolerName(role), reason)
-			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(&newSpec.Spec, role)
+			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(role)
 			if err != nil {
 				msg := "could not generate deployment for connection pooler: %v"
 				return reason, fmt.Errorf(msg, err)
