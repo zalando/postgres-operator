@@ -48,8 +48,8 @@ function set_kind_api_server_ip(){
 }
 
 function run_tests(){
-  echo "Running tests..."
-
+  echo "Running tests... image: ${e2e_test_runner_image}"
+  echo $@
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
 
   docker run --rm --network=host -e "TERM=xterm-256color" \
@@ -57,7 +57,7 @@ function run_tests(){
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
-  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}"
+  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}" $@
 }
 
 function clean_up(){
@@ -68,13 +68,14 @@ function clean_up(){
 }
 
 function main(){
-
+  echo "Entering main function..."
   [[ -z ${NOCLEANUP-} ]] && trap "clean_up" QUIT TERM EXIT
   pull_images
   [[ ! -f ${kubeconfig_path} ]] && start_kind
   set_kind_api_server_ip
-  run_tests
+  shift
+  run_tests $@
   exit 0
 }
 
-"$@"
+"$1" $@

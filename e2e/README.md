@@ -40,6 +40,25 @@ To run the end 2 end test and keep the kind state execute:
 NOCLEANUP=True ./run.sh
 ```
 
+## Run indidual test
+
+After having executed a normal E2E run with `NOCLEANUP=True` Kind still continues to run, allowing you subsequent test runs.
+
+To run an individual test, run the following command in the `e2e` directory
+
+```bash
+NOCLEANUP=True ./run.sh main tests.test_e2e.EndToEndTestCase.test_lazy_spilo_upgrade
+```
+
+## Inspecting Kind
+
+If you want to inspect Kind/Kubernetes cluster, use the following script to exec into the K8s setup and then use `kubectl`
+
+```bash
+./run_test_image.sh
+kubectl get pods
+```
+
 ## Covered use cases
 
 The current tests are all bundled in [`test_e2e.py`](tests/test_e2e.py):

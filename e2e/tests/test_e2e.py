@@ -1069,7 +1069,10 @@ class K8s:
                               stderr=subprocess.PIPE)
 
     def get_patroni_state(self, pod):
-        return json.loads(self.exec_with_kubectl(pod, "patronictl list -f json").stdout)
+        r = self.exec_with_kubectl(pod, "patronictl list -f json")
+        if not r.returncode == 0 or not r.stdout.decode()[0:1]=="[":
+            return []
+        return json.loads(r.stdout.decode())
 
     def get_patroni_running_members(self, pod):
         result = self.get_patroni_state(pod)
