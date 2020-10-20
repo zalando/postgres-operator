@@ -295,7 +295,6 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
 	}
 
-	c.initPodServiceAccount()
 	c.initSharedInformers()
 
 	if c.opConfig.DebugLogging {
