@@ -15,7 +15,6 @@ rules:
   resources:
   - postgresqls
   - postgresqls/status
-  - postgresteams
   - operatorconfigurations
   verbs:
   - create
@@ -25,6 +24,15 @@ rules:
   - list
   - patch
   - update
+  - watch
+# operator only reads PostgresTeams
+- apiGroups:
+  - acid.zalan.do
+  resources:
+  - postgresteams
+  verbs:
+  - get
+  - list
   - watch
 # to create or get/update CRDs when starting up
 - apiGroups:

@@ -269,6 +269,67 @@ to choose superusers, group roles, [PAM configuration](https://github.com/CyberD
 etc. An OAuth2 token can be passed to the Teams API via a secret. The name for
 this secret is configurable with the `oauth_token_secret_name` parameter.
 
+### Additional teams and members per cluster
+
+Postgres clusters are associated with one team by providing the `teamID` in
+the manifest. Additional superuser teams can be configured as mentioned in
+the previous paragraph. However, this is a global setting. To assign
+additional teams, superuser teams and single users to clusters of a given
+team, use the [PostgresTeam CRD](../manifests/postgresteam.yaml). It provides
+a simple mapping structure.
+
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: PostgresTeam
+metadata:
+  name: custom-team-membership
+spec:
+  additionalSuperuserTeams:
+    acid:
+    - "postgres_superusers"
+  additionalTeams:
+    acid: []
+  additionalMembers:
+    acid:
+    - "elephant"
+```
+
+One `PostgresTeam` resource could contain mappings of multiple teams but you
+can choose to create separate CRDs, alternatively. On each CRD creation or
+update the operator will gather all mappings to create additional human users
+in databases the next time they are synced. Additional teams are resolved
+transitively, meaning you will also add users for their `additionalTeams`
+or (not and) `additionalSuperuserTeams`.
+
+For each additional team the Teams API would be queried. Additional members
+will be added either way. There can be "virtual teams" that do not exists in
+your Teams API but users of associated teams as well as members will get
+created. With `PostgresTeams` it's also easy to cover team name changes. Just
+add the mapping between old and new team name and the rest can stay the same.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: PostgresTeam
+metadata:
+  name: virtualteam-membership
+spec:
+  additionalSuperuserTeams:
+    acid:
+    - "virtual_superusers"
+    virtual_superusers:
+    - "real_teamA"
+    - "real_teamB"
+    real_teamA:
+    - "real_teamA_renamed"
+  additionalTeams:
+    real_teamA:
+    - "real_teamA_renamed"
+  additionalMembers:
+    virtual_superusers:
+    - "foo"
+```
+
 ## Prepared databases with roles and default privileges
 
 The `users` section in the manifests only allows for creating database roles

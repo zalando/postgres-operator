@@ -36,11 +36,11 @@ spec:
           properties:
             additionalSuperuserTeams:
               type: object
-              description: "Map for teamId and associted additional admin teams"
+              description: "Map for teamId and associted additional superuser teams"
               additionalProperties:
                 type: array
                 nullable: true
-                description: "List of teams to become Postgres admins"
+                description: "List of teams to become Postgres superusers"
                 items:
                   type: string
             additionalTeams:
