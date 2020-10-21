@@ -34,6 +34,7 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 					ConnectionPoolerDefaultCPULimit:      "100m",
 					ConnectionPoolerDefaultMemoryRequest: "100Mi",
 					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    int32ToPointer(1),
 				},
 			},
 		}, k8sutil.NewMockKubernetesClient(), acidv1.Postgresql{}, logger, eventRecorder)
@@ -48,25 +49,27 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 		ConnectionPooler:              &acidv1.ConnectionPooler{},
 		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
+
+	reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
+
+	if err != nil {
+		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
+			testName, err, reason)
+	}
 	for _, role := range cluster.RolesConnectionPooler() {
-		reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
+		if cluster.ConnectionPooler[role] != nil {
+			if cluster.ConnectionPooler[role].Deployment == nil {
+				t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
+			}
 
-		if err != nil {
-			t.Errorf("%s: Cannot create connection pooler, %s, %+v",
-				testName, err, reason)
-		}
+			if cluster.ConnectionPooler[role].Service == nil {
+				t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
+			}
 
-		if cluster.ConnectionPooler[role].Deployment == nil {
-			t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
-		}
-
-		if cluster.ConnectionPooler[role].Service == nil {
-			t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
-		}
-
-		err = cluster.deleteConnectionPooler(role)
-		if err != nil {
-			t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
+			err = cluster.deleteConnectionPooler(role)
+			if err != nil {
+				t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
+			}
 		}
 	}
 }

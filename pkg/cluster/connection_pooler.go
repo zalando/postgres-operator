@@ -75,7 +75,6 @@ func (c *Cluster) RolesConnectionPooler() []PostgresRole {
 	if needMasterConnectionPoolerWorker(&c.Spec) {
 		roles = append(roles, Replica)
 	}
-	c.logger.Warningf("roles found are %v", roles)
 	return roles
 }
 
@@ -451,7 +450,9 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	// Repeat the same for the service object
 	var service *v1.Service
 	service = c.ConnectionPooler[role].Service
-
+	if service == nil {
+		c.logger.Infof("nil service to be deleted")
+	}
 	if service != nil {
 
 		err = c.KubeClient.
@@ -579,7 +580,6 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(spec *acidv1.ConnectionPooler
 	if spec == nil {
 		spec = &acidv1.ConnectionPooler{}
 	}
-
 	if spec.NumberOfInstances == nil &&
 		*deployment.Spec.Replicas != *config.NumberOfInstances {
 
@@ -669,10 +669,6 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 	// Check and perform the sync requirements for each of the roles.
 	for _, role := range [2]PostgresRole{Master, Replica} {
 
-		if c.ConnectionPooler[role] != nil {
-			c.logger.Warningf("Connection pooler %s already exists in the cluster for the role %s", c.connectionPoolerName(role), role)
-			return NoSync, nil
-		}
 		if role == Master {
 			newNeedConnectionPooler = needMasterConnectionPoolerWorker(&newSpec.Spec)
 			if oldSpec != nil {
@@ -839,8 +835,6 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 				return reason, err
 			}
 			c.ConnectionPooler[role].Deployment = deployment
-
-			return reason, nil
 		}
 	}
 

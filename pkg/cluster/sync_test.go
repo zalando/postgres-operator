@@ -83,7 +83,7 @@ func objectsAreDeleted(cluster *Cluster, err error, reason SyncReason) error {
 	for _, role := range [2]PostgresRole{Master, Replica} {
 		if cluster.ConnectionPooler[role] != nil &&
 			(cluster.ConnectionPooler[role].Deployment != nil || cluster.ConnectionPooler[role].Service != nil) {
-			return fmt.Errorf("Connection pooler was not deleted for role %v", cluster.ConnectionPooler[role])
+			return fmt.Errorf("Connection pooler was not deleted for role %v", role)
 		}
 	}
 

@@ -1021,6 +1021,17 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+	var clusterNoDefaultRes = New(
+		Config{
+			OpConfig: config.Config{
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				ConnectionPooler: config.ConnectionPooler{},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error { return nil }
 
