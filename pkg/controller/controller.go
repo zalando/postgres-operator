@@ -1,9 +1,12 @@
 package controller
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -190,10 +193,18 @@ func (c *Controller) warnOnDeprecatedOperatorParameters() {
 	}
 }
 
+func compactValue(v string) string {
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, []byte(v)); err != nil {
+		panic("Hard coded json strings broken!")
+	}
+	return compact.String()
+}
+
 func (c *Controller) initPodServiceAccount() {
 
 	if c.opConfig.PodServiceAccountDefinition == "" {
-		c.opConfig.PodServiceAccountDefinition = `
+		stringValue := `
 		{
 			"apiVersion": "v1",
 			"kind": "ServiceAccount",
@@ -201,6 +212,9 @@ func (c *Controller) initPodServiceAccount() {
 				"name": "postgres-pod"
 			}
 		}`
+
+		c.opConfig.PodServiceAccountDefinition = compactValue(stringValue)
+
 	}
 
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
@@ -230,7 +244,7 @@ func (c *Controller) initRoleBinding() {
 	// operator binds it to the cluster role with sufficient privileges
 	// we assume the role is created by the k8s administrator
 	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
-		c.opConfig.PodServiceAccountRoleBindingDefinition = fmt.Sprintf(`
+		stringValue := fmt.Sprintf(`
 		{
 			"apiVersion": "rbac.authorization.k8s.io/v1",
 			"kind": "RoleBinding",
@@ -249,6 +263,7 @@ func (c *Controller) initRoleBinding() {
 				}
 			]
 		}`, c.PodServiceAccount.Name, c.PodServiceAccount.Name, c.PodServiceAccount.Name)
+		c.opConfig.PodServiceAccountRoleBindingDefinition = compactValue(stringValue)
 	}
 	c.logger.Info("Parse role bindings")
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
@@ -267,7 +282,14 @@ func (c *Controller) initRoleBinding() {
 
 	}
 
-	// actual roles bindings are deployed at the time of Postgres/Spilo cluster creation
+	// actual roles bindings ar*logrus.Entrye deployed at the time of Postgres/Spilo cluster creation
+}
+
+func logMultiLineConfig(log *logrus.Entry, config string) {
+	lines := strings.Split(config, "\n")
+	for _, l := range lines {
+		log.Infof("%s", l)
+	}
 }
 
 func (c *Controller) initController() {
@@ -302,7 +324,7 @@ func (c *Controller) initController() {
 		c.logger.Logger.Level = logrus.DebugLevel
 	}
 
-	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
+	logMultiLineConfig(c.logger, c.opConfig.MustMarshal())
 
 	roleDefs := c.getInfrastructureRoleDefinitions()
 	if infraRoles, err := c.getInfrastructureRoles(roleDefs); err != nil {

@@ -18,6 +18,7 @@ RUN apt-get update \
     && curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.18.0/bin/linux/amd64/kubectl \
     && chmod +x ./kubectl \
     && mv ./kubectl /usr/local/bin/kubectl \
+    && apt-get vim
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

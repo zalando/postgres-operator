@@ -199,7 +199,7 @@ type Config struct {
 
 // MustMarshal marshals the config or panics
 func (c Config) MustMarshal() string {
-	b, err := json.MarshalIndent(c, "", "\t")
+	b, err := json.MarshalIndent(c, "", "   ")
 	if err != nil {
 		panic(err)
 	}

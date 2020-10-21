@@ -32,11 +32,15 @@ function start_kind(){
   fi
 
   export KUBECONFIG="${kubeconfig_path}"
-  kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml
-  kind load docker-image "${operator_image}" --name ${cluster_name}
+  kind create cluster --name ${cluster_name} --config kind-cluster-postgres-operator-e2e-tests.yaml  
   docker pull "${spilo_image}"
   kind load docker-image "${spilo_image}" --name ${cluster_name}
-} 
+}
+
+function load_operator_image() {
+  export KUBECONFIG="${kubeconfig_path}"
+  kind load docker-image "${operator_image}" --name ${cluster_name}
+}
 
 function set_kind_api_server_ip(){
   echo "Setting up kind API server ip"
@@ -72,6 +76,7 @@ function main(){
   [[ -z ${NOCLEANUP-} ]] && trap "clean_up" QUIT TERM EXIT
   pull_images
   [[ ! -f ${kubeconfig_path} ]] && start_kind
+  load_operator_image
   set_kind_api_server_ip
   shift
   run_tests $@
