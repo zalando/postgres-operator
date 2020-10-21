@@ -9,7 +9,10 @@ IFS=$'\n\t'
 readonly cluster_name="postgres-operator-e2e-tests"
 readonly kubeconfig_path="/tmp/kind-config-${cluster_name}"
 readonly spilo_image="registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
-readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:latest"
+readonly e2e_test_runner_image="registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner:0.3"
+
+export GOPATH=${GOPATH-~/go}
+export PATH=${GOPATH}/bin:$PATH
 
 echo "Clustername: ${cluster_name}"
 echo "Kubeconfig path: ${kubeconfig_path}"
@@ -38,6 +41,7 @@ function start_kind(){
 }
 
 function load_operator_image() {
+  echo "Loading operator image"
   export KUBECONFIG="${kubeconfig_path}"
   kind load docker-image "${operator_image}" --name ${cluster_name}
 }
@@ -53,7 +57,6 @@ function set_kind_api_server_ip(){
 
 function run_tests(){
   echo "Running tests... image: ${e2e_test_runner_image}"
-  echo $@
   # tests modify files in ./manifests, so we mount a copy of this directory done by the e2e Makefile
 
   docker run --rm --network=host -e "TERM=xterm-256color" \
@@ -61,7 +64,7 @@ function run_tests(){
   --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
   --mount type=bind,source="$(readlink -f tests)",target=/tests \
   --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
-  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}" $@
+  -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}" ${E2E_TEST_CASE-} $@
 }
 
 function clean_up(){
@@ -78,6 +81,7 @@ function main(){
   [[ ! -f ${kubeconfig_path} ]] && start_kind
   load_operator_image
   set_kind_api_server_ip
+
   shift
   run_tests $@
   exit 0

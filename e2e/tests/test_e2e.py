@@ -10,7 +10,7 @@ import yaml
 from datetime import datetime
 from kubernetes import client, config
 
-from k8s_api import K8s
+from tests.k8s_api import K8s
 
 SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
 SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
@@ -262,7 +262,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         # update infrastructure roles description
         secret_name = "postgresql-infrastructure-roles"
-        roles = "secretname: postgresql-infrastructure-roles-new,userkey: user, rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
+        roles = "secretname: postgresql-infrastructure-roles-new, userkey: user, rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
         patch_infrastructure_roles = {
             "data": {
                 "infrastructure_roles_secret_name": secret_name,
@@ -336,8 +336,7 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_lazy_spilo_upgrade, step="Init baseline image version")
 
-        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), SPILO_CURRENT, "Stagefulset not updated initially")
-        
+        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), SPILO_CURRENT, "Stagefulset not updated initially")        
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
 
