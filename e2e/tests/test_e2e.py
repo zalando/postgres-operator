@@ -574,25 +574,20 @@ class EndToEndTestCase(unittest.TestCase):
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         '''
         k8s = self.k8s
-        labels = "application=spilo,cluster-name=acid-minimal-cluster"
+        pod="acid-minimal-cluster-0"
 
-        try:
-            k8s.wait_for_pg_to_scale(3)
-            self.assertEqual(3, k8s.count_pods_with_label(labels))
-            self.assert_master_is_unique()
-
-            k8s.wait_for_pg_to_scale(2)
-            self.assertEqual(2, k8s.count_pods_with_label(labels))
-            self.assert_master_is_unique()
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
+        k8s.scale_cluster(3)        
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 3, "Scale up to 3 failed")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod)), 3, "Not all 3 nodes healthy")
+        
+        k8s.scale_cluster(2)
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "Scale down to 2 failed")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod)), 2, "Not all members 2 healthy")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_service_annotations(self):
         '''
-        Create a Postgres cluster with service annotations and check them.
+            Create a Postgres cluster with service annotations and check them.
         '''
         k8s = self.k8s
         patch_custom_service_annotations = {
@@ -602,32 +597,24 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_custom_service_annotations)
 
-        try:
-            pg_patch_custom_annotations = {
-                "spec": {
-                    "serviceAnnotations": {
-                        "annotation.key": "value",
-                        "foo": "bar",
-                    }
+        pg_patch_custom_annotations = {
+            "spec": {
+                "serviceAnnotations": {
+                    "annotation.key": "value",
+                    "foo": "bar",
                 }
             }
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_custom_annotations)
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_custom_annotations)
 
-            # wait a little before proceeding
-            time.sleep(30)
-            annotations = {
-                "annotation.key": "value",
-                "foo": "bar",
-            }
-            self.assertTrue(k8s.check_service_annotations(
-                "cluster-name=acid-minimal-cluster,spilo-role=master", annotations))
-            self.assertTrue(k8s.check_service_annotations(
-                "cluster-name=acid-minimal-cluster,spilo-role=replica", annotations))
+        annotations = {
+            "annotation.key": "value",
+            "foo": "bar",
+        }
 
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
+        self.eventuallyTrue(lambda: k8s.check_service_annotations("cluster-name=acid-minimal-cluster,spilo-role=master", annotations))
+        self.eventuallyTrue(lambda: k8s.check_service_annotations("cluster-name=acid-minimal-cluster,spilo-role=replica", annotations))
 
         # clean up
         unpatch_custom_service_annotations = {
@@ -652,27 +639,24 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_sset_propagate_annotations)
 
-        try:
-            pg_crd_annotations = {
-                "metadata": {
-                    "annotations": {
-                        "deployment-time": "2020-04-30 12:00:00",
-                        "downscaler/downtime_replicas": "0",
-                    },
-                }
+        pg_crd_annotations = {
+            "metadata": {
+                "annotations": {
+                    "deployment-time": "2020-04-30 12:00:00",
+                    "downscaler/downtime_replicas": "0",
+                },
             }
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotations)
-            
-            annotations = {
-                "deployment-time": "2020-04-30 12:00:00",
-                "downscaler/downtime_replicas": "0",
-            }
-            self.assertTrue(k8s.check_statefulset_annotations(cluster_label, annotations))
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotations)
+        
+        annotations = {
+            "deployment-time": "2020-04-30 12:00:00",
+            "downscaler/downtime_replicas": "0",
+        }
+        
+        self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations))
 
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_taint_based_eviction(self):
