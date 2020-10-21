@@ -110,6 +110,14 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.wait_for_operator_pod_start()
 
+        # make sure we start a new operator on every new run,
+        # this tackles the problem when kind is reused
+        # and the Docker image is infact changed (dirty one)
+
+        # patch resync period, this can catch some problems with hanging e2e tests
+        # k8s.update_config({"data": {"resync_period":"30s"}},step="TestSuite setup")
+        k8s.update_config({}, step="TestSuite Startup")
+
         actual_operator_image = k8s.api.core_v1.list_namespaced_pod(
             'default', label_selector='name=postgres-operator').items[0].spec.containers[0].image
         print("Tested operator image: {}".format(actual_operator_image))  # shows up after tests finish
@@ -454,8 +462,6 @@ class EndToEndTestCase(unittest.TestCase):
         Lower resource limits below configured minimum and let operator fix it
         '''
         k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'    
-        _, failover_targets = k8s.get_pg_nodes(cluster_label)
 
         # configure minimum boundaries for CPU and memory limits
         minCPULimit = '503m'
@@ -545,6 +551,7 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             }
+            self.assertTrue(len(failover_targets)>0, "No failover targets available")
             for failover_target in failover_targets:
                 k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
 

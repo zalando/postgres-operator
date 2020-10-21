@@ -12,6 +12,10 @@ Docker.
 Docker
 Go
 
+# Notice
+
+The `manifest` folder in e2e tests folder is not commited to git, it comes from `/manifests`
+
 ## Build test runner
 
 In the directory of the cloned Postgres Operator repository change to the e2e
