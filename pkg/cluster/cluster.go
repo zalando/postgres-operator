@@ -331,10 +331,6 @@ func (c *Cluster) Create() error {
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
-	if err != nil {
-		c.logger.Warningf("could not create connection pooler: %v", err)
-		return nil
-	}
 
 	return nil
 }

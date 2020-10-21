@@ -488,9 +488,8 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 // Perform actual patching of a connection pooler deployment, assuming that all
 // the check were already done before.
-func (c *Cluster) updateConnectionPoolerDeployment(newDeployment *appsv1.Deployment, role PostgresRole) (*appsv1.Deployment, error) {
-	//c.setProcessName("updating connection pooler")
-	if c == nil || c.ConnectionPooler[role].Deployment == nil {
+func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
+	if newDeployment == nil {
 		return nil, fmt.Errorf("there is no connection pooler in the cluster")
 	}
 
@@ -502,10 +501,10 @@ func (c *Cluster) updateConnectionPoolerDeployment(newDeployment *appsv1.Deploym
 	// An update probably requires RetryOnConflict, but since only one operator
 	// worker at one time will try to update it chances of conflicts are
 	// minimal.
-	deployment, err := c.KubeClient.
-		Deployments(c.ConnectionPooler[role].Deployment.Namespace).Patch(
+	deployment, err := KubeClient.
+		Deployments(newDeployment.Namespace).Patch(
 		context.TODO(),
-		c.ConnectionPooler[role].Deployment.Name,
+		newDeployment.Name,
 		types.MergePatchType,
 		patchData,
 		metav1.PatchOptions{},
@@ -513,8 +512,6 @@ func (c *Cluster) updateConnectionPoolerDeployment(newDeployment *appsv1.Deploym
 	if err != nil {
 		return nil, fmt.Errorf("could not patch deployment: %v", err)
 	}
-
-	c.ConnectionPooler[role].Deployment = deployment
 
 	return deployment, nil
 }
@@ -659,7 +656,7 @@ func (c Cluster) makeDefaultConnectionPoolerResources() acidv1.Resources {
 	}
 }
 
-func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, lookup InstallFunction) (SyncReason, error) {
+func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, installLookupFunction InstallFunction) (SyncReason, error) {
 
 	var reason SyncReason
 	var err error
@@ -700,7 +697,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 			// since it could happen that there is no difference in specs, and all
 			// the resources are remembered, but the deployment was manually deleted
 			// in between
-			c.logger.Debugf("syncing connection pooler for the role %s", role)
+			c.logger.Debugf("syncing connection pooler for the Spilo role %s", role)
 
 			// in this case also do not forget to install lookup function as for
 			// creating cluster
@@ -723,7 +720,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, look
 					specUser,
 					c.OpConfig.ConnectionPooler.User)
 
-				if err = lookup(schema, user, role); err != nil {
+				if err = installLookupFunction(schema, user, role); err != nil {
 					return NoSync, err
 				}
 			}
@@ -827,9 +824,8 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 
 			//oldDeploymentSpec := c.ConnectionPooler[role].Deployment
 
-			deployment, err := c.updateConnectionPoolerDeployment(
-				newDeploymentSpec,
-				role)
+			deployment, err := updateConnectionPoolerDeployment(c.KubeClient,
+				newDeploymentSpec)
 
 			if err != nil {
 				return reason, err
