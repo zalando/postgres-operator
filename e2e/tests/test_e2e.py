@@ -27,7 +27,7 @@ class EndToEndTestCase(unittest.TestCase):
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
 
-    def eventuallyEqual(self, f, x, m, retries=25, interval=2):
+    def eventuallyEqual(self, f, x, m, retries=60, interval=2):
         while True:
             try:
                 y = f()
@@ -39,7 +39,7 @@ class EndToEndTestCase(unittest.TestCase):
                     raise
                 time.sleep(interval)
 
-    def eventuallyNotEqual(self, f, x, m, retries=25, interval=2):
+    def eventuallyNotEqual(self, f, x, m, retries=60, interval=2):
         while True:
             try:
                 y = f()
@@ -51,7 +51,7 @@ class EndToEndTestCase(unittest.TestCase):
                     raise
                 time.sleep(interval)
 
-    def eventuallyTrue(self, f, m, retries=25, interval=2):
+    def eventuallyTrue(self, f, m, retries=60, interval=2):
         while True:
             try:
                 self.assertTrue(f(), m)
