@@ -239,8 +239,7 @@ class K8s:
 
 class K8sBase:
     '''
-    To not fix all it once it is a copy of above
-    Wraps around K8s api client and helper methods.
+    K8s basic API wrapper class supposed to be inherited by other more specific classes for e2e tests
     '''
 
     RETRY_TIMEOUT_SEC = 1
@@ -442,6 +441,9 @@ class K8sBase:
         return pod.items[0].spec.containers[0].image
 
 
+"""
+  Inspiriational classes towards easier writing of end to end tests with one cluster per test case
+"""
 class K8sOperator(K8sBase):
     def __init__(self, labels="name=postgres-operator", namespace="default"):
         super().__init__(labels, namespace)
