@@ -107,19 +107,14 @@ class K8s:
                     return False
         return True
 
-    def wait_for_pg_to_scale(self, number_of_instances, namespace='default'):
-
+    def scale_cluster(self, number_of_instances, name="acid-minimal-cluster", namespace="default"):
         body = {
             "spec": {
                 "numberOfInstances": number_of_instances
             }
         }
-        _ = self.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", namespace, "postgresqls", "acid-minimal-cluster", body)
-
-        labels = 'application=spilo,cluster-name=acid-minimal-cluster'
-        while self.count_pods_with_label(labels) != number_of_instances:
-            time.sleep(self.RETRY_TIMEOUT_SEC)
+        self.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", namespace, "postgresqls", name, body)
 
     def wait_for_running_pods(self, labels, number, namespace=''):
         while self.count_pods_with_label(labels) != number:
