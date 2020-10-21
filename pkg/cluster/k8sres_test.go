@@ -1021,6 +1021,11 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	cluster.Spec = acidv1.PostgresSpec{
+		ConnectionPooler:              &acidv1.ConnectionPooler{},
+		EnableReplicaConnectionPooler: boolToPointer(true),
+	}
 	var clusterNoDefaultRes = New(
 		Config{
 			OpConfig: config.Config{
@@ -1032,6 +1037,11 @@ func TestConnectionPoolerPodSpec(t *testing.T) {
 				ConnectionPooler: config.ConnectionPooler{},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	clusterNoDefaultRes.Spec = acidv1.PostgresSpec{
+		ConnectionPooler:              &acidv1.ConnectionPooler{},
+		EnableReplicaConnectionPooler: boolToPointer(true),
+	}
 
 	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error { return nil }
 
