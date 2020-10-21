@@ -454,13 +454,13 @@ class EndToEndTestCase(unittest.TestCase):
         Lower resource limits below configured minimum and let operator fix it
         '''
         k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        labels = 'spilo-role=master,' + cluster_label
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'    
         _, failover_targets = k8s.get_pg_nodes(cluster_label)
 
         # configure minimum boundaries for CPU and memory limits
-        minCPULimit = '500m'
-        minMemoryLimit = '500Mi'
+        minCPULimit = '503m'
+        minMemoryLimit = '502Mi'
+
         patch_min_resource_limits = {
             "data": {
                 "min_cpu_limit": minCPULimit,
@@ -487,25 +487,18 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
 
-        try:
-            k8s.wait_for_pod_failover(failover_targets, labels)
-            k8s.wait_for_pod_start('spilo-role=replica')
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members()), 2, "Postgres status did not enter running")
+        
+        def verify_pod_limits():
+            pods = k8s.api.core_v1.list_namespaced_pod('default', label_selector="cluster-name=acid-minimal-cluster,application=spilo").items
+            r = pods[0].spec.containers[0].resources.limits['memory']==minMemoryLimit
+            r = r and pods[0].spec.containers[0].resources.limits['cpu'] == minCPULimit
+            r = r and pods[1].spec.containers[0].resources.limits['memory']==minMemoryLimit
+            r = r and pods[1].spec.containers[0].resources.limits['cpu'] == minCPULimit
+            return r
 
-            pods = k8s.api.core_v1.list_namespaced_pod(
-                'default', label_selector=labels).items
-            self.assert_master_is_unique()
-            masterPod = pods[0]
-
-            self.assertEqual(masterPod.spec.containers[0].resources.limits['cpu'], minCPULimit,
-                             "Expected CPU limit {}, found {}"
-                             .format(minCPULimit, masterPod.spec.containers[0].resources.limits['cpu']))
-            self.assertEqual(masterPod.spec.containers[0].resources.limits['memory'], minMemoryLimit,
-                             "Expected memory limit {}, found {}"
-                             .format(minMemoryLimit, masterPod.spec.containers[0].resources.limits['memory']))
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
+        self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
