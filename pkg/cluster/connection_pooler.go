@@ -25,6 +25,7 @@ type ConnectionPoolerObjects struct {
 	Name        string
 	ClusterName string
 	Namespace   string
+	Role        PostgresRole
 	// It could happen that a connection pooler was enabled, but the operator
 	// was not able to properly process a corresponding event or was restarted.
 	// In this case we will miss missing/require situation and a lookup function
@@ -83,11 +84,11 @@ func (c *Cluster) RolesConnectionPooler() []PostgresRole {
 // have e.g. different `application` label, so that recreatePod operation will
 // not interfere with it (it lists all the pods via labels, and if there would
 // be no difference, it will recreate also pooler pods).
-func (c *Cluster) connectionPoolerLabelsSelector(role PostgresRole) *metav1.LabelSelector {
+func (c *Cluster) connectionPoolerLabelsSelector(name string, role PostgresRole) *metav1.LabelSelector {
 	connectionPoolerLabels := labels.Set(map[string]string{})
 
 	extraLabels := labels.Set(map[string]string{
-		"connection-pooler-name": c.connectionPoolerName(role),
+		"connection-pooler-name": name,
 		"application":            "db-connection-pooler",
 		"role":                   string(role),
 		"cluster-name":           c.Name,
@@ -289,7 +290,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector(c.connectionPoolerName(role), role).MatchLabels,
 			Namespace:   c.Namespace,
 			Annotations: c.generatePodAnnotations(spec),
 		},
@@ -306,7 +307,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	return podTemplate, nil
 }
 
-func (c *Cluster) generateConnectionPoolerDeployment(role PostgresRole) (
+func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *ConnectionPoolerObjects) (
 	*appsv1.Deployment, error) {
 	spec := &c.Spec
 
@@ -320,7 +321,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(role PostgresRole) (
 		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
 
-	podTemplate, err := c.generateConnectionPoolerPodTemplate(role)
+	podTemplate, err := c.generateConnectionPoolerPodTemplate(connectionPooler.Role)
 	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
@@ -341,9 +342,9 @@ func (c *Cluster) generateConnectionPoolerDeployment(role PostgresRole) (
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connectionPoolerName(role),
+			Name:        connectionPooler.Name,
 			Namespace:   c.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector(connectionPooler.Name, connectionPooler.Role).MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
@@ -355,7 +356,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(role PostgresRole) (
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: numberOfInstances,
-			Selector: c.connectionPoolerLabelsSelector(role),
+			Selector: c.connectionPoolerLabelsSelector(connectionPooler.Name, connectionPooler.Role),
 			Template: *podTemplate,
 		},
 	}
@@ -363,8 +364,9 @@ func (c *Cluster) generateConnectionPoolerDeployment(role PostgresRole) (
 	return deployment, nil
 }
 
-func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, role PostgresRole) *v1.Service {
+func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPoolerObjects) *v1.Service {
 
+	spec := &c.Spec
 	// there are two ways to enable connection pooler, either to specify a
 	// connectionPooler section or enableConnectionPooler. In the second case
 	// spec.connectionPooler will be nil, so to make it easier to calculate
@@ -378,22 +380,22 @@ func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec, rol
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{
-				Name:       c.connectionPoolerName(role),
+				Name:       connectionPooler.Name,
 				Port:       pgPort,
-				TargetPort: intstr.IntOrString{StrVal: c.servicePort(role)},
+				TargetPort: intstr.IntOrString{StrVal: c.servicePort(connectionPooler.Role)},
 			},
 		},
 		Type: v1.ServiceTypeClusterIP,
 		Selector: map[string]string{
-			"connection-pooler": c.connectionPoolerName(role),
+			"connection-pooler": connectionPooler.Name,
 		},
 	}
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connectionPoolerName(role),
-			Namespace:   c.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
+			Name:        connectionPooler.Name,
+			Namespace:   connectionPooler.Namespace,
+			Labels:      c.connectionPoolerLabelsSelector(connectionPooler.Name, connectionPooler.Role).MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
@@ -416,7 +418,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 	// Lack of connection pooler objects is not a fatal error, just log it if
 	// it was present before in the manifest
-	if c == nil || role == "" {
+	if c.ConnectionPooler[role] == nil || role == "" {
 		c.logger.Infof("No connection pooler to delete")
 		return nil
 	}
@@ -436,7 +438,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 		err = c.KubeClient.
 			Deployments(c.Namespace).
-			Delete(context.TODO(), c.connectionPoolerName(role), options)
+			Delete(context.TODO(), deployment.Name, options)
 
 		if k8sutil.ResourceNotFound(err) {
 			c.logger.Debugf("Connection pooler deployment was already deleted")
@@ -444,7 +446,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 			return fmt.Errorf("could not delete deployment: %v", err)
 		}
 
-		c.logger.Infof("Connection pooler deployment %q has been deleted for role %s", c.connectionPoolerName(role), role)
+		c.logger.Infof("Connection pooler deployment %q has been deleted for role %s", deployment.Name, role)
 	}
 
 	// Repeat the same for the service object
@@ -457,7 +459,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 		err = c.KubeClient.
 			Services(c.Namespace).
-			Delete(context.TODO(), c.connectionPoolerName(role), options)
+			Delete(context.TODO(), service.Name, options)
 
 		if k8sutil.ResourceNotFound(err) {
 			c.logger.Debugf("Connection pooler service was already deleted")
@@ -465,7 +467,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 			return fmt.Errorf("could not delete service: %v", err)
 		}
 
-		c.logger.Infof("Connection pooler service %q has been deleted for role %s", c.connectionPoolerName(role), role)
+		c.logger.Infof("Connection pooler service %q has been deleted for role %s", service.Name, role)
 	}
 	// Repeat the same for the secret object
 	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
@@ -482,7 +484,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 		}
 	}
 
-	c.ConnectionPooler = nil
+	c.ConnectionPooler[role] = nil
 	return nil
 }
 
@@ -517,15 +519,14 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 }
 
 //updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
-func (c *Cluster) updateConnectionPoolerAnnotations(annotations map[string]string, role PostgresRole) (*appsv1.Deployment, error) {
-	c.logger.Debugf("updating connection pooler annotations")
+func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, deployment *appsv1.Deployment, annotations map[string]string) (*appsv1.Deployment, error) {
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("could not form patch for the deployment metadata: %v", err)
 	}
-	result, err := c.KubeClient.Deployments(c.ConnectionPooler[role].Deployment.Namespace).Patch(
+	result, err := KubeClient.Deployments(deployment.Namespace).Patch(
 		context.TODO(),
-		c.ConnectionPooler[role].Deployment.Name,
+		deployment.Name,
 		types.MergePatchType,
 		[]byte(patchData),
 		metav1.PatchOptions{},
@@ -677,19 +678,35 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, inst
 				oldNeedConnectionPooler = needReplicaConnectionPoolerWorker(&oldSpec.Spec)
 			}
 		}
+
 		if c.ConnectionPooler == nil {
 			c.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
 				Master: {
 					Deployment:     nil,
 					Service:        nil,
+					Name:           c.connectionPoolerName(Master),
+					ClusterName:    c.ClusterName,
+					Namespace:      c.Namespace,
 					LookupFunction: false,
+					Role:           Master,
 				},
 				Replica: {
 					Deployment:     nil,
 					Service:        nil,
+					Name:           c.connectionPoolerName(Replica),
+					ClusterName:    c.ClusterName,
+					Namespace:      c.Namespace,
 					LookupFunction: false,
+					Role:           Replica,
 				},
 			}
+		}
+		if c.ConnectionPooler[role] == nil {
+			c.ConnectionPooler[role] = &ConnectionPoolerObjects{
+				Deployment:     nil,
+				Service:        nil,
+				LookupFunction: false,
+				Role:           role}
 		}
 		if newNeedConnectionPooler {
 			// Try to sync in any case. If we didn't needed connection pooler before,
@@ -697,7 +714,6 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, inst
 			// since it could happen that there is no difference in specs, and all
 			// the resources are remembered, but the deployment was manually deleted
 			// in between
-			c.logger.Debugf("syncing connection pooler for the Spilo role %s", role)
 
 			// in this case also do not forget to install lookup function as for
 			// creating cluster
@@ -724,7 +740,6 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, inst
 					return NoSync, err
 				}
 			}
-
 			if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec, role); err != nil {
 				c.logger.Errorf("could not sync connection pooler: %v", err)
 				return reason, err
@@ -760,7 +775,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		msg := "Deployment %s for connection pooler synchronization is not found, create it"
 		c.logger.Warningf(msg, c.connectionPoolerName(role))
 
-		deploymentSpec, err := c.generateConnectionPoolerDeployment(role)
+		deploymentSpec, err := c.generateConnectionPoolerDeployment(c.ConnectionPooler[role])
 		if err != nil {
 			msg = "could not generate deployment for connection pooler: %v"
 			return NoSync, fmt.Errorf(msg, err)
@@ -816,7 +831,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		if specSync || defaultsSync {
 			c.logger.Infof("Update connection pooler deployment %s, reason: %+v",
 				c.connectionPoolerName(role), reason)
-			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(role)
+			newDeploymentSpec, err := c.generateConnectionPoolerDeployment(c.ConnectionPooler[role])
 			if err != nil {
 				msg := "could not generate deployment for connection pooler: %v"
 				return reason, fmt.Errorf(msg, err)
@@ -836,7 +851,11 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 
 	newAnnotations := c.AnnotationsToPropagate(c.ConnectionPooler[role].Deployment.Annotations)
 	if newAnnotations != nil {
-		c.updateConnectionPoolerAnnotations(newAnnotations, role)
+		deployment, err = updateConnectionPoolerAnnotations(c.KubeClient, c.ConnectionPooler[role].Deployment, newAnnotations)
+		if err != nil {
+			return nil, err
+		}
+		c.ConnectionPooler[role].Deployment = deployment
 	}
 
 	service, err := c.KubeClient.
@@ -847,7 +866,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		msg := "Service %s for connection pooler synchronization is not found, create it"
 		c.logger.Warningf(msg, c.connectionPoolerName(role))
 
-		serviceSpec := c.generateConnectionPoolerService(&newSpec.Spec, role)
+		serviceSpec := c.generateConnectionPoolerService(c.ConnectionPooler[role])
 		service, err := c.KubeClient.
 			Services(serviceSpec.Namespace).
 			Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
