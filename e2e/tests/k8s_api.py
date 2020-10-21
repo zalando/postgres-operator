@@ -103,7 +103,7 @@ class K8s:
         for sset in ssets:
             for key, value in annotations.items():
                 if key not in sset.metadata.annotations or sset.metadata.annotations[key] != value:
-                    print("Expected key {} not found in annotations {}".format(key, sset.metadata.annotation))
+                    print("Expected key {} not found in annotations {}".format(key, sset.metadata.annotations))
                     return False
         return True
 
@@ -263,7 +263,7 @@ class K8sBase:
         return master_pod_node, replica_pod_nodes
 
     def wait_for_operator_pod_start(self):
-        self. wait_for_pod_start("name=postgres-operator")        
+        self.wait_for_pod_start("name=postgres-operator")
 
     def get_operator_pod(self):
         pods = self.api.core_v1.list_namespaced_pod(
