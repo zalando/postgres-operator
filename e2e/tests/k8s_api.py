@@ -60,7 +60,9 @@ class K8s:
             'default', label_selector='name=postgres-operator'
         ).items
 
-        if pods:
+        pods = list(filter(lambda x: x.status.phase=='Running', pods))
+
+        if len(pods):
             return pods[0]
 
         return None

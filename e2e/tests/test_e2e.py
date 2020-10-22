@@ -284,28 +284,31 @@ class EndToEndTestCase(unittest.TestCase):
             # operator configuration via API
 
             def verify_role():
-                operator_pod = k8s.get_operator_pod()
-                get_config_cmd = "wget --quiet -O - localhost:8080/config"
-                result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
                 try:
-                    roles_dict = (json.loads(result.stdout)
-                                .get("controller", {})
-                                .get("InfrastructureRoles"))
-                except:
-                    return False
+                    operator_pod = k8s.get_operator_pod()
+                    get_config_cmd = "wget --quiet -O - localhost:8080/config"
+                    result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
+                    try:
+                        roles_dict = (json.loads(result.stdout)
+                                    .get("controller", {})
+                                    .get("InfrastructureRoles"))
+                    except:
+                        return False
 
-                if "robot_zmon_acid_monitoring_new" in roles_dict:
-                    role = roles_dict["robot_zmon_acid_monitoring_new"]
-                    role.pop("Password", None)
-                    self.assertDictEqual(role, {
-                        "Name": "robot_zmon_acid_monitoring_new",
-                        "Flags": None,
-                        "MemberOf": ["robot_zmon"],
-                        "Parameters": None,
-                        "AdminRole": "",
-                        "Origin": 2,
-                    })
-                    return True
+                    if "robot_zmon_acid_monitoring_new" in roles_dict:
+                        role = roles_dict["robot_zmon_acid_monitoring_new"]
+                        role.pop("Password", None)
+                        self.assertDictEqual(role, {
+                            "Name": "robot_zmon_acid_monitoring_new",
+                            "Flags": None,
+                            "MemberOf": ["robot_zmon"],
+                            "Parameters": None,
+                            "AdminRole": "",
+                            "Origin": 2,
+                        })
+                        return True
+                except:
+                    pass
 
                 return False
 
