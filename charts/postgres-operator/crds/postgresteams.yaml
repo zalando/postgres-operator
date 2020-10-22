@@ -40,7 +40,7 @@ spec:
           properties:
             additionalSuperuserTeams:
               type: object
-              description: "Map for teamId and associted additional superuser teams"
+              description: "Map for teamId and associated additional superuser teams"
               additionalProperties:
                 type: array
                 nullable: true
@@ -49,7 +49,7 @@ spec:
                   type: string
             additionalTeams:
               type: object
-              description: "Map for teamId and associted additional teams"
+              description: "Map for teamId and associated additional teams"
               additionalProperties:
                 type: array
                 nullable: true
@@ -58,7 +58,7 @@ spec:
                   type: string
             additionalMembers:
               type: object
-              description: "Map for teamId and associted additional users"
+              description: "Map for teamId and associated additional users"
               additionalProperties:
                 type: array
                 nullable: true

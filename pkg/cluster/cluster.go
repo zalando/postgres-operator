@@ -1141,7 +1141,7 @@ func (c *Cluster) initHumanUsers() error {
 	for _, superuserTeam := range superuserTeams {
 		err := c.initTeamMembers(superuserTeam, true)
 		if err != nil {
-			return fmt.Errorf("Cannot create team %q of Postgres superusers: %v", superuserTeam, err)
+			return fmt.Errorf("Cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
 		}
 		if superuserTeam == c.Spec.TeamID {
 			clusterIsOwnedBySuperuserTeam = true
@@ -1153,7 +1153,7 @@ func (c *Cluster) initHumanUsers() error {
 		if !(util.SliceContains(superuserTeams, additionalTeam)) {
 			err := c.initTeamMembers(additionalTeam, false)
 			if err != nil {
-				return fmt.Errorf("Cannot create additional team %q for cluster owner by %q: %v", additionalTeam, c.Spec.TeamID, err)
+				return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
 			}
 		}
 	}
@@ -1165,7 +1165,7 @@ func (c *Cluster) initHumanUsers() error {
 
 	err := c.initTeamMembers(c.Spec.TeamID, false)
 	if err != nil {
-		return fmt.Errorf("Cannot create a team %q of admins owning the PG cluster: %v", c.Spec.TeamID, err)
+		return fmt.Errorf("Cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil
