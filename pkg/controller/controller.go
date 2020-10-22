@@ -76,6 +76,10 @@ func NewController(controllerConfig *spec.ControllerConfig, controllerId string)
 	logger := logrus.New()
 	if controllerConfig.EnableJsonLogging {
 		logger.SetFormatter(&logrus.JSONFormatter{})
+	} else {
+		if os.Getenv("LOG_NOQUOTE") != "" {
+			logger.SetFormatter(&logrus.TextFormatter{PadLevelText: true, DisableQuote: true})
+		}
 	}
 
 	var myComponentName = "postgres-operator"
@@ -84,7 +88,10 @@ func NewController(controllerConfig *spec.ControllerConfig, controllerId string)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logger.Infof)
+
+	// disabling the sending of events also to the logoutput
+	// the operator currently duplicates a lot of log entries with this setup
+	// eventBroadcaster.StartLogging(logger.Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: myComponentName})
 
 	c := &Controller{

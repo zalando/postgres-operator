@@ -168,7 +168,7 @@ func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpd
 		)
 	}
 
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+	logNiceDiff(c.logger, old.Spec, new.Spec)
 }
 
 func logNiceDiff(log *logrus.Entry, old, new interface{}) {
@@ -181,7 +181,8 @@ func logNiceDiff(log *logrus.Entry, old, new interface{}) {
 
 	nice := nicediff.Diff(string(o), string(n), true)
 	for _, s := range strings.Split(nice, "\n") {
-		log.Debugf(s)
+		// " is not needed in the value to understand
+		log.Debugf(strings.ReplaceAll(s, "\"", ""))
 	}
 }
 
@@ -193,16 +194,17 @@ func (c *Cluster) logStatefulSetChanges(old, new *appsv1.StatefulSet, isUpdate b
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
-		c.logger.Debugf("metadata.annotation diff\n%s\n", util.PrettyDiff(old.Annotations, new.Annotations))
-	}
 
-	c.logger.Debugf("Statefulset spec is different")
 	logNiceDiff(c.logger, old.Spec, new.Spec)
+
+	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
+		c.logger.Debugf("metadata.annotation are different")
+		logNiceDiff(c.logger, old.Annotations, new.Annotations)
+	}
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
-			c.logger.Infof("reason: %q", reason)
+			c.logger.Infof("reason: %s", reason)
 		}
 	}
 }
@@ -217,7 +219,8 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+
+	logNiceDiff(c.logger, old.Spec, new.Spec)
 
 	if reason != "" {
 		c.logger.Infof("reason: %s", reason)
@@ -226,7 +229,7 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 
 func (c *Cluster) logVolumeChanges(old, new acidv1.Volume) {
 	c.logger.Infof("volume specification has been changed")
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
+	logNiceDiff(c.logger, old, new)
 }
 
 func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
