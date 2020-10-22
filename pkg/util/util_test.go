@@ -51,7 +51,7 @@ var isEqualIgnoreOrderTest = []struct {
 	{[]string{"a", "b", "c"}, []string{"a", "b", "c"}, true},
 	{[]string{"a", "b", "c"}, []string{"a", "c", "b"}, true},
 	{[]string{"a", "b"}, []string{"a", "c", "b"}, false},
-	{[]string{"a", "b", "c"}, []string{"a", "d", "c"}, true},
+	{[]string{"a", "b", "c"}, []string{"a", "d", "c"}, false},
 }
 
 var substractTest = []struct {

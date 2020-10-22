@@ -110,9 +110,9 @@ func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
 
 	for teamID := range teamIDs {
 		(*ptm)[teamID] = postgresTeamMembership{
-			AdditionalSuperuserTeams: superuserTeamSet.toMap()[teamID],
-			AdditionalTeams:          teamSet.toMap()[teamID],
-			AdditionalMembers:        teamMemberSet.toMap()[teamID],
+			AdditionalSuperuserTeams: util.CoalesceStrArr(superuserTeamSet.toMap()[teamID], []string{}),
+			AdditionalTeams:          util.CoalesceStrArr(teamSet.toMap()[teamID], []string{}),
+			AdditionalMembers:        util.CoalesceStrArr(teamMemberSet.toMap()[teamID], []string{}),
 		}
 	}
 }
