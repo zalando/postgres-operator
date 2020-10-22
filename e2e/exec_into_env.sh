@@ -10,4 +10,5 @@ docker run -it --entrypoint /bin/bash --network=host -e "TERM=xterm-256color" \
     --mount type=bind,source="$(readlink -f manifests)",target=/manifests \
     --mount type=bind,source="$(readlink -f tests)",target=/tests \
     --mount type=bind,source="$(readlink -f exec.sh)",target=/exec.sh \
+    --mount type=bind,source="$(readlink -f scripts)",target=/scripts \
     -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}"
