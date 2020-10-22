@@ -345,7 +345,7 @@ func (c *Controller) initSharedInformers() {
 	c.postgresTeamInformer = acidv1informer.NewPostgresTeamInformer(
 		c.KubeClient.AcidV1ClientSet,
 		c.opConfig.WatchedNamespace,
-		constants.QueueResyncPeriodTPR,
+		constants.QueueResyncPeriodTPR*6, // 30 min
 		cache.Indexers{})
 
 	c.postgresTeamInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{

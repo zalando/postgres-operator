@@ -225,19 +225,19 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	}
 
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled, returning only additional members for team %q if set", teamID)
+		c.logger.Debugf("team API is disabled, only returning %d members for team %q", len(members), teamID)
 		return members, nil
 	}
 
 	token, err := c.oauthTokenGetter.getOAuthToken()
 	if err != nil {
-		c.logger.Warnf("could not get oauth token to authenticate to team service API, returning only additional members for team %q if set: %v", teamID, err)
+		c.logger.Warnf("could not get oauth token to authenticate to team service API, only returning %d members for team %q: %v", len(members), teamID, err)
 		return members, nil
 	}
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		c.logger.Warnf("could not get team info for team %q, returning only additional members if set: %v", teamID, err)
+		c.logger.Warnf("could not get team info for team %q, only returning %d members: %v", teamID, len(members), err)
 		return members, nil
 	}
 
