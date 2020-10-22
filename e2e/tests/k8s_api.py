@@ -75,6 +75,11 @@ class K8s:
             namespace='default'
         )
 
+    def pg_get_status(self, name="acid-minimal-cluster", namespace="default"):
+        pg = self.api.custom_objects_api.get_namespaced_custom_object(
+            "acid.zalan.do", "v1", namespace, "postgresqls", name)
+        return pg.get("status", {}).get("PostgresClusterStatus", None)
+
     def wait_for_pod_start(self, pod_labels, namespace='default'):
         pod_phase = 'No pod running'
         while pod_phase != 'Running':
@@ -193,6 +198,9 @@ class K8s:
     def update_config(self, config_map_patch, step="Updating operator deployment"):
         self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
         self.delete_operator_pod(step=step)
+
+    def patch_statefulset(self, data, name="acid-minimal-cluster", namespace="default"):
+        self.api.apps_v1.patch_namespaced_stateful_set(name, namespace, data)
 
     def create_with_kubectl(self, path):
         return subprocess.run(

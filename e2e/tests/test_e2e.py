@@ -97,6 +97,8 @@ class EndToEndTestCase(unittest.TestCase):
         with open("manifests/postgres-operator.yaml", 'r+') as f:
             operator_deployment = yaml.safe_load(f)
             operator_deployment["spec"]["template"]["spec"]["containers"][0]["image"] = os.environ['OPERATOR_IMAGE']
+        
+        with open("manifests/postgres-operator.yaml", 'w') as f:
             yaml.dump(operator_deployment, f, Dumper=yaml.Dumper)
 
         for filename in ["operator-service-account-rbac.yaml",
@@ -465,6 +467,7 @@ class EndToEndTestCase(unittest.TestCase):
         Lower resource limits below configured minimum and let operator fix it
         '''
         k8s = self.k8s
+        # self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Cluster not healthy at start")
 
         # configure minimum boundaries for CPU and memory limits
         minCPULimit = '503m'
@@ -476,7 +479,6 @@ class EndToEndTestCase(unittest.TestCase):
                 "min_memory_limit": minMemoryLimit
             }
         }
-        k8s.update_config(patch_min_resource_limits)
 
         # lower resource limits below minimum
         pg_patch_resources = {
@@ -495,6 +497,9 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
+        
+        k8s.patch_statefulset({"metadata":{"annotations":{"zalando-postgres-operator-rolling-update-required": "False"}}})
+        k8s.update_config(patch_min_resource_limits, "Minimum resource test")
 
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members()), 2, "Postgres status did not enter running")
@@ -508,6 +513,12 @@ class EndToEndTestCase(unittest.TestCase):
             return r
 
         self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
+
+    @classmethod
+    def setUp(cls):
+        # cls.k8s.update_config({}, step="Setup")
+        cls.k8s.patch_statefulset({"meta":{"annotations":{"zalando-postgres-operator-rolling-update-required": False}}})
+        pass
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
