@@ -53,8 +53,8 @@ function set_kind_api_server_ip(){
 
 function deploy_minio(){
  echo "Deploying MinIO object storage..."
- /tmp/helm-postgres-operator-e2e-tests/helm repo update
  /tmp/helm-postgres-operator-e2e-tests/helm repo add stable https://kubernetes-charts.storage.googleapis.com/
+ /tmp/helm-postgres-operator-e2e-tests/helm repo update
  /tmp/helm-postgres-operator-e2e-tests/helm install --generate-name minio/minio
  kubectl create file manifests/minio-configmap.yaml
 }
