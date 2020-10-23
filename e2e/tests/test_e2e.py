@@ -575,7 +575,7 @@ class EndToEndTestCase(unittest.TestCase):
                     "node_readiness_label": readiness_label + ':' + readiness_value,
                 }
             }
-            k8s.update_config(patch_readiness_label_config)
+            k8s.update_config(patch_readiness_label_config, "setting readiness label")
             new_master_node, new_replica_nodes = self.assert_failover(
                 current_master_node, num_replicas, failover_targets, cluster_label)
 
@@ -856,7 +856,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_pod_antiaffinity": "true"
             }
         }
-        k8s.update_config(patch_enable_antiaffinity)
+        k8s.update_config(patch_enable_antiaffinity, "enable antiaffinity")
         self.assert_failover(master_node, len(replica_nodes), failover_targets, cluster_label)
 
         # now disable pod anti affintiy again which will cause yet another failover
@@ -865,7 +865,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_pod_antiaffinity": "false"
             }
         }
-        k8s.update_config(patch_disable_antiaffinity)
+        k8s.update_config(patch_disable_antiaffinity, "disalbe antiaffinity")
         k8s.wait_for_pod_start('spilo-role=master')
         k8s.wait_for_pod_start('spilo-role=replica')
         return True

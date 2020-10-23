@@ -59,8 +59,16 @@ NOCLEANUP=True ./run.sh main tests.test_e2e.EndToEndTestCase.test_lazy_spilo_upg
 If you want to inspect Kind/Kubernetes cluster, use the following script to exec into the K8s setup and then use `kubectl`
 
 ```bash
-./run_test_image.sh
+./exec_into_env.sh
+
+# use kube ctl
 kubectl get pods
+
+# watch relevant objects
+./scripts/watch_objects.sh
+
+# get operator logs
+./scripts/get_logs.sh
 ```
 
 ## Covered use cases
