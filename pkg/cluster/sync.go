@@ -968,7 +968,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			newConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		c.logger.Infof("Old: %+v, New %+v", oldConnectionPooler, newConnectionPooler)
+		logNiceDiff(c.logger, oldConnectionPooler, newConnectionPooler)
 
 		specSync, specReason := c.needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, deployment)
