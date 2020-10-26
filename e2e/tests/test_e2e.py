@@ -614,7 +614,7 @@ class EndToEndTestCase(unittest.TestCase):
             "spec": {
                 "serviceAnnotations": {
                     "annotation.key": "value",
-                    "foo": "bar",
+                    "alice": "bob",
                 }
             }
         }
@@ -624,6 +624,7 @@ class EndToEndTestCase(unittest.TestCase):
         annotations = {
             "annotation.key": "value",
             "foo": "bar",
+            "alice": "bob"
         }
 
         self.eventuallyTrue(lambda: k8s.check_service_annotations("cluster-name=acid-minimal-cluster,spilo-role=master", annotations), "Wrong annotations")
@@ -721,7 +722,7 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_x_cluster_deletion(self):
+    def test_zzzz_cluster_deletion(self):
         '''
            Test deletion with configured protection
         '''
@@ -774,17 +775,14 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
 
-            # wait until cluster is deleted
-            time.sleep(120)
-
             # check if everything has been deleted
-            self.assertEqual(0, k8s.count_pods_with_label(cluster_label))
-            self.assertEqual(0, k8s.count_services_with_label(cluster_label))
-            self.assertEqual(0, k8s.count_endpoints_with_label(cluster_label))
-            self.assertEqual(0, k8s.count_statefulsets_with_label(cluster_label))
-            self.assertEqual(0, k8s.count_deployments_with_label(cluster_label))
-            self.assertEqual(0, k8s.count_pdbs_with_label(cluster_label))
-            self.assertEqual(0, k8s.count_secrets_with_label(cluster_label))
+            self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_label), 0, "Pods not deleted")
+            self.eventuallyEqual(lambda: k8s.count_services_with_label(cluster_label), 0, "Service not deleted")
+            self.eventuallyEqual(lambda: k8s.count_endpoints_with_label(cluster_label), 0, "Endpoints not deleted")
+            self.eventuallyEqual(lambda: k8s.count_statefulsets_with_label(cluster_label), 0, "Statefulset not deleted")
+            self.eventuallyEqual(lambda: k8s.count_deployments_with_label(cluster_label), 0, "Deployments not deleted")
+            self.eventuallyEqual(lambda: k8s.count_pdbs_with_label(cluster_label), 0, "Pod disruption budget not deleted")
+            self.eventuallyEqual(lambda: k8s.count_secrets_with_label(cluster_label), 0, "Secrets not deleted")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
