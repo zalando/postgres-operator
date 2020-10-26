@@ -536,7 +536,7 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_zzz_node_readiness_label(self):
+    def test_zz_node_readiness_label(self):
         '''
            Remove node readiness label from master node. This must cause a failover.
         '''
@@ -675,7 +675,7 @@ class EndToEndTestCase(unittest.TestCase):
 
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_taint_based_eviction(self):
+    def test_zzz_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
         '''
