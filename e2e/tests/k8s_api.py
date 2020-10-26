@@ -100,7 +100,7 @@ class K8s:
         svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items
         for svc in svcs:
             for key, value in annotations.items():
-                if key not in svc.metadata.annotations or svc.metadata.annotations[key] != value:
+                if not svc.metadata.annotations or key not in svc.metadata.annotations or svc.metadata.annotations[key] != value:
                     print("Expected key {} not found in annotations {}".format(key, svc.metadata.annotation))
                     return False
         return True
