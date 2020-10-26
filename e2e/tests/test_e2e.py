@@ -162,6 +162,7 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
 
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2, "Deployment replicas is 2 default")
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 2, "No pooler pods found")
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 1, "No pooler service found")
 
@@ -177,6 +178,7 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
 
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3, "Deployment replicas is scaled to 3")
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 3, "Scale up of pooler pods does not work")
 
         # turn it off, keeping config should be overwritten by false
