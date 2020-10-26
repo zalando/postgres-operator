@@ -297,7 +297,12 @@ func (c *Controller) initController() {
 
 	c.initPodServiceAccount()
 	c.initSharedInformers()
-	c.loadPostgresTeams()
+
+	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+		c.loadPostgresTeams()
+	} else {
+		c.pgTeamMap = teams.PostgresTeamMap{}
+	}
 
 	if c.opConfig.DebugLogging {
 		c.logger.Logger.Level = logrus.DebugLevel
@@ -330,6 +335,7 @@ func (c *Controller) initController() {
 
 func (c *Controller) initSharedInformers() {
 
+	// Postgresqls
 	c.postgresqlInformer = acidv1informer.NewPostgresqlInformer(
 		c.KubeClient.AcidV1ClientSet,
 		c.opConfig.WatchedNamespace,
@@ -342,16 +348,19 @@ func (c *Controller) initSharedInformers() {
 		DeleteFunc: c.postgresqlDelete,
 	})
 
-	c.postgresTeamInformer = acidv1informer.NewPostgresTeamInformer(
-		c.KubeClient.AcidV1ClientSet,
-		c.opConfig.WatchedNamespace,
-		constants.QueueResyncPeriodTPR*6, // 30 min
-		cache.Indexers{})
+	// PostgresTeams
+	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+		c.postgresTeamInformer = acidv1informer.NewPostgresTeamInformer(
+			c.KubeClient.AcidV1ClientSet,
+			c.opConfig.WatchedNamespace,
+			constants.QueueResyncPeriodTPR*6, // 30 min
+			cache.Indexers{})
 
-	c.postgresTeamInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.postgresTeamAdd,
-		UpdateFunc: c.postgresTeamUpdate,
-	})
+		c.postgresTeamInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.postgresTeamAdd,
+			UpdateFunc: c.postgresTeamUpdate,
+		})
+	}
 
 	// Pods
 	podLw := &cache.ListWatch{
@@ -409,10 +418,13 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	wg.Add(5)
 	go c.runPodInformer(stopCh, wg)
 	go c.runPostgresqlInformer(stopCh, wg)
-	go c.runPostgresTeamInformer(stopCh, wg)
 	go c.clusterResync(stopCh, wg)
 	go c.apiserver.Run(stopCh, wg)
 	go c.kubeNodesInformer(stopCh, wg)
+
+	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+		go c.runPostgresTeamInformer(stopCh, wg)
+	}
 
 	c.logger.Info("started working in background")
 }

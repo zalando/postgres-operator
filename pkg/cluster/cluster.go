@@ -1102,7 +1102,7 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 		if c.shouldAvoidProtectedOrSystemRole(username, "API role") {
 			continue
 		}
-		if c.OpConfig.EnableTeamSuperuser || isPostgresSuperuserTeam {
+		if (c.OpConfig.EnableTeamSuperuser && teamID == c.Spec.TeamID) || isPostgresSuperuserTeam {
 			flags = append(flags, constants.RoleFlagSuperuser)
 		} else {
 			if c.OpConfig.TeamAdminRole != "" {
@@ -1130,8 +1130,13 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 
 func (c *Cluster) initHumanUsers() error {
 
-	superuserTeams := c.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
 	var clusterIsOwnedBySuperuserTeam bool
+	superuserTeams := []string{}
+
+	if c.OpConfig.EnablePostgresTeamCRDSuperusers {
+		superuserTeams = c.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
+	}
+
 	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
 		if !(util.SliceContains(superuserTeams, postgresSuperuserTeam)) {
 			superuserTeams = append(superuserTeams, postgresSuperuserTeam)

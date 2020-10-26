@@ -319,6 +319,10 @@ spec:
               properties:
                 enable_admin_role_for_users:
                   type: boolean
+                enable_postgres_team_crd:
+                  type: boolean
+                enable_postgres_team_crd_superusers:
+                  type: boolean
                 enable_team_superuser:
                   type: boolean
                 enable_teams_api:

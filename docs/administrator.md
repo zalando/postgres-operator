@@ -561,9 +561,12 @@ database.
 * **Human users** originate from the [Teams API](user.md#teams-api-roles) that
 returns a list of the team members given a team id. The operator differentiates
 between (a) product teams that own a particular Postgres cluster and are granted
-admin rights to maintain it, and (b) Postgres superuser teams that get the
-superuser access to all Postgres databases running in a K8s cluster for the
-purposes of maintaining and troubleshooting.
+admin rights to maintain it, (b) Postgres superuser teams that get superuser
+access to all Postgres databases running in a K8s cluster for the purposes of
+maintaining and troubleshooting, and (c) additional teams, superuser teams or
+members associated with the owning team. The latter is managed via the
+[PostgresTeam CRD](user.md#additional-teams-and-members-per-cluster).
+
 
 ## Understanding rolling update of Spilo pods
 

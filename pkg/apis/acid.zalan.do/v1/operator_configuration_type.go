@@ -135,16 +135,18 @@ type OperatorDebugConfiguration struct {
 
 // TeamsAPIConfiguration defines the configuration of TeamsAPI
 type TeamsAPIConfiguration struct {
-	EnableTeamsAPI           bool              `json:"enable_teams_api,omitempty"`
-	TeamsAPIUrl              string            `json:"teams_api_url,omitempty"`
-	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
-	EnableTeamSuperuser      bool              `json:"enable_team_superuser,omitempty"`
-	EnableAdminRoleForUsers  bool              `json:"enable_admin_role_for_users,omitempty"`
-	TeamAdminRole            string            `json:"team_admin_role,omitempty"`
-	PamRoleName              string            `json:"pam_role_name,omitempty"`
-	PamConfiguration         string            `json:"pam_configuration,omitempty"`
-	ProtectedRoles           []string          `json:"protected_role_names,omitempty"`
-	PostgresSuperuserTeams   []string          `json:"postgres_superuser_teams,omitempty"`
+	EnableTeamsAPI                  bool              `json:"enable_teams_api,omitempty"`
+	TeamsAPIUrl                     string            `json:"teams_api_url,omitempty"`
+	TeamAPIRoleConfiguration        map[string]string `json:"team_api_role_configuration,omitempty"`
+	EnableTeamSuperuser             bool              `json:"enable_team_superuser,omitempty"`
+	EnableAdminRoleForUsers         bool              `json:"enable_admin_role_for_users,omitempty"`
+	TeamAdminRole                   string            `json:"team_admin_role,omitempty"`
+	PamRoleName                     string            `json:"pam_role_name,omitempty"`
+	PamConfiguration                string            `json:"pam_configuration,omitempty"`
+	ProtectedRoles                  []string          `json:"protected_role_names,omitempty"`
+	PostgresSuperuserTeams          []string          `json:"postgres_superuser_teams,omitempty"`
+	EnablePostgresTeamCRD           *bool             `json:"enable_postgres_team_crd,omitempty"`
+	EnablePostgresTeamCRDSuperusers bool              `json:"enable_postgres_team_crd_superusers,omitempty"`
 }
 
 // LoggingRESTAPIConfiguration defines Logging API conf
