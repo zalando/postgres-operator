@@ -152,63 +152,46 @@ class EndToEndTestCase(unittest.TestCase):
         pod_selector = to_selector(pod_labels)
         service_selector = to_selector(service_labels)
 
-        try:
-            # enable connection pooler
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'enableConnectionPooler': True,
-                    }
-                })
-            k8s.wait_for_pod_start(pod_selector)
+        # enable connection pooler
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableConnectionPooler': True,
+                }
+            })
 
-            pods = k8s.api.core_v1.list_namespaced_pod(
-                'default', label_selector=pod_selector
-            ).items
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 2, "No pooler pods found")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 1, "No pooler service found")
 
-            self.assertTrue(pods, 'No connection pooler pods')
+        # scale up connection pooler deployment
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'connectionPooler': {
+                        'numberOfInstances': 3,
+                    },
+                }
+            })
 
-            k8s.wait_for_service(service_selector)
-            services = k8s.api.core_v1.list_namespaced_service(
-                'default', label_selector=service_selector
-            ).items
-            services = [
-                s for s in services
-                if s.metadata.name.endswith('pooler')
-            ]
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 3, "Scale up of pooler pods does not work")
 
-            self.assertTrue(services, 'No connection pooler service')
+        # turn it off, keeping configuration section
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableConnectionPooler': False,
+                    'connectionPooler': None
+                }
+            })
 
-            # scale up connection pooler deployment
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'connectionPooler': {
-                            'numberOfInstances': 2,
-                        },
-                    }
-                })
-
-            k8s.wait_for_running_pods(pod_selector, 2)
-
-            # turn it off, keeping configuration section
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                'acid.zalan.do', 'v1', 'default',
-                'postgresqls', 'acid-minimal-cluster',
-                {
-                    'spec': {
-                        'enableConnectionPooler': False,
-                    }
-                })
-            k8s.wait_for_pods_to_stop(pod_selector)
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 0, "Pooler pods not scaled down")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 0, "Pooler service not removed")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_load_balancer(self):
@@ -542,7 +525,7 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_node_readiness_label(self):
+    def test_zzz_node_readiness_label(self):
         '''
            Remove node readiness label from master node. This must cause a failover.
         '''
@@ -676,7 +659,7 @@ class EndToEndTestCase(unittest.TestCase):
             "downscaler/downtime_replicas": "0",
         }
         
-        self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations))
+        self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
