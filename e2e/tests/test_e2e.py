@@ -721,7 +721,12 @@ class EndToEndTestCase(unittest.TestCase):
         
         k8s.update_config(patch_toleration_config, step="allow tainted nodes")
 
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
         # toggle pod anti affinity to move replica away from master node
+        nm, new_replica_nodes = k8s.get_cluster_nodes()
+        new_master_node = nm[0]
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -862,11 +867,6 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=master')
         k8s.wait_for_pod_start('spilo-role=replica')
         return True
-
-
-
-
-
 
 
 if __name__ == '__main__':
