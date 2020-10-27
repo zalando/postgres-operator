@@ -11,6 +11,9 @@ from datetime import datetime
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
+def to_selector(labels):
+    return ",".join(["=".join(l) for l in labels.items()])
+
 class K8sApi:
 
     def __init__(self):
@@ -260,6 +263,19 @@ class K8s:
         if len(pod.items) == 0:
             return None
         return pod.items[0].spec.containers[0].image
+
+    def get_cluster_leader_pod(self, pg_cluster_name, namespace='default'):
+        labels = {
+            'application': 'spilo',
+            'cluster-name': pg_cluster_name,
+            'spilo-role': 'master',
+        }
+
+        pods = self.api.core_v1.list_namespaced_pod(
+                namespace, label_selector=to_selector(labels)).items
+
+        if pods:
+            return pods[0]
 
 
 class K8sBase:
