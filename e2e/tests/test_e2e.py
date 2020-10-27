@@ -709,8 +709,8 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         k8s.api.core_v1.patch_node(master_nodes[0], body)
-        self.eventuallyTrue(k8s.get_cluster_nodes()[0], replica_nodes)
-        self.assertNotEqual(k8s.get_cluster_nodes()[0], master_nodes)
+        self.eventuallyTrue(lambda: k8s.get_cluster_nodes()[0], replica_nodes)
+        self.assertNotEqual(lambda: k8s.get_cluster_nodes()[0], master_nodes)
 
         # add toleration to pods
         patch_toleration_config = {
