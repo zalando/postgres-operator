@@ -68,7 +68,7 @@ function run_tests(){
   -e OPERATOR_IMAGE="${operator_image}" "${e2e_test_runner_image}" ${E2E_TEST_CASE-} $@
 }
 
-function clean_up(){
+function cleanup(){
   echo "Executing cleanup"
   unset KUBECONFIG
   kind delete cluster --name ${cluster_name}
@@ -77,7 +77,7 @@ function clean_up(){
 
 function main(){
   echo "Entering main function..."
-  [[ -z ${NOCLEANUP-} ]] && trap "clean_up" QUIT TERM EXIT
+  [[ -z ${NOCLEANUP-} ]] && trap "cleanup" QUIT TERM EXIT
   pull_images
   [[ ! -f ${kubeconfig_path} ]] && start_kind
   load_operator_image

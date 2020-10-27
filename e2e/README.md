@@ -71,6 +71,14 @@ kubectl get pods
 ./scripts/get_logs.sh
 ```
 
+## Cleaning up Kind
+
+To cleanup kind and start fresh
+
+```bash
+e2e/run.sh cleanup
+```
+
 ## Covered use cases
 
 The current tests are all bundled in [`test_e2e.py`](tests/test_e2e.py):
