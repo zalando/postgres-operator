@@ -13,7 +13,7 @@ require (
 	golang.org/x/tools v0.0.0-20201026223136-e84cfc6dd5ca // indirect
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.19.3
-	k8s.io/apiextensions-apiserver v0.19.3
+	k8s.io/apiextensions-apiserver v0.18.8
 	k8s.io/apimachinery v0.19.3
 	k8s.io/client-go v0.19.3
 	k8s.io/code-generator v0.19.3
