@@ -564,6 +564,9 @@ class EndToEndTestCase(unittest.TestCase):
         
         def verify_pod_limits():
             pods = k8s.api.core_v1.list_namespaced_pod('default', label_selector="cluster-name=acid-minimal-cluster,application=spilo").items
+            if len(pods)<2:
+                return False
+
             r = pods[0].spec.containers[0].resources.limits['memory']==minMemoryLimit
             r = r and pods[0].spec.containers[0].resources.limits['cpu'] == minCPULimit
             r = r and pods[1].spec.containers[0].resources.limits['memory']==minMemoryLimit
