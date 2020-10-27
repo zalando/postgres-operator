@@ -889,6 +889,26 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 			Name: "test-sts",
 		},
 	}
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+			Name:           cluster.connectionPoolerName(Master),
+			ClusterName:    cluster.ClusterName,
+			Namespace:      cluster.Namespace,
+			Role:           Master,
+		},
+		Replica: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: false,
+			Name:           cluster.connectionPoolerName(Replica),
+			ClusterName:    cluster.ClusterName,
+			Namespace:      cluster.Namespace,
+			Role:           Replica,
+		},
+	}
 
 	noCheck := func(cluster *Cluster, deployment *v1.Service, role PostgresRole) error {
 		return nil
