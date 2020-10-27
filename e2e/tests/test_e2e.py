@@ -814,6 +814,7 @@ class EndToEndTestCase(unittest.TestCase):
             # this delete attempt should be omitted because of missing annotations
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
+            time.sleep(5)
 
             # check that pods and services are still there
             k8s.wait_for_running_pods(cluster_label, 2)
@@ -846,6 +847,9 @@ class EndToEndTestCase(unittest.TestCase):
             # now delete process should be triggered
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
+
+            self.eventuallyEqual(lambda: len(k8s.api.custom_objects_api.list_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", label_selector="cluster-name=acid-minimal-cluster")["items"]), 0, "Manifest not deleted")
 
             # check if everything has been deleted
             self.eventuallyEqual(lambda: k8s.count_pods_with_label(cluster_label), 0, "Pods not deleted")
