@@ -49,7 +49,7 @@ Note, that the name of the cluster must start with the `teamId` and `-`. At
 Zalando we use team IDs (nicknames) to lower the chance of duplicate cluster
 names and colliding entities. The team ID would also be used to query an API to
 get all members of a team and create [database roles](#teams-api-roles) for
-them.
+them. Besides, the maximum cluster name length is 53 characters.
 
 ## Watch pods being created
 

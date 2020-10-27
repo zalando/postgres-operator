@@ -114,6 +114,8 @@ type ControllerConfig struct {
 	CRDReadyWaitTimeout  time.Duration
 	ConfigMapName        NamespacedName
 	Namespace            string
+
+	EnableJsonLogging bool
 }
 
 // cached value for the GetOperatorNamespace
