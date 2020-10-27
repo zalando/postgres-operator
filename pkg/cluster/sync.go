@@ -847,7 +847,9 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 	var err error
 
 	if c.ConnectionPooler == nil {
-		c.ConnectionPooler = &ConnectionPoolerObjects{}
+		c.ConnectionPooler = &ConnectionPoolerObjects{
+			LookupFunction: false,
+		}
 	}
 
 	newNeedConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
@@ -885,6 +887,11 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 			if err = lookup(schema, user); err != nil {
 				return NoSync, err
 			}
+		} else {
+			// Lookup function installation seems to be a fragile point, so
+			// let's log for debugging if we skip it
+			msg := "Skip lookup function installation, old: %d, already installed %d"
+			c.logger.Debug(msg, oldNeedConnectionPooler, c.ConnectionPooler.LookupFunction)
 		}
 
 		if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec); err != nil {

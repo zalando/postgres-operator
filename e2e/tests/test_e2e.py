@@ -19,6 +19,14 @@ def to_selector(labels):
     return ",".join(["=".join(l) for l in labels.items()])
 
 
+def clean_list(values):
+    # value is not stripped bytes, strip and convert to a string
+    clean = lambda v: v.strip().decode()
+    notNone = lambda v: v
+
+    return list(filter(notNone, map(clean, values)))
+
+
 class EndToEndTestCase(unittest.TestCase):
     '''
     Test interaction of the operator with multiple K8s components.
@@ -197,6 +205,58 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 0, "Pooler pods not scaled down")
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 0, "Pooler service not removed")
+
+        # Verify that all the databases have pooler schema installed.
+        # Do this via psql, since otherwise we need to deal with
+        # credentials.
+        dbList = []
+
+        leader = k8s.get_cluster_leader_pod('acid-minimal-cluster')
+        dbListQuery = "select datname from pg_database"
+        schemasQuery = """
+            select schema_name
+            from information_schema.schemata
+            where schema_name = 'pooler'
+        """
+        exec_query = r"psql -tAq -c \"{}\" -d {}"
+
+        if leader:
+            try:
+                q = exec_query.format(dbListQuery, "postgres")
+                q = "su postgres -c \"{}\"".format(q)
+                print('Get databases: {}'.format(q))
+                result = k8s.exec_with_kubectl(leader.metadata.name, q)
+                dbList = clean_list(result.stdout.split(b'\n'))
+                print('dbList: {}, stdout: {}, stderr {}'.format(
+                    dbList, result.stdout, result.stderr
+                ))
+            except Exception as ex:
+                print('Could not get databases: {}'.format(ex))
+                print('Stdout: {}'.format(result.stdout))
+                print('Stderr: {}'.format(result.stderr))
+
+            for db in dbList:
+                if db in ('template0', 'template1'):
+                    continue
+
+                schemas = []
+                try:
+                    q = exec_query.format(schemasQuery, db)
+                    q = "su postgres -c \"{}\"".format(q)
+                    print('Get schemas: {}'.format(q))
+                    result = k8s.exec_with_kubectl(leader.metadata.name, q)
+                    schemas = clean_list(result.stdout.split(b'\n'))
+                    print('schemas: {}, stdout: {}, stderr {}'.format(
+                        schemas, result.stdout, result.stderr
+                    ))
+                except Exception as ex:
+                    print('Could not get databases: {}'.format(ex))
+                    print('Stdout: {}'.format(result.stdout))
+                    print('Stderr: {}'.format(result.stderr))
+
+                self.assertNotEqual(len(schemas), 0)
+        else:
+            print('Could not find leader pod')
 
         # remove config section to make test work next time
         k8s.api.custom_objects_api.patch_namespaced_custom_object(

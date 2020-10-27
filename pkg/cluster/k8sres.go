@@ -841,7 +841,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 		return secretPodEnvVarsList, nil
 	}
 
-	secret, err := c.KubeClient.Secrets(c.OpConfig.PodEnvironmentSecret).Get(
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
 		context.TODO(),
 		c.OpConfig.PodEnvironmentSecret,
 		metav1.GetOptions{})
