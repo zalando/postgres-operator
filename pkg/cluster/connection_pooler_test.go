@@ -64,7 +64,7 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
 			testName, err, reason)
 	}
-	for _, role := range cluster.RolesConnectionPooler() {
+	for _, role := range [2]PostgresRole{Master, Replica} {
 		if cluster.ConnectionPooler[role] != nil {
 			if cluster.ConnectionPooler[role].Deployment == nil {
 				t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
@@ -105,7 +105,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 		ConnectionPooler: &acidv1.ConnectionPooler{},
 	}
 
-	if !cluster.needMasterConnectionPooler() {
+	if !needMasterConnectionPooler(&cluster.Spec) {
 		t.Errorf("%s: Connection pooler is not enabled with full definition",
 			testName)
 	}
@@ -114,7 +114,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 		EnableConnectionPooler: boolToPointer(true),
 	}
 
-	if !cluster.needMasterConnectionPooler() {
+	if !needMasterConnectionPooler(&cluster.Spec) {
 		t.Errorf("%s: Connection pooler is not enabled with flag",
 			testName)
 	}
@@ -124,7 +124,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 		ConnectionPooler:       &acidv1.ConnectionPooler{},
 	}
 
-	if cluster.needMasterConnectionPooler() {
+	if needMasterConnectionPooler(&cluster.Spec) {
 		t.Errorf("%s: Connection pooler is still enabled with flag being false",
 			testName)
 	}
@@ -134,7 +134,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 		ConnectionPooler:       &acidv1.ConnectionPooler{},
 	}
 
-	if !cluster.needMasterConnectionPooler() {
+	if !needMasterConnectionPooler(&cluster.Spec) {
 		t.Errorf("%s: Connection pooler is not enabled with flag and full",
 			testName)
 	}
@@ -144,7 +144,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 		ConnectionPooler: &acidv1.ConnectionPooler{},
 	}
 
-	if cluster.needReplicaConnectionPooler() {
+	if needReplicaConnectionPooler(&cluster.Spec) {
 		t.Errorf("%s: Replica Connection pooler is not enabled with full definition",
 			testName)
 	}
@@ -153,7 +153,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
 
-	if !cluster.needReplicaConnectionPooler() {
+	if !needReplicaConnectionPooler(&cluster.Spec) {
 		t.Errorf("%s: Replica Connection pooler is not enabled with flag",
 			testName)
 	}
@@ -163,7 +163,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 		ConnectionPooler:              &acidv1.ConnectionPooler{},
 	}
 
-	if cluster.needReplicaConnectionPooler() {
+	if needReplicaConnectionPooler(&cluster.Spec) {
 		t.Errorf("%s: Replica Connection pooler is still enabled with flag being false",
 			testName)
 	}
@@ -173,7 +173,7 @@ func TestNeedConnectionPooler(t *testing.T) {
 		ConnectionPooler:              &acidv1.ConnectionPooler{},
 	}
 
-	if !cluster.needReplicaConnectionPooler() {
+	if !needReplicaConnectionPooler(&cluster.Spec) {
 		t.Errorf("%s: Replica Connection pooler is not enabled with flag and full",
 			testName)
 	}

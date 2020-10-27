@@ -899,7 +899,7 @@ func (c *Cluster) initSystemUsers() {
 
 	// Connection pooler user is an exception, if requested it's going to be
 	// created by operator as a normal pgUser
-	if c.needConnectionPooler() {
+	if needConnectionPooler(&c.Spec) {
 		// initialize empty connection pooler if not done yet
 		if c.Spec.ConnectionPooler == nil {
 			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}

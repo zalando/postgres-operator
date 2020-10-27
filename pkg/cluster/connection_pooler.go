@@ -3,8 +3,10 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/r3labs/diff"
+	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -47,13 +49,13 @@ func (c *Cluster) connectionPoolerName(role PostgresRole) string {
 }
 
 // isConnectionPoolerEnabled
-func (c *Cluster) needConnectionPooler() bool {
-	return needMasterConnectionPoolerWorker(&c.Spec) ||
-		needReplicaConnectionPoolerWorker(&c.Spec)
+func needConnectionPooler(spec *acidv1.PostgresSpec) bool {
+	return needMasterConnectionPoolerWorker(spec) ||
+		needReplicaConnectionPoolerWorker(spec)
 }
 
-func (c *Cluster) needMasterConnectionPooler() bool {
-	return needMasterConnectionPoolerWorker(&c.Spec)
+func needMasterConnectionPooler(spec *acidv1.PostgresSpec) bool {
+	return needMasterConnectionPoolerWorker(spec)
 }
 
 func needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
@@ -61,26 +63,13 @@ func needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 		(spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
 }
 
-func (c *Cluster) needReplicaConnectionPooler() bool {
-	return needReplicaConnectionPoolerWorker(&c.Spec)
+func needReplicaConnectionPooler(spec *acidv1.PostgresSpec) bool {
+	return needReplicaConnectionPoolerWorker(spec)
 }
 
 func needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 	return spec.EnableReplicaConnectionPooler != nil &&
 		*spec.EnableReplicaConnectionPooler
-}
-
-// RolesConnectionPooler gives the list of roles which need connection pooler
-func (c *Cluster) RolesConnectionPooler() []PostgresRole {
-	roles := make([]PostgresRole, 2)
-
-	if needMasterConnectionPoolerWorker(&c.Spec) {
-		roles = append(roles, Master)
-	}
-	if needMasterConnectionPoolerWorker(&c.Spec) {
-		roles = append(roles, Replica)
-	}
-	return roles
 }
 
 // Return connection pooler labels selector, which should from one point of view
@@ -570,12 +559,12 @@ func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler) (s
 
 // Check if we need to synchronize connection pooler deployment due to new
 // defaults, that are different from what we see in the DeploymentSpec
-func (c *Cluster) needSyncConnectionPoolerDefaults(spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment) (sync bool, reasons []string) {
+func needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment) (sync bool, reasons []string) {
 
 	reasons = []string{}
 	sync = false
 
-	config := c.OpConfig.ConnectionPooler
+	config := Config.OpConfig.ConnectionPooler
 	podTemplate := deployment.Spec.Template
 	poolerContainer := podTemplate.Spec.Containers[constants.ConnectionPoolerContainer]
 
@@ -601,7 +590,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(spec *acidv1.ConnectionPooler
 	}
 
 	expectedResources, err := generateResourceRequirements(spec.Resources,
-		makeDefaultConnectionPoolerResources(&c.OpConfig))
+		makeDefaultConnectionPoolerResources(&Config.OpConfig))
 
 	// An error to generate expected resources means something is not quite
 	// right, but for the purpose of robustness do not panic here, just report
@@ -615,14 +604,19 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(spec *acidv1.ConnectionPooler
 	}
 
 	if err != nil {
-		c.logger.Warningf("Cannot generate expected resources, %v", err)
+		return false, reasons
 	}
 
 	for _, env := range poolerContainer.Env {
 		if spec.User == "" && env.Name == "PGUSER" {
 			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
+			secretName := Config.OpConfig.SecretNameTemplate.Format(
+				"username", strings.Replace(config.User, "_", "-", -1),
+				"cluster", deployment.ClusterName,
+				"tprkind", acidv1.PostgresCRDResourceKind,
+				"tprgroup", acidzalando.GroupName)
 
-			if ref.Name != c.credentialSecretName(config.User) {
+			if ref.Name != secretName {
 				sync = true
 				msg := fmt.Sprintf("pooler user is different (having %s, required %s)",
 					ref.Name, config.User)
@@ -815,7 +809,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
 		}
 
-		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, deployment)
+		defaultsSync, defaultsReason := needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
 		reason := append(specReason, defaultsReason...)
 
 		if specSync || defaultsSync {
