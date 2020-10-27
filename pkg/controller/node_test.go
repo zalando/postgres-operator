@@ -40,24 +40,29 @@ func TestNodeIsReady(t *testing.T) {
 		readinessLabel map[string]string
 	}{
 		{
-			in:  makeNode(map[string]string{"foo": "bar"}, true),
-			out: true,
+			in:             makeNode(map[string]string{"foo": "bar"}, true),
+			out:            true,
+			readinessLabel: map[string]string{readyLabel: readyValue},
 		},
 		{
-			in:  makeNode(map[string]string{"foo": "bar"}, false),
-			out: false,
+			in:             makeNode(map[string]string{"foo": "bar"}, false),
+			out:            false,
+			readinessLabel: map[string]string{readyLabel: readyValue},
 		},
 		{
-			in:  makeNode(map[string]string{readyLabel: readyValue}, false),
-			out: true,
+			in:             makeNode(map[string]string{readyLabel: readyValue}, false),
+			out:            true,
+			readinessLabel: map[string]string{readyLabel: readyValue},
 		},
 		{
-			in:  makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
-			out: true,
+			in:             makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
+			out:            true,
+			readinessLabel: map[string]string{readyLabel: readyValue},
 		},
 		{
-			in:  makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
-			out: true,
+			in:             makeNode(map[string]string{"foo": "bar", "master": "true"}, false),
+			out:            true,
+			readinessLabel: map[string]string{readyLabel: readyValue},
 		},
 		{
 			in:             makeNode(map[string]string{"foo": "bar"}, true),
@@ -81,12 +86,7 @@ func TestNodeIsReady(t *testing.T) {
 		},
 	}
 	for _, tt := range testTable {
-		if tt.readinessLabel != nil {
-			nodeTestController.opConfig.NodeReadinessLabel = tt.readinessLabel
-		} else {
-			nodeTestController.opConfig.NodeReadinessLabel = map[string]string{readyLabel: readyValue}
-		}
-
+		nodeTestController.opConfig.NodeReadinessLabel = tt.readinessLabel
 		if isReady := nodeTestController.nodeIsReady(tt.in); isReady != tt.out {
 			t.Errorf("%s: expected response %t doesn't match the actual %t for the node %#v",
 				testName, tt.out, isReady, tt.in)
