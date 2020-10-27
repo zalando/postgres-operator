@@ -691,12 +691,10 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
         # get nodes of master and replica(s) (expected target of new master)
-        current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
-        num_replicas = len(current_replica_nodes)
+        master_nodes, replica_nodes = k8s.get_cluster_nodes()
 
-        self.assertNotEqual(current_master_node, '')
-        self.assertTrue(num_replicas, 1)
-        failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
+        self.assertNotEqual(master_nodes, [])
+        self.assertNotEqual(replica_nodes, [])
 
         # taint node with postgres=:NoExecute to force failover
         body = {
@@ -710,8 +708,9 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
 
-        k8s.api.core_v1.patch_node(current_master_node, body)
-        new_master_node, new_replica_nodes = self.assert_failover(current_master_node, num_replicas, failover_targets, cluster_label)
+        k8s.api.core_v1.patch_node(master_nodes[0], body)
+        self.eventuallyTrue(k8s.get_closter_nodes()[0], replica_nodes)
+        self.assertNotEqual(k8s.get_closter_nodes()[0], master_nodes)
 
         # add toleration to pods
         patch_toleration_config = {
