@@ -69,7 +69,10 @@ class K8s:
         return m, r
 
     def wait_for_operator_pod_start(self):
-        self. wait_for_pod_start("name=postgres-operator")        
+        self.wait_for_pod_start("name=postgres-operator")
+        # give operator time to subscribe to objects
+        time.sleep(1)
+        return True
 
     def get_operator_pod(self):
         pods = self.api.core_v1.list_namespaced_pod(
@@ -104,6 +107,7 @@ class K8s:
                 pod_phase = pods[0].status.phase
 
             time.sleep(self.RETRY_TIMEOUT_SEC)
+
 
     def get_service_type(self, svc_labels, namespace='default'):
         svc_type = ''

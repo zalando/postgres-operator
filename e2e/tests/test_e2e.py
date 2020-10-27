@@ -860,6 +860,15 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
+        #reset configmap
+        patch_delete_annotations = {
+            "data": {
+                "delete_annotation_date_key": "",
+                "delete_annotation_name_key": ""
+            }
+        }
+        k8s.update_config(patch_delete_annotations)
+
     def get_failover_targets(self, master_node, replica_nodes):
         '''
            If all pods live on the same node, failover will happen to other worker(s)
