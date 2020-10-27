@@ -53,6 +53,18 @@ class K8s:
 
         return master_pod_node, replica_pod_nodes
 
+    def get_cluster_nodes(self, cluster_labels='cluster-name=acid-minimal-cluster', namespace='default'):
+        m = []
+        r = []
+        podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=cluster_labels)
+        for pod in podsList.items:
+            if pod.metadata.labels.get('spilo-role') == 'master' and pod.status.phase == 'Running':
+                m.append(pod.spec.node_name)
+            elif pod.metadata.labels.get('spilo-role') == 'replica' and pod.status.phase == 'Running':
+                r.append(pod.spec.node_name)
+
+        return m, r
+
     def wait_for_operator_pod_start(self):
         self. wait_for_pod_start("name=postgres-operator")        
 
