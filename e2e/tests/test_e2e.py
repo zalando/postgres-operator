@@ -840,7 +840,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
 
             # wait a little before proceeding
-            time.sleep(10)
+            time.sleep(20)
             k8s.wait_for_running_pods(cluster_label, 2)
             k8s.wait_for_service(cluster_label)
 
