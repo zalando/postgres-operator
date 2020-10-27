@@ -176,7 +176,7 @@ func logNiceDiff(log *logrus.Entry, old, new interface{}) {
 	n, errn := json.MarshalIndent(new, "", "  ")
 
 	if erro != nil || errn != nil {
-		panic("could not marschal API objects, should not happen")
+		panic("could not marshal API objects, should not happen")
 	}
 
 	nice := nicediff.Diff(string(o), string(n), true)

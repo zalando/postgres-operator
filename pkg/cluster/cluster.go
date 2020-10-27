@@ -595,7 +595,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 			return fmt.Errorf("could not compare defined memory limit %s with configured minimum value %s: %v", memoryLimit, minMemoryLimit, err)
 		}
 		if isSmaller {
-			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be increase", memoryLimit, minMemoryLimit)
+			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be increased", memoryLimit, minMemoryLimit)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
 			spec.Resources.ResourceLimits.Memory = minMemoryLimit
 		}
