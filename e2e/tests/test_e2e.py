@@ -112,6 +112,10 @@ class EndToEndTestCase(unittest.TestCase):
 
         k8s.wait_for_operator_pod_start()
 
+        # reset taints and tolerations
+        k8s.api.core_v1.patch_node("postgres-operator-e2e-tests-worker",{"spec":{"taints":[]}})
+        k8s.api.core_v1.patch_node("postgres-operator-e2e-tests-worker2",{"spec":{"taints":[]}})
+
         # make sure we start a new operator on every new run,
         # this tackles the problem when kind is reused
         # and the Docker image is infact changed (dirty one)
@@ -682,9 +686,16 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
 
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
         # get nodes of master and replica(s) (expected target of new master)
         current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
         num_replicas = len(current_replica_nodes)
+
+        self.assertNotEqual(current_master_node, '')
+        self.assertTrue(num_replicas, 1)
         failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
 
         # taint node with postgres=:NoExecute to force failover
@@ -699,29 +710,20 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
 
-        try:
-            # patch node and test if master is failing over to one of the expected nodes
-            k8s.api.core_v1.patch_node(current_master_node, body)
-            new_master_node, new_replica_nodes = self.assert_failover(
-                current_master_node, num_replicas, failover_targets, cluster_label)
+        k8s.api.core_v1.patch_node(current_master_node, body)
+        new_master_node, new_replica_nodes = self.assert_failover(current_master_node, num_replicas, failover_targets, cluster_label)
 
-            # add toleration to pods
-            patch_toleration_config = {
-                "data": {
-                    "toleration": "key:postgres,operator:Exists,effect:NoExecute"
-                }
+        # add toleration to pods
+        patch_toleration_config = {
+            "data": {
+                "toleration": "key:postgres,operator:Exists,effect:NoExecute"
             }
-            k8s.update_config(patch_toleration_config)
+        }
+        
+        k8s.update_config(patch_toleration_config, step="allow tainted nodes")
 
-            # wait a little before proceeding with the pod distribution test
-            time.sleep(30)
-
-            # toggle pod anti affinity to move replica away from master node
-            self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
+        # toggle pod anti affinity to move replica away from master node
+        self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zzzz_cluster_deletion(self):

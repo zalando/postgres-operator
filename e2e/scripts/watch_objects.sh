@@ -7,7 +7,7 @@ echo -n 'Rolling upgrade pending: '
 kubectl get statefulset -o jsonpath='{.items..metadata.annotations.zalando-postgres-operator-rolling-update-required}'
 echo
 echo
-kubectl get pods
+kubectl get pods -o wide
 echo
 kubectl get statefulsets
 echo
