@@ -617,8 +617,6 @@ of the backup cron job.
 `cronjobs` resource from the `batch` API group for the operator service account.
 See [example RBAC](../manifests/operator-service-account-rbac.yaml)
 
-You cannot use logical backups when you are cloning cluster. For that you need to setup WAL writing into S3 or GCS.
-
 ## Access to cloud resources from clusters in non-cloud environment
 
 To access cloud resources like S3 from a cluster on bare metal you can use
