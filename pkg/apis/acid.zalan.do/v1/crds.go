@@ -107,12 +107,13 @@ var min0 = 0.0
 var min1 = 1.0
 var min2 = 2.0
 var minDisable = -1.0
+var maxLength = int64(53)
 
 // PostgresCRDResourceValidation to check applied manifest parameters
 var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 	OpenAPIV3Schema: &apiextv1beta1.JSONSchemaProps{
 		Type:     "object",
-		Required: []string{"kind", "apiVersion", "spec"},
+		Required: []string{"kind", "apiVersion", "metadata", "spec"},
 		Properties: map[string]apiextv1beta1.JSONSchemaProps{
 			"kind": {
 				Type: "string",
@@ -127,6 +128,16 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 				Enum: []apiextv1beta1.JSON{
 					{
 						Raw: []byte(`"acid.zalan.do/v1"`),
+					},
+				},
+			},
+			"metadata": {
+				Type:     "object",
+				Required: []string{"name"},
+				Properties: map[string]apiextv1beta1.JSONSchemaProps{
+					"name": {
+						Type:      "string",
+						MaxLength: &maxLength,
 					},
 				},
 			},

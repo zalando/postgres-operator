@@ -74,6 +74,9 @@ type Controller struct {
 // NewController creates a new controller
 func NewController(controllerConfig *spec.ControllerConfig, controllerId string) *Controller {
 	logger := logrus.New()
+	if controllerConfig.EnableJsonLogging {
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	}
 
 	var myComponentName = "postgres-operator"
 	if controllerId != "" {
@@ -295,7 +298,6 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
 	}
 
-	c.initPodServiceAccount()
 	c.initSharedInformers()
 
 	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
