@@ -14,11 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 )
 
-// K8S objects that are belongs to a connection pooler
+// K8S objects that are belong to connection pooler
 type ConnectionPoolerObjects struct {
 	Deployment  *appsv1.Deployment
 	Service     *v1.Service
@@ -33,8 +34,8 @@ type ConnectionPoolerObjects struct {
 	// this, we can remember the result in memory at least until the next
 	// restart.
 	LookupFunction bool
-	// Careful with referencing cluster.spec this object pointer changes during runtime and lifetime of cluster
-	// Cluster *cluster
+	// Careful with referencing cluster.spec this object pointer changes
+	// during runtime and lifetime of cluster
 }
 
 func (c *Cluster) connectionPoolerName(role PostgresRole) string {
@@ -47,7 +48,8 @@ func (c *Cluster) connectionPoolerName(role PostgresRole) string {
 
 // isConnectionPoolerEnabled
 func (c *Cluster) needConnectionPooler() bool {
-	return needMasterConnectionPoolerWorker(&c.Spec) || needReplicaConnectionPoolerWorker(&c.Spec)
+	return needMasterConnectionPoolerWorker(&c.Spec) ||
+		needReplicaConnectionPoolerWorker(&c.Spec)
 }
 
 func (c *Cluster) needMasterConnectionPooler() bool {
@@ -55,7 +57,8 @@ func (c *Cluster) needMasterConnectionPooler() bool {
 }
 
 func needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) || (spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
+	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) ||
+		(spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
 }
 
 func (c *Cluster) needReplicaConnectionPooler() bool {
@@ -63,7 +66,8 @@ func (c *Cluster) needReplicaConnectionPooler() bool {
 }
 
 func needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return spec.EnableReplicaConnectionPooler != nil && *spec.EnableReplicaConnectionPooler
+	return spec.EnableReplicaConnectionPooler != nil &&
+		*spec.EnableReplicaConnectionPooler
 }
 
 // RolesConnectionPooler gives the list of roles which need connection pooler
@@ -210,7 +214,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
 	resources, err := generateResourceRequirements(
 		spec.ConnectionPooler.Resources,
-		c.makeDefaultConnectionPoolerResources())
+		makeDefaultConnectionPoolerResources(&c.OpConfig))
 
 	effectiveDockerImage := util.Coalesce(
 		spec.ConnectionPooler.DockerImage,
@@ -320,8 +324,8 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 	if spec.ConnectionPooler == nil {
 		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
 	}
-
 	podTemplate, err := c.generateConnectionPoolerPodTemplate(connectionPooler.Role)
+
 	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
@@ -343,7 +347,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        connectionPooler.Name,
-			Namespace:   c.Namespace,
+			Namespace:   connectionPooler.Namespace,
 			Labels:      c.connectionPoolerLabelsSelector(connectionPooler.Name, connectionPooler.Role).MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
@@ -597,7 +601,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(spec *acidv1.ConnectionPooler
 	}
 
 	expectedResources, err := generateResourceRequirements(spec.Resources,
-		c.makeDefaultConnectionPoolerResources())
+		makeDefaultConnectionPoolerResources(&c.OpConfig))
 
 	// An error to generate expected resources means something is not quite
 	// right, but for the purpose of robustness do not panic here, just report
@@ -639,8 +643,7 @@ func (c *Cluster) needSyncConnectionPoolerDefaults(spec *acidv1.ConnectionPooler
 
 // Generate default resource section for connection pooler deployment, to be
 // used if nothing custom is specified in the manifest
-func (c Cluster) makeDefaultConnectionPoolerResources() acidv1.Resources {
-	config := c.OpConfig
+func makeDefaultConnectionPoolerResources(config *config.Config) acidv1.Resources {
 
 	defaultRequests := acidv1.ResourceDescription{
 		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPURequest,
@@ -679,34 +682,21 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, inst
 			}
 		}
 
+		// if the call is via createConnectionPooler, then it is required to initialize
+		// the structure
 		if c.ConnectionPooler == nil {
-			c.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
-				Master: {
-					Deployment:     nil,
-					Service:        nil,
-					Name:           c.connectionPoolerName(Master),
-					ClusterName:    c.ClusterName,
-					Namespace:      c.Namespace,
-					LookupFunction: false,
-					Role:           Master,
-				},
-				Replica: {
-					Deployment:     nil,
-					Service:        nil,
-					Name:           c.connectionPoolerName(Replica),
-					ClusterName:    c.ClusterName,
-					Namespace:      c.Namespace,
-					LookupFunction: false,
-					Role:           Replica,
-				},
-			}
+			c.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
 		}
 		if c.ConnectionPooler[role] == nil {
 			c.ConnectionPooler[role] = &ConnectionPoolerObjects{
 				Deployment:     nil,
 				Service:        nil,
+				Name:           c.connectionPoolerName(role),
+				ClusterName:    c.ClusterName,
+				Namespace:      c.Namespace,
 				LookupFunction: false,
-				Role:           role}
+				Role:           role,
+			}
 		}
 		if newNeedConnectionPooler {
 			// Try to sync in any case. If we didn't needed connection pooler before,

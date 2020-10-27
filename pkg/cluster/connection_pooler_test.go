@@ -23,6 +23,10 @@ func boolToPointer(value bool) *bool {
 	return &value
 }
 
+func int32ToPointer(value int32) *int32 {
+	return &value
+}
+
 func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 	testName := "Test connection pooler creation"
 	var cluster = New(
@@ -173,10 +177,6 @@ func TestNeedConnectionPooler(t *testing.T) {
 		t.Errorf("%s: Replica Connection pooler is not enabled with flag and full",
 			testName)
 	}
-}
-
-func int32ToPointer(value int32) *int32 {
-	return &value
 }
 
 func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
