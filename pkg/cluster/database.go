@@ -527,7 +527,7 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 			continue
 		}
 
-		c.logger.Infof("Install pooler lookup function into %s", dbname)
+		c.logger.Infof("install pooler lookup function into database '%s'", dbname)
 
 		// golang sql will do retries couple of times if pq driver reports
 		// connections issues (driver.ErrBadConn), but since our query is
