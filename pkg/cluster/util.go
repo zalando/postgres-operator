@@ -18,12 +18,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
+	"github.com/sirupsen/logrus"
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/nicediff"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
@@ -166,40 +168,59 @@ func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpd
 		)
 	}
 
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+	logNiceDiff(c.logger, old.Spec, new.Spec)
+}
+
+func logNiceDiff(log *logrus.Entry, old, new interface{}) {
+	o, erro := json.MarshalIndent(old, "", "  ")
+	n, errn := json.MarshalIndent(new, "", "  ")
+
+	if erro != nil || errn != nil {
+		panic("could not marshal API objects, should not happen")
+	}
+
+	nice := nicediff.Diff(string(o), string(n), true)
+	for _, s := range strings.Split(nice, "\n") {
+		// " is not needed in the value to understand
+		log.Debugf(strings.ReplaceAll(s, "\"", ""))
+	}
 }
 
 func (c *Cluster) logStatefulSetChanges(old, new *appsv1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
-		c.logger.Infof("statefulset %q has been changed", util.NameFromMeta(old.ObjectMeta))
+		c.logger.Infof("statefulset %s has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
-		c.logger.Infof("statefulset %q is not in the desired state and needs to be updated",
+		c.logger.Infof("statefulset %s is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
+
+	logNiceDiff(c.logger, old.Spec, new.Spec)
+
 	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
-		c.logger.Debugf("metadata.annotation diff\n%s\n", util.PrettyDiff(old.Annotations, new.Annotations))
+		c.logger.Debugf("metadata.annotation are different")
+		logNiceDiff(c.logger, old.Annotations, new.Annotations)
 	}
-	c.logger.Debugf("spec diff between old and new statefulsets: \n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
-			c.logger.Infof("reason: %q", reason)
+			c.logger.Infof("reason: %s", reason)
 		}
 	}
 }
 
 func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("%s service %q has been changed",
+		c.logger.Infof("%s service %s has been changed",
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("%s service %q is not in the desired state and needs to be updated",
+		c.logger.Infof("%s service %s is not in the desired state and needs to be updated",
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+
+	logNiceDiff(c.logger, old.Spec, new.Spec)
 
 	if reason != "" {
 		c.logger.Infof("reason: %s", reason)
@@ -208,7 +229,7 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 
 func (c *Cluster) logVolumeChanges(old, new acidv1.Volume) {
 	c.logger.Infof("volume specification has been changed")
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
+	logNiceDiff(c.logger, old, new)
 }
 
 func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {

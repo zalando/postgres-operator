@@ -180,3 +180,13 @@ func TestIsSmallerQuantity(t *testing.T) {
 		}
 	}
 }
+
+/*
+func TestNiceDiff(t *testing.T) {
+	o := "a\nb\nc\n"
+	n := "b\nd\n"
+	d := nicediff.Diff(o, n, true)
+	t.Log(d)
+	// t.Errorf("Lets see output")
+}
+*/

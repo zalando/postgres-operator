@@ -293,7 +293,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 
 // setRollingUpdateFlagForStatefulSet sets the indicator or the rolling update requirement
 // in the StatefulSet annotation.
-func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool) {
+func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool, msg string) {
 	anno := sset.GetAnnotations()
 	if anno == nil {
 		anno = make(map[string]string)
@@ -301,13 +301,13 @@ func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, v
 
 	anno[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
 	sset.SetAnnotations(anno)
-	c.logger.Debugf("statefulset's rolling update annotation has been set to %t", val)
+	c.logger.Debugf("set statefulset's rolling update annotation to %t: caller/reason %s", val, msg)
 }
 
 // applyRollingUpdateFlagforStatefulSet sets the rolling update flag for the cluster's StatefulSet
 // and applies that setting to the actual running cluster.
 func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
-	c.setRollingUpdateFlagForStatefulSet(c.Statefulset, val)
+	c.setRollingUpdateFlagForStatefulSet(c.Statefulset, val, "applyRollingUpdateFlag")
 	sset, err := c.updateStatefulSetAnnotations(c.Statefulset.GetAnnotations())
 	if err != nil {
 		return err
@@ -359,14 +359,13 @@ func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *appsv1.St
 			podsRollingUpdateRequired = false
 		} else {
 			c.logger.Infof("found a statefulset with an unfinished rolling update of the pods")
-
 		}
 	}
 	return podsRollingUpdateRequired
 }
 
 func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
-	c.logger.Debugf("updating statefulset annotations")
+	c.logger.Debugf("patching statefulset annotations")
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("could not form patch for the statefulset metadata: %v", err)

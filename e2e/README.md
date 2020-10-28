@@ -12,6 +12,10 @@ Docker.
 Docker
 Go
 
+# Notice
+
+The `manifest` folder in e2e tests folder is not commited to git, it comes from `/manifests`
+
 ## Build test runner
 
 In the directory of the cloned Postgres Operator repository change to the e2e
@@ -34,6 +38,46 @@ In the e2e folder you can invoke tests either with `make test` or with:
 
 To run both the build and test step you can invoke `make e2e` from the parent
 directory.
+
+To run the end 2 end test and keep the kind state execute:
+```bash
+NOCLEANUP=True ./run.sh
+```
+
+## Run indidual test
+
+After having executed a normal E2E run with `NOCLEANUP=True` Kind still continues to run, allowing you subsequent test runs.
+
+To run an individual test, run the following command in the `e2e` directory
+
+```bash
+NOCLEANUP=True ./run.sh main tests.test_e2e.EndToEndTestCase.test_lazy_spilo_upgrade
+```
+
+## Inspecting Kind
+
+If you want to inspect Kind/Kubernetes cluster, use the following script to exec into the K8s setup and then use `kubectl`
+
+```bash
+./exec_into_env.sh
+
+# use kube ctl
+kubectl get pods
+
+# watch relevant objects
+./scripts/watch_objects.sh
+
+# get operator logs
+./scripts/get_logs.sh
+```
+
+## Cleaning up Kind
+
+To cleanup kind and start fresh
+
+```bash
+e2e/run.sh cleanup
+```
 
 ## Covered use cases
 

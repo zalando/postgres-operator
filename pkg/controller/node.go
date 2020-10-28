@@ -42,7 +42,7 @@ func (c *Controller) nodeAdd(obj interface{}) {
 		return
 	}
 
-	c.logger.Debugf("new node has been added: %q (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
+	c.logger.Debugf("new node has been added: %s (%s)", util.NameFromMeta(node.ObjectMeta), node.Spec.ProviderID)
 
 	// check if the node became not ready while the operator was down (otherwise we would have caught it in nodeUpdate)
 	if !c.nodeIsReady(node) {
