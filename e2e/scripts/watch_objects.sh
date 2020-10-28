@@ -16,4 +16,6 @@ echo
 kubectl get pods -l name=postgres-operator -o jsonpath='{.items..metadata.annotations.step}'
 echo
 kubectl get pods -l application=spilo -o jsonpath='{.items..spec.containers..image}'
+echo
+kubectl exec -it $(kubectl get pods -l name=postgres-operator -o jsonpath='{.items.name}') -- curl localhost:8008/api/status/queue/
 "

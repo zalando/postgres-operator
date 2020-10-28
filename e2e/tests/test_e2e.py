@@ -109,9 +109,18 @@ class EndToEndTestCase(unittest.TestCase):
         with open("manifests/postgres-operator.yaml", 'w') as f:
             yaml.dump(operator_deployment, f, Dumper=yaml.Dumper)
 
+        with open("manifests/configmap.yaml", 'r+') as f:
+                    configmap = yaml.safe_load(f)
+                    configmap["data"]["workers"] = "1"
+
+        with open("manifests/configmap.yaml", 'w') as f:
+            yaml.dump(configmap, f, Dumper=yaml.Dumper)
+
         for filename in ["operator-service-account-rbac.yaml",
+                         "postgresteam.crd.yaml",
                          "configmap.yaml",
                          "postgres-operator.yaml",
+                         "api-service.yaml",
                          "infrastructure-roles.yaml",
                          "infrastructure-roles-new.yaml",
                          "e2e-storage-class.yaml"]:

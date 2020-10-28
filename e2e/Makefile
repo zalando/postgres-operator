@@ -51,3 +51,6 @@ tools:
 
 e2etest: tools copy clean
 	./run.sh main
+
+cleanup: clean
+	./run.sh cleanup
