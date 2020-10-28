@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.5.0
+  tag: v1.5.0-61-ged2b3239-dirty 
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -247,6 +247,11 @@ configLogicalBackup:
 configTeamsApi:
   # team_admin_role will have the rights to grant roles coming from PG manifests
   # enable_admin_role_for_users: "true"
+
+  # operator watches for PostgresTeam CRs to assign additional teams and members to clusters
+  enable_postgres_team_crd: "true"
+  # toogle to create additional superuser teams from PostgresTeam CRs
+  # enable_postgres_team_crd_superusers: "false"
 
   # toggle to grant superuser to team members created from the Teams API
   # enable_team_superuser: "false"

@@ -14,19 +14,10 @@ import (
 
 	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/tools/reference"
-
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	pgteams "github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -34,7 +25,16 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	"github.com/zalando/postgres-operator/pkg/util/users"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/reference"
 )
 
 var (
@@ -48,6 +48,7 @@ var (
 type Config struct {
 	OpConfig                     config.Config
 	RestConfig                   *rest.Config
+	PgTeamMap                    pgteams.PostgresTeamMap
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
@@ -1107,7 +1108,7 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 		if c.shouldAvoidProtectedOrSystemRole(username, "API role") {
 			continue
 		}
-		if c.OpConfig.EnableTeamSuperuser || isPostgresSuperuserTeam {
+		if (c.OpConfig.EnableTeamSuperuser && teamID == c.Spec.TeamID) || isPostgresSuperuserTeam {
 			flags = append(flags, constants.RoleFlagSuperuser)
 		} else {
 			if c.OpConfig.TeamAdminRole != "" {
@@ -1136,14 +1137,35 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 func (c *Cluster) initHumanUsers() error {
 
 	var clusterIsOwnedBySuperuserTeam bool
+	superuserTeams := []string{}
+
+	if c.OpConfig.EnablePostgresTeamCRDSuperusers {
+		superuserTeams = c.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
+	}
 
 	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
-		err := c.initTeamMembers(postgresSuperuserTeam, true)
-		if err != nil {
-			return fmt.Errorf("Cannot create a team %q of Postgres superusers: %v", postgresSuperuserTeam, err)
+		if !(util.SliceContains(superuserTeams, postgresSuperuserTeam)) {
+			superuserTeams = append(superuserTeams, postgresSuperuserTeam)
 		}
-		if postgresSuperuserTeam == c.Spec.TeamID {
+	}
+
+	for _, superuserTeam := range superuserTeams {
+		err := c.initTeamMembers(superuserTeam, true)
+		if err != nil {
+			return fmt.Errorf("Cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
+		}
+		if superuserTeam == c.Spec.TeamID {
 			clusterIsOwnedBySuperuserTeam = true
+		}
+	}
+
+	additionalTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
+	for _, additionalTeam := range additionalTeams {
+		if !(util.SliceContains(superuserTeams, additionalTeam)) {
+			err := c.initTeamMembers(additionalTeam, false)
+			if err != nil {
+				return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+			}
 		}
 	}
 
@@ -1154,7 +1176,7 @@ func (c *Cluster) initHumanUsers() error {
 
 	err := c.initTeamMembers(c.Spec.TeamID, false)
 	if err != nil {
-		return fmt.Errorf("Cannot create a team %q of admins owning the PG cluster: %v", c.Spec.TeamID, err)
+		return fmt.Errorf("Cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil

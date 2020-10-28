@@ -238,24 +238,37 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 		return nil, fmt.Errorf("no teamId specified")
 	}
 
+	c.logger.Debugf("fetching possible additional team members for team %q", teamID)
+	members := []string{}
+	additionalMembers := c.PgTeamMap[c.Spec.TeamID].AdditionalMembers
+	for _, member := range additionalMembers {
+		members = append(members, member)
+	}
+
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled, returning empty list of members for team %q", teamID)
-		return []string{}, nil
+		c.logger.Debugf("team API is disabled, only returning %d members for team %q", len(members), teamID)
+		return members, nil
 	}
 
 	token, err := c.oauthTokenGetter.getOAuthToken()
 	if err != nil {
-		c.logger.Warnf("could not get oauth token to authenticate to team service API, returning empty list of team members: %v", err)
-		return []string{}, nil
+		c.logger.Warnf("could not get oauth token to authenticate to team service API, only returning %d members for team %q: %v", len(members), teamID, err)
+		return members, nil
 	}
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		c.logger.Warnf("could not get team info for team %q, returning empty list of team members: %v", teamID, err)
-		return []string{}, nil
+		c.logger.Warnf("could not get team info for team %q, only returning %d members: %v", teamID, len(members), err)
+		return members, nil
 	}
 
-	return teamInfo.Members, nil
+	for _, member := range teamInfo.Members {
+		if !(util.SliceContains(members, member)) {
+			members = append(members, member)
+		}
+	}
+
+	return members, nil
 }
 
 func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {

@@ -16,6 +16,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -34,8 +35,9 @@ import (
 
 // Controller represents operator controller
 type Controller struct {
-	config   spec.ControllerConfig
-	opConfig *config.Config
+	config    spec.ControllerConfig
+	opConfig  *config.Config
+	pgTeamMap teams.PostgresTeamMap
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
@@ -56,10 +58,11 @@ type Controller struct {
 	clusterHistory   map[spec.NamespacedName]ringlog.RingLogger // history of the cluster changes
 	teamClusters     map[string][]spec.NamespacedName
 
-	postgresqlInformer cache.SharedIndexInformer
-	podInformer        cache.SharedIndexInformer
-	nodesInformer      cache.SharedIndexInformer
-	podCh              chan cluster.PodEvent
+	postgresqlInformer   cache.SharedIndexInformer
+	postgresTeamInformer cache.SharedIndexInformer
+	podInformer          cache.SharedIndexInformer
+	nodesInformer        cache.SharedIndexInformer
+	podCh                chan cluster.PodEvent
 
 	clusterEventQueues    []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime   int64
@@ -326,6 +329,12 @@ func (c *Controller) initController() {
 
 	c.initSharedInformers()
 
+	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+		c.loadPostgresTeams()
+	} else {
+		c.pgTeamMap = teams.PostgresTeamMap{}
+	}
+
 	if c.opConfig.DebugLogging {
 		c.logger.Logger.Level = logrus.DebugLevel
 	}
@@ -357,6 +366,7 @@ func (c *Controller) initController() {
 
 func (c *Controller) initSharedInformers() {
 
+	// Postgresqls
 	c.postgresqlInformer = acidv1informer.NewPostgresqlInformer(
 		c.KubeClient.AcidV1ClientSet,
 		c.opConfig.WatchedNamespace,
@@ -368,6 +378,20 @@ func (c *Controller) initSharedInformers() {
 		UpdateFunc: c.postgresqlUpdate,
 		DeleteFunc: c.postgresqlDelete,
 	})
+
+	// PostgresTeams
+	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+		c.postgresTeamInformer = acidv1informer.NewPostgresTeamInformer(
+			c.KubeClient.AcidV1ClientSet,
+			c.opConfig.WatchedNamespace,
+			constants.QueueResyncPeriodTPR*6, // 30 min
+			cache.Indexers{})
+
+		c.postgresTeamInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.postgresTeamAdd,
+			UpdateFunc: c.postgresTeamUpdate,
+		})
+	}
 
 	// Pods
 	podLw := &cache.ListWatch{
@@ -429,6 +453,10 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	go c.apiserver.Run(stopCh, wg)
 	go c.kubeNodesInformer(stopCh, wg)
 
+	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+		go c.runPostgresTeamInformer(stopCh, wg)
+	}
+
 	c.logger.Info("started working in background")
 }
 
@@ -442,6 +470,12 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 	defer wg.Done()
 
 	c.postgresqlInformer.Run(stopCh)
+}
+
+func (c *Controller) runPostgresTeamInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	c.postgresTeamInformer.Run(stopCh)
 }
 
 func queueClusterKey(eventType EventType, uid types.UID) string {

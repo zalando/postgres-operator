@@ -598,8 +598,8 @@ key.
   The default is `"log_statement:all"`
 
 * **enable_team_superuser**
-  whether to grant superuser to team members created from the Teams API.
-  The default is `false`.
+  whether to grant superuser to members of the cluster's owning team created
+  from the Teams API. The default is `false`.
 
 * **team_admin_role**
   role name to grant to team members created from the Teams API. The default is
@@ -631,6 +631,16 @@ key.
   List of teams which members need the superuser role in each PG database
   cluster to administer Postgres and maintain infrastructure built around it.
   The default is empty.
+
+* **enable_postgres_team_crd**
+  toggle to make the operator watch for created or updated `PostgresTeam` CRDs
+  and create roles for specified additional teams and members.
+  The default is `true`.
+
+* **enable_postgres_team_crd_superusers**
+  in a `PostgresTeam` CRD additional superuser teams can assigned to teams that
+  own clusters. With this flag set to `false`, it will be ignored.
+  The default is `false`.
 
 ## Logging and REST API
 
