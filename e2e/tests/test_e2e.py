@@ -347,6 +347,7 @@ class EndToEndTestCase(unittest.TestCase):
             },
         }
         k8s.update_config(patch_infrastructure_roles)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
         try:
             # check that new roles are represented in the config by requesting the
@@ -456,6 +457,7 @@ class EndToEndTestCase(unittest.TestCase):
             # so we additonally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
             self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Rolling upgrade was not executed", 50, 3)
             self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), conf_image, "Rolling upgrade was not executed", 50, 3)
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -527,6 +529,9 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+        # ensure cluster is healthy after tests
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):
