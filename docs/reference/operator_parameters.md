@@ -635,7 +635,7 @@ key.
 * **enable_postgres_team_crd**
   toggle to make the operator watch for created or updated `PostgresTeam` CRDs
   and create roles for specified additional teams and members.
-  The default is `true`.
+  The default is `false`.
 
 * **enable_postgres_team_crd_superusers**
   in a `PostgresTeam` CRD additional superuser teams can assigned to teams that

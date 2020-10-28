@@ -169,7 +169,7 @@ type Config struct {
 	EnableTeamSuperuser                    bool              `name:"enable_team_superuser" default:"false"`
 	TeamAdminRole                          string            `name:"team_admin_role" default:"admin"`
 	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
-	EnablePostgresTeamCRD                  *bool             `name:"enable_postgres_team_crd" default:"true"`
+	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
 	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`

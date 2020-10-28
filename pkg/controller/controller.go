@@ -329,7 +329,7 @@ func (c *Controller) initController() {
 
 	c.initSharedInformers()
 
-	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+	if c.opConfig.EnablePostgresTeamCRD {
 		c.loadPostgresTeams()
 	} else {
 		c.pgTeamMap = teams.PostgresTeamMap{}
@@ -380,7 +380,7 @@ func (c *Controller) initSharedInformers() {
 	})
 
 	// PostgresTeams
-	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+	if c.opConfig.EnablePostgresTeamCRD {
 		c.postgresTeamInformer = acidv1informer.NewPostgresTeamInformer(
 			c.KubeClient.AcidV1ClientSet,
 			c.opConfig.WatchedNamespace,
@@ -453,7 +453,7 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	go c.apiserver.Run(stopCh, wg)
 	go c.kubeNodesInformer(stopCh, wg)
 
-	if c.opConfig.EnablePostgresTeamCRD != nil && *c.opConfig.EnablePostgresTeamCRD {
+	if c.opConfig.EnablePostgresTeamCRD {
 		go c.runPostgresTeamInformer(stopCh, wg)
 	}
 

@@ -122,7 +122,7 @@ configuration:
     enable_database_access: true
   teams_api:
     # enable_admin_role_for_users: true
-    # enable_postgres_team_crd: true
+    # enable_postgres_team_crd: false
     # enable_postgres_team_crd_superusers: false
     enable_team_superuser: false
     enable_teams_api: false

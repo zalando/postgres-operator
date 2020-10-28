@@ -1114,11 +1114,6 @@ func (in *TeamsAPIConfiguration) DeepCopyInto(out *TeamsAPIConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.EnablePostgresTeamCRD != nil {
-		in, out := &in.EnablePostgresTeamCRD, &out.EnablePostgresTeamCRD
-		*out = new(bool)
-		**out = **in
-	}
 	return
 }
 
