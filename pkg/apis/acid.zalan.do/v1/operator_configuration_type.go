@@ -145,7 +145,7 @@ type TeamsAPIConfiguration struct {
 	PamConfiguration                string            `json:"pam_configuration,omitempty"`
 	ProtectedRoles                  []string          `json:"protected_role_names,omitempty"`
 	PostgresSuperuserTeams          []string          `json:"postgres_superuser_teams,omitempty"`
-	EnablePostgresTeamCRD           *bool             `json:"enable_postgres_team_crd,omitempty"`
+	EnablePostgresTeamCRD           bool              `json:"enable_postgres_team_crd,omitempty"`
 	EnablePostgresTeamCRDSuperusers bool              `json:"enable_postgres_team_crd_superusers,omitempty"`
 }
 

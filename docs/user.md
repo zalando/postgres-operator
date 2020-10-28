@@ -330,6 +330,11 @@ spec:
     - "foo"
 ```
 
+Note, by default the `PostgresTeam` support is disabled in the configuration.
+Switch `enable_postgres_team_crd` flag to `true` and the operator will start to
+watch for this CRD. Make sure, the cluster role is up to date and contains a
+section for [PostgresTeam](../manifests/operator-service-account-rbac.yaml#L30).
+
 ## Prepared databases with roles and default privileges
 
 The `users` section in the manifests only allows for creating database roles

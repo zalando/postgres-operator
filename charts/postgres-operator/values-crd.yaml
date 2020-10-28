@@ -257,7 +257,7 @@ configTeamsApi:
   # enable_admin_role_for_users: true
 
   # operator watches for PostgresTeam CRs to assign additional teams and members to clusters
-  enable_postgres_team_crd: true
+  enable_postgres_team_crd: false
   # toogle to create additional superuser teams from PostgresTeam CRs
   # enable_postgres_team_crd_superusers: "false"
 
