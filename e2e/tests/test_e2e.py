@@ -829,6 +829,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
             time.sleep(5)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
             # check that pods and services are still there
             k8s.wait_for_running_pods(cluster_label, 2)
@@ -839,6 +840,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # wait a little before proceeding
             time.sleep(10)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
             # add annotations to manifest
             delete_date = datetime.today().strftime('%Y-%m-%d')
