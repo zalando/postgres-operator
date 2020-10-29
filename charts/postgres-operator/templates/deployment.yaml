@@ -37,6 +37,10 @@ spec:
         image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         env:
+      {{- if .Values.enableJsonLogging }}
+        - name: ENABLE_JSON_LOGGING
+          value: "true"
+      {{- end }}
       {{- if eq .Values.configTarget "ConfigMap" }}
         - name: CONFIG_MAP_NAME
           value: {{ template "postgres-operator.fullname" . }}
