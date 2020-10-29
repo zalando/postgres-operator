@@ -239,6 +239,19 @@ class K8s:
             return []
         return json.loads(r.stdout.decode())
 
+    def get_operator_state(self):
+        pod = self.get_operator_pod()
+        if pod == None:
+            return None
+        pod = pod.metadata.name
+
+        r = self.exec_with_kubectl(pod, "curl localhost:8080/workers/all/status/")
+        if not r.returncode == 0 or not r.stdout.decode()[0:1]=="{":
+            return None
+
+        return json.loads(r.stdout.decode())
+
+
     def get_patroni_running_members(self, pod="acid-minimal-cluster-0"):
         result = self.get_patroni_state(pod)
         return list(filter(lambda x: "State" in x and x["State"] == "running", result))
