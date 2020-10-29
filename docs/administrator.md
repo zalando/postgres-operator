@@ -687,7 +687,7 @@ aws_or_gcp:
 
 ### Setup pod environment configmap
 
-By default postgres-operator is using WAL-E to perform backup and restore. WAL-E doesn't work very well with GCS, so instead we want to use WAL-G. By providing custom pod environment, we can instruct Spilo to use WAL-G for backup and recovery.
+To make postgres-operator work with GCS, use following configmap:
 ```yml
 apiVersion: v1
 kind: ConfigMap
@@ -700,6 +700,7 @@ data:
   USE_WALG_RESTORE: "true"
   CLONE_USE_WALG_RESTORE: "true"
 ```
+This configmap will instruct operator to use WAL-G, instead of WAL-E, that is better suited for GCS.
 
 Then provide this configmap in postgres-operator settings:
 ```yml
