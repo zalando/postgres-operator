@@ -757,7 +757,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// need to process. In the future we may want to do this more careful and
 	// check which databases we need to process, but even repeating the whole
 	// installation process should be good enough.
-	c.ConnectionPooler.LookupFunction = false
 
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
 		c.installLookupFunction); err != nil {
