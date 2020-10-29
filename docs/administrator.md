@@ -700,7 +700,7 @@ data:
   USE_WALG_RESTORE: "true"
   CLONE_USE_WALG_RESTORE: "true"
 ```
-This configmap will instruct operator to use WAL-G, instead of WAL-E, that is better suited for GCS.
+This configmap will instruct operator to use WAL-G, instead of WAL-E, for backup and restore.
 
 Then provide this configmap in postgres-operator settings:
 ```yml
