@@ -10,7 +10,9 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -134,6 +136,21 @@ func PrettyDiff(a, b interface{}) string {
 	return strings.Join(Diff(a, b), "\n")
 }
 
+// Compare two string slices while ignoring the order of elements
+func IsEqualIgnoreOrder(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	a_copy := make([]string, len(a))
+	b_copy := make([]string, len(b))
+	copy(a_copy, a)
+	copy(b_copy, b)
+	sort.Strings(a_copy)
+	sort.Strings(b_copy)
+
+	return reflect.DeepEqual(a_copy, b_copy)
+}
+
 // SubstractStringSlices finds elements in a that are not in b and return them as a result slice.
 func SubstractStringSlices(a []string, b []string) (result []string, equal bool) {
 	// Slices are assumed to contain unique elements only
@@ -174,6 +191,20 @@ func FindNamedStringSubmatch(r *regexp.Regexp, s string) map[string]string {
 	}
 
 	return res
+}
+
+// SliceContains
+func SliceContains(slice interface{}, item interface{}) bool {
+	s := reflect.ValueOf(slice)
+	if s.Kind() != reflect.Slice {
+		panic("Invalid data-type")
+	}
+	for i := 0; i < s.Len(); i++ {
+		if s.Index(i).Interface() == item {
+			return true
+		}
+	}
+	return false
 }
 
 // MapContains returns true if and only if haystack contains all the keys from the needle with matching corresponding values

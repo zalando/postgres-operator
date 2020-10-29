@@ -169,6 +169,8 @@ type Config struct {
 	EnableTeamSuperuser                    bool              `name:"enable_team_superuser" default:"false"`
 	TeamAdminRole                          string            `name:"team_admin_role" default:"admin"`
 	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
+	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
+	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
@@ -199,7 +201,7 @@ type Config struct {
 
 // MustMarshal marshals the config or panics
 func (c Config) MustMarshal() string {
-	b, err := json.MarshalIndent(c, "", "\t")
+	b, err := json.MarshalIndent(c, "", "   ")
 	if err != nil {
 		panic(err)
 	}

@@ -43,6 +43,17 @@ var prettyDiffTest = []struct {
 	{[]int{1, 2, 3, 4}, []int{1, 2, 3, 4}, ""},
 }
 
+var isEqualIgnoreOrderTest = []struct {
+	inA      []string
+	inB      []string
+	outEqual bool
+}{
+	{[]string{"a", "b", "c"}, []string{"a", "b", "c"}, true},
+	{[]string{"a", "b", "c"}, []string{"a", "c", "b"}, true},
+	{[]string{"a", "b"}, []string{"a", "c", "b"}, false},
+	{[]string{"a", "b", "c"}, []string{"a", "d", "c"}, false},
+}
+
 var substractTest = []struct {
 	inA      []string
 	inB      []string
@@ -51,6 +62,16 @@ var substractTest = []struct {
 }{
 	{[]string{"a", "b", "c", "d"}, []string{"a", "b", "c", "d"}, []string{}, true},
 	{[]string{"a", "b", "c", "d"}, []string{"a", "bb", "c", "d"}, []string{"b"}, false},
+}
+
+var sliceContaintsTest = []struct {
+	slice []string
+	item  string
+	out   bool
+}{
+	{[]string{"a", "b", "c"}, "a", true},
+	{[]string{"a", "b", "c"}, "d", false},
+	{[]string{}, "d", false},
 }
 
 var mapContaintsTest = []struct {
@@ -136,6 +157,15 @@ func TestPrettyDiff(t *testing.T) {
 	}
 }
 
+func TestIsEqualIgnoreOrder(t *testing.T) {
+	for _, tt := range isEqualIgnoreOrderTest {
+		actualEqual := IsEqualIgnoreOrder(tt.inA, tt.inB)
+		if actualEqual != tt.outEqual {
+			t.Errorf("IsEqualIgnoreOrder expected: %t, got: %t", tt.outEqual, actualEqual)
+		}
+	}
+}
+
 func TestSubstractSlices(t *testing.T) {
 	for _, tt := range substractTest {
 		actualRes, actualEqual := SubstractStringSlices(tt.inA, tt.inB)
@@ -160,6 +190,15 @@ func TestFindNamedStringSubmatch(t *testing.T) {
 	}
 }
 
+func TestSliceContains(t *testing.T) {
+	for _, tt := range sliceContaintsTest {
+		res := SliceContains(tt.slice, tt.item)
+		if res != tt.out {
+			t.Errorf("SliceContains expected: %#v, got: %#v", tt.out, res)
+		}
+	}
+}
+
 func TestMapContains(t *testing.T) {
 	for _, tt := range mapContaintsTest {
 		res := MapContains(tt.inA, tt.inB)
@@ -180,3 +219,13 @@ func TestIsSmallerQuantity(t *testing.T) {
 		}
 	}
 }
+
+/*
+func TestNiceDiff(t *testing.T) {
+	o := "a\nb\nc\n"
+	n := "b\nd\n"
+	d := nicediff.Diff(o, n, true)
+	t.Log(d)
+	// t.Errorf("Lets see output")
+}
+*/

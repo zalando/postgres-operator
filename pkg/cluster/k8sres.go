@@ -841,7 +841,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 		return secretPodEnvVarsList, nil
 	}
 
-	secret, err := c.KubeClient.Secrets(c.OpConfig.PodEnvironmentSecret).Get(
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
 		context.TODO(),
 		c.OpConfig.PodEnvironmentSecret,
 		metav1.GetOptions{})
@@ -1122,7 +1122,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate the spilo container
-	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
+	c.logger.Debugf("Generating Spilo container, environment variables")
+	c.logger.Debugf("%v", spiloEnvVars)
+
 	spiloContainer := generateContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
@@ -2020,7 +2022,8 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
 	}
 
-	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+	c.logger.Debugf("Generated logical backup env vars")
+	c.logger.Debugf("%v", envVars)
 	return envVars
 }
 
@@ -2181,6 +2184,13 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec)
 			},
 		},
 		Env: envVars,
+		ReadinessProbe: &v1.Probe{
+			Handler: v1.Handler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.IntOrString{IntVal: pgPort},
+				},
+			},
+		},
 	}
 
 	podTemplate := &v1.PodTemplateSpec{

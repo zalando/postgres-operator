@@ -18,12 +18,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
+	"github.com/sirupsen/logrus"
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/nicediff"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
@@ -166,40 +168,59 @@ func (c *Cluster) logPDBChanges(old, new *policybeta1.PodDisruptionBudget, isUpd
 		)
 	}
 
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+	logNiceDiff(c.logger, old.Spec, new.Spec)
+}
+
+func logNiceDiff(log *logrus.Entry, old, new interface{}) {
+	o, erro := json.MarshalIndent(old, "", "  ")
+	n, errn := json.MarshalIndent(new, "", "  ")
+
+	if erro != nil || errn != nil {
+		panic("could not marshal API objects, should not happen")
+	}
+
+	nice := nicediff.Diff(string(o), string(n), true)
+	for _, s := range strings.Split(nice, "\n") {
+		// " is not needed in the value to understand
+		log.Debugf(strings.ReplaceAll(s, "\"", ""))
+	}
 }
 
 func (c *Cluster) logStatefulSetChanges(old, new *appsv1.StatefulSet, isUpdate bool, reasons []string) {
 	if isUpdate {
-		c.logger.Infof("statefulset %q has been changed", util.NameFromMeta(old.ObjectMeta))
+		c.logger.Infof("statefulset %s has been changed", util.NameFromMeta(old.ObjectMeta))
 	} else {
-		c.logger.Infof("statefulset %q is not in the desired state and needs to be updated",
+		c.logger.Infof("statefulset %s is not in the desired state and needs to be updated",
 			util.NameFromMeta(old.ObjectMeta),
 		)
 	}
+
+	logNiceDiff(c.logger, old.Spec, new.Spec)
+
 	if !reflect.DeepEqual(old.Annotations, new.Annotations) {
-		c.logger.Debugf("metadata.annotation diff\n%s\n", util.PrettyDiff(old.Annotations, new.Annotations))
+		c.logger.Debugf("metadata.annotation are different")
+		logNiceDiff(c.logger, old.Annotations, new.Annotations)
 	}
-	c.logger.Debugf("spec diff between old and new statefulsets: \n%s\n", util.PrettyDiff(old.Spec, new.Spec))
 
 	if len(reasons) > 0 {
 		for _, reason := range reasons {
-			c.logger.Infof("reason: %q", reason)
+			c.logger.Infof("reason: %s", reason)
 		}
 	}
 }
 
 func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isUpdate bool, reason string) {
 	if isUpdate {
-		c.logger.Infof("%s service %q has been changed",
+		c.logger.Infof("%s service %s has been changed",
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	} else {
-		c.logger.Infof("%s service %q is not in the desired state and needs to be updated",
+		c.logger.Infof("%s service %s is not in the desired state and needs to be updated",
 			role, util.NameFromMeta(old.ObjectMeta),
 		)
 	}
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old.Spec, new.Spec))
+
+	logNiceDiff(c.logger, old.Spec, new.Spec)
 
 	if reason != "" {
 		c.logger.Infof("reason: %s", reason)
@@ -208,7 +229,7 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 
 func (c *Cluster) logVolumeChanges(old, new acidv1.Volume) {
 	c.logger.Infof("volume specification has been changed")
-	c.logger.Debugf("diff\n%s\n", util.PrettyDiff(old, new))
+	logNiceDiff(c.logger, old, new)
 }
 
 func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
@@ -217,24 +238,37 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 		return nil, fmt.Errorf("no teamId specified")
 	}
 
+	c.logger.Debugf("fetching possible additional team members for team %q", teamID)
+	members := []string{}
+	additionalMembers := c.PgTeamMap[c.Spec.TeamID].AdditionalMembers
+	for _, member := range additionalMembers {
+		members = append(members, member)
+	}
+
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled, returning empty list of members for team %q", teamID)
-		return []string{}, nil
+		c.logger.Debugf("team API is disabled, only returning %d members for team %q", len(members), teamID)
+		return members, nil
 	}
 
 	token, err := c.oauthTokenGetter.getOAuthToken()
 	if err != nil {
-		c.logger.Warnf("could not get oauth token to authenticate to team service API, returning empty list of team members: %v", err)
-		return []string{}, nil
+		c.logger.Warnf("could not get oauth token to authenticate to team service API, only returning %d members for team %q: %v", len(members), teamID, err)
+		return members, nil
 	}
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		c.logger.Warnf("could not get team info for team %q, returning empty list of team members: %v", teamID, err)
-		return []string{}, nil
+		c.logger.Warnf("could not get team info for team %q, only returning %d members: %v", teamID, len(members), err)
+		return members, nil
 	}
 
-	return teamInfo.Members, nil
+	for _, member := range teamInfo.Members {
+		if !(util.SliceContains(members, member)) {
+			members = append(members, member)
+		}
+	}
+
+	return members, nil
 }
 
 func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {

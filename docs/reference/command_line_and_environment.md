@@ -56,3 +56,7 @@ The following environment variables are accepted by the operator:
 * **CRD_READY_WAIT_INTERVAL**
   defines the  interval between consecutive attempts waiting for the
   `postgresql` CRD to be created. The default is 5s.
+  
+* **ENABLE_JSON_LOGGING**
+  Set to `true` for JSON formatted logging output.
+  The default is false.

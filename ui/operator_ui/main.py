@@ -104,6 +104,8 @@ USE_AWS_INSTANCE_PROFILE = (
     getenv('USE_AWS_INSTANCE_PROFILE', 'false').lower() != 'false'
 )
 
+AWS_ENDPOINT = getenv('AWS_ENDPOINT')
+
 tokens.configure()
 tokens.manage('read-only')
 tokens.start()
@@ -1055,6 +1057,7 @@ def main(port, secret_key, debug, clusters: list):
     logger.info(f'Tokeninfo URL: {TOKENINFO_URL}')
     logger.info(f'Use AWS instance_profile: {USE_AWS_INSTANCE_PROFILE}')
     logger.info(f'WAL-E S3 endpoint: {WALE_S3_ENDPOINT}')
+    logger.info(f'AWS S3 endpoint: {AWS_ENDPOINT}')
 
     if TARGET_NAMESPACE is None:
         @on_exception(
