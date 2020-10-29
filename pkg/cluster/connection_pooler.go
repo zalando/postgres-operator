@@ -406,7 +406,6 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 
 //delete connection pooler
 func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
-	//c.setProcessName("deleting connection pooler")
 	c.logger.Debugln("deleting connection pooler")
 
 	// Lack of connection pooler objects is not a fatal error, just log it if
