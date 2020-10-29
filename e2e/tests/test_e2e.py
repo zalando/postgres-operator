@@ -109,9 +109,18 @@ class EndToEndTestCase(unittest.TestCase):
         with open("manifests/postgres-operator.yaml", 'w') as f:
             yaml.dump(operator_deployment, f, Dumper=yaml.Dumper)
 
+        with open("manifests/configmap.yaml", 'r+') as f:
+                    configmap = yaml.safe_load(f)
+                    configmap["data"]["workers"] = "1"
+
+        with open("manifests/configmap.yaml", 'w') as f:
+            yaml.dump(configmap, f, Dumper=yaml.Dumper)
+
         for filename in ["operator-service-account-rbac.yaml",
+                         "postgresteam.crd.yaml",
                          "configmap.yaml",
                          "postgres-operator.yaml",
+                         "api-service.yaml",
                          "infrastructure-roles.yaml",
                          "infrastructure-roles-new.yaml",
                          "e2e-storage-class.yaml"]:
@@ -338,6 +347,7 @@ class EndToEndTestCase(unittest.TestCase):
             },
         }
         k8s.update_config(patch_infrastructure_roles)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
         try:
             # check that new roles are represented in the config by requesting the
@@ -447,6 +457,7 @@ class EndToEndTestCase(unittest.TestCase):
             # so we additonally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
             self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Rolling upgrade was not executed", 50, 3)
             self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), conf_image, "Rolling upgrade was not executed", 50, 3)
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -518,6 +529,9 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+        # ensure cluster is healthy after tests
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):
@@ -809,12 +823,14 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
         try:
             # this delete attempt should be omitted because of missing annotations
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
             time.sleep(5)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
             # check that pods and services are still there
             k8s.wait_for_running_pods(cluster_label, 2)
@@ -825,6 +841,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # wait a little before proceeding
             time.sleep(10)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
             # add annotations to manifest
             delete_date = datetime.today().strftime('%Y-%m-%d')
@@ -838,6 +855,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
             # wait a little before proceeding
             time.sleep(20)
