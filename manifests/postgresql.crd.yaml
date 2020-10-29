@@ -56,7 +56,6 @@ spec:
         required:
           - kind
           - apiVersion
-          - metadata
           - spec
         properties:
           kind:
@@ -67,14 +66,6 @@ spec:
             type: string
             enum:
               - acid.zalan.do/v1
-          metadata:
-            type: object
-            required:
-              - name
-            properties:
-              name:
-                type: string
-                maxLength: 53
           spec:
             type: object
             required:
