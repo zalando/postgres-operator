@@ -16,6 +16,8 @@ logger = getLogger(__name__)
 
 session = Session()
 
+AWS_ENDPOINT = getenv('AWS_ENDPOINT')
+
 OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
 
 COMMON_CLUSTER_LABEL = getenv('COMMON_CLUSTER_LABEL', '{"application":"spilo"}')
@@ -266,7 +268,7 @@ def read_stored_clusters(bucket, prefix, delimiter='/'):
     return [
         prefix['Prefix'].split('/')[-2]
         for prefix in these(
-            client('s3').list_objects(
+            client('s3', endpoint_url=AWS_ENDPOINT).list_objects(
                 Bucket=bucket,
                 Delimiter=delimiter,
                 Prefix=prefix,
@@ -287,7 +289,7 @@ def read_versions(
     return [
         'base' if uid == 'wal' else uid
         for prefix in these(
-            client('s3').list_objects(
+            client('s3', endpoint_url=AWS_ENDPOINT).list_objects(
                 Bucket=bucket,
                 Delimiter=delimiter,
                 Prefix=prefix + pg_cluster + delimiter,

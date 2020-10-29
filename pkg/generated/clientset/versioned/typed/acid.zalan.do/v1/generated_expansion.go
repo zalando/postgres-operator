@@ -26,4 +26,6 @@ package v1
 
 type OperatorConfigurationExpansion interface{}
 
+type PostgresTeamExpansion interface{}
+
 type PostgresqlExpansion interface{}

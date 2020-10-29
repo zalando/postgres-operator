@@ -348,13 +348,13 @@ func (c *Cluster) syncStatefulSet() error {
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
-		c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired)
+		c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired, "from cache")
 
 		cmp := c.compareStatefulSetWith(desiredSS)
 		if !cmp.match {
 			if cmp.rollingUpdate && !podsRollingUpdateRequired {
 				podsRollingUpdateRequired = true
-				c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired)
+				c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired, "statefulset changes")
 			}
 
 			c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
@@ -497,11 +497,11 @@ func (c *Cluster) syncSecrets() error {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
 			if secretUsername != string(secret.Data["username"]) {
-				c.logger.Warningf("secret %q does not contain the role %q", secretSpec.Name, secretUsername)
+				c.logger.Warningf("secret %s does not contain the role %q", secretSpec.Name, secretUsername)
 				continue
 			}
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("secret %q already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
+			c.logger.Debugf("secret %s already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
 				userMap = c.systemUsers
@@ -696,12 +696,8 @@ func (c *Cluster) syncPreparedDatabases() error {
 		if err := c.initDbConnWithName(preparedDbName); err != nil {
 			return fmt.Errorf("could not init connection to database %s: %v", preparedDbName, err)
 		}
-		defer func() {
-			if err := c.closeDbConn(); err != nil {
-				c.logger.Errorf("could not close database connection: %v", err)
-			}
-		}()
 
+		c.logger.Debugf("syncing prepared database %q", preparedDbName)
 		// now, prepare defined schemas
 		preparedSchemas := preparedDB.PreparedSchemas
 		if len(preparedDB.PreparedSchemas) == 0 {
@@ -714,6 +710,10 @@ func (c *Cluster) syncPreparedDatabases() error {
 		// install extensions
 		if err := c.syncExtensions(preparedDB.Extensions); err != nil {
 			return err
+		}
+
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
 		}
 	}
 
@@ -804,7 +804,7 @@ func (c *Cluster) syncLogicalBackupJob() error {
 			return fmt.Errorf("could not generate the desired logical backup job state: %v", err)
 		}
 		if match, reason := k8sutil.SameLogicalBackupJob(job, desiredJob); !match {
-			c.logger.Infof("logical job %q is not in the desired state and needs to be updated",
+			c.logger.Infof("logical job %s is not in the desired state and needs to be updated",
 				c.getLogicalBackupJobName(),
 			)
 			if reason != "" {
@@ -825,12 +825,12 @@ func (c *Cluster) syncLogicalBackupJob() error {
 	c.logger.Info("could not find the cluster's logical backup job")
 
 	if err = c.createLogicalBackupJob(); err == nil {
-		c.logger.Infof("created missing logical backup job %q", jobName)
+		c.logger.Infof("created missing logical backup job %s", jobName)
 	} else {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			return fmt.Errorf("could not create missing logical backup job: %v", err)
 		}
-		c.logger.Infof("logical backup job %q already exists", jobName)
+		c.logger.Infof("logical backup job %s already exists", jobName)
 		if _, err = c.KubeClient.CronJobsGetter.CronJobs(c.Namespace).Get(context.TODO(), jobName, metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not fetch existing logical backup job: %v", err)
 		}
@@ -847,7 +847,9 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 	var err error
 
 	if c.ConnectionPooler == nil {
-		c.ConnectionPooler = &ConnectionPoolerObjects{}
+		c.ConnectionPooler = &ConnectionPoolerObjects{
+			LookupFunction: false,
+		}
 	}
 
 	newNeedConnectionPooler := c.needConnectionPoolerWorker(&newSpec.Spec)
@@ -885,6 +887,11 @@ func (c *Cluster) syncConnectionPooler(oldSpec,
 			if err = lookup(schema, user); err != nil {
 				return NoSync, err
 			}
+		} else {
+			// Lookup function installation seems to be a fragile point, so
+			// let's log for debugging if we skip it
+			msg := "Skip lookup function installation, old: %d, already installed %d"
+			c.logger.Debug(msg, oldNeedConnectionPooler, c.ConnectionPooler.LookupFunction)
 		}
 
 		if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec); err != nil {
@@ -968,7 +975,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			newConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		c.logger.Infof("Old: %+v, New %+v", oldConnectionPooler, newConnectionPooler)
+		logNiceDiff(c.logger, oldConnectionPooler, newConnectionPooler)
 
 		specSync, specReason := c.needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
 		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(newConnectionPooler, deployment)

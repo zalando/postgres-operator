@@ -4,7 +4,6 @@ metadata:
   name: operatorconfigurations.acid.zalan.do
 spec:
   group: acid.zalan.do
-  scope: Namespaced
   names:
     kind: OperatorConfiguration
     listKind: OperatorConfigurationList
@@ -12,6 +11,7 @@ spec:
     singular: operatorconfiguration
     shortNames:
     - opconfig
+  scope: Namespaced
   versions:
   - name: v1
     served: true
@@ -384,16 +384,21 @@ spec:
                 load_balancer:
                   type: object
                   properties:
+                    custom_service_annotations:
+                      type: object
+                      additionalProperties:
+                        type: string
                     db_hosted_zone:
                       type: string
                     enable_master_load_balancer:
                       type: boolean
                     enable_replica_load_balancer:
                       type: boolean
-                    custom_service_annotations:
-                      type: object
-                      additionalProperties:
-                        type: string
+                    external_traffic_policy:
+                      type: string
+                      enum:
+                        - "Cluster"
+                        - "Local"
                     master_dns_name_format:
                       type: string
                     replica_dns_name_format:
@@ -442,6 +447,10 @@ spec:
                   type: object
                   properties:
                     enable_admin_role_for_users:
+                      type: boolean
+                    enable_postgres_team_crd:
+                      type: boolean
+                    enable_postgres_team_crd_superusers:
                       type: boolean
                     enable_team_superuser:
                       type: boolean

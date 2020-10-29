@@ -14,19 +14,10 @@ import (
 
 	"github.com/r3labs/diff"
 	"github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
-	policybeta1 "k8s.io/api/policy/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/tools/reference"
-
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/scheme"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	pgteams "github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -34,7 +25,16 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	"github.com/zalando/postgres-operator/pkg/util/users"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	policybeta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/reference"
 )
 
 var (
@@ -48,6 +48,7 @@ var (
 type Config struct {
 	OpConfig                     config.Config
 	RestConfig                   *rest.Config
+	PgTeamMap                    pgteams.PostgresTeamMap
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
@@ -371,11 +372,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	//TODO: improve me
 	if *c.Statefulset.Spec.Replicas != *statefulSet.Spec.Replicas {
 		match = false
-		reasons = append(reasons, "new statefulset's number of replicas doesn't match the current one")
+		reasons = append(reasons, "new statefulset's number of replicas does not match the current one")
 	}
 	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
 		match = false
-		reasons = append(reasons, "new statefulset's annotations doesn't match the current one")
+		reasons = append(reasons, "new statefulset's annotations does not match the current one")
 	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
@@ -392,24 +393,24 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	if c.Statefulset.Spec.Template.Spec.ServiceAccountName != statefulSet.Spec.Template.Spec.ServiceAccountName {
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's serviceAccountName service account name doesn't match the current one")
+		reasons = append(reasons, "new statefulset's serviceAccountName service account name does not match the current one")
 	}
 	if *c.Statefulset.Spec.Template.Spec.TerminationGracePeriodSeconds != *statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds {
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's terminationGracePeriodSeconds doesn't match the current one")
+		reasons = append(reasons, "new statefulset's terminationGracePeriodSeconds does not match the current one")
 	}
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Affinity, statefulSet.Spec.Template.Spec.Affinity) {
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's pod affinity doesn't match the current one")
+		reasons = append(reasons, "new statefulset's pod affinity does not match the current one")
 	}
 
 	// Some generated fields like creationTimestamp make it not possible to use DeepCompare on Spec.Template.ObjectMeta
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Labels, statefulSet.Spec.Template.Labels) {
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's metadata labels doesn't match the current one")
+		reasons = append(reasons, "new statefulset's metadata labels does not match the current one")
 	}
 	if (c.Statefulset.Spec.Selector != nil) && (statefulSet.Spec.Selector != nil) {
 		if !reflect.DeepEqual(c.Statefulset.Spec.Selector.MatchLabels, statefulSet.Spec.Selector.MatchLabels) {
@@ -420,7 +421,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 				return &compareStatefulsetResult{}
 			}
 			needsReplace = true
-			reasons = append(reasons, "new statefulset's selector doesn't match the current one")
+			reasons = append(reasons, "new statefulset's selector does not match the current one")
 		}
 	}
 
@@ -434,7 +435,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		match = false
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's pod template security context in spec doesn't match the current one")
+		reasons = append(reasons, "new statefulset's pod template security context in spec does not match the current one")
 	}
 	if len(c.Statefulset.Spec.VolumeClaimTemplates) != len(statefulSet.Spec.VolumeClaimTemplates) {
 		needsReplace = true
@@ -445,25 +446,34 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		// Some generated fields like creationTimestamp make it not possible to use DeepCompare on ObjectMeta
 		if name != statefulSet.Spec.VolumeClaimTemplates[i].Name {
 			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d doesn't match the current one", i))
+			reasons = append(reasons, fmt.Sprintf("new statefulset's name for volume %d does not match the current one", i))
 			continue
 		}
 		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Annotations, statefulSet.Spec.VolumeClaimTemplates[i].Annotations) {
 			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q doesn't match the current one", name))
+			reasons = append(reasons, fmt.Sprintf("new statefulset's annotations for volume %q does not match the current one", name))
 		}
 		if !reflect.DeepEqual(c.Statefulset.Spec.VolumeClaimTemplates[i].Spec, statefulSet.Spec.VolumeClaimTemplates[i].Spec) {
 			name := c.Statefulset.Spec.VolumeClaimTemplates[i].Name
 			needsReplace = true
-			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q doesn't match the current one", name))
+			reasons = append(reasons, fmt.Sprintf("new statefulset's volumeClaimTemplates specification for volume %q does not match the current one", name))
 		}
+	}
+
+	// we assume any change in priority happens by rolling out a new priority class
+	// changing the priority value in an existing class is not supproted
+	if c.Statefulset.Spec.Template.Spec.PriorityClassName != statefulSet.Spec.Template.Spec.PriorityClassName {
+		match = false
+		needsReplace = true
+		needsRollUpdate = true
+		reasons = append(reasons, "new statefulset's pod priority class in spec does not match the current one")
 	}
 
 	// lazy Spilo update: modify the image in the statefulset itself but let its pods run with the old image
 	// until they are re-created for other reasons, for example node rotation
 	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Containers[0].Image, statefulSet.Spec.Template.Spec.Containers[0].Image) {
 		needsReplace = true
-		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image doesn't match the current one")
+		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image does not match the current one")
 	}
 
 	if needsRollUpdate || needsReplace {
@@ -573,7 +583,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 			return fmt.Errorf("could not compare defined CPU limit %s with configured minimum value %s: %v", cpuLimit, minCPULimit, err)
 		}
 		if isSmaller {
-			c.logger.Warningf("defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
+			c.logger.Warningf("defined CPU limit %s is below required minimum %s and will be increased", cpuLimit, minCPULimit)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined CPU limit %s is below required minimum %s and will be set to it", cpuLimit, minCPULimit)
 			spec.Resources.ResourceLimits.CPU = minCPULimit
 		}
@@ -586,7 +596,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 			return fmt.Errorf("could not compare defined memory limit %s with configured minimum value %s: %v", memoryLimit, minMemoryLimit, err)
 		}
 		if isSmaller {
-			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
+			c.logger.Warningf("defined memory limit %s is below required minimum %s and will be increased", memoryLimit, minMemoryLimit)
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "ResourceLimits", "defined memory limit %s is below required minimum %s and will be set to it", memoryLimit, minMemoryLimit)
 			spec.Resources.ResourceLimits.Memory = minMemoryLimit
 		}
@@ -771,7 +781,13 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}
 
-	// sync connection pooler
+	// Sync connection pooler. Before actually doing sync reset lookup
+	// installation flag, since manifest updates could add another db which we
+	// need to process. In the future we may want to do this more careful and
+	// check which databases we need to process, but even repeating the whole
+	// installation process should be good enough.
+	c.ConnectionPooler.LookupFunction = false
+
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
 		c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
@@ -1092,7 +1108,7 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 		if c.shouldAvoidProtectedOrSystemRole(username, "API role") {
 			continue
 		}
-		if c.OpConfig.EnableTeamSuperuser || isPostgresSuperuserTeam {
+		if (c.OpConfig.EnableTeamSuperuser && teamID == c.Spec.TeamID) || isPostgresSuperuserTeam {
 			flags = append(flags, constants.RoleFlagSuperuser)
 		} else {
 			if c.OpConfig.TeamAdminRole != "" {
@@ -1121,14 +1137,35 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 func (c *Cluster) initHumanUsers() error {
 
 	var clusterIsOwnedBySuperuserTeam bool
+	superuserTeams := []string{}
+
+	if c.OpConfig.EnablePostgresTeamCRDSuperusers {
+		superuserTeams = c.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
+	}
 
 	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
-		err := c.initTeamMembers(postgresSuperuserTeam, true)
-		if err != nil {
-			return fmt.Errorf("Cannot create a team %q of Postgres superusers: %v", postgresSuperuserTeam, err)
+		if !(util.SliceContains(superuserTeams, postgresSuperuserTeam)) {
+			superuserTeams = append(superuserTeams, postgresSuperuserTeam)
 		}
-		if postgresSuperuserTeam == c.Spec.TeamID {
+	}
+
+	for _, superuserTeam := range superuserTeams {
+		err := c.initTeamMembers(superuserTeam, true)
+		if err != nil {
+			return fmt.Errorf("Cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
+		}
+		if superuserTeam == c.Spec.TeamID {
 			clusterIsOwnedBySuperuserTeam = true
+		}
+	}
+
+	additionalTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
+	for _, additionalTeam := range additionalTeams {
+		if !(util.SliceContains(superuserTeams, additionalTeam)) {
+			err := c.initTeamMembers(additionalTeam, false)
+			if err != nil {
+				return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+			}
 		}
 	}
 
@@ -1139,7 +1176,7 @@ func (c *Cluster) initHumanUsers() error {
 
 	err := c.initTeamMembers(c.Spec.TeamID, false)
 	if err != nil {
-		return fmt.Errorf("Cannot create a team %q of admins owning the PG cluster: %v", c.Spec.TeamID, err)
+		return fmt.Errorf("Cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil

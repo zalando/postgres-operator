@@ -135,16 +135,18 @@ type OperatorDebugConfiguration struct {
 
 // TeamsAPIConfiguration defines the configuration of TeamsAPI
 type TeamsAPIConfiguration struct {
-	EnableTeamsAPI           bool              `json:"enable_teams_api,omitempty"`
-	TeamsAPIUrl              string            `json:"teams_api_url,omitempty"`
-	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
-	EnableTeamSuperuser      bool              `json:"enable_team_superuser,omitempty"`
-	EnableAdminRoleForUsers  bool              `json:"enable_admin_role_for_users,omitempty"`
-	TeamAdminRole            string            `json:"team_admin_role,omitempty"`
-	PamRoleName              string            `json:"pam_role_name,omitempty"`
-	PamConfiguration         string            `json:"pam_configuration,omitempty"`
-	ProtectedRoles           []string          `json:"protected_role_names,omitempty"`
-	PostgresSuperuserTeams   []string          `json:"postgres_superuser_teams,omitempty"`
+	EnableTeamsAPI                  bool              `json:"enable_teams_api,omitempty"`
+	TeamsAPIUrl                     string            `json:"teams_api_url,omitempty"`
+	TeamAPIRoleConfiguration        map[string]string `json:"team_api_role_configuration,omitempty"`
+	EnableTeamSuperuser             bool              `json:"enable_team_superuser,omitempty"`
+	EnableAdminRoleForUsers         bool              `json:"enable_admin_role_for_users,omitempty"`
+	TeamAdminRole                   string            `json:"team_admin_role,omitempty"`
+	PamRoleName                     string            `json:"pam_role_name,omitempty"`
+	PamConfiguration                string            `json:"pam_configuration,omitempty"`
+	ProtectedRoles                  []string          `json:"protected_role_names,omitempty"`
+	PostgresSuperuserTeams          []string          `json:"postgres_superuser_teams,omitempty"`
+	EnablePostgresTeamCRD           bool              `json:"enable_postgres_team_crd,omitempty"`
+	EnablePostgresTeamCRDSuperusers bool              `json:"enable_postgres_team_crd_superusers,omitempty"`
 }
 
 // LoggingRESTAPIConfiguration defines Logging API conf
@@ -193,20 +195,19 @@ type OperatorLogicalBackupConfiguration struct {
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDValidation     *bool    `json:"enable_crd_validation,omitempty"`
-	EnableLazySpiloUpgrade  bool     `json:"enable_lazy_spilo_upgrade,omitempty"`
-	EtcdHost                string   `json:"etcd_host,omitempty"`
-	KubernetesUseConfigMaps bool     `json:"kubernetes_use_configmaps,omitempty"`
-	DockerImage             string   `json:"docker_image,omitempty"`
-	Workers                 uint32   `json:"workers,omitempty"`
-	MinInstances            int32    `json:"min_instances,omitempty"`
-	MaxInstances            int32    `json:"max_instances,omitempty"`
-	ResyncPeriod            Duration `json:"resync_period,omitempty"`
-	RepairPeriod            Duration `json:"repair_period,omitempty"`
-	SetMemoryRequestToLimit bool     `json:"set_memory_request_to_limit,omitempty"`
-	ShmVolume               *bool    `json:"enable_shm_volume,omitempty"`
-	// deprecated in favour of SidecarContainers
-	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
+	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EtcdHost                   string                             `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
+	DockerImage                string                             `json:"docker_image,omitempty"`
+	Workers                    uint32                             `json:"workers,omitempty"`
+	MinInstances               int32                              `json:"min_instances,omitempty"`
+	MaxInstances               int32                              `json:"max_instances,omitempty"`
+	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
+	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
+	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
+	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
 	SidecarContainers          []v1.Container                     `json:"sidecars,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`

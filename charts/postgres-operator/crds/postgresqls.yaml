@@ -8,7 +8,6 @@ metadata:
     "helm.sh/hook": crd-install
 spec:
   group: acid.zalan.do
-  scope: Namespaced
   names:
     kind: postgresql
     listKind: postgresqlList
@@ -16,6 +15,7 @@ spec:
     singular: postgresql
     shortNames:
     - pg
+  scope: Namespaced
   versions:
   - name: v1
     served: true

@@ -4,7 +4,6 @@ metadata:
   name: postgresqls.acid.zalan.do
 spec:
   group: acid.zalan.do
-  scope: Namespaced
   names:
     kind: postgresql
     listKind: postgresqlList
@@ -12,6 +11,7 @@ spec:
     singular: postgresql
     shortNames:
     - pg
+  scope: Namespaced
   versions:
   - name: v1
     served: true
@@ -56,6 +56,7 @@ spec:
         required:
           - kind
           - apiVersion
+          - metadata
           - spec
         properties:
           kind:
@@ -66,6 +67,14 @@ spec:
             type: string
             enum:
               - acid.zalan.do/v1
+          metadata:
+            type: object
+            required:
+              - name
+            properties:
+              name:
+                type: string
+                maxLength: 53
           spec:
             type: object
             required:
