@@ -415,30 +415,6 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 	}
 }
 
-// Return connection pooler labels selector, which should from one point of view
-// inherit most of the labels from the cluster itself, but at the same time
-// have e.g. different `application` label, so that recreatePod operation will
-// not interfere with it (it lists all the pods via labels, and if there would
-// be no difference, it will recreate also pooler pods).
-func (c *Cluster) connectionPoolerLabelsSelector(role PostgresRole) *metav1.LabelSelector {
-	connectionPoolerLabels := labels.Set(map[string]string{})
-
-	extraLabels := labels.Set(map[string]string{
-		"connection-pooler-name": c.connectionPoolerName(role),
-		"application":            "db-connection-pooler",
-		"role":                   string(role),
-		"cluster-name":           c.ClusterName,
-	})
-
-	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, c.labelsSet(false))
-	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, extraLabels)
-
-	return &metav1.LabelSelector{
-		MatchLabels:      connectionPoolerLabels,
-		MatchExpressions: nil,
-	}
-}
-
 func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) labels.Set {
 	lbls := c.labelsSet(shouldAddExtraLabels)
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
@@ -519,40 +495,6 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 
 	// otherwise, follow the operator configuration
 	return c.OpConfig.KubernetesUseConfigMaps
-}
-
-// isConnectionPoolerEnabled
-func (c *Cluster) needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) || (spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
-}
-
-func (c *Cluster) needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return spec.EnableReplicaConnectionPooler != nil && *spec.EnableReplicaConnectionPooler
-}
-
-func (c *Cluster) needMasterConnectionPooler() bool {
-	return c.needMasterConnectionPoolerWorker(&c.Spec)
-}
-
-func (c *Cluster) needConnectionPooler() bool {
-	return c.needMasterConnectionPoolerWorker(&c.Spec) || c.needReplicaConnectionPoolerWorker(&c.Spec)
-}
-
-// RolesConnectionPooler gives the list of roles which need connection pooler
-func (c *Cluster) RolesConnectionPooler() []PostgresRole {
-	roles := make([]PostgresRole, 2)
-
-	if c.needMasterConnectionPoolerWorker(&c.Spec) {
-		roles = append(roles, Master)
-	}
-	if c.needMasterConnectionPoolerWorker(&c.Spec) {
-		roles = append(roles, Replica)
-	}
-	return roles
-}
-
-func (c *Cluster) needReplicaConnectionPooler() bool {
-	return c.needReplicaConnectionPoolerWorker(&c.Spec)
 }
 
 // Earlier arguments take priority
