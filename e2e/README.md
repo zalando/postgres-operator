@@ -33,7 +33,7 @@ runtime.
 In the e2e folder you can invoke tests either with `make test` or with:
 
 ```bash
-./run.sh
+./run.sh main
 ```
 
 To run both the build and test step you can invoke `make e2e` from the parent
@@ -41,7 +41,7 @@ directory.
 
 To run the end 2 end test and keep the kind state execute:
 ```bash
-NOCLEANUP=True ./run.sh
+NOCLEANUP=True ./run.sh main
 ```
 
 ## Run indidual test

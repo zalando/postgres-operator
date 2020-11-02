@@ -131,12 +131,12 @@ func (c *Cluster) initDbConnWithName(dbname string) error {
 			}
 
 			if _, ok := err.(*net.OpError); ok {
-				c.logger.Errorf("could not connect to PostgreSQL database: %v", err)
+				c.logger.Warningf("could not connect to Postgres database: %v", err)
 				return false, nil
 			}
 
 			if err2 := conn.Close(); err2 != nil {
-				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err)
+				c.logger.Errorf("error when closing Postgres connection after another error: %v", err)
 				return false, err2
 			}
 
@@ -151,7 +151,7 @@ func (c *Cluster) initDbConnWithName(dbname string) error {
 	conn.SetMaxIdleConns(-1)
 
 	if c.pgDb != nil {
-		msg := "Closing an existing connection before opening a new one to %s"
+		msg := "closing an existing connection before opening a new one to %s"
 		c.logger.Warningf(msg, dbname)
 		c.closeDbConn()
 	}
@@ -166,7 +166,7 @@ func (c *Cluster) connectionIsClosed() bool {
 }
 
 func (c *Cluster) closeDbConn() (err error) {
-	c.setProcessName("closing db connection")
+	c.setProcessName("closing database connection")
 	if c.pgDb != nil {
 		c.logger.Debug("closing database connection")
 		if err = c.pgDb.Close(); err != nil {
@@ -181,7 +181,7 @@ func (c *Cluster) closeDbConn() (err error) {
 }
 
 func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUserMap, err error) {
-	c.setProcessName("reading users from the db")
+	c.setProcessName("reading users from the database")
 	var rows *sql.Rows
 	users = make(spec.PgUserMap)
 	if rows, err = c.pgDb.Query(getUserSQL, pq.Array(userNames)); err != nil {
