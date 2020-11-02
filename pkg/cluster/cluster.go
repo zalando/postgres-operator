@@ -626,13 +626,16 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
-	if oldSpec.Spec.PostgresqlParam.PgVersion != newSpec.Spec.PostgresqlParam.PgVersion { // PG versions comparison
+	if oldSpec.Spec.PostgresqlParam.PgVersion >= newSpec.Spec.PostgresqlParam.PgVersion {
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
 		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "PostgreSQL", "postgresql version change(%q -> %q) has no effect",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
-		//we need that hack to generate statefulset with the old version
+		// we need that hack to generate statefulset with the old version
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
+	} else {
+		c.logger.Infof("postgresql version increased (%q -> %q), major version upgrade can be done manually after StatefulSet Sync",
+			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
 	}
 
 	// Service
