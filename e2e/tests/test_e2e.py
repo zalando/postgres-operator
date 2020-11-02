@@ -828,13 +828,14 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
+        time.sleep(25)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
         try:
             # this delete attempt should be omitted because of missing annotations
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
-            time.sleep(15)
+            time.sleep(5)
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
             # check that pods and services are still there
