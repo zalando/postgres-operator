@@ -686,6 +686,32 @@ aws_or_gcp:
 ...
 ```
 
+### Setup pod environment configmap
+
+To make postgres-operator work with GCS, use following configmap:
+```yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-env-overrides
+  namespace: postgres-operator-system
+data:
+  # Any env variable used by spilo can be added
+  USE_WALG_BACKUP: "true"
+  USE_WALG_RESTORE: "true"
+  CLONE_USE_WALG_RESTORE: "true"
+```
+This configmap will instruct operator to use WAL-G, instead of WAL-E, for backup and restore.
+
+Then provide this configmap in postgres-operator settings:
+```yml
+...
+# namespaced name of the ConfigMap with environment variables to populate on every pod
+pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
+...
+```
+
+
 ## Sidecars for Postgres clusters
 
 A list of sidecars is added to each cluster created by the operator. The default

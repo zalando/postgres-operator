@@ -1719,11 +1719,31 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			msg := "Figure out which S3 bucket to use from env"
 			c.logger.Info(msg, description.S3WalPath)
 
+			if c.OpConfig.WALES3Bucket != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_WAL_S3_BUCKET",
+						Value: c.OpConfig.WALES3Bucket,
+					},
+				}
+				result = append(result, envs...)
+			} else if c.OpConfig.WALGSBucket != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_WAL_GS_BUCKET",
+						Value: c.OpConfig.WALGSBucket,
+					},
+					{
+						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
+						Value: c.OpConfig.GCPCredentials,
+					},
+				}
+				result = append(result, envs...)
+			} else {
+				c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
+			}
+
 			envs := []v1.EnvVar{
-				{
-					Name:  "CLONE_WAL_S3_BUCKET",
-					Value: c.OpConfig.WALES3Bucket,
-				},
 				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 					Value: getBucketScopeSuffix(description.UID),
