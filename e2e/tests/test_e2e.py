@@ -202,7 +202,8 @@ class EndToEndTestCase(unittest.TestCase):
             })
 
         self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3, "Deployment replicas is scaled to 3")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 3, "Scale up of pooler pods does not work")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler"), 3, "Scale up of pooler pods does not work")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler-repl"), 3, "Scale up of pooler replica pods does not work")
 
         # turn it off, keeping config should be overwritten by false
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
