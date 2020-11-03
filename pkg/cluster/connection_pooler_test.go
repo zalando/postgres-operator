@@ -58,7 +58,7 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
 
-	reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
+	reason, err := cluster.createConnectionPooler()
 
 	if err != nil {
 		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
