@@ -567,10 +567,12 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string, role Po
 			failedDatabases = append(failedDatabases, dbname)
 			continue
 		}
-
 		c.logger.Infof("pooler lookup function installed into %s", dbname)
 	}
 
-	c.ConnectionPooler[role].LookupFunction = true
+	if len(failedDatabases) == 0 {
+		c.ConnectionPooler[role].LookupFunction = true
+	}
+
 	return nil
 }

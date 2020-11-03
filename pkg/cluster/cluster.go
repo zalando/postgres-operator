@@ -331,7 +331,7 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	c.createConnectionPooler(c.installLookupFunction)
+	c.createConnectionPooler()
 
 	return nil
 }

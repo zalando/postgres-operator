@@ -108,12 +108,12 @@ func (c *Cluster) connectionPoolerLabelsSelector(name string, role PostgresRole)
 // have connectionpooler name in the cp object to have it immutable name
 // add these cp related functions to a new cp file
 // opConfig, cluster, and database name
-func (c *Cluster) createConnectionPooler(lookup InstallFunction) (SyncReason, error) {
+func (c *Cluster) createConnectionPooler() (SyncReason, error) {
 	var reason SyncReason
 	c.setProcessName("creating connection pooler")
 
 	//this is essentially sync with nil as oldSpec
-	if reason, err := c.syncConnectionPooler(nil, &c.Postgresql, lookup); err != nil {
+	if reason, err := c.syncConnectionPooler(nil, &c.Postgresql, c.installLookupFunction); err != nil {
 		return reason, err
 	}
 	return reason, nil
@@ -692,6 +692,13 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, inst
 			}
 		}
 		if newNeedConnectionPooler {
+			//Sync pooler secrets in case they were deleted
+			c.logger.Debugf("syncing secrets")
+
+			if err := c.syncSecrets(); err != nil {
+				c.logger.Errorf("could not sync secrets: %v", err)
+			}
+
 			// Try to sync in any case. If we didn't needed connection pooler before,
 			// it means we want to create it. If it was already present, still sync
 			// since it could happen that there is no difference in specs, and all
@@ -723,6 +730,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, inst
 					return NoSync, err
 				}
 			}
+
 			if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec, role); err != nil {
 				c.logger.Errorf("could not sync connection pooler: %v", err)
 				return reason, err
@@ -819,8 +827,6 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 				msg := "could not generate deployment for connection pooler: %v"
 				return reason, fmt.Errorf(msg, err)
 			}
-
-			//oldDeploymentSpec := c.ConnectionPooler[role].Deployment
 
 			deployment, err := updateConnectionPoolerDeployment(c.KubeClient,
 				newDeploymentSpec)

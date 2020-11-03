@@ -189,6 +189,39 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler-repl"), 2, "No pooler replica pods found")
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 2, "No pooler service found")
 
+        #Turn off only master connection pooler
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableConnectionPooler': False,
+                    'enableReplicaConnectionPooler': True,
+                }
+            })
+
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2, "Deployment replicas is 2 default")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler"), 0, "Master pooler pods not deleted")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler-repl"), 2, "Pooler replica pods not found")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 1, "No pooler service found")
+
+        #Turn off only replica connection pooler
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableConnectionPooler': True,
+                    'enableReplicaConnectionPooler': False,
+                }
+            })
+
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2, "Deployment replicas is 2 default")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler"), 2, "Master pooler pods not found")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler-repl"), 0, "Pooler replica pods not deleted")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 1, "No pooler service found")
+
+
         # scale up connection pooler deployment
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
@@ -203,7 +236,6 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3, "Deployment replicas is scaled to 3")
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler"), 3, "Scale up of pooler pods does not work")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler-name=acid-minimal-cluster-pooler-repl"), 3, "Scale up of pooler replica pods does not work")
 
         # turn it off, keeping config should be overwritten by false
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -423,7 +455,7 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_lazy_spilo_upgrade, step="Init baseline image version")
 
-        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), SPILO_CURRENT, "Stagefulset not updated initially")
+        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), SPILO_CURRENT, "Statefulset not updated initially")
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
 
