@@ -201,8 +201,8 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
 
-        # self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3, "Deployment replicas is scaled to 3")
-        # self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 3, "Scale up of pooler pods does not work")
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3, "Deployment replicas is scaled to 3")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 3, "Scale up of pooler pods does not work")
 
         # turn it off, keeping config should be overwritten by false
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -828,7 +828,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
-        time.sleep(25)
+        time.sleep(5)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
 
         try:
