@@ -2,21 +2,20 @@ import json
 import unittest
 import time
 import timeout_decorator
-import subprocess
-import warnings
 import os
 import yaml
 
 from datetime import datetime
-from kubernetes import client, config
+from kubernetes import client
 
 from tests.k8s_api import K8s
 
 SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
 SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
 
+
 def to_selector(labels):
-    return ",".join(["=".join(l) for l in labels.items()])
+    return ",".join(["=".join(lbl) for lbl in labels.items()])
 
 
 def clean_list(values):
@@ -42,7 +41,7 @@ class EndToEndTestCase(unittest.TestCase):
                 self.assertEqual(y, x, m.format(y))
                 return True
             except AssertionError:
-                retries = retries -1
+                retries = retries - 1
                 if not retries > 0:
                     raise
                 time.sleep(interval)
@@ -54,7 +53,7 @@ class EndToEndTestCase(unittest.TestCase):
                 self.assertNotEqual(y, x, m.format(y))
                 return True
             except AssertionError:
-                retries = retries -1
+                retries = retries - 1
                 if not retries > 0:
                     raise
                 time.sleep(interval)
@@ -65,7 +64,7 @@ class EndToEndTestCase(unittest.TestCase):
                 self.assertTrue(f(), m)
                 return True
             except AssertionError:
-                retries = retries -1
+                retries = retries - 1
                 if not retries > 0:
                     raise
                 time.sleep(interval)
@@ -110,8 +109,8 @@ class EndToEndTestCase(unittest.TestCase):
             yaml.dump(operator_deployment, f, Dumper=yaml.Dumper)
 
         with open("manifests/configmap.yaml", 'r+') as f:
-                    configmap = yaml.safe_load(f)
-                    configmap["data"]["workers"] = "1"
+            configmap = yaml.safe_load(f)
+            configmap["data"]["workers"] = "1"
 
         with open("manifests/configmap.yaml", 'w') as f:
             yaml.dump(configmap, f, Dumper=yaml.Dumper)
@@ -130,8 +129,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_operator_pod_start()
 
         # reset taints and tolerations
-        k8s.api.core_v1.patch_node("postgres-operator-e2e-tests-worker",{"spec":{"taints":[]}})
-        k8s.api.core_v1.patch_node("postgres-operator-e2e-tests-worker2",{"spec":{"taints":[]}})
+        k8s.api.core_v1.patch_node("postgres-operator-e2e-tests-worker", {"spec": {"taints": []}})
+        k8s.api.core_v1.patch_node("postgres-operator-e2e-tests-worker2", {"spec": {"taints": []}})
 
         # make sure we start a new operator on every new run,
         # this tackles the problem when kind is reused
@@ -163,15 +162,15 @@ class EndToEndTestCase(unittest.TestCase):
         the end turn connection pooler off to not interfere with other tests.
         '''
         k8s = self.k8s
-        service_labels = {
-            'cluster-name': 'acid-minimal-cluster',
-        }
-        pod_labels = dict({
-            'connection-pooler': 'acid-minimal-cluster-pooler',
-        })
+        # service_labels = {
+        #     'cluster-name': 'acid-minimal-cluster',
+        # }
+        # pod_labels = dict({
+        #     'connection-pooler': 'acid-minimal-cluster-pooler',
+        # })
 
-        pod_selector = to_selector(pod_labels)
-        service_selector = to_selector(service_labels)
+        # pod_selector = to_selector(pod_labels)
+        # service_selector = to_selector(service_labels)
 
         # enable connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -184,12 +183,19 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
 
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2, "Deployment replicas is 2 default")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 2, "No pooler pods found")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler-repl"), 2, "No pooler replica pods found")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 2, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2,
+                             "Deployment replicas is 2 default")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(
+                            "connection-pooler=acid-minimal-cluster-pooler"),
+                            2, "No pooler pods found")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(
+                            "connection-pooler=acid-minimal-cluster-pooler-repl"),
+                            2, "No pooler replica pods found")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(
+                            'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                            2, "No pooler service found")
 
-        #Turn off only master connection pooler
+        # Turn off only master connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
@@ -200,13 +206,21 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
 
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2, "Deployment replicas is 2 default")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 0, "Master pooler pods not deleted")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler-repl"), 2, "Pooler replica pods not found")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 1, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2,
+                             "Deployment replicas is 2 default")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(
+                             "connection-pooler=acid-minimal-cluster-pooler"),
+                             0, "Master pooler pods not deleted")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(
+                             "connection-pooler=acid-minimal-cluster-pooler-repl"),
+                             2, "Pooler replica pods not found")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label(
+                             'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "No pooler service found")
 
-        #Turn off only replica connection pooler
+        # Turn off only replica connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
@@ -217,12 +231,16 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
 
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2, "Deployment replicas is 2 default")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 2, "Master pooler pods not found")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler-repl"), 0, "Pooler replica pods not deleted")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 1, "No pooler service found")
-
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2,
+                             "Deployment replicas is 2 default")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+                             2, "Master pooler pods not found")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler-repl"),
+                             0, "Pooler replica pods not deleted")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "No pooler service found")
 
         # scale up connection pooler deployment
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -236,8 +254,10 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
 
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3, "Deployment replicas is scaled to 3")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 3, "Scale up of pooler pods does not work")
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3,
+                             "Deployment replicas is scaled to 3")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+                             3, "Scale up of pooler pods does not work")
 
         # turn it off, keeping config should be overwritten by false
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -251,8 +271,10 @@ class EndToEndTestCase(unittest.TestCase):
 
             })
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"), 0, "Pooler pods not scaled down")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'), 0, "Pooler service not removed")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+                             0, "Pooler pods not scaled down")
+        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             0, "Pooler service not removed")
 
         # Verify that all the databases have pooler schema installed.
         # Do this via psql, since otherwise we need to deal with
@@ -327,8 +349,8 @@ class EndToEndTestCase(unittest.TestCase):
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster,spilo-role={}'
 
         self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
-                                 'ClusterIP',
-                                "Expected ClusterIP type initially, found {}")
+                             'ClusterIP',
+                             "Expected ClusterIP type initially, found {}")
 
         try:
             # enable load balancer services
@@ -343,11 +365,11 @@ class EndToEndTestCase(unittest.TestCase):
 
             self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
                                  'LoadBalancer',
-                                "Expected LoadBalancer service type for master, found {}")
+                                 "Expected LoadBalancer service type for master, found {}")
 
             self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("replica")),
                                  'LoadBalancer',
-                                "Expected LoadBalancer service type for master, found {}")
+                                 "Expected LoadBalancer service type for master, found {}")
 
             # disable load balancer services again
             pg_patch_disable_lbs = {
@@ -361,11 +383,11 @@ class EndToEndTestCase(unittest.TestCase):
 
             self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("master")),
                                  'ClusterIP',
-                                "Expected LoadBalancer service type for master, found {}")
+                                 "Expected LoadBalancer service type for master, found {}")
 
             self.eventuallyEqual(lambda: k8s.get_service_type(cluster_label.format("replica")),
                                  'ClusterIP',
-                                "Expected LoadBalancer service type for master, found {}")
+                                 "Expected LoadBalancer service type for master, found {}")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -379,7 +401,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         # update infrastructure roles description
         secret_name = "postgresql-infrastructure-roles"
-        roles = "secretname: postgresql-infrastructure-roles-new, userkey: user, rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
+        roles = "secretname: postgresql-infrastructure-roles-new, userkey: user,"\
+                "rolekey: memberof, passwordkey: password, defaultrolevalue: robot_zmon"
         patch_infrastructure_roles = {
             "data": {
                 "infrastructure_roles_secret_name": secret_name,
@@ -387,7 +410,8 @@ class EndToEndTestCase(unittest.TestCase):
             },
         }
         k8s.update_config(patch_infrastructure_roles)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
 
         try:
             # check that new roles are represented in the config by requesting the
@@ -397,11 +421,12 @@ class EndToEndTestCase(unittest.TestCase):
                 try:
                     operator_pod = k8s.get_operator_pod()
                     get_config_cmd = "wget --quiet -O - localhost:8080/config"
-                    result = k8s.exec_with_kubectl(operator_pod.metadata.name, get_config_cmd)
+                    result = k8s.exec_with_kubectl(operator_pod.metadata.name,
+                                                   get_config_cmd)
                     try:
                         roles_dict = (json.loads(result.stdout)
-                                    .get("controller", {})
-                                    .get("InfrastructureRoles"))
+                                          .get("controller", {})
+                                          .get("InfrastructureRoles"))
                     except:
                         return False
 
@@ -424,7 +449,6 @@ class EndToEndTestCase(unittest.TestCase):
 
             self.eventuallyTrue(verify_role, "infrastructure role setup is not loaded")
 
-
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
@@ -432,13 +456,15 @@ class EndToEndTestCase(unittest.TestCase):
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
         '''
-        Test lazy upgrade for the Spilo image: operator changes a stateful set but lets pods run with the old image
-        until they are recreated for reasons other than operator's activity. That works because the operator configures
-        stateful sets to use "onDelete" pod update policy.
+        Test lazy upgrade for the Spilo image: operator changes a stateful set
+        but lets pods run with the old image until they are recreated for
+        reasons other than operator's activity. That works because the operator
+        configures stateful sets to use "onDelete" pod update policy.
 
         The test covers:
         1) enabling lazy upgrade in existing operator deployment
-        2) forcing the normal rolling upgrade by changing the operator configmap and restarting its pod
+        2) forcing the normal rolling upgrade by changing the operator
+        configmap and restarting its pod
         '''
 
         k8s = self.k8s
@@ -446,8 +472,10 @@ class EndToEndTestCase(unittest.TestCase):
         pod0 = 'acid-minimal-cluster-0'
         pod1 = 'acid-minimal-cluster-1'
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
+                             "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)),
+                             2, "Postgres status did not enter running")
 
         patch_lazy_spilo_upgrade = {
             "data": {
@@ -455,14 +483,20 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_lazy_spilo_upgrade": "false"
             }
         }
-        k8s.update_config(patch_lazy_spilo_upgrade, step="Init baseline image version")
+        k8s.update_config(patch_lazy_spilo_upgrade,
+                          step="Init baseline image version")
 
-        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), SPILO_CURRENT, "Statefulset not updated initially")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
+        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), SPILO_CURRENT,
+                             "Statefulset not updated initially")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
+                             "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)),
+                             2, "Postgres status did not enter running")
 
-        self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), SPILO_CURRENT, "Rolling upgrade was not executed")
-        self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), SPILO_CURRENT, "Rolling upgrade was not executed")
+        self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0),
+                             SPILO_CURRENT, "Rolling upgrade was not executed")
+        self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1),
+                             SPILO_CURRENT, "Rolling upgrade was not executed")
 
         # update docker image in config and enable the lazy upgrade
         conf_image = SPILO_LAZY
@@ -472,18 +506,25 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_lazy_spilo_upgrade": "true"
             }
         }
-        k8s.update_config(patch_lazy_spilo_upgrade,step="patch image and lazy upgrade")
-        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), conf_image, "Statefulset not updated to next Docker image")
+        k8s.update_config(patch_lazy_spilo_upgrade,
+                          step="patch image and lazy upgrade")
+        self.eventuallyEqual(lambda: k8s.get_statefulset_image(), conf_image,
+                             "Statefulset not updated to next Docker image")
 
         try:
             # restart the pod to get a container with the new image
             k8s.api.core_v1.delete_namespaced_pod(pod0, 'default')
 
             # verify only pod-0 which was deleted got new image from statefulset
-            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Delete pod-0 did not get new spilo image")
-            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
-            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
-            self.assertNotEqual(lambda: k8s.get_effective_pod_image(pod1), SPILO_CURRENT, "pod-1 should not have change Docker image to {}".format(SPILO_CURRENT))
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0),
+                                 conf_image, "Delete pod-0 did not get new spilo image")
+            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
+                                 "No two pods running after lazy rolling upgrade")
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)),
+                                 2, "Postgres status did not enter running")
+            self.assertNotEqual(lambda: k8s.get_effective_pod_image(pod1),
+                                SPILO_CURRENT,
+                                "pod-1 should not have change Docker image to {}".format(SPILO_CURRENT))
 
             # clean up
             unpatch_lazy_spilo_upgrade = {
@@ -495,9 +536,14 @@ class EndToEndTestCase(unittest.TestCase):
 
             # at this point operator will complete the normal rolling upgrade
             # so we additonally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
-            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0), conf_image, "Rolling upgrade was not executed", 50, 3)
-            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1), conf_image, "Rolling upgrade was not executed", 50, 3)
-            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)), 2, "Postgres status did not enter running")
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0),
+                                 conf_image, "Rolling upgrade was not executed",
+                                 50, 3)
+            self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod1),
+                                 conf_image, "Rolling upgrade was not executed",
+                                 50, 3)
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members(pod0)),
+                                 2, "Postgres status did not enter running")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
@@ -553,7 +599,7 @@ class EndToEndTestCase(unittest.TestCase):
                 return jobs[0].spec.job_template.spec.template.spec.containers[0].image
 
             self.eventuallyEqual(get_docker_image, image,
-                             "Expected job image {}, found {}".format(image, "{}"))
+                                 "Expected job image {}, found {}".format(image, "{}"))
 
             # delete the logical backup cron job
             pg_patch_disable_backup = {
@@ -610,7 +656,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
 
-        k8s.patch_statefulset({"metadata":{"annotations":{"zalando-postgres-operator-rolling-update-required": "False"}}})
+        k8s.patch_statefulset({"metadata": {"annotations": {"zalando-postgres-operator-rolling-update-required": "False"}}})
         k8s.update_config(patch_min_resource_limits, "Minimum resource test")
 
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
@@ -618,12 +664,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         def verify_pod_limits():
             pods = k8s.api.core_v1.list_namespaced_pod('default', label_selector="cluster-name=acid-minimal-cluster,application=spilo").items
-            if len(pods)<2:
+            if len(pods) < 2:
                 return False
 
-            r = pods[0].spec.containers[0].resources.limits['memory']==minMemoryLimit
+            r = pods[0].spec.containers[0].resources.limits['memory'] == minMemoryLimit
             r = r and pods[0].spec.containers[0].resources.limits['cpu'] == minCPULimit
-            r = r and pods[1].spec.containers[0].resources.limits['memory']==minMemoryLimit
+            r = r and pods[1].spec.containers[0].resources.limits['memory'] == minMemoryLimit
             r = r and pods[1].spec.containers[0].resources.limits['cpu'] == minCPULimit
             return r
 
@@ -632,7 +678,7 @@ class EndToEndTestCase(unittest.TestCase):
     @classmethod
     def setUp(cls):
         # cls.k8s.update_config({}, step="Setup")
-        cls.k8s.patch_statefulset({"meta":{"annotations":{"zalando-postgres-operator-rolling-update-required": False}}})
+        cls.k8s.patch_statefulset({"meta": {"annotations": {"zalando-postgres-operator-rolling-update-required": False}}})
         pass
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -680,7 +726,7 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             }
-            self.assertTrue(len(failover_targets)>0, "No failover targets available")
+            self.assertTrue(len(failover_targets) > 0, "No failover targets available")
             for failover_target in failover_targets:
                 k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
 
@@ -710,7 +756,7 @@ class EndToEndTestCase(unittest.TestCase):
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         '''
         k8s = self.k8s
-        pod="acid-minimal-cluster-0"
+        pod = "acid-minimal-cluster-0"
 
         k8s.scale_cluster(3)
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 3, "Scale up to 3 failed")
@@ -794,7 +840,6 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     @unittest.skip("Skipping this test until fixed")
     def test_zzz_taint_based_eviction(self):
@@ -863,15 +908,15 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
-        time.sleep(5)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+        time.sleep(15)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         try:
             # this delete attempt should be omitted because of missing annotations
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
             time.sleep(5)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # check that pods and services are still there
             k8s.wait_for_running_pods(cluster_label, 2)
@@ -882,7 +927,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # wait a little before proceeding
             time.sleep(10)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # add annotations to manifest
             delete_date = datetime.today().strftime('%Y-%m-%d')
@@ -896,7 +941,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # wait a little before proceeding
             time.sleep(20)
@@ -923,7 +968,7 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
-        #reset configmap
+        # reset configmap
         patch_delete_annotations = {
             "data": {
                 "delete_annotation_date_key": "",
