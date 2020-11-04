@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/r3labs/diff"
+	"github.com/sirupsen/logrus"
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -406,12 +407,12 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 
 //delete connection pooler
 func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
-	c.logger.Debugln("deleting connection pooler")
+	c.logger.Infof("deleting connection pooler spilo-role=%s", role)
 
 	// Lack of connection pooler objects is not a fatal error, just log it if
 	// it was present before in the manifest
 	if c.ConnectionPooler[role] == nil || role == "" {
-		c.logger.Infof("No connection pooler to delete")
+		c.logger.Debugf("no connection pooler to delete")
 		return nil
 	}
 
@@ -433,34 +434,34 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 			Delete(context.TODO(), deployment.Name, options)
 
 		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("Connection pooler deployment was already deleted")
+			c.logger.Debugf("connection pooler deployment was already deleted")
 		} else if err != nil {
-			return fmt.Errorf("could not delete deployment: %v", err)
+			return fmt.Errorf("could not delete connection pooler deployment: %v", err)
 		}
 
-		c.logger.Infof("Connection pooler deployment %q has been deleted for role %s", deployment.Name, role)
+		c.logger.Infof("connection pooler deployment %s has been deleted for role %s", deployment.Name, role)
 	}
 
 	// Repeat the same for the service object
 	var service *v1.Service
 	service = c.ConnectionPooler[role].Service
 	if service == nil {
-		c.logger.Infof("nil service to be deleted")
-	}
-	if service != nil {
+		c.logger.Debugf("no connection pooler service object to delete")
+	} else {
 
 		err = c.KubeClient.
 			Services(c.Namespace).
 			Delete(context.TODO(), service.Name, options)
 
 		if k8sutil.ResourceNotFound(err) {
-			c.logger.Debugf("Connection pooler service was already deleted")
+			c.logger.Debugf("connection pooler service was already deleted")
 		} else if err != nil {
-			return fmt.Errorf("could not delete service: %v", err)
+			return fmt.Errorf("could not delete connection pooler service: %v", err)
 		}
 
-		c.logger.Infof("Connection pooler service %q has been deleted for role %s", service.Name, role)
+		c.logger.Infof("connection pooler service %s has been deleted for role %s", service.Name, role)
 	}
+
 	c.ConnectionPooler[role] = nil
 	return nil
 }
@@ -475,7 +476,7 @@ func (c *Cluster) deleteConnectionPoolerSecret() (err error) {
 		Get(context.TODO(), secretName, metav1.GetOptions{})
 
 	if err != nil {
-		c.logger.Debugf("could not get connection pooler secret %q: %v", secretName, err)
+		c.logger.Debugf("could not get connection pooler secret %s: %v", secretName, err)
 	} else {
 		if err = c.deleteSecret(secret.UID, *secret); err != nil {
 			return fmt.Errorf("could not delete pooler secret: %v", err)
@@ -493,7 +494,7 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 
 	patchData, err := specPatch(newDeployment.Spec)
 	if err != nil {
-		return nil, fmt.Errorf("could not form patch for the deployment: %v", err)
+		return nil, fmt.Errorf("could not form patch for the connection pooler deployment: %v", err)
 	}
 
 	// An update probably requires RetryOnConflict, but since only one operator
@@ -508,7 +509,7 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 		metav1.PatchOptions{},
 		"")
 	if err != nil {
-		return nil, fmt.Errorf("could not patch deployment: %v", err)
+		return nil, fmt.Errorf("could not patch connection pooler deployment: %v", err)
 	}
 
 	return deployment, nil
@@ -518,7 +519,7 @@ func updateConnectionPoolerDeployment(KubeClient k8sutil.KubernetesClient, newDe
 func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, deployment *appsv1.Deployment, annotations map[string]string) (*appsv1.Deployment, error) {
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
-		return nil, fmt.Errorf("could not form patch for the deployment metadata: %v", err)
+		return nil, fmt.Errorf("could not form patch for the connection pooler deployment metadata: %v", err)
 	}
 	result, err := KubeClient.Deployments(deployment.Namespace).Patch(
 		context.TODO(),
@@ -657,7 +658,22 @@ func makeDefaultConnectionPoolerResources(config *config.Config) acidv1.Resource
 	}
 }
 
+func logPoolerEssentials(log *logrus.Entry, oldSpec, newSpec *acidv1.Postgresql) {
+	var v []string
+
+	for _, b := range []*bool{oldSpec.Spec.EnableConnectionPooler, oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler} {
+		if b == nil {
+			v = append(v, "nil")
+		} else {
+			v = append(v, fmt.Sprintf("%v", *b))
+		}
+	}
+
+	log.Debugf("syncing connection pooler from (%v, %v) to (%v, %v)", v[0], v[1], v[2], v[3])
+}
+
 func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, LookupFunction InstallFunction) (SyncReason, error) {
+	logPoolerEssentials(c.logger, oldSpec, newSpec)
 
 	var reason SyncReason
 	var err error
@@ -767,7 +783,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		Get(context.TODO(), c.connectionPoolerName(role), metav1.GetOptions{})
 
 	if err != nil && k8sutil.ResourceNotFound(err) {
-		msg := "Deployment %s for connection pooler synchronization is not found, create it"
+		msg := "deployment %s for connection pooler synchronization is not found, create it"
 		c.logger.Warningf(msg, c.connectionPoolerName(role))
 
 		deploymentSpec, err := c.generateConnectionPoolerDeployment(c.ConnectionPooler[role])
@@ -811,7 +827,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			newConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		c.logger.Infof("Old: %+v, New %+v", oldConnectionPooler, newConnectionPooler)
+		c.logger.Infof("old: %+v, new %+v", oldConnectionPooler, newConnectionPooler)
 
 		var specSync bool
 		var specReason []string
