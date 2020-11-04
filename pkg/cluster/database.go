@@ -101,14 +101,19 @@ func (c *Cluster) databaseAccessDisabled() bool {
 }
 
 func (c *Cluster) initDbConn() error {
-	return c.initDbConnWithName("")
-}
-
-func (c *Cluster) initDbConnWithName(dbname string) error {
-	c.setProcessName("initializing db connection")
 	if c.pgDb != nil {
 		return nil
 	}
+
+	return c.initDbConnWithName("")
+}
+
+// Worker function for connection initialization. This function does not check
+// if the connection is already open, if it is then it will be overwritten.
+// Callers need to make sure no connection is open, otherwise we could leak
+// connections
+func (c *Cluster) initDbConnWithName(dbname string) error {
+	c.setProcessName("initializing db connection")
 
 	var conn *sql.DB
 	connstring := c.pgConnectionString(dbname)
@@ -126,12 +131,12 @@ func (c *Cluster) initDbConnWithName(dbname string) error {
 			}
 
 			if _, ok := err.(*net.OpError); ok {
-				c.logger.Errorf("could not connect to PostgreSQL database: %v", err)
+				c.logger.Warningf("could not connect to Postgres database: %v", err)
 				return false, nil
 			}
 
 			if err2 := conn.Close(); err2 != nil {
-				c.logger.Errorf("error when closing PostgreSQL connection after another error: %v", err)
+				c.logger.Errorf("error when closing Postgres connection after another error: %v", err)
 				return false, err2
 			}
 
@@ -145,6 +150,12 @@ func (c *Cluster) initDbConnWithName(dbname string) error {
 	conn.SetMaxOpenConns(1)
 	conn.SetMaxIdleConns(-1)
 
+	if c.pgDb != nil {
+		msg := "closing an existing connection before opening a new one to %s"
+		c.logger.Warningf(msg, dbname)
+		c.closeDbConn()
+	}
+
 	c.pgDb = conn
 
 	return nil
@@ -155,7 +166,7 @@ func (c *Cluster) connectionIsClosed() bool {
 }
 
 func (c *Cluster) closeDbConn() (err error) {
-	c.setProcessName("closing db connection")
+	c.setProcessName("closing database connection")
 	if c.pgDb != nil {
 		c.logger.Debug("closing database connection")
 		if err = c.pgDb.Close(); err != nil {
@@ -170,7 +181,7 @@ func (c *Cluster) closeDbConn() (err error) {
 }
 
 func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUserMap, err error) {
-	c.setProcessName("reading users from the db")
+	c.setProcessName("reading users from the database")
 	var rows *sql.Rows
 	users = make(spec.PgUserMap)
 	if rows, err = c.pgDb.Query(getUserSQL, pq.Array(userNames)); err != nil {
@@ -465,8 +476,11 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 // perform remote authentification.
 func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 	var stmtBytes bytes.Buffer
+
 	c.logger.Info("Installing lookup function")
 
+	// Open a new connection if not yet done. This connection will be used only
+	// to get the list of databases, not for the actuall installation.
 	if err := c.initDbConn(); err != nil {
 		return fmt.Errorf("could not init database connection")
 	}
@@ -480,36 +494,40 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 		}
 	}()
 
+	// List of databases we failed to process. At the moment it function just
+	// like a flag to retry on the next sync, but in the future we may want to
+	// retry only necessary parts, so let's keep the list.
+	failedDatabases := []string{}
 	currentDatabases, err := c.getDatabases()
 	if err != nil {
 		msg := "could not get databases to install pooler lookup function: %v"
 		return fmt.Errorf(msg, err)
 	}
 
+	// We've got the list of target databases, now close this connection to
+	// open a new one to every each of them.
+	if err := c.closeDbConn(); err != nil {
+		c.logger.Errorf("could not close database connection: %v", err)
+	}
+
 	templater := template.Must(template.New("sql").Parse(connectionPoolerLookup))
+	params := TemplateParams{
+		"pooler_schema": poolerSchema,
+		"pooler_user":   poolerUser,
+	}
+
+	if err := templater.Execute(&stmtBytes, params); err != nil {
+		msg := "could not prepare sql statement %+v: %v"
+		return fmt.Errorf(msg, params, err)
+	}
 
 	for dbname := range currentDatabases {
+
 		if dbname == "template0" || dbname == "template1" {
 			continue
 		}
 
-		if err := c.initDbConnWithName(dbname); err != nil {
-			return fmt.Errorf("could not init database connection to %s", dbname)
-		}
-
-		c.logger.Infof("Install pooler lookup function into %s", dbname)
-
-		params := TemplateParams{
-			"pooler_schema": poolerSchema,
-			"pooler_user":   poolerUser,
-		}
-
-		if err := templater.Execute(&stmtBytes, params); err != nil {
-			c.logger.Errorf("could not prepare sql statement %+v: %v",
-				params, err)
-			// process other databases
-			continue
-		}
+		c.logger.Infof("install pooler lookup function into database '%s'", dbname)
 
 		// golang sql will do retries couple of times if pq driver reports
 		// connections issues (driver.ErrBadConn), but since our query is
@@ -520,7 +538,20 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 			constants.PostgresConnectTimeout,
 			constants.PostgresConnectRetryTimeout,
 			func() (bool, error) {
-				if _, err := c.pgDb.Exec(stmtBytes.String()); err != nil {
+
+				// At this moment we are not connected to any database
+				if err := c.initDbConnWithName(dbname); err != nil {
+					msg := "could not init database connection to %s"
+					return false, fmt.Errorf(msg, dbname)
+				}
+				defer func() {
+					if err := c.closeDbConn(); err != nil {
+						msg := "could not close database connection: %v"
+						c.logger.Errorf(msg, err)
+					}
+				}()
+
+				if _, err = c.pgDb.Exec(stmtBytes.String()); err != nil {
 					msg := fmt.Errorf("could not execute sql statement %s: %v",
 						stmtBytes.String(), err)
 					return false, msg
@@ -533,15 +564,16 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 			c.logger.Errorf("could not execute after retries %s: %v",
 				stmtBytes.String(), err)
 			// process other databases
+			failedDatabases = append(failedDatabases, dbname)
 			continue
 		}
 
 		c.logger.Infof("pooler lookup function installed into %s", dbname)
-		if err := c.closeDbConn(); err != nil {
-			c.logger.Errorf("could not close database connection: %v", err)
-		}
 	}
 
-	c.ConnectionPooler.LookupFunction = true
+	if len(failedDatabases) == 0 {
+		c.ConnectionPooler.LookupFunction = true
+	}
+
 	return nil
 }

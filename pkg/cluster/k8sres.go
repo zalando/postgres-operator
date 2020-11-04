@@ -844,7 +844,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 		return secretPodEnvVarsList, nil
 	}
 
-	secret, err := c.KubeClient.Secrets(c.OpConfig.PodEnvironmentSecret).Get(
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
 		context.TODO(),
 		c.OpConfig.PodEnvironmentSecret,
 		metav1.GetOptions{})
@@ -910,51 +910,6 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 		return "", err
 	}
 	return fmt.Sprintf("%v", pgVersion), nil
-}
-
-func (c *Cluster) getNewPgVersion(container v1.Container, newPgVersion string) (string, error) {
-	var (
-		spiloConfiguration spiloConfiguration
-		runningPgVersion   string
-		version            string
-		err                error
-	)
-
-	for _, env := range container.Env {
-
-		if env.Name == "PGVERSION" {
-			err = json.Unmarshal([]byte(env.Value), &version)
-			if err != nil {
-				return newPgVersion, err
-			}
-			return version, nil
-		}
-
-		if env.Name != "SPILO_CONFIGURATION" {
-			continue
-		}
-		err = json.Unmarshal([]byte(env.Value), &spiloConfiguration)
-		if err != nil {
-			return newPgVersion, err
-		}
-	}
-
-	if len(spiloConfiguration.PgLocalConfiguration) > 0 {
-		currentBinPath := fmt.Sprintf("%v", spiloConfiguration.PgLocalConfiguration[patroniPGBinariesParameterName])
-		runningPgVersion, err = extractPgVersionFromBinPath(currentBinPath, pgBinariesLocationTemplate)
-		if err != nil {
-			return "", fmt.Errorf("could not extract Postgres version from %v in SPILO_CONFIGURATION", currentBinPath)
-		}
-	} else {
-		return "", fmt.Errorf("could not find %q setting in SPILO_CONFIGURATION", patroniPGBinariesParameterName)
-	}
-
-	if runningPgVersion != newPgVersion {
-		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", runningPgVersion, newPgVersion)
-		newPgVersion = runningPgVersion
-	}
-
-	return newPgVersion, nil
 }
 
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
@@ -1170,7 +1125,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate the spilo container
-	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
+	c.logger.Debugf("Generating Spilo container, environment variables")
+	c.logger.Debugf("%v", spiloEnvVars)
+
 	spiloContainer := generateContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
@@ -1765,11 +1722,31 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			msg := "Figure out which S3 bucket to use from env"
 			c.logger.Info(msg, description.S3WalPath)
 
+			if c.OpConfig.WALES3Bucket != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_WAL_S3_BUCKET",
+						Value: c.OpConfig.WALES3Bucket,
+					},
+				}
+				result = append(result, envs...)
+			} else if c.OpConfig.WALGSBucket != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_WAL_GS_BUCKET",
+						Value: c.OpConfig.WALGSBucket,
+					},
+					{
+						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
+						Value: c.OpConfig.GCPCredentials,
+					},
+				}
+				result = append(result, envs...)
+			} else {
+				c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
+			}
+
 			envs := []v1.EnvVar{
-				{
-					Name:  "CLONE_WAL_S3_BUCKET",
-					Value: c.OpConfig.WALES3Bucket,
-				},
 				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 					Value: getBucketScopeSuffix(description.UID),
@@ -2068,7 +2045,8 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
 	}
 
-	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+	c.logger.Debugf("Generated logical backup env vars")
+	c.logger.Debugf("%v", envVars)
 	return envVars
 }
 
@@ -2229,6 +2207,13 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec)
 			},
 		},
 		Env: envVars,
+		ReadinessProbe: &v1.Probe{
+			Handler: v1.Handler{
+				TCPSocket: &v1.TCPSocketAction{
+					Port: intstr.IntOrString{IntVal: pgPort},
+				},
+			},
+		},
 	}
 
 	podTemplate := &v1.PodTemplateSpec{

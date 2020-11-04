@@ -1,11 +1,10 @@
 package v1
 
 import (
+	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
 )
 
 // APIVersion of the `postgresql` and `operator` CRDs
@@ -44,6 +43,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO: User uppercase CRDResourceKind of our types in the next major API version
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresql"), &Postgresql{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("postgresqlList"), &PostgresqlList{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("PostgresTeam"), &PostgresTeam{})
+	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("PostgresTeamList"), &PostgresTeamList{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("OperatorConfiguration"),
 		&OperatorConfiguration{})
 	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("OperatorConfigurationList"),

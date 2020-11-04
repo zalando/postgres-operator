@@ -1,9 +1,12 @@
 package controller
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +16,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	acidv1informer "github.com/zalando/postgres-operator/pkg/generated/informers/externalversions/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -31,8 +35,9 @@ import (
 
 // Controller represents operator controller
 type Controller struct {
-	config   spec.ControllerConfig
-	opConfig *config.Config
+	config    spec.ControllerConfig
+	opConfig  *config.Config
+	pgTeamMap teams.PostgresTeamMap
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
@@ -53,10 +58,11 @@ type Controller struct {
 	clusterHistory   map[spec.NamespacedName]ringlog.RingLogger // history of the cluster changes
 	teamClusters     map[string][]spec.NamespacedName
 
-	postgresqlInformer cache.SharedIndexInformer
-	podInformer        cache.SharedIndexInformer
-	nodesInformer      cache.SharedIndexInformer
-	podCh              chan cluster.PodEvent
+	postgresqlInformer   cache.SharedIndexInformer
+	postgresTeamInformer cache.SharedIndexInformer
+	podInformer          cache.SharedIndexInformer
+	nodesInformer        cache.SharedIndexInformer
+	podCh                chan cluster.PodEvent
 
 	clusterEventQueues    []*cache.FIFO // [workerID]Queue
 	lastClusterSyncTime   int64
@@ -73,6 +79,10 @@ func NewController(controllerConfig *spec.ControllerConfig, controllerId string)
 	logger := logrus.New()
 	if controllerConfig.EnableJsonLogging {
 		logger.SetFormatter(&logrus.JSONFormatter{})
+	} else {
+		if os.Getenv("LOG_NOQUOTE") != "" {
+			logger.SetFormatter(&logrus.TextFormatter{PadLevelText: true, DisableQuote: true})
+		}
 	}
 
 	var myComponentName = "postgres-operator"
@@ -81,7 +91,10 @@ func NewController(controllerConfig *spec.ControllerConfig, controllerId string)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logger.Infof)
+
+	// disabling the sending of events also to the logoutput
+	// the operator currently duplicates a lot of log entries with this setup
+	// eventBroadcaster.StartLogging(logger.Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: myComponentName})
 
 	c := &Controller{
@@ -190,10 +203,18 @@ func (c *Controller) warnOnDeprecatedOperatorParameters() {
 	}
 }
 
+func compactValue(v string) string {
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, []byte(v)); err != nil {
+		panic("Hard coded json strings broken!")
+	}
+	return compact.String()
+}
+
 func (c *Controller) initPodServiceAccount() {
 
 	if c.opConfig.PodServiceAccountDefinition == "" {
-		c.opConfig.PodServiceAccountDefinition = `
+		stringValue := `
 		{
 			"apiVersion": "v1",
 			"kind": "ServiceAccount",
@@ -201,6 +222,9 @@ func (c *Controller) initPodServiceAccount() {
 				"name": "postgres-pod"
 			}
 		}`
+
+		c.opConfig.PodServiceAccountDefinition = compactValue(stringValue)
+
 	}
 
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
@@ -230,7 +254,7 @@ func (c *Controller) initRoleBinding() {
 	// operator binds it to the cluster role with sufficient privileges
 	// we assume the role is created by the k8s administrator
 	if c.opConfig.PodServiceAccountRoleBindingDefinition == "" {
-		c.opConfig.PodServiceAccountRoleBindingDefinition = fmt.Sprintf(`
+		stringValue := fmt.Sprintf(`
 		{
 			"apiVersion": "rbac.authorization.k8s.io/v1",
 			"kind": "RoleBinding",
@@ -249,6 +273,7 @@ func (c *Controller) initRoleBinding() {
 				}
 			]
 		}`, c.PodServiceAccount.Name, c.PodServiceAccount.Name, c.PodServiceAccount.Name)
+		c.opConfig.PodServiceAccountRoleBindingDefinition = compactValue(stringValue)
 	}
 	c.logger.Info("Parse role bindings")
 	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
@@ -267,7 +292,14 @@ func (c *Controller) initRoleBinding() {
 
 	}
 
-	// actual roles bindings are deployed at the time of Postgres/Spilo cluster creation
+	// actual roles bindings ar*logrus.Entrye deployed at the time of Postgres/Spilo cluster creation
+}
+
+func logMultiLineConfig(log *logrus.Entry, config string) {
+	lines := strings.Split(config, "\n")
+	for _, l := range lines {
+		log.Infof("%s", l)
+	}
 }
 
 func (c *Controller) initController() {
@@ -295,14 +327,19 @@ func (c *Controller) initController() {
 		c.logger.Fatalf("could not register Postgres CustomResourceDefinition: %v", err)
 	}
 
-	c.initPodServiceAccount()
 	c.initSharedInformers()
+
+	if c.opConfig.EnablePostgresTeamCRD {
+		c.loadPostgresTeams()
+	} else {
+		c.pgTeamMap = teams.PostgresTeamMap{}
+	}
 
 	if c.opConfig.DebugLogging {
 		c.logger.Logger.Level = logrus.DebugLevel
 	}
 
-	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
+	logMultiLineConfig(c.logger, c.opConfig.MustMarshal())
 
 	roleDefs := c.getInfrastructureRoleDefinitions()
 	if infraRoles, err := c.getInfrastructureRoles(roleDefs); err != nil {
@@ -329,6 +366,7 @@ func (c *Controller) initController() {
 
 func (c *Controller) initSharedInformers() {
 
+	// Postgresqls
 	c.postgresqlInformer = acidv1informer.NewPostgresqlInformer(
 		c.KubeClient.AcidV1ClientSet,
 		c.opConfig.WatchedNamespace,
@@ -340,6 +378,20 @@ func (c *Controller) initSharedInformers() {
 		UpdateFunc: c.postgresqlUpdate,
 		DeleteFunc: c.postgresqlDelete,
 	})
+
+	// PostgresTeams
+	if c.opConfig.EnablePostgresTeamCRD {
+		c.postgresTeamInformer = acidv1informer.NewPostgresTeamInformer(
+			c.KubeClient.AcidV1ClientSet,
+			c.opConfig.WatchedNamespace,
+			constants.QueueResyncPeriodTPR*6, // 30 min
+			cache.Indexers{})
+
+		c.postgresTeamInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.postgresTeamAdd,
+			UpdateFunc: c.postgresTeamUpdate,
+		})
+	}
 
 	// Pods
 	podLw := &cache.ListWatch{
@@ -401,6 +453,10 @@ func (c *Controller) Run(stopCh <-chan struct{}, wg *sync.WaitGroup) {
 	go c.apiserver.Run(stopCh, wg)
 	go c.kubeNodesInformer(stopCh, wg)
 
+	if c.opConfig.EnablePostgresTeamCRD {
+		go c.runPostgresTeamInformer(stopCh, wg)
+	}
+
 	c.logger.Info("started working in background")
 }
 
@@ -414,6 +470,12 @@ func (c *Controller) runPostgresqlInformer(stopCh <-chan struct{}, wg *sync.Wait
 	defer wg.Done()
 
 	c.postgresqlInformer.Run(stopCh)
+}
+
+func (c *Controller) runPostgresTeamInformer(stopCh <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	c.postgresTeamInformer.Run(stopCh)
 }
 
 func queueClusterKey(eventType EventType, uid types.UID) string {

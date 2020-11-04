@@ -38,6 +38,10 @@ func (c *FakeAcidV1) OperatorConfigurations(namespace string) v1.OperatorConfigu
 	return &FakeOperatorConfigurations{c, namespace}
 }
 
+func (c *FakeAcidV1) PostgresTeams(namespace string) v1.PostgresTeamInterface {
+	return &FakePostgresTeams{c, namespace}
+}
+
 func (c *FakeAcidV1) Postgresqls(namespace string) v1.PostgresqlInterface {
 	return &FakePostgresqls{c, namespace}
 }
