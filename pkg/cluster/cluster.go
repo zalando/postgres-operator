@@ -331,7 +331,7 @@ func (c *Cluster) Create() error {
 	//
 	// Do not consider connection pooler as a strict requirement, and if
 	// something fails, report warning
-	c.createConnectionPooler()
+	c.createConnectionPooler(c.installLookupFunction)
 
 	return nil
 }
@@ -759,8 +759,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// check which databases we need to process, but even repeating the whole
 	// installation process should be good enough.
 
-	if _, err := c.syncConnectionPooler(oldSpec, newSpec,
-		c.installLookupFunction); err != nil {
+	if _, err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
 		updateFailed = true
 	}

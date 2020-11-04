@@ -77,15 +77,15 @@ func needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 // have e.g. different `application` label, so that recreatePod operation will
 // not interfere with it (it lists all the pods via labels, and if there would
 // be no difference, it will recreate also pooler pods).
-func (c *Cluster) connectionPoolerLabelsSelector(name string, role PostgresRole) *metav1.LabelSelector {
+func (c *Cluster) connectionPoolerLabelsSelector(role PostgresRole) *metav1.LabelSelector {
 	connectionPoolerLabels := labels.Set(map[string]string{})
 
 	extraLabels := labels.Set(map[string]string{
-		"connection-pooler-name": name,
-		"application":            "db-connection-pooler",
-		"role":                   string(role),
-		"cluster-name":           c.Name,
-		"Namespace":              c.Namespace,
+		"connection-pooler": c.connectionPoolerName(role),
+		"application":       "db-connection-pooler",
+		"spilo-role":        string(role),
+		"cluster-name":      c.Name,
+		"Namespace":         c.Namespace,
 	})
 
 	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, c.labelsSet(false))
@@ -108,12 +108,12 @@ func (c *Cluster) connectionPoolerLabelsSelector(name string, role PostgresRole)
 // have connectionpooler name in the cp object to have it immutable name
 // add these cp related functions to a new cp file
 // opConfig, cluster, and database name
-func (c *Cluster) createConnectionPooler() (SyncReason, error) {
+func (c *Cluster) createConnectionPooler(LookupFunction InstallFunction) (SyncReason, error) {
 	var reason SyncReason
 	c.setProcessName("creating connection pooler")
 
 	//this is essentially sync with nil as oldSpec
-	if reason, err := c.syncConnectionPooler(nil, &c.Postgresql, c.installLookupFunction); err != nil {
+	if reason, err := c.syncConnectionPooler(nil, &c.Postgresql, LookupFunction); err != nil {
 		return reason, err
 	}
 	return reason, nil
@@ -283,7 +283,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.connectionPoolerLabelsSelector(c.connectionPoolerName(role), role).MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector(role).MatchLabels,
 			Namespace:   c.Namespace,
 			Annotations: c.generatePodAnnotations(spec),
 		},
@@ -337,7 +337,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        connectionPooler.Name,
 			Namespace:   connectionPooler.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector(connectionPooler.Name, connectionPooler.Role).MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector(connectionPooler.Role).MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
@@ -349,7 +349,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: numberOfInstances,
-			Selector: c.connectionPoolerLabelsSelector(connectionPooler.Name, connectionPooler.Role),
+			Selector: c.connectionPoolerLabelsSelector(connectionPooler.Role),
 			Template: *podTemplate,
 		},
 	}
@@ -380,7 +380,7 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		},
 		Type: v1.ServiceTypeClusterIP,
 		Selector: map[string]string{
-			"connection-pooler": connectionPooler.Name,
+			"connection-pooler": c.connectionPoolerName(connectionPooler.Role),
 		},
 	}
 
@@ -388,7 +388,7 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        connectionPooler.Name,
 			Namespace:   connectionPooler.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector(connectionPooler.Name, connectionPooler.Role).MatchLabels,
+			Labels:      c.connectionPoolerLabelsSelector(connectionPooler.Role).MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
@@ -657,7 +657,7 @@ func makeDefaultConnectionPoolerResources(config *config.Config) acidv1.Resource
 	}
 }
 
-func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, installLookupFunction InstallFunction) (SyncReason, error) {
+func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, LookupFunction InstallFunction) (SyncReason, error) {
 
 	var reason SyncReason
 	var err error
@@ -695,6 +695,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, inst
 				Role:           role,
 			}
 		}
+
 		if newNeedConnectionPooler {
 			// Try to sync in any case. If we didn't needed connection pooler before,
 			// it means we want to create it. If it was already present, still sync
@@ -723,7 +724,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, inst
 					specUser,
 					c.OpConfig.ConnectionPooler.User)
 
-				if err = installLookupFunction(schema, user, role); err != nil {
+				if err = LookupFunction(schema, user, role); err != nil {
 					return NoSync, err
 				}
 			}

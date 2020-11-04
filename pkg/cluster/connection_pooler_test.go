@@ -57,8 +57,19 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 		ConnectionPooler:              &acidv1.ConnectionPooler{},
 		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
-
-	reason, err := cluster.createConnectionPooler()
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
+		Master: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: true,
+		},
+		Replica: {
+			Deployment:     nil,
+			Service:        nil,
+			LookupFunction: true,
+		},
+	}
+	reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
 
 	if err != nil {
 		t.Errorf("%s: Cannot create connection pooler, %s, %+v",
@@ -348,6 +359,21 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 		check            func(cluster *Cluster, err error, reason SyncReason) error
 	}{
 		{
+			subTest: "create from scratch",
+			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{},
+			},
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPooler: &acidv1.ConnectionPooler{},
+				},
+			},
+			cluster:          clusterMissingObjects,
+			defaultImage:     "pooler:1.0",
+			defaultInstances: 1,
+			check:            MasterobjectsAreSaved,
+		},
+		{
 			subTest: "create if doesn't exist",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
@@ -380,22 +406,6 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			check:            MasterobjectsAreSaved,
 		},
 		{
-			subTest: "create replica if doesn't exist with a flag",
-			oldSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{},
-			},
-			newSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					ConnectionPooler:              &acidv1.ConnectionPooler{},
-					EnableReplicaConnectionPooler: boolToPointer(true),
-				},
-			},
-			cluster:          clusterDirtyMock,
-			defaultImage:     "pooler:1.0",
-			defaultInstances: 1,
-			check:            ReplicaobjectsAreSaved,
-		},
-		{
 			subTest: "create no replica with flag",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
@@ -411,19 +421,20 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			check:            objectsAreDeleted,
 		},
 		{
-			subTest: "create from scratch",
+			subTest: "create replica if doesn't exist with a flag",
 			oldSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
-					ConnectionPooler: &acidv1.ConnectionPooler{},
+					ConnectionPooler:              &acidv1.ConnectionPooler{},
+					EnableReplicaConnectionPooler: boolToPointer(true),
 				},
 			},
-			cluster:          clusterMissingObjects,
+			cluster:          clusterDirtyMock,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            MasterobjectsAreSaved,
+			check:            ReplicaobjectsAreSaved,
 		},
 		{
 			subTest: "create both master and replica",
@@ -443,19 +454,22 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			check:            objectsAreSaved,
 		},
 		{
-			subTest: "delete if not needed",
+			subTest: "delete only replica if not needed",
 			oldSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{
+					ConnectionPooler:              &acidv1.ConnectionPooler{},
+					EnableReplicaConnectionPooler: boolToPointer(true),
+				},
+			},
+			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			newSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{},
-			},
-			cluster:          clusterMock,
+			cluster:          clusterDirtyMock,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            objectsAreDeleted,
+			check:            OnlyReplicaDeleted,
 		},
 		{
 			subTest: "delete only master if not needed",
@@ -476,22 +490,19 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 			check:            OnlyMasterDeleted,
 		},
 		{
-			subTest: "delete only replica if not needed",
+			subTest: "delete if not needed",
 			oldSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{
-					ConnectionPooler:              &acidv1.ConnectionPooler{},
-					EnableReplicaConnectionPooler: boolToPointer(true),
-				},
-			},
-			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
 					ConnectionPooler: &acidv1.ConnectionPooler{},
 				},
 			},
-			cluster:          clusterDirtyMock,
+			newSpec: &acidv1.Postgresql{
+				Spec: acidv1.PostgresSpec{},
+			},
+			cluster:          clusterMock,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            OnlyReplicaDeleted,
+			check:            objectsAreDeleted,
 		},
 		{
 			subTest: "cleanup if still there",
@@ -742,7 +753,9 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 		Master: {
 			Deployment:     nil,
 			Service:        nil,
-			LookupFunction: false,
+			LookupFunction: true,
+			Name:           "",
+			Role:           Master,
 		},
 	}
 
@@ -835,9 +848,9 @@ func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresR
 func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	poolerLabels := podSpec.ObjectMeta.Labels["connection-pooler"]
 
-	if poolerLabels != cluster.connectionPoolerLabelsSelector(cluster.connectionPoolerName(role), role).MatchLabels["connection-pooler"] {
+	if poolerLabels != cluster.connectionPoolerLabelsSelector(role).MatchLabels["connection-pooler"] {
 		return fmt.Errorf("Pod labels do not match, got %+v, expected %+v",
-			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector(cluster.connectionPoolerName(role), role).MatchLabels)
+			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector(role).MatchLabels)
 	}
 
 	return nil
@@ -845,7 +858,7 @@ func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole
 
 func testSelector(cluster *Cluster, deployment *appsv1.Deployment) error {
 	labels := deployment.Spec.Selector.MatchLabels
-	expected := cluster.connectionPoolerLabelsSelector(cluster.connectionPoolerName(Master), Master).MatchLabels
+	expected := cluster.connectionPoolerLabelsSelector(Master).MatchLabels
 
 	if labels["connection-pooler"] != expected["connection-pooler"] {
 		return fmt.Errorf("Labels are incorrect, got %+v, expected %+v",
@@ -894,18 +907,12 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: false,
-			Name:           cluster.connectionPoolerName(Master),
-			ClusterName:    cluster.ClusterName,
-			Namespace:      cluster.Namespace,
 			Role:           Master,
 		},
 		Replica: {
 			Deployment:     nil,
 			Service:        nil,
 			LookupFunction: false,
-			Name:           cluster.connectionPoolerName(Replica),
-			ClusterName:    cluster.ClusterName,
-			Namespace:      cluster.Namespace,
 			Role:           Replica,
 		},
 	}
