@@ -615,6 +615,8 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+        finally:
+            k8s.api.core_v1.delete_namespace("test")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_node_readiness_label(self):
@@ -958,7 +960,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_pod_antiaffinity": "false"
             }
         }
-        k8s.update_config(patch_disable_antiaffinity, "disalbe antiaffinity")
+        k8s.update_config(patch_disable_antiaffinity, "disable antiaffinity")
         k8s.wait_for_pod_start('spilo-role=master')
         k8s.wait_for_pod_start('spilo-role=replica')
         return True
