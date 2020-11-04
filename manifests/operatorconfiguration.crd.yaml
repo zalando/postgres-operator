@@ -45,15 +45,15 @@ spec:
           - kind
           - apiVersion
           - configuration
-          properties:
-            kind:
-              type: string
-              enum:
-              - OperatorConfiguration
-            apiVersion:
-              type: string
-              enum:
-              - acid.zalan.do/v1
+        properties:
+          kind:
+            type: string
+            enum:
+            - OperatorConfiguration
+          apiVersion:
+            type: string
+            enum:
+            - acid.zalan.do/v1
           configuration:
             type: object
             properties:
