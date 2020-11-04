@@ -1,17 +1,20 @@
 #!/bin/bash
 
 watch -c "
-kubectl get postgresql
+kubectl get postgresql --all-namespaces
 echo
 echo -n 'Rolling upgrade pending: '
 kubectl get statefulset -o jsonpath='{.items..metadata.annotations.zalando-postgres-operator-rolling-update-required}'
 echo
 echo
-kubectl get pods -o wide
+echo 'Pods'
+kubectl get pods -l application=spilo -l name=postgres-operator -l application=db-connection-pooler -o wide --all-namespaces
 echo
-kubectl get statefulsets
+echo 'Statefulsets'
+kubectl get statefulsets --all-namespaces
 echo
-kubectl get deployments
+echo 'Deployments'
+kubectl get deployments --all-namespaces -l application=db-connection-pooler -l name=postgres-operator
 echo
 echo
 echo 'Step from operator deployment'
