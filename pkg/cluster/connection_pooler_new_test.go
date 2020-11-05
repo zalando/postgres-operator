@@ -19,10 +19,11 @@ func NewFakeKubernetesClient() k8sutil.KubernetesClient {
 	clientSet := fake.NewSimpleClientset()
 
 	return k8sutil.KubernetesClient{
-		SecretsGetter:     clientSet.CoreV1(),
-		ConfigMapsGetter:  clientSet.CoreV1(),
-		DeploymentsGetter: clientSet.AppsV1(),
-		ServicesGetter:    clientSet.CoreV1(),
+		SecretsGetter:                clientSet.CoreV1(),
+		ConfigMapsGetter:             clientSet.CoreV1(),
+		DeploymentsGetter:            clientSet.AppsV1(),
+		ServicesGetter:               clientSet.CoreV1(),
+		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
 	}
 }
 
