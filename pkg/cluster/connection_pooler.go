@@ -661,7 +661,14 @@ func makeDefaultConnectionPoolerResources(config *config.Config) acidv1.Resource
 func logPoolerEssentials(log *logrus.Entry, oldSpec, newSpec *acidv1.Postgresql) {
 	var v []string
 
-	for _, b := range []*bool{oldSpec.Spec.EnableConnectionPooler, oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler} {
+	var input []*bool
+	if oldSpec == nil {
+		input = []*bool{nil, nil, newSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler}
+	} else {
+		input = []*bool{oldSpec.Spec.EnableConnectionPooler, oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler}
+	}
+
+	for _, b := range input {
 		if b == nil {
 			v = append(v, "nil")
 		} else {
