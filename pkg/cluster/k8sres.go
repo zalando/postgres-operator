@@ -885,41 +885,6 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 	return fmt.Sprintf("%v", pgVersion), nil
 }
 
-func (c *Cluster) getNewPgVersion(container v1.Container, newPgVersion string) (string, error) {
-	var (
-		spiloConfiguration spiloConfiguration
-		runningPgVersion   string
-		err                error
-	)
-
-	for _, env := range container.Env {
-		if env.Name != "SPILO_CONFIGURATION" {
-			continue
-		}
-		err = json.Unmarshal([]byte(env.Value), &spiloConfiguration)
-		if err != nil {
-			return newPgVersion, err
-		}
-	}
-
-	if len(spiloConfiguration.PgLocalConfiguration) > 0 {
-		currentBinPath := fmt.Sprintf("%v", spiloConfiguration.PgLocalConfiguration[patroniPGBinariesParameterName])
-		runningPgVersion, err = extractPgVersionFromBinPath(currentBinPath, pgBinariesLocationTemplate)
-		if err != nil {
-			return "", fmt.Errorf("could not extract Postgres version from %v in SPILO_CONFIGURATION", currentBinPath)
-		}
-	} else {
-		return "", fmt.Errorf("could not find %q setting in SPILO_CONFIGURATION", patroniPGBinariesParameterName)
-	}
-
-	if runningPgVersion != newPgVersion {
-		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", runningPgVersion, newPgVersion)
-		newPgVersion = runningPgVersion
-	}
-
-	return newPgVersion, nil
-}
-
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
 
 	var (
@@ -1730,11 +1695,31 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			msg := "Figure out which S3 bucket to use from env"
 			c.logger.Info(msg, description.S3WalPath)
 
+			if c.OpConfig.WALES3Bucket != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_WAL_S3_BUCKET",
+						Value: c.OpConfig.WALES3Bucket,
+					},
+				}
+				result = append(result, envs...)
+			} else if c.OpConfig.WALGSBucket != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_WAL_GS_BUCKET",
+						Value: c.OpConfig.WALGSBucket,
+					},
+					{
+						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
+						Value: c.OpConfig.GCPCredentials,
+					},
+				}
+				result = append(result, envs...)
+			} else {
+				c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
+			}
+
 			envs := []v1.EnvVar{
-				{
-					Name:  "CLONE_WAL_S3_BUCKET",
-					Value: c.OpConfig.WALES3Bucket,
-				},
 				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 					Value: getBucketScopeSuffix(description.UID),
