@@ -150,6 +150,17 @@ func TestNeedConnectionPooler(t *testing.T) {
 			testName)
 	}
 
+	cluster.Spec = acidv1.PostgresSpec{
+		EnableConnectionPooler:        boolToPointer(false),
+		EnableReplicaConnectionPooler: boolToPointer(false),
+		ConnectionPooler:              nil,
+	}
+
+	if needMasterConnectionPooler(&cluster.Spec) {
+		t.Errorf("%s: Connection pooler is enabled with flag false and nil",
+			testName)
+	}
+
 	// Test for replica connection pooler
 	cluster.Spec = acidv1.PostgresSpec{
 		ConnectionPooler: &acidv1.ConnectionPooler{},

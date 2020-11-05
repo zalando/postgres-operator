@@ -43,15 +43,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	c.logger.Debugf("syncing secrets")
-
 	//TODO: mind the secrets of the deleted/new users
 	if err = c.syncSecrets(); err != nil {
 		err = fmt.Errorf("could not sync secrets: %v", err)
 		return err
 	}
 
-	c.logger.Debugf("syncing services")
 	if err = c.syncServices(); err != nil {
 		err = fmt.Errorf("could not sync services: %v", err)
 		return err
@@ -482,6 +479,7 @@ func (c *Cluster) syncSecrets() error {
 		err    error
 		secret *v1.Secret
 	)
+	c.logger.Info("syncing secrets")
 	c.setProcessName("syncing secrets")
 	secrets := c.generateUserSecrets()
 
