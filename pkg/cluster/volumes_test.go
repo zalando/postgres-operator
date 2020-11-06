@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/util/config"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -56,7 +57,7 @@ func TestResizeVolumeClaim(t *testing.T) {
 		Items: []v1.PersistentVolumeClaim{
 			{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pgdata-" + clusterName + "-0",
+					Name:      constants.DataVolumeName + "-" + clusterName + "-0",
 					Namespace: namespace,
 					Labels:    filterLabels,
 				},
@@ -70,7 +71,7 @@ func TestResizeVolumeClaim(t *testing.T) {
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pgdata-" + clusterName + "-1",
+					Name:      constants.DataVolumeName + "-" + clusterName + "-1",
 					Namespace: namespace,
 					Labels:    filterLabels,
 				},
@@ -106,6 +107,39 @@ func TestResizeVolumeClaim(t *testing.T) {
 		expectedSize := quantityToGigabyte(expectedQuantity)
 		if newStorageSize != expectedSize {
 			t.Errorf("%s: resizing failed, got %v, expected %v", testName, newStorageSize, expectedSize)
+		}
+	}
+}
+
+func TestQuantityToGigabyte(t *testing.T) {
+	tests := []struct {
+		name        string
+		quantityStr string
+		expected    int64
+	}{
+		{
+			"test with 1Gi",
+			"1Gi",
+			1,
+		},
+		{
+			"test with float",
+			"1.5Gi",
+			int64(1),
+		},
+		{
+			"test with 1000Mi",
+			"1000Mi",
+			int64(0),
+		},
+	}
+
+	for _, tt := range tests {
+		quantity, err := resource.ParseQuantity(tt.quantityStr)
+		assert.NoError(t, err)
+		gigabyte := quantityToGigabyte(quantity)
+		if gigabyte != tt.expected {
+			t.Errorf("%s: got %v, expected %v", tt.name, gigabyte, tt.expected)
 		}
 	}
 }
