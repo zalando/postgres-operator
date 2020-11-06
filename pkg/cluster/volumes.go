@@ -62,7 +62,7 @@ func (c *Cluster) resizeVolumeClaims(newVolume acidv1.Volume) error {
 	if err != nil {
 		return fmt.Errorf("could not parse volume size: %v", err)
 	}
-	_, newSize, err := c.listVolumesWithManifestSize(newVolume)
+	newSize := quantityToGigabyte(newQuantity)
 	for _, pvc := range pvcs {
 		volumeSize := quantityToGigabyte(pvc.Spec.Resources.Requests[v1.ResourceStorage])
 		if volumeSize >= newSize {
