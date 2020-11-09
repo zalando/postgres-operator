@@ -93,12 +93,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         # operator deploys pod service account there on start up
         # needed for test_multi_namespace_support()
-        cls.namespace = "test"
+        cls.test_namespace = "test"
         try:
-            v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.namespace))
+            v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.test_namespace))
             k8s.api.core_v1.create_namespace(v1_namespace)
         except ApiException as e:
-            print("Failed to create the '{0}' namespace: {1}".format(cls.namespace, e))
+            print("Failed to create the '{0}' namespace: {1}".format(cls.test_namespace, e))
 
         # submit the most recent operator image built on the Docker host
         with open("manifests/postgres-operator.yaml", 'r+') as f:
@@ -600,13 +600,13 @@ class EndToEndTestCase(unittest.TestCase):
 
         with open("manifests/complete-postgres-manifest.yaml", 'r+') as f:
             pg_manifest = yaml.safe_load(f)
-            pg_manifest["metadata"]["namespace"] = self.namespace
+            pg_manifest["metadata"]["namespace"] = self.test_namespace
             yaml.dump(pg_manifest, f, Dumper=yaml.Dumper)
 
         try:
             k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
-            k8s.wait_for_pod_start("spilo-role=master", self.namespace)
-            self.assert_master_is_unique(self.namespace, "acid-test-cluster")
+            k8s.wait_for_pod_start("spilo-role=master", self.test_namespace)
+            self.assert_master_is_unique(self.test_namespace, "acid-test-cluster")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
