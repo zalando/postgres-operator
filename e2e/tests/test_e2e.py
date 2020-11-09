@@ -616,7 +616,7 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
         finally:
-            k8s.api.core_v1.delete_namespace("test")
+            k8s.api.core_v1.delete_namespace(self.namespace)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_node_readiness_label(self):
@@ -667,7 +667,7 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_scaling(self):
+    def test_a_scaling(self):
         '''
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         '''
