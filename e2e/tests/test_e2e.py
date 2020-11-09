@@ -9,6 +9,7 @@ from datetime import datetime
 from kubernetes import client
 
 from tests.k8s_api import K8s
+from kubernetes.client.rest import ApiException
 
 SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
 SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
@@ -87,8 +88,8 @@ class EndToEndTestCase(unittest.TestCase):
         # remove existing local storage class and create hostpath class
         try:
             k8s.api.storage_v1_api.delete_storage_class("standard")
-        except:
-            print("Storage class has already been remove")
+        except ApiException as e:
+            print("Failed to delete the 'standard' storage class: {0}".format(e))
 
         # operator deploys pod service account there on start up
         # needed for test_multi_namespace_support()
@@ -96,8 +97,8 @@ class EndToEndTestCase(unittest.TestCase):
         try:
             v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.namespace))
             k8s.api.core_v1.create_namespace(v1_namespace)
-        except:
-            print("Namespace already present")
+        except ApiException as e:
+            print("Failed to create the '{0}' namespace: {1}".format(cls.namespace, e))
 
         # submit the most recent operator image built on the Docker host
         with open("manifests/postgres-operator.yaml", 'r+') as f:
