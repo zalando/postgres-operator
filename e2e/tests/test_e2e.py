@@ -2,13 +2,11 @@ import json
 import unittest
 import time
 import timeout_decorator
-import subprocess
-import warnings
 import os
 import yaml
 
 from datetime import datetime
-from kubernetes import client, config
+from kubernetes import client
 
 from tests.k8s_api import K8s
 
@@ -169,9 +167,6 @@ class EndToEndTestCase(unittest.TestCase):
         pod_labels = dict({
             'connection-pooler': 'acid-minimal-cluster-pooler',
         })
-
-        pod_selector = to_selector(pod_labels)
-        service_selector = to_selector(service_labels)
 
         # enable connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -746,12 +741,12 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotations)
-        
+
         annotations = {
             "deployment-time": "2020-04-30 12:00:00",
             "downscaler/downtime_replicas": "0",
         }
-        
+
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
 
@@ -823,14 +818,14 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         try:
             # this delete attempt should be omitted because of missing annotations
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
             time.sleep(5)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # check that pods and services are still there
             k8s.wait_for_running_pods(cluster_label, 2)
@@ -841,7 +836,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # wait a little before proceeding
             time.sleep(10)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # add annotations to manifest
             delete_date = datetime.today().strftime('%Y-%m-%d')
@@ -855,7 +850,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # wait a little before proceeding
             time.sleep(20)
@@ -882,7 +877,7 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
-        #reset configmap
+        # reset configmap
         patch_delete_annotations = {
             "data": {
                 "delete_annotation_date_key": "",
