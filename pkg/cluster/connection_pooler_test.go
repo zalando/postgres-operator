@@ -57,18 +57,7 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 		ConnectionPooler:              &acidv1.ConnectionPooler{},
 		EnableReplicaConnectionPooler: boolToPointer(true),
 	}
-	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
-		Master: {
-			Deployment:     nil,
-			Service:        nil,
-			LookupFunction: true,
-		},
-		Replica: {
-			Deployment:     nil,
-			Service:        nil,
-			LookupFunction: true,
-		},
-	}
+
 	reason, err := cluster.createConnectionPooler(mockInstallLookupFunction)
 
 	if err != nil {
@@ -84,11 +73,31 @@ func TestConnectionPoolerCreationAndDeletion(t *testing.T) {
 			if cluster.ConnectionPooler[role].Service == nil {
 				t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
 			}
+		}
+	}
+	oldSpec := &acidv1.Postgresql{
+		Spec: acidv1.PostgresSpec{
+			EnableConnectionPooler:        boolToPointer(true),
+			EnableReplicaConnectionPooler: boolToPointer(true),
+		},
+	}
+	newSpec := &acidv1.Postgresql{
+		Spec: acidv1.PostgresSpec{
+			EnableConnectionPooler:        boolToPointer(false),
+			EnableReplicaConnectionPooler: boolToPointer(false),
+		},
+	}
 
-			err = cluster.deleteConnectionPooler(role)
-			if err != nil {
-				t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
-			}
+	// Delete connection pooler via sync
+	_, err = cluster.syncConnectionPooler(oldSpec, newSpec, mockInstallLookupFunction)
+	if err != nil {
+		t.Errorf("%s: Cannot sync connection pooler, %s", testName, err)
+	}
+
+	for _, role := range [2]PostgresRole{Master, Replica} {
+		err = cluster.deleteConnectionPooler(role)
+		if err != nil {
+			t.Errorf("%s: Cannot delete connection pooler, %s", testName, err)
 		}
 	}
 }

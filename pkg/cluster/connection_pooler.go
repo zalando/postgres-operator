@@ -767,7 +767,6 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 					c.logger.Warningf("could not remove connection pooler: %v", err)
 				}
 			}
-
 		}
 	}
 	if !needMasterConnectionPoolerWorker(&newSpec.Spec) &&
