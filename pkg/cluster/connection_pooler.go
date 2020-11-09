@@ -462,7 +462,8 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 		c.logger.Infof("connection pooler service %s has been deleted for role %s", service.Name, role)
 	}
 
-	c.ConnectionPooler[role] = nil
+	c.ConnectionPooler[role].Deployment = nil
+	c.ConnectionPooler[role].Service = nil
 	return nil
 }
 
@@ -757,7 +758,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 				return reason, err
 			}
 		} else {
-			// delete and cleanup resources
+			// delete and cleanup resources if they are already detected
 			if c.ConnectionPooler[role] != nil &&
 				(c.ConnectionPooler[role].Deployment != nil ||
 					c.ConnectionPooler[role].Service != nil) {
@@ -766,12 +767,13 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 					c.logger.Warningf("could not remove connection pooler: %v", err)
 				}
 			}
-			if (role == Master && !needReplicaConnectionPoolerWorker(&newSpec.Spec)) ||
-				(role == Replica && !needMasterConnectionPoolerWorker(&newSpec.Spec)) {
-				if err = c.deleteConnectionPoolerSecret(); err != nil {
-					c.logger.Warningf("could not remove connection pooler secret: %v", err)
-				}
-			}
+
+		}
+	}
+	if !needMasterConnectionPoolerWorker(&newSpec.Spec) &&
+		!needReplicaConnectionPoolerWorker(&newSpec.Spec) {
+		if err = c.deleteConnectionPoolerSecret(); err != nil {
+			c.logger.Warningf("could not remove connection pooler secret: %v", err)
 		}
 	}
 
