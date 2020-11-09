@@ -330,26 +330,6 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 		},
 	}
 
-	clusterDirtyMock := newCluster(k8sutil.NewMockKubernetesClient())
-	clusterDirtyMock.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{
-		Master: {
-			Deployment:     nil,
-			Service:        nil,
-			LookupFunction: false,
-		},
-		Replica: {
-			Deployment:     nil,
-			Service:        nil,
-			LookupFunction: false,
-		},
-	}
-
-	clusterDirtyMock.ConnectionPooler[Master].Deployment = &appsv1.Deployment{}
-	clusterDirtyMock.ConnectionPooler[Master].Service = &v1.Service{}
-
-	clusterDirtyMock.ConnectionPooler[Replica].Deployment = &appsv1.Deployment{}
-	clusterDirtyMock.ConnectionPooler[Replica].Service = &v1.Service{}
-
 	tests := []struct {
 		subTest          string
 		oldSpec          *acidv1.Postgresql

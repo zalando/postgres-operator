@@ -162,15 +162,6 @@ class EndToEndTestCase(unittest.TestCase):
         the end turn connection pooler off to not interfere with other tests.
         '''
         k8s = self.k8s
-        # service_labels = {
-        #     'cluster-name': 'acid-minimal-cluster',
-        # }
-        # pod_labels = dict({
-        #     'connection-pooler': 'acid-minimal-cluster-pooler',
-        # })
-
-        # pod_selector = to_selector(pod_labels)
-        # service_selector = to_selector(service_labels)
 
         # enable connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(

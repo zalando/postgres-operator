@@ -26,34 +26,34 @@ spec:
     - name: Team
       type: string
       description: Team responsible for Postgres CLuster
-      JSONPath: .spec.teamId
+      jsonPath: .spec.teamId
     - name: Version
       type: string
       description: PostgreSQL version
-      JSONPath: .spec.postgresql.version
+      jsonPath: .spec.postgresql.version
     - name: Pods
       type: integer
       description: Number of Pods per Postgres cluster
-      JSONPath: .spec.numberOfInstances
+      jsonPath: .spec.numberOfInstances
     - name: Volume
       type: string
       description: Size of the bound volume
-      JSONPath: .spec.volume.size
+      jsonPath: .spec.volume.size
     - name: CPU-Request
       type: string
       description: Requested CPU for Postgres containers
-      JSONPath: .spec.resources.requests.cpu
+      jsonPath: .spec.resources.requests.cpu
     - name: Memory-Request
       type: string
       description: Requested memory for Postgres containers
-      JSONPath: .spec.resources.requests.memory
+      jsonPath: .spec.resources.requests.memory
     - name: Age
       type: date
-      JSONPath: .metadata.creationTimestamp
+      jsonPath: .metadata.creationTimestamp
     - name: Status
       type: string
       description: Current sync status of postgresql resource
-      JSONPath: .status.PostgresClusterStatus
+      jsonPath: .status.PostgresClusterStatus
     schema:
       openAPIV3Schema:
         type: object
@@ -189,6 +189,8 @@ spec:
               dockerImage:
                 type: string
               enableConnectionPooler:
+                type: boolean
+              enableReplicaConnectionPooler:
                 type: boolean
               enableLogicalBackup:
                 type: boolean
@@ -390,60 +392,9 @@ spec:
                           #
                           # https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
                           pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                schema:
-                  type: string
-                user:
-                  type: string
-            databases:
-              type: object
-              additionalProperties:
-                type: string
-              # Note: usernames specified here as database owners must be declared in the users key of the spec key.
-            dockerImage:
-              type: string
-            enableConnectionPooler:
-              type: boolean
-            enableReplicaConnectionPooler:
-                type: boolean
-            enableLogicalBackup:
-              type: boolean
-            enableMasterLoadBalancer:
-              type: boolean
-            enableReplicaLoadBalancer:
-              type: boolean
-            enableShmVolume:
-              type: boolean
-            init_containers:  # deprecated
-              type: array
-              nullable: true
-              items:
-                type: object
-                additionalProperties: true
-            initContainers:
-              type: array
-              nullable: true
-              items:
-                type: object
-                additionalProperties: true
-            logicalBackupSchedule:
-              type: string
-              pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
-            maintenanceWindows:
-              type: array
-              items:
-                type: string
-                pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
-            numberOfInstances:
-              type: integer
-              minimum: 0
-            patroni:
-              type: object
-              properties:
-                initdb:
-                  type: object
-                  additionalProperties:
-                    type: string
-                pg_hba:
+                          # Note: the value specified here must not be zero or be higher
+                          # than the corresponding limit.
+                sidecars:
                   type: array
                   nullable: true
                   items:
