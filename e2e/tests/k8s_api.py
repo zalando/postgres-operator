@@ -212,8 +212,9 @@ class K8s:
     def wait_for_logical_backup_job_creation(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
-    def delete_operator_pod(self, step="Delete operator deplyment"):
-        self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, time.time())}}}}})
+    def delete_operator_pod(self, step="Delete operator pod"):
+        # patching the pod template in the deployment restarts the operator pod
+        self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, datetime.fromtimestamp(time.time()))}}}}})
         self.wait_for_operator_pod_start()
 
     def update_config(self, config_map_patch, step="Updating operator deployment"):

@@ -134,10 +134,8 @@ class EndToEndTestCase(unittest.TestCase):
 
         # make sure we start a new operator on every new run,
         # this tackles the problem when kind is reused
-        # and the Docker image is infact changed (dirty one)
+        # and the Docker image is in fact changed (dirty one)
 
-        # patch resync period, this can catch some problems with hanging e2e tests
-        # k8s.update_config({"data": {"resync_period":"30s"}},step="TestSuite setup")
         k8s.update_config({}, step="TestSuite Startup")
 
         actual_operator_image = k8s.api.core_v1.list_namespaced_pod(
@@ -343,7 +341,7 @@ class EndToEndTestCase(unittest.TestCase):
             },
         }
         k8s.update_config(patch_infrastructure_roles)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         try:
             # check that new roles are represented in the config by requesting the
