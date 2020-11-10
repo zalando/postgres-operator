@@ -609,6 +609,8 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+        finally:
+            k8s.api.core_v1.delete_namespace(self.test_namespace)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_node_readiness_label(self):
