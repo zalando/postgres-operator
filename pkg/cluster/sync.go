@@ -57,8 +57,8 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
+	c.logger.Debugf("syncing volumes using %q storage resize mode", c.OpConfig.StorageResizeMode)
 	if c.OpConfig.StorageResizeMode == "pvc" {
-		c.logger.Debugf("syncing persistent volume claims")
 		if err = c.syncVolumeClaims(); err != nil {
 			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
 			return err
@@ -70,7 +70,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		// TODO: handle the case of the cluster that is downsized and enlarged again
 		// (there will be a volume from the old pod for which we can't act before the
 		//  the statefulset modification is concluded)
-		c.logger.Debugf("syncing persistent volumes")
 		if err = c.syncVolumes(); err != nil {
 			err = fmt.Errorf("could not sync persistent volumes: %v", err)
 			return err

@@ -130,7 +130,7 @@ configKubernetes:
   # whether the Spilo container should run in privileged mode
   spilo_privileged: "false"
   # storage resize strategy, available options are: ebs, pvc, off
-  storage_resize_mode: ebs
+  storage_resize_mode: pvc
   # operator watches for postgres objects in the given namespace
   watched_namespace: "*"  # listen to all namespaces
 

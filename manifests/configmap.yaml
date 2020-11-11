@@ -107,7 +107,7 @@ data:
   # spilo_runasgroup: 103
   # spilo_fsgroup: 103
   spilo_privileged: "false"
-  # storage_resize_mode: "off"
+  storage_resize_mode: "pvc"
   super_username: postgres
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
