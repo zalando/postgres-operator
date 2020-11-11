@@ -672,7 +672,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// Volume
 	if oldSpec.Spec.Size != newSpec.Spec.Size {
 		c.logVolumeChanges(oldSpec.Spec.Volume, newSpec.Spec.Volume)
-		c.logger.Debugf("syncing volumes using %q resize mode", c.OpConfig.StorageResizeMode)
+		c.logger.Debugf("syncing volumes using %q storage resize mode", c.OpConfig.StorageResizeMode)
 		if c.OpConfig.StorageResizeMode == "pvc" {
 			if err := c.syncVolumeClaims(); err != nil {
 				c.logger.Errorf("could not sync persistent volume claims: %v", err)
