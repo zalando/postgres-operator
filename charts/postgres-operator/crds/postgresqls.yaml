@@ -26,34 +26,34 @@ spec:
     - name: Team
       type: string
       description: Team responsible for Postgres CLuster
-      JSONPath: .spec.teamId
+      jsonPath: .spec.teamId
     - name: Version
       type: string
       description: PostgreSQL version
-      JSONPath: .spec.postgresql.version
+      jsonPath: .spec.postgresql.version
     - name: Pods
       type: integer
       description: Number of Pods per Postgres cluster
-      JSONPath: .spec.numberOfInstances
+      jsonPath: .spec.numberOfInstances
     - name: Volume
       type: string
       description: Size of the bound volume
-      JSONPath: .spec.volume.size
+      jsonPath: .spec.volume.size
     - name: CPU-Request
       type: string
       description: Requested CPU for Postgres containers
-      JSONPath: .spec.resources.requests.cpu
+      jsonPath: .spec.resources.requests.cpu
     - name: Memory-Request
       type: string
       description: Requested memory for Postgres containers
-      JSONPath: .spec.resources.requests.memory
+      jsonPath: .spec.resources.requests.memory
     - name: Age
       type: date
-      JSONPath: .metadata.creationTimestamp
+      jsonPath: .metadata.creationTimestamp
     - name: Status
       type: string
       description: Current sync status of postgresql resource
-      JSONPath: .status.PostgresClusterStatus
+      jsonPath: .status.PostgresClusterStatus
     schema:
       openAPIV3Schema:
         type: object
