@@ -2,15 +2,14 @@ import json
 import unittest
 import time
 import timeout_decorator
-import subprocess
-import warnings
 import os
 import yaml
 
 from datetime import datetime
-from kubernetes import client, config
+from kubernetes import client
 
 from tests.k8s_api import K8s
+from kubernetes.client.rest import ApiException
 
 SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
 SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
@@ -89,17 +88,17 @@ class EndToEndTestCase(unittest.TestCase):
         # remove existing local storage class and create hostpath class
         try:
             k8s.api.storage_v1_api.delete_storage_class("standard")
-        except:
-            print("Storage class has already been remove")
+        except ApiException as e:
+            print("Failed to delete the 'standard' storage class: {0}".format(e))
 
         # operator deploys pod service account there on start up
         # needed for test_multi_namespace_support()
-        cls.namespace = "test"
+        cls.test_namespace = "test"
         try:
-            v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.namespace))
+            v1_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=cls.test_namespace))
             k8s.api.core_v1.create_namespace(v1_namespace)
-        except:
-            print("Namespace already present")
+        except ApiException as e:
+            print("Failed to create the '{0}' namespace: {1}".format(cls.test_namespace, e))
 
         # submit the most recent operator image built on the Docker host
         with open("manifests/postgres-operator.yaml", 'r+') as f:
@@ -135,10 +134,8 @@ class EndToEndTestCase(unittest.TestCase):
 
         # make sure we start a new operator on every new run,
         # this tackles the problem when kind is reused
-        # and the Docker image is infact changed (dirty one)
+        # and the Docker image is in fact changed (dirty one)
 
-        # patch resync period, this can catch some problems with hanging e2e tests
-        # k8s.update_config({"data": {"resync_period":"30s"}},step="TestSuite setup")
         k8s.update_config({}, step="TestSuite Startup")
 
         actual_operator_image = k8s.api.core_v1.list_namespaced_pod(
@@ -169,9 +166,6 @@ class EndToEndTestCase(unittest.TestCase):
         pod_labels = dict({
             'connection-pooler': 'acid-minimal-cluster-pooler',
         })
-
-        pod_selector = to_selector(pod_labels)
-        service_selector = to_selector(service_labels)
 
         # enable connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -347,7 +341,7 @@ class EndToEndTestCase(unittest.TestCase):
             },
         }
         k8s.update_config(patch_infrastructure_roles)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         try:
             # check that new roles are represented in the config by requesting the
@@ -604,17 +598,25 @@ class EndToEndTestCase(unittest.TestCase):
 
         with open("manifests/complete-postgres-manifest.yaml", 'r+') as f:
             pg_manifest = yaml.safe_load(f)
-            pg_manifest["metadata"]["namespace"] = self.namespace
+            pg_manifest["metadata"]["namespace"] = self.test_namespace
             yaml.dump(pg_manifest, f, Dumper=yaml.Dumper)
 
         try:
             k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
-            k8s.wait_for_pod_start("spilo-role=master", self.namespace)
-            self.assert_master_is_unique(self.namespace, "acid-test-cluster")
+            k8s.wait_for_pod_start("spilo-role=master", self.test_namespace)
+            self.assert_master_is_unique(self.test_namespace, "acid-test-cluster")
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+        finally:
+            # delete the new cluster so that the k8s_api.get_operator_state works correctly in subsequent tests
+            # ideally we should delete the 'test' namespace here but
+            # the pods inside the namespace stuck in the Terminating state making the test time out
+            k8s.api.custom_objects_api.delete_namespaced_custom_object(
+                "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-test-cluster")
+            time.sleep(5)
+
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_node_readiness_label(self):
@@ -746,12 +748,12 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_crd_annotations)
-        
+
         annotations = {
             "deployment-time": "2020-04-30 12:00:00",
             "downscaler/downtime_replicas": "0",
         }
-        
+
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
 
@@ -823,14 +825,14 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         try:
             # this delete attempt should be omitted because of missing annotations
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster")
             time.sleep(5)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # check that pods and services are still there
             k8s.wait_for_running_pods(cluster_label, 2)
@@ -841,7 +843,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # wait a little before proceeding
             time.sleep(10)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # add annotations to manifest
             delete_date = datetime.today().strftime('%Y-%m-%d')
@@ -855,7 +857,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_delete_annotations)
-            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0":"idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # wait a little before proceeding
             time.sleep(20)
@@ -882,7 +884,7 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
-        #reset configmap
+        # reset configmap
         patch_delete_annotations = {
             "data": {
                 "delete_annotation_date_key": "",

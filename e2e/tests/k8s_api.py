@@ -11,8 +11,10 @@ from datetime import datetime
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
+
 def to_selector(labels):
     return ",".join(["=".join(l) for l in labels.items()])
+
 
 class K8sApi:
 
@@ -181,10 +183,10 @@ class K8s:
     def count_pdbs_with_label(self, labels, namespace='default'):
         return len(self.api.policy_v1_beta1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
-  
+
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
-        return len(list(filter(lambda x: x.status.phase=='Running', pods)))
+        return len(list(filter(lambda x: x.status.phase == 'Running', pods)))
 
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
@@ -210,9 +212,9 @@ class K8s:
     def wait_for_logical_backup_job_creation(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
-    def delete_operator_pod(self, step="Delete operator deplyment"):
-        operator_pod = self.api.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
-        self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, time.time())}}}}})
+    def delete_operator_pod(self, step="Delete operator pod"):
+        # patching the pod template in the deployment restarts the operator pod
+        self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, datetime.fromtimestamp(time.time()))}}}}})
         self.wait_for_operator_pod_start()
 
     def update_config(self, config_map_patch, step="Updating operator deployment"):
@@ -241,7 +243,7 @@ class K8s:
 
     def get_operator_state(self):
         pod = self.get_operator_pod()
-        if pod == None:
+        if pod is None:
             return None
         pod = pod.metadata.name
 
@@ -251,7 +253,6 @@ class K8s:
 
         return json.loads(r.stdout.decode())
 
-
     def get_patroni_running_members(self, pod="acid-minimal-cluster-0"):
         result = self.get_patroni_state(pod)
         return list(filter(lambda x: "State" in x and x["State"] == "running", result))
@@ -260,9 +261,9 @@ class K8s:
         try:
             deployment = self.api.apps_v1.read_namespaced_deployment(name, namespace)
             return deployment.spec.replicas
-        except ApiException as e:
+        except ApiException:
             return None
-    
+
     def get_statefulset_image(self, label_selector="application=spilo,cluster-name=acid-minimal-cluster", namespace='default'):
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=label_selector, limit=1)
         if len(ssets.items) == 0:
@@ -463,7 +464,6 @@ class K8sBase:
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
     def delete_operator_pod(self, step="Delete operator deplyment"):
-        operator_pod = self.api.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
         self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, time.time())}}}}})
         self.wait_for_operator_pod_start()
 
@@ -521,7 +521,7 @@ class K8sOperator(K8sBase):
 class K8sPostgres(K8sBase):
     def __init__(self, labels="cluster-name=acid-minimal-cluster", namespace="default"):
         super().__init__(labels, namespace)
-    
+
     def get_pg_nodes(self):
         master_pod_node = ''
         replica_pod_nodes = []
