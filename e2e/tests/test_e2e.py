@@ -667,7 +667,7 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_a_scaling(self):
+    def test_scaling(self):
         '''
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
         '''
