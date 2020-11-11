@@ -614,7 +614,7 @@ class EndToEndTestCase(unittest.TestCase):
             # ideally we should delete the 'test' namespace here but
             # the pods inside the namespace stuck in the Terminating state making the test time out
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
-                "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-minimal-cluster")
+                "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-test-cluster")
             time.sleep(5)
 
 
