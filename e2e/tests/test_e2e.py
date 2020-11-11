@@ -610,7 +610,13 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
         finally:
-            k8s.api.core_v1.delete_namespace(self.test_namespace)
+            # delete the new cluster so that the k8s_api.get_operator_state works correctly in subsequent tests
+            # ideally we should delete the 'test' namespace here but
+            # the pods inside the namespace stuck in the Terminating state making the test time out
+            k8s.api.custom_objects_api.delete_namespaced_custom_object(
+                "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-minimal-cluster")
+            time.sleep(5)
+
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_node_readiness_label(self):
