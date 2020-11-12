@@ -11,21 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 )
-
-func NewFakeKubernetesClient() k8sutil.KubernetesClient {
-	clientSet := fake.NewSimpleClientset()
-
-	return k8sutil.KubernetesClient{
-		SecretsGetter:                clientSet.CoreV1(),
-		ConfigMapsGetter:             clientSet.CoreV1(),
-		DeploymentsGetter:            clientSet.AppsV1(),
-		ServicesGetter:               clientSet.CoreV1(),
-		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
-	}
-}
 
 func TestFakeClient(t *testing.T) {
 	clientSet := fake.NewSimpleClientset()

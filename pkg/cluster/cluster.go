@@ -598,6 +598,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	logNiceDiff(c.logger, oldSpec, newSpec)
+
 	if oldSpec.Spec.PostgresqlParam.PgVersion > newSpec.Spec.PostgresqlParam.PgVersion {
 		c.logger.Warningf("postgresql version change(%q -> %q) has no effect",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
