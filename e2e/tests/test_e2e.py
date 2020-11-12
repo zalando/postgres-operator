@@ -198,7 +198,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 2,
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler-repl"), 2,
                              "Deployment replicas is 2 default")
         self.eventuallyEqual(lambda: k8s.count_running_pods(
                              "connection-pooler=acid-minimal-cluster-pooler"),
@@ -258,7 +258,6 @@ class EndToEndTestCase(unittest.TestCase):
                     'enableConnectionPooler': False,
                     'enableReplicaConnectionPooler': False,
                 }
-
             })
 
         self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
