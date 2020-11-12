@@ -10,6 +10,7 @@ from kubernetes.client.rest import ApiException
 def to_selector(labels):
     return ",".join(["=".join(lbl) for lbl in labels.items()])
 
+
 class K8sApi:
 
     def __init__(self):
@@ -205,9 +206,9 @@ class K8s:
     def wait_for_logical_backup_job_creation(self):
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
-    def delete_operator_pod(self, step="Delete operator deplyment"):
-        # operator_pod = self.api.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
-        self.api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", {"spec": {"template": {"metadata": {"annotations": {"step": "{}-{}".format(step, time.time())}}}}})
+    def delete_operator_pod(self, step="Delete operator pod"):
+             # patching the pod template in the deployment restarts the operator pod
+        self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, datetime.fromtimestamp(time.time()))}}}}})
         self.wait_for_operator_pod_start()
 
     def update_config(self, config_map_patch, step="Updating operator deployment"):
@@ -236,7 +237,7 @@ class K8s:
 
     def get_operator_state(self):
         pod = self.get_operator_pod()
-        if pod == None:
+        if pod is None:
             return None
         pod = pod.metadata.name
 
@@ -254,7 +255,7 @@ class K8s:
         try:
             deployment = self.api.apps_v1.read_namespaced_deployment(name, namespace)
             return deployment.spec.replicas
-        except ApiException as e:
+        except ApiException:
             return None
 
     def get_statefulset_image(self, label_selector="application=spilo,cluster-name=acid-minimal-cluster", namespace='default'):
@@ -457,8 +458,7 @@ class K8sBase:
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
     def delete_operator_pod(self, step="Delete operator deplyment"):
-        # operator_pod = self.api.core_v1.list_namespaced_pod('default', label_selector="name=postgres-operator").items[0].metadata.name
-        self.api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", {"spec": {"template": {"metadata": {"annotations": {"step": "{}-{}".format(step, time.time())}}}}})
+        self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, time.time())}}}}})
         self.wait_for_operator_pod_start()
 
     def update_config(self, config_map_patch, step="Updating operator deployment"):

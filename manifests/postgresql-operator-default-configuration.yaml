@@ -72,7 +72,7 @@ configuration:
     # spilo_runasgroup: 103
     # spilo_fsgroup: 103
     spilo_privileged: false
-    storage_resize_mode: ebs
+    storage_resize_mode: pvc
     # toleration: {}
     # watched_namespace: ""
   postgres_pod_resources:
