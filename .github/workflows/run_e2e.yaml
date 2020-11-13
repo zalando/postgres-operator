@@ -19,6 +19,6 @@ jobs:
     - name: Compile
       run: make linux
     - name: Run unit tests
-      run: make test
+      run: go test ./...
     - name: Run end-2-end tests
       run: make e2e
