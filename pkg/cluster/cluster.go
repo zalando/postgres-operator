@@ -625,7 +625,8 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	// initUsers. Check if it needs to be called.
 	sameUsers := reflect.DeepEqual(oldSpec.Spec.Users, newSpec.Spec.Users) &&
 		reflect.DeepEqual(oldSpec.Spec.PreparedDatabases, newSpec.Spec.PreparedDatabases)
-	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec)
+	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
+		needReplicaConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("syncing secrets")
 		if err := c.initUsers(); err != nil {
