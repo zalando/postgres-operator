@@ -16,7 +16,7 @@ pipeline:
         - desc: 'Install go'
           cmd: |
             cd /tmp
-            wget -q https://storage.googleapis.com/golang/go1.14.7.linux-amd64.tar.gz -O go.tar.gz
+            wget -q https://storage.googleapis.com/golang/go1.15.5.linux-amd64.tar.gz -O go.tar.gz
             tar -xf go.tar.gz
             mv go /usr/local
             ln -s /usr/local/go/bin/go /usr/bin/go
