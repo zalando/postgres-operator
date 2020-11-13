@@ -1,0 +1,15 @@
+name: ubuntu
+
+on: 
+  pull_request:
+  push:
+    branches:
+    - master
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build and test Operator
+      run: make e2e
