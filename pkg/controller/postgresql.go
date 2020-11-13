@@ -473,7 +473,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		lg.Errorf("error while queueing cluster event: %v", clusterEvent)
 	}
-	lg.Infof("%q event has been queued", eventType)
+	lg.Infof("%s event has been queued", eventType)
 
 	if eventType != EventDelete {
 		return
@@ -494,7 +494,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		if err != nil {
 			lg.Warningf("could not delete event from the queue: %v", err)
 		} else {
-			lg.Debugf("event %q has been discarded for the cluster", evType)
+			lg.Debugf("event %s has been discarded for the cluster", evType)
 		}
 	}
 }

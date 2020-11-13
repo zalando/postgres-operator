@@ -620,6 +620,17 @@ def update_postgresql(namespace: str, cluster: str):
         if 'enableConnectionPooler' in o['spec']:
             del o['spec']['enableConnectionPooler']
 
+    if 'enableReplicaConnectionPooler' in postgresql['spec']:
+        cp = postgresql['spec']['enableReplicaConnectionPooler']
+        if not cp:
+            if 'enableReplicaConnectionPooler' in o['spec']:
+                del o['spec']['enableReplicaConnectionPooler']
+        else:
+            spec['enableReplicaConnectionPooler'] = True
+    else:
+        if 'enableReplicaConnectionPooler' in o['spec']:
+            del o['spec']['enableReplicaConnectionPooler']
+
     if 'enableReplicaLoadBalancer' in postgresql['spec']:
         rlb = postgresql['spec']['enableReplicaLoadBalancer']
         if not rlb:

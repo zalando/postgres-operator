@@ -186,6 +186,8 @@ spec:
                 type: string
               enableConnectionPooler:
                 type: boolean
+              enableReplicaConnectionPooler:
+                  type: boolean
               enableLogicalBackup:
                 type: boolean
               enableMasterLoadBalancer:

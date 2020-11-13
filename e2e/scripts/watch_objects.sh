@@ -8,7 +8,9 @@ kubectl get statefulset -o jsonpath='{.items..metadata.annotations.zalando-postg
 echo
 echo
 echo 'Pods'
-kubectl get pods -l application=spilo -l name=postgres-operator -l application=db-connection-pooler -o wide --all-namespaces
+kubectl get pods -l application=spilo -o wide --all-namespaces
+echo
+kubectl get pods -l application=db-connection-pooler -o wide --all-namespaces
 echo
 echo 'Statefulsets'
 kubectl get statefulsets --all-namespaces

@@ -1,19 +1,14 @@
 import json
-import unittest
 import time
-import timeout_decorator
 import subprocess
 import warnings
-import os
-import yaml
 
-from datetime import datetime
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
 
 def to_selector(labels):
-    return ",".join(["=".join(l) for l in labels.items()])
+    return ",".join(["=".join(lbl) for lbl in labels.items()])
 
 
 class K8sApi:
@@ -43,8 +38,8 @@ class K8s:
 
     def __init__(self, labels='x=y', namespace='default'):
         self.api = K8sApi()
-        self.labels=labels
-        self.namespace=namespace
+        self.labels = labels
+        self.namespace = namespace
 
     def get_pg_nodes(self, pg_cluster_name, namespace='default'):
         master_pod_node = ''
@@ -81,7 +76,7 @@ class K8s:
             'default', label_selector='name=postgres-operator'
         ).items
 
-        pods = list(filter(lambda x: x.status.phase=='Running', pods))
+        pods = list(filter(lambda x: x.status.phase == 'Running', pods))
 
         if len(pods):
             return pods[0]
@@ -109,7 +104,6 @@ class K8s:
                 pod_phase = pods[0].status.phase
 
             time.sleep(self.RETRY_TIMEOUT_SEC)
-
 
     def get_service_type(self, svc_labels, namespace='default'):
         svc_type = ''
@@ -213,8 +207,8 @@ class K8s:
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
     def delete_operator_pod(self, step="Delete operator pod"):
-        # patching the pod template in the deployment restarts the operator pod
-        self.api.apps_v1.patch_namespaced_deployment("postgres-operator","default", {"spec":{"template":{"metadata":{"annotations":{"step":"{}-{}".format(step, datetime.fromtimestamp(time.time()))}}}}})
+             # patching the pod template in the deployment restarts the operator pod
+        self.api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", {"spec": {"template": {"metadata": {"annotations": {"step": "{}-{}".format(step, time.time())}}}}})
         self.wait_for_operator_pod_start()
 
     def update_config(self, config_map_patch, step="Updating operator deployment"):
@@ -237,7 +231,7 @@ class K8s:
 
     def get_patroni_state(self, pod):
         r = self.exec_with_kubectl(pod, "patronictl list -f json")
-        if not r.returncode == 0 or not r.stdout.decode()[0:1]=="[":
+        if not r.returncode == 0 or not r.stdout.decode()[0:1] == "[":
             return []
         return json.loads(r.stdout.decode())
 
@@ -248,7 +242,7 @@ class K8s:
         pod = pod.metadata.name
 
         r = self.exec_with_kubectl(pod, "curl localhost:8080/workers/all/status/")
-        if not r.returncode == 0 or not r.stdout.decode()[0:1]=="{":
+        if not r.returncode == 0 or not r.stdout.decode()[0:1] == "{":
             return None
 
         return json.loads(r.stdout.decode())
@@ -277,7 +271,7 @@ class K8s:
         '''
         pod = self.api.core_v1.list_namespaced_pod(
             namespace, label_selector="statefulset.kubernetes.io/pod-name=" + pod_name)
-        
+
         if len(pod.items) == 0:
             return None
         return pod.items[0].spec.containers[0].image
@@ -305,8 +299,8 @@ class K8sBase:
 
     def __init__(self, labels='x=y', namespace='default'):
         self.api = K8sApi()
-        self.labels=labels
-        self.namespace=namespace
+        self.labels = labels
+        self.namespace = namespace
 
     def get_pg_nodes(self, pg_cluster_labels='cluster-name=acid-minimal-cluster', namespace='default'):
         master_pod_node = ''
@@ -434,10 +428,10 @@ class K8sBase:
     def count_pdbs_with_label(self, labels, namespace='default'):
         return len(self.api.policy_v1_beta1.list_namespaced_pod_disruption_budget(
             namespace, label_selector=labels).items)
-  
+
     def count_running_pods(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
-        return len(list(filter(lambda x: x.status.phase=='Running', pods)))
+        return len(list(filter(lambda x: x.status.phase == 'Running', pods)))
 
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
@@ -484,14 +478,14 @@ class K8sBase:
 
     def get_patroni_state(self, pod):
         r = self.exec_with_kubectl(pod, "patronictl list -f json")
-        if not r.returncode == 0 or not r.stdout.decode()[0:1]=="[":
+        if not r.returncode == 0 or not r.stdout.decode()[0:1] == "[":
             return []
         return json.loads(r.stdout.decode())
 
     def get_patroni_running_members(self, pod):
         result = self.get_patroni_state(pod)
-        return list(filter(lambda x: x["State"]=="running", result))
-    
+        return list(filter(lambda x: x["State"] == "running", result))
+
     def get_statefulset_image(self, label_selector="application=spilo,cluster-name=acid-minimal-cluster", namespace='default'):
         ssets = self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=label_selector, limit=1)
         if len(ssets.items) == 0:
@@ -505,7 +499,7 @@ class K8sBase:
         '''
         pod = self.api.core_v1.list_namespaced_pod(
             namespace, label_selector="statefulset.kubernetes.io/pod-name=" + pod_name)
-        
+
         if len(pod.items) == 0:
             return None
         return pod.items[0].spec.containers[0].image
@@ -514,9 +508,12 @@ class K8sBase:
 """
   Inspiriational classes towards easier writing of end to end tests with one cluster per test case
 """
+
+
 class K8sOperator(K8sBase):
     def __init__(self, labels="name=postgres-operator", namespace="default"):
         super().__init__(labels, namespace)
+
 
 class K8sPostgres(K8sBase):
     def __init__(self, labels="cluster-name=acid-minimal-cluster", namespace="default"):

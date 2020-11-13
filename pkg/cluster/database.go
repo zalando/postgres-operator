@@ -473,8 +473,8 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 }
 
 // Creates a connection pool credentials lookup function in every database to
-// perform remote authentification.
-func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
+// perform remote authentication.
+func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string, role PostgresRole) error {
 	var stmtBytes bytes.Buffer
 
 	c.logger.Info("Installing lookup function")
@@ -567,12 +567,11 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 			failedDatabases = append(failedDatabases, dbname)
 			continue
 		}
-
 		c.logger.Infof("pooler lookup function installed into %s", dbname)
 	}
 
 	if len(failedDatabases) == 0 {
-		c.ConnectionPooler.LookupFunction = true
+		c.ConnectionPooler[role].LookupFunction = true
 	}
 
 	return nil
