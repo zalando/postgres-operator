@@ -152,6 +152,7 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
         self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
@@ -165,6 +166,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
+        time.sleep(10)
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
                              "Operator did not succeed in overwriting labels")
@@ -178,6 +180,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
+        time.sleep(10)
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
