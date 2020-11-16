@@ -1,4 +1,4 @@
-name: ubuntu
+name: operator-tests
 
 on: 
   pull_request:
