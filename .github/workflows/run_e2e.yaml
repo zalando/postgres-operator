@@ -1,4 +1,4 @@
-name: ubuntu
+name: operator-e2e-tests
 
 on: 
   pull_request:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   tests:
+    name: End-2-End tests
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
