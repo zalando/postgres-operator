@@ -1,5 +1,9 @@
 # Postgres Operator
 
+![Tests](https://github.com/zalando/postgres-operator/workflows/operator-tests/badge.svg)
+![E2E Tests](https://github.com/zalando/postgres-operator/workflows/operator-e2e-tests/badge.svg)
+[![Coverage Status](https://coveralls.io/repos/github/zalando/postgres-operator/badge.svg?branch=master)](https://coveralls.io/github/zalando/postgres-operator?branch=master)
+
 <img src="docs/diagrams/logo.png" width="200">
 
 The Postgres Operator delivers an easy to run highly-available [PostgreSQL](https://www.postgresql.org/)
