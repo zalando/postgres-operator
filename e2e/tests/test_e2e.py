@@ -166,9 +166,8 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        time.sleep(10)
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
+        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
                              "Operator did not succeed in overwriting labels")
 
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -180,7 +179,6 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        time.sleep(10)
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
