@@ -89,7 +89,6 @@ func (c *Cluster) connectionPoolerLabels(role PostgresRole, moreLabels bool) *me
 			"application":       "db-connection-pooler",
 			"spilo-role":        string(role),
 			"cluster-name":      c.Name,
-			"Namespace":         c.Namespace,
 		})
 	} else {
 		extraLabels = labels.Set(map[string]string{
@@ -293,7 +292,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.connectionPoolerLabels(role, false).MatchLabels,
+			Labels:      c.connectionPoolerLabels(role, true).MatchLabels,
 			Namespace:   c.Namespace,
 			Annotations: c.generatePodAnnotations(spec),
 		},
