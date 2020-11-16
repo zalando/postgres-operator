@@ -165,6 +165,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
                              "Operator did not succeed in overwriting labels")
 
@@ -177,6 +178,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
 
