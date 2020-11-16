@@ -152,8 +152,8 @@ class EndToEndTestCase(unittest.TestCase):
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
-    def test_a_overwrite_pooler_deployment(self):
-        result = self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
+    def test_overwrite_pooler_deployment(self):
+        self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
