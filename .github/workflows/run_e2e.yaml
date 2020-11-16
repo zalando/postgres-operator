@@ -1,0 +1,24 @@
+name: ubuntu
+
+on: 
+  pull_request:
+  push:
+    branches:
+    - master
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-go@v2
+      with:
+          go-version: "^1.15.5"
+    - name: Make dependencies
+      run: make deps
+    - name: Compile
+      run: make linux
+    - name: Run unit tests
+      run: go test ./...
+    - name: Run end-2-end tests
+      run: make e2e
