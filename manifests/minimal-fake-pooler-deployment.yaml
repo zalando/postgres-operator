@@ -6,13 +6,13 @@ metadata:
   labels:
     application: db-connection-pooler
     connection-pooler: acid-minimal-cluster-pooler
-    cluster-name: acid-minimal-cluster
 spec:
   replicas: 1
   selector:
     matchLabels:
       application: db-connection-pooler
       connection-pooler: acid-minimal-cluster-pooler
+      version: acid-minimal-cluster
   template:
     metadata:
       labels:
