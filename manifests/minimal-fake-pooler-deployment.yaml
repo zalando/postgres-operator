@@ -12,7 +12,7 @@ spec:
     matchLabels:
       application: db-connection-pooler
       connection-pooler: acid-minimal-cluster-pooler
-      version: acid-minimal-cluster
+      cluster-name: acid-minimal-cluster
   template:
     metadata:
       labels:
