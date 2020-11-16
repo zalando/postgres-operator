@@ -2,6 +2,7 @@ package v1
 
 import (
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
+	"github.com/zalando/postgres-operator/pkg/util"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -111,8 +112,9 @@ var minDisable = -1.0
 // PostgresCRDResourceValidation to check applied manifest parameters
 var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 	OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
-		Type:     "object",
-		Required: []string{"kind", "apiVersion", "spec"},
+		Type:                   "object",
+		XPreserveUnknownFields: util.True(),
+		Required:               []string{"kind", "apiVersion", "spec"},
 		Properties: map[string]apiextv1.JSONSchemaProps{
 			"kind": {
 				Type: "string",
@@ -411,6 +413,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"12"`),
+									},
+									{
+										Raw: []byte(`"13"`),
 									},
 								},
 							},
@@ -779,8 +784,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 // OperatorConfigCRDResourceValidation to check applied manifest parameters
 var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 	OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
-		Type:     "object",
-		Required: []string{"kind", "apiVersion", "configuration"},
+		Type:                   "object",
+		XPreserveUnknownFields: util.True(),
+		Required:               []string{"kind", "apiVersion", "configuration"},
 		Properties: map[string]apiextv1.JSONSchemaProps{
 			"kind": {
 				Type: "string",
@@ -1394,6 +1400,7 @@ func buildCRD(name, kind, plural, short string, columns []apiextv1.CustomResourc
 				Plural:     plural,
 				ShortNames: []string{short},
 				Kind:       kind,
+				Categories: []string{"all"},
 			},
 			Scope: apiextv1.NamespaceScoped,
 			Versions: []apiextv1.CustomResourceDefinitionVersion{

@@ -15,6 +15,8 @@ spec:
     singular: operatorconfiguration
     shortNames:
     - opconfig
+    categories:
+    - all
   scope: Namespaced
   versions:
   - name: v1
@@ -45,6 +47,7 @@ spec:
     schema:
       openAPIV3Schema:
         type: object
+        x-preserve-unknown-fields: true
         required:
           - kind
           - apiVersion
