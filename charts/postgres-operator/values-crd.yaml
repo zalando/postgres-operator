@@ -136,7 +136,7 @@ configKubernetes:
   # whether the Spilo container should run in privileged mode
   spilo_privileged: false
   # storage resize strategy, available options are: ebs, pvc, off
-  storage_resize_mode: ebs
+  storage_resize_mode: pvc
   # operator watches for postgres objects in the given namespace
   watched_namespace: "*"  # listen to all namespaces
 
@@ -255,6 +255,11 @@ configLogicalBackup:
 configTeamsApi:
   # team_admin_role will have the rights to grant roles coming from PG manifests
   # enable_admin_role_for_users: true
+
+  # operator watches for PostgresTeam CRs to assign additional teams and members to clusters
+  enable_postgres_team_crd: false
+  # toogle to create additional superuser teams from PostgresTeam CRs
+  # enable_postgres_team_crd_superusers: "false"
 
   # toggle to grant superuser to team members created from the Teams API
   enable_team_superuser: false

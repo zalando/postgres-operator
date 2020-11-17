@@ -41,6 +41,8 @@ data:
   enable_master_load_balancer: "false"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
+  # enable_postgres_team_crd: "false"
+  # enable_postgres_team_crd_superusers: "false"
   enable_replica_load_balancer: "false"
   # enable_shm_volume: "true"
   # enable_sidecars: "true"
@@ -105,7 +107,7 @@ data:
   # spilo_runasgroup: 103
   # spilo_fsgroup: 103
   spilo_privileged: "false"
-  # storage_resize_mode: "off"
+  storage_resize_mode: "pvc"
   super_username: postgres
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"

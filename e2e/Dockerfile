@@ -14,6 +14,7 @@ RUN apt-get update \
            python3-setuptools \
            python3-pip \
            curl \
+           vim \
     && pip3 install --no-cache-dir -r requirements.txt \
     && curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.18.0/bin/linux/amd64/kubectl \
     && chmod +x ./kubectl \
@@ -21,4 +22,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["python3", "-m", "unittest", "discover", "--start-directory", ".", "-v"]
+# working line
+# python3 -m unittest discover -v --failfast -k test_e2e.EndToEndTestCase.test_lazy_spilo_upgrade --start-directory tests
+ENTRYPOINT ["python3", "-m", "unittest"]
+CMD ["discover","-v","--failfast","--start-directory","/tests"]

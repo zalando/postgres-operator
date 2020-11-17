@@ -72,7 +72,7 @@ configuration:
     # spilo_runasgroup: 103
     # spilo_fsgroup: 103
     spilo_privileged: false
-    storage_resize_mode: ebs
+    storage_resize_mode: pvc
     # toleration: {}
     # watched_namespace: ""
   postgres_pod_resources:
@@ -122,6 +122,8 @@ configuration:
     enable_database_access: true
   teams_api:
     # enable_admin_role_for_users: true
+    # enable_postgres_team_crd: false
+    # enable_postgres_team_crd_superusers: false
     enable_team_superuser: false
     enable_teams_api: false
     # pam_configuration: ""

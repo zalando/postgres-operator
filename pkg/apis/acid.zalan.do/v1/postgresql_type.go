@@ -29,8 +29,9 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	EnableConnectionPooler *bool             `json:"enableConnectionPooler,omitempty"`
-	ConnectionPooler       *ConnectionPooler `json:"connectionPooler,omitempty"`
+	EnableConnectionPooler        *bool             `json:"enableConnectionPooler,omitempty"`
+	EnableReplicaConnectionPooler *bool             `json:"enableReplicaConnectionPooler,omitempty"`
+	ConnectionPooler              *ConnectionPooler `json:"connectionPooler,omitempty"`
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`

@@ -151,9 +151,14 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   configured (so you can override the operator configuration). Optional.
 
 * **enableConnectionPooler**
-  Tells the operator to create a connection pooler with a database. If this
-  field is true, a connection pooler deployment will be created even if
+  Tells the operator to create a connection pooler with a database for the master
+  service. If this field is true, a connection pooler deployment will be created even if
   `connectionPooler` section is empty. Optional, not set by default.
+
+* **enableReplicaConnectionPooler**
+  Tells the operator to create a connection pooler with a database for the replica
+  service. If this field is true, a connection pooler deployment for replica
+  will be created even if `connectionPooler` section is empty. Optional, not set by default.
 
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
@@ -241,10 +246,10 @@ explanation of `ttl` and `loop_wait` parameters.
 
 * **synchronous_mode**
   Patroni `synchronous_mode` parameter value. The default is set to `false`. Optional.
-  
+
 * **synchronous_mode_strict**
   Patroni `synchronous_mode_strict` parameter value. Can be used in addition to `synchronous_mode`. The default is set to `false`. Optional.
-  
+
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
@@ -397,8 +402,10 @@ CPU and memory limits for the sidecar container.
 
 Parameters are grouped under the `connectionPooler` top-level key and specify
 configuration for connection pooler. If this section is not empty, a connection
-pooler will be created for a database even if `enableConnectionPooler` is not
-present.
+pooler will be created for master service only even if `enableConnectionPooler`
+is not present. But if this section is present then it defines the configuration
+for both master and replica pooler services (if `enableReplicaConnectionPooler`
+ is enabled).
 
 * **numberOfInstances**
   How many instances of connection pooler to create.

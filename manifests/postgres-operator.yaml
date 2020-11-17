@@ -4,6 +4,8 @@ metadata:
   name: postgres-operator
 spec:
   replicas: 1
+  strategy:
+    type: "Recreate"
   selector:
     matchLabels:
       name: postgres-operator

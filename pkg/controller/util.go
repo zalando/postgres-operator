@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -15,6 +15,7 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -30,6 +31,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
 		RestConfig:          c.config.RestConfig,
 		OpConfig:            config.Copy(c.opConfig),
+		PgTeamMap:           c.pgTeamMap,
 		InfrastructureRoles: infrastructureRoles,
 		PodServiceAccount:   c.PodServiceAccount,
 	}
@@ -52,7 +54,7 @@ func (c *Controller) clusterWorkerID(clusterName spec.NamespacedName) uint32 {
 	return c.clusterWorkers[clusterName]
 }
 
-func (c *Controller) createOperatorCRD(crd *apiextv1beta1.CustomResourceDefinition) error {
+func (c *Controller) createOperatorCRD(crd *apiextv1.CustomResourceDefinition) error {
 	if _, err := c.KubeClient.CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
 		if k8sutil.ResourceAlreadyExists(err) {
 			c.logger.Infof("customResourceDefinition %q is already registered and will only be updated", crd.Name)
@@ -80,12 +82,12 @@ func (c *Controller) createOperatorCRD(crd *apiextv1beta1.CustomResourceDefiniti
 
 		for _, cond := range c.Status.Conditions {
 			switch cond.Type {
-			case apiextv1beta1.Established:
-				if cond.Status == apiextv1beta1.ConditionTrue {
+			case apiextv1.Established:
+				if cond.Status == apiextv1.ConditionTrue {
 					return true, err
 				}
-			case apiextv1beta1.NamesAccepted:
-				if cond.Status == apiextv1beta1.ConditionFalse {
+			case apiextv1.NamesAccepted:
+				if cond.Status == apiextv1.ConditionFalse {
 					return false, fmt.Errorf("name conflict: %v", cond.Reason)
 				}
 			}
@@ -339,9 +341,7 @@ func (c *Controller) getInfrastructureRole(
 				util.Coalesce(string(secretData[infraRole.RoleKey]), infraRole.DefaultRoleValue))
 		}
 
-		if roleDescr.Valid() {
-			roles = append(roles, *roleDescr)
-		} else {
+		if !roleDescr.Valid() {
 			msg := "infrastructure role %q is not complete and ignored"
 			c.logger.Warningf(msg, roleDescr)
 
@@ -392,6 +392,37 @@ func (c *Controller) getInfrastructureRole(
 
 	// TODO: check for role collisions
 	return roles, nil
+}
+
+func (c *Controller) loadPostgresTeams() {
+	// reset team map
+	c.pgTeamMap = teams.PostgresTeamMap{}
+
+	pgTeams, err := c.KubeClient.AcidV1ClientSet.AcidV1().PostgresTeams(c.opConfig.WatchedNamespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		c.logger.Errorf("could not list postgres team objects: %v", err)
+	}
+
+	c.pgTeamMap.Load(pgTeams)
+	c.logger.Debugf("Internal Postgres Team Cache: %#v", c.pgTeamMap)
+}
+
+func (c *Controller) postgresTeamAdd(obj interface{}) {
+	pgTeam, ok := obj.(*acidv1.PostgresTeam)
+	if !ok {
+		c.logger.Errorf("could not cast to PostgresTeam spec")
+	}
+	c.logger.Debugf("PostgreTeam %q added. Reloading postgres team CRDs and overwriting cached map", pgTeam.Name)
+	c.loadPostgresTeams()
+}
+
+func (c *Controller) postgresTeamUpdate(prev, obj interface{}) {
+	pgTeam, ok := obj.(*acidv1.PostgresTeam)
+	if !ok {
+		c.logger.Errorf("could not cast to PostgresTeam spec")
+	}
+	c.logger.Debugf("PostgreTeam %q updated. Reloading postgres team CRDs and overwriting cached map", pgTeam.Name)
+	c.loadPostgresTeams()
 }
 
 func (c *Controller) podClusterName(pod *v1.Pod) spec.NamespacedName {
