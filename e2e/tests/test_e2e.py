@@ -1008,6 +1008,11 @@ class EndToEndTestCase(unittest.TestCase):
             patch_node_affinity_config = {
                 "spec": {
                     "nodeAffinity" : {
+                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                            "nodeSelectorTerms": [
+                                {}
+                            ]
+                        }
                     }
                 }
             }
