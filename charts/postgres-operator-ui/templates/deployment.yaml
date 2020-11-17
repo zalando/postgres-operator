@@ -21,6 +21,10 @@ spec:
         team: "acid" # Parameterize?
     spec:
       serviceAccountName: {{ include "postgres-operator-ui.serviceAccountName" . }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{ toYaml .Values.imagePullSecrets | indent 8 }}
+      {{- end }}
       containers:
         - name: "service"
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
