@@ -280,7 +280,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"nodeAffinity": {
 								Type: "object",
-								AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 									Allows: true,
 								},
 							},
@@ -605,7 +605,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					},
 					"nodeAffinity": {
 						Type: "object",
-						AdditionalProperties: &apiextv1beta1.JSONSchemaPropsOrBool{
+						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 							Allows: true,
 						},
 					},
