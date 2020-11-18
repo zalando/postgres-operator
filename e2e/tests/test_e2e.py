@@ -941,18 +941,18 @@ class EndToEndTestCase(unittest.TestCase):
         current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
 
         # label node with environment=postgres
-        body = {
+        node_label_body = {
             "metadata": {
                 "labels": {
-                    "environment": "postgres"
+                    "node-affinity-test": "postgres"
                 }
             }
         }
 
         try:
             # patch current master node with the label
-            print('patching master node: %s', current_master_node)
-            k8s.api.core_v1.patch_node(current_master_node, body)
+            print('patching master node: {}'.format(current_master_node))
+            k8s.api.core_v1.patch_node(current_master_node, node_label_body)
 
             # add node affinity to cluster
             patch_node_affinity_config = {
@@ -963,7 +963,7 @@ class EndToEndTestCase(unittest.TestCase):
                                 {
                                     "matchExpressions": [
                                         {
-                                            "key": "environment",
+                                            "key": "node-affinity-test",
                                             "operator": "In",
                                             "values": [
                                                 "postgres"
@@ -976,6 +976,7 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             }
+
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 group="acid.zalan.do",
                 version="v1",
@@ -987,8 +988,8 @@ class EndToEndTestCase(unittest.TestCase):
             # bounce replica and check if it has migrated to proper node that has a label
             k8s.api.core_v1.delete_namespaced_pod("acid-minimal-cluster-1", "default")
 
-            # wait a little
-            time.sleep(60)
+            # wait for operator to apply node affinity changes
+            time.sleep(120)
 
             podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
             for pod in podsList.items:
@@ -999,21 +1000,14 @@ class EndToEndTestCase(unittest.TestCase):
                     # check that pod has correct node affinity
                     key = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].key
                     value = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].values[0]
-                    self.assertEqual("environment", key,
-                        "Sanity check: expect node selector key to be equal to 'environment' but got {}".format(key))
+                    self.assertEqual("node-affinity-test", key,
+                        "Sanity check: expect node selector key to be equal to 'node-affinity-test' but got {}".format(key))
                     self.assertEqual("postgres", value,
                         "Sanity check: expect node selector value to be equal to 'postgres' but got {}".format(value))
 
-            # remove node affinity and let other tests continue normally
-            patch_node_affinity_config = {
+            patch_node_remove_affinity_config = {
                 "spec": {
-                    "nodeAffinity" : {
-                        "requiredDuringSchedulingIgnoredDuringExecution": {
-                            "nodeSelectorTerms": [
-                                {}
-                            ]
-                        }
-                    }
+                    "nodeAffinity" : None
                 }
             }
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -1022,7 +1016,10 @@ class EndToEndTestCase(unittest.TestCase):
                 namespace="default",
                 plural="postgresqls",
                 name="acid-minimal-cluster",
-                body=patch_node_affinity_config)
+                body=patch_node_remove_affinity_config)
+
+            # wait for operator to apply node affinity changes
+            time.sleep(120)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
