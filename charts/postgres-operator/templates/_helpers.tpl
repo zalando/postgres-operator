@@ -51,3 +51,21 @@ Create chart name and version as used by the chart label.
 {{- define "postgres-operator.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{- define "flattenValuesForConfigMap" }}
+{{- range $key, $value := . }}
+    {{- if or (kindIs "string" $value) (kindIs "int" $value) }}
+{{ $key }}: {{ $value | quote }}
+    {{- end }}
+    {{- if kindIs "slice" $value }}
+{{ $key }}: {{ join "," $value | quote }}
+    {{- end }}
+    {{- if kindIs "map" $value }}
+        {{- $list := list }}
+        {{- range $subKey, $subValue := $value }}
+            {{- $list = append $list (printf "%s:%s" $subKey $subValue) }}
+{{ $key }}: {{ join "," $list | quote }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
