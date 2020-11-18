@@ -987,9 +987,8 @@ class EndToEndTestCase(unittest.TestCase):
 
             # bounce replica and check if it has migrated to proper node that has a label
             k8s.api.core_v1.delete_namespaced_pod("acid-minimal-cluster-1", "default")
-
-            # wait for operator to apply node affinity changes
-            time.sleep(120)
+            # wait for pod to be started
+            k8s.wait_for_pod_start('spilo-role=replica')
 
             podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
             for pod in podsList.items:
@@ -1017,9 +1016,6 @@ class EndToEndTestCase(unittest.TestCase):
                 plural="postgresqls",
                 name="acid-minimal-cluster",
                 body=patch_node_remove_affinity_config)
-
-            # wait for operator to apply node affinity changes
-            time.sleep(120)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
