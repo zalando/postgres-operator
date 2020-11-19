@@ -78,25 +78,18 @@ func needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 // have e.g. different `application` label, so that recreatePod operation will
 // not interfere with it (it lists all the pods via labels, and if there would
 // be no difference, it will recreate also pooler pods).
-func (c *Cluster) connectionPoolerLabels(role PostgresRole, moreLabels bool) *metav1.LabelSelector {
-	connectionPoolerLabels := labels.Set(map[string]string{})
+func (c *Cluster) connectionPoolerLabels(role PostgresRole, spiloRole bool) *metav1.LabelSelector {
+	connectionPoolerLabels := c.labelsSet(false)
 
-	var extraLabels map[string]string
-
-	if moreLabels {
-		extraLabels = labels.Set(map[string]string{
-			"connection-pooler": c.connectionPoolerName(role),
-			"application":       "db-connection-pooler",
-			"spilo-role":        string(role),
-		})
-	} else {
-		extraLabels = labels.Set(map[string]string{
-			"connection-pooler": c.connectionPoolerName(role),
-			"application":       "db-connection-pooler",
-		})
+	extraLabels := map[string]string{
+		"connection-pooler": c.connectionPoolerName(role),
+		"application":       "db-connection-pooler",
 	}
 
-	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, c.labelsSet(false))
+	if spiloRole {
+		extraLabels["spilo-role"] = string(role)
+	}
+
 	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, extraLabels)
 
 	return &metav1.LabelSelector{
@@ -291,7 +284,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.connectionPoolerLabels(role, false).MatchLabels,
+			Labels:      c.connectionPoolerLabels(role, true).MatchLabels,
 			Namespace:   c.Namespace,
 			Annotations: c.generatePodAnnotations(spec),
 		},
@@ -396,7 +389,7 @@ func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPo
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        connectionPooler.Name,
 			Namespace:   connectionPooler.Namespace,
-			Labels:      c.connectionPoolerLabels(connectionPooler.Role, true).MatchLabels,
+			Labels:      c.connectionPoolerLabels(connectionPooler.Role, false).MatchLabels,
 			Annotations: map[string]string{},
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
