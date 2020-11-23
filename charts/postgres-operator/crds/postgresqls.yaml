@@ -194,7 +194,7 @@ spec:
               enableConnectionPooler:
                 type: boolean
               enableReplicaConnectionPooler:
-                  type: boolean
+                type: boolean
               enableLogicalBackup:
                 type: boolean
               enableMasterLoadBalancer:
