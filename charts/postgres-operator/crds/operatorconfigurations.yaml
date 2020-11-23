@@ -47,7 +47,6 @@ spec:
     schema:
       openAPIV3Schema:
         type: object
-        x-preserve-unknown-fields: true
         required:
           - kind
           - apiVersion
@@ -97,7 +96,7 @@ spec:
                 nullable: true
                 items:
                   type: object
-                  additionalProperties: true
+                  x-kubernetes-preserve-unknown-fields: true
               workers:
                 type: integer
                 minimum: 1

@@ -112,9 +112,8 @@ var minDisable = -1.0
 // PostgresCRDResourceValidation to check applied manifest parameters
 var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 	OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
-		Type:                   "object",
-		XPreserveUnknownFields: util.True(),
-		Required:               []string{"kind", "apiVersion", "spec"},
+		Type:     "object",
+		Required: []string{"kind", "apiVersion", "spec"},
 		Properties: map[string]apiextv1.JSONSchemaProps{
 			"kind": {
 				Type: "string",
@@ -136,6 +135,38 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 				Type:     "object",
 				Required: []string{"numberOfInstances", "teamId", "postgresql", "volume"},
 				Properties: map[string]apiextv1.JSONSchemaProps{
+					"additionalVolumes": {
+						Type: "array",
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"name", "mountPath", "volumeSource"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"mountPath": {
+										Type: "string",
+									},
+									"targetContainers": {
+										Type: "array",
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"volumeSource": {
+										Type:                   "object",
+										XPreserveUnknownFields: util.True(),
+									},
+									"subPath": {
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
 					"allowedSourceRanges": {
 						Type:     "array",
 						Nullable: true,
@@ -284,10 +315,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Description: "Deprecated",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Allows: true,
-								},
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
 							},
 						},
 					},
@@ -295,10 +324,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "array",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Allows: true,
-								},
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
 							},
 						},
 					},
@@ -736,37 +763,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
-					"additionalVolumes": {
-						Type: "array",
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:     "object",
-								Required: []string{"name", "mountPath", "volumeSource"},
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"name": {
-										Type: "string",
-									},
-									"mountPath": {
-										Type: "string",
-									},
-									"targetContainers": {
-										Type: "array",
-										Items: &apiextv1.JSONSchemaPropsOrArray{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "string",
-											},
-										},
-									},
-									"volumeSource": {
-										Type: "object",
-									},
-									"subPath": {
-										Type: "string",
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 			"status": {
@@ -784,9 +780,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 // OperatorConfigCRDResourceValidation to check applied manifest parameters
 var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 	OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
-		Type:                   "object",
-		XPreserveUnknownFields: util.True(),
-		Required:               []string{"kind", "apiVersion", "configuration"},
+		Type:     "object",
+		Required: []string{"kind", "apiVersion", "configuration"},
 		Properties: map[string]apiextv1.JSONSchemaProps{
 			"kind": {
 				Type: "string",
@@ -856,10 +851,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "array",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Allows: true,
-								},
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
 							},
 						},
 					},
