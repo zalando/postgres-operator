@@ -156,6 +156,8 @@ class EndToEndTestCase(unittest.TestCase):
     def test_overwrite_pooler_deployment(self):
         self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
+                             "Initial broken deplyment not rolled out")
 
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
