@@ -78,22 +78,22 @@ func needReplicaConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
 // have e.g. different `application` label, so that recreatePod operation will
 // not interfere with it (it lists all the pods via labels, and if there would
 // be no difference, it will recreate also pooler pods).
-func (c *Cluster) connectionPoolerLabels(role PostgresRole, spiloRole bool) *metav1.LabelSelector {
-	connectionPoolerLabels := c.labelsSet(false)
+func (c *Cluster) connectionPoolerLabels(role PostgresRole, addExtraLabels bool) *metav1.LabelSelector {
+	poolerLabels := c.labelsSet(addExtraLabels)
 
-	extraLabels := map[string]string{
-		"connection-pooler": c.connectionPoolerName(role),
-		"application":       "db-connection-pooler",
-	}
+	// TODO should be config values
+	poolerLabels["application"] = "db-connection-pooler"
+	poolerLabels["connection-pooler"] = c.connectionPoolerName(role)
 
-	if spiloRole {
+	if addExtraLabels {
+		extraLabels := map[string]string{}
 		extraLabels["spilo-role"] = string(role)
-	}
 
-	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, extraLabels)
+		poolerLabels = labels.Merge(poolerLabels, extraLabels)
+	}
 
 	return &metav1.LabelSelector{
-		MatchLabels:      connectionPoolerLabels,
+		MatchLabels:      poolerLabels,
 		MatchExpressions: nil,
 	}
 }
