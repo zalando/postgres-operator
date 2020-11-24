@@ -357,6 +357,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
+							"loop_wait": {
+								Type: "integer",
+							},
+							"maximum_lag_on_failover": {
+								Type: "integer",
+							},
 							"pg_hba": {
 								Type: "array",
 								Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -364,6 +370,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "string",
 									},
 								},
+							},
+							"retry_timeout": {
+								Type: "integer",
 							},
 							"slots": {
 								Type: "object",
@@ -378,23 +387,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
-							"ttl": {
-								Type: "integer",
-							},
-							"loop_wait": {
-								Type: "integer",
-							},
-							"retry_timeout": {
-								Type: "integer",
-							},
-							"maximum_lag_on_failover": {
-								Type: "integer",
-							},
 							"synchronous_mode": {
 								Type: "boolean",
 							},
 							"synchronous_mode_strict": {
 								Type: "boolean",
+							},
+							"ttl": {
+								Type: "integer",
 							},
 						},
 					},
