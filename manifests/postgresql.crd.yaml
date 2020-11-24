@@ -338,16 +338,16 @@ spec:
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
                         # Note: the value specified here must not be zero or be higher
                         # than the corresponding limit.
-                  requests:	
-                    type: object	
-                    required:	
-                      - cpu	
-                      - memory	
-                    properties:	
+                  requests:
+                    type: object
+                    required:
+                      - cpu
+                      - memory
+                    properties:
                       cpu:
                         type: string
                         pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                      memory:	
+                      memory:
                         type: string
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
               serviceAnnotations:

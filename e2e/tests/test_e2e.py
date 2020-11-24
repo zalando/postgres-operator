@@ -121,6 +121,7 @@ class EndToEndTestCase(unittest.TestCase):
                          "operatorconfiguration.crd.yaml",
                          "postgresteam.crd.yaml",
                          "configmap.yaml",
+                         "postgresql-operator-default-configuration.yaml",
                          "postgres-operator.yaml",
                          "api-service.yaml",
                          "infrastructure-roles.yaml",
