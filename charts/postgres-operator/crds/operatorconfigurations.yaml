@@ -47,7 +47,6 @@ spec:
     schema:
       openAPIV3Schema:
         type: object
-        x-preserve-unknown-fields: true
         required:
           - kind
           - apiVersion
@@ -97,7 +96,7 @@ spec:
                 nullable: true
                 items:
                   type: object
-                  additionalProperties: true
+                  x-kubernetes-preserve-unknown-fields: true
               workers:
                 type: integer
                 minimum: 1
@@ -275,6 +274,11 @@ spec:
                     type: boolean
                   enable_replica_load_balancer:
                     type: boolean
+                  external_traffic_policy:
+                    type: string
+                    enum:
+                      - "Cluster"
+                      - "Local"
                   master_dns_name_format:
                     type: string
                   replica_dns_name_format:
@@ -330,6 +334,10 @@ spec:
                 properties:
                   enable_admin_role_for_users:
                     type: boolean
+                  enable_postgres_team_crd:
+                    type: boolean
+                  enable_postgres_team_crd_superusers:
+                    type: boolean
                   enable_team_superuser:
                     type: boolean
                   enable_teams_api:
@@ -342,176 +350,15 @@ spec:
                     type: array
                     items:
                       type: string
-                    pod_service_account_name:
+                  protected_role_names:
+                    type: array
+                    items:
                       type: string
-                    pod_terminate_grace_period:
-                      type: string
-                    secret_name_template:
-                      type: string
-                    spilo_fsgroup:
-                      type: integer
-                    spilo_privileged:
-                      type: boolean
-                    toleration:
-                      type: object
-                      additionalProperties:
-                        type: string
-                    watched_namespace:
-                      type: string
-                postgres_pod_resources:
-                  type: object
-                  properties:
-                    default_cpu_limit:
-                      type: string
-                      pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default_cpu_request:
-                      type: string
-                      pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    default_memory_limit:
-                      type: string
-                      pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    default_memory_request:
-                      type: string
-                      pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                timeouts:
-                  type: object
-                  properties:
-                    pod_label_wait_timeout:
-                      type: string
-                    pod_deletion_wait_timeout:
-                      type: string
-                    ready_wait_interval:
-                      type: string
-                    ready_wait_timeout:
-                      type: string
-                    resource_check_interval:
-                      type: string
-                    resource_check_timeout:
-                      type: string
-                load_balancer:
-                  type: object
-                  properties:
-                    custom_service_annotations:
-                      type: object
-                      additionalProperties:
-                        type: string
-                    db_hosted_zone:
-                      type: string
-                    enable_master_load_balancer:
-                      type: boolean
-                    enable_replica_load_balancer:
-                      type: boolean
-                    external_traffic_policy:
-                      type: string
-                      enum:
-                        - "Cluster"
-                        - "Local"
-                    master_dns_name_format:
-                      type: string
-                    replica_dns_name_format:
-                      type: string
-                aws_or_gcp:
-                  type: object
-                  properties:
-                    additional_secret_mount:
-                      type: string
-                    additional_secret_mount_path:
-                      type: string
-                    aws_region:
-                      type: string
-                    kube_iam_role:
-                      type: string
-                    log_s3_bucket:
-                      type: string
-                    wal_s3_bucket:
-                      type: string
-                logical_backup:
-                  type: object
-                  properties:
-                    logical_backup_schedule:
-                      type: string
-                      pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
-                    logical_backup_docker_image:
-                      type: string
-                    logical_backup_s3_bucket:
-                      type: string
-                    logical_backup_s3_endpoint:
-                      type: string
-                    logical_backup_s3_sse:
-                      type: string
-                    logical_backup_s3_access_key_id:
-                      type: string
-                    logical_backup_s3_secret_access_key:
-                      type: string
-                debug:
-                  type: object
-                  properties:
-                    debug_logging:
-                      type: boolean
-                    enable_database_access:
-                      type: boolean
-                teams_api:
-                  type: object
-                  properties:
-                    enable_admin_role_for_users:
-                      type: boolean
-                    enable_postgres_team_crd:
-                      type: boolean
-                    enable_postgres_team_crd_superusers:
-                      type: boolean
-                    enable_team_superuser:
-                      type: boolean
-                    enable_teams_api:
-                      type: boolean
-                    pam_configuration:
-                      type: string
-                    pam_role_name:
-                      type: string
-                    postgres_superuser_teams:
-                      type: array
-                      items:
-                        type: string
-                    protected_role_names:
-                      type: array
-                      items:
-                        type: string
-                    team_admin_role:
-                      type: string
-                    team_api_role_configuration:
-                      type: object
-                      additionalProperties:
-                        type: string
-                    teams_api_url:
-                      type: string
-                logging_rest_api:
-                  type: object
-                  properties:
-                    api_port:
-                      type: integer
-                    cluster_history_entries:
-                      type: integer
-                    ring_log_lines:
-                      type: integer
-                scalyr:
-                  type: object
-                  properties:
-                    scalyr_api_key:
-                      type: string
-                    scalyr_cpu_limit:
-                      type: string
-                      pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    scalyr_cpu_request:
-                      type: string
-                      pattern: '^(\d+m|\d+(\.\d{1,3})?)$'
-                    scalyr_image:
-                      type: string
-                    scalyr_memory_limit:
-                      type: string
-                      pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    scalyr_memory_request:
-                      type: string
-                      pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
-                    scalyr_server_url:
+                  team_admin_role:
+                    type: string
+                  team_api_role_configuration:
+                    type: object
+                    additionalProperties:
                       type: string
                   teams_api_url:
                     type: string
