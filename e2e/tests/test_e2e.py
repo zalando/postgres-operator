@@ -117,6 +117,8 @@ class EndToEndTestCase(unittest.TestCase):
             yaml.dump(configmap, f, Dumper=yaml.Dumper)
 
         for filename in ["operator-service-account-rbac.yaml",
+                         "postgresql.crd.yaml",
+                         "operatorconfiguration.crd.yaml",
                          "postgresteam.crd.yaml",
                          "configmap.yaml",
                          "postgres-operator.yaml",
