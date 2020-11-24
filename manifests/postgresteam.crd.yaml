@@ -11,6 +11,8 @@ spec:
     singular: postgresteam
     shortNames:
     - pgteam
+    categories:
+    - all
   scope: Namespaced
   versions:
   - name: v1

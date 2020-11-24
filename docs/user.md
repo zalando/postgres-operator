@@ -807,11 +807,17 @@ manifest:
 ```yaml
 spec:
   enableConnectionPooler: true
+  enableReplicaConnectionPooler: true
 ```
 
 This will tell the operator to create a connection pooler with default
 configuration, through which one can access the master via a separate service
-`{cluster-name}-pooler`. In most of the cases the
+`{cluster-name}-pooler`. With the first option, connection pooler for master service
+is created and with the second option, connection pooler for replica is created.
+Note that both of these flags are independent of each other and user can set or
+unset any of them as per their requirements without any effect on the other.
+
+In most of the cases the
 [default configuration](reference/operator_parameters.md#connection-pooler-configuration)
 should be good enough. To configure a new connection pooler individually for
 each Postgres cluster, specify:

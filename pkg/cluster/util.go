@@ -449,28 +449,6 @@ func (c *Cluster) labelsSelector() *metav1.LabelSelector {
 	}
 }
 
-// Return connection pooler labels selector, which should from one point of view
-// inherit most of the labels from the cluster itself, but at the same time
-// have e.g. different `application` label, so that recreatePod operation will
-// not interfere with it (it lists all the pods via labels, and if there would
-// be no difference, it will recreate also pooler pods).
-func (c *Cluster) connectionPoolerLabelsSelector() *metav1.LabelSelector {
-	connectionPoolerLabels := labels.Set(map[string]string{})
-
-	extraLabels := labels.Set(map[string]string{
-		"connection-pooler": c.connectionPoolerName(),
-		"application":       "db-connection-pooler",
-	})
-
-	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, c.labelsSet(false))
-	connectionPoolerLabels = labels.Merge(connectionPoolerLabels, extraLabels)
-
-	return &metav1.LabelSelector{
-		MatchLabels:      connectionPoolerLabels,
-		MatchExpressions: nil,
-	}
-}
-
 func (c *Cluster) roleLabelsSet(shouldAddExtraLabels bool, role PostgresRole) labels.Set {
 	lbls := c.labelsSet(shouldAddExtraLabels)
 	lbls[c.OpConfig.PodRoleLabel] = string(role)
@@ -551,18 +529,6 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 
 	// otherwise, follow the operator configuration
 	return c.OpConfig.KubernetesUseConfigMaps
-}
-
-func (c *Cluster) needConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	if spec.EnableConnectionPooler == nil {
-		return spec.ConnectionPooler != nil
-	} else {
-		return *spec.EnableConnectionPooler
-	}
-}
-
-func (c *Cluster) needConnectionPooler() bool {
-	return c.needConnectionPoolerWorker(&c.Spec)
 }
 
 // Earlier arguments take priority

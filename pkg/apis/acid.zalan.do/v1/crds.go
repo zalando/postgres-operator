@@ -2,6 +2,7 @@ package v1
 
 import (
 	acidzalando "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do"
+	"github.com/zalando/postgres-operator/pkg/util"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -134,6 +135,38 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 				Type:     "object",
 				Required: []string{"numberOfInstances", "teamId", "postgresql", "volume"},
 				Properties: map[string]apiextv1.JSONSchemaProps{
+					"additionalVolumes": {
+						Type: "array",
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"name", "mountPath", "volumeSource"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"name": {
+										Type: "string",
+									},
+									"mountPath": {
+										Type: "string",
+									},
+									"targetContainers": {
+										Type: "array",
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type: "string",
+											},
+										},
+									},
+									"volumeSource": {
+										Type:                   "object",
+										XPreserveUnknownFields: util.True(),
+									},
+									"subPath": {
+										Type: "string",
+									},
+								},
+							},
+						},
+					},
 					"allowedSourceRanges": {
 						Type:     "array",
 						Nullable: true,
@@ -262,6 +295,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enableConnectionPooler": {
 						Type: "boolean",
 					},
+					"enableReplicaConnectionPooler": {
+						Type: "boolean",
+					},
 					"enableLogicalBackup": {
 						Type: "boolean",
 					},
@@ -279,10 +315,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Description: "Deprecated",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Allows: true,
-								},
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
 							},
 						},
 					},
@@ -290,10 +324,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "array",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Allows: true,
-								},
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
 							},
 						},
 					},
@@ -325,6 +357,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
+							"loop_wait": {
+								Type: "integer",
+							},
+							"maximum_lag_on_failover": {
+								Type: "integer",
+							},
 							"pg_hba": {
 								Type: "array",
 								Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -332,6 +370,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "string",
 									},
 								},
+							},
+							"retry_timeout": {
+								Type: "integer",
 							},
 							"slots": {
 								Type: "object",
@@ -346,23 +387,14 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
-							"ttl": {
-								Type: "integer",
-							},
-							"loop_wait": {
-								Type: "integer",
-							},
-							"retry_timeout": {
-								Type: "integer",
-							},
-							"maximum_lag_on_failover": {
-								Type: "integer",
-							},
 							"synchronous_mode": {
 								Type: "boolean",
 							},
 							"synchronous_mode_strict": {
 								Type: "boolean",
+							},
+							"ttl": {
+								Type: "integer",
 							},
 						},
 					},
@@ -408,6 +440,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 									{
 										Raw: []byte(`"12"`),
+									},
+									{
+										Raw: []byte(`"13"`),
 									},
 								},
 							},
@@ -728,37 +763,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
-					"additionalVolumes": {
-						Type: "array",
-						Items: &apiextv1.JSONSchemaPropsOrArray{
-							Schema: &apiextv1.JSONSchemaProps{
-								Type:     "object",
-								Required: []string{"name", "mountPath", "volumeSource"},
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"name": {
-										Type: "string",
-									},
-									"mountPath": {
-										Type: "string",
-									},
-									"targetContainers": {
-										Type: "array",
-										Items: &apiextv1.JSONSchemaPropsOrArray{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "string",
-											},
-										},
-									},
-									"volumeSource": {
-										Type: "object",
-									},
-									"subPath": {
-										Type: "string",
-									},
-								},
-							},
-						},
-					},
 				},
 			},
 			"status": {
@@ -847,10 +851,8 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "array",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Allows: true,
-								},
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
 							},
 						},
 					},
@@ -1391,6 +1393,7 @@ func buildCRD(name, kind, plural, short string, columns []apiextv1.CustomResourc
 				Plural:     plural,
 				ShortNames: []string{short},
 				Kind:       kind,
+				Categories: []string{"all"},
 			},
 			Scope: apiextv1.NamespaceScoped,
 			Versions: []apiextv1.CustomResourceDefinitionVersion{

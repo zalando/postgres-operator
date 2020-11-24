@@ -532,6 +532,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableReplicaConnectionPooler != nil {
+		in, out := &in.EnableReplicaConnectionPooler, &out.EnableReplicaConnectionPooler
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ConnectionPooler != nil {
 		in, out := &in.ConnectionPooler, &out.ConnectionPooler
 		*out = new(ConnectionPooler)
