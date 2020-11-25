@@ -536,6 +536,7 @@ func (c *Cluster) generatePodTemplate(
 	spiloRunAsGroup *int64,
 	spiloFSGroup *int64,
 	nodeAffinity *v1.Affinity,
+	schedulerName *string,
 	terminateGracePeriod int64,
 	podServiceAccountName string,
 	kubeIAMRole string,
@@ -572,6 +573,10 @@ func (c *Cluster) generatePodTemplate(
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
 		SecurityContext:               &securityContext,
+	}
+
+	if schedulerName != nil {
+		podSpec.SchedulerName = *schedulerName
 	}
 
 	if shmVolume != nil && *shmVolume {
@@ -1187,6 +1192,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveRunAsGroup,
 		effectiveFSGroup,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		spec.SchedulerName,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
@@ -1888,6 +1894,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		nil,
 		nil,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		nil,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
