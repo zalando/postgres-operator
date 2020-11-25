@@ -118,6 +118,9 @@ Those are top-level keys, containing both leaf keys and groups.
   This option is global for an operator object, and can be overwritten by
   `enableShmVolume` parameter from Postgres manifest. The default is `true`.
 
+* **enable_pgversion_env_var**
+  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. This option instructs operator if the newer way of specifying the version is to be used. Using both ways produces identical results. However, the newer way may break old Spilo images. Use at your own discretion. The default is `false`.
+
 * **workers**
   number of working routines the operator spawns to process requests to
   create/update/delete/sync clusters concurrently. The default is `4`.
