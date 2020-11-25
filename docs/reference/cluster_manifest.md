@@ -65,6 +65,10 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   custom Docker image that overrides the **docker_image** operator parameter.
   It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
+* **schedulerName**
+  specifies the scheduling profile for database pods. If no value is provided
+  K8s' `default-scheduler` will be used. Optional.
+
 * **spiloRunAsUser**
   sets the user ID which should be used in the container to run the process.
   This must be set to run the container without root. By default the container

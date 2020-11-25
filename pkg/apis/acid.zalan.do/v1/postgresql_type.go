@@ -60,6 +60,7 @@ type PostgresSpec struct {
 	ClusterName           string                      `json:"-"`
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
+	SchedulerName         *string                     `json:"schedulerName,omitempty"`
 	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
 	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
 	InitContainers        []v1.Container              `json:"initContainers,omitempty"`

@@ -350,6 +350,8 @@ spec:
                       memory:
                         type: string
                         pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
+              schedulerName:
+                type: string
               serviceAnnotations:
                 type: object
                 additionalProperties:
