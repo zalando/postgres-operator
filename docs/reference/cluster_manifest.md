@@ -66,7 +66,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
 * **schedulerName**
-  specifies the scheduling profile for pods. If no value is provided
+  specifies the scheduling profile for database pods. If no value is provided
   K8s' `default-scheduler` will be used. Optional.
 
 * **spiloRunAsUser**
