@@ -301,8 +301,12 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 
 		envVars = append(
 			envVars,
-			v1.EnvVar{Name: "TLS_CRT", Value: filepath.Join("/tls", crtFile)},
-			v1.EnvVar{Name: "TLS_KEY", Value: filepath.Join("/tls", keyFile)},
+			v1.EnvVar{
+				Name: "CONNECTION_POOLER_CLIENT_TLS_CRT", Value: filepath.Join("/tls", crtFile),
+			},
+			v1.EnvVar{
+				Name: "CONNECTION_POOLER_CLIENT_TLS_KEY", Value: filepath.Join("/tls", keyFile),
+			},
 		)
 
 		// Volume
