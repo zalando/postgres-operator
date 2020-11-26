@@ -66,7 +66,7 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			patroni:  &acidv1.Patroni{},
 			role:     "zalandos",
 			opConfig: config.Config{},
-			result:   `{"postgresql":{},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/9.6/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
@@ -88,12 +88,12 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 			},
 			role:     "zalandos",
 			opConfig: config.Config{},
-			result:   `{"postgresql":{"pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin", "pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
 		},
 	}
 	for _, tt := range tests {
 		cluster.OpConfig = tt.opConfig
-		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.role, logger, false)
+		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.role, false, logger)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -119,17 +119,17 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	expectedValuesGSBucket := []ExpectedValue{
 		ExpectedValue{
-			envIndex:       16,
+			envIndex:       15,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
 		ExpectedValue{
-			envIndex:       17,
+			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
 		ExpectedValue{
-			envIndex:       18,
+			envIndex:       17,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
@@ -137,22 +137,22 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	expectedValuesGCPCreds := []ExpectedValue{
 		ExpectedValue{
-			envIndex:       16,
+			envIndex:       15,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
 		ExpectedValue{
-			envIndex:       17,
+			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
 		ExpectedValue{
-			envIndex:       18,
+			envIndex:       17,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 		ExpectedValue{
-			envIndex:       19,
+			envIndex:       18,
 			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
 			envVarValue:    "some_path_to_credentials",
 		},
