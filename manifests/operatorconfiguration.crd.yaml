@@ -65,6 +65,8 @@ spec:
                 type: boolean
               enable_lazy_spilo_upgrade:
                 type: boolean
+              enable_pgversion_env_var:
+                type: boolean
               enable_shm_volume:
                 type: boolean
               etcd_host:
