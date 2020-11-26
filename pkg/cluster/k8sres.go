@@ -189,7 +189,7 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 	return requests, nil
 }
 
-func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, logger *logrus.Entry, EnablePgVersionEnvVar bool) (string, error) {
+func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, EnablePgVersionEnvVar bool, logger *logrus.Entry) (string, error) {
 	config := spiloConfiguration{}
 
 	config.Bootstrap = pgBootstrap{}
@@ -1022,7 +1022,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 	}
 
-	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger, c.OpConfig.EnablePgVersionEnvVar)
+	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.OpConfig.EnablePgVersionEnvVar, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
 	}
