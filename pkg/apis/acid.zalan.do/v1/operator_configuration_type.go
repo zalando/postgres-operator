@@ -167,7 +167,7 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
-// Defines default configuration for connection pooler
+// ConnectionPoolerConfiguration defines default configuration for connection pooler
 type ConnectionPoolerConfiguration struct {
 	NumberOfInstances    *int32 `json:"connection_pooler_number_of_instances,omitempty"`
 	Schema               string `json:"connection_pooler_schema,omitempty"`
@@ -197,6 +197,7 @@ type OperatorLogicalBackupConfiguration struct {
 type OperatorConfigurationData struct {
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`

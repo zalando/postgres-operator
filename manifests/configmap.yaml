@@ -45,6 +45,7 @@ data:
   # enable_postgres_team_crd_superusers: "false"
   enable_replica_load_balancer: "false"
   # enable_shm_volume: "true"
+  # enable_pgversion_env_var: "false"
   # enable_sidecars: "true"
   # enable_team_superuser: "false"
   enable_teams_api: "false"
