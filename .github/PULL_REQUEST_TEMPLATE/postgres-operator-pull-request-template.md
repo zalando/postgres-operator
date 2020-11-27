@@ -1,3 +1,13 @@
+## Problem description
+
+
+
+## Linked issues
+
+
+
+## Checklist
+
 Thanks for submitting a pull request to the Postgres Operator project.
 Please, ensure your contribution matches the following items:
 
