@@ -482,7 +482,7 @@ func (c *Cluster) syncSecrets() error {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
 			if secretUsername != string(secret.Data["username"]) {
-				c.logger.Warningf("secret %s does not contain the role %q", secretSpec.Name, secretUsername)
+				c.logger.Errorf("secret %s does not contain the role %q", secretSpec.Name, secretUsername)
 				continue
 			}
 			c.Secrets[secret.UID] = secret
