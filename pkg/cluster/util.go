@@ -549,3 +549,13 @@ func mergeContainers(containers ...[]v1.Container) ([]v1.Container, []string) {
 	}
 	return result, conflicts
 }
+
+// Get env key's value from env list
+func getEnvValue(envKey string, customPodEnvVarsList []v1.EnvVar) string {
+	for _, customEnvVar := range customPodEnvVarsList {
+		if customEnvVar.Name == envKey {
+			return customEnvVar.Value
+		}
+	}
+	return ""
+}

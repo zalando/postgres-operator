@@ -741,7 +741,6 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 	}
 
 	if c.OpConfig.WALES3Bucket != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
@@ -760,6 +759,13 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+	}
+
+	// Get WAL_S3_BUCKET env var from customPodEnvVarsList, if present. Priority to be given to customPodEnvVarsList
+	if getEnvValue("WAL_S3_BUCKET", customPodEnvVarsList) != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: getEnvValue("WAL_S3_BUCKET", customPodEnvVarsList)})
+	} else if c.OpConfig.WALES3Bucket != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 	}
 
 	return envVars
@@ -1857,7 +1863,15 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		return nil, fmt.Errorf("could not generate resource requirements for logical backup pods: %v", err)
 	}
 
-	envVars := c.generateLogicalBackupPodEnvVars()
+	// fetch env vars from custom ConfigMap
+	customPodEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(customPodEnvVarsList,
+		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
+
+	envVars := deduplicateEnvVars(c.generateLogicalBackupPodEnvVars(customPodEnvVarsList), c.containerName(), c.logger)
 	logicalBackupContainer := generateContainer(
 		"logical-backup",
 		&c.OpConfig.LogicalBackup.LogicalBackupDockerImage,
@@ -1952,7 +1966,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 	return cronJob, nil
 }
 
-func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
+func (c *Cluster) generateLogicalBackupPodEnvVars(customPodEnvVarsList []v1.EnvVar) []v1.EnvVar {
 
 	envVars := []v1.EnvVar{
 		{
@@ -1973,10 +1987,6 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			},
 		},
 		// Bucket env vars
-		{
-			Name:  "LOGICAL_BACKUP_S3_BUCKET",
-			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
-		},
 		{
 			Name:  "LOGICAL_BACKUP_S3_REGION",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Region,
@@ -2025,6 +2035,13 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 				},
 			},
 		},
+	}
+
+	// Get LOGICAL_BACKUP_S3_BUCKET env var from customPodEnvVarsList, if present. Priority to be given to customPodEnvVarsList
+	if getEnvValue("LOGICAL_BACKUP_S3_BUCKET", customPodEnvVarsList) != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_S3_BUCKET", Value: getEnvValue("LOGICAL_BACKUP_S3_BUCKET", customPodEnvVarsList)})
+	} else if c.OpConfig.LogicalBackup.LogicalBackupS3Bucket != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "LOGICAL_BACKUP_S3_BUCKET", Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket})
 	}
 
 	if c.OpConfig.LogicalBackup.LogicalBackupS3AccessKeyID != "" {
