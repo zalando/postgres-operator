@@ -276,6 +276,8 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 // when listing k8s objects. See operator PR #252
 func (c *Cluster) annotationsSet(annotations map[string]string) map[string]string {
 
+	var result map[string]string
+
 	// allow to inherit certain labels from the 'postgres' object
 	if spec, err := c.GetSpec(); err == nil {
 		for k, v := range spec.ObjectMeta.Annotations {
@@ -289,7 +291,11 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 		c.logger.Warningf("could not get the list of InheritedAnnoations for cluster %q: %v", c.Name, err)
 	}
 
-	return annotations
+	if len(annotations) > 0 {
+		result = annotations
+	}
+
+	return result
 }
 
 func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
