@@ -202,6 +202,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.InheritedAnnotations != nil {
+		in, out := &in.InheritedAnnotations, &out.InheritedAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.DownscalerAnnotations != nil {
 		in, out := &in.DownscalerAnnotations, &out.DownscalerAnnotations
 		*out = make([]string, len(*in))
@@ -623,6 +628,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
+	if in.SchedulerName != nil {
+		in, out := &in.SchedulerName, &out.SchedulerName
+		*out = new(string)
+		**out = **in
+	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]corev1.Toleration, len(*in))
@@ -686,11 +696,6 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-	}
-	if in.SchedulerName != nil {
-		in, out := &in.SchedulerName, &out.SchedulerName
-		*out = new(string)
-		**out = **in
 	}
 	return
 }

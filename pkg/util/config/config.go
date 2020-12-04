@@ -36,6 +36,7 @@ type Resources struct {
 	SpiloPrivileged         bool                `name:"spilo_privileged" default:"false"`
 	ClusterLabels           map[string]string   `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels         []string            `name:"inherited_labels" default:""`
+	InheritedAnnotations    []string            `name:"inherited_annotations" default:""`
 	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
 	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
 	DeleteAnnotationDateKey string              `name:"delete_annotation_date_key"`

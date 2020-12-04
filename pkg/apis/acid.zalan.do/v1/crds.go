@@ -963,6 +963,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
+							"inherited_annotations": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
 							"inherited_labels": {
 								Type: "array",
 								Items: &apiextv1.JSONSchemaPropsOrArray{
@@ -1400,7 +1408,7 @@ func buildCRD(name, kind, plural, short string, columns []apiextv1.CustomResourc
 			},
 			Scope: apiextv1.NamespaceScoped,
 			Versions: []apiextv1.CustomResourceDefinitionVersion{
-				apiextv1.CustomResourceDefinitionVersion{
+				{
 					Name:    SchemeGroupVersion.Version,
 					Served:  true,
 					Storage: true,

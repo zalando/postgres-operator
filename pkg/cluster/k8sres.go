@@ -1180,8 +1180,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
-		// TODO c.annotationsSet(annotations),
-		annotations,
+		c.annotationsSet(annotations),
 		spiloContainer,
 		initContainers,
 		sidecarContainers,
@@ -1232,11 +1231,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.statefulSetName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
-			// TODO Annotations: c.annotationsSet(c.AnnotationsToPropagate(annotations)),
-			Annotations: c.AnnotationsToPropagate(annotations),
+			Name:        c.statefulSetName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(c.AnnotationsToPropagate(annotations)),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -1529,10 +1527,10 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	username := pgUser.Name
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.credentialSecretName(username),
-			Namespace: namespace,
-			Labels:    c.labelsSet(true),
-			// TODO Annotations: c.annotationsSet(map[string]string{}),
+			Name:        c.credentialSecretName(username),
+			Namespace:   namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(map[string]string{}),
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -1603,11 +1601,10 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.serviceName(role),
-			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(true, role),
-			// TODO Annotations: c.annotationsSet(c.generateServiceAnnotations(role, spec)),
-			Annotations: c.generateServiceAnnotations(role, spec),
+			Name:        c.serviceName(role),
+			Namespace:   c.Namespace,
+			Labels:      c.roleLabelsSet(true, role),
+			Annotations: c.annotationsSet(c.generateServiceAnnotations(role, spec)),
 		},
 		Spec: serviceSpec,
 	}
@@ -1654,10 +1651,10 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.endpointName(role),
-			Namespace: c.Namespace,
-			Labels:    c.roleLabelsSet(true, role),
-			// TODO Annotations: c.annotationsSet(map[string]string{}),
+			Name:        c.endpointName(role),
+			Namespace:   c.Namespace,
+			Labels:      c.roleLabelsSet(true, role),
+			Annotations: c.annotationsSet(map[string]string{}),
 		},
 	}
 	if len(subsets) > 0 {
@@ -1811,10 +1808,10 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 
 	return &policybeta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.podDisruptionBudgetName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
-			// TODO Annotations: c.annotationsSet(map[string]string{}),
+			Name:        c.podDisruptionBudgetName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(map[string]string{}),
 		},
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
@@ -1934,10 +1931,10 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	cronJob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.getLogicalBackupJobName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
-			// TODO Annotations: c.annotationsSet(map[string]string{}),
+			Name:        c.getLogicalBackupJobName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(map[string]string{}),
 		},
 		Spec: batchv1beta1.CronJobSpec{
 			Schedule:          schedule,

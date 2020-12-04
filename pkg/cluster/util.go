@@ -271,6 +271,27 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	return members, nil
 }
 
+// Returns annotations used to create or list k8s objects such as pods
+// For backward compatibility, shouldAddExtraLabels must be false
+// when listing k8s objects. See operator PR #252
+func (c *Cluster) annotationsSet(annotations map[string]string) map[string]string {
+
+	// allow to inherit certain labels from the 'postgres' object
+	if spec, err := c.GetSpec(); err == nil {
+		for k, v := range spec.ObjectMeta.Annotations {
+			for _, match := range c.OpConfig.InheritedAnnotations {
+				if k == match {
+					annotations[k] = v
+				}
+			}
+		}
+	} else {
+		c.logger.Warningf("could not get the list of InheritedAnnoations for cluster %q: %v", c.Name, err)
+	}
+
+	return annotations
+}
+
 func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {

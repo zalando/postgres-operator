@@ -49,6 +49,8 @@ configuration:
     # - secretname: "other-infrastructure-role"
     #   userkey: "other-user-key"
     #   passwordkey: "other-password-key"
+    # inherited_annotations:
+    # - owned-by
     # inherited_labels:
     # - application
     # - environment

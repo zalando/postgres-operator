@@ -66,6 +66,7 @@ type KubernetesMetaConfiguration struct {
 	PodRoleLabel                           string                       `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string            `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
+	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`
 	DownscalerAnnotations                  []string                     `json:"downscaler_annotations,omitempty"`
 	ClusterNameLabel                       string                       `json:"cluster_name_label,omitempty"`
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
@@ -167,7 +168,7 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
-// Defines default configuration for connection pooler
+// ConnectionPoolerConfiguration defines default configuration for connection pooler
 type ConnectionPoolerConfiguration struct {
 	NumberOfInstances    *int32 `json:"connection_pooler_number_of_instances,omitempty"`
 	Schema               string `json:"connection_pooler_schema,omitempty"`
