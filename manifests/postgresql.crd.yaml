@@ -398,15 +398,18 @@ spec:
                   preferredDuringSchedulingIgnoredDuringExecution:
                     type: array
                     items:
+                      type: object
                       required:
                       - weight
                       - preference
                       properties:
                         preference:
+                          type: object
                           properties:
                             matchExpressions:
                               type: array
                               items:
+                                type: object
                                 required:
                                 - key
                                 - operator
@@ -422,6 +425,7 @@ spec:
                             matchFields:
                               type: array
                               items:
+                                type: object
                                 required:
                                 - key
                                 - operator
@@ -438,16 +442,19 @@ spec:
                           format: int32
                           type: integer
                   requiredDuringSchedulingIgnoredDuringExecution:
+                    type: object
                     required:
                     - nodeSelectorTerms
                     properties:
                       nodeSelectorTerms:
                         type: array
                         items:
+                          type: object
                           properties:
                             matchExpressions:
                               type: array
                               items:
+                                type: object
                                 required:
                                 - key
                                 - operator
@@ -463,6 +470,7 @@ spec:
                             matchFields:
                               type: array
                               items:
+                                type: object
                                 required:
                                 - key
                                 - operator
