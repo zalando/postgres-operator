@@ -443,12 +443,6 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
-	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Affinity.NodeAffinity, statefulSet.Spec.Template.Spec.Affinity.NodeAffinity) {
-		needsReplace = true
-		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's NodeAffinity doesn't match the current one")
-	}
-
 	// we assume any change in priority happens by rolling out a new priority class
 	// changing the priority value in an existing class is not supproted
 	if c.Statefulset.Spec.Template.Spec.PriorityClassName != statefulSet.Spec.Template.Spec.PriorityClassName {
