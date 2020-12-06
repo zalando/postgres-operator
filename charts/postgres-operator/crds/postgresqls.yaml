@@ -396,6 +396,89 @@ spec:
                     type: string
                   caSecretName:
                     type: string
+              nodeAffinity:
+                type: object
+                properties:
+                  preferredDuringSchedulingIgnoredDuringExecution:
+                    type: array
+                    items:
+                      required:
+                      - weight
+                      - preference
+                      properties:
+                        preference:
+                          properties:
+                            matchExpressions:
+                              type: array
+                              items:
+                                required:
+                                - key
+                                - operator
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    type: array
+                                    items:
+                                      type: string
+                            matchFields:
+                              type: array
+                              items:
+                                required:
+                                - key
+                                - operator
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    type: array
+                                    items:
+                                      type: string
+                        weight:
+                          format: int32
+                          type: integer
+                  requiredDuringSchedulingIgnoredDuringExecution:
+                    required:
+                    - nodeSelectorTerms
+                    properties:
+                      nodeSelectorTerms:
+                        type: array
+                        items:
+                          properties:
+                            matchExpressions:
+                              type: array
+                              items:
+                                required:
+                                - key
+                                - operator
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    type: array
+                                    items:
+                                      type: string
+                            matchFields:
+                              type: array
+                              items:
+                                required:
+                                - key
+                                - operator
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    type: array
+                                    items:
+                                      type: string
               tolerations:
                 type: array
                 items:
