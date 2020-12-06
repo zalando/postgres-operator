@@ -16,7 +16,8 @@ echo 'Statefulsets'
 kubectl get statefulsets --all-namespaces
 echo
 echo 'Deployments'
-kubectl get deployments --all-namespaces -l application=db-connection-pooler -l name=postgres-operator
+kubectl get deployments --all-namespaces -l application=db-connection-pooler
+kubectl get deployments --all-namespaces -l application=postgres-operator
 echo
 echo
 echo 'Step from operator deployment'

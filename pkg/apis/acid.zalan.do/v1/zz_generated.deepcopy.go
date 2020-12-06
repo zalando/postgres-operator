@@ -532,6 +532,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableReplicaConnectionPooler != nil {
+		in, out := &in.EnableReplicaConnectionPooler, &out.EnableReplicaConnectionPooler
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ConnectionPooler != nil {
 		in, out := &in.ConnectionPooler, &out.ConnectionPooler
 		*out = new(ConnectionPooler)
@@ -681,6 +686,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.SchedulerName != nil {
+		in, out := &in.SchedulerName, &out.SchedulerName
+		*out = new(string)
+		**out = **in
 	}
 	return
 }

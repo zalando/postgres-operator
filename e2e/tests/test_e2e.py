@@ -117,8 +117,11 @@ class EndToEndTestCase(unittest.TestCase):
             yaml.dump(configmap, f, Dumper=yaml.Dumper)
 
         for filename in ["operator-service-account-rbac.yaml",
+                         "postgresql.crd.yaml",
+                         "operatorconfiguration.crd.yaml",
                          "postgresteam.crd.yaml",
                          "configmap.yaml",
+                         "postgresql-operator-default-configuration.yaml",
                          "postgres-operator.yaml",
                          "api-service.yaml",
                          "infrastructure-roles.yaml",
@@ -151,6 +154,40 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_overwrite_pooler_deployment(self):
+        self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
+                             "Initial broken deplyment not rolled out")
+
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresqls', 'acid-minimal-cluster',
+        {
+            'spec': {
+                'enableConnectionPooler': True
+            }
+        })
+
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
+                             "Operator did not succeed in overwriting labels")
+
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresqls', 'acid-minimal-cluster',
+        {
+            'spec': {
+                'enableConnectionPooler': False
+            }
+        })
+
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+                             0, "Pooler pods not scaled down")
+
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
@@ -1043,7 +1080,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_pod_antiaffinity": "false"
             }
         }
-        k8s.update_config(patch_disable_antiaffinity, "disalbe antiaffinity")
+        k8s.update_config(patch_disable_antiaffinity, "disable antiaffinity")
         k8s.wait_for_pod_start('spilo-role=master')
         k8s.wait_for_pod_start('spilo-role=replica')
         return True
