@@ -937,8 +937,16 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
 
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
         # get nodes of master and replica(s)
-        current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
+        master_node, replica_nodes = k8s.get_pg_nodes(cluster_label)
+
+        self.assertNotEqual(master_node, [])
+        self.assertNotEqual(replica_nodes, [])
 
         # label node with environment=postgres
         node_label_body = {
@@ -951,8 +959,8 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             # patch current master node with the label
-            print('patching master node: {}'.format(current_master_node))
-            k8s.api.core_v1.patch_node(current_master_node, node_label_body)
+            print('patching master node: {}'.format(master_node))
+            k8s.api.core_v1.patch_node(master_node, node_label_body)
 
             # add node affinity to cluster
             patch_node_affinity_config = {
@@ -984,17 +992,17 @@ class EndToEndTestCase(unittest.TestCase):
                 plural="postgresqls",
                 name="acid-minimal-cluster",
                 body=patch_node_affinity_config)
+            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-            # bounce replica and check if it has migrated to proper node that has a label
-            k8s.api.core_v1.delete_namespaced_pod("acid-minimal-cluster-1", "default")
-            # wait for pod to be started
-            k8s.wait_for_pod_start('spilo-role=replica')
+            # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
+            k8s.wait_for_pod_failover(master_node, 'spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
             for pod in podsList.items:
                 if pod.metadata.labels.get('spilo-role') == 'replica':
-                    self.assertEqual(current_master_node, pod.spec.node_name,
-                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(current_master_node, pod.spec.node_name))
+                    self.assertEqual(master_node, pod.spec.node_name,
+                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(master_node, pod.spec.node_name))
 
                     # check that pod has correct node affinity
                     key = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].key
@@ -1016,6 +1024,12 @@ class EndToEndTestCase(unittest.TestCase):
                 plural="postgresqls",
                 name="acid-minimal-cluster",
                 body=patch_node_remove_affinity_config)
+            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            # remove node affinity to move replica away from master node
+            nm, new_replica_nodes = k8s.get_cluster_nodes()
+            new_master_node = nm[0]
+            self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
