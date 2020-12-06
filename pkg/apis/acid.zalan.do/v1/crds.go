@@ -285,7 +285,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "array",
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
-												Type: "object",
+												Type:     "object",
+												Required: []string{"preference, weight"},
 												Properties: map[string]apiextv1.JSONSchemaProps{
 													"preference": {
 														Type: "object",
@@ -319,7 +320,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 														Format: "int32",
 													},
 												},
-												Required: []string{"preference, weight"},
 											},
 										},
 									},
@@ -689,7 +689,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "array",
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
-										Type: "object",
+										Type:     "object",
+										Required: []string{"preference, weight"},
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"preference": {
 												Type: "object",
@@ -723,7 +724,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 												Format: "int32",
 											},
 										},
-										Required: []string{"preference, weight"},
 									},
 								},
 							},
