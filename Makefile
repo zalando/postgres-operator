@@ -84,6 +84,7 @@ scm-source.json: .git
 tools:
 	GO111MODULE=on go get -u honnef.co/go/tools/cmd/staticcheck
 	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.19.3
+	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.4.4
 	GO111MODULE=on go mod tidy
 
 fmt:
