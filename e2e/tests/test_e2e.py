@@ -862,7 +862,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "annotations": {
                     "deployment-time": "2020-04-30 12:00:00",
                     "downscaler/downtime_replicas": "0",
-                    "owned-by": "acid"
+                    "owned-by": "acid",
                 },
             }
         }
