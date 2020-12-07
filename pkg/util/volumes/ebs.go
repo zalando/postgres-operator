@@ -20,27 +20,27 @@ type EBSVolumeResizer struct {
 }
 
 // ConnectToProvider connects to AWS.
-func (c *EBSVolumeResizer) ConnectToProvider() error {
-	sess, err := session.NewSession(&aws.Config{Region: aws.String(c.AWSRegion)})
+func (r *EBSVolumeResizer) ConnectToProvider() error {
+	sess, err := session.NewSession(&aws.Config{Region: aws.String(r.AWSRegion)})
 	if err != nil {
 		return fmt.Errorf("could not establish AWS session: %v", err)
 	}
-	c.connection = ec2.New(sess)
+	r.connection = ec2.New(sess)
 	return nil
 }
 
 // IsConnectedToProvider checks if AWS connection is established.
-func (c *EBSVolumeResizer) IsConnectedToProvider() bool {
-	return c.connection != nil
+func (r *EBSVolumeResizer) IsConnectedToProvider() bool {
+	return r.connection != nil
 }
 
 // VolumeBelongsToProvider checks if the given persistent volume is backed by EBS.
-func (c *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool {
+func (r *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool {
 	return pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner
 }
 
 // GetProviderVolumeID converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes
-func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string, error) {
+func (r *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string, error) {
 	volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
 	if volumeID == "" {
 		return "", fmt.Errorf("volume id is empty for volume %q", pv.Name)
@@ -52,10 +52,33 @@ func (c *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string,
 	return volumeID[idx:], nil
 }
 
+// DescribeVolumes ...
+func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperties, error) {
+	if !r.IsConnectedToProvider() {
+		err := r.ConnectToProvider()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: aws.StringSlice((volumeIds))})
+
+	if err != nil {
+		return nil, err
+	}
+
+	p := []VolumeProperties{}
+
+	for _, v := range volumeOutput.Volumes {
+		p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: *v.Size, VolumeType: *v.VolumeType, Iops: *v.Iops, Throughput: *v.Throughput})
+	}
+	return p, nil
+}
+
 // ResizeVolume actually calls AWS API to resize the EBS volume if necessary.
-func (c *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
+func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 	/* first check if the volume is already of a requested size */
-	volumeOutput, err := c.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeID}})
+	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeID}})
 	if err != nil {
 		return fmt.Errorf("could not get information about the volume: %v", err)
 	}
@@ -68,7 +91,7 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 		return nil
 	}
 	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeID}
-	output, err := c.connection.ModifyVolume(&input)
+	output, err := r.connection.ModifyVolume(&input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
 	}
@@ -87,7 +110,7 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []*string{&volumeID}}
 	return retryutil.Retry(constants.EBSVolumeResizeWaitInterval, constants.EBSVolumeResizeWaitTimeout,
 		func() (bool, error) {
-			out, err := c.connection.DescribeVolumesModifications(&in)
+			out, err := r.connection.DescribeVolumesModifications(&in)
 			if err != nil {
 				return false, fmt.Errorf("could not describe volume modification: %v", err)
 			}
@@ -103,9 +126,9 @@ func (c *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 }
 
 // ModifyVolume Modify EBS volume
-func (c *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize int64, iops int64, throughput int64) error {
+func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize int64, iops int64, throughput int64) error {
 	/* first check if the volume is already of a requested size */
-	volumeOutput, err := c.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeID}})
+	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeID}})
 	if err != nil {
 		return fmt.Errorf("could not get information about the volume: %v", err)
 	}
@@ -119,7 +142,7 @@ func (c *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize
 	}
 
 	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeID, VolumeType: &newType, Iops: &iops, Throughput: &throughput}
-	output, err := c.connection.ModifyVolume(&input)
+	output, err := r.connection.ModifyVolume(&input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)
 	}
@@ -138,7 +161,7 @@ func (c *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize
 	in := ec2.DescribeVolumesModificationsInput{VolumeIds: []*string{&volumeID}}
 	return retryutil.Retry(constants.EBSVolumeResizeWaitInterval, constants.EBSVolumeResizeWaitTimeout,
 		func() (bool, error) {
-			out, err := c.connection.DescribeVolumesModifications(&in)
+			out, err := r.connection.DescribeVolumesModifications(&in)
 			if err != nil {
 				return false, fmt.Errorf("could not describe volume modification: %v", err)
 			}

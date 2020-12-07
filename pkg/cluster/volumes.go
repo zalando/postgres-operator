@@ -251,3 +251,31 @@ func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedNam
 func quantityToGigabyte(q resource.Quantity) int64 {
 	return q.ScaledValue(0) / (1 * constants.Gigabyte)
 }
+
+func (c *Cluster) executeEBSMigration() error {
+	if !c.OpConfig.EnableEBSGp3Migration {
+		return nil
+	}
+
+	pvs, _, err := c.listVolumesWithManifestSize(c.Spec.Volume)
+	if err != nil {
+		return fmt.Errorf("could not list persistent volumes: %v", err)
+	}
+
+	volumeIds := []string{}
+	for _, pv := range pvs {
+		volumeIds = append(volumeIds, pv.Spec.AWSElasticBlockStore.VolumeID)
+	}
+
+	awsVolumes, err := c.VolumeResizer.DescribeVolumes(volumeIds)
+
+	for _, volume := range awsVolumes {
+		if volume.VolumeType == "gp2" && volume.Size < c.OpConfig.EnableEBSGp3MaxSize {
+			c.logger.Info("Modifying EBS volume %s to type gp3 (%s)", volume.VolumeID, volume.Size)
+			c.VolumeResizer.ModifyVolume(volume.VolumeID, "gp3", volume.Size, 3000, 125)
+		}
+		c.EBSVolumes[volume.VolumeID] = volume
+	}
+
+	return nil
+}

@@ -65,14 +65,6 @@ type kubeResources struct {
 	//PVCs are treated separately
 }
 
-type EBSVolume struct {
-	volumeId   string
-	volumeType string
-	size       int64
-	iops       int32
-	throughput int32
-}
-
 // Cluster describes postgresql cluster
 type Cluster struct {
 	kubeResources
@@ -98,7 +90,7 @@ type Cluster struct {
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
 	ConnectionPooler map[PostgresRole]*ConnectionPoolerObjects
-	EBSVolumes       map[string]EBSVolume
+	EBSVolumes       map[string]volumes.VolumeProperties
 	VolumeResizer    volumes.VolumeResizer
 }
 

@@ -2,6 +2,15 @@ package volumes
 
 import v1 "k8s.io/api/core/v1"
 
+// VolumeProperties ...
+type VolumeProperties struct {
+	VolumeID   string
+	VolumeType string
+	Size       int64
+	Iops       int64
+	Throughput int64
+}
+
 // VolumeResizer defines the set of methods used to implememnt provider-specific resizing of persistent volumes.
 type VolumeResizer interface {
 	ConnectToProvider() error
@@ -11,4 +20,5 @@ type VolumeResizer interface {
 	ResizeVolume(providerVolumeID string, newSize int64) error
 	ModifyVolume(providerVolumeID string, newType string, newSize int64, iops int64, throughput int64) error
 	DisconnectFromProvider() error
+	DescribeVolumes(providerVolumesID []string) ([]VolumeProperties, error)
 }

@@ -55,7 +55,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 
 	c.logger.Debugf("syncing volumes using %q storage resize mode", c.OpConfig.StorageResizeMode)
 
+	if c.OpConfig.EnableEBSGp3Migration {
+		c.executeEBSMigration()
+	}
+
 	if c.OpConfig.StorageResizeMode == "mixed" {
+		// mixed op uses AWS API to adjust size,throughput,iops and calls pvc chance for file system resize
 
 		// resize pvc to adjust filesystem size until better K8s support
 		if err = c.syncVolumeClaims(); err != nil {
