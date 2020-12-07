@@ -25,6 +25,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	"github.com/zalando/postgres-operator/pkg/util/users"
+	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -64,6 +65,14 @@ type kubeResources struct {
 	//PVCs are treated separately
 }
 
+type EBSVolume struct {
+	volumeId   string
+	volumeType string
+	size       int64
+	iops       int32
+	throughput int32
+}
+
 // Cluster describes postgresql cluster
 type Cluster struct {
 	kubeResources
@@ -89,7 +98,10 @@ type Cluster struct {
 	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
 	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
 	ConnectionPooler map[PostgresRole]*ConnectionPoolerObjects
+	EBSVolumes       map[string]EBSVolume
+	VolumeResizer    volumes.VolumeResizer
 }
+
 type compareStatefulsetResult struct {
 	match         bool
 	replace       bool
@@ -134,6 +146,11 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	cluster.oauthTokenGetter = newSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
 	cluster.patroni = patroni.New(cluster.logger)
 	cluster.eventRecorder = eventRecorder
+
+	if cfg.OpConfig.StorageResizeMode != "pvc" {
+		cluster.VolumeResizer = &volumes.EBSVolumeResizer{AWSRegion: cfg.OpConfig.AWSRegion}
+	}
+
 	return cluster
 }
 

@@ -198,6 +198,8 @@ type Config struct {
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"false"`
+	EnableEBSGp3Migration                  bool              `name:"enable_ebs_gp3_migration" default:"false"`
+	EnableEBSGp3MaxSize                    int32             `name:"enable_ebs_gp3_max_size" default:"1000"`
 }
 
 // MustMarshal marshals the config or panics

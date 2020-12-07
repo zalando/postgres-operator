@@ -1,8 +1,6 @@
 package volumes
 
-import (
-	"k8s.io/api/core/v1"
-)
+import v1 "k8s.io/api/core/v1"
 
 // VolumeResizer defines the set of methods used to implememnt provider-specific resizing of persistent volumes.
 type VolumeResizer interface {
@@ -11,5 +9,6 @@ type VolumeResizer interface {
 	VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
 	GetProviderVolumeID(pv *v1.PersistentVolume) (string, error)
 	ResizeVolume(providerVolumeID string, newSize int64) error
+	ModifyVolume(providerVolumeID string, newType string, newSize int64, iops int64, throughput int64) error
 	DisconnectFromProvider() error
 }
