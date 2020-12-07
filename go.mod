@@ -18,4 +18,6 @@ require (
 	k8s.io/apimachinery v0.19.3
 	k8s.io/client-go v0.19.3
 	k8s.io/code-generator v0.19.3
+
+	github.com/golang/mock v1.4.4
 )

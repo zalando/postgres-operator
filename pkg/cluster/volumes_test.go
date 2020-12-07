@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"testing"
 
 	"context"
@@ -10,11 +11,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/volumes/mocks"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -23,6 +26,8 @@ func NewFakeKubernetesClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 	return k8sutil.KubernetesClient{
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
+		PersistentVolumesGetter:      clientSet.CoreV1(),
+		PodsGetter:                   clientSet.CoreV1(),
 	}, clientSet
 }
 
@@ -168,4 +173,100 @@ func TestQuantityToGigabyte(t *testing.T) {
 			t.Errorf("%s: got %v, expected %v", tt.name, gigabyte, tt.expected)
 		}
 	}
+}
+
+func CreatePVCs(namespace string, clusterName string, labels labels.Set, n int, size string) v1.PersistentVolumeClaimList {
+	// define and create PVCs for 1Gi volumes
+	storage1Gi, _ := resource.ParseQuantity("1Gi")
+	pvcList := v1.PersistentVolumeClaimList{
+		Items: []v1.PersistentVolumeClaim{},
+	}
+
+	for i := 0; i <= n; i++ {
+		pvc := v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%s-%d", constants.DataVolumeName, clusterName, i),
+				Namespace: namespace,
+				Labels:    labels,
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceStorage: storage1Gi,
+					},
+				},
+				VolumeName: fmt.Sprintf("persistent-volume-%d", i),
+			},
+		}
+		pvcList.Items = append(pvcList.Items, pvc)
+	}
+
+	return pvcList
+}
+
+func TestMigrateEBS(t *testing.T) {
+	client, _ := NewFakeKubernetesClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+
+	// new cluster with pvc storage resize mode and configured labels
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: "cluster-name",
+				},
+				StorageResizeMode:     "pvc",
+				EnableEBSGp3Migration: true,
+			},
+		}, client, acidv1.Postgresql{}, logger, eventRecorder)
+	cluster.Spec.Volume.Size = "1Gi"
+
+	// set metadata, so that labels will get correct values
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	filterLabels := cluster.labelsSet(false)
+
+	pvcList := CreatePVCs(namespace, clusterName, filterLabels, 2, "1Gi")
+
+	ps := v1.PersistentVolumeSpec{}
+	ps.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
+	ps.AWSElasticBlockStore.VolumeID = "vol-1111"
+
+	pvList := &v1.PersistentVolumeList{
+		Items: []v1.PersistentVolume{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "persistent-volume-0",
+				},
+				Spec: ps,
+			},
+		},
+	}
+
+	for _, pvc := range pvcList.Items {
+		cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
+	}
+
+	cluster.KubeClient.PersistentVolumes().Create(context.TODO(), &pvList.Items[0], metav1.CreateOptions{})
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   clusterName + "-0",
+			Labels: filterLabels,
+		},
+		Spec: v1.PodSpec{},
+	}
+
+	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	resizer := mocks.NewMockVolumeResizer(ctrl)
+	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"vol-1111"})).Return(nil, nil)
+
+	cluster.VolumeResizer = resizer
+	cluster.executeEBSMigration()
 }
