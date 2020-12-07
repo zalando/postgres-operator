@@ -353,8 +353,9 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-		annotations := c.AnnotationsToPropagate(c.Statefulset.Annotations)
-		c.updateStatefulSetAnnotations(c.annotationsSet(annotations))
+		annotations := c.annotationsSet(c.Statefulset.Annotations)
+		annotations = c.AnnotationsToPropagate(annotations)
+		c.updateStatefulSetAnnotations(annotations)
 
 		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if desired and actual statefulsets match

@@ -866,7 +866,8 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		}
 	}
 
-	newAnnotations := c.AnnotationsToPropagate(c.ConnectionPooler[role].Deployment.Annotations)
+	newAnnotations := c.annotationsSet(c.ConnectionPooler[role].Deployment.Annotations)
+	newAnnotations = c.AnnotationsToPropagate(newAnnotations)
 	if newAnnotations != nil {
 		deployment, err = updateConnectionPoolerAnnotations(c.KubeClient, c.ConnectionPooler[role].Deployment, newAnnotations)
 		if err != nil {

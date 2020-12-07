@@ -17,13 +17,14 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 	clientSet := fake.NewSimpleClientset()
 
 	return k8sutil.KubernetesClient{
-		DeploymentsGetter:          clientSet.AppsV1(),
-		EndpointsGetter:            clientSet.CoreV1(),
-		PodsGetter:                 clientSet.CoreV1(),
-		PodDisruptionBudgetsGetter: clientSet.PolicyV1beta1(),
-		SecretsGetter:              clientSet.CoreV1(),
-		ServicesGetter:             clientSet.CoreV1(),
-		StatefulSetsGetter:         clientSet.AppsV1(),
+		DeploymentsGetter:            clientSet.AppsV1(),
+		EndpointsGetter:              clientSet.CoreV1(),
+		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
+		PodsGetter:                   clientSet.CoreV1(),
+		PodDisruptionBudgetsGetter:   clientSet.PolicyV1beta1(),
+		SecretsGetter:                clientSet.CoreV1(),
+		ServicesGetter:               clientSet.CoreV1(),
+		StatefulSetsGetter:           clientSet.AppsV1(),
 	}, clientSet
 }
 
@@ -32,13 +33,13 @@ func TestInheritedAnnotations(t *testing.T) {
 	client, _ := newFakeK8sAnnotationsClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
+	annotationValue := "acid"
 
-	annotationKey := "acid"
 	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName,
 			Annotations: map[string]string{
-				"owned-by": annotationKey,
+				"owned-by": annotationValue,
 			},
 		},
 		Spec: acidv1.PostgresSpec{
@@ -91,6 +92,15 @@ func TestInheritedAnnotations(t *testing.T) {
 	for _, pod := range podList.Items {
 		if !(util.MapContains(pod.ObjectMeta.Annotations, inheritedAnnotations)) {
 			t.Errorf("%s: Pod %v not inherited annotations %#v, got %#v", testName, pod.ObjectMeta.Name, inheritedAnnotations, pod.ObjectMeta.Annotations)
+		}
+	}
+
+	// check pvc annotations
+	pvcList, err := cluster.KubeClient.PersistentVolumeClaims(namespace).List(context.TODO(), listOptions)
+	assert.NoError(t, err)
+	for _, pvc := range pvcList.Items {
+		if !(util.MapContains(pvc.ObjectMeta.Annotations, inheritedAnnotations)) {
+			t.Errorf("%s: PVC %v not inherited annotations %#v, got %#v", testName, pvc.ObjectMeta.Name, inheritedAnnotations, pvc.ObjectMeta.Annotations)
 		}
 	}
 
