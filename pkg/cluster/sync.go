@@ -403,11 +403,10 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 		annotations = make(map[string]string)
 	}
 
-	toPropagateAnnotations := c.OpConfig.DownscalerAnnotations
-	pgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
+	pgCRDAnnotations := c.ObjectMeta.Annotations
 
-	if toPropagateAnnotations != nil && pgCRDAnnotations != nil {
-		for _, anno := range toPropagateAnnotations {
+	if pgCRDAnnotations != nil {
+		for _, anno := range c.OpConfig.DownscalerAnnotations {
 			for k, v := range pgCRDAnnotations {
 				matched, err := regexp.MatchString(anno, k)
 				if err != nil {

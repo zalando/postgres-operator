@@ -277,17 +277,18 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
+
+	pgCRDAnnotations := c.ObjectMeta.Annotations
+
 	// allow to inherit certain labels from the 'postgres' object
-	if spec, err := c.GetSpec(); err == nil {
-		for k, v := range spec.ObjectMeta.Annotations {
+	if pgCRDAnnotations != nil {
+		for k, v := range pgCRDAnnotations {
 			for _, match := range c.OpConfig.InheritedAnnotations {
 				if k == match {
 					annotations[k] = v
 				}
 			}
 		}
-	} else {
-		c.logger.Warningf("could not get the list of InheritedAnnoations for cluster %q: %v", c.Name, err)
 	}
 
 	if len(annotations) > 0 {

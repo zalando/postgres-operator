@@ -67,7 +67,7 @@ func TestInheritedAnnotations(t *testing.T) {
 	cluster.Create()
 
 	// test annotationsSet function
-	inheritedAnnotations := cluster.annotationsSet(map[string]string{})
+	inheritedAnnotations := cluster.annotationsSet(nil)
 
 	listOptions := metav1.ListOptions{
 		LabelSelector: cluster.labelsSet(false).String(),

@@ -1226,7 +1226,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	stsAnnotations := c.annotationsSet(map[string]string{})
+	stsAnnotations := c.annotationsSet(nil)
 	stsAnnotations = c.AnnotationsToPropagate(stsAnnotations)
 	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
 
@@ -1531,7 +1531,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 			Name:        c.credentialSecretName(username),
 			Namespace:   namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(map[string]string{}),
+			Annotations: c.annotationsSet(nil),
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -1652,10 +1652,9 @@ func (c *Cluster) generateServiceAnnotations(role PostgresRole, spec *acidv1.Pos
 func (c *Cluster) generateEndpoint(role PostgresRole, subsets []v1.EndpointSubset) *v1.Endpoints {
 	endpoints := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.endpointName(role),
-			Namespace:   c.Namespace,
-			Labels:      c.roleLabelsSet(true, role),
-			Annotations: c.annotationsSet(map[string]string{}),
+			Name:      c.endpointName(role),
+			Namespace: c.Namespace,
+			Labels:    c.roleLabelsSet(true, role),
 		},
 	}
 	if len(subsets) > 0 {
@@ -1812,7 +1811,7 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 			Name:        c.podDisruptionBudgetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(map[string]string{}),
+			Annotations: c.annotationsSet(nil),
 		},
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
@@ -1935,7 +1934,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 			Name:        c.getLogicalBackupJobName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: c.annotationsSet(map[string]string{}),
+			Annotations: c.annotationsSet(nil),
 		},
 		Spec: batchv1beta1.CronJobSpec{
 			Schedule:          schedule,
