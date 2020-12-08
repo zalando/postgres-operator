@@ -260,7 +260,9 @@ func TestMigrateEBS(t *testing.T) {
 		cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
 	}
 
-	cluster.KubeClient.PersistentVolumes().Create(context.TODO(), &pvList.Items[0], metav1.CreateOptions{})
+	for _, pv := range pvList.Items {
+		cluster.KubeClient.PersistentVolumes().Create(context.TODO(), &pv, metav1.CreateOptions{})
+	}
 
 	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
