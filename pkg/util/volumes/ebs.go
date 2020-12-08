@@ -177,7 +177,7 @@ func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize
 }
 
 // DisconnectFromProvider closes connection to the EC2 instance
-func (c *EBSVolumeResizer) DisconnectFromProvider() error {
-	c.connection = nil
+func (r *EBSVolumeResizer) DisconnectFromProvider() error {
+	r.connection = nil
 	return nil
 }
