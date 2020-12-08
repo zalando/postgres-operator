@@ -233,7 +233,11 @@ func TestMigrateEBS(t *testing.T) {
 
 	ps := v1.PersistentVolumeSpec{}
 	ps.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
-	ps.AWSElasticBlockStore.VolumeID = "vol-1111"
+	ps.AWSElasticBlockStore.VolumeID = "ebs-volume-1"
+
+	ps2 := v1.PersistentVolumeSpec{}
+	ps2.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
+	ps2.AWSElasticBlockStore.VolumeID = "ebs-volume-2"
 
 	pvList := &v1.PersistentVolumeList{
 		Items: []v1.PersistentVolume{
@@ -242,6 +246,12 @@ func TestMigrateEBS(t *testing.T) {
 					Name: "persistent-volume-0",
 				},
 				Spec: ps,
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "persistent-volume-1",
+				},
+				Spec: ps2,
 			},
 		},
 	}
@@ -262,16 +272,26 @@ func TestMigrateEBS(t *testing.T) {
 
 	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 
+	pod = v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   clusterName + "-1",
+			Labels: filterLabels,
+		},
+		Spec: v1.PodSpec{},
+	}
+
+	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	resizer := mocks.NewMockVolumeResizer(ctrl)
 	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"vol-1111"})).Return(
 		[]volumes.VolumeProperties{
-			{VolumeID: "persistent-volume-0", VolumeType: "gp2", Size: 100},
-			{VolumeID: "persistent-volume-1", VolumeType: "gp3", Size: 100}}, nil)
+			{VolumeID: "ebs-volume-1", VolumeType: "gp2", Size: 100},
+			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 100}}, nil)
 
-	// expect onl ygp2 volume to be modified
+	// expect only gp2 volume to be modified
 	resizer.EXPECT().ModifyVolume(gomock.Eq("persistent-volume-0"), gomock.Eq("gp3"), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	cluster.VolumeResizer = resizer
