@@ -6,15 +6,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
+	k8sFake "k8s.io/client-go/kubernetes/fake"
 )
 
-func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *fake.Clientset) {
-	clientSet := fake.NewSimpleClientset()
+func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset) {
+	clientSet := k8sFake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
 
 	return k8sutil.KubernetesClient{
 		DeploymentsGetter:            clientSet.AppsV1(),
@@ -25,6 +27,7 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 		SecretsGetter:                clientSet.CoreV1(),
 		ServicesGetter:               clientSet.CoreV1(),
 		StatefulSetsGetter:           clientSet.AppsV1(),
+		PostgresqlsGetter:            acidClientSet.AcidV1(),
 	}, clientSet
 }
 
@@ -54,12 +57,14 @@ func TestInheritedAnnotations(t *testing.T) {
 					ClusterLabels:        map[string]string{"application": "spilo"},
 					ClusterNameLabel:     "cluster-name",
 					InheritedAnnotations: []string{"owned-by"},
+					PodRoleLabel:         "spilo-role",
 				},
 			},
 		}, client, pg, logger, eventRecorder)
 
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
+	cluster.Create()
 
 	// test annotationsSet function
 	inheritedAnnotations := cluster.annotationsSet(map[string]string{})
