@@ -139,9 +139,10 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	cluster.patroni = patroni.New(cluster.logger)
 	cluster.eventRecorder = eventRecorder
 
+	cluster.EBSVolumes = make(map[string]volumes.VolumeProperties)
 	if cfg.OpConfig.StorageResizeMode != "pvc" {
 		cluster.VolumeResizer = &volumes.EBSVolumeResizer{AWSRegion: cfg.OpConfig.AWSRegion}
-		cluster.EBSVolumes = make(map[string]volumes.VolumeProperties)
+
 	}
 
 	return cluster
