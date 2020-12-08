@@ -16,7 +16,7 @@ jobs:
       with:
           go-version: "^1.15.5"
     - name: Make dependencies
-      run: make deps
+      run: make deps mocks
     - name: Compile
       run: make linux
     - name: Run unit tests

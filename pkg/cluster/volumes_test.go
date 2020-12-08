@@ -18,6 +18,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
+	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -265,7 +266,7 @@ func TestMigrateEBS(t *testing.T) {
 	defer ctrl.Finish()
 
 	resizer := mocks.NewMockVolumeResizer(ctrl)
-	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"vol-1111"})).Return(nil, nil)
+	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"vol-1111"})).Return([]volumes.VolumeProperties{{VolumeType: "gp3"}}, nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.executeEBSMigration()

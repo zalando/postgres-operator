@@ -81,6 +81,9 @@ push:
 scm-source.json: .git
 	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
+mocks:
+	GO111MODULE=on go generate ./...
+
 tools:
 	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.19.3
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.4.4
@@ -95,7 +98,6 @@ vet:
 
 deps: tools
 	GO111MODULE=on go mod vendor
-	GO111MODULE=on go generate ./...
 
 test:
 	hack/verify-codegen.sh
