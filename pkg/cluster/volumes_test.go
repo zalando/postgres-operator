@@ -292,7 +292,7 @@ func TestMigrateEBS(t *testing.T) {
 			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 100}}, nil)
 
 	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("persistent-volume-0"), gomock.Eq("gp3"), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-0"), gomock.Eq("gp3"), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.executeEBSMigration()
