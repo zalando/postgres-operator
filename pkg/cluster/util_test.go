@@ -20,7 +20,6 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset
 
 	return k8sutil.KubernetesClient{
 		DeploymentsGetter:            clientSet.AppsV1(),
-		EndpointsGetter:              clientSet.CoreV1(),
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
 		PodsGetter:                   clientSet.CoreV1(),
 		PodDisruptionBudgetsGetter:   clientSet.PolicyV1beta1(),
@@ -115,15 +114,6 @@ func TestInheritedAnnotations(t *testing.T) {
 	for _, svc := range svcList.Items {
 		if !(util.MapContains(svc.ObjectMeta.Annotations, inheritedAnnotations)) {
 			t.Errorf("%s: Service %v not inherited annotations %#v, got %#v", testName, svc.ObjectMeta.Name, inheritedAnnotations, svc.ObjectMeta.Annotations)
-		}
-	}
-
-	// check endpoint annotations
-	epList, err := cluster.KubeClient.Endpoints(namespace).List(context.TODO(), listOptions)
-	assert.NoError(t, err)
-	for _, ep := range epList.Items {
-		if !(util.MapContains(ep.ObjectMeta.Annotations, inheritedAnnotations)) {
-			t.Errorf("%s: Endpoint %v not inherited annotations %#v, got %#v", testName, ep.ObjectMeta.Name, inheritedAnnotations, ep.ObjectMeta.Annotations)
 		}
 	}
 
