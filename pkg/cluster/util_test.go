@@ -11,6 +11,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8sFake "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -21,9 +22,7 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset
 	return k8sutil.KubernetesClient{
 		DeploymentsGetter:            clientSet.AppsV1(),
 		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
-		PodsGetter:                   clientSet.CoreV1(),
 		PodDisruptionBudgetsGetter:   clientSet.PolicyV1beta1(),
-		SecretsGetter:                clientSet.CoreV1(),
 		ServicesGetter:               clientSet.CoreV1(),
 		StatefulSetsGetter:           clientSet.AppsV1(),
 		PostgresqlsGetter:            acidClientSet.AcidV1(),
@@ -63,17 +62,17 @@ func TestInheritedAnnotations(t *testing.T) {
 
 	cluster.Name = clusterName
 	cluster.Namespace = namespace
-	cluster.Create()
 
 	// test annotationsSet function
 	inheritedAnnotations := cluster.annotationsSet(nil)
 
-	listOptions := metav1.ListOptions{
-		LabelSelector: cluster.labelsSet(false).String(),
+	poolerListOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(cluster.connectionPoolerLabels(Master, false).MatchLabels).String(),
 	}
 
 	// check pooler deployment annotations
-	deployList, err := cluster.KubeClient.Deployments(namespace).List(context.TODO(), listOptions)
+	cluster.createConnectionPooler(cluster.installLookupFunction)
+	deployList, err := client.Deployments(namespace).List(context.TODO(), poolerListOptions)
 	assert.NoError(t, err)
 	for _, deploy := range deployList.Items {
 		if !(util.MapContains(deploy.ObjectMeta.Annotations, inheritedAnnotations)) {
@@ -81,35 +80,27 @@ func TestInheritedAnnotations(t *testing.T) {
 		}
 	}
 
+	listOptions := metav1.ListOptions{
+		LabelSelector: cluster.labelsSet(false).String(),
+	}
+
 	// check statefulset annotations
-	stsList, err := cluster.KubeClient.StatefulSets(namespace).List(context.TODO(), listOptions)
+	cluster.createStatefulSet()
+	stsList, err := client.StatefulSets(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
 	for _, sts := range stsList.Items {
 		if !(util.MapContains(sts.ObjectMeta.Annotations, inheritedAnnotations)) {
 			t.Errorf("%s: StatefulSet %v not inherited annotations %#v, got %#v", testName, sts.ObjectMeta.Name, inheritedAnnotations, sts.ObjectMeta.Annotations)
 		}
-	}
 
-	// check pod annotations
-	podList, err := cluster.KubeClient.Pods(namespace).List(context.TODO(), listOptions)
-	assert.NoError(t, err)
-	for _, pod := range podList.Items {
-		if !(util.MapContains(pod.ObjectMeta.Annotations, inheritedAnnotations)) {
-			t.Errorf("%s: Pod %v not inherited annotations %#v, got %#v", testName, pod.ObjectMeta.Name, inheritedAnnotations, pod.ObjectMeta.Annotations)
-		}
-	}
-
-	// check pvc annotations
-	pvcList, err := cluster.KubeClient.PersistentVolumeClaims(namespace).List(context.TODO(), listOptions)
-	assert.NoError(t, err)
-	for _, pvc := range pvcList.Items {
-		if !(util.MapContains(pvc.ObjectMeta.Annotations, inheritedAnnotations)) {
-			t.Errorf("%s: PVC %v not inherited annotations %#v, got %#v", testName, pvc.ObjectMeta.Name, inheritedAnnotations, pvc.ObjectMeta.Annotations)
+		if !(util.MapContains(sts.Spec.Template.Annotations, inheritedAnnotations)) {
+			t.Errorf("%s: pod template %v not inherited annotations %#v, got %#v", testName, sts.ObjectMeta.Name, inheritedAnnotations, sts.ObjectMeta.Annotations)
 		}
 	}
 
 	// check service annotations
-	svcList, err := cluster.KubeClient.Services(namespace).List(context.TODO(), listOptions)
+	cluster.createService(Master)
+	svcList, err := client.Services(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
 	for _, svc := range svcList.Items {
 		if !(util.MapContains(svc.ObjectMeta.Annotations, inheritedAnnotations)) {
@@ -118,20 +109,12 @@ func TestInheritedAnnotations(t *testing.T) {
 	}
 
 	// check pod disruption budget annotations
-	pdbList, err := cluster.KubeClient.PodDisruptionBudgets(namespace).List(context.TODO(), listOptions)
+	cluster.createPodDisruptionBudget()
+	pdbList, err := client.PodDisruptionBudgets(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
 	for _, pdb := range pdbList.Items {
 		if !(util.MapContains(pdb.ObjectMeta.Annotations, inheritedAnnotations)) {
 			t.Errorf("%s: Pod Disruption Budget %v not inherited annotations %#v, got %#v", testName, pdb.ObjectMeta.Name, inheritedAnnotations, pdb.ObjectMeta.Annotations)
-		}
-	}
-
-	// check secret annotations
-	secretList, err := cluster.KubeClient.Secrets(namespace).List(context.TODO(), listOptions)
-	assert.NoError(t, err)
-	for _, secret := range secretList.Items {
-		if !(util.MapContains(secret.ObjectMeta.Annotations, inheritedAnnotations)) {
-			t.Errorf("%s: Secret %v not inherited annotations %#v, got %#v", testName, secret.ObjectMeta.Name, inheritedAnnotations, secret.ObjectMeta.Annotations)
 		}
 	}
 }
