@@ -274,6 +274,9 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 // Returns annotations to be passed to child objects
 func (c *Cluster) annotationsSet(annotations map[string]string) map[string]string {
 
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
 	// allow to inherit certain labels from the 'postgres' object
 	if spec, err := c.GetSpec(); err == nil {
 		for k, v := range spec.ObjectMeta.Annotations {

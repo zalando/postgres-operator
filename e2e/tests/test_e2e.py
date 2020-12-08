@@ -874,7 +874,7 @@ class EndToEndTestCase(unittest.TestCase):
             "downscaler/downtime_replicas": "0",
             "owned-by": "acid",
         }
-
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
