@@ -398,6 +398,11 @@ func (c *Cluster) syncStatefulSet() error {
 // AnnotationsToPropagate get the annotations to update if required
 // based on the annotations in postgres CRD
 func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[string]string {
+
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
 	toPropagateAnnotations := c.OpConfig.DownscalerAnnotations
 	pgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
 

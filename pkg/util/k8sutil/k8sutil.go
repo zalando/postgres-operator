@@ -59,7 +59,8 @@ type KubernetesClient struct {
 	acidv1.PostgresTeamsGetter
 	acidv1.PostgresqlsGetter
 
-	RESTClient rest.Interface
+	RESTClient      rest.Interface
+	AcidV1ClientSet *acidv1client.Clientset
 }
 
 type mockSecret struct {
@@ -157,14 +158,14 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 
 	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1()
 
-	acidClient, err := acidv1client.NewForConfig(cfg)
+	kubeClient.AcidV1ClientSet = acidv1client.NewForConfigOrDie(cfg)
 	if err != nil {
 		return kubeClient, fmt.Errorf("could not create acid.zalan.do clientset: %v", err)
 	}
 
-	kubeClient.OperatorConfigurationsGetter = acidClient.AcidV1()
-	kubeClient.PostgresTeamsGetter = acidClient.AcidV1()
-	kubeClient.PostgresqlsGetter = acidClient.AcidV1()
+	kubeClient.OperatorConfigurationsGetter = kubeClient.AcidV1ClientSet.AcidV1()
+	kubeClient.PostgresTeamsGetter = kubeClient.AcidV1ClientSet.AcidV1()
+	kubeClient.PostgresqlsGetter = kubeClient.AcidV1ClientSet.AcidV1()
 
 	return kubeClient, nil
 }

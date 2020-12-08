@@ -46,7 +46,7 @@ func (c *Controller) listClusters(options metav1.ListOptions) (*acidv1.Postgresq
 	var pgList acidv1.PostgresqlList
 
 	// TODO: use the SharedInformer cache instead of quering Kubernetes API directly.
-	list, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.opConfig.WatchedNamespace).List(context.TODO(), options)
+	list, err := c.KubeClient.PostgresqlsGetter.Postgresqls(c.opConfig.WatchedNamespace).List(context.TODO(), options)
 	if err != nil {
 		c.logger.Errorf("could not list postgresql objects: %v", err)
 	}
