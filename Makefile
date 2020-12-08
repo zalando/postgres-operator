@@ -1,4 +1,4 @@
-.PHONY: clean local test linux macos docker push scm-source.json e2e
+.PHONY: clean local test linux macos mocks docker push scm-source.json e2e
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
