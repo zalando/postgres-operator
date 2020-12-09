@@ -275,6 +275,7 @@ func (c *Cluster) executeEBSMigration() error {
 				hasGp2 = true
 			}
 		}
+
 		if !hasGp2 {
 			// no gp2 volumes left to migrate
 			return nil
@@ -285,8 +286,10 @@ func (c *Cluster) executeEBSMigration() error {
 
 	for _, volume := range awsVolumes {
 		if volume.VolumeType == "gp2" && volume.Size < c.OpConfig.EnableEBSGp3MaxSize {
-			c.logger.Infof("Modifying EBS volume %s to type gp3 (%d)", volume.VolumeID, volume.Size)
+			c.logger.Infof("modifying EBS volume %s to type gp3 migration (%d)", volume.VolumeID, volume.Size)
 			c.VolumeResizer.ModifyVolume(volume.VolumeID, "gp3", volume.Size, 3000, 125)
+		} else {
+			c.logger.Debugf("skipping EBS volume %s to type gp3 migration (%d)", volume.VolumeID, volume.Size)
 		}
 		c.EBSVolumes[volume.VolumeID] = volume
 	}
