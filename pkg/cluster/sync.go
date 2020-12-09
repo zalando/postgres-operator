@@ -56,7 +56,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	c.logger.Debugf("syncing volumes using %q storage resize mode", c.OpConfig.StorageResizeMode)
 
 	if c.OpConfig.EnableEBSGp3Migration {
-		c.executeEBSMigration()
+		err = c.executeEBSMigration()
+		if nil != err {
+			return err
+		}
 	}
 
 	if c.OpConfig.StorageResizeMode == "mixed" {
