@@ -234,11 +234,11 @@ func TestMigrateEBS(t *testing.T) {
 
 	ps := v1.PersistentVolumeSpec{}
 	ps.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
-	ps.AWSElasticBlockStore.VolumeID = "ebs-volume-1"
+	ps.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-1"
 
 	ps2 := v1.PersistentVolumeSpec{}
 	ps2.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
-	ps2.AWSElasticBlockStore.VolumeID = "ebs-volume-2"
+	ps2.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-2"
 
 	pvList := &v1.PersistentVolumeList{
 		Items: []v1.PersistentVolume{

@@ -265,8 +265,13 @@ func (c *Cluster) executeEBSMigration() error {
 	c.logger.Debugf("found %d volumes, size of known volumes %d", len(pvs), len(c.EBSVolumes))
 
 	volumeIds := []string{}
+	var volumeID string
 	for _, pv := range pvs {
-		volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
+		volumeID, err = c.VolumeResizer.GetProviderVolumeID(pv)
+		if err != nil {
+			continue
+		}
+
 		volumeIds = append(volumeIds, volumeID)
 	}
 

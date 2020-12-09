@@ -47,7 +47,7 @@ func (r *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string,
 	}
 	idx := strings.LastIndex(volumeID, constants.EBSVolumeIDStart) + 1
 	if idx == 0 {
-		return "", fmt.Errorf("malfored EBS volume id %q", volumeID)
+		return "", fmt.Errorf("malformed EBS volume id %q", volumeID)
 	}
 	return volumeID[idx:], nil
 }
