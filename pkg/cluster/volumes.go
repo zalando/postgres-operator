@@ -264,7 +264,21 @@ func (c *Cluster) executeEBSMigration() error {
 
 	volumeIds := []string{}
 	for _, pv := range pvs {
-		volumeIds = append(volumeIds, pv.Spec.AWSElasticBlockStore.VolumeID)
+		volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
+		volumeIds = append(volumeIds, volumeID)
+	}
+
+	if len(volumeIds) == len(c.EBSVolumes) {
+		hasGp2 := false
+		for _, v := range c.EBSVolumes {
+			if v.VolumeType == "gp2" {
+				hasGp2 = true
+			}
+		}
+		if !hasGp2 {
+			// no gp2 volumes left to migrate
+			return nil
+		}
 	}
 
 	awsVolumes, err := c.VolumeResizer.DescribeVolumes(volumeIds)
