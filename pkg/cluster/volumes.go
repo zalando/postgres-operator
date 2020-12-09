@@ -295,7 +295,7 @@ func (c *Cluster) executeEBSMigration() error {
 	}
 
 	for _, volume := range awsVolumes {
-		if volume.VolumeType == "gp2" && volume.Size < c.OpConfig.EnableEBSGp3MaxSize {
+		if volume.VolumeType == "gp2" && volume.Size < c.OpConfig.EnableEBSGp3MigrationMaxSize {
 			c.logger.Infof("modifying EBS volume %s to type gp3 migration (%d)", volume.VolumeID, volume.Size)
 			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, "gp3", volume.Size, 3000, 125)
 			if nil != err {

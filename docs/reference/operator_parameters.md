@@ -368,6 +368,13 @@ configuration they are grouped under the `kubernetes` key.
   changes PVC definition, off - disables resize of the volumes. Default is "ebs".
   When using OpenShift please use one of the other available options.
 
+* **enable_ebs_gp3_migration**
+  enable automatic migration on AWS from gp2 volumes to gp3 volumes, smaller than configured max size.
+  it ignored that ebs gp3 is by default only 125mb/sec vs 250mb/sec for gp2 >= 333gb.
+
+* **enable_ebs_gp3_migration_max_size**
+  defines the maximum volume size until which auto migration happens, default 1tb which matches 3000iops default
+
 ## Kubernetes resource requests
 
 This group allows you to configure resource requests for the Postgres pods.

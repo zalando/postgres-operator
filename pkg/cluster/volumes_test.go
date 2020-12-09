@@ -218,9 +218,9 @@ func TestMigrateEBS(t *testing.T) {
 					ClusterLabels:    map[string]string{"application": "spilo"},
 					ClusterNameLabel: "cluster-name",
 				},
-				StorageResizeMode:     "pvc",
-				EnableEBSGp3Migration: true,
-				EnableEBSGp3MaxSize:   1000,
+				StorageResizeMode:            "pvc",
+				EnableEBSGp3Migration:        true,
+				EnableEBSGp3MigrationMaxSize: 1000,
 			},
 		}, client, acidv1.Postgresql{}, logger, eventRecorder)
 	cluster.Spec.Volume.Size = "1Gi"

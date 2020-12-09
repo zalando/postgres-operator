@@ -39,7 +39,7 @@ pipeline:
             go test ./...
         - desc: 'Run e2e tests'
           cmd: |
-            echo "" || make e2e
+            make e2e
         - desc: 'Push docker image'
           cmd: |
             export PATH=$PATH:$HOME/go/bin
