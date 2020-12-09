@@ -262,6 +262,7 @@ func (c *Cluster) executeEBSMigration() error {
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
+	c.logger.Debugf("found %d volumes, size of known volumes %d", len(pvs), len(c.EBSVolumes))
 
 	volumeIds := []string{}
 	for _, pv := range pvs {
@@ -284,6 +285,9 @@ func (c *Cluster) executeEBSMigration() error {
 	}
 
 	awsVolumes, err := c.VolumeResizer.DescribeVolumes(volumeIds)
+	if nil != err {
+		return err
+	}
 
 	for _, volume := range awsVolumes {
 		if volume.VolumeType == "gp2" && volume.Size < c.OpConfig.EnableEBSGp3MaxSize {
