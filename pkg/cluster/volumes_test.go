@@ -220,6 +220,7 @@ func TestMigrateEBS(t *testing.T) {
 				},
 				StorageResizeMode:     "pvc",
 				EnableEBSGp3Migration: true,
+				EnableEBSGp3MaxSize:   1000,
 			},
 		}, client, acidv1.Postgresql{}, logger, eventRecorder)
 	cluster.Spec.Volume.Size = "1Gi"
