@@ -39,17 +39,23 @@ func (r *EBSVolumeResizer) VolumeBelongsToProvider(pv *v1.PersistentVolume) bool
 	return pv.Spec.AWSElasticBlockStore != nil && pv.Annotations[constants.VolumeStorateProvisionerAnnotation] == constants.EBSProvisioner
 }
 
-// GetProviderVolumeID converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes
-func (r *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string, error) {
-	volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
-	if volumeID == "" {
-		return "", fmt.Errorf("volume id is empty for volume %q", pv.Name)
-	}
+// ExtractVolumeID extracts volumeID
+func (r *EBSVolumeResizer) ExtractVolumeID(volumeID string) (string, error) {
 	idx := strings.LastIndex(volumeID, constants.EBSVolumeIDStart) + 1
 	if idx == 0 {
 		return "", fmt.Errorf("malformed EBS volume id %q", volumeID)
 	}
 	return volumeID[idx:], nil
+}
+
+// GetProviderVolumeID converts aws://eu-central-1b/vol-00f93d4827217c629 to vol-00f93d4827217c629 for EBS volumes
+func (r *EBSVolumeResizer) GetProviderVolumeID(pv *v1.PersistentVolume) (string, error) {
+	volumeID := pv.Spec.AWSElasticBlockStore.VolumeID
+	if volumeID == "" {
+		return "", fmt.Errorf("got empty volume id for volume %v", pv)
+	}
+
+	return r.ExtractVolumeID(volumeID)
 }
 
 // DescribeVolumes ...

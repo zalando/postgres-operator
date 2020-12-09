@@ -289,6 +289,10 @@ func TestMigrateEBS(t *testing.T) {
 	defer ctrl.Finish()
 
 	resizer := mocks.NewMockVolumeResizer(ctrl)
+
+	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-1")).Return("ebs-volume-1", nil)
+	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
+
 	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2"})).Return(
 		[]volumes.VolumeProperties{
 			{VolumeID: "ebs-volume-1", VolumeType: "gp2", Size: 100},

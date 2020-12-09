@@ -267,7 +267,7 @@ func (c *Cluster) executeEBSMigration() error {
 	volumeIds := []string{}
 	var volumeID string
 	for _, pv := range pvs {
-		volumeID, err = c.VolumeResizer.GetProviderVolumeID(pv)
+		volumeID, err = c.VolumeResizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
 		if err != nil {
 			continue
 		}
