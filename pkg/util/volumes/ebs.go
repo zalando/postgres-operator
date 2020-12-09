@@ -151,10 +151,6 @@ func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize
 	if *vol.VolumeId != volumeID {
 		return fmt.Errorf("describe volume %q returned information about a non-matching volume %q", volumeID, *vol.VolumeId)
 	}
-	if *vol.Size == newSize {
-		// nothing to do
-		return nil
-	}
 
 	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeID, VolumeType: &newType, Iops: &iops, Throughput: &throughput}
 	output, err := r.connection.ModifyVolume(&input)
