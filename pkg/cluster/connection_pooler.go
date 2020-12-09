@@ -87,7 +87,7 @@ func (c *Cluster) connectionPoolerLabels(role PostgresRole, addExtraLabels bool)
 
 	if addExtraLabels {
 		extraLabels := map[string]string{}
-		extraLabels["spilo-role"] = string(role)
+		extraLabels[c.OpConfig.PodRoleLabel] = string(role)
 
 		poolerLabels = labels.Merge(poolerLabels, extraLabels)
 	}
