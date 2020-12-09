@@ -389,6 +389,17 @@ func (c *Cluster) syncStatefulSet() error {
 	}
 
 
+	if instancesRestartRequired {
+		c.logger.Debugln("restarting Postgres server within pods")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
+		if err := c.restartInstances(); err != nil {
+			c.logger.Warningf("could not restart Postgres server within pods: %v", err)
+			// Perform rolling update if couldn'r restart instances
+			podsRollingUpdateRequired = true
+		}
+		c.logger.Infof("Postgres server successfuly restarted on all pods")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done - all instances have been restarted")
+	}
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if len(podsToRecreate) > 0 {
@@ -401,15 +412,6 @@ func (c *Cluster) syncStatefulSet() error {
 		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
 			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
 		}
-	}
-	if instancesRestartRequired {
-		c.logger.Debugln("restarting Postgres server within pods")
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
-		if err := c.restartInstances(); err != nil {
-			return fmt.Errorf("could not restart Postgres server within pods: %v", err)
-		}
-		c.logger.Infof("Postgres server successfuly restarted on all pods")
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done - all instances have been restarted")
 	}
 	return nil
 }
