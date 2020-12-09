@@ -72,14 +72,19 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 		return nil, err
 	}
 
-	fmt.Printf("%v", volumeOutput)
 	p := []VolumeProperties{}
 	if nil == volumeOutput.Volumes {
 		return p, nil
 	}
 
 	for _, v := range volumeOutput.Volumes {
-		p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: *v.Size, VolumeType: *v.VolumeType, Iops: *v.Iops, Throughput: *v.Throughput})
+		if *v.VolumeType == "gp3" {
+			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: *v.Size, VolumeType: *v.VolumeType, Iops: *v.Iops, Throughput: *v.Throughput})
+		} else if *v.VolumeType == "gp2" {
+			p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: *v.Size, VolumeType: *v.VolumeType})
+		} else {
+			return nil, fmt.Errorf("Discovered unexpected volume type %s %s", *v.VolumeId, *v.VolumeType)
+		}
 	}
 
 	return p, nil
