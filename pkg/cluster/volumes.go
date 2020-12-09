@@ -256,6 +256,7 @@ func (c *Cluster) executeEBSMigration() error {
 	if !c.OpConfig.EnableEBSGp3Migration {
 		return nil
 	}
+	c.logger.Infof("starting EBS gp2 to gp3 migration")
 
 	pvs, _, err := c.listVolumesWithManifestSize(c.Spec.Volume)
 	if err != nil {
@@ -277,7 +278,7 @@ func (c *Cluster) executeEBSMigration() error {
 		}
 
 		if !hasGp2 {
-			// no gp2 volumes left to migrate
+			c.logger.Infof("no EBS gp2 volumes left to migrate")
 			return nil
 		}
 	}
