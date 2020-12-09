@@ -68,16 +68,20 @@ func (r *EBSVolumeResizer) DescribeVolumes(volumeIds []string) ([]VolumeProperti
 	}
 
 	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: aws.StringSlice((volumeIds))})
-
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("%v", volumeOutput)
 	p := []VolumeProperties{}
+	if nil == volumeOutput.Volumes {
+		return p, nil
+	}
 
 	for _, v := range volumeOutput.Volumes {
 		p = append(p, VolumeProperties{VolumeID: *v.VolumeId, Size: *v.Size, VolumeType: *v.VolumeType, Iops: *v.Iops, Throughput: *v.Throughput})
 	}
+
 	return p, nil
 }
 
