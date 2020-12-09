@@ -11,7 +11,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	k8sFake "k8s.io/client-go/kubernetes/fake"
 )
 
@@ -20,12 +19,10 @@ func newFakeK8sAnnotationsClient() (k8sutil.KubernetesClient, *k8sFake.Clientset
 	acidClientSet := fakeacidv1.NewSimpleClientset()
 
 	return k8sutil.KubernetesClient{
-		DeploymentsGetter:            clientSet.AppsV1(),
-		PersistentVolumeClaimsGetter: clientSet.CoreV1(),
-		PodDisruptionBudgetsGetter:   clientSet.PolicyV1beta1(),
-		ServicesGetter:               clientSet.CoreV1(),
-		StatefulSetsGetter:           clientSet.AppsV1(),
-		PostgresqlsGetter:            acidClientSet.AcidV1(),
+		PodDisruptionBudgetsGetter: clientSet.PolicyV1beta1(),
+		ServicesGetter:             clientSet.CoreV1(),
+		StatefulSetsGetter:         clientSet.AppsV1(),
+		PostgresqlsGetter:          acidClientSet.AcidV1(),
 	}, clientSet
 }
 
@@ -35,6 +32,7 @@ func TestInheritedAnnotations(t *testing.T) {
 	clusterName := "acid-test-cluster"
 	namespace := "default"
 	annotationValue := "acid"
+	role := Master
 
 	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
@@ -45,15 +43,30 @@ func TestInheritedAnnotations(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			EnableReplicaConnectionPooler: boolToPointer(true),
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
 		},
 	}
 
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    int32ToPointer(1),
+				},
+				PodManagementPolicy: "ordered_ready",
 				Resources: config.Resources{
 					ClusterLabels:        map[string]string{"application": "spilo"},
 					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
 					InheritedAnnotations: []string{"owned-by"},
 					PodRoleLabel:         "spilo-role",
 				},
@@ -66,35 +79,27 @@ func TestInheritedAnnotations(t *testing.T) {
 	// test annotationsSet function
 	inheritedAnnotations := cluster.annotationsSet(nil)
 
-	poolerListOptions := metav1.ListOptions{
-		LabelSelector: labels.Set(cluster.connectionPoolerLabels(Master, false).MatchLabels).String(),
-	}
-
-	// check pooler deployment annotations
-	cluster.createConnectionPooler(cluster.installLookupFunction)
-	deployList, err := client.Deployments(namespace).List(context.TODO(), poolerListOptions)
-	assert.NoError(t, err)
-	for _, deploy := range deployList.Items {
-		if !(util.MapContains(deploy.ObjectMeta.Annotations, inheritedAnnotations)) {
-			t.Errorf("%s: Deployment %v not inherited annotations %#v, got %#v", testName, deploy.ObjectMeta.Name, inheritedAnnotations, deploy.ObjectMeta.Annotations)
-		}
-	}
-
 	listOptions := metav1.ListOptions{
 		LabelSelector: cluster.labelsSet(false).String(),
 	}
 
 	// check statefulset annotations
-	cluster.createStatefulSet()
+	_, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
+
 	stsList, err := client.StatefulSets(namespace).List(context.TODO(), listOptions)
 	assert.NoError(t, err)
 	for _, sts := range stsList.Items {
 		if !(util.MapContains(sts.ObjectMeta.Annotations, inheritedAnnotations)) {
 			t.Errorf("%s: StatefulSet %v not inherited annotations %#v, got %#v", testName, sts.ObjectMeta.Name, inheritedAnnotations, sts.ObjectMeta.Annotations)
 		}
-
-		if !(util.MapContains(sts.Spec.Template.Annotations, inheritedAnnotations)) {
+		// pod template
+		if !(util.MapContains(sts.Spec.Template.ObjectMeta.Annotations, inheritedAnnotations)) {
 			t.Errorf("%s: pod template %v not inherited annotations %#v, got %#v", testName, sts.ObjectMeta.Name, inheritedAnnotations, sts.ObjectMeta.Annotations)
+		}
+		// pvc template
+		if util.MapContains(sts.Spec.VolumeClaimTemplates[0].Annotations, inheritedAnnotations) {
+			t.Errorf("%s: PVC template %v not expected to have inherited annotations %#v, got %#v", testName, sts.ObjectMeta.Name, inheritedAnnotations, sts.ObjectMeta.Annotations)
 		}
 	}
 
@@ -117,4 +122,20 @@ func TestInheritedAnnotations(t *testing.T) {
 			t.Errorf("%s: Pod Disruption Budget %v not inherited annotations %#v, got %#v", testName, pdb.ObjectMeta.Name, inheritedAnnotations, pdb.ObjectMeta.Annotations)
 		}
 	}
+
+	// check pooler deployment annotations
+	cluster.ConnectionPooler = map[PostgresRole]*ConnectionPoolerObjects{}
+	cluster.ConnectionPooler[role] = &ConnectionPoolerObjects{
+		Name:        cluster.connectionPoolerName(role),
+		ClusterName: cluster.ClusterName,
+		Namespace:   cluster.Namespace,
+		Role:        role,
+	}
+	deploy, err := cluster.generateConnectionPoolerDeployment(cluster.ConnectionPooler[role])
+	assert.NoError(t, err)
+
+	if !(util.MapContains(deploy.ObjectMeta.Annotations, inheritedAnnotations)) {
+		t.Errorf("%s: Deployment %v not inherited annotations %#v, got %#v", testName, deploy.ObjectMeta.Name, inheritedAnnotations, deploy.ObjectMeta.Annotations)
+	}
+
 }

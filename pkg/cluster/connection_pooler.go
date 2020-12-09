@@ -325,7 +325,7 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 
 	if *numberOfInstances < constants.ConnectionPoolerMinInstances {
 		msg := "Adjusted number of connection pooler instances from %d to %d"
-		c.logger.Warningf(msg, numberOfInstances, constants.ConnectionPoolerMinInstances)
+		c.logger.Warningf(msg, *numberOfInstances, constants.ConnectionPoolerMinInstances)
 
 		*numberOfInstances = constants.ConnectionPoolerMinInstances
 	}
