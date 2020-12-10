@@ -54,7 +54,7 @@ type PostgresSpec struct {
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
-	Users                 map[string]UserFlags        `json:"users"`
+	Users                 map[string]UserFlags        `json:"users,omitempty"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
 	Clone                 *CloneDescription           `json:"clone,omitempty"`
 	ClusterName           string                      `json:"-"`
@@ -113,14 +113,14 @@ type MaintenanceWindow struct {
 // Volume describes a single volume in the manifest.
 type Volume struct {
 	Size         string `json:"size"`
-	StorageClass string `json:"storageClass"`
+	StorageClass string `json:"storageClass,omitempty"`
 	SubPath      string `json:"subPath,omitempty"`
 }
 
 type AdditionalVolume struct {
 	Name             string          `json:"name"`
 	MountPath        string          `json:"mountPath"`
-	SubPath          string          `json:"subPath"`
+	SubPath          string          `json:"subPath,omitempty"`
 	TargetContainers []string        `json:"targetContainers"`
 	VolumeSource     v1.VolumeSource `json:"volumeSource"`
 }
@@ -128,7 +128,7 @@ type AdditionalVolume struct {
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
 type PostgresqlParam struct {
 	PgVersion  string            `json:"version"`
-	Parameters map[string]string `json:"parameters"`
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
@@ -145,15 +145,15 @@ type Resources struct {
 
 // Patroni contains Patroni-specific configuration
 type Patroni struct {
-	InitDB                map[string]string            `json:"initdb"`
-	PgHba                 []string                     `json:"pg_hba"`
-	TTL                   uint32                       `json:"ttl"`
-	LoopWait              uint32                       `json:"loop_wait"`
-	RetryTimeout          uint32                       `json:"retry_timeout"`
-	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
-	Slots                 map[string]map[string]string `json:"slots"`
-	SynchronousMode       bool                         `json:"synchronous_mode"`
-	SynchronousModeStrict bool                         `json:"synchronous_mode_strict"`
+	InitDB                map[string]string            `json:"initdb,omitempty"`
+	PgHba                 []string                     `json:"pg_hba,omitempty"`
+	TTL                   uint32                       `json:"ttl,omitempty"`
+	LoopWait              uint32                       `json:"loop_wait,omitempty"`
+	RetryTimeout          uint32                       `json:"retry_timeout,omitempty"`
+	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover,omitempty"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	Slots                 map[string]map[string]string `json:"slots,omitempty"`
+	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
+	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
 }
 
 //StandbyCluster
