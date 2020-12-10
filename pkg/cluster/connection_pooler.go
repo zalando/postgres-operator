@@ -334,15 +334,12 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 		return nil, err
 	}
 
-	annotations := c.annotationsSet(nil)
-	annotations = c.AnnotationsToPropagate(annotations)
-
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        connectionPooler.Name,
 			Namespace:   connectionPooler.Namespace,
 			Labels:      c.connectionPoolerLabels(connectionPooler.Role, true).MatchLabels,
-			Annotations: annotations,
+			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 			// make StatefulSet object its owner to represent the dependency.
 			// By itself StatefulSet is being deleted with "Orphaned"
 			// propagation policy, which means that it's deletion will not
@@ -869,8 +866,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		}
 	}
 
-	newAnnotations := c.annotationsSet(c.ConnectionPooler[role].Deployment.Annotations)
-	newAnnotations = c.AnnotationsToPropagate(newAnnotations)
+	newAnnotations := c.AnnotationsToPropagate(c.annotationsSet(c.ConnectionPooler[role].Deployment.Annotations))
 	if newAnnotations != nil && len(newAnnotations) > 0 {
 		deployment, err = updateConnectionPoolerAnnotations(c.KubeClient, c.ConnectionPooler[role].Deployment, newAnnotations)
 		if err != nil {

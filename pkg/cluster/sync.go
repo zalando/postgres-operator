@@ -353,9 +353,8 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-		annotations := c.annotationsSet(c.Statefulset.Annotations)
-		annotations = c.AnnotationsToPropagate(annotations)
-		c.updateStatefulSetAnnotations(annotations)
+
+		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
 
 		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if desired and actual statefulsets match
@@ -420,7 +419,11 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 		}
 	}
 
-	return annotations
+	if len(annotations) > 0 {
+		return annotations
+	}
+
+	return nil
 }
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters

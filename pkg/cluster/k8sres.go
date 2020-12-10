@@ -1226,9 +1226,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	stsAnnotations := c.annotationsSet(nil)
-	stsAnnotations = c.AnnotationsToPropagate(stsAnnotations)
+	stsAnnotations := make(map[string]string)
 	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
+	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
