@@ -550,10 +550,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "array",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Allows: true,
-								},
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
 							},
 						},
 					},
