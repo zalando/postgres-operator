@@ -211,6 +211,14 @@ configAwsOrGcp:
   # AWS region used to store ESB volumes
   aws_region: eu-central-1
 
+  # enable automatic migration on AWS from gp2 to gp3 volumes
+  enable_ebs_gp3_migration: "false"
+  # defines maximum volume size in GB until which auto migration happens
+  # enable_ebs_gp3_migration_max_size: 1000
+
+  # GCP credentials for setting the GOOGLE_APPLICATION_CREDNETIALS environment variable
+  # gcp_credentials: ""
+
   # AWS IAM role to supply in the iam.amazonaws.com/role annotation of Postgres pods
   # kube_iam_role: ""
 
@@ -222,9 +230,6 @@ configAwsOrGcp:
 
   # GCS bucket to use for shipping WAL segments with WAL-E
   # wal_gs_bucket: ""
-
-  # GCP credentials for setting the GOOGLE_APPLICATION_CREDNETIALS environment variable
-  # gcp_credentials: ""
 
 # configure K8s cron job managed by the operator
 configLogicalBackup:

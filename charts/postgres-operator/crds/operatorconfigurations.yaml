@@ -292,6 +292,10 @@ spec:
                     type: string
                   aws_region:
                     type: string
+                  enable_ebs_gp3_migration:
+                    type: boolean
+                  enable_ebs_gp3_migration_max_size:
+                    type: integer
                   gcp_credentials:
                     type: string
                   kube_iam_role:

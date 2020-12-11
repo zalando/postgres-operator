@@ -103,6 +103,8 @@ configuration:
     # additional_secret_mount: "some-secret-name"
     # additional_secret_mount_path: "/some/dir"
     aws_region: eu-central-1
+    enable_ebs_gp3_migration: false
+    # enable_ebs_gp3_migration_max_size: 1000
     # gcp_credentials: ""
     # kube_iam_role: ""
     # log_s3_bucket: ""

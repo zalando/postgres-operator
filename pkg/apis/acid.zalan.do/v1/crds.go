@@ -1169,6 +1169,15 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"aws_region": {
 								Type: "string",
 							},
+							"enable_ebs_gp3_migration": {
+								Type: "boolean",
+							},
+							"enable_ebs_gp3_migration_max_size": {
+								Type: "integer",
+							},
+							"gcp_credentials": {
+								Type: "string",
+							},
 							"kube_iam_role": {
 								Type: "string",
 							},

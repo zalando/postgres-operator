@@ -98,3 +98,5 @@ e2e/manifests
 # Translations
 *.mo
 *.pot
+
+mocks

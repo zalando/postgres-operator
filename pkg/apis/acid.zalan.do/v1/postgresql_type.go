@@ -115,8 +115,11 @@ type Volume struct {
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass,omitempty"`
 	SubPath      string `json:"subPath,omitempty"`
+	Iops         *int64 `json:"iops,omitempty"`
+	Throughput   *int64 `json:"throughput,omitempty"`
 }
 
+// AdditionalVolume specs additional optional volumes for statefulset
 type AdditionalVolume struct {
 	Name             string          `json:"name"`
 	MountPath        string          `json:"mountPath"`
@@ -156,11 +159,12 @@ type Patroni struct {
 	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
 }
 
-//StandbyCluster
+// StandbyDescription contains s3 wal path
 type StandbyDescription struct {
 	S3WalPath string `json:"s3_wal_path,omitempty"`
 }
 
+// TLSDescription specs TLS properties
 type TLSDescription struct {
 	SecretName      string `json:"secretName,omitempty"`
 	CertificateFile string `json:"certificateFile,omitempty"`
@@ -198,7 +202,7 @@ type PostgresStatus struct {
 	PostgresClusterStatus string `json:"PostgresClusterStatus"`
 }
 
-// Options for connection pooler
+// ConnectionPooler Options for connection pooler
 //
 // TODO: prepared snippets of configuration, one can choose via type, e.g.
 // pgbouncer-large (with higher resources) or odyssey-small (with smaller
