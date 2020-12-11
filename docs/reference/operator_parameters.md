@@ -368,13 +368,6 @@ configuration they are grouped under the `kubernetes` key.
   changes PVC definition, off - disables resize of the volumes. Default is "ebs".
   When using OpenShift please use one of the other available options.
 
-* **enable_ebs_gp3_migration**
-  enable automatic migration on AWS from gp2 volumes to gp3 volumes, smaller than configured max size.
-  it ignored that ebs gp3 is by default only 125mb/sec vs 250mb/sec for gp2 >= 333gb.
-
-* **enable_ebs_gp3_migration_max_size**
-  defines the maximum volume size until which auto migration happens, default 1tb which matches 3000iops default
-
 ## Kubernetes resource requests
 
 This group allows you to configure resource requests for the Postgres pods.
@@ -525,10 +518,22 @@ yet officially supported.
   AWS region used to store EBS volumes. The default is `eu-central-1`.
 
 * **additional_secret_mount**
-  Additional Secret (aws or gcp credentials) to mount in the pod. The default is empty.
+  Additional Secret (aws or gcp credentials) to mount in the pod.
+  The default is empty.
 
 * **additional_secret_mount_path**
-  Path to mount the above Secret in the filesystem of the container(s). The default is empty.
+  Path to mount the above Secret in the filesystem of the container(s).
+  The default is empty.
+
+* **enable_ebs_gp3_migration**
+  enable automatic migration on AWS from gp2 to gp3 volumes, that are smaller
+  than the configured max size (see below). This ignores that EBS gp3 is by
+  default only 125 MB/sec vs 250 MB/sec for gp2 >= 333GB.
+  The default is `false`.
+
+* **enable_ebs_gp3_migration_max_size**
+  defines the maximum volume size in GB until which auto migration happens.
+  Default is 1000 (1TB) which matches 3000 IOPS.
 
 ## Logical backup
 

@@ -36,6 +36,8 @@ data:
   # enable_admin_role_for_users: "true"
   # enable_crd_validation: "true"
   # enable_database_access: "true"
+  enable_ebs_gp3_migration: "false"
+  # enable_ebs_gp3_migration_max_size: 1000
   # enable_init_containers: "true"
   # enable_lazy_spilo_upgrade: "false"
   enable_master_load_balancer: "false"

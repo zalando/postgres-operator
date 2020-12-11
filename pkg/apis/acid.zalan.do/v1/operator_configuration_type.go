@@ -117,14 +117,16 @@ type LoadBalancerConfiguration struct {
 // AWSGCPConfiguration defines the configuration for AWS
 // TODO complete Google Cloud Platform (GCP) configuration
 type AWSGCPConfiguration struct {
-	WALES3Bucket              string `json:"wal_s3_bucket,omitempty"`
-	AWSRegion                 string `json:"aws_region,omitempty"`
-	WALGSBucket               string `json:"wal_gs_bucket,omitempty"`
-	GCPCredentials            string `json:"gcp_credentials,omitempty"`
-	LogS3Bucket               string `json:"log_s3_bucket,omitempty"`
-	KubeIAMRole               string `json:"kube_iam_role,omitempty"`
-	AdditionalSecretMount     string `json:"additional_secret_mount,omitempty"`
-	AdditionalSecretMountPath string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	WALES3Bucket                 string `json:"wal_s3_bucket,omitempty"`
+	AWSRegion                    string `json:"aws_region,omitempty"`
+	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
+	GCPCredentials               string `json:"gcp_credentials,omitempty"`
+	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
+	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
+	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
+	AdditionalSecretMountPath    string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration" default:"false"`
+	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size" default:"1000"`
 }
 
 // OperatorDebugConfiguration defines options for the debug mode

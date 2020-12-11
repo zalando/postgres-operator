@@ -163,6 +163,8 @@ type Config struct {
 	GCPCredentials                         string            `name:"gcp_credentials"`
 	AdditionalSecretMount                  string            `name:"additional_secret_mount"`
 	AdditionalSecretMountPath              string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
+	EnableEBSGp3Migration                  bool              `name:"enable_ebs_gp3_migration" default:"false"`
+	EnableEBSGp3MigrationMaxSize           int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
 	DebugLogging                           bool              `name:"debug_logging" default:"true"`
 	EnableDBAccess                         bool              `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI                         bool              `name:"enable_teams_api" default:"true"`
@@ -198,8 +200,6 @@ type Config struct {
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"false"`
-	EnableEBSGp3Migration                  bool              `name:"enable_ebs_gp3_migration" default:"false"`
-	EnableEBSGp3MigrationMaxSize           int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
 }
 
 // MustMarshal marshals the config or panics
