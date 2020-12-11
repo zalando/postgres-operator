@@ -163,7 +163,7 @@ func CreatePVCs(namespace string, clusterName string, labels labels.Set, n int, 
 }
 
 func TestMigrateEBS(t *testing.T) {
-	client, _ := NewFakeKubernetesClient()
+	client, _ := newFakeK8sPVCclient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
 
