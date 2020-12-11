@@ -22,7 +22,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func NewFakeKubernetesClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+func newFakeK8sPVCclient() (k8sutil.KubernetesClient, *fake.Clientset) {
 	clientSet := fake.NewSimpleClientset()
 
 	return k8sutil.KubernetesClient{
@@ -34,7 +34,7 @@ func NewFakeKubernetesClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 func TestResizeVolumeClaim(t *testing.T) {
 	testName := "test resizing of persistent volume claims"
-	client, _ := NewFakeKubernetesClient()
+	client, _ := newFakeK8sPVCclient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
 	newVolumeSize := "2Gi"

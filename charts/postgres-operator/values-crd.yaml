@@ -91,7 +91,11 @@ configKubernetes:
   # namespaced name of the secret containing infrastructure roles names and passwords
   # infrastructure_roles_secret_name: postgresql-infrastructure-roles
 
-  # list of labels that can be inherited from the cluster manifest
+  # list of annotation keys that can be inherited from the cluster manifest
+  # inherited_annotations:
+  # - owned-by
+
+  # list of label keys that can be inherited from the cluster manifest
   # inherited_labels:
   # - application
   # - environment

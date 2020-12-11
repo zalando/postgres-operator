@@ -852,6 +852,7 @@ class EndToEndTestCase(unittest.TestCase):
         patch_sset_propagate_annotations = {
             "data": {
                 "downscaler_annotations": "deployment-time,downscaler/*",
+                "inherited_annotations": "owned-by",
             }
         }
         k8s.update_config(patch_sset_propagate_annotations)
@@ -861,6 +862,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "annotations": {
                     "deployment-time": "2020-04-30 12:00:00",
                     "downscaler/downtime_replicas": "0",
+                    "owned-by": "acid",
                 },
             }
         }
@@ -870,10 +872,9 @@ class EndToEndTestCase(unittest.TestCase):
         annotations = {
             "deployment-time": "2020-04-30 12:00:00",
             "downscaler/downtime_replicas": "0",
+            "owned-by": "acid",
         }
-
-        self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
-
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)

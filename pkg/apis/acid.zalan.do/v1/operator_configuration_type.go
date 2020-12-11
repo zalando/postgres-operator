@@ -66,6 +66,7 @@ type KubernetesMetaConfiguration struct {
 	PodRoleLabel                           string                       `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string            `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
+	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`
 	DownscalerAnnotations                  []string                     `json:"downscaler_annotations,omitempty"`
 	ClusterNameLabel                       string                       `json:"cluster_name_label,omitempty"`
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`

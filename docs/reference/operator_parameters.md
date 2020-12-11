@@ -274,6 +274,12 @@ configuration they are grouped under the `kubernetes` key.
   are extracted. For the ConfigMap this has to be a string which allows
   referencing only one infrastructure roles secret. The default is empty.
 
+* **inherited_annotations**
+  list of annotation keys that can be inherited from the cluster manifest, and
+  added to each child objects  (`Deployment`, `StatefulSet`, `Pod`, `PDB` and
+  `Services`) created by the operator incl. the ones from the connection
+  pooler deployment. The default is empty.
+
 * **pod_role_label**
   name of the label assigned to the Postgres pods (and services/endpoints) by
   the operator. The default is `spilo-role`.
@@ -283,15 +289,16 @@ configuration they are grouped under the `kubernetes` key.
   objects. The default is `application:spilo`.
 
 * **inherited_labels**
-  list of labels that can be inherited from the cluster manifest, and added to
-  each child objects (`StatefulSet`, `Pod`, `Service` and `Endpoints`) created
-  by the operator. Typical use case is to dynamically pass labels that are
-  specific to a given Postgres cluster, in order to implement `NetworkPolicy`.
-  The default is empty.
+  list of label keys that can be inherited from the cluster manifest, and
+  added to each child objects (`Deployment`, `StatefulSet`, `Pod`, `PVCs`,
+  `PDB`, `Service`, `Endpoints` and `Secrets`) created by the operator.
+  Typical use case is to dynamically pass labels that are specific to a
+  given Postgres cluster, in order to implement `NetworkPolicy`. The default
+  is empty.
 
 * **cluster_name_label**
-  name of the label assigned to Kubernetes objects created by the operator that
-  indicates which cluster a given object belongs to. The default is
+  name of the label assigned to Kubernetes objects created by the operator
+  that indicates which cluster a given object belongs to. The default is
   `cluster-name`.
 
 * **node_readiness_label**

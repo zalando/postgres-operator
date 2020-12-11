@@ -398,7 +398,7 @@ func (c *Controller) loadPostgresTeams() {
 	// reset team map
 	c.pgTeamMap = teams.PostgresTeamMap{}
 
-	pgTeams, err := c.KubeClient.AcidV1ClientSet.AcidV1().PostgresTeams(c.opConfig.WatchedNamespace).List(context.TODO(), metav1.ListOptions{})
+	pgTeams, err := c.KubeClient.PostgresTeamsGetter.PostgresTeams(c.opConfig.WatchedNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		c.logger.Errorf("could not list postgres team objects: %v", err)
 	}

@@ -202,6 +202,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.InheritedAnnotations != nil {
+		in, out := &in.InheritedAnnotations, &out.InheritedAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.DownscalerAnnotations != nil {
 		in, out := &in.DownscalerAnnotations, &out.DownscalerAnnotations
 		*out = make([]string, len(*in))

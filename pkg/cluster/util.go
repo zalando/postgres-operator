@@ -271,6 +271,33 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	return members, nil
 }
 
+// Returns annotations to be passed to child objects
+func (c *Cluster) annotationsSet(annotations map[string]string) map[string]string {
+
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	pgCRDAnnotations := c.ObjectMeta.Annotations
+
+	// allow to inherit certain labels from the 'postgres' object
+	if pgCRDAnnotations != nil {
+		for k, v := range pgCRDAnnotations {
+			for _, match := range c.OpConfig.InheritedAnnotations {
+				if k == match {
+					annotations[k] = v
+				}
+			}
+		}
+	}
+
+	if len(annotations) > 0 {
+		return annotations
+	}
+
+	return nil
+}
+
 func (c *Cluster) waitForPodLabel(podEvents chan PodEvent, stopChan chan struct{}, role *PostgresRole) (*v1.Pod, error) {
 	timeout := time.After(c.OpConfig.PodLabelWaitTimeout)
 	for {

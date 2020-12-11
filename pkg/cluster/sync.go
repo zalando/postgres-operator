@@ -368,8 +368,8 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-		annotations := c.AnnotationsToPropagate(c.Statefulset.Annotations)
-		c.updateStatefulSetAnnotations(annotations)
+
+		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
 
 		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if desired and actual statefulsets match
@@ -412,11 +412,15 @@ func (c *Cluster) syncStatefulSet() error {
 // AnnotationsToPropagate get the annotations to update if required
 // based on the annotations in postgres CRD
 func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[string]string {
-	toPropagateAnnotations := c.OpConfig.DownscalerAnnotations
-	pgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
 
-	if toPropagateAnnotations != nil && pgCRDAnnotations != nil {
-		for _, anno := range toPropagateAnnotations {
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	pgCRDAnnotations := c.ObjectMeta.Annotations
+
+	if pgCRDAnnotations != nil {
+		for _, anno := range c.OpConfig.DownscalerAnnotations {
 			for k, v := range pgCRDAnnotations {
 				matched, err := regexp.MatchString(anno, k)
 				if err != nil {
@@ -430,7 +434,11 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 		}
 	}
 
-	return annotations
+	if len(annotations) > 0 {
+		return annotations
+	}
+
+	return nil
 }
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
