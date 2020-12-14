@@ -201,6 +201,7 @@ type OperatorConfigurationData struct {
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
+	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`

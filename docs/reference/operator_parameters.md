@@ -79,6 +79,12 @@ Those are top-level keys, containing both leaf keys and groups.
   Instruct operator to update only the statefulsets with new images (Spilo and InitContainers) without immediately doing the rolling update. The assumption is pods will be re-started later with new images, for example due to the node rotation.
   The default is `false`.
 
+* **enable_pgversion_env_var**
+  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `false`.
+
+* **enable_spilo_wal_path_compat**
+  enables backwards compatible path between Spilo 12 and Spilo 13 images. The default is `false`.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use
@@ -117,9 +123,6 @@ Those are top-level keys, containing both leaf keys and groups.
   [docker issue](https://github.com/docker-library/postgres/issues/416)).
   This option is global for an operator object, and can be overwritten by
   `enableShmVolume` parameter from Postgres manifest. The default is `true`.
-
-* **enable_pgversion_env_var**
-  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `false`.
 
 * **workers**
   number of working routines the operator spawns to process requests to

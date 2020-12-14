@@ -69,6 +69,8 @@ spec:
                 type: boolean
               enable_shm_volume:
                 type: boolean
+              enable_spilo_wal_path_compat:
+                type: boolean
               etcd_host:
                 type: string
               kubernetes_use_configmaps:
