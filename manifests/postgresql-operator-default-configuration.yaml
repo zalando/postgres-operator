@@ -6,6 +6,7 @@ configuration:
   docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
   # enable_crd_validation: true
   # enable_lazy_spilo_upgrade: false
+  # enable_pgversion_env_var: false
   # enable_shm_volume: true
   etcd_host: ""
   # kubernetes_use_configmaps: false

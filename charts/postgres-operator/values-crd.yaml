@@ -22,7 +22,7 @@ configGeneral:
   # update only the statefulsets without immediately doing the rolling update
   enable_lazy_spilo_upgrade: false
   # set the PGVERSION env var instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION
-  enable_pgversion_env_var: "false"
+  enable_pgversion_env_var: false
   # start any new database pod without limitations on shm memory
   enable_shm_volume: true
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
@@ -270,7 +270,7 @@ configTeamsApi:
   # operator watches for PostgresTeam CRs to assign additional teams and members to clusters
   enable_postgres_team_crd: false
   # toogle to create additional superuser teams from PostgresTeam CRs
-  # enable_postgres_team_crd_superusers: "false"
+  # enable_postgres_team_crd_superusers: false
 
   # toggle to grant superuser to team members created from the Teams API
   enable_team_superuser: false
