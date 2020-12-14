@@ -50,6 +50,7 @@ data:
   # enable_shm_volume: "true"
   # enable_pgversion_env_var: "false"
   # enable_sidecars: "true"
+  enable_spilo_wal_path_compat: "false"
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""

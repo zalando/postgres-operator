@@ -815,6 +815,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enable_shm_volume": {
 						Type: "boolean",
 					},
+					"enable_spilo_wal_path_compat": {
+						Type: "boolean",
+					},
 					"etcd_host": {
 						Type: "string",
 					},

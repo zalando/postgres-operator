@@ -824,7 +824,7 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	return configMapPodEnvVarsList, nil
 }
 
-// Return list of variables the pod recieved from the configured Secret
+// Return list of variables the pod received from the configured Secret
 func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	secretPodEnvVarsList := make([]v1.EnvVar, 0)
 
@@ -979,6 +979,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers = spec.InitContainers
 	}
 
+	spiloCompathWalPathList := make([]v1.EnvVar, 0)
+	if c.OpConfig.EnableSpiloWalPathCompat {
+		spiloCompathWalPathList = append(spiloCompathWalPathList,
+			v1.EnvVar{
+				Name:  "ENABLE_WAL_PATH_COMPAT",
+				Value: "true",
+			},
+		)
+	}
+
 	// fetch env vars from custom ConfigMap
 	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
 	if err != nil {
@@ -992,7 +1002,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// concat all custom pod env vars and sort them
-	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
+	customPodEnvVarsList := append(spiloCompathWalPathList, configMapEnvVarsList...)
+	customPodEnvVarsList = append(customPodEnvVarsList, secretEnvVarsList...)
 	sort.Slice(customPodEnvVarsList,
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
