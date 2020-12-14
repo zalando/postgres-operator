@@ -201,7 +201,7 @@ func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.Namespaced
 func SameService(cur, new *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
 	if cur.Spec.Type != new.Spec.Type {
-		return false, fmt.Sprintf("new service's type %q doesn't match the current one %q",
+		return false, fmt.Sprintf("new service's type %q does not match the current one %q",
 			new.Spec.Type, cur.Spec.Type)
 	}
 
@@ -211,13 +211,13 @@ func SameService(cur, new *v1.Service) (match bool, reason string) {
 	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
 	if (len(oldSourceRanges) != 0) || (len(newSourceRanges) != 0) {
 		if !reflect.DeepEqual(oldSourceRanges, newSourceRanges) {
-			return false, "new service's LoadBalancerSourceRange doesn't match the current one"
+			return false, "new service's LoadBalancerSourceRange does not match the current one"
 		}
 	}
 
 	match = true
 
-	reasonPrefix := "new service's annotations doesn't match the current one:"
+	reasonPrefix := "new service's annotations does not match the current one:"
 	for ann := range cur.Annotations {
 		if _, ok := new.Annotations[ann]; !ok {
 			match = false
@@ -253,7 +253,7 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	//TODO: improve comparison
 	match = reflect.DeepEqual(new.Spec, cur.Spec)
 	if !match {
-		reason = "new PDB spec doesn't match the current one"
+		reason = "new PDB spec does not match the current one"
 	}
 
 	return
@@ -267,14 +267,14 @@ func getJobImage(cronJob *batchv1beta1.CronJob) string {
 func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
 
 	if cur.Spec.Schedule != new.Spec.Schedule {
-		return false, fmt.Sprintf("new job's schedule %q doesn't match the current one %q",
+		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
 			new.Spec.Schedule, cur.Spec.Schedule)
 	}
 
 	newImage := getJobImage(new)
 	curImage := getJobImage(cur)
 	if newImage != curImage {
-		return false, fmt.Sprintf("new job's image %q doesn't match the current one %q",
+		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
 			newImage, curImage)
 	}
 

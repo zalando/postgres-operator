@@ -248,7 +248,7 @@ func (c *Cluster) Create() error {
 		}
 		if role == Master {
 			// replica endpoint will be created by the replica service. Master endpoint needs to be created by us,
-			// since the corresponding master service doesn't define any selectors.
+			// since the corresponding master service does not define any selectors.
 			ep, err = c.createEndpoint(role)
 			if err != nil {
 				return fmt.Errorf("could not create %s endpoint: %v", role, err)
@@ -412,7 +412,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		match = false
 		needsReplace = true
 		needsRollUpdate = true
-		reasons = append(reasons, "new statefulset's pod template metadata annotations doesn't match the current one")
+		reasons = append(reasons, "new statefulset's pod template metadata annotations does not match the current one")
 	}
 	if !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.SecurityContext, statefulSet.Spec.Template.Spec.SecurityContext) {
 		match = false
@@ -488,20 +488,22 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 	}
 
 	checks := []containerCheck{
-		newCheck("new statefulset %s's %s (index %d) name doesn't match the current one",
+		newCheck("new statefulset %s's %s (index %d) name does not match the current one",
 			func(a, b v1.Container) bool { return a.Name != b.Name }),
-		newCheck("new statefulset %s's %s (index %d) ports don't match the current one",
+		newCheck("new statefulset %s's %s (index %d) ports do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Ports, b.Ports) }),
-		newCheck("new statefulset %s's %s (index %d) resources don't match the current ones",
+		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
-		newCheck("new statefulset %s's %s (index %d) environment doesn't match the current one",
+		newCheck("new statefulset %s's %s (index %d) environment does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
-		newCheck("new statefulset %s's %s (index %d) environment sources don't match the current one",
+		newCheck("new statefulset %s's %s (index %d) environment sources do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
+		newCheck("new statefulset %s's %s (index %d) security context does not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
-		checks = append(checks, newCheck("new statefulset %s's %s (index %d) image doesn't match the current one",
+		checks = append(checks, newCheck("new statefulset %s's %s (index %d) image does not match the current one",
 			func(a, b v1.Container) bool { return a.Image != b.Image }))
 	}
 
