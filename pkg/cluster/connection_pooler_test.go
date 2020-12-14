@@ -810,25 +810,25 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
 	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
-		return fmt.Errorf("CPU request doesn't match, got %s, expected %s",
+		return fmt.Errorf("CPU request does not match, got %s, expected %s",
 			cpuReq.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest)
 	}
 
 	memReq := podSpec.Spec.Containers[0].Resources.Requests["memory"]
 	if memReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest {
-		return fmt.Errorf("Memory request doesn't match, got %s, expected %s",
+		return fmt.Errorf("Memory request does not match, got %s, expected %s",
 			memReq.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest)
 	}
 
 	cpuLim := podSpec.Spec.Containers[0].Resources.Limits["cpu"]
 	if cpuLim.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPULimit {
-		return fmt.Errorf("CPU limit doesn't match, got %s, expected %s",
+		return fmt.Errorf("CPU limit does not match, got %s, expected %s",
 			cpuLim.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPULimit)
 	}
 
 	memLim := podSpec.Spec.Containers[0].Resources.Limits["memory"]
 	if memLim.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit {
-		return fmt.Errorf("Memory limit doesn't match, got %s, expected %s",
+		return fmt.Errorf("Memory limit does not match, got %s, expected %s",
 			memLim.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit)
 	}
 
