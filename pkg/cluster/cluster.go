@@ -623,6 +623,10 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	} else if oldSpec.Spec.PostgresqlParam.PgVersion < newSpec.Spec.PostgresqlParam.PgVersion {
 		c.logger.Infof("postgresql version increased (%q -> %q), major version upgrade can be done manually after StatefulSet Sync",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
+		if err := c.syncStatefulSet(); err != nil {
+			c.logger.Errorf("could not sync statefulSet: %v", err)
+			updateFailed = true
+		}
 	}
 
 	// Service
