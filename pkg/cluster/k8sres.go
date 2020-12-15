@@ -824,7 +824,7 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	return configMapPodEnvVarsList, nil
 }
 
-// Return list of variables the pod recieved from the configured Secret
+// Return list of variables the pod received from the configured Secret
 func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	secretPodEnvVarsList := make([]v1.EnvVar, 0)
 
@@ -979,6 +979,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers = spec.InitContainers
 	}
 
+	spiloCompathWalPathList := make([]v1.EnvVar, 0)
+	if c.OpConfig.EnableSpiloWalPathCompat {
+		spiloCompathWalPathList = append(spiloCompathWalPathList,
+			v1.EnvVar{
+				Name:  "ENABLE_WAL_PATH_COMPAT",
+				Value: "true",
+			},
+		)
+	}
+
 	// fetch env vars from custom ConfigMap
 	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
 	if err != nil {
@@ -992,7 +1002,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// concat all custom pod env vars and sort them
-	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
+	customPodEnvVarsList := append(spiloCompathWalPathList, configMapEnvVarsList...)
+	customPodEnvVarsList = append(customPodEnvVarsList, secretEnvVarsList...)
 	sort.Slice(customPodEnvVarsList,
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
@@ -1184,13 +1195,13 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	annotations := c.generatePodAnnotations(spec)
+	podAnnotations := c.generatePodAnnotations(spec)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
-		annotations,
+		c.annotationsSet(podAnnotations),
 		spiloContainer,
 		initContainers,
 		sidecarContainers,
@@ -1236,15 +1247,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	annotations = make(map[string]string)
-	annotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
+	stsAnnotations := make(map[string]string)
+	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
+	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: c.AnnotationsToPropagate(annotations),
+			Annotations: stsAnnotations,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -1537,9 +1549,10 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	username := pgUser.Name
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.credentialSecretName(username),
-			Namespace: namespace,
-			Labels:    c.labelsSet(true),
+			Name:        c.credentialSecretName(username),
+			Namespace:   namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(nil),
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -1613,7 +1626,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
 			Labels:      c.roleLabelsSet(true, role),
-			Annotations: c.generateServiceAnnotations(role, spec),
+			Annotations: c.annotationsSet(c.generateServiceAnnotations(role, spec)),
 		},
 		Spec: serviceSpec,
 	}
@@ -1816,9 +1829,10 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 
 	return &policybeta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.podDisruptionBudgetName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
+			Name:        c.podDisruptionBudgetName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(nil),
 		},
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
@@ -1938,9 +1952,10 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	cronJob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.getLogicalBackupJobName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
+			Name:        c.getLogicalBackupJobName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(nil),
 		},
 		Spec: batchv1beta1.CronJobSpec{
 			Schedule:          schedule,

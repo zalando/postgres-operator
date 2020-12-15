@@ -25,6 +25,13 @@ package cmd
 import (
 	"flag"
 	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,12 +39,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -88,7 +89,7 @@ func confirmAction(clusterName string, namespace string) {
 		}
 		clusterDetails := strings.Split(confirmClusterDetails, "/")
 		if clusterDetails[0] != namespace || clusterDetails[1] != clusterName {
-			fmt.Printf("cluster name or namespace doesn't match. Please re-enter %s/%s\nHint: Press (ctrl+c) to exit\n", namespace, clusterName)
+			fmt.Printf("cluster name or namespace does not match. Please re-enter %s/%s\nHint: Press (ctrl+c) to exit\n", namespace, clusterName)
 		} else {
 			return
 		}

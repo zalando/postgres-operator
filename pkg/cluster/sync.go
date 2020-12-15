@@ -11,7 +11,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	"github.com/zalando/postgres-operator/pkg/util/volumes"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -55,7 +54,23 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	}
 
 	c.logger.Debugf("syncing volumes using %q storage resize mode", c.OpConfig.StorageResizeMode)
-	if c.OpConfig.StorageResizeMode == "pvc" {
+
+	if c.OpConfig.EnableEBSGp3Migration {
+		err = c.executeEBSMigration()
+		if nil != err {
+			return err
+		}
+	}
+
+	if c.OpConfig.StorageResizeMode == "mixed" {
+		// mixed op uses AWS API to adjust size,throughput,iops and calls pvc chance for file system resize
+
+		// resize pvc to adjust filesystem size until better K8s support
+		if err = c.syncVolumeClaims(); err != nil {
+			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
+			return err
+		}
+	} else if c.OpConfig.StorageResizeMode == "pvc" {
 		if err = c.syncVolumeClaims(); err != nil {
 			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
 			return err
@@ -353,8 +368,8 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-		annotations := c.AnnotationsToPropagate(c.Statefulset.Annotations)
-		c.updateStatefulSetAnnotations(annotations)
+
+		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
 
 		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if desired and actual statefulsets match
@@ -397,11 +412,15 @@ func (c *Cluster) syncStatefulSet() error {
 // AnnotationsToPropagate get the annotations to update if required
 // based on the annotations in postgres CRD
 func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[string]string {
-	toPropagateAnnotations := c.OpConfig.DownscalerAnnotations
-	pgCRDAnnotations := c.Postgresql.ObjectMeta.GetAnnotations()
 
-	if toPropagateAnnotations != nil && pgCRDAnnotations != nil {
-		for _, anno := range toPropagateAnnotations {
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	pgCRDAnnotations := c.ObjectMeta.Annotations
+
+	if pgCRDAnnotations != nil {
+		for _, anno := range c.OpConfig.DownscalerAnnotations {
 			for k, v := range pgCRDAnnotations {
 				matched, err := regexp.MatchString(anno, k)
 				if err != nil {
@@ -415,7 +434,11 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 		}
 	}
 
-	return annotations
+	if len(annotations) > 0 {
+		return annotations
+	}
+
+	return nil
 }
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
@@ -576,7 +599,7 @@ func (c *Cluster) syncVolumeClaims() error {
 		return fmt.Errorf("could not compare size of the volume claims: %v", err)
 	}
 	if !act {
-		c.logger.Infof("volume claims don't require changes")
+		c.logger.Infof("volume claims do not require changes")
 		return nil
 	}
 	if err := c.resizeVolumeClaims(c.Spec.Volume); err != nil {
@@ -599,7 +622,8 @@ func (c *Cluster) syncVolumes() error {
 	if !act {
 		return nil
 	}
-	if err := c.resizeVolumes(c.Spec.Volume, []volumes.VolumeResizer{&volumes.EBSVolumeResizer{AWSRegion: c.OpConfig.AWSRegion}}); err != nil {
+
+	if err := c.resizeVolumes(); err != nil {
 		return fmt.Errorf("could not sync volumes: %v", err)
 	}
 

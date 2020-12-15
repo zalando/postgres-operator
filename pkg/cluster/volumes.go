@@ -15,7 +15,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
-	"github.com/zalando/postgres-operator/pkg/util/volumes"
 )
 
 func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, error) {
@@ -119,19 +118,26 @@ func (c *Cluster) listPersistentVolumes() ([]*v1.PersistentVolume, error) {
 }
 
 // resizeVolumes resize persistent volumes compatible with the given resizer interface
-func (c *Cluster) resizeVolumes(newVolume acidv1.Volume, resizers []volumes.VolumeResizer) error {
-	c.setProcessName("resizing volumes")
+func (c *Cluster) resizeVolumes() error {
+	if c.VolumeResizer == nil {
+		return fmt.Errorf("no volume resizer set for EBS volume handling")
+	}
 
+	c.setProcessName("resizing EBS volumes")
+
+	resizer := c.VolumeResizer
 	var totalIncompatible int
 
-	newQuantity, err := resource.ParseQuantity(newVolume.Size)
+	newQuantity, err := resource.ParseQuantity(c.Spec.Volume.Size)
 	if err != nil {
 		return fmt.Errorf("could not parse volume size: %v", err)
 	}
-	pvs, newSize, err := c.listVolumesWithManifestSize(newVolume)
+
+	pvs, newSize, err := c.listVolumesWithManifestSize(c.Spec.Volume)
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
+
 	for _, pv := range pvs {
 		volumeSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
 		if volumeSize >= newSize {
@@ -141,43 +147,43 @@ func (c *Cluster) resizeVolumes(newVolume acidv1.Volume, resizers []volumes.Volu
 			continue
 		}
 		compatible := false
-		for _, resizer := range resizers {
-			if !resizer.VolumeBelongsToProvider(pv) {
-				continue
-			}
-			compatible = true
-			if !resizer.IsConnectedToProvider() {
-				err := resizer.ConnectToProvider()
-				if err != nil {
-					return fmt.Errorf("could not connect to the volume provider: %v", err)
-				}
-				defer func() {
-					if err := resizer.DisconnectFromProvider(); err != nil {
-						c.logger.Errorf("%v", err)
-					}
-				}()
-			}
-			awsVolumeID, err := resizer.GetProviderVolumeID(pv)
-			if err != nil {
-				return err
-			}
-			c.logger.Debugf("updating persistent volume %q to %d", pv.Name, newSize)
-			if err := resizer.ResizeVolume(awsVolumeID, newSize); err != nil {
-				return fmt.Errorf("could not resize EBS volume %q: %v", awsVolumeID, err)
-			}
-			c.logger.Debugf("resizing the filesystem on the volume %q", pv.Name)
-			podName := getPodNameFromPersistentVolume(pv)
-			if err := c.resizePostgresFilesystem(podName, []filesystems.FilesystemResizer{&filesystems.Ext234Resize{}}); err != nil {
-				return fmt.Errorf("could not resize the filesystem on pod %q: %v", podName, err)
-			}
-			c.logger.Debugf("filesystem resize successful on volume %q", pv.Name)
-			pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
-			c.logger.Debugf("updating persistent volume definition for volume %q", pv.Name)
-			if _, err := c.KubeClient.PersistentVolumes().Update(context.TODO(), pv, metav1.UpdateOptions{}); err != nil {
-				return fmt.Errorf("could not update persistent volume: %q", err)
-			}
-			c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
+
+		if !resizer.VolumeBelongsToProvider(pv) {
+			continue
 		}
+		compatible = true
+		if !resizer.IsConnectedToProvider() {
+			err := resizer.ConnectToProvider()
+			if err != nil {
+				return fmt.Errorf("could not connect to the volume provider: %v", err)
+			}
+			defer func() {
+				if err := resizer.DisconnectFromProvider(); err != nil {
+					c.logger.Errorf("%v", err)
+				}
+			}()
+		}
+		awsVolumeID, err := resizer.GetProviderVolumeID(pv)
+		if err != nil {
+			return err
+		}
+		c.logger.Debugf("updating persistent volume %q to %d", pv.Name, newSize)
+		if err := resizer.ResizeVolume(awsVolumeID, newSize); err != nil {
+			return fmt.Errorf("could not resize EBS volume %q: %v", awsVolumeID, err)
+		}
+		c.logger.Debugf("resizing the filesystem on the volume %q", pv.Name)
+		podName := getPodNameFromPersistentVolume(pv)
+		if err := c.resizePostgresFilesystem(podName, []filesystems.FilesystemResizer{&filesystems.Ext234Resize{}}); err != nil {
+			return fmt.Errorf("could not resize the filesystem on pod %q: %v", podName, err)
+		}
+		c.logger.Debugf("filesystem resize successful on volume %q", pv.Name)
+		pv.Spec.Capacity[v1.ResourceStorage] = newQuantity
+		c.logger.Debugf("updating persistent volume definition for volume %q", pv.Name)
+		if _, err := c.KubeClient.PersistentVolumes().Update(context.TODO(), pv, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("could not update persistent volume: %q", err)
+		}
+		c.logger.Debugf("successfully updated persistent volume %q", pv.Name)
+
 		if !compatible {
 			c.logger.Warningf("volume %q is incompatible with all available resizing providers, consider switching storage_resize_mode to pvc or off", pv.Name)
 			totalIncompatible++
@@ -244,4 +250,62 @@ func getPodNameFromPersistentVolume(pv *v1.PersistentVolume) *spec.NamespacedNam
 
 func quantityToGigabyte(q resource.Quantity) int64 {
 	return q.ScaledValue(0) / (1 * constants.Gigabyte)
+}
+
+func (c *Cluster) executeEBSMigration() error {
+	if !c.OpConfig.EnableEBSGp3Migration {
+		return nil
+	}
+	c.logger.Infof("starting EBS gp2 to gp3 migration")
+
+	pvs, _, err := c.listVolumesWithManifestSize(c.Spec.Volume)
+	if err != nil {
+		return fmt.Errorf("could not list persistent volumes: %v", err)
+	}
+	c.logger.Debugf("found %d volumes, size of known volumes %d", len(pvs), len(c.EBSVolumes))
+
+	volumeIds := []string{}
+	var volumeID string
+	for _, pv := range pvs {
+		volumeID, err = c.VolumeResizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+		if err != nil {
+			continue
+		}
+
+		volumeIds = append(volumeIds, volumeID)
+	}
+
+	if len(volumeIds) == len(c.EBSVolumes) {
+		hasGp2 := false
+		for _, v := range c.EBSVolumes {
+			if v.VolumeType == "gp2" {
+				hasGp2 = true
+			}
+		}
+
+		if !hasGp2 {
+			c.logger.Infof("no EBS gp2 volumes left to migrate")
+			return nil
+		}
+	}
+
+	awsVolumes, err := c.VolumeResizer.DescribeVolumes(volumeIds)
+	if nil != err {
+		return err
+	}
+
+	for _, volume := range awsVolumes {
+		if volume.VolumeType == "gp2" && volume.Size < c.OpConfig.EnableEBSGp3MigrationMaxSize {
+			c.logger.Infof("modifying EBS volume %s to type gp3 migration (%d)", volume.VolumeID, volume.Size)
+			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, "gp3", volume.Size, 3000, 125)
+			if nil != err {
+				c.logger.Warningf("modifying volume %s failed: %v", volume.VolumeID, err)
+			}
+		} else {
+			c.logger.Debugf("skipping EBS volume %s to type gp3 migration (%d)", volume.VolumeID, volume.Size)
+		}
+		c.EBSVolumes[volume.VolumeID] = volume
+	}
+
+	return nil
 }

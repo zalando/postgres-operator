@@ -69,7 +69,11 @@ spec:
                 type: boolean
               enable_lazy_spilo_upgrade:
                 type: boolean
+              enable_pgversion_env_var:
+                type: boolean
               enable_shm_volume:
+                type: boolean
+              enable_spilo_wal_path_compat:
                 type: boolean
               etcd_host:
                 type: string
@@ -166,6 +170,10 @@ spec:
                           type: string
                         template:
                           type: boolean
+                  inherited_annotations:
+                    type: array
+                    items:
+                      type: string
                   inherited_labels:
                     type: array
                     items:
@@ -292,6 +300,10 @@ spec:
                     type: string
                   aws_region:
                     type: string
+                  enable_ebs_gp3_migration:
+                    type: boolean
+                  enable_ebs_gp3_migration_max_size:
+                    type: integer
                   gcp_credentials:
                     type: string
                   kube_iam_role:

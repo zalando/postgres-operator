@@ -550,10 +550,8 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "array",
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
-								Type: "object",
-								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-									Allows: true,
-								},
+								Type:                   "object",
+								XPreserveUnknownFields: util.True(),
 							},
 						},
 					},
@@ -817,6 +815,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enable_shm_volume": {
 						Type: "boolean",
 					},
+					"enable_spilo_wal_path_compat": {
+						Type: "boolean",
+					},
 					"etcd_host": {
 						Type: "string",
 					},
@@ -960,6 +961,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 												Type: "boolean",
 											},
 										},
+									},
+								},
+							},
+							"inherited_annotations": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
 									},
 								},
 							},
@@ -1169,6 +1178,15 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 							},
 							"aws_region": {
+								Type: "string",
+							},
+							"enable_ebs_gp3_migration": {
+								Type: "boolean",
+							},
+							"enable_ebs_gp3_migration_max_size": {
+								Type: "integer",
+							},
+							"gcp_credentials": {
 								Type: "string",
 							},
 							"kube_iam_role": {
@@ -1400,7 +1418,7 @@ func buildCRD(name, kind, plural, short string, columns []apiextv1.CustomResourc
 			},
 			Scope: apiextv1.NamespaceScoped,
 			Versions: []apiextv1.CustomResourceDefinitionVersion{
-				apiextv1.CustomResourceDefinitionVersion{
+				{
 					Name:    SchemeGroupVersion.Version,
 					Served:  true,
 					Storage: true,

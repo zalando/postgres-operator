@@ -63,7 +63,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's type "LoadBalancer" doesn't match the current one "ClusterIP"`,
+			reason: `new service's type "LoadBalancer" does not match the current one "ClusterIP"`,
 		},
 		{
 			about: "services differ on lb source ranges",
@@ -82,7 +82,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"185.249.56.0/22"}),
 			match:  false,
-			reason: `new service's LoadBalancerSourceRange doesn't match the current one`,
+			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
 		{
 			about: "new service doesn't have lb source ranges",
@@ -101,7 +101,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{}),
 			match:  false,
-			reason: `new service's LoadBalancerSourceRange doesn't match the current one`,
+			reason: `new service's LoadBalancerSourceRange does not match the current one`,
 		},
 		{
 			about: "services differ on DNS annotation",
@@ -120,7 +120,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations doesn't match the current one: 'external-dns.alpha.kubernetes.io/hostname' changed from 'clstr.acid.zalan.do' to 'new_clstr.acid.zalan.do'.`,
+			reason: `new service's annotations does not match the current one: 'external-dns.alpha.kubernetes.io/hostname' changed from 'clstr.acid.zalan.do' to 'new_clstr.acid.zalan.do'.`,
 		},
 		{
 			about: "services differ on AWS ELB annotation",
@@ -139,7 +139,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations doesn't match the current one: 'service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout' changed from '3600' to '1800'.`,
+			reason: `new service's annotations does not match the current one: 'service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout' changed from '3600' to '1800'.`,
 		},
 		{
 			about: "service changes existing annotation",
@@ -160,7 +160,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations doesn't match the current one: 'foo' changed from 'bar' to 'baz'.`,
+			reason: `new service's annotations does not match the current one: 'foo' changed from 'bar' to 'baz'.`,
 		},
 		{
 			about: "service changes multiple existing annotations",
@@ -184,7 +184,7 @@ func TestSameService(t *testing.T) {
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match: false,
 			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations doesn't match the current one:`,
+			reason: `new service's annotations does not match the current one:`,
 		},
 		{
 			about: "service adds a new custom annotation",
@@ -204,7 +204,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations doesn't match the current one: Added 'foo' with value 'bar'.`,
+			reason: `new service's annotations does not match the current one: Added 'foo' with value 'bar'.`,
 		},
 		{
 			about: "service removes a custom annotation",
@@ -224,7 +224,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations doesn't match the current one: Removed 'foo'.`,
+			reason: `new service's annotations does not match the current one: Removed 'foo'.`,
 		},
 		{
 			about: "service removes a custom annotation and adds a new one",
@@ -245,7 +245,7 @@ func TestSameService(t *testing.T) {
 				v1.ServiceTypeLoadBalancer,
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match:  false,
-			reason: `new service's annotations doesn't match the current one: Removed 'foo'. Added 'bar' with value 'foo'.`,
+			reason: `new service's annotations does not match the current one: Removed 'foo'. Added 'bar' with value 'foo'.`,
 		},
 		{
 			about: "service removes a custom annotation, adds a new one and change another",
@@ -269,7 +269,7 @@ func TestSameService(t *testing.T) {
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match: false,
 			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations doesn't match the current one: Removed 'foo'.`,
+			reason: `new service's annotations does not match the current one: Removed 'foo'.`,
 		},
 		{
 			about: "service add annotations",
@@ -286,7 +286,7 @@ func TestSameService(t *testing.T) {
 				[]string{"128.141.0.0/16", "137.138.0.0/16"}),
 			match: false,
 			// Test just the prefix to avoid flakiness and map sorting
-			reason: `new service's annotations doesn't match the current one: Added `,
+			reason: `new service's annotations does not match the current one: Added `,
 		},
 	}
 	for _, tt := range tests {

@@ -88,7 +88,7 @@ func TestNodeIsReady(t *testing.T) {
 	for _, tt := range testTable {
 		nodeTestController.opConfig.NodeReadinessLabel = tt.readinessLabel
 		if isReady := nodeTestController.nodeIsReady(tt.in); isReady != tt.out {
-			t.Errorf("%s: expected response %t doesn't match the actual %t for the node %#v",
+			t.Errorf("%s: expected response %t does not match the actual %t for the node %#v",
 				testName, tt.out, isReady, tt.in)
 		}
 	}

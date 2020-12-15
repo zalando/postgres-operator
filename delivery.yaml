@@ -32,7 +32,7 @@ pipeline:
               IMAGE=registry-write.opensource.zalan.do/acid/postgres-operator-test
             fi
             export IMAGE
-            make deps docker
+            make deps mocks docker
         - desc: 'Run unit tests'
           cmd: |
             export PATH=$PATH:$HOME/go/bin

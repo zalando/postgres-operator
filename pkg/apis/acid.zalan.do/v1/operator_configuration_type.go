@@ -66,6 +66,7 @@ type KubernetesMetaConfiguration struct {
 	PodRoleLabel                           string                       `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string            `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
+	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`
 	DownscalerAnnotations                  []string                     `json:"downscaler_annotations,omitempty"`
 	ClusterNameLabel                       string                       `json:"cluster_name_label,omitempty"`
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
@@ -117,14 +118,16 @@ type LoadBalancerConfiguration struct {
 // AWSGCPConfiguration defines the configuration for AWS
 // TODO complete Google Cloud Platform (GCP) configuration
 type AWSGCPConfiguration struct {
-	WALES3Bucket              string `json:"wal_s3_bucket,omitempty"`
-	AWSRegion                 string `json:"aws_region,omitempty"`
-	WALGSBucket               string `json:"wal_gs_bucket,omitempty"`
-	GCPCredentials            string `json:"gcp_credentials,omitempty"`
-	LogS3Bucket               string `json:"log_s3_bucket,omitempty"`
-	KubeIAMRole               string `json:"kube_iam_role,omitempty"`
-	AdditionalSecretMount     string `json:"additional_secret_mount,omitempty"`
-	AdditionalSecretMountPath string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	WALES3Bucket                 string `json:"wal_s3_bucket,omitempty"`
+	AWSRegion                    string `json:"aws_region,omitempty"`
+	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
+	GCPCredentials               string `json:"gcp_credentials,omitempty"`
+	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
+	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
+	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
+	AdditionalSecretMountPath    string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration" default:"false"`
+	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size" default:"1000"`
 }
 
 // OperatorDebugConfiguration defines options for the debug mode
@@ -198,6 +201,7 @@ type OperatorConfigurationData struct {
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
 	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
+	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
