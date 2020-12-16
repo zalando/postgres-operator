@@ -13,7 +13,10 @@ RUN apt-get update     \
         curl \
         jq \
         gnupg \
+        gcc \
+        libffi-dev \
     && pip3 install --no-cache-dir awscli --upgrade \
+    && pip3 install --no-cache-dir gsutil --upgrade \
     && echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
     && cat /etc/apt/sources.list.d/pgdg.list \
     && curl --silent https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
