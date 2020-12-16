@@ -517,7 +517,7 @@ manifest the operator will raise the limits to the configured minimum values.
 If no resources are defined in the manifest they will be obtained from the
 configured [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
 
-## Use taints and tolerations for dedicated PostgreSQL nodes
+## Use taints, tolerations and node affinity for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,
 you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
@@ -529,6 +529,28 @@ spec:
   - key: postgres
     operator: Exists
     effect: NoSchedule
+```
+
+If you need the pods to be scheduled on specific nodes you may use [node affinity](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/)
+to specify a set of label(s), of which a prospective host node must have at least one. This could be used to
+place nodes with certain hardware capabilities (e.g. SSD drives) in certain environments or network segments,
+e.g. for PCI compliance.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-minimal-cluster
+spec:
+  teamId: "ACID"
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: environment
+          operator: In
+          values:
+          - pci
 ```
 
 ## How to clone an existing PostgreSQL cluster

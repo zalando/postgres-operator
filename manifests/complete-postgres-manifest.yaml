@@ -172,3 +172,14 @@ spec:
 # When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
 # if unknown, set it to 103 which is the usual value in the default spilo images.
 # In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.
+
+# Add node affinity support by allowing postgres pods to schedule only on nodes that
+# have label: "postgres-operator:enabled" set.
+#  nodeAffinity:
+#    requiredDuringSchedulingIgnoredDuringExecution:
+#      nodeSelectorTerms:
+#        - matchExpressions:
+#            - key: postgres-operator
+#              operator: In
+#              values:
+#                - enabled

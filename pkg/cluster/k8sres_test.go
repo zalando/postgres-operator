@@ -864,6 +864,72 @@ func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) 
 	return nil
 }
 
+func TestNodeAffinity(t *testing.T) {
+	var err error
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
+	var spiloFSGroup = int64(103)
+
+	makeSpec := func(nodeAffinity *v1.NodeAffinity) acidv1.PostgresSpec {
+		return acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			NodeAffinity: *nodeAffinity,
+		}
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					SpiloRunAsUser:  &spiloRunAsUser,
+					SpiloRunAsGroup: &spiloRunAsGroup,
+					SpiloFSGroup:    &spiloFSGroup,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	nodeAff := &v1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				v1.NodeSelectorTerm{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						v1.NodeSelectorRequirement{
+							Key:      "test-label",
+							Operator: v1.NodeSelectorOpIn,
+							Values: []string{
+								"test-value",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	spec = makeSpec(nodeAff)
+	s, err := cluster.generateStatefulSet(&spec)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	assert.NotNil(t, s.Spec.Template.Spec.Affinity.NodeAffinity, "node affinity in statefulset shouldn't be nil")
+	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
+}
+
 func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	if podSpec.ObjectMeta.Name != "test-pod-template" {
 		return fmt.Errorf("Custom pod template is not used, current spec %+v",

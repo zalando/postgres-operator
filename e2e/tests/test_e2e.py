@@ -930,6 +930,112 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_node_affinity(self):
+        '''
+           Add label to a node and update postgres cluster spec to deploy only on a node with that label
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        # get nodes of master and replica(s)
+        master_node, replica_nodes = k8s.get_pg_nodes(cluster_label)
+
+        self.assertNotEqual(master_node, [])
+        self.assertNotEqual(replica_nodes, [])
+
+        # label node with environment=postgres
+        node_label_body = {
+            "metadata": {
+                "labels": {
+                    "node-affinity-test": "postgres"
+                }
+            }
+        }
+
+        try:
+            # patch current master node with the label
+            print('patching master node: {}'.format(master_node))
+            k8s.api.core_v1.patch_node(master_node, node_label_body)
+
+            # add node affinity to cluster
+            patch_node_affinity_config = {
+                "spec": {
+                    "nodeAffinity" : {
+                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                            "nodeSelectorTerms": [
+                                {
+                                    "matchExpressions": [
+                                        {
+                                            "key": "node-affinity-test",
+                                            "operator": "In",
+                                            "values": [
+                                                "postgres"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                group="acid.zalan.do",
+                version="v1",
+                namespace="default",
+                plural="postgresqls",
+                name="acid-minimal-cluster",
+                body=patch_node_affinity_config)
+            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
+            k8s.wait_for_pod_failover(master_node, 'spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
+            for pod in podsList.items:
+                if pod.metadata.labels.get('spilo-role') == 'replica':
+                    self.assertEqual(master_node, pod.spec.node_name,
+                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(master_node, pod.spec.node_name))
+
+                    # check that pod has correct node affinity
+                    key = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].key
+                    value = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].values[0]
+                    self.assertEqual("node-affinity-test", key,
+                        "Sanity check: expect node selector key to be equal to 'node-affinity-test' but got {}".format(key))
+                    self.assertEqual("postgres", value,
+                        "Sanity check: expect node selector value to be equal to 'postgres' but got {}".format(value))
+
+            patch_node_remove_affinity_config = {
+                "spec": {
+                    "nodeAffinity" : None
+                }
+            }
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                group="acid.zalan.do",
+                version="v1",
+                namespace="default",
+                plural="postgresqls",
+                name="acid-minimal-cluster",
+                body=patch_node_remove_affinity_config)
+            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            # remove node affinity to move replica away from master node
+            nm, new_replica_nodes = k8s.get_cluster_nodes()
+            new_master_node = nm[0]
+            self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+   
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zzzz_cluster_deletion(self):
         '''
            Test deletion with configured protection
