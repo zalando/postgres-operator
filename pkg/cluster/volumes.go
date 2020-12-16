@@ -17,6 +17,83 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
 )
 
+func (c *Cluster) syncVolumes() error {
+	c.logger.Debugf("syncing volumes using %q storage resize mode", c.OpConfig.StorageResizeMode)
+	var err error
+
+	if c.OpConfig.StorageResizeMode == "mixed" {
+		// mixed op uses AWS API to adjust size,throughput,iops and calls pvc chance for file system resize
+
+		// resize pvc to adjust filesystem size until better K8s support
+		if err = c.syncVolumeClaims(); err != nil {
+			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
+			return err
+		}
+	} else if c.OpConfig.StorageResizeMode == "pvc" {
+		if err = c.syncVolumeClaims(); err != nil {
+			err = fmt.Errorf("could not sync persistent volume claims: %v", err)
+			return err
+		}
+	} else if c.OpConfig.StorageResizeMode == "ebs" {
+		// potentially enlarge volumes before changing the statefulset. By doing that
+		// in this order we make sure the operator is not stuck waiting for a pod that
+		// cannot start because it ran out of disk space.
+		// TODO: handle the case of the cluster that is downsized and enlarged again
+		// (there will be a volume from the old pod for which we can't act before the
+		//  the statefulset modification is concluded)
+		if err = c.syncEbsVolumes(); err != nil {
+			err = fmt.Errorf("could not sync persistent volumes: %v", err)
+			return err
+		}
+	} else {
+		c.logger.Infof("Storage resize is disabled (storage_resize_mode is off). Skipping volume sync.")
+	}
+
+	return nil
+}
+
+// syncVolumeClaims reads all persistent volume claims and checks that their size matches the one declared in the statefulset.
+func (c *Cluster) syncVolumeClaims() error {
+	c.setProcessName("syncing volume claims")
+
+	act, err := c.volumeClaimsNeedResizing(c.Spec.Volume)
+	if err != nil {
+		return fmt.Errorf("could not compare size of the volume claims: %v", err)
+	}
+	if !act {
+		c.logger.Infof("volume claims do not require changes")
+		return nil
+	}
+	if err := c.resizeVolumeClaims(c.Spec.Volume); err != nil {
+		return fmt.Errorf("could not sync volume claims: %v", err)
+	}
+
+	c.logger.Infof("volume claims have been synced successfully")
+
+	return nil
+}
+
+// syncVolumes reads all persistent volumes and checks that their size matches the one declared in the statefulset.
+func (c *Cluster) syncEbsVolumes() error {
+	c.setProcessName("syncing volumes")
+
+	act, err := c.volumesNeedResizing(c.Spec.Volume)
+	if err != nil {
+		return fmt.Errorf("could not compare size of the volumes: %v", err)
+	}
+	if !act {
+		return nil
+	}
+
+	if err := c.resizeVolumes(); err != nil {
+		return fmt.Errorf("could not sync volumes: %v", err)
+	}
+
+	c.logger.Infof("volumes have been synced successfully")
+
+	return nil
+}
+
 func (c *Cluster) listPersistentVolumeClaims() ([]v1.PersistentVolumeClaim, error) {
 	ns := c.Namespace
 	listOptions := metav1.ListOptions{
