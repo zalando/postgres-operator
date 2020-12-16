@@ -88,7 +88,7 @@ pipeline:
         - desc: Build image
           cmd: |
             cd docker/logical-backup
-            export TAG=${git describe --tags --always --dirty}
+            export TAG=$(git describe --tags --always --dirty)
             IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
             docker build --rm -t "$IMAGE:$TAG$CDP_TAG" .
             docker push "$IMAGE):$TAG$CDP_TAG"
