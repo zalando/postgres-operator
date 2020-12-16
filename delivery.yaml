@@ -83,7 +83,8 @@ pipeline:
 
     - id: build-logical-backup
       type: script
-      steps:
+
+      commands:
         - desc: Build image
           cmd: |
             cd docker/logical-backup
