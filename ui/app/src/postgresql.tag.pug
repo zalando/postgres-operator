@@ -74,10 +74,12 @@ postgresql
 
         .alert.alert-info(if='{ !progress.requestStatus }') PostgreSQL cluster requested
         .alert.alert-danger(if='{ progress.requestStatus !== "OK" }') Create request failed
-        .alert.alert-success(if='{ progress.requestStatus === "OK" }') Create request successful ({ new Date(progress.createdTimestamp).toLocaleString() })
+        .alert.alert-success(if='{ progress.requestStatus === "OK" }') Manifest creation successful ({ new Date(progress.createdTimestamp).toLocaleString() })
 
         .alert.alert-info(if='{ !progress.postgresql }') PostgreSQL cluster manifest pending
         .alert.alert-success(if='{ progress.postgresql }') PostgreSQL cluster manifest created
+
+        .alert.alert-danger(if='{progress.status && progress.status.PostgresClusterStatus == "CreateFailed"}') Cluster creation failed: Check events and cluster name!
 
         .alert.alert-info(if='{ !progress.statefulSet }') StatefulSet pending
         .alert.alert-success(if='{ progress.statefulSet }') StatefulSet created
@@ -127,6 +129,8 @@ postgresql
         this.progress.pooler = false
         this.progress.postgresql = true
         this.progress.postgresqlManifest = data
+        // copy status as we delete later for edit
+        this.progress.status = data.status
         this.progress.createdTimestamp = data.metadata.creationTimestamp
         this.progress.poolerEnabled = data.spec.enableConnectionPooler
         this.uid = this.progress.postgresqlManifest.metadata.uid
@@ -203,6 +207,7 @@ postgresql
           delete manifest.metadata.annotations[last_applied]
         }
 
+        delete manifest.metadata.managedFields
         delete manifest.metadata.creationTimestamp
         delete manifest.metadata.deletionGracePeriodSeconds
         delete manifest.metadata.deletionTimestamp
