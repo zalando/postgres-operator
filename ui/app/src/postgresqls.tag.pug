@@ -228,7 +228,7 @@ postgresqls
     )
 
     const calcCosts = this.calcCosts = (nodes, cpu, memory, disk) => {
-        costs = Math.max(nodes, opts.config.min_pods) * * (toCores(cpu) * opts.config.cost_core + toMemory(memory) * opts.config.cost_memory + toDisk(disk) * opts.config.cost_ebs)
+        costs = Math.max(nodes, opts.config.min_pods) * (toCores(cpu) * opts.config.cost_core + toMemory(memory) * opts.config.cost_memory + toDisk(disk) * opts.config.cost_ebs)
         return costs.toFixed(2)
     }
 
