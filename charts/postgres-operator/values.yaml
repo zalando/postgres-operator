@@ -25,7 +25,7 @@ configGeneral:
   # update only the statefulsets without immediately doing the rolling update
   enable_lazy_spilo_upgrade: "false"
   # set the PGVERSION env var instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION
-  enable_pgversion_env_var: "false"
+  enable_pgversion_env_var: "true"
   # start any new database pod without limitations on shm memory
   enable_shm_volume: "true"
   # enables backwards compatible path between Spilo 12 and Spilo 13 images
