@@ -63,11 +63,15 @@ rules:
   - patch
   - update
   - watch
-# to manage endpoints which are also used by Patroni
+# to manage endpoints/configmaps which are also used by Patroni
 - apiGroups:
   - ""
   resources:
+{{- if toString .Values.configGeneral.kubernetes_use_configmaps | eq "true" }}
+  - configmaps
+{{- else }}
   - endpoints
+{{- end }}
   verbs:
   - create
   - delete

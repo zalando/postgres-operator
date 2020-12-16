@@ -10,6 +10,27 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 rules:
 # Patroni needs to watch and manage endpoints
+{{- if toString .Values.configGeneral.kubernetes_use_configmaps | eq "true" }}
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+{{- else }}
 - apiGroups:
   - ""
   resources:
@@ -23,6 +44,7 @@ rules:
   - patch
   - update
   - watch
+{{- end }}
 # Patroni needs to watch pods
 - apiGroups:
   - ""
