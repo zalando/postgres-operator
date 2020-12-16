@@ -302,6 +302,7 @@ def read_versions(
         if uid == 'wal' or defaulting(lambda: UUID(uid))
     ]
 
+BACKUP_VERSION_PREFIXES = ['','9.5/', '9.6/', '10/','11/', '12/', '13/']
 
 def read_basebackups(
     pg_cluster,
@@ -314,18 +315,24 @@ def read_basebackups(
 ):
     environ['WALE_S3_ENDPOINT'] = s3_endpoint
     suffix = '' if uid == 'base' else '/' + uid
-    return [
-        {
-            key: value
-            for key, value in basebackup.__dict__.items()
-            if isinstance(value, str) or isinstance(value, int)
-        }
-        for basebackup in Attrs.call(
-            f=configure_backup_cxt,
-            aws_instance_profile=use_aws_instance_profile,
-            s3_prefix=f's3://{bucket}/{prefix}{pg_cluster}{suffix}/wal/',
-        )._backup_list(detail=True)._backup_list(prefix=f"{prefix}{pg_cluster}{suffix}/wal/")
-    ]
+    backups = []
+
+    for vp in BACKUP_VERSION_PREFIXES:
+
+        backups = backups + [
+            {
+                key: value
+                for key, value in basebackup.__dict__.items()
+                if isinstance(value, str) or isinstance(value, int)
+            }
+            for basebackup in Attrs.call(
+                f=configure_backup_cxt,
+                aws_instance_profile=use_aws_instance_profile,
+                s3_prefix=f's3://{bucket}/{prefix}{pg_cluster}{suffix}/wal/{vp}',
+            )._backup_list(detail=True)
+        ]
+
+    return backups
 
 
 def parse_time(s: str):
