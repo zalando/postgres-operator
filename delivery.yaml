@@ -80,3 +80,13 @@ pipeline:
             export IMAGE
             make docker
             make push
+
+    - id: build-logical-backup
+      type: script
+      steps:
+        - desc: Build image
+          cmd: |
+            cd docker/logical-backup
+            IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
+            docker build -t "$IMAGE" .
+            docker push "$IMAGE"
