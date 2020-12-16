@@ -14,5 +14,5 @@ const (
 	ConnectionPoolerContainer            = 0
 	ConnectionPoolerMaxDBConnections     = 60
 	ConnectionPoolerMaxClientConnections = 10000
-	ConnectionPoolerMinInstances         = 2
+	ConnectionPoolerMinInstances         = 1
 )

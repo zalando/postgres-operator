@@ -24,19 +24,20 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/spf13/cobra"
 	postgresConstants "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"log"
 )
 
 // checkCmd represent kubectl pg check.
 var checkCmd = &cobra.Command{
 	Use:   "check",
 	Short: "Checks the Postgres operator is installed in the k8s cluster",
-	Long: `Checks that the Postgres CRD is registered in a k8s cluster. 
+	Long: `Checks that the Postgres CRD is registered in a k8s cluster.
 This means that the operator pod was able to start normally.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		check()
@@ -47,9 +48,9 @@ kubectl pg check
 }
 
 // check validates postgresql CRD registered or not.
-func check() *v1beta1.CustomResourceDefinition {
+func check() *v1.CustomResourceDefinition {
 	config := getConfig()
-	apiExtClient, err := apiextbeta1.NewForConfig(config)
+	apiExtClient, err := apiextv1.NewForConfig(config)
 	if err != nil {
 		log.Fatal(err)
 	}

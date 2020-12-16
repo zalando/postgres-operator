@@ -46,7 +46,7 @@ func (c *Controller) listClusters(options metav1.ListOptions) (*acidv1.Postgresq
 	var pgList acidv1.PostgresqlList
 
 	// TODO: use the SharedInformer cache instead of quering Kubernetes API directly.
-	list, err := c.KubeClient.AcidV1ClientSet.AcidV1().Postgresqls(c.opConfig.WatchedNamespace).List(context.TODO(), options)
+	list, err := c.KubeClient.PostgresqlsGetter.Postgresqls(c.opConfig.WatchedNamespace).List(context.TODO(), options)
 	if err != nil {
 		c.logger.Errorf("could not list postgresql objects: %v", err)
 	}
@@ -225,11 +225,11 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	switch event.EventType {
 	case EventAdd:
 		if clusterFound {
-			lg.Debugf("cluster already exists")
+			lg.Infof("Recieved add event for already existing Postgres cluster")
 			return
 		}
 
-		lg.Infof("creation of the cluster started")
+		lg.Infof("creating a new Postgres cluster")
 
 		cl = c.addCluster(lg, clusterName, event.NewSpec)
 
@@ -473,7 +473,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 	if err := c.clusterEventQueues[workerID].Add(clusterEvent); err != nil {
 		lg.Errorf("error while queueing cluster event: %v", clusterEvent)
 	}
-	lg.Infof("%q event has been queued", eventType)
+	lg.Infof("%s event has been queued", eventType)
 
 	if eventType != EventDelete {
 		return
@@ -494,7 +494,7 @@ func (c *Controller) queueClusterEvent(informerOldSpec, informerNewSpec *acidv1.
 		if err != nil {
 			lg.Warningf("could not delete event from the queue: %v", err)
 		} else {
-			lg.Debugf("event %q has been discarded for the cluster", evType)
+			lg.Debugf("event %s has been discarded for the cluster", evType)
 		}
 	}
 }

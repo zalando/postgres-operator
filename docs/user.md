@@ -49,7 +49,7 @@ Note, that the name of the cluster must start with the `teamId` and `-`. At
 Zalando we use team IDs (nicknames) to lower the chance of duplicate cluster
 names and colliding entities. The team ID would also be used to query an API to
 get all members of a team and create [database roles](#teams-api-roles) for
-them.
+them. Besides, the maximum cluster name length is 53 characters.
 
 ## Watch pods being created
 
@@ -269,6 +269,72 @@ to choose superusers, group roles, [PAM configuration](https://github.com/CyberD
 etc. An OAuth2 token can be passed to the Teams API via a secret. The name for
 this secret is configurable with the `oauth_token_secret_name` parameter.
 
+### Additional teams and members per cluster
+
+Postgres clusters are associated with one team by providing the `teamID` in
+the manifest. Additional superuser teams can be configured as mentioned in
+the previous paragraph. However, this is a global setting. To assign
+additional teams, superuser teams and single users to clusters of a given
+team, use the [PostgresTeam CRD](../manifests/postgresteam.yaml). It provides
+a simple mapping structure.
+
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: PostgresTeam
+metadata:
+  name: custom-team-membership
+spec:
+  additionalSuperuserTeams:
+    acid:
+    - "postgres_superusers"
+  additionalTeams:
+    acid: []
+  additionalMembers:
+    acid:
+    - "elephant"
+```
+
+One `PostgresTeam` resource could contain mappings of multiple teams but you
+can choose to create separate CRDs, alternatively. On each CRD creation or
+update the operator will gather all mappings to create additional human users
+in databases the next time they are synced. Additional teams are resolved
+transitively, meaning you will also add users for their `additionalTeams`
+or (not and) `additionalSuperuserTeams`.
+
+For each additional team the Teams API would be queried. Additional members
+will be added either way. There can be "virtual teams" that do not exists in
+your Teams API but users of associated teams as well as members will get
+created. With `PostgresTeams` it's also easy to cover team name changes. Just
+add the mapping between old and new team name and the rest can stay the same.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: PostgresTeam
+metadata:
+  name: virtualteam-membership
+spec:
+  additionalSuperuserTeams:
+    acid:
+    - "virtual_superusers"
+    virtual_superusers:
+    - "real_teamA"
+    - "real_teamB"
+    real_teamA:
+    - "real_teamA_renamed"
+  additionalTeams:
+    real_teamA:
+    - "real_teamA_renamed"
+  additionalMembers:
+    virtual_superusers:
+    - "foo"
+```
+
+Note, by default the `PostgresTeam` support is disabled in the configuration.
+Switch `enable_postgres_team_crd` flag to `true` and the operator will start to
+watch for this CRD. Make sure, the cluster role is up to date and contains a
+section for [PostgresTeam](../manifests/operator-service-account-rbac.yaml#L30).
+
 ## Prepared databases with roles and default privileges
 
 The `users` section in the manifests only allows for creating database roles
@@ -475,6 +541,10 @@ section in the spec. There are two options here:
 
 Note, that cloning can also be used for [major version upgrades](administrator.md#minor-and-major-version-upgrade)
 of PostgreSQL.
+
+## In-place major version upgrade
+
+Starting with Spilo 13, operator supports in-place major version upgrade to a higher major version (e.g. from PG 10 to PG 12). To trigger the upgrade, simply increase the version in the manifest. It is your responsibility to test your applications against the new version before the upgrade; downgrading is not supported. The easiest way to do so is to try the upgrade on the cloned cluster first. For details of how Spilo does the upgrade [see here](https://github.com/zalando/spilo/pull/488), operator implementation is described [in the admin docs](administrator.md#minor-and-major-version-upgrade).
 
 ### Clone from S3
 
@@ -737,11 +807,17 @@ manifest:
 ```yaml
 spec:
   enableConnectionPooler: true
+  enableReplicaConnectionPooler: true
 ```
 
 This will tell the operator to create a connection pooler with default
 configuration, through which one can access the master via a separate service
-`{cluster-name}-pooler`. In most of the cases the
+`{cluster-name}-pooler`. With the first option, connection pooler for master service
+is created and with the second option, connection pooler for replica is created.
+Note that both of these flags are independent of each other and user can set or
+unset any of them as per their requirements without any effect on the other.
+
+In most of the cases the
 [default configuration](reference/operator_parameters.md#connection-pooler-configuration)
 should be good enough. To configure a new connection pooler individually for
 each Postgres cluster, specify:

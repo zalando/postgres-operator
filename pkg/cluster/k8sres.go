@@ -75,10 +75,6 @@ func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
 
-func (c *Cluster) connectionPoolerName() string {
-	return c.Name + "-pooler"
-}
-
 func (c *Cluster) endpointName(role PostgresRole) string {
 	name := c.Name
 	if role == Replica {
@@ -142,26 +138,6 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 	}
 }
 
-// Generate default resource section for connection pooler deployment, to be
-// used if nothing custom is specified in the manifest
-func (c *Cluster) makeDefaultConnectionPoolerResources() acidv1.Resources {
-	config := c.OpConfig
-
-	defaultRequests := acidv1.ResourceDescription{
-		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPURequest,
-		Memory: config.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest,
-	}
-	defaultLimits := acidv1.ResourceDescription{
-		CPU:    config.ConnectionPooler.ConnectionPoolerDefaultCPULimit,
-		Memory: config.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit,
-	}
-
-	return acidv1.Resources{
-		ResourceRequests: defaultRequests,
-		ResourceLimits:   defaultLimits,
-	}
-}
-
 func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
 	var err error
 
@@ -213,7 +189,7 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 	return requests, nil
 }
 
-func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, logger *logrus.Entry) (string, error) {
+func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, EnablePgVersionEnvVar bool, logger *logrus.Entry) (string, error) {
 	config := spiloConfiguration{}
 
 	config.Bootstrap = pgBootstrap{}
@@ -294,7 +270,14 @@ PatroniInitDBParams:
 	}
 
 	config.PgLocalConfiguration = make(map[string]interface{})
-	config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
+
+	// the newer and preferred way to specify the PG version is to use the `PGVERSION` env variable
+	// setting postgresq.bin_dir in the SPILO_CONFIGURATION still works and takes precedence over PGVERSION
+	// so we add postgresq.bin_dir only if PGVERSION is unused
+	// see PR 222 in Spilo
+	if !EnablePgVersionEnvVar {
+		config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
+	}
 	if len(pg.Parameters) > 0 {
 		local, bootstrap := getLocalAndBoostrapPostgreSQLParameters(pg.Parameters)
 
@@ -561,6 +544,7 @@ func (c *Cluster) generatePodTemplate(
 	spiloRunAsGroup *int64,
 	spiloFSGroup *int64,
 	nodeAffinity *v1.Affinity,
+	schedulerName *string,
 	terminateGracePeriod int64,
 	podServiceAccountName string,
 	kubeIAMRole string,
@@ -597,6 +581,10 @@ func (c *Cluster) generatePodTemplate(
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
 		SecurityContext:               &securityContext,
+	}
+
+	if schedulerName != nil {
+		podSpec.SchedulerName = *schedulerName
 	}
 
 	if shmVolume != nil && *shmVolume {
@@ -714,6 +702,9 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 			Name:  "HUMAN_ROLE",
 			Value: c.OpConfig.PamRoleName,
 		},
+	}
+	if c.OpConfig.EnablePgVersionEnvVar {
+		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.Spec.PgVersion})
 	}
 	// Spilo expects cluster labels as JSON
 	if clusterLabels, err := json.Marshal(labels.Set(c.OpConfig.ClusterLabels)); err != nil {
@@ -833,7 +824,7 @@ func (c *Cluster) getPodEnvironmentConfigMapVariables() ([]v1.EnvVar, error) {
 	return configMapPodEnvVarsList, nil
 }
 
-// Return list of variables the pod recieved from the configured Secret
+// Return list of variables the pod received from the configured Secret
 func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 	secretPodEnvVarsList := make([]v1.EnvVar, 0)
 
@@ -841,7 +832,7 @@ func (c *Cluster) getPodEnvironmentSecretVariables() ([]v1.EnvVar, error) {
 		return secretPodEnvVarsList, nil
 	}
 
-	secret, err := c.KubeClient.Secrets(c.OpConfig.PodEnvironmentSecret).Get(
+	secret, err := c.KubeClient.Secrets(c.Namespace).Get(
 		context.TODO(),
 		c.OpConfig.PodEnvironmentSecret,
 		metav1.GetOptions{})
@@ -907,41 +898,6 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 		return "", err
 	}
 	return fmt.Sprintf("%v", pgVersion), nil
-}
-
-func (c *Cluster) getNewPgVersion(container v1.Container, newPgVersion string) (string, error) {
-	var (
-		spiloConfiguration spiloConfiguration
-		runningPgVersion   string
-		err                error
-	)
-
-	for _, env := range container.Env {
-		if env.Name != "SPILO_CONFIGURATION" {
-			continue
-		}
-		err = json.Unmarshal([]byte(env.Value), &spiloConfiguration)
-		if err != nil {
-			return newPgVersion, err
-		}
-	}
-
-	if len(spiloConfiguration.PgLocalConfiguration) > 0 {
-		currentBinPath := fmt.Sprintf("%v", spiloConfiguration.PgLocalConfiguration[patroniPGBinariesParameterName])
-		runningPgVersion, err = extractPgVersionFromBinPath(currentBinPath, pgBinariesLocationTemplate)
-		if err != nil {
-			return "", fmt.Errorf("could not extract Postgres version from %v in SPILO_CONFIGURATION", currentBinPath)
-		}
-	} else {
-		return "", fmt.Errorf("could not find %q setting in SPILO_CONFIGURATION", patroniPGBinariesParameterName)
-	}
-
-	if runningPgVersion != newPgVersion {
-		c.logger.Warningf("postgresql version change(%q -> %q) has no effect", runningPgVersion, newPgVersion)
-		newPgVersion = runningPgVersion
-	}
-
-	return newPgVersion, nil
 }
 
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
@@ -1023,6 +979,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		initContainers = spec.InitContainers
 	}
 
+	spiloCompathWalPathList := make([]v1.EnvVar, 0)
+	if c.OpConfig.EnableSpiloWalPathCompat {
+		spiloCompathWalPathList = append(spiloCompathWalPathList,
+			v1.EnvVar{
+				Name:  "ENABLE_WAL_PATH_COMPAT",
+				Value: "true",
+			},
+		)
+	}
+
 	// fetch env vars from custom ConfigMap
 	configMapEnvVarsList, err := c.getPodEnvironmentConfigMapVariables()
 	if err != nil {
@@ -1036,7 +1002,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// concat all custom pod env vars and sort them
-	customPodEnvVarsList := append(configMapEnvVarsList, secretEnvVarsList...)
+	customPodEnvVarsList := append(spiloCompathWalPathList, configMapEnvVarsList...)
+	customPodEnvVarsList = append(customPodEnvVarsList, secretEnvVarsList...)
 	sort.Slice(customPodEnvVarsList,
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
@@ -1066,7 +1033,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 	}
 
-	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.logger)
+	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.OpConfig.EnablePgVersionEnvVar, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
 	}
@@ -1157,7 +1124,9 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate the spilo container
-	c.logger.Debugf("Generating Spilo container, environment variables: %v", spiloEnvVars)
+	c.logger.Debugf("Generating Spilo container, environment variables")
+	c.logger.Debugf("%v", spiloEnvVars)
+
 	spiloContainer := generateContainer(c.containerName(),
 		&effectiveDockerImage,
 		resourceRequirements,
@@ -1226,13 +1195,13 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
 
-	annotations := c.generatePodAnnotations(spec)
+	podAnnotations := c.generatePodAnnotations(spec)
 
 	// generate pod template for the statefulset, based on the spilo container and sidecars
 	podTemplate, err = c.generatePodTemplate(
 		c.Namespace,
 		c.labelsSet(true),
-		annotations,
+		c.annotationsSet(podAnnotations),
 		spiloContainer,
 		initContainers,
 		sidecarContainers,
@@ -1241,6 +1210,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveRunAsGroup,
 		effectiveFSGroup,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		spec.SchedulerName,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
@@ -1277,15 +1247,16 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	annotations = make(map[string]string)
-	annotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
+	stsAnnotations := make(map[string]string)
+	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
+	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: c.AnnotationsToPropagate(annotations),
+			Annotations: stsAnnotations,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -1578,9 +1549,10 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	username := pgUser.Name
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.credentialSecretName(username),
-			Namespace: namespace,
-			Labels:    c.labelsSet(true),
+			Name:        c.credentialSecretName(username),
+			Namespace:   namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(nil),
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
@@ -1654,7 +1626,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 			Name:        c.serviceName(role),
 			Namespace:   c.Namespace,
 			Labels:      c.roleLabelsSet(true, role),
-			Annotations: c.generateServiceAnnotations(role, spec),
+			Annotations: c.annotationsSet(c.generateServiceAnnotations(role, spec)),
 		},
 		Spec: serviceSpec,
 	}
@@ -1752,11 +1724,31 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			msg := "Figure out which S3 bucket to use from env"
 			c.logger.Info(msg, description.S3WalPath)
 
+			if c.OpConfig.WALES3Bucket != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_WAL_S3_BUCKET",
+						Value: c.OpConfig.WALES3Bucket,
+					},
+				}
+				result = append(result, envs...)
+			} else if c.OpConfig.WALGSBucket != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_WAL_GS_BUCKET",
+						Value: c.OpConfig.WALGSBucket,
+					},
+					{
+						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
+						Value: c.OpConfig.GCPCredentials,
+					},
+				}
+				result = append(result, envs...)
+			} else {
+				c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
+			}
+
 			envs := []v1.EnvVar{
-				{
-					Name:  "CLONE_WAL_S3_BUCKET",
-					Value: c.OpConfig.WALES3Bucket,
-				},
 				{
 					Name:  "CLONE_WAL_BUCKET_SCOPE_SUFFIX",
 					Value: getBucketScopeSuffix(description.UID),
@@ -1837,9 +1829,10 @@ func (c *Cluster) generatePodDisruptionBudget() *policybeta1.PodDisruptionBudget
 
 	return &policybeta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.podDisruptionBudgetName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
+			Name:        c.podDisruptionBudgetName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(nil),
 		},
 		Spec: policybeta1.PodDisruptionBudgetSpec{
 			MinAvailable: &minAvailable,
@@ -1922,6 +1915,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		nil,
 		nil,
 		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		nil,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
 		c.OpConfig.KubeIAMRole,
@@ -1958,9 +1952,10 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 
 	cronJob := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.getLogicalBackupJobName(),
-			Namespace: c.Namespace,
-			Labels:    c.labelsSet(true),
+			Name:        c.getLogicalBackupJobName(),
+			Namespace:   c.Namespace,
+			Labels:      c.labelsSet(true),
+			Annotations: c.annotationsSet(nil),
 		},
 		Spec: batchv1beta1.CronJobSpec{
 			Schedule:          schedule,
@@ -1994,6 +1989,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 		// Bucket env vars
 		{
+			Name:  "LOGICAL_BACKUP_PROVIDER",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupProvider,
+		},
+		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
 		},
@@ -2012,6 +2011,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
 			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
+		{
+			Name:  "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials,
 		},
 		// Postgres env vars
 		{
@@ -2055,186 +2058,14 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.LogicalBackup.LogicalBackupS3SecretAccessKey})
 	}
 
-	c.logger.Debugf("Generated logical backup env vars %v", envVars)
+	c.logger.Debugf("Generated logical backup env vars")
+	c.logger.Debugf("%v", envVars)
 	return envVars
 }
 
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
 	return "logical-backup-" + c.clusterName().Name
-}
-
-// Generate pool size related environment variables.
-//
-// MAX_DB_CONN would specify the global maximum for connections to a target
-// 	database.
-//
-// MAX_CLIENT_CONN is not configurable at the moment, just set it high enough.
-//
-// DEFAULT_SIZE is a pool size per db/user (having in mind the use case when
-// 	most of the queries coming through a connection pooler are from the same
-// 	user to the same db). In case if we want to spin up more connection pooler
-// 	instances, take this into account and maintain the same number of
-// 	connections.
-//
-// MIN_SIZE is a pool's minimal size, to prevent situation when sudden workload
-// 	have to wait for spinning up a new connections.
-//
-// RESERVE_SIZE is how many additional connections to allow for a pooler.
-func (c *Cluster) getConnectionPoolerEnvVars(spec *acidv1.PostgresSpec) []v1.EnvVar {
-	effectiveMode := util.Coalesce(
-		spec.ConnectionPooler.Mode,
-		c.OpConfig.ConnectionPooler.Mode)
-
-	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
-	if numberOfInstances == nil {
-		numberOfInstances = util.CoalesceInt32(
-			c.OpConfig.ConnectionPooler.NumberOfInstances,
-			k8sutil.Int32ToPointer(1))
-	}
-
-	effectiveMaxDBConn := util.CoalesceInt32(
-		spec.ConnectionPooler.MaxDBConnections,
-		c.OpConfig.ConnectionPooler.MaxDBConnections)
-
-	if effectiveMaxDBConn == nil {
-		effectiveMaxDBConn = k8sutil.Int32ToPointer(
-			constants.ConnectionPoolerMaxDBConnections)
-	}
-
-	maxDBConn := *effectiveMaxDBConn / *numberOfInstances
-
-	defaultSize := maxDBConn / 2
-	minSize := defaultSize / 2
-	reserveSize := minSize
-
-	return []v1.EnvVar{
-		{
-			Name:  "CONNECTION_POOLER_PORT",
-			Value: fmt.Sprint(pgPort),
-		},
-		{
-			Name:  "CONNECTION_POOLER_MODE",
-			Value: effectiveMode,
-		},
-		{
-			Name:  "CONNECTION_POOLER_DEFAULT_SIZE",
-			Value: fmt.Sprint(defaultSize),
-		},
-		{
-			Name:  "CONNECTION_POOLER_MIN_SIZE",
-			Value: fmt.Sprint(minSize),
-		},
-		{
-			Name:  "CONNECTION_POOLER_RESERVE_SIZE",
-			Value: fmt.Sprint(reserveSize),
-		},
-		{
-			Name:  "CONNECTION_POOLER_MAX_CLIENT_CONN",
-			Value: fmt.Sprint(constants.ConnectionPoolerMaxClientConnections),
-		},
-		{
-			Name:  "CONNECTION_POOLER_MAX_DB_CONN",
-			Value: fmt.Sprint(maxDBConn),
-		},
-	}
-}
-
-func (c *Cluster) generateConnectionPoolerPodTemplate(spec *acidv1.PostgresSpec) (
-	*v1.PodTemplateSpec, error) {
-
-	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
-	resources, err := generateResourceRequirements(
-		spec.ConnectionPooler.Resources,
-		c.makeDefaultConnectionPoolerResources())
-
-	effectiveDockerImage := util.Coalesce(
-		spec.ConnectionPooler.DockerImage,
-		c.OpConfig.ConnectionPooler.Image)
-
-	effectiveSchema := util.Coalesce(
-		spec.ConnectionPooler.Schema,
-		c.OpConfig.ConnectionPooler.Schema)
-
-	if err != nil {
-		return nil, fmt.Errorf("could not generate resource requirements: %v", err)
-	}
-
-	secretSelector := func(key string) *v1.SecretKeySelector {
-		effectiveUser := util.Coalesce(
-			spec.ConnectionPooler.User,
-			c.OpConfig.ConnectionPooler.User)
-
-		return &v1.SecretKeySelector{
-			LocalObjectReference: v1.LocalObjectReference{
-				Name: c.credentialSecretName(effectiveUser),
-			},
-			Key: key,
-		}
-	}
-
-	envVars := []v1.EnvVar{
-		{
-			Name:  "PGHOST",
-			Value: c.serviceAddress(Master),
-		},
-		{
-			Name:  "PGPORT",
-			Value: c.servicePort(Master),
-		},
-		{
-			Name: "PGUSER",
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: secretSelector("username"),
-			},
-		},
-		// the convention is to use the same schema name as
-		// connection pooler username
-		{
-			Name:  "PGSCHEMA",
-			Value: effectiveSchema,
-		},
-		{
-			Name: "PGPASSWORD",
-			ValueFrom: &v1.EnvVarSource{
-				SecretKeyRef: secretSelector("password"),
-			},
-		},
-	}
-
-	envVars = append(envVars, c.getConnectionPoolerEnvVars(spec)...)
-
-	poolerContainer := v1.Container{
-		Name:            connectionPoolerContainer,
-		Image:           effectiveDockerImage,
-		ImagePullPolicy: v1.PullIfNotPresent,
-		Resources:       *resources,
-		Ports: []v1.ContainerPort{
-			{
-				ContainerPort: pgPort,
-				Protocol:      v1.ProtocolTCP,
-			},
-		},
-		Env: envVars,
-	}
-
-	podTemplate := &v1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
-			Namespace:   c.Namespace,
-			Annotations: c.generatePodAnnotations(spec),
-		},
-		Spec: v1.PodSpec{
-			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
-			TerminationGracePeriodSeconds: &gracePeriod,
-			Containers:                    []v1.Container{poolerContainer},
-			// TODO: add tolerations to scheduler pooler on the same node
-			// as database
-			//Tolerations:                   *tolerationsSpec,
-		},
-	}
-
-	return podTemplate, nil
 }
 
 // Return an array of ownerReferences to make an arbitraty object dependent on
@@ -2260,108 +2091,6 @@ func (c *Cluster) ownerReferences() []metav1.OwnerReference {
 			Controller: &controller,
 		},
 	}
-}
-
-func (c *Cluster) generateConnectionPoolerDeployment(spec *acidv1.PostgresSpec) (
-	*appsv1.Deployment, error) {
-
-	// there are two ways to enable connection pooler, either to specify a
-	// connectionPooler section or enableConnectionPooler. In the second case
-	// spec.connectionPooler will be nil, so to make it easier to calculate
-	// default values, initialize it to an empty structure. It could be done
-	// anywhere, but here is the earliest common entry point between sync and
-	// create code, so init here.
-	if spec.ConnectionPooler == nil {
-		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
-	}
-
-	podTemplate, err := c.generateConnectionPoolerPodTemplate(spec)
-	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
-	if numberOfInstances == nil {
-		numberOfInstances = util.CoalesceInt32(
-			c.OpConfig.ConnectionPooler.NumberOfInstances,
-			k8sutil.Int32ToPointer(1))
-	}
-
-	if *numberOfInstances < constants.ConnectionPoolerMinInstances {
-		msg := "Adjusted number of connection pooler instances from %d to %d"
-		c.logger.Warningf(msg, numberOfInstances, constants.ConnectionPoolerMinInstances)
-
-		*numberOfInstances = constants.ConnectionPoolerMinInstances
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connectionPoolerName(),
-			Namespace:   c.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
-			Annotations: map[string]string{},
-			// make StatefulSet object its owner to represent the dependency.
-			// By itself StatefulSet is being deleted with "Orphaned"
-			// propagation policy, which means that it's deletion will not
-			// clean up this deployment, but there is a hope that this object
-			// will be garbage collected if something went wrong and operator
-			// didn't deleted it.
-			OwnerReferences: c.ownerReferences(),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: numberOfInstances,
-			Selector: c.connectionPoolerLabelsSelector(),
-			Template: *podTemplate,
-		},
-	}
-
-	return deployment, nil
-}
-
-func (c *Cluster) generateConnectionPoolerService(spec *acidv1.PostgresSpec) *v1.Service {
-
-	// there are two ways to enable connection pooler, either to specify a
-	// connectionPooler section or enableConnectionPooler. In the second case
-	// spec.connectionPooler will be nil, so to make it easier to calculate
-	// default values, initialize it to an empty structure. It could be done
-	// anywhere, but here is the earliest common entry point between sync and
-	// create code, so init here.
-	if spec.ConnectionPooler == nil {
-		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
-	}
-
-	serviceSpec := v1.ServiceSpec{
-		Ports: []v1.ServicePort{
-			{
-				Name:       c.connectionPoolerName(),
-				Port:       pgPort,
-				TargetPort: intstr.IntOrString{StrVal: c.servicePort(Master)},
-			},
-		},
-		Type: v1.ServiceTypeClusterIP,
-		Selector: map[string]string{
-			"connection-pooler": c.connectionPoolerName(),
-		},
-	}
-
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.connectionPoolerName(),
-			Namespace:   c.Namespace,
-			Labels:      c.connectionPoolerLabelsSelector().MatchLabels,
-			Annotations: map[string]string{},
-			// make StatefulSet object its owner to represent the dependency.
-			// By itself StatefulSet is being deleted with "Orphaned"
-			// propagation policy, which means that it's deletion will not
-			// clean up this service, but there is a hope that this object will
-			// be garbage collected if something went wrong and operator didn't
-			// deleted it.
-			OwnerReferences: c.ownerReferences(),
-		},
-		Spec: serviceSpec,
-	}
-
-	return service
 }
 
 func ensurePath(file string, defaultDir string, defaultFile string) string {

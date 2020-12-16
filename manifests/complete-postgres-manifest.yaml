@@ -18,7 +18,8 @@ spec:
     - createdb
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
-#  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
+  enableConnectionPooler: false # enable/disable connection pooler deployment
+  enableReplicaConnectionPooler: false # set to enable connectionPooler for replica service
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
@@ -126,18 +127,19 @@ spec:
 #  - 01:00-06:00  #UTC
 #  - Sat:00:00-04:00
 
-  connectionPooler:
-    numberOfInstances: 2
-    mode: "transaction"
-    schema: "pooler"
-    user: "pooler"
-    resources:
-      requests:
-        cpu: 300m
-        memory: 100Mi
-      limits:
-        cpu: "1"
-        memory: 100Mi
+# overwrite custom properties for connection pooler deployments
+#  connectionPooler:
+#    numberOfInstances: 2
+#    mode: "transaction"
+#    schema: "pooler"
+#    user: "pooler"
+#    resources:
+#      requests:
+#        cpu: 300m
+#        memory: 100Mi
+#      limits:
+#        cpu: "1"
+#        memory: 100Mi
 
   initContainers:
   - name: date

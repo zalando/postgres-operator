@@ -94,150 +94,6 @@ func (c *Cluster) createStatefulSet() (*appsv1.StatefulSet, error) {
 	return statefulSet, nil
 }
 
-// Prepare the database for connection pooler to be used, i.e. install lookup
-// function (do it first, because it should be fast and if it didn't succeed,
-// it doesn't makes sense to create more K8S objects. At this moment we assume
-// that necessary connection pooler user exists.
-//
-// After that create all the objects for connection pooler, namely a deployment
-// with a chosen pooler and a service to expose it.
-func (c *Cluster) createConnectionPooler(lookup InstallFunction) (*ConnectionPoolerObjects, error) {
-	var msg string
-	c.setProcessName("creating connection pooler")
-
-	if c.ConnectionPooler == nil {
-		c.ConnectionPooler = &ConnectionPoolerObjects{}
-	}
-
-	schema := c.Spec.ConnectionPooler.Schema
-
-	if schema == "" {
-		schema = c.OpConfig.ConnectionPooler.Schema
-	}
-
-	user := c.Spec.ConnectionPooler.User
-	if user == "" {
-		user = c.OpConfig.ConnectionPooler.User
-	}
-
-	err := lookup(schema, user)
-
-	if err != nil {
-		msg = "could not prepare database for connection pooler: %v"
-		return nil, fmt.Errorf(msg, err)
-	}
-
-	deploymentSpec, err := c.generateConnectionPoolerDeployment(&c.Spec)
-	if err != nil {
-		msg = "could not generate deployment for connection pooler: %v"
-		return nil, fmt.Errorf(msg, err)
-	}
-
-	// client-go does retry 10 times (with NoBackoff by default) when the API
-	// believe a request can be retried and returns Retry-After header. This
-	// should be good enough to not think about it here.
-	deployment, err := c.KubeClient.
-		Deployments(deploymentSpec.Namespace).
-		Create(context.TODO(), deploymentSpec, metav1.CreateOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	serviceSpec := c.generateConnectionPoolerService(&c.Spec)
-	service, err := c.KubeClient.
-		Services(serviceSpec.Namespace).
-		Create(context.TODO(), serviceSpec, metav1.CreateOptions{})
-
-	if err != nil {
-		return nil, err
-	}
-
-	c.ConnectionPooler = &ConnectionPoolerObjects{
-		Deployment: deployment,
-		Service:    service,
-	}
-	c.logger.Debugf("created new connection pooler %q, uid: %q",
-		util.NameFromMeta(deployment.ObjectMeta), deployment.UID)
-
-	return c.ConnectionPooler, nil
-}
-
-func (c *Cluster) deleteConnectionPooler() (err error) {
-	c.setProcessName("deleting connection pooler")
-	c.logger.Debugln("deleting connection pooler")
-
-	// Lack of connection pooler objects is not a fatal error, just log it if
-	// it was present before in the manifest
-	if c.ConnectionPooler == nil {
-		c.logger.Infof("No connection pooler to delete")
-		return nil
-	}
-
-	// Clean up the deployment object. If deployment resource we've remembered
-	// is somehow empty, try to delete based on what would we generate
-	deploymentName := c.connectionPoolerName()
-	deployment := c.ConnectionPooler.Deployment
-
-	if deployment != nil {
-		deploymentName = deployment.Name
-	}
-
-	// set delete propagation policy to foreground, so that replica set will be
-	// also deleted.
-	policy := metav1.DeletePropagationForeground
-	options := metav1.DeleteOptions{PropagationPolicy: &policy}
-	err = c.KubeClient.
-		Deployments(c.Namespace).
-		Delete(context.TODO(), deploymentName, options)
-
-	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("Connection pooler deployment was already deleted")
-	} else if err != nil {
-		return fmt.Errorf("could not delete deployment: %v", err)
-	}
-
-	c.logger.Infof("Connection pooler deployment %q has been deleted", deploymentName)
-
-	// Repeat the same for the service object
-	service := c.ConnectionPooler.Service
-	serviceName := c.connectionPoolerName()
-
-	if service != nil {
-		serviceName = service.Name
-	}
-
-	err = c.KubeClient.
-		Services(c.Namespace).
-		Delete(context.TODO(), serviceName, options)
-
-	if k8sutil.ResourceNotFound(err) {
-		c.logger.Debugf("Connection pooler service was already deleted")
-	} else if err != nil {
-		return fmt.Errorf("could not delete service: %v", err)
-	}
-
-	c.logger.Infof("Connection pooler service %q has been deleted", serviceName)
-
-	// Repeat the same for the secret object
-	secretName := c.credentialSecretName(c.OpConfig.ConnectionPooler.User)
-
-	secret, err := c.KubeClient.
-		Secrets(c.Namespace).
-		Get(context.TODO(), secretName, metav1.GetOptions{})
-
-	if err != nil {
-		c.logger.Debugf("could not get connection pooler secret %q: %v", secretName, err)
-	} else {
-		if err = c.deleteSecret(secret.UID, *secret); err != nil {
-			return fmt.Errorf("could not delete pooler secret: %v", err)
-		}
-	}
-
-	c.ConnectionPooler = nil
-	return nil
-}
-
 func getPodIndex(podName string) (int32, error) {
 	parts := strings.Split(podName, "-")
 	if len(parts) == 0 {
@@ -293,7 +149,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 
 // setRollingUpdateFlagForStatefulSet sets the indicator or the rolling update requirement
 // in the StatefulSet annotation.
-func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool) {
+func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool, msg string) {
 	anno := sset.GetAnnotations()
 	if anno == nil {
 		anno = make(map[string]string)
@@ -301,13 +157,13 @@ func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, v
 
 	anno[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
 	sset.SetAnnotations(anno)
-	c.logger.Debugf("statefulset's rolling update annotation has been set to %t", val)
+	c.logger.Debugf("set statefulset's rolling update annotation to %t: caller/reason %s", val, msg)
 }
 
 // applyRollingUpdateFlagforStatefulSet sets the rolling update flag for the cluster's StatefulSet
 // and applies that setting to the actual running cluster.
 func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
-	c.setRollingUpdateFlagForStatefulSet(c.Statefulset, val)
+	c.setRollingUpdateFlagForStatefulSet(c.Statefulset, val, "applyRollingUpdateFlag")
 	sset, err := c.updateStatefulSetAnnotations(c.Statefulset.GetAnnotations())
 	if err != nil {
 		return err
@@ -359,14 +215,13 @@ func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *appsv1.St
 			podsRollingUpdateRequired = false
 		} else {
 			c.logger.Infof("found a statefulset with an unfinished rolling update of the pods")
-
 		}
 	}
 	return podsRollingUpdateRequired
 }
 
 func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
-	c.logger.Debugf("updating statefulset annotations")
+	c.logger.Debugf("patching statefulset annotations")
 	patchData, err := metaAnnotationsPatch(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("could not form patch for the statefulset metadata: %v", err)
@@ -852,58 +707,4 @@ func (c *Cluster) GetStatefulSet() *appsv1.StatefulSet {
 // GetPodDisruptionBudget returns cluster's kubernetes PodDisruptionBudget
 func (c *Cluster) GetPodDisruptionBudget() *policybeta1.PodDisruptionBudget {
 	return c.PodDisruptionBudget
-}
-
-// Perform actual patching of a connection pooler deployment, assuming that all
-// the check were already done before.
-func (c *Cluster) updateConnectionPoolerDeployment(oldDeploymentSpec, newDeployment *appsv1.Deployment) (*appsv1.Deployment, error) {
-	c.setProcessName("updating connection pooler")
-	if c.ConnectionPooler == nil || c.ConnectionPooler.Deployment == nil {
-		return nil, fmt.Errorf("there is no connection pooler in the cluster")
-	}
-
-	patchData, err := specPatch(newDeployment.Spec)
-	if err != nil {
-		return nil, fmt.Errorf("could not form patch for the deployment: %v", err)
-	}
-
-	// An update probably requires RetryOnConflict, but since only one operator
-	// worker at one time will try to update it chances of conflicts are
-	// minimal.
-	deployment, err := c.KubeClient.
-		Deployments(c.ConnectionPooler.Deployment.Namespace).Patch(
-		context.TODO(),
-		c.ConnectionPooler.Deployment.Name,
-		types.MergePatchType,
-		patchData,
-		metav1.PatchOptions{},
-		"")
-	if err != nil {
-		return nil, fmt.Errorf("could not patch deployment: %v", err)
-	}
-
-	c.ConnectionPooler.Deployment = deployment
-
-	return deployment, nil
-}
-
-//updateConnectionPoolerAnnotations updates the annotations of connection pooler deployment
-func (c *Cluster) updateConnectionPoolerAnnotations(annotations map[string]string) (*appsv1.Deployment, error) {
-	c.logger.Debugf("updating connection pooler annotations")
-	patchData, err := metaAnnotationsPatch(annotations)
-	if err != nil {
-		return nil, fmt.Errorf("could not form patch for the deployment metadata: %v", err)
-	}
-	result, err := c.KubeClient.Deployments(c.ConnectionPooler.Deployment.Namespace).Patch(
-		context.TODO(),
-		c.ConnectionPooler.Deployment.Name,
-		types.MergePatchType,
-		[]byte(patchData),
-		metav1.PatchOptions{},
-		"")
-	if err != nil {
-		return nil, fmt.Errorf("could not patch connection pooler annotations %q: %v", patchData, err)
-	}
-	return result, nil
-
 }

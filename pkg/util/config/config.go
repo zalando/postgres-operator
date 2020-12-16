@@ -36,6 +36,7 @@ type Resources struct {
 	SpiloPrivileged         bool                `name:"spilo_privileged" default:"false"`
 	ClusterLabels           map[string]string   `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels         []string            `name:"inherited_labels" default:""`
+	InheritedAnnotations    []string            `name:"inherited_annotations" default:""`
 	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
 	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
 	DeleteAnnotationDateKey string              `name:"delete_annotation_date_key"`
@@ -110,14 +111,16 @@ type Scalyr struct {
 
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
-	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
-	LogicalBackupS3Bucket          string `name:"logical_backup_s3_bucket" default:""`
-	LogicalBackupS3Region          string `name:"logical_backup_s3_region" default:""`
-	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
-	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
-	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
-	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:""`
+	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
+	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
+	LogicalBackupS3Endpoint                   string `name:"logical_backup_s3_endpoint" default:""`
+	LogicalBackupS3AccessKeyID                string `name:"logical_backup_s3_access_key_id" default:""`
+	LogicalBackupS3SecretAccessKey            string `name:"logical_backup_s3_secret_access_key" default:""`
+	LogicalBackupS3SSE                        string `name:"logical_backup_s3_sse" default:""`
+	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
 }
 
 // Operator options for connection pooler
@@ -163,12 +166,16 @@ type Config struct {
 	GCPCredentials                         string            `name:"gcp_credentials"`
 	AdditionalSecretMount                  string            `name:"additional_secret_mount"`
 	AdditionalSecretMountPath              string            `name:"additional_secret_mount_path" default:"/meta/credentials"`
+	EnableEBSGp3Migration                  bool              `name:"enable_ebs_gp3_migration" default:"false"`
+	EnableEBSGp3MigrationMaxSize           int64             `name:"enable_ebs_gp3_migration_max_size" default:"1000"`
 	DebugLogging                           bool              `name:"debug_logging" default:"true"`
 	EnableDBAccess                         bool              `name:"enable_database_access" default:"true"`
 	EnableTeamsAPI                         bool              `name:"enable_teams_api" default:"true"`
 	EnableTeamSuperuser                    bool              `name:"enable_team_superuser" default:"false"`
 	TeamAdminRole                          string            `name:"team_admin_role" default:"admin"`
 	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
+	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
+	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
 	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
@@ -195,11 +202,13 @@ type Config struct {
 	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
+	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"false"`
+	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 }
 
 // MustMarshal marshals the config or panics
 func (c Config) MustMarshal() string {
-	b, err := json.MarshalIndent(c, "", "\t")
+	b, err := json.MarshalIndent(c, "", "   ")
 	if err != nil {
 		panic(err)
 	}

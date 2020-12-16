@@ -79,6 +79,12 @@ Those are top-level keys, containing both leaf keys and groups.
   Instruct operator to update only the statefulsets with new images (Spilo and InitContainers) without immediately doing the rolling update. The assumption is pods will be re-started later with new images, for example due to the node rotation.
   The default is `false`.
 
+* **enable_pgversion_env_var**
+  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `false`.
+
+* **enable_spilo_wal_path_compat**
+  enables backwards compatible path between Spilo 12 and Spilo 13 images. The default is `false`.
+
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
   Patroni native Kubernetes support is used. The default is empty (use
@@ -271,6 +277,12 @@ configuration they are grouped under the `kubernetes` key.
   are extracted. For the ConfigMap this has to be a string which allows
   referencing only one infrastructure roles secret. The default is empty.
 
+* **inherited_annotations**
+  list of annotation keys that can be inherited from the cluster manifest, and
+  added to each child objects  (`Deployment`, `StatefulSet`, `Pod`, `PDB` and
+  `Services`) created by the operator incl. the ones from the connection
+  pooler deployment. The default is empty.
+
 * **pod_role_label**
   name of the label assigned to the Postgres pods (and services/endpoints) by
   the operator. The default is `spilo-role`.
@@ -280,15 +292,16 @@ configuration they are grouped under the `kubernetes` key.
   objects. The default is `application:spilo`.
 
 * **inherited_labels**
-  list of labels that can be inherited from the cluster manifest, and added to
-  each child objects (`StatefulSet`, `Pod`, `Service` and `Endpoints`) created
-  by the operator. Typical use case is to dynamically pass labels that are
-  specific to a given Postgres cluster, in order to implement `NetworkPolicy`.
-  The default is empty.
+  list of label keys that can be inherited from the cluster manifest, and
+  added to each child objects (`Deployment`, `StatefulSet`, `Pod`, `PVCs`,
+  `PDB`, `Service`, `Endpoints` and `Secrets`) created by the operator.
+  Typical use case is to dynamically pass labels that are specific to a
+  given Postgres cluster, in order to implement `NetworkPolicy`. The default
+  is empty.
 
 * **cluster_name_label**
-  name of the label assigned to Kubernetes objects created by the operator that
-  indicates which cluster a given object belongs to. The default is
+  name of the label assigned to Kubernetes objects created by the operator
+  that indicates which cluster a given object belongs to. The default is
   `cluster-name`.
 
 * **node_readiness_label**
@@ -515,10 +528,22 @@ yet officially supported.
   AWS region used to store EBS volumes. The default is `eu-central-1`.
 
 * **additional_secret_mount**
-  Additional Secret (aws or gcp credentials) to mount in the pod. The default is empty.
+  Additional Secret (aws or gcp credentials) to mount in the pod.
+  The default is empty.
 
 * **additional_secret_mount_path**
-  Path to mount the above Secret in the filesystem of the container(s). The default is empty.
+  Path to mount the above Secret in the filesystem of the container(s).
+  The default is empty.
+
+* **enable_ebs_gp3_migration**
+  enable automatic migration on AWS from gp2 to gp3 volumes, that are smaller
+  than the configured max size (see below). This ignores that EBS gp3 is by
+  default only 125 MB/sec vs 250 MB/sec for gp2 >= 333GB.
+  The default is `false`.
+
+* **enable_ebs_gp3_migration_max_size**
+  defines the maximum volume size in GB until which auto migration happens.
+  Default is 1000 (1TB) which matches 3000 IOPS.
 
 ## Logical backup
 
@@ -537,6 +562,10 @@ grouped under the `logical_backup` key.
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
   pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
+
+* **logical_backup_provider**
+  Specifies the storage provider to which the backup should be uploaded (`s3` or `gcs`).
+  Default: "s3"
 
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
@@ -557,6 +586,9 @@ grouped under the `logical_backup` key.
 
 * **logical_backup_s3_secret_access_key**
   When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
+
+* **logical_backup_google_application_credentials**
+  Specifies the path of the google cloud service account json file. Default is empty.
 
 ## Debugging the operator
 
@@ -598,8 +630,8 @@ key.
   The default is `"log_statement:all"`
 
 * **enable_team_superuser**
-  whether to grant superuser to team members created from the Teams API.
-  The default is `false`.
+  whether to grant superuser to members of the cluster's owning team created
+  from the Teams API. The default is `false`.
 
 * **team_admin_role**
   role name to grant to team members created from the Teams API. The default is
@@ -631,6 +663,16 @@ key.
   List of teams which members need the superuser role in each PG database
   cluster to administer Postgres and maintain infrastructure built around it.
   The default is empty.
+
+* **enable_postgres_team_crd**
+  toggle to make the operator watch for created or updated `PostgresTeam` CRDs
+  and create roles for specified additional teams and members.
+  The default is `false`.
+
+* **enable_postgres_team_crd_superusers**
+  in a `PostgresTeam` CRD additional superuser teams can assigned to teams that
+  own clusters. With this flag set to `false`, it will be ignored.
+  The default is `false`.
 
 ## Logging and REST API
 

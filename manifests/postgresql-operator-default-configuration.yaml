@@ -6,7 +6,9 @@ configuration:
   docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
   # enable_crd_validation: true
   # enable_lazy_spilo_upgrade: false
+  # enable_pgversion_env_var: false
   # enable_shm_volume: true
+  enable_spilo_wal_path_compat: false
   etcd_host: ""
   # kubernetes_use_configmaps: false
   max_instances: -1
@@ -49,6 +51,8 @@ configuration:
     # - secretname: "other-infrastructure-role"
     #   userkey: "other-user-key"
     #   passwordkey: "other-password-key"
+    # inherited_annotations:
+    # - owned-by
     # inherited_labels:
     # - application
     # - environment
@@ -72,7 +76,7 @@ configuration:
     # spilo_runasgroup: 103
     # spilo_fsgroup: 103
     spilo_privileged: false
-    storage_resize_mode: ebs
+    storage_resize_mode: pvc
     # toleration: {}
     # watched_namespace: ""
   postgres_pod_resources:
@@ -103,6 +107,8 @@ configuration:
     # additional_secret_mount: "some-secret-name"
     # additional_secret_mount_path: "/some/dir"
     aws_region: eu-central-1
+    enable_ebs_gp3_migration: false
+    # enable_ebs_gp3_migration_max_size: 1000
     # gcp_credentials: ""
     # kube_iam_role: ""
     # log_s3_bucket: ""
@@ -122,6 +128,8 @@ configuration:
     enable_database_access: true
   teams_api:
     # enable_admin_role_for_users: true
+    # enable_postgres_team_crd: false
+    # enable_postgres_team_crd_superusers: false
     enable_team_superuser: false
     enable_teams_api: false
     # pam_configuration: ""

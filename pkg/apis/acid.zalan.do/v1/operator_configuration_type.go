@@ -66,6 +66,7 @@ type KubernetesMetaConfiguration struct {
 	PodRoleLabel                           string                       `json:"pod_role_label,omitempty"`
 	ClusterLabels                          map[string]string            `json:"cluster_labels,omitempty"`
 	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
+	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`
 	DownscalerAnnotations                  []string                     `json:"downscaler_annotations,omitempty"`
 	ClusterNameLabel                       string                       `json:"cluster_name_label,omitempty"`
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
@@ -117,14 +118,16 @@ type LoadBalancerConfiguration struct {
 // AWSGCPConfiguration defines the configuration for AWS
 // TODO complete Google Cloud Platform (GCP) configuration
 type AWSGCPConfiguration struct {
-	WALES3Bucket              string `json:"wal_s3_bucket,omitempty"`
-	AWSRegion                 string `json:"aws_region,omitempty"`
-	WALGSBucket               string `json:"wal_gs_bucket,omitempty"`
-	GCPCredentials            string `json:"gcp_credentials,omitempty"`
-	LogS3Bucket               string `json:"log_s3_bucket,omitempty"`
-	KubeIAMRole               string `json:"kube_iam_role,omitempty"`
-	AdditionalSecretMount     string `json:"additional_secret_mount,omitempty"`
-	AdditionalSecretMountPath string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	WALES3Bucket                 string `json:"wal_s3_bucket,omitempty"`
+	AWSRegion                    string `json:"aws_region,omitempty"`
+	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
+	GCPCredentials               string `json:"gcp_credentials,omitempty"`
+	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
+	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
+	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
+	AdditionalSecretMountPath    string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration" default:"false"`
+	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size" default:"1000"`
 }
 
 // OperatorDebugConfiguration defines options for the debug mode
@@ -135,16 +138,18 @@ type OperatorDebugConfiguration struct {
 
 // TeamsAPIConfiguration defines the configuration of TeamsAPI
 type TeamsAPIConfiguration struct {
-	EnableTeamsAPI           bool              `json:"enable_teams_api,omitempty"`
-	TeamsAPIUrl              string            `json:"teams_api_url,omitempty"`
-	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
-	EnableTeamSuperuser      bool              `json:"enable_team_superuser,omitempty"`
-	EnableAdminRoleForUsers  bool              `json:"enable_admin_role_for_users,omitempty"`
-	TeamAdminRole            string            `json:"team_admin_role,omitempty"`
-	PamRoleName              string            `json:"pam_role_name,omitempty"`
-	PamConfiguration         string            `json:"pam_configuration,omitempty"`
-	ProtectedRoles           []string          `json:"protected_role_names,omitempty"`
-	PostgresSuperuserTeams   []string          `json:"postgres_superuser_teams,omitempty"`
+	EnableTeamsAPI                  bool              `json:"enable_teams_api,omitempty"`
+	TeamsAPIUrl                     string            `json:"teams_api_url,omitempty"`
+	TeamAPIRoleConfiguration        map[string]string `json:"team_api_role_configuration,omitempty"`
+	EnableTeamSuperuser             bool              `json:"enable_team_superuser,omitempty"`
+	EnableAdminRoleForUsers         bool              `json:"enable_admin_role_for_users,omitempty"`
+	TeamAdminRole                   string            `json:"team_admin_role,omitempty"`
+	PamRoleName                     string            `json:"pam_role_name,omitempty"`
+	PamConfiguration                string            `json:"pam_configuration,omitempty"`
+	ProtectedRoles                  []string          `json:"protected_role_names,omitempty"`
+	PostgresSuperuserTeams          []string          `json:"postgres_superuser_teams,omitempty"`
+	EnablePostgresTeamCRD           bool              `json:"enable_postgres_team_crd,omitempty"`
+	EnablePostgresTeamCRDSuperusers bool              `json:"enable_postgres_team_crd_superusers,omitempty"`
 }
 
 // LoggingRESTAPIConfiguration defines Logging API conf
@@ -165,7 +170,7 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
-// Defines default configuration for connection pooler
+// ConnectionPoolerConfiguration defines default configuration for connection pooler
 type ConnectionPoolerConfiguration struct {
 	NumberOfInstances    *int32 `json:"connection_pooler_number_of_instances,omitempty"`
 	Schema               string `json:"connection_pooler_schema,omitempty"`
@@ -181,20 +186,24 @@ type ConnectionPoolerConfiguration struct {
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
 type OperatorLogicalBackupConfiguration struct {
-	Schedule          string `json:"logical_backup_schedule,omitempty"`
-	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
-	S3Region          string `json:"logical_backup_s3_region,omitempty"`
-	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
-	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
-	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`
-	S3SSE             string `json:"logical_backup_s3_sse,omitempty"`
+	Schedule                     string `json:"logical_backup_schedule,omitempty"`
+	DockerImage                  string `json:"logical_backup_docker_image,omitempty"`
+	BackupProvider               string `json:"logical_backup_provider,omitempty"`
+	S3Bucket                     string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Region                     string `json:"logical_backup_s3_region,omitempty"`
+	S3Endpoint                   string `json:"logical_backup_s3_endpoint,omitempty"`
+	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`
+	S3SecretAccessKey            string `json:"logical_backup_s3_secret_access_key,omitempty"`
+	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
+	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
 	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
 	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
+	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`

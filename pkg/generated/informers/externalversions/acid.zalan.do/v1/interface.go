@@ -30,6 +30,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// PostgresTeams returns a PostgresTeamInformer.
+	PostgresTeams() PostgresTeamInformer
 	// Postgresqls returns a PostgresqlInformer.
 	Postgresqls() PostgresqlInformer
 }
@@ -43,6 +45,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// PostgresTeams returns a PostgresTeamInformer.
+func (v *version) PostgresTeams() PostgresTeamInformer {
+	return &postgresTeamInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Postgresqls returns a PostgresqlInformer.
