@@ -778,7 +778,7 @@ func TestConnectionPoolerDeploymentSpec(t *testing.T) {
 			},
 			expected: nil,
 			cluster:  cluster,
-			check:    testDeploymentOwnwerReference,
+			check:    testDeploymentOwnerReference,
 		},
 		{
 			subTest: "selector",
@@ -931,7 +931,7 @@ func TestConnectionPoolerServiceSpec(t *testing.T) {
 				ConnectionPooler: &acidv1.ConnectionPooler{},
 			},
 			cluster: cluster,
-			check:   testServiceOwnwerReference,
+			check:   testServiceOwnerReference,
 		},
 		{
 			subTest: "selector",
