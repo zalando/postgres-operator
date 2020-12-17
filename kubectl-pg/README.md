@@ -26,11 +26,10 @@ From Go >=1.13 Go modules will be enabled by default
 ```
 # Assumes you have a working KUBECONFIG
 $ GO111MODULE="on" 
-# As of now go by default doesn't support Go mods. So explicit enabling is required.
 $ GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go mod vendor 
 # This generate a vendor directory with all dependencies needed by the plugin.
 $ $GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go install
-# This will place the kubectl-pg binary in your $GOPATH/bin
+# This will place the kubectl-pg binary in your $GOPATH/binG
 ```
 
 ### Before using the kubectl pg plugin make sure to set KUBECONFIG env varibale
