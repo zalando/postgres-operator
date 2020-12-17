@@ -63,7 +63,7 @@ If you are already using the Postgres operator in older version with a Spilo 12 
 We introduce the major version into the backup path to smoothen the [major version upgrade](docs/administrator.md#minor-and-major-version-upgrade) that is now supported manually.
 
 The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
-This comes at a potential performance cost and should be disabled after a few days.
+This comes at potential performance costs and should be disabled after a few days.
 
 The new Spilo 13 image is: `registry.opensource.zalan.do/acid/spilo-13:2.0-p2`
 
