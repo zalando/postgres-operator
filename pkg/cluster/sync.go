@@ -655,7 +655,7 @@ func (c *Cluster) syncDatabases() error {
 
 	// if no prepared databases are specified create a database named like the cluster
 	if c.Spec.PreparedDatabases != nil && len(c.Spec.PreparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
-		c.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
+		c.Spec.PreparedDatabases = map[string]*acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
 	}
 	for preparedDatabaseName := range c.Spec.PreparedDatabases {
 		_, exists := currentDatabases[preparedDatabaseName]
@@ -710,7 +710,7 @@ func (c *Cluster) syncPreparedDatabases() error {
 		// now, prepare defined schemas
 		preparedSchemas := preparedDB.PreparedSchemas
 		if len(preparedDB.PreparedSchemas) == 0 {
-			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
+			preparedSchemas = map[string]*acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
 		}
 		if err := c.syncPreparedSchemas(preparedDbName, preparedSchemas); err != nil {
 			return err
@@ -729,7 +729,7 @@ func (c *Cluster) syncPreparedDatabases() error {
 	return nil
 }
 
-func (c *Cluster) syncPreparedSchemas(databaseName string, preparedSchemas map[string]acidv1.PreparedSchema) error {
+func (c *Cluster) syncPreparedSchemas(databaseName string, preparedSchemas map[string]*acidv1.PreparedSchema) error {
 	c.setProcessName("syncing prepared schemas")
 
 	currentSchemas, err := c.getSchemas()

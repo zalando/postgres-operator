@@ -763,7 +763,7 @@ func TestInitSystemUsers(t *testing.T) {
 func TestPreparedDatabases(t *testing.T) {
 	testName := "TestDefaultPreparedDatabase"
 
-	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{}
+	cl.Spec.PreparedDatabases = map[string]*acidv1.PreparedDatabase{}
 	cl.initPreparedDatabaseRoles()
 
 	for _, role := range []string{"acid_test_owner", "acid_test_reader", "acid_test_writer",
@@ -775,10 +775,10 @@ func TestPreparedDatabases(t *testing.T) {
 
 	testName = "TestPreparedDatabaseWithSchema"
 
-	cl.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{
+	cl.Spec.PreparedDatabases = map[string]*acidv1.PreparedDatabase{
 		"foo": {
 			DefaultUsers: true,
-			PreparedSchemas: map[string]acidv1.PreparedSchema{
+			PreparedSchemas: map[string]*acidv1.PreparedSchema{
 				"bar": {
 					DefaultUsers: true,
 				},

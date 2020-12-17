@@ -623,9 +623,17 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 	}
 	if in.PreparedDatabases != nil {
 		in, out := &in.PreparedDatabases, &out.PreparedDatabases
-		*out = make(map[string]PreparedDatabase, len(*in))
+		*out = make(map[string]*PreparedDatabase, len(*in))
 		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+			var outVal *PreparedDatabase
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = new(PreparedDatabase)
+				(*in).DeepCopyInto(*out)
+			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.SchedulerName != nil {
@@ -633,7 +641,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = new(string)
 		**out = **in
 	}
-	in.NodeAffinity.DeepCopyInto(&out.NodeAffinity)
+	if in.NodeAffinity != nil {
+		in, out := &in.NodeAffinity, &out.NodeAffinity
+		*out = new(corev1.NodeAffinity)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]corev1.Toleration, len(*in))
@@ -953,9 +965,17 @@ func (in *PreparedDatabase) DeepCopyInto(out *PreparedDatabase) {
 	*out = *in
 	if in.PreparedSchemas != nil {
 		in, out := &in.PreparedSchemas, &out.PreparedSchemas
-		*out = make(map[string]PreparedSchema, len(*in))
+		*out = make(map[string]*PreparedSchema, len(*in))
 		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+			var outVal *PreparedSchema
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = new(PreparedSchema)
+				(*in).DeepCopyInto(*out)
+			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.Extensions != nil {
