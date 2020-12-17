@@ -36,7 +36,7 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "12"
+    version: "13"
     parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
@@ -93,9 +93,9 @@ spec:
       encoding: "UTF8"
       locale: "en_US.UTF-8"
       data-checksums: "true"
-    pg_hba:
-    - hostssl all all 0.0.0.0/0 md5
-    - host    all all 0.0.0.0/0 md5
+#    pg_hba:
+#      - hostssl all all 0.0.0.0/0 md5
+#      - host    all all 0.0.0.0/0 md5
 #    slots:
 #      permanent_physical_1:
 #        type: physical

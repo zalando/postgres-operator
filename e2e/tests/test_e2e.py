@@ -11,8 +11,8 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
+SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-13:2.0-p1"
+SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-cdp-13:2.0-p145"
 
 
 def to_selector(labels):

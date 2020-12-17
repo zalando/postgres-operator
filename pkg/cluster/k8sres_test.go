@@ -939,7 +939,7 @@ func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error 
 	return nil
 }
 
-func testDeploymentOwnwerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
+func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
@@ -950,7 +950,7 @@ func testDeploymentOwnwerReference(cluster *Cluster, deployment *appsv1.Deployme
 	return nil
 }
 
-func testServiceOwnwerReference(cluster *Cluster, service *v1.Service, role PostgresRole) error {
+func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role PostgresRole) error {
 	owner := service.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Statefulset.ObjectMeta.Name {

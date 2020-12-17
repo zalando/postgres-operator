@@ -1291,6 +1291,12 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_docker_image": {
 								Type: "string",
 							},
+							"logical_backup_google_application_credentials": {
+								Type: "string",
+							},
+							"logical_backup_provider": {
+								Type: "string",
+							},
 							"logical_backup_s3_access_key_id": {
 								Type: "string",
 							},

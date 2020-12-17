@@ -68,10 +68,8 @@ spec:
                   "cost_core": 0.0575,
                   "cost_memory": 0.014375,
                   "postgresql_versions": [
+                    "13",
                     "12",
-                    "11",
-                    "10",
-                    "9.6",
-                    "9.5"
+                    "11"
                   ]
                 }

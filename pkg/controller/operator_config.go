@@ -70,7 +70,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
 	result.EnablePodDisruptionBudget = util.CoalesceBool(fromCRD.Kubernetes.EnablePodDisruptionBudget, util.True())
-	result.StorageResizeMode = util.Coalesce(fromCRD.Kubernetes.StorageResizeMode, "ebs")
+	result.StorageResizeMode = util.Coalesce(fromCRD.Kubernetes.StorageResizeMode, "pvc")
 	result.EnableInitContainers = util.CoalesceBool(fromCRD.Kubernetes.EnableInitContainers, util.True())
 	result.EnableSidecars = util.CoalesceBool(fromCRD.Kubernetes.EnableSidecars, util.True())
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate

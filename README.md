@@ -14,7 +14,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 ### Operator features
 
 * Rolling updates on Postgres cluster changes, incl. quick minor version updates
-* Live volume resize without pod restarts (AWS EBS, others pending)
+* Live volume resize without pod restarts (AWS EBS, PvC)
 * Database connection pooler with PGBouncer
 * Restore and cloning Postgres clusters (incl. major version upgrade)
 * Additionally logical backups to S3 bucket can be configured
@@ -23,10 +23,12 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Basic credential and user management on K8s, eases application deployments
 * UI to create and edit Postgres cluster manifests
 * Works well on Amazon AWS, Google Cloud, OpenShift and locally on Kind
+* Support for custom TLS certificates
+* Base support for AWS EBS gp3 migration (iops, throughput pending)
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 12, starting from 9.6+
+* Supports PostgreSQL 13, starting from 9.6+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
@@ -48,7 +50,25 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 [timescaledb](https://github.com/timescale/timescaledb)
 
 The Postgres Operator has been developed at Zalando and is being used in
-production for over two years.
+production for over three years.
+
+## Notes on Postgres 13 support
+
+If you are new to the operator, you can skip this and just start using the Postgres operator as is, Postgres 13 is ready to go.
+
+The Postgres operator supports Postgres 13 with the new Spilo Image that includes also the recent Patroni version to support PG13 settings.
+More work on optimizing restarts and rolling upgrades is pending.
+
+If you are already using the Postgres operator in older version with a Spilo 12 Docker Image you need to be aware of the changes for the backup path.
+We introduce the major version into the backup path to smooth the major version upgrade that is now supported manually.
+
+The new operator configuration, sets a compatilibty flag *enable_spilo_wal_path_compat* to make Spilo look in current path but also old format paths for wal segments.
+This comes at potential perf. costs, and should be disabled after a few days.
+
+The new Spilo 13 image is: `registry.opensource.zalan.do/acid/spilo-13:2.0-p1`
+
+The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
+
 
 ## Getting started
 

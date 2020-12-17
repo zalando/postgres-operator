@@ -80,7 +80,7 @@ Those are top-level keys, containing both leaf keys and groups.
   The default is `false`.
 
 * **enable_pgversion_env_var**
-  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `false`.
+  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `true`.
 
 * **enable_spilo_wal_path_compat**
   enables backwards compatible path between Spilo 12 and Spilo 13 images. The default is `false`.
@@ -375,7 +375,7 @@ configuration they are grouped under the `kubernetes` key.
 * **storage_resize_mode**
   defines how operator handels the difference between requested volume size and
   actual size. Available options are: ebs - tries to resize EBS volume, pvc -
-  changes PVC definition, off - disables resize of the volumes. Default is "ebs".
+  changes PVC definition, off - disables resize of the volumes. Default is "pvc".
   When using OpenShift please use one of the other available options.
 
 ## Kubernetes resource requests

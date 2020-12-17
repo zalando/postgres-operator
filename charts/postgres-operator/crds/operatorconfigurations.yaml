@@ -319,6 +319,10 @@ spec:
                 properties:
                   logical_backup_docker_image:
                     type: string
+                  logical_backup_google_application_credentials:
+                    type: string
+                  logical_backup_provider:
+                    type: string
                   logical_backup_s3_access_key_id:
                     type: string
                   logical_backup_s3_bucket:

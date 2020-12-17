@@ -182,7 +182,7 @@ type Config struct {
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
-	StorageResizeMode                      string            `name:"storage_resize_mode" default:"ebs"`
+	StorageResizeMode                      string            `name:"storage_resize_mode" default:"pvc"`
 	EnableLoadBalancer                     *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
 	ExternalTrafficPolicy                  string            `name:"external_traffic_policy" default:"Cluster"`
 	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
@@ -202,7 +202,7 @@ type Config struct {
 	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
-	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"false"`
+	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 }
 
