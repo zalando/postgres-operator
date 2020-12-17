@@ -55,7 +55,7 @@ pipeline:
 
     - id: build-operator-ui
       type: script
-
+      requires_human_approval: true
       commands:
         - desc: 'Prepare environment'
           cmd: |
@@ -80,3 +80,15 @@ pipeline:
             export IMAGE
             make docker
             make push
+
+    - id: build-logical-backup
+      type: script
+      requires_human_approval: true
+      commands:
+        - desc: Build image
+          cmd: |
+            cd docker/logical-backup
+            export TAG=$(git describe --tags --always --dirty)
+            IMAGE="registry-write.opensource.zalan.do/acid/logical-backup"
+            docker build --rm -t "$IMAGE:$TAG$CDP_TAG" .
+            docker push "$IMAGE:$TAG$CDP_TAG"
