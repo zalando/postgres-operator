@@ -3,10 +3,10 @@ entries:
   postgres-operator:
   - apiVersion: v1
     appVersion: 1.6.0
-    created: "2020-12-17T15:46:21.948364251+01:00"
+    created: "2020-12-17T16:16:25.639708821+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
-    digest: de1306a53dd8264a2703fe0867b43a13b1e378e6d81f6200ecdea1c8ef9d202d
+    digest: 2f5f527bae0a22b02f2f7b1e2352665cecf489a990e18212444fa34450b97604
     home: https://github.com/zalando/postgres-operator
     keywords:
     - postgres
@@ -25,7 +25,7 @@ entries:
     version: 1.6.0
   - apiVersion: v1
     appVersion: 1.5.0
-    created: "2020-12-17T15:46:21.945665932+01:00"
+    created: "2020-12-17T16:16:25.637262877+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 198351d5db52e65cdf383d6f3e1745d91ac1e2a01121f8476f8b1be728b09531
@@ -45,4 +45,4 @@ entries:
     urls:
     - postgres-operator-1.5.0.tgz
     version: 1.5.0
-generated: "2020-12-17T15:46:21.937893219+01:00"
+generated: "2020-12-17T16:16:25.635647131+01:00"

@@ -248,7 +248,7 @@ configAwsOrGcp:
 # configure K8s cron job managed by the operator
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:master-58"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.0"
   # S3 Access Key ID
   logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
