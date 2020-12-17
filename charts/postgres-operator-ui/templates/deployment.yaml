@@ -68,10 +68,8 @@ spec:
                   "resources_visible": true,
                   "users_visible": true,
                   "postgresql_versions": [
+                    "13",
                     "12",
-                    "11",
-                    "10",
-                    "9.6",
-                    "9.5"
+                    "11"
                   ]
                 }

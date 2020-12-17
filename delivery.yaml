@@ -55,7 +55,7 @@ pipeline:
 
     - id: build-operator-ui
       type: script
-      requires_human_approval: true
+
       commands:
         - desc: 'Prepare environment'
           cmd: |
@@ -83,7 +83,7 @@ pipeline:
 
     - id: build-logical-backup
       type: script
-      requires_human_approval: true
+
       commands:
         - desc: Build image
           cmd: |
