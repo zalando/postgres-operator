@@ -14,9 +14,9 @@ This plugin is a prototype developed as a part of GSoC 2019 under the organisati
 https://github.com/VineethReddy02/GSoC-Kubectl-Plugin-for-Postgres-Operator-tracker
 
  ### Final Project Report
- 
+
  https://gist.github.com/VineethReddy02/159283bd368a710379eaf0f6bd60a40a
- 
+
 
 ### Installtion of kubectl pg plugin
 
@@ -25,18 +25,18 @@ Install go and enable go modules ```export GO111MODULE=on```
 From Go >=1.13 Go modules will be enabled by default
 ```
 # Assumes you have a working KUBECONFIG
-$ GO111MODULE="on" 
-$ GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go mod vendor 
+$ GO111MODULE="on"
+$ GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go mod vendor
 # This generate a vendor directory with all dependencies needed by the plugin.
 $ $GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go install
-# This will place the kubectl-pg binary in your $GOPATH/binG
+# This will place the kubectl-pg binary in your $GOPATH/bin
 ```
 
 ### Before using the kubectl pg plugin make sure to set KUBECONFIG env varibale
 
 Ideally KUBECONFIG is found in $HOME/.kube/config else specify the KUBECONFIG path here.
 
-```export KUBECONFIG=$HOME/.kube/config``` 
+```export KUBECONFIG=$HOME/.kube/config```
 
 ### To list all commands available in kubectl pg
 
@@ -121,4 +121,4 @@ Note: -p represents psql prompt
 ## Development
 
 - When making changes to plugin make sure to change the major or patch version
-of plugin in ```build.sh``` and run ```./build.sh``` 
+of plugin in ```build.sh``` and run ```./build.sh```
