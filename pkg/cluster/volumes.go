@@ -21,8 +21,15 @@ func (c *Cluster) syncVolumes() error {
 	c.logger.Debugf("syncing volumes using %q storage resize mode", c.OpConfig.StorageResizeMode)
 	var err error
 
+	// check quantity string once, and not bother with it anymore everywhwere
+	_, err = resource.ParseQuantity(c.Spec.Volume.Size)
+	if err != nil {
+		return fmt.Errorf("could not parse volume size from the manifest: %v", err)
+	}
+
 	if c.OpConfig.StorageResizeMode == "mixed" {
 		// mixed op uses AWS API to adjust size,throughput,iops and calls pvc chance for file system resize
+		err = c.syncUnderlyingEBSVolume()
 
 		// resize pvc to adjust filesystem size until better K8s support
 		if err = c.syncVolumeClaims(); err != nil {
@@ -52,6 +59,10 @@ func (c *Cluster) syncVolumes() error {
 	return nil
 }
 
+func (c *Cluster) syncUnderlyingEBSVolume() {
+
+}
+
 // syncVolumeClaims reads all persistent volume claims and checks that their size matches the one declared in the statefulset.
 func (c *Cluster) syncVolumeClaims() error {
 	c.setProcessName("syncing volume claims")
@@ -75,9 +86,9 @@ func (c *Cluster) syncVolumeClaims() error {
 
 // syncVolumes reads all persistent volumes and checks that their size matches the one declared in the statefulset.
 func (c *Cluster) syncEbsVolumes() error {
-	c.setProcessName("syncing volumes")
+	c.setProcessName("syncing EBS and Claims volumes")
 
-	act, err := c.volumesNeedResizing(c.Spec.Volume)
+	act, err := c.volumesNeedResizing()
 	if err != nil {
 		return fmt.Errorf("could not compare size of the volumes: %v", err)
 	}
@@ -202,6 +213,8 @@ func (c *Cluster) resizeVolumes() error {
 
 	c.setProcessName("resizing EBS volumes")
 
+	newQuantity, _ := resource.ParseQuantity(c.Spec.Volume.Size)
+	newSize := quantityToGigabyte(newQuantity)
 	resizer := c.VolumeResizer
 	var totalIncompatible int
 
@@ -210,7 +223,7 @@ func (c *Cluster) resizeVolumes() error {
 		return fmt.Errorf("could not parse volume size: %v", err)
 	}
 
-	pvs, newSize, err := c.listVolumesWithManifestSize(c.Spec.Volume)
+	pvs, err := c.listPersistentVolumes()
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
@@ -291,31 +304,21 @@ func (c *Cluster) volumeClaimsNeedResizing(newVolume acidv1.Volume) (bool, error
 	return false, nil
 }
 
-func (c *Cluster) volumesNeedResizing(newVolume acidv1.Volume) (bool, error) {
-	vols, manifestSize, err := c.listVolumesWithManifestSize(newVolume)
+func (c *Cluster) volumesNeedResizing() (bool, error) {
+	newQuantity, _ := resource.ParseQuantity(c.Spec.Volume.Size)
+	newSize := quantityToGigabyte(newQuantity)
+
+	vols, err := c.listPersistentVolumes()
 	if err != nil {
 		return false, err
 	}
 	for _, pv := range vols {
 		currentSize := quantityToGigabyte(pv.Spec.Capacity[v1.ResourceStorage])
-		if currentSize != manifestSize {
+		if currentSize != newSize {
 			return true, nil
 		}
 	}
 	return false, nil
-}
-
-func (c *Cluster) listVolumesWithManifestSize(newVolume acidv1.Volume) ([]*v1.PersistentVolume, int64, error) {
-	newSize, err := resource.ParseQuantity(newVolume.Size)
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not parse volume size from the manifest: %v", err)
-	}
-	manifestSize := quantityToGigabyte(newSize)
-	vols, err := c.listPersistentVolumes()
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not list persistent volumes: %v", err)
-	}
-	return vols, manifestSize, nil
 }
 
 // getPodNameFromPersistentVolume returns a pod name that it extracts from the volume claim ref.
@@ -335,7 +338,7 @@ func (c *Cluster) executeEBSMigration() error {
 	}
 	c.logger.Infof("starting EBS gp2 to gp3 migration")
 
-	pvs, _, err := c.listVolumesWithManifestSize(c.Spec.Volume)
+	pvs, err := c.listPersistentVolumes()
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
 	}
