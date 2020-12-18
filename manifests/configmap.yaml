@@ -31,7 +31,7 @@ data:
   # default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p1
+  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_validation: "true"
@@ -48,7 +48,6 @@ data:
   # enable_postgres_team_crd_superusers: "false"
   enable_replica_load_balancer: "false"
   # enable_shm_volume: "true"
-  enable_pgversion_env_var: "true"
   # enable_sidecars: "true"
   enable_spilo_wal_path_compat: "true"
   # enable_team_superuser: "false"
@@ -63,7 +62,7 @@ data:
   # inherited_labels: application,environment
   # kube_iam_role: ""
   # log_s3_bucket: ""
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.0"
   # logical_backup_s3_access_key_id: ""
   logical_backup_s3_bucket: "my-bucket-url"
   # logical_backup_s3_region: ""

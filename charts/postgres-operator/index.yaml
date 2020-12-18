@@ -2,8 +2,30 @@ apiVersion: v1
 entries:
   postgres-operator:
   - apiVersion: v1
+    appVersion: 1.6.0
+    created: "2020-12-17T16:16:25.639708821+01:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
+    digest: 2f5f527bae0a22b02f2f7b1e2352665cecf489a990e18212444fa34450b97604
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-1.6.0.tgz
+    version: 1.6.0
+  - apiVersion: v1
     appVersion: 1.5.0
-    created: "2020-06-04T17:06:49.41741489+02:00"
+    created: "2020-12-17T16:16:25.637262877+01:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running
       in Kubernetes
     digest: 198351d5db52e65cdf383d6f3e1745d91ac1e2a01121f8476f8b1be728b09531
@@ -23,26 +45,4 @@ entries:
     urls:
     - postgres-operator-1.5.0.tgz
     version: 1.5.0
-  - apiVersion: v1
-    appVersion: 1.4.0
-    created: "2020-06-04T17:06:49.416001109+02:00"
-    description: Postgres Operator creates and manages PostgreSQL clusters running
-      in Kubernetes
-    digest: f8b90fecfc3cb825b94ed17edd9d5cefc36ae61801d4568597b4a79bcd73b2e9
-    home: https://github.com/zalando/postgres-operator
-    keywords:
-    - postgres
-    - operator
-    - cloud-native
-    - patroni
-    - spilo
-    maintainers:
-    - email: opensource@zalando.de
-      name: Zalando
-    name: postgres-operator
-    sources:
-    - https://github.com/zalando/postgres-operator
-    urls:
-    - postgres-operator-1.4.0.tgz
-    version: 1.4.0
-generated: "2020-06-04T17:06:49.414521538+02:00"
+generated: "2020-12-17T16:16:25.635647131+01:00"

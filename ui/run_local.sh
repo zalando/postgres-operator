@@ -23,11 +23,9 @@ default_operator_ui_config='{
   "cost_core": 0.0575,
   "cost_memory": 0.014375,
   "postgresql_versions": [
+    "13",
     "12",
-    "11",
-    "10",
-    "9.6",
-    "9.5"
+    "11"
   ],
   "static_network_whitelist": {
     "localhost": ["172.0.0.1/32"]
