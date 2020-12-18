@@ -975,7 +975,7 @@ func (c *Cluster) initSystemUsers() {
 func (c *Cluster) initPreparedDatabaseRoles() error {
 
 	if c.Spec.PreparedDatabases != nil && len(c.Spec.PreparedDatabases) == 0 { // TODO: add option to disable creating such a default DB
-		c.Spec.PreparedDatabases = map[string]*acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
+		c.Spec.PreparedDatabases = map[string]acidv1.PreparedDatabase{strings.Replace(c.Name, "-", "_", -1): {}}
 	}
 
 	// create maps with default roles/users as keys and their membership as values
@@ -994,7 +994,7 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		// get list of prepared schemas to set in search_path
 		preparedSchemas := preparedDB.PreparedSchemas
 		if len(preparedDB.PreparedSchemas) == 0 {
-			preparedSchemas = map[string]*acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
+			preparedSchemas = map[string]acidv1.PreparedSchema{"data": {DefaultRoles: util.True()}}
 		}
 
 		var searchPath strings.Builder
