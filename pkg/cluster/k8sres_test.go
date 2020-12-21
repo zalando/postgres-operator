@@ -882,7 +882,7 @@ func TestNodeAffinity(t *testing.T) {
 			Volume: acidv1.Volume{
 				Size: "1G",
 			},
-			NodeAffinity: *nodeAffinity,
+			NodeAffinity: nodeAffinity,
 		}
 	}
 

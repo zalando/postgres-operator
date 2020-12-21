@@ -22,7 +22,7 @@ started.
 
 Starting with Spilo 13, Postgres Operator can do in-place major version upgrade,
 which should be faster than cloning. However, it is not fully automatic yet.
-First, you need to make sure, that setting the PG_VERSION environment variable
+First, you need to make sure, that setting the `PGVERSION` environment variable
 is enabled in the configuration. Since `v1.6.0`, `enable_pgversion_env_var` is
 enabled by default.
 
