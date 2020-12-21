@@ -76,7 +76,7 @@ function get_current_pod {
         --cacert $CERT \
         -H "Authorization: Bearer ${TOKEN}"
 }
-if $RUN_LOGICAL_BACKUP_ON_MASTER; then
+if $LOGICAL_BACKUP_ON_MASTER; then
 declare -a search_strategy=(
     get_master_pod
 )
