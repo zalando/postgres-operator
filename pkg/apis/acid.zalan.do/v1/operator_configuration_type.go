@@ -196,6 +196,7 @@ type OperatorLogicalBackupConfiguration struct {
 	S3SecretAccessKey            string `json:"logical_backup_s3_secret_access_key,omitempty"`
 	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
+	BackupOnMaster               string `json:"logical_backup_on_master,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config

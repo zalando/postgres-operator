@@ -1319,6 +1319,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type:    "string",
 								Pattern: "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$",
 							},
+							"logical_backup_on_master": {
+								Type: "string",
+							},
 						},
 					},
 					"debug": {

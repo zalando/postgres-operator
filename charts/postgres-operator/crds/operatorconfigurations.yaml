@@ -338,6 +338,8 @@ spec:
                   logical_backup_schedule:
                     type: string
                     pattern: '^(\d+|\*)(/\d+)?(\s+(\d+|\*)(/\d+)?){4}$'
+                  logical_backup_on_master:
+                    type: string
               debug:
                 type: object
                 properties:

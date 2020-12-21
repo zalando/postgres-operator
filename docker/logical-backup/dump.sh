@@ -76,12 +76,18 @@ function get_current_pod {
         --cacert $CERT \
         -H "Authorization: Bearer ${TOKEN}"
 }
-
+if $RUN_LOGICAL_BACKUP_ON_MASTER; then
+declare -a search_strategy=(
+    get_master_pod
+)
+else
 declare -a search_strategy=(
     list_all_replica_pods_current_node
     list_all_replica_pods_any_node
     get_master_pod
 )
+fi
+
 
 function list_all_replica_pods_current_node {
     get_pods "labelSelector=${CLUSTER_NAME_LABEL}%3D${SCOPE},spilo-role%3Dreplica&fieldSelector=spec.nodeName%3D${CURRENT_NODENAME}" | head -n 1
