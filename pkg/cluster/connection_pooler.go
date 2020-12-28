@@ -681,12 +681,22 @@ func logPoolerEssentials(log *logrus.Entry, oldSpec, newSpec *acidv1.Postgresql)
 }
 
 func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, LookupFunction InstallFunction) (SyncReason, error) {
-	logPoolerEssentials(c.logger, oldSpec, newSpec)
 
 	var reason SyncReason
 	var err error
 	var newNeedConnectionPooler, oldNeedConnectionPooler bool
 	oldNeedConnectionPooler = false
+
+	needSync, reason := needSyncConnectionPoolerSpecs(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler)
+	masterChanges, err := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
+	replicaChanges, err := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
+
+	if !needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0 {
+		c.logger.Debugln("no need for pooler sync")
+		return nil, nil
+	}
+
+	logPoolerEssentials(c.logger, oldSpec, newSpec)
 
 	// Check and perform the sync requirements for each of the roles.
 	for _, role := range [2]PostgresRole{Master, Replica} {
