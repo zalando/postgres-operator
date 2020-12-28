@@ -687,13 +687,15 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	var newNeedConnectionPooler, oldNeedConnectionPooler bool
 	oldNeedConnectionPooler = false
 
-	needSync, reason := needSyncConnectionPoolerSpecs(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler)
-	masterChanges, err := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
-	replicaChanges, err := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
+	if oldSpec != nil {
+		needSync, _ := needSyncConnectionPoolerSpecs(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler)
+		masterChanges, _ := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
+		replicaChanges, _ := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
 
-	if !needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0 {
-		c.logger.Debugln("no need for pooler sync")
-		return nil, nil
+		if !needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0 {
+			c.logger.Debugln("no need for pooler sync")
+			return nil, nil
+		}
 	}
 
 	logPoolerEssentials(c.logger, oldSpec, newSpec)
