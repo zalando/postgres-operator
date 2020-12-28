@@ -539,13 +539,13 @@ func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, depl
 // Test if two connection pooler configuration needs to be synced. For simplicity
 // compare not the actual K8S objects, but the configuration itself and request
 // sync if there is any difference.
-func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler) (sync bool, reasons []string) {
+func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler, logger *logrus.Entry) (sync bool, reasons []string) {
 	reasons = []string{}
 	sync = false
 
 	changelog, err := diff.Diff(oldSpec, newSpec)
 	if err != nil {
-		//c.logger.Infof("Cannot get diff, do not do anything, %+v", err)
+		logger.Infof("Cannot get diff, do not do anything, %+v", err)
 		return false, reasons
 	}
 
@@ -687,15 +687,21 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	var newNeedConnectionPooler, oldNeedConnectionPooler bool
 	oldNeedConnectionPooler = false
 
-	if oldSpec != nil {
-		needSync, _ := needSyncConnectionPoolerSpecs(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler)
-		masterChanges, _ := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
-		replicaChanges, _ := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
-
-		if !needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0 {
-			c.logger.Debugln("no need for pooler sync")
-			return nil, nil
+	if oldSpec == nil {
+		oldSpec = &acidv1.Postgresql{
+			Spec: acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
 		}
+	}
+
+	needSync, _ := needSyncConnectionPoolerSpecs(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler, c.logger)
+	masterChanges, _ := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
+	replicaChanges, _ := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
+
+	if !needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0 {
+		c.logger.Warningln("no need for pooler sync")
+		return nil, nil
 	}
 
 	logPoolerEssentials(c.logger, oldSpec, newSpec)
@@ -853,7 +859,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		var specReason []string
 
 		if oldSpec != nil {
-			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
+			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler, c.logger)
 		}
 
 		defaultsSync, defaultsReason := needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
