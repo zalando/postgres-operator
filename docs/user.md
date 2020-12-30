@@ -49,7 +49,7 @@ Note, that the name of the cluster must start with the `teamId` and `-`. At
 Zalando we use team IDs (nicknames) to lower the chance of duplicate cluster
 names and colliding entities. The team ID would also be used to query an API to
 get all members of a team and create [database roles](#teams-api-roles) for
-them.
+them. Besides, the maximum cluster name length is 53 characters.
 
 ## Watch pods being created
 
@@ -150,23 +150,62 @@ user. There are two ways to define them:
 
 #### Infrastructure roles secret
 
-The infrastructure roles secret is specified by the `infrastructure_roles_secret_name`
-parameter. The role definition looks like this (values are base64 encoded):
+Infrastructure roles can be specified by the `infrastructure_roles_secrets`
+parameter where you can reference multiple existing secrets. Prior to `v1.6.0`
+the operator could only reference one secret with the
+`infrastructure_roles_secret_name` option. However, this secret could contain
+multiple roles using the same set of keys plus incrementing index.
 
 ```yaml
-user1: ZGJ1c2Vy
-password1: c2VjcmV0
-inrole1: b3BlcmF0b3I=
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-infrastructure-roles
+data:
+  user1: ZGJ1c2Vy
+  password1: c2VjcmV0
+  inrole1: b3BlcmF0b3I=
+  user2: ...
 ```
 
 The block above describes the infrastructure role 'dbuser' with password
-'secret' that is a member of the 'operator' role. For the following definitions
-one must increase the index, i.e. the next role will be defined as 'user2' and
-so on. The resulting role will automatically be a login role.
+'secret' that is a member of the 'operator' role. The resulting role will
+automatically be a login role.
 
-Note that with definitions that solely use the infrastructure roles secret
-there is no way to specify role options (like superuser or nologin) or role
-memberships. This is where the ConfigMap comes into play.
+With the new option users can configure the names of secret keys that contain
+the user name, password etc. The secret itself is referenced by the
+`secretname` key. If the secret uses a template for multiple roles as described
+above list them separately.
+
+```yaml
+apiVersion: v1
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    infrastructure_roles_secrets:
+    - secretname: "postgresql-infrastructure-roles"
+      userkey: "user1"
+      passwordkey: "password1"
+      rolekey: "inrole1"
+    - secretname: "postgresql-infrastructure-roles"
+      userkey: "user2"
+      ...
+```
+
+Note, only the CRD-based configuration allows for referencing multiple secrets.
+As of now, the ConfigMap is restricted to either one or the existing template
+option with `infrastructure_roles_secret_name`. Please, refer to the example
+manifests to understand how `infrastructure_roles_secrets` has to be configured
+for the [configmap](../manifests/configmap.yaml) or [CRD configuration](../manifests/postgresql-operator-default-configuration.yaml).
+
+If both `infrastructure_roles_secret_name` and `infrastructure_roles_secrets`
+are defined the operator will create roles for both of them. So make sure,
+they do not collide. Note also, that with definitions that solely use the
+infrastructure roles secret there is no way to specify role options (like
+superuser or nologin) or role memberships. This is where the additional
+ConfigMap comes into play.
 
 #### Secret plus ConfigMap
 
@@ -229,6 +268,144 @@ and `enable_teams_api` must be set to `true`. There are more settings available
 to choose superusers, group roles, [PAM configuration](https://github.com/CyberDem0n/pam-oauth2)
 etc. An OAuth2 token can be passed to the Teams API via a secret. The name for
 this secret is configurable with the `oauth_token_secret_name` parameter.
+
+### Additional teams and members per cluster
+
+Postgres clusters are associated with one team by providing the `teamID` in
+the manifest. Additional superuser teams can be configured as mentioned in
+the previous paragraph. However, this is a global setting. To assign
+additional teams, superuser teams and single users to clusters of a given
+team, use the [PostgresTeam CRD](../manifests/postgresteam.yaml).
+
+Note, by default the `PostgresTeam` support is disabled in the configuration.
+Switch `enable_postgres_team_crd` flag to `true` and the operator will start to
+watch for this CRD. Make sure, the cluster role is up to date and contains a
+section for [PostgresTeam](../manifests/operator-service-account-rbac.yaml#L30).
+
+#### Additional teams
+
+To assign additional teams and single users to clusters of a given team,
+define a mapping with the `PostgresTeam` Kubernetes resource. The Postgres
+Operator will read such team mappings each time it syncs all Postgres clusters.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: PostgresTeam
+metadata:
+  name: custom-team-membership
+spec:
+  additionalTeams:
+    a-team:
+    - "b-team"
+```
+
+With the example above the operator will create login roles for all members
+of `b-team` in every cluster owned by `a-team`. It's possible to do vice versa
+for clusters of `b-team` in one manifest:
+
+```yaml
+spec:
+  additionalTeams:
+    a-team:
+    - "b-team"
+    b-team:
+    - "a-team"
+```
+
+You see, the `PostgresTeam` CRD is a global team mapping and independent from
+the Postgres manifests. It is possible to define multiple mappings, even with
+redundant content - the Postgres operator will create one internal cache from
+it. Additional teams are resolved transitively, meaning you will also add
+users for their `additionalTeams`, e.g.:
+
+```yaml
+spec:
+  additionalTeams:
+    a-team:
+    - "b-team"
+    - "c-team"
+    b-team:
+    - "a-team"
+```
+
+This creates roles for members of the `c-team` team not only in all clusters
+owned by `a-team`, but as well in cluster owned by `b-team`, as `a-team` is
+an `additionalTeam` to `b-team` 
+
+Not, you can also define `additionalSuperuserTeams` in the `PostgresTeam`
+manifest. By default, this option is disabled and must be configured with
+`enable_postgres_team_crd_superusers` to make it work.
+
+#### Virtual teams
+
+There can be "virtual teams" that do not exist in the Teams API. It can make
+it easier to map a group of teams to many other teams:
+
+```yaml
+spec:
+  additionalTeams:
+    a-team:
+    - "virtual-team"
+    b-team:
+    - "virtual-team"
+    virtual-team:
+    - "c-team"
+    - "d-team"
+```
+
+This example would create roles for members of `c-team` and `d-team` plus
+additional `virtual-team` members in clusters owned by `a-team` or `b-team`.
+
+#### Teams changing their names
+
+With `PostgresTeams` it is also easy to cover team name changes. Just add
+the mapping between old and new team name and the rest can stay the same.
+E.g. if team `a-team`'s name would change to `f-team` in the teams API it
+could be reflected in a `PostgresTeam` mapping with just two lines:
+
+```yaml
+spec:
+  additionalTeams:
+    a-team:
+    - "f-team"
+```
+
+This is helpful, because Postgres cluster names are immutable and can not
+be changed. Only via cloning it could get a different name starting with the
+new `teamID`.
+
+#### Additional members
+
+Single members might be excluded from teams although they continue to work
+with the same people. However, the teams API would not reflect this anymore.
+To still add a database role for former team members list their role under
+the `additionalMembers` section of the `PostgresTeam` resource:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: PostgresTeam
+metadata:
+  name: custom-team-membership
+spec:
+  additionalMembers:
+    a-team:
+    - "tia"
+```
+
+This will create the login role `tia` in every cluster owned by `a-team`.
+The user can connect to databases like the other team members.
+
+The `additionalMembers` map can also be used to define users of virtual
+teams, e.g. for `virtual-team` we used above:
+
+```yaml
+spec:
+  additionalMembers:
+    virtual-team:
+    - "flynch"
+    - "rdecker"
+    - "briggs"
+```
 
 ## Prepared databases with roles and default privileges
 
@@ -412,7 +589,7 @@ manifest the operator will raise the limits to the configured minimum values.
 If no resources are defined in the manifest they will be obtained from the
 configured [default requests](reference/operator_parameters.md#kubernetes-resource-requests).
 
-## Use taints and tolerations for dedicated PostgreSQL nodes
+## Use taints, tolerations and node affinity for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,
 you can use [taints and tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
@@ -426,6 +603,28 @@ spec:
     effect: NoSchedule
 ```
 
+If you need the pods to be scheduled on specific nodes you may use [node affinity](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/)
+to specify a set of label(s), of which a prospective host node must have at least one. This could be used to
+place nodes with certain hardware capabilities (e.g. SSD drives) in certain environments or network segments,
+e.g. for PCI compliance.
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: acid-minimal-cluster
+spec:
+  teamId: "ACID"
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: environment
+          operator: In
+          values:
+          - pci
+```
+
 ## How to clone an existing PostgreSQL cluster
 
 You can spin up a new cluster as a clone of the existing one, using a `clone`
@@ -436,6 +635,10 @@ section in the spec. There are two options here:
 
 Note, that cloning can also be used for [major version upgrades](administrator.md#minor-and-major-version-upgrade)
 of PostgreSQL.
+
+## In-place major version upgrade
+
+Starting with Spilo 13, operator supports in-place major version upgrade to a higher major version (e.g. from PG 10 to PG 12). To trigger the upgrade, simply increase the version in the manifest. It is your responsibility to test your applications against the new version before the upgrade; downgrading is not supported. The easiest way to do so is to try the upgrade on the cloned cluster first. For details of how Spilo does the upgrade [see here](https://github.com/zalando/spilo/pull/488), operator implementation is described [in the admin docs](administrator.md#minor-and-major-version-upgrade).
 
 ### Clone from S3
 
@@ -698,11 +901,17 @@ manifest:
 ```yaml
 spec:
   enableConnectionPooler: true
+  enableReplicaConnectionPooler: true
 ```
 
 This will tell the operator to create a connection pooler with default
 configuration, through which one can access the master via a separate service
-`{cluster-name}-pooler`. In most of the cases the
+`{cluster-name}-pooler`. With the first option, connection pooler for master service
+is created and with the second option, connection pooler for replica is created.
+Note that both of these flags are independent of each other and user can set or
+unset any of them as per their requirements without any effect on the other.
+
+In most of the cases the
 [default configuration](reference/operator_parameters.md#connection-pooler-configuration)
 should be good enough. To configure a new connection pooler individually for
 each Postgres cluster, specify:

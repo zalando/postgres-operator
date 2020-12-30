@@ -21,6 +21,10 @@ spec:
         team: "acid" # Parameterize?
     spec:
       serviceAccountName: {{ include "postgres-operator-ui.serviceAccountName" . }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{ toYaml .Values.imagePullSecrets | indent 8 }}
+      {{- end }}
       containers:
         - name: "service"
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -46,7 +50,7 @@ spec:
             - name: "RESOURCES_VISIBLE"
               value: "{{ .Values.envs.resourcesVisible }}"
             - name: "TARGET_NAMESPACE"
-              value: {{ .Values.envs.targetNamespace }}
+              value: "{{ .Values.envs.targetNamespace }}"
             - name: "TEAMS"
               value: |-
                 [
@@ -64,10 +68,8 @@ spec:
                   "resources_visible": true,
                   "users_visible": true,
                   "postgresql_versions": [
+                    "13",
                     "12",
-                    "11",
-                    "10",
-                    "9.6",
-                    "9.5"
+                    "11"
                   ]
                 }

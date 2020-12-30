@@ -20,7 +20,7 @@ spec:
       serviceAccountName: postgres-operator-ui
       containers:
         - name: "service"
-          image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.5.0-dirty
+          image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.6.0
           ports:
             - containerPort: 8081
               protocol: "TCP"
@@ -68,10 +68,8 @@ spec:
                   "cost_core": 0.0575,
                   "cost_memory": 0.014375,
                   "postgresql_versions": [
+                    "13",
                     "12",
-                    "11",
-                    "10",
-                    "9.6",
-                    "9.5"
+                    "11"
                   ]
                 }

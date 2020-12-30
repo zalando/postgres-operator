@@ -45,30 +45,38 @@ type PostgresUsersConfiguration struct {
 type KubernetesMetaConfiguration struct {
 	PodServiceAccountName string `json:"pod_service_account_name,omitempty"`
 	// TODO: change it to the proper json
-	PodServiceAccountDefinition            string                `json:"pod_service_account_definition,omitempty"`
-	PodServiceAccountRoleBindingDefinition string                `json:"pod_service_account_role_binding_definition,omitempty"`
-	PodTerminateGracePeriod                Duration              `json:"pod_terminate_grace_period,omitempty"`
-	SpiloPrivileged                        bool                  `json:"spilo_privileged,omitempty"`
-	SpiloFSGroup                           *int64                `json:"spilo_fsgroup,omitempty"`
-	WatchedNamespace                       string                `json:"watched_namespace,omitempty"`
-	PDBNameFormat                          config.StringTemplate `json:"pdb_name_format,omitempty"`
-	EnablePodDisruptionBudget              *bool                 `json:"enable_pod_disruption_budget,omitempty"`
-	EnableInitContainers                   *bool                 `json:"enable_init_containers,omitempty"`
-	EnableSidecars                         *bool                 `json:"enable_sidecars,omitempty"`
-	SecretNameTemplate                     config.StringTemplate `json:"secret_name_template,omitempty"`
-	ClusterDomain                          string                `json:"cluster_domain,omitempty"`
-	OAuthTokenSecretName                   spec.NamespacedName   `json:"oauth_token_secret_name,omitempty"`
-	InfrastructureRolesSecretName          spec.NamespacedName   `json:"infrastructure_roles_secret_name,omitempty"`
-	PodRoleLabel                           string                `json:"pod_role_label,omitempty"`
-	ClusterLabels                          map[string]string     `json:"cluster_labels,omitempty"`
-	InheritedLabels                        []string              `json:"inherited_labels,omitempty"`
-	DownscalerAnnotations                  []string              `json:"downscaler_annotations,omitempty"`
-	ClusterNameLabel                       string                `json:"cluster_name_label,omitempty"`
-	NodeReadinessLabel                     map[string]string     `json:"node_readiness_label,omitempty"`
-	CustomPodAnnotations                   map[string]string     `json:"custom_pod_annotations,omitempty"`
+	PodServiceAccountDefinition            string                       `json:"pod_service_account_definition,omitempty"`
+	PodServiceAccountRoleBindingDefinition string                       `json:"pod_service_account_role_binding_definition,omitempty"`
+	PodTerminateGracePeriod                Duration                     `json:"pod_terminate_grace_period,omitempty"`
+	SpiloPrivileged                        bool                         `json:"spilo_privileged,omitempty"`
+	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
+	SpiloRunAsGroup                        *int64                       `json:"spilo_runasgroup,omitempty"`
+	SpiloFSGroup                           *int64                       `json:"spilo_fsgroup,omitempty"`
+	WatchedNamespace                       string                       `json:"watched_namespace,omitempty"`
+	PDBNameFormat                          config.StringTemplate        `json:"pdb_name_format,omitempty"`
+	EnablePodDisruptionBudget              *bool                        `json:"enable_pod_disruption_budget,omitempty"`
+	StorageResizeMode                      string                       `json:"storage_resize_mode,omitempty"`
+	EnableInitContainers                   *bool                        `json:"enable_init_containers,omitempty"`
+	EnableSidecars                         *bool                        `json:"enable_sidecars,omitempty"`
+	SecretNameTemplate                     config.StringTemplate        `json:"secret_name_template,omitempty"`
+	ClusterDomain                          string                       `json:"cluster_domain,omitempty"`
+	OAuthTokenSecretName                   spec.NamespacedName          `json:"oauth_token_secret_name,omitempty"`
+	InfrastructureRolesSecretName          spec.NamespacedName          `json:"infrastructure_roles_secret_name,omitempty"`
+	InfrastructureRolesDefs                []*config.InfrastructureRole `json:"infrastructure_roles_secrets,omitempty"`
+	PodRoleLabel                           string                       `json:"pod_role_label,omitempty"`
+	ClusterLabels                          map[string]string            `json:"cluster_labels,omitempty"`
+	InheritedLabels                        []string                     `json:"inherited_labels,omitempty"`
+	InheritedAnnotations                   []string                     `json:"inherited_annotations,omitempty"`
+	DownscalerAnnotations                  []string                     `json:"downscaler_annotations,omitempty"`
+	ClusterNameLabel                       string                       `json:"cluster_name_label,omitempty"`
+	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
+	DeleteAnnotationNameKey                string                       `json:"delete_annotation_name_key,omitempty"`
+	NodeReadinessLabel                     map[string]string            `json:"node_readiness_label,omitempty"`
+	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration              map[string]string   `json:"toleration,omitempty"`
 	PodEnvironmentConfigMap    spec.NamespacedName `json:"pod_environment_configmap,omitempty"`
+	PodEnvironmentSecret       string              `json:"pod_environment_secret,omitempty"`
 	PodPriorityClassName       string              `json:"pod_priority_class_name,omitempty"`
 	MasterPodMoveTimeout       Duration            `json:"master_pod_move_timeout,omitempty"`
 	EnablePodAntiAffinity      bool                `json:"enable_pod_antiaffinity,omitempty"`
@@ -104,17 +112,22 @@ type LoadBalancerConfiguration struct {
 	CustomServiceAnnotations  map[string]string     `json:"custom_service_annotations,omitempty"`
 	MasterDNSNameFormat       config.StringTemplate `json:"master_dns_name_format,omitempty"`
 	ReplicaDNSNameFormat      config.StringTemplate `json:"replica_dns_name_format,omitempty"`
+	ExternalTrafficPolicy     string                `json:"external_traffic_policy" default:"Cluster"`
 }
 
 // AWSGCPConfiguration defines the configuration for AWS
 // TODO complete Google Cloud Platform (GCP) configuration
 type AWSGCPConfiguration struct {
-	WALES3Bucket              string `json:"wal_s3_bucket,omitempty"`
-	AWSRegion                 string `json:"aws_region,omitempty"`
-	LogS3Bucket               string `json:"log_s3_bucket,omitempty"`
-	KubeIAMRole               string `json:"kube_iam_role,omitempty"`
-	AdditionalSecretMount     string `json:"additional_secret_mount,omitempty"`
-	AdditionalSecretMountPath string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	WALES3Bucket                 string `json:"wal_s3_bucket,omitempty"`
+	AWSRegion                    string `json:"aws_region,omitempty"`
+	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
+	GCPCredentials               string `json:"gcp_credentials,omitempty"`
+	LogS3Bucket                  string `json:"log_s3_bucket,omitempty"`
+	KubeIAMRole                  string `json:"kube_iam_role,omitempty"`
+	AdditionalSecretMount        string `json:"additional_secret_mount,omitempty"`
+	AdditionalSecretMountPath    string `json:"additional_secret_mount_path" default:"/meta/credentials"`
+	EnableEBSGp3Migration        bool   `json:"enable_ebs_gp3_migration" default:"false"`
+	EnableEBSGp3MigrationMaxSize int64  `json:"enable_ebs_gp3_migration_max_size" default:"1000"`
 }
 
 // OperatorDebugConfiguration defines options for the debug mode
@@ -125,16 +138,18 @@ type OperatorDebugConfiguration struct {
 
 // TeamsAPIConfiguration defines the configuration of TeamsAPI
 type TeamsAPIConfiguration struct {
-	EnableTeamsAPI           bool              `json:"enable_teams_api,omitempty"`
-	TeamsAPIUrl              string            `json:"teams_api_url,omitempty"`
-	TeamAPIRoleConfiguration map[string]string `json:"team_api_role_configuration,omitempty"`
-	EnableTeamSuperuser      bool              `json:"enable_team_superuser,omitempty"`
-	EnableAdminRoleForUsers  bool              `json:"enable_admin_role_for_users,omitempty"`
-	TeamAdminRole            string            `json:"team_admin_role,omitempty"`
-	PamRoleName              string            `json:"pam_role_name,omitempty"`
-	PamConfiguration         string            `json:"pam_configuration,omitempty"`
-	ProtectedRoles           []string          `json:"protected_role_names,omitempty"`
-	PostgresSuperuserTeams   []string          `json:"postgres_superuser_teams,omitempty"`
+	EnableTeamsAPI                  bool              `json:"enable_teams_api,omitempty"`
+	TeamsAPIUrl                     string            `json:"teams_api_url,omitempty"`
+	TeamAPIRoleConfiguration        map[string]string `json:"team_api_role_configuration,omitempty"`
+	EnableTeamSuperuser             bool              `json:"enable_team_superuser,omitempty"`
+	EnableAdminRoleForUsers         bool              `json:"enable_admin_role_for_users,omitempty"`
+	TeamAdminRole                   string            `json:"team_admin_role,omitempty"`
+	PamRoleName                     string            `json:"pam_role_name,omitempty"`
+	PamConfiguration                string            `json:"pam_configuration,omitempty"`
+	ProtectedRoles                  []string          `json:"protected_role_names,omitempty"`
+	PostgresSuperuserTeams          []string          `json:"postgres_superuser_teams,omitempty"`
+	EnablePostgresTeamCRD           bool              `json:"enable_postgres_team_crd,omitempty"`
+	EnablePostgresTeamCRDSuperusers bool              `json:"enable_postgres_team_crd_superusers,omitempty"`
 }
 
 // LoggingRESTAPIConfiguration defines Logging API conf
@@ -155,7 +170,7 @@ type ScalyrConfiguration struct {
 	ScalyrMemoryLimit   string `json:"scalyr_memory_limit,omitempty"`
 }
 
-// Defines default configuration for connection pooler
+// ConnectionPoolerConfiguration defines default configuration for connection pooler
 type ConnectionPoolerConfiguration struct {
 	NumberOfInstances    *int32 `json:"connection_pooler_number_of_instances,omitempty"`
 	Schema               string `json:"connection_pooler_schema,omitempty"`
@@ -171,32 +186,35 @@ type ConnectionPoolerConfiguration struct {
 
 // OperatorLogicalBackupConfiguration defines configuration for logical backup
 type OperatorLogicalBackupConfiguration struct {
-	Schedule          string `json:"logical_backup_schedule,omitempty"`
-	DockerImage       string `json:"logical_backup_docker_image,omitempty"`
-	S3Bucket          string `json:"logical_backup_s3_bucket,omitempty"`
-	S3Region          string `json:"logical_backup_s3_region,omitempty"`
-	S3Endpoint        string `json:"logical_backup_s3_endpoint,omitempty"`
-	S3AccessKeyID     string `json:"logical_backup_s3_access_key_id,omitempty"`
-	S3SecretAccessKey string `json:"logical_backup_s3_secret_access_key,omitempty"`
-	S3SSE             string `json:"logical_backup_s3_sse,omitempty"`
+	Schedule                     string `json:"logical_backup_schedule,omitempty"`
+	DockerImage                  string `json:"logical_backup_docker_image,omitempty"`
+	BackupProvider               string `json:"logical_backup_provider,omitempty"`
+	S3Bucket                     string `json:"logical_backup_s3_bucket,omitempty"`
+	S3Region                     string `json:"logical_backup_s3_region,omitempty"`
+	S3Endpoint                   string `json:"logical_backup_s3_endpoint,omitempty"`
+	S3AccessKeyID                string `json:"logical_backup_s3_access_key_id,omitempty"`
+	S3SecretAccessKey            string `json:"logical_backup_s3_secret_access_key,omitempty"`
+	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
+	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
 type OperatorConfigurationData struct {
-	EnableCRDValidation     *bool    `json:"enable_crd_validation,omitempty"`
-	EnableLazySpiloUpgrade  bool     `json:"enable_lazy_spilo_upgrade,omitempty"`
-	EtcdHost                string   `json:"etcd_host,omitempty"`
-	KubernetesUseConfigMaps bool     `json:"kubernetes_use_configmaps,omitempty"`
-	DockerImage             string   `json:"docker_image,omitempty"`
-	Workers                 uint32   `json:"workers,omitempty"`
-	MinInstances            int32    `json:"min_instances,omitempty"`
-	MaxInstances            int32    `json:"max_instances,omitempty"`
-	ResyncPeriod            Duration `json:"resync_period,omitempty"`
-	RepairPeriod            Duration `json:"repair_period,omitempty"`
-	SetMemoryRequestToLimit bool     `json:"set_memory_request_to_limit,omitempty"`
-	ShmVolume               *bool    `json:"enable_shm_volume,omitempty"`
-	// deprecated in favour of SidecarContainers
-	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"`
+	EnableCRDValidation        *bool                              `json:"enable_crd_validation,omitempty"`
+	EnableLazySpiloUpgrade     bool                               `json:"enable_lazy_spilo_upgrade,omitempty"`
+	EnablePgVersionEnvVar      bool                               `json:"enable_pgversion_env_var,omitempty"`
+	EnableSpiloWalPathCompat   bool                               `json:"enable_spilo_wal_path_compat,omitempty"`
+	EtcdHost                   string                             `json:"etcd_host,omitempty"`
+	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
+	DockerImage                string                             `json:"docker_image,omitempty"`
+	Workers                    uint32                             `json:"workers,omitempty"`
+	MinInstances               int32                              `json:"min_instances,omitempty"`
+	MaxInstances               int32                              `json:"max_instances,omitempty"`
+	ResyncPeriod               Duration                           `json:"resync_period,omitempty"`
+	RepairPeriod               Duration                           `json:"repair_period,omitempty"`
+	SetMemoryRequestToLimit    bool                               `json:"set_memory_request_to_limit,omitempty"`
+	ShmVolume                  *bool                              `json:"enable_shm_volume,omitempty"`
+	SidecarImages              map[string]string                  `json:"sidecar_docker_images,omitempty"` // deprecated in favour of SidecarContainers
 	SidecarContainers          []v1.Container                     `json:"sidecars,omitempty"`
 	PostgresUsersConfiguration PostgresUsersConfiguration         `json:"users"`
 	Kubernetes                 KubernetesMetaConfiguration        `json:"kubernetes"`

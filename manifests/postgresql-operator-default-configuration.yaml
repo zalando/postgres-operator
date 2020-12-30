@@ -3,10 +3,12 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
+  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
   # enable_crd_validation: true
   # enable_lazy_spilo_upgrade: false
+  enable_pgversion_env_var: true
   # enable_shm_volume: true
+  enable_spilo_wal_path_compat: false
   etcd_host: ""
   # kubernetes_use_configmaps: false
   max_instances: -1
@@ -19,7 +21,7 @@ configuration:
   #   name: global-sidecar-1
   #   ports:
   #   - containerPort: 80
-  workers: 4
+  workers: 8
   users:
     replication_username: standby
     super_username: postgres
@@ -31,6 +33,8 @@ configuration:
     # custom_pod_annotations:
     #   keya: valuea
     #   keyb: valueb
+    # delete_annotation_date_key: delete-date
+    # delete_annotation_name_key: delete-clustername
     # downscaler_annotations:
     # - deployment-time
     # - downscaler/*
@@ -39,6 +43,16 @@ configuration:
     enable_pod_disruption_budget: true
     enable_sidecars: true
     # infrastructure_roles_secret_name: "postgresql-infrastructure-roles"
+    # infrastructure_roles_secrets:
+    # - secretname: "monitoring-roles"
+    #   userkey: "user"
+    #   passwordkey: "password"
+    #   rolekey: "inrole"
+    # - secretname: "other-infrastructure-role"
+    #   userkey: "other-user-key"
+    #   passwordkey: "other-password-key"
+    # inherited_annotations:
+    # - owned-by
     # inherited_labels:
     # - application
     # - environment
@@ -49,16 +63,20 @@ configuration:
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"
     # pod_environment_configmap: "default/my-custom-config"
+    # pod_environment_secret: "my-custom-secret"
     pod_management_policy: "ordered_ready"
-    # pod_priority_class_name: ""
+    # pod_priority_class_name: "postgres-pod-priority"
     pod_role_label: spilo-role
     # pod_service_account_definition: ""
     pod_service_account_name: postgres-pod
     # pod_service_account_role_binding_definition: ""
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+    # spilo_runasuser: 101
+    # spilo_runasgroup: 103
     # spilo_fsgroup: 103
     spilo_privileged: false
+    storage_resize_mode: pvc
     # toleration: {}
     # watched_namespace: ""
   postgres_pod_resources:
@@ -76,23 +94,28 @@ configuration:
     resource_check_interval: 3s
     resource_check_timeout: 10m
   load_balancer:
-    # db_hosted_zone: ""
-    enable_master_load_balancer: false
-    enable_replica_load_balancer: false
     # custom_service_annotations:
     #   keyx: valuex
     #   keyy: valuey
+    # db_hosted_zone: ""
+    enable_master_load_balancer: false
+    enable_replica_load_balancer: false
+    external_traffic_policy: "Cluster"
     master_dns_name_format: "{cluster}.{team}.{hostedzone}"
     replica_dns_name_format: "{cluster}-repl.{team}.{hostedzone}"
   aws_or_gcp:
     # additional_secret_mount: "some-secret-name"
     # additional_secret_mount_path: "/some/dir"
     aws_region: eu-central-1
+    enable_ebs_gp3_migration: false
+    # enable_ebs_gp3_migration_max_size: 1000
+    # gcp_credentials: ""
     # kube_iam_role: ""
     # log_s3_bucket: ""
+    # wal_gs_bucket: ""
     # wal_s3_bucket: ""
   logical_backup:
-    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:master-58"
+    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v.1.6.0"
     # logical_backup_s3_access_key_id: ""
     logical_backup_s3_bucket: "my-bucket-url"
     # logical_backup_s3_endpoint: ""
@@ -105,6 +128,8 @@ configuration:
     enable_database_access: true
   teams_api:
     # enable_admin_role_for_users: true
+    # enable_postgres_team_crd: false
+    # enable_postgres_team_crd_superusers: false
     enable_team_superuser: false
     enable_teams_api: false
     # pam_configuration: ""
@@ -126,7 +151,7 @@ configuration:
     connection_pooler_default_cpu_request: "500m"
     connection_pooler_default_memory_limit: 100Mi
     connection_pooler_default_memory_request: 100Mi
-    connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-7"
+    connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-9"
     # connection_pooler_max_db_connections: 60
     connection_pooler_mode: "transaction"
     connection_pooler_number_of_instances: 2

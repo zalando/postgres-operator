@@ -1,0 +1,35 @@
+# will not run but is good enough for tests to fail
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acid-minimal-cluster-pooler
+  labels:
+    application: db-connection-pooler
+    connection-pooler: acid-minimal-cluster-pooler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: db-connection-pooler
+      connection-pooler: acid-minimal-cluster-pooler
+      cluster-name: acid-minimal-cluster
+  template:
+    metadata:
+      labels:
+        application: db-connection-pooler
+        connection-pooler: acid-minimal-cluster-pooler
+        cluster-name: acid-minimal-cluster
+    spec:
+      serviceAccountName: postgres-operator
+      containers:
+      - name: postgres-operator
+        image: registry.opensource.zalan.do/acid/pgbouncer:master-12
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 100m
+            memory: 250Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+        env: []

@@ -87,6 +87,7 @@ SPILO_S3_BACKUP_PREFIX = getenv('SPILO_S3_BACKUP_PREFIX', 'spilo/')
 SUPERUSER_TEAM = getenv('SUPERUSER_TEAM', 'acid')
 TARGET_NAMESPACE = getenv('TARGET_NAMESPACE')
 GOOGLE_ANALYTICS = getenv('GOOGLE_ANALYTICS', False)
+MIN_PODS= getenv('MIN_PODS', 2)
 
 # storage pricing, i.e. https://aws.amazon.com/ebs/pricing/
 COST_EBS = float(getenv('COST_EBS', 0.119))  # GB per month
@@ -103,6 +104,8 @@ WALE_S3_ENDPOINT = getenv(
 USE_AWS_INSTANCE_PROFILE = (
     getenv('USE_AWS_INSTANCE_PROFILE', 'false').lower() != 'false'
 )
+
+AWS_ENDPOINT = getenv('AWS_ENDPOINT')
 
 tokens.configure()
 tokens.manage('read-only')
@@ -300,13 +303,14 @@ DEFAULT_UI_CONFIG = {
     'users_visible': True,
     'databases_visible': True,
     'resources_visible': True,
-    'postgresql_versions': ['9.6', '10', '11'],
+    'postgresql_versions': ['11','12','13'],
     'dns_format_string': '{0}.{1}.{2}',
     'pgui_link': '',
     'static_network_whitelist': {},
     'cost_ebs': COST_EBS,
     'cost_core': COST_CORE,
-    'cost_memory': COST_MEMORY
+    'cost_memory': COST_MEMORY,
+    'min_pods': MIN_PODS
 }
 
 
@@ -318,6 +322,7 @@ def get_config():
     config['resources_visible'] = RESOURCES_VISIBLE
     config['superuser_team'] = SUPERUSER_TEAM
     config['target_namespace'] = TARGET_NAMESPACE
+    config['min_pods'] = MIN_PODS
 
     config['namespaces'] = (
         [TARGET_NAMESPACE]
@@ -491,6 +496,7 @@ def get_postgresqls():
             'uid': uid,
             'namespaced_name': namespace + '/' + name,
             'full_name': namespace + '/' + name + ('/' + uid if uid else ''),
+            'status': status,
         }
         for cluster in these(
             read_postgresqls(
@@ -504,6 +510,7 @@ def get_postgresqls():
             'items',
         )
         for spec in [cluster.get('spec', {}) if cluster.get('spec', {}) is not None else {"error": "Invalid spec in manifest"}]
+        for status in [cluster.get('status', {})]
         for metadata in [cluster['metadata']]
         for namespace in [metadata['namespace']]
         for name in [metadata['name']]
@@ -617,6 +624,17 @@ def update_postgresql(namespace: str, cluster: str):
     else:
         if 'enableConnectionPooler' in o['spec']:
             del o['spec']['enableConnectionPooler']
+
+    if 'enableReplicaConnectionPooler' in postgresql['spec']:
+        cp = postgresql['spec']['enableReplicaConnectionPooler']
+        if not cp:
+            if 'enableReplicaConnectionPooler' in o['spec']:
+                del o['spec']['enableReplicaConnectionPooler']
+        else:
+            spec['enableReplicaConnectionPooler'] = True
+    else:
+        if 'enableReplicaConnectionPooler' in o['spec']:
+            del o['spec']['enableReplicaConnectionPooler']
 
     if 'enableReplicaLoadBalancer' in postgresql['spec']:
         rlb = postgresql['spec']['enableReplicaLoadBalancer']
@@ -1055,6 +1073,7 @@ def main(port, secret_key, debug, clusters: list):
     logger.info(f'Tokeninfo URL: {TOKENINFO_URL}')
     logger.info(f'Use AWS instance_profile: {USE_AWS_INSTANCE_PROFILE}')
     logger.info(f'WAL-E S3 endpoint: {WALE_S3_ENDPOINT}')
+    logger.info(f'AWS S3 endpoint: {AWS_ENDPOINT}')
 
     if TARGET_NAMESPACE is None:
         @on_exception(

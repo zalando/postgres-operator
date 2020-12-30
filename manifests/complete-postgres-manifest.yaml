@@ -6,8 +6,10 @@ metadata:
 #    environment: demo
 #  annotations:
 #    "acid.zalan.do/controller": "second-operator"
+#    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
+#    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
+  dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -16,7 +18,8 @@ spec:
     - createdb
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
-#  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
+  enableConnectionPooler: false # enable/disable connection pooler deployment
+  enableReplicaConnectionPooler: false # set to enable connectionPooler for replica service
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
@@ -33,8 +36,8 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "12"
-    parameters: # Expert section
+    version: "13"
+    parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
@@ -66,6 +69,8 @@ spec:
 #          name: my-config-map
 
   enableShmVolume: true
+#  spiloRunAsUser: 101
+#  spiloRunAsGroup: 103
 #  spiloFSGroup: 103
 #  podAnnotations:
 #    annotation.key: value
@@ -88,9 +93,9 @@ spec:
       encoding: "UTF8"
       locale: "en_US.UTF-8"
       data-checksums: "true"
-    pg_hba:
-    - hostssl all all 0.0.0.0/0 md5
-    - host    all all 0.0.0.0/0 md5
+#    pg_hba:
+#      - hostssl all all 0.0.0.0/0 md5
+#      - host    all all 0.0.0.0/0 md5
 #    slots:
 #      permanent_physical_1:
 #        type: physical
@@ -122,18 +127,19 @@ spec:
 #  - 01:00-06:00  #UTC
 #  - Sat:00:00-04:00
 
-  connectionPooler:
-    numberOfInstances: 2
-    mode: "transaction"
-    schema: "pooler"
-    user: "pooler"
-    resources:
-      requests:
-        cpu: 300m
-        memory: 100Mi
-      limits:
-        cpu: "1"
-        memory: 100Mi
+# overwrite custom properties for connection pooler deployments
+#  connectionPooler:
+#    numberOfInstances: 2
+#    mode: "transaction"
+#    schema: "pooler"
+#    user: "pooler"
+#    resources:
+#      requests:
+#        cpu: 300m
+#        memory: 100Mi
+#      limits:
+#        cpu: "1"
+#        memory: 100Mi
 
   initContainers:
   - name: date
@@ -166,3 +172,14 @@ spec:
 # When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
 # if unknown, set it to 103 which is the usual value in the default spilo images.
 # In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.
+
+# Add node affinity support by allowing postgres pods to schedule only on nodes that
+# have label: "postgres-operator:enabled" set.
+#  nodeAffinity:
+#    requiredDuringSchedulingIgnoredDuringExecution:
+#      nodeSelectorTerms:
+#        - matchExpressions:
+#            - key: postgres-operator
+#              operator: In
+#              values:
+#                - enabled

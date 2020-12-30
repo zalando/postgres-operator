@@ -1,15 +1,17 @@
 package cluster
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -20,8 +22,17 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
+
+// For testing purposes
+type ExpectedValue struct {
+	envIndex       int
+	envVarConstant string
+	envVarValue    string
+}
 
 func toIntStr(val int) *intstr.IntOrString {
 	b := intstr.FromInt(val)
@@ -82,13 +93,126 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		cluster.OpConfig = tt.opConfig
-		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.role, logger)
+		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.role, false, logger)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if tt.result != result {
 			t.Errorf("%s %s: Spilo Config is %v, expected %v for role %#v and param %#v",
 				testName, tt.subtest, result, tt.result, tt.role, tt.pgParam)
+		}
+	}
+}
+
+func TestGenerateSpiloPodEnvVars(t *testing.T) {
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				WALGSBucket:    "wale-gs-bucket",
+				ProtectedRoles: []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	expectedValuesGSBucket := []ExpectedValue{
+		ExpectedValue{
+			envIndex:       15,
+			envVarConstant: "WAL_GS_BUCKET",
+			envVarValue:    "wale-gs-bucket",
+		},
+		ExpectedValue{
+			envIndex:       16,
+			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/SomeUUID",
+		},
+		ExpectedValue{
+			envIndex:       17,
+			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "",
+		},
+	}
+
+	expectedValuesGCPCreds := []ExpectedValue{
+		ExpectedValue{
+			envIndex:       15,
+			envVarConstant: "WAL_GS_BUCKET",
+			envVarValue:    "wale-gs-bucket",
+		},
+		ExpectedValue{
+			envIndex:       16,
+			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
+			envVarValue:    "/SomeUUID",
+		},
+		ExpectedValue{
+			envIndex:       17,
+			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
+			envVarValue:    "",
+		},
+		ExpectedValue{
+			envIndex:       18,
+			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
+			envVarValue:    "some_path_to_credentials",
+		},
+	}
+
+	testName := "TestGenerateSpiloPodEnvVars"
+	tests := []struct {
+		subTest            string
+		opConfig           config.Config
+		uid                types.UID
+		spiloConfig        string
+		cloneDescription   *acidv1.CloneDescription
+		standbyDescription *acidv1.StandbyDescription
+		customEnvList      []v1.EnvVar
+		expectedValues     []ExpectedValue
+	}{
+		{
+			subTest: "Will set WAL_GS_BUCKET env",
+			opConfig: config.Config{
+				WALGSBucket: "wale-gs-bucket",
+			},
+			uid:                "SomeUUID",
+			spiloConfig:        "someConfig",
+			cloneDescription:   &acidv1.CloneDescription{},
+			standbyDescription: &acidv1.StandbyDescription{},
+			customEnvList:      []v1.EnvVar{},
+			expectedValues:     expectedValuesGSBucket,
+		},
+		{
+			subTest: "Will set GOOGLE_APPLICATION_CREDENTIALS env",
+			opConfig: config.Config{
+				WALGSBucket:    "wale-gs-bucket",
+				GCPCredentials: "some_path_to_credentials",
+			},
+			uid:                "SomeUUID",
+			spiloConfig:        "someConfig",
+			cloneDescription:   &acidv1.CloneDescription{},
+			standbyDescription: &acidv1.StandbyDescription{},
+			customEnvList:      []v1.EnvVar{},
+			expectedValues:     expectedValuesGCPCreds,
+		},
+	}
+
+	for _, tt := range tests {
+		cluster.OpConfig = tt.opConfig
+
+		actualEnvs := cluster.generateSpiloPodEnvVars(tt.uid, tt.spiloConfig, tt.cloneDescription, tt.standbyDescription, tt.customEnvList)
+
+		for _, ev := range tt.expectedValues {
+			env := actualEnvs[ev.envIndex]
+
+			if env.Name != ev.envVarConstant {
+				t.Errorf("%s %s: Expected env name %s, have %s instead",
+					testName, tt.subTest, ev.envVarConstant, env.Name)
+			}
+
+			if env.Value != ev.envVarValue {
+				t.Errorf("%s %s: Expected env value %s, have %s instead",
+					testName, tt.subTest, ev.envVarValue, env.Value)
+			}
 		}
 	}
 }
@@ -432,95 +556,6 @@ func TestExtractPgVersionFromBinPath(t *testing.T) {
 	}
 }
 
-func TestGetPgVersion(t *testing.T) {
-	testName := "TestGetPgVersion"
-	tests := []struct {
-		subTest          string
-		pgContainer      v1.Container
-		currentPgVersion string
-		newPgVersion     string
-	}{
-		{
-			subTest: "new version with decimal point differs from current SPILO_CONFIGURATION",
-			pgContainer: v1.Container{
-				Name: "postgres",
-				Env: []v1.EnvVar{
-					{
-						Name:  "SPILO_CONFIGURATION",
-						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/9.6/bin\"}}",
-					},
-				},
-			},
-			currentPgVersion: "9.6",
-			newPgVersion:     "12",
-		},
-		{
-			subTest: "new version differs from current SPILO_CONFIGURATION",
-			pgContainer: v1.Container{
-				Name: "postgres",
-				Env: []v1.EnvVar{
-					{
-						Name:  "SPILO_CONFIGURATION",
-						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/11/bin\"}}",
-					},
-				},
-			},
-			currentPgVersion: "11",
-			newPgVersion:     "12",
-		},
-		{
-			subTest: "new version is lower than the one found in current SPILO_CONFIGURATION",
-			pgContainer: v1.Container{
-				Name: "postgres",
-				Env: []v1.EnvVar{
-					{
-						Name:  "SPILO_CONFIGURATION",
-						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/12/bin\"}}",
-					},
-				},
-			},
-			currentPgVersion: "12",
-			newPgVersion:     "11",
-		},
-		{
-			subTest: "new version is the same like in the current SPILO_CONFIGURATION",
-			pgContainer: v1.Container{
-				Name: "postgres",
-				Env: []v1.EnvVar{
-					{
-						Name:  "SPILO_CONFIGURATION",
-						Value: "{\"postgresql\": {\"bin_dir\": \"/usr/lib/postgresql/12/bin\"}}",
-					},
-				},
-			},
-			currentPgVersion: "12",
-			newPgVersion:     "12",
-		},
-	}
-
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				ProtectedRoles: []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-
-	for _, tt := range tests {
-		pgVersion, err := cluster.getNewPgVersion(tt.pgContainer, tt.newPgVersion)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		if pgVersion != tt.currentPgVersion {
-			t.Errorf("%s %s: Expected version %s, have %s instead",
-				testName, tt.subTest, tt.currentPgVersion, pgVersion)
-		}
-	}
-}
-
 func TestSecretVolume(t *testing.T) {
 	testName := "TestSecretVolume"
 	tests := []struct {
@@ -592,46 +627,219 @@ func TestSecretVolume(t *testing.T) {
 	}
 }
 
-func testResources(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
-	cpuReq := podSpec.Spec.Containers[0].Resources.Requests["cpu"]
-	if cpuReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest {
-		return fmt.Errorf("CPU request doesn't match, got %s, expected %s",
-			cpuReq.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPURequest)
-	}
+const (
+	testPodEnvironmentConfigMapName = "pod_env_cm"
+	testPodEnvironmentSecretName    = "pod_env_sc"
+)
 
-	memReq := podSpec.Spec.Containers[0].Resources.Requests["memory"]
-	if memReq.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest {
-		return fmt.Errorf("Memory request doesn't match, got %s, expected %s",
-			memReq.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryRequest)
-	}
-
-	cpuLim := podSpec.Spec.Containers[0].Resources.Limits["cpu"]
-	if cpuLim.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPULimit {
-		return fmt.Errorf("CPU limit doesn't match, got %s, expected %s",
-			cpuLim.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultCPULimit)
-	}
-
-	memLim := podSpec.Spec.Containers[0].Resources.Limits["memory"]
-	if memLim.String() != cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit {
-		return fmt.Errorf("Memory limit doesn't match, got %s, expected %s",
-			memLim.String(), cluster.OpConfig.ConnectionPooler.ConnectionPoolerDefaultMemoryLimit)
-	}
-
-	return nil
+type mockSecret struct {
+	v1core.SecretInterface
 }
 
-func testLabels(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
-	poolerLabels := podSpec.ObjectMeta.Labels["connection-pooler"]
-
-	if poolerLabels != cluster.connectionPoolerLabelsSelector().MatchLabels["connection-pooler"] {
-		return fmt.Errorf("Pod labels do not match, got %+v, expected %+v",
-			podSpec.ObjectMeta.Labels, cluster.connectionPoolerLabelsSelector().MatchLabels)
-	}
-
-	return nil
+type mockConfigMap struct {
+	v1core.ConfigMapInterface
 }
 
-func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
+func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
+	if name != testPodEnvironmentSecretName {
+		return nil, fmt.Errorf("Secret PodEnvironmentSecret not found")
+	}
+	secret := &v1.Secret{}
+	secret.Name = testPodEnvironmentSecretName
+	secret.Data = map[string][]byte{
+		"minio_access_key": []byte("alpha"),
+		"minio_secret_key": []byte("beta"),
+	}
+	return secret, nil
+}
+
+func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
+	if name != testPodEnvironmentConfigMapName {
+		return nil, fmt.Errorf("NotFound")
+	}
+	configmap := &v1.ConfigMap{}
+	configmap.Name = testPodEnvironmentConfigMapName
+	configmap.Data = map[string]string{
+		"foo1": "bar1",
+		"foo2": "bar2",
+	}
+	return configmap, nil
+}
+
+type MockSecretGetter struct {
+}
+
+type MockConfigMapsGetter struct {
+}
+
+func (c *MockSecretGetter) Secrets(namespace string) v1core.SecretInterface {
+	return &mockSecret{}
+}
+
+func (c *MockConfigMapsGetter) ConfigMaps(namespace string) v1core.ConfigMapInterface {
+	return &mockConfigMap{}
+}
+
+func newMockKubernetesClient() k8sutil.KubernetesClient {
+	return k8sutil.KubernetesClient{
+		SecretsGetter:    &MockSecretGetter{},
+		ConfigMapsGetter: &MockConfigMapsGetter{},
+	}
+}
+func newMockCluster(opConfig config.Config) *Cluster {
+	cluster := &Cluster{
+		Config:     Config{OpConfig: opConfig},
+		KubeClient: newMockKubernetesClient(),
+	}
+	return cluster
+}
+
+func TestPodEnvironmentConfigMapVariables(t *testing.T) {
+	testName := "TestPodEnvironmentConfigMapVariables"
+	tests := []struct {
+		subTest  string
+		opConfig config.Config
+		envVars  []v1.EnvVar
+		err      error
+	}{
+		{
+			subTest: "no PodEnvironmentConfigMap",
+			envVars: []v1.EnvVar{},
+		},
+		{
+			subTest: "missing PodEnvironmentConfigMap",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentConfigMap: spec.NamespacedName{
+						Name: "idonotexist",
+					},
+				},
+			},
+			err: fmt.Errorf("could not read PodEnvironmentConfigMap: NotFound"),
+		},
+		{
+			subTest: "simple PodEnvironmentConfigMap",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentConfigMap: spec.NamespacedName{
+						Name: testPodEnvironmentConfigMapName,
+					},
+				},
+			},
+			envVars: []v1.EnvVar{
+				{
+					Name:  "foo1",
+					Value: "bar1",
+				},
+				{
+					Name:  "foo2",
+					Value: "bar2",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		vars, err := c.getPodEnvironmentConfigMapVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+		if !reflect.DeepEqual(vars, tt.envVars) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.envVars, vars)
+		}
+		if tt.err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s %s: expected error `%v` but got `%v`",
+					testName, tt.subTest, tt.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s %s: expected no error but got error: `%v`",
+					testName, tt.subTest, err)
+			}
+		}
+	}
+}
+
+// Test if the keys of an existing secret are properly referenced
+func TestPodEnvironmentSecretVariables(t *testing.T) {
+	testName := "TestPodEnvironmentSecretVariables"
+	tests := []struct {
+		subTest  string
+		opConfig config.Config
+		envVars  []v1.EnvVar
+		err      error
+	}{
+		{
+			subTest: "No PodEnvironmentSecret configured",
+			envVars: []v1.EnvVar{},
+		},
+		{
+			subTest: "Secret referenced by PodEnvironmentSecret does not exist",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentSecret: "idonotexist",
+				},
+			},
+			err: fmt.Errorf("could not read Secret PodEnvironmentSecretName: Secret PodEnvironmentSecret not found"),
+		},
+		{
+			subTest: "Pod environment vars reference all keys from secret configured by PodEnvironmentSecret",
+			opConfig: config.Config{
+				Resources: config.Resources{
+					PodEnvironmentSecret: testPodEnvironmentSecretName,
+				},
+			},
+			envVars: []v1.EnvVar{
+				{
+					Name: "minio_access_key",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "minio_access_key",
+						},
+					},
+				},
+				{
+					Name: "minio_secret_key",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: testPodEnvironmentSecretName,
+							},
+							Key: "minio_secret_key",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		c := newMockCluster(tt.opConfig)
+		vars, err := c.getPodEnvironmentSecretVariables()
+		sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
+		if !reflect.DeepEqual(vars, tt.envVars) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.envVars, vars)
+		}
+		if tt.err != nil {
+			if err.Error() != tt.err.Error() {
+				t.Errorf("%s %s: expected error `%v` but got `%v`",
+					testName, tt.subTest, tt.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s %s: expected no error but got error: `%v`",
+					testName, tt.subTest, err)
+			}
+		}
+	}
+
+}
+
+func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) error {
 	required := map[string]bool{
 		"PGHOST":                 false,
 		"PGPORT":                 false,
@@ -656,6 +864,72 @@ func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	return nil
 }
 
+func TestNodeAffinity(t *testing.T) {
+	var err error
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
+	var spiloFSGroup = int64(103)
+
+	makeSpec := func(nodeAffinity *v1.NodeAffinity) acidv1.PostgresSpec {
+		return acidv1.PostgresSpec{
+			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
+			Volume: acidv1.Volume{
+				Size: "1G",
+			},
+			NodeAffinity: nodeAffinity,
+		}
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					SpiloRunAsUser:  &spiloRunAsUser,
+					SpiloRunAsGroup: &spiloRunAsGroup,
+					SpiloFSGroup:    &spiloFSGroup,
+				},
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	nodeAff := &v1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				v1.NodeSelectorTerm{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						v1.NodeSelectorRequirement{
+							Key:      "test-label",
+							Operator: v1.NodeSelectorOpIn,
+							Values: []string{
+								"test-value",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	spec = makeSpec(nodeAff)
+	s, err := cluster.generateStatefulSet(&spec)
+	if err != nil {
+		assert.NoError(t, err)
+	}
+
+	assert.NotNil(t, s.Spec.Template.Spec.Affinity.NodeAffinity, "node affinity in statefulset shouldn't be nil")
+	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
+}
+
 func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
 	if podSpec.ObjectMeta.Name != "test-pod-template" {
 		return fmt.Errorf("Custom pod template is not used, current spec %+v",
@@ -665,110 +939,7 @@ func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error 
 	return nil
 }
 
-func TestConnectionPoolerPodSpec(t *testing.T) {
-	testName := "Test connection pooler pod template generation"
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				ProtectedRoles: []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-				ConnectionPooler: config.ConnectionPooler{
-					MaxDBConnections:                     int32ToPointer(60),
-					ConnectionPoolerDefaultCPURequest:    "100m",
-					ConnectionPoolerDefaultCPULimit:      "100m",
-					ConnectionPoolerDefaultMemoryRequest: "100Mi",
-					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-				},
-			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-
-	var clusterNoDefaultRes = New(
-		Config{
-			OpConfig: config.Config{
-				ProtectedRoles: []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-				ConnectionPooler: config.ConnectionPooler{},
-			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-
-	noCheck := func(cluster *Cluster, podSpec *v1.PodTemplateSpec) error { return nil }
-
-	tests := []struct {
-		subTest  string
-		spec     *acidv1.PostgresSpec
-		expected error
-		cluster  *Cluster
-		check    func(cluster *Cluster, podSpec *v1.PodTemplateSpec) error
-	}{
-		{
-			subTest: "default configuration",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			expected: nil,
-			cluster:  cluster,
-			check:    noCheck,
-		},
-		{
-			subTest: "no default resources",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			expected: errors.New(`could not generate resource requirements: could not fill resource requests: could not parse default CPU quantity: quantities must match the regular expression '^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$'`),
-			cluster:  clusterNoDefaultRes,
-			check:    noCheck,
-		},
-		{
-			subTest: "default resources are set",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testResources,
-		},
-		{
-			subTest: "labels for service",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testLabels,
-		},
-		{
-			subTest: "required envs",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testEnvs,
-		},
-	}
-	for _, tt := range tests {
-		podSpec, err := tt.cluster.generateConnectionPoolerPodTemplate(tt.spec)
-
-		if err != tt.expected && err.Error() != tt.expected.Error() {
-			t.Errorf("%s [%s]: Could not generate pod template,\n %+v, expected\n %+v",
-				testName, tt.subTest, err, tt.expected)
-		}
-
-		err = tt.check(cluster, podSpec)
-		if err != nil {
-			t.Errorf("%s [%s]: Pod spec is incorrect, %+v",
-				testName, tt.subTest, err)
-		}
-	}
-}
-
-func testDeploymentOwnwerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
+func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
@@ -779,98 +950,7 @@ func testDeploymentOwnwerReference(cluster *Cluster, deployment *appsv1.Deployme
 	return nil
 }
 
-func testSelector(cluster *Cluster, deployment *appsv1.Deployment) error {
-	labels := deployment.Spec.Selector.MatchLabels
-	expected := cluster.connectionPoolerLabelsSelector().MatchLabels
-
-	if labels["connection-pooler"] != expected["connection-pooler"] {
-		return fmt.Errorf("Labels are incorrect, got %+v, expected %+v",
-			labels, expected)
-	}
-
-	return nil
-}
-
-func TestConnectionPoolerDeploymentSpec(t *testing.T) {
-	testName := "Test connection pooler deployment spec generation"
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				ProtectedRoles: []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-				ConnectionPooler: config.ConnectionPooler{
-					ConnectionPoolerDefaultCPURequest:    "100m",
-					ConnectionPoolerDefaultCPULimit:      "100m",
-					ConnectionPoolerDefaultMemoryRequest: "100Mi",
-					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-				},
-			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-	cluster.Statefulset = &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-sts",
-		},
-	}
-
-	noCheck := func(cluster *Cluster, deployment *appsv1.Deployment) error {
-		return nil
-	}
-
-	tests := []struct {
-		subTest  string
-		spec     *acidv1.PostgresSpec
-		expected error
-		cluster  *Cluster
-		check    func(cluster *Cluster, deployment *appsv1.Deployment) error
-	}{
-		{
-			subTest: "default configuration",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			expected: nil,
-			cluster:  cluster,
-			check:    noCheck,
-		},
-		{
-			subTest: "owner reference",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testDeploymentOwnwerReference,
-		},
-		{
-			subTest: "selector",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			expected: nil,
-			cluster:  cluster,
-			check:    testSelector,
-		},
-	}
-	for _, tt := range tests {
-		deployment, err := tt.cluster.generateConnectionPoolerDeployment(tt.spec)
-
-		if err != tt.expected && err.Error() != tt.expected.Error() {
-			t.Errorf("%s [%s]: Could not generate deployment spec,\n %+v, expected\n %+v",
-				testName, tt.subTest, err, tt.expected)
-		}
-
-		err = tt.check(cluster, deployment)
-		if err != nil {
-			t.Errorf("%s [%s]: Deployment spec is incorrect, %+v",
-				testName, tt.subTest, err)
-		}
-	}
-}
-
-func testServiceOwnwerReference(cluster *Cluster, service *v1.Service) error {
+func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role PostgresRole) error {
 	owner := service.ObjectMeta.OwnerReferences[0]
 
 	if owner.Name != cluster.Statefulset.ObjectMeta.Name {
@@ -881,90 +961,12 @@ func testServiceOwnwerReference(cluster *Cluster, service *v1.Service) error {
 	return nil
 }
 
-func testServiceSelector(cluster *Cluster, service *v1.Service) error {
-	selector := service.Spec.Selector
-
-	if selector["connection-pooler"] != cluster.connectionPoolerName() {
-		return fmt.Errorf("Selector is incorrect, got %s, expected %s",
-			selector["connection-pooler"], cluster.connectionPoolerName())
-	}
-
-	return nil
-}
-
-func TestConnectionPoolerServiceSpec(t *testing.T) {
-	testName := "Test connection pooler service spec generation"
-	var cluster = New(
-		Config{
-			OpConfig: config.Config{
-				ProtectedRoles: []string{"admin"},
-				Auth: config.Auth{
-					SuperUsername:       superUserName,
-					ReplicationUsername: replicationUserName,
-				},
-				ConnectionPooler: config.ConnectionPooler{
-					ConnectionPoolerDefaultCPURequest:    "100m",
-					ConnectionPoolerDefaultCPULimit:      "100m",
-					ConnectionPoolerDefaultMemoryRequest: "100Mi",
-					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
-				},
-			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-	cluster.Statefulset = &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-sts",
-		},
-	}
-
-	noCheck := func(cluster *Cluster, deployment *v1.Service) error {
-		return nil
-	}
-
-	tests := []struct {
-		subTest string
-		spec    *acidv1.PostgresSpec
-		cluster *Cluster
-		check   func(cluster *Cluster, deployment *v1.Service) error
-	}{
-		{
-			subTest: "default configuration",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			cluster: cluster,
-			check:   noCheck,
-		},
-		{
-			subTest: "owner reference",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			cluster: cluster,
-			check:   testServiceOwnwerReference,
-		},
-		{
-			subTest: "selector",
-			spec: &acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-			cluster: cluster,
-			check:   testServiceSelector,
-		},
-	}
-	for _, tt := range tests {
-		service := tt.cluster.generateConnectionPoolerService(tt.spec)
-
-		if err := tt.check(cluster, service); err != nil {
-			t.Errorf("%s [%s]: Service spec is incorrect, %+v",
-				testName, tt.subTest, err)
-		}
-	}
-}
-
 func TestTLS(t *testing.T) {
 	var err error
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
 	var spiloFSGroup = int64(103)
 	var additionalVolumes = spec.AdditionalVolumes
 
@@ -992,7 +994,9 @@ func TestTLS(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				Resources: config.Resources{
-					SpiloFSGroup: &spiloFSGroup,
+					SpiloRunAsUser:  &spiloRunAsUser,
+					SpiloRunAsGroup: &spiloRunAsGroup,
+					SpiloFSGroup:    &spiloFSGroup,
 				},
 			},
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
@@ -1394,7 +1398,7 @@ func TestSidecars(t *testing.T) {
 
 	// replaced sidecar
 	// the order in env is important
-	scalyrEnv := append([]v1.EnvVar{v1.EnvVar{Name: "SCALYR_API_KEY", Value: "abc"}, v1.EnvVar{Name: "SCALYR_SERVER_HOST", Value: ""}}, env...)
+	scalyrEnv := append(env, v1.EnvVar{Name: "SCALYR_API_KEY", Value: "abc"}, v1.EnvVar{Name: "SCALYR_SERVER_HOST", Value: ""})
 	assert.Contains(t, s.Spec.Template.Spec.Containers, v1.Container{
 		Name:            "scalyr-sidecar",
 		Image:           "scalyr-image",
@@ -1403,5 +1407,85 @@ func TestSidecars(t *testing.T) {
 		Env:             scalyrEnv,
 		VolumeMounts:    mounts,
 	})
+
+}
+
+func TestGenerateService(t *testing.T) {
+	var spec acidv1.PostgresSpec
+	var cluster *Cluster
+	var enableLB bool = true
+	spec = acidv1.PostgresSpec{
+		TeamID: "myapp", NumberOfInstances: 1,
+		Resources: acidv1.Resources{
+			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+		},
+		Volume: acidv1.Volume{
+			Size: "1G",
+		},
+		Sidecars: []acidv1.Sidecar{
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar",
+			},
+			acidv1.Sidecar{
+				Name: "cluster-specific-sidecar-with-resources",
+				Resources: acidv1.Resources{
+					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
+					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
+				},
+			},
+			acidv1.Sidecar{
+				Name:        "replace-sidecar",
+				DockerImage: "overwrite-image",
+			},
+		},
+		EnableMasterLoadBalancer: &enableLB,
+	}
+
+	cluster = New(
+		Config{
+			OpConfig: config.Config{
+				PodManagementPolicy: "ordered_ready",
+				ProtectedRoles:      []string{"admin"},
+				Auth: config.Auth{
+					SuperUsername:       superUserName,
+					ReplicationUsername: replicationUserName,
+				},
+				Resources: config.Resources{
+					DefaultCPURequest:    "200m",
+					DefaultCPULimit:      "500m",
+					DefaultMemoryRequest: "0.7Gi",
+					DefaultMemoryLimit:   "1.3Gi",
+				},
+				SidecarImages: map[string]string{
+					"deprecated-global-sidecar": "image:123",
+				},
+				SidecarContainers: []v1.Container{
+					v1.Container{
+						Name: "global-sidecar",
+					},
+					// will be replaced by a cluster specific sidecar with the same name
+					v1.Container{
+						Name:  "replace-sidecar",
+						Image: "replaced-image",
+					},
+				},
+				Scalyr: config.Scalyr{
+					ScalyrAPIKey:        "abc",
+					ScalyrImage:         "scalyr-image",
+					ScalyrCPURequest:    "220m",
+					ScalyrCPULimit:      "520m",
+					ScalyrMemoryRequest: "0.9Gi",
+					// ise default memory limit
+				},
+				ExternalTrafficPolicy: "Cluster",
+			},
+		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
+
+	service := cluster.generateService(Master, &spec)
+	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeCluster, service.Spec.ExternalTrafficPolicy)
+	cluster.OpConfig.ExternalTrafficPolicy = "Local"
+	service = cluster.generateService(Master, &spec)
+	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
 
 }

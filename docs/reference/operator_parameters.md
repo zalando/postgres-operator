@@ -76,8 +76,14 @@ Those are top-level keys, containing both leaf keys and groups.
   The default is `true`.
 
 * **enable_lazy_spilo_upgrade**
-  Instruct operator to update only the statefulsets with the new image without immediately doing the rolling update. The assumption is pods will be re-started later with the new image, for example due to the node rotation.
+  Instruct operator to update only the statefulsets with new images (Spilo and InitContainers) without immediately doing the rolling update. The assumption is pods will be re-started later with new images, for example due to the node rotation.
   The default is `false`.
+
+* **enable_pgversion_env_var**
+  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `true`.
+
+* **enable_spilo_wal_path_compat**
+  enables backwards compatible path between Spilo 12 and Spilo 13 images. The default is `false`.
 
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
@@ -200,6 +206,16 @@ configuration they are grouped under the `kubernetes` key.
   of a database created by the operator. If the annotation key is also provided
   by the database definition, the database definition value is used.
 
+* **delete_annotation_date_key**
+  key name for annotation that compares manifest value with current date in the
+  YYYY-MM-DD format. Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`.
+  The default is empty which also disables this delete protection check.
+
+* **delete_annotation_name_key**
+  key name for annotation that compares manifest value with Postgres cluster name.
+  Allowed pattern: `'([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]'`. The default is
+  empty which also disables this delete protection check.
+
 * **downscaler_annotations**
   An array of annotations that should be passed from Postgres CRD on to the
   statefulset and, if exists, to the connection pooler deployment as well.
@@ -252,8 +268,20 @@ configuration they are grouped under the `kubernetes` key.
   teams API. The default is `postgresql-operator`.
 
 * **infrastructure_roles_secret_name**
-  namespaced name of the secret containing infrastructure roles names and
-  passwords.
+  *deprecated*: namespaced name of the secret containing infrastructure roles
+  with user names, passwords and role membership.
+
+* **infrastructure_roles_secrets**
+  array of infrastructure role definitions which reference existing secrets
+  and specify the key names from which user name, password and role membership
+  are extracted. For the ConfigMap this has to be a string which allows
+  referencing only one infrastructure roles secret. The default is empty.
+
+* **inherited_annotations**
+  list of annotation keys that can be inherited from the cluster manifest, and
+  added to each child objects  (`Deployment`, `StatefulSet`, `Pod`, `PDB` and
+  `Services`) created by the operator incl. the ones from the connection
+  pooler deployment. The default is empty.
 
 * **pod_role_label**
   name of the label assigned to the Postgres pods (and services/endpoints) by
@@ -264,15 +292,16 @@ configuration they are grouped under the `kubernetes` key.
   objects. The default is `application:spilo`.
 
 * **inherited_labels**
-  list of labels that can be inherited from the cluster manifest, and added to
-  each child objects (`StatefulSet`, `Pod`, `Service` and `Endpoints`) created
-  by the operator. Typical use case is to dynamically pass labels that are
-  specific to a given Postgres cluster, in order to implement `NetworkPolicy`.
-  The default is empty.
+  list of label keys that can be inherited from the cluster manifest, and
+  added to each child objects (`Deployment`, `StatefulSet`, `Pod`, `PVCs`,
+  `PDB`, `Service`, `Endpoints` and `Secrets`) created by the operator.
+  Typical use case is to dynamically pass labels that are specific to a
+  given Postgres cluster, in order to implement `NetworkPolicy`. The default
+  is empty.
 
 * **cluster_name_label**
-  name of the label assigned to Kubernetes objects created by the operator that
-  indicates which cluster a given object belongs to. The default is
+  name of the label assigned to Kubernetes objects created by the operator
+  that indicates which cluster a given object belongs to. The default is
   `cluster-name`.
 
 * **node_readiness_label**
@@ -300,6 +329,16 @@ configuration they are grouped under the `kubernetes` key.
   a name of the [priority class](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass)
   that should be assigned to the Postgres pods. The priority class itself must
   be defined in advance. Default is empty (use the default priority class).
+
+* **spilo_runasuser**
+  sets the user ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
+* **spilo_runasgroup**
+  sets the group ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
 
 * **spilo_fsgroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
@@ -332,6 +371,12 @@ configuration they are grouped under the `kubernetes` key.
   specify the [pod management policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-management-policies)
   of stateful sets of PG clusters. The default is `ordered_ready`, the second
   possible value is `parallel`.
+
+* **storage_resize_mode**
+  defines how operator handels the difference between requested volume size and
+  actual size. Available options are: ebs - tries to resize EBS volume, pvc -
+  changes PVC definition, off - disables resize of the volumes. Default is "pvc".
+  When using OpenShift please use one of the other available options.
 
 ## Kubernetes resource requests
 
@@ -402,6 +447,12 @@ CRD-based configuration.
 Those options affect the behavior of load balancers created by the operator.
 In the CRD-based configuration they are grouped under the `load_balancer` key.
 
+* **custom_service_annotations**
+  This key/value map provides a list of annotations that get attached to each
+  service of a cluster created by the operator. If the annotation key is also
+  provided by the cluster definition, the manifest value is used.
+  Optional.
+
 * **db_hosted_zone**
   DNS zone for the cluster DNS name when the load balancer is configured for
   the cluster. Only used when combined with
@@ -418,11 +469,8 @@ In the CRD-based configuration they are grouped under the `load_balancer` key.
   cluster.  Can be overridden by individual cluster settings. The default is
   `false`.
 
-* **custom_service_annotations**
-  This key/value map provides a list of annotations that get attached to each
-  service of a cluster created by the operator. If the annotation key is also
-  provided by the cluster definition, the manifest value is used.
-  Optional.
+* **external_traffic_policy** defines external traffic policy for load
+  balancers. Allowed values are `Cluster` (default) and `Local`.
 
 * **master_dns_name_format** defines the DNS name string template for the
   master load balancer cluster.  The default is
@@ -451,6 +499,20 @@ yet officially supported.
   present and accessible by Postgres pods. At the moment, supported services by
   Spilo are S3 and GCS. The default is empty.
 
+* **wal_gs_bucket**
+  GCS bucket to use for shipping WAL segments with WAL-E. A bucket has to be
+  present and accessible by Postgres pods. Note, only the name of the bucket is
+  required. At the moment, supported services by Spilo are S3 and GCS.
+  The default is empty.
+
+* **gcp_credentials**
+  Used to set the GOOGLE_APPLICATION_CREDENTIALS environment variable for the pods.
+  This is used in with conjunction with the `additional_secret_mount` and
+  `additional_secret_mount_path` to properly set the credentials for the spilo
+  containers. This will allow users to use specific
+  [service accounts](https://cloud.google.com/kubernetes-engine/docs/tutorials/authenticating-to-cloud-platform).
+  The default is empty
+
 * **log_s3_bucket**
   S3 bucket to use for shipping Postgres daily logs. Works only with S3 on AWS.
   The bucket has to be present and accessible by Postgres pods. The default is
@@ -466,10 +528,22 @@ yet officially supported.
   AWS region used to store EBS volumes. The default is `eu-central-1`.
 
 * **additional_secret_mount**
-  Additional Secret (aws or gcp credentials) to mount in the pod. The default is empty.
+  Additional Secret (aws or gcp credentials) to mount in the pod.
+  The default is empty.
 
 * **additional_secret_mount_path**
-  Path to mount the above Secret in the filesystem of the container(s). The default is empty.
+  Path to mount the above Secret in the filesystem of the container(s).
+  The default is empty.
+
+* **enable_ebs_gp3_migration**
+  enable automatic migration on AWS from gp2 to gp3 volumes, that are smaller
+  than the configured max size (see below). This ignores that EBS gp3 is by
+  default only 125 MB/sec vs 250 MB/sec for gp2 >= 333GB.
+  The default is `false`.
+
+* **enable_ebs_gp3_migration_max_size**
+  defines the maximum volume size in GB until which auto migration happens.
+  Default is 1000 (1TB) which matches 3000 IOPS.
 
 ## Logical backup
 
@@ -488,6 +562,10 @@ grouped under the `logical_backup` key.
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
   pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
+
+* **logical_backup_provider**
+  Specifies the storage provider to which the backup should be uploaded (`s3` or `gcs`).
+  Default: "s3"
 
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
@@ -508,6 +586,9 @@ grouped under the `logical_backup` key.
 
 * **logical_backup_s3_secret_access_key**
   When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
+
+* **logical_backup_google_application_credentials**
+  Specifies the path of the google cloud service account json file. Default is empty.
 
 ## Debugging the operator
 
@@ -549,8 +630,8 @@ key.
   The default is `"log_statement:all"`
 
 * **enable_team_superuser**
-  whether to grant superuser to team members created from the Teams API.
-  The default is `false`.
+  whether to grant superuser to members of the cluster's owning team created
+  from the Teams API. The default is `false`.
 
 * **team_admin_role**
   role name to grant to team members created from the Teams API. The default is
@@ -582,6 +663,16 @@ key.
   List of teams which members need the superuser role in each PG database
   cluster to administer Postgres and maintain infrastructure built around it.
   The default is empty.
+
+* **enable_postgres_team_crd**
+  toggle to make the operator watch for created or updated `PostgresTeam` CRDs
+  and create roles for specified additional teams and members.
+  The default is `false`.
+
+* **enable_postgres_team_crd_superusers**
+  in a `PostgresTeam` CRD additional superuser teams can assigned to teams that
+  own clusters. With this flag set to `false`, it will be ignored.
+  The default is `false`.
 
 ## Logging and REST API
 

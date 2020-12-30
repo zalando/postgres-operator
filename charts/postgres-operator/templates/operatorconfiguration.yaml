@@ -13,6 +13,9 @@ configuration:
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
   kubernetes:
+    {{- if .Values.podPriorityClassName }}
+    pod_priority_class_name: {{ .Values.podPriorityClassName }}
+    {{- end }}
     pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
     oauth_token_secret_name: {{ template "postgres-operator.fullname" . }}
 {{ toYaml .Values.configKubernetes | indent 4 }}

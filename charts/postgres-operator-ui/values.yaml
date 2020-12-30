@@ -8,8 +8,14 @@ replicaCount: 1
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator-ui
-  tag: v1.5.0-dirty
+  tag: v1.6.0
   pullPolicy: "IfNotPresent"
+
+# Optionally specify an array of imagePullSecrets.
+# Secrets must be manually created in the namespace.
+# ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+# imagePullSecrets:
+#   - name: 
 
 rbac:
   # Specifies whether RBAC resources should be created
@@ -43,7 +49,7 @@ envs:
 # configure UI service
 service:
   type: "ClusterIP"
-  port: "8081"
+  port: "80"
   # If the type of the service is NodePort a port can be specified using the nodePort field
   # If the nodePort field is not specified, or if it has no value, then a random port is used
   # notePort: 32521

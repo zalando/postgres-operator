@@ -29,13 +29,16 @@ type PostgresSpec struct {
 	Patroni         `json:"patroni,omitempty"`
 	Resources       `json:"resources,omitempty"`
 
-	EnableConnectionPooler *bool             `json:"enableConnectionPooler,omitempty"`
-	ConnectionPooler       *ConnectionPooler `json:"connectionPooler,omitempty"`
+	EnableConnectionPooler        *bool             `json:"enableConnectionPooler,omitempty"`
+	EnableReplicaConnectionPooler *bool             `json:"enableReplicaConnectionPooler,omitempty"`
+	ConnectionPooler              *ConnectionPooler `json:"connectionPooler,omitempty"`
 
 	TeamID      string `json:"teamId"`
 	DockerImage string `json:"dockerImage,omitempty"`
 
-	SpiloFSGroup *int64 `json:"spiloFSGroup,omitempty"`
+	SpiloRunAsUser  *int64 `json:"spiloRunAsUser,omitempty"`
+	SpiloRunAsGroup *int64 `json:"spiloRunAsGroup,omitempty"`
+	SpiloFSGroup    *int64 `json:"spiloFSGroup,omitempty"`
 
 	// vars that enable load balancers are pointers because it is important to know if any of them is omitted from the Postgres manifest
 	// in that case the var evaluates to nil and the value is taken from the operator config
@@ -51,12 +54,14 @@ type PostgresSpec struct {
 	AllowedSourceRanges []string `json:"allowedSourceRanges"`
 
 	NumberOfInstances     int32                       `json:"numberOfInstances"`
-	Users                 map[string]UserFlags        `json:"users"`
+	Users                 map[string]UserFlags        `json:"users,omitempty"`
 	MaintenanceWindows    []MaintenanceWindow         `json:"maintenanceWindows,omitempty"`
-	Clone                 CloneDescription            `json:"clone"`
+	Clone                 *CloneDescription           `json:"clone,omitempty"`
 	ClusterName           string                      `json:"-"`
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
+	SchedulerName         *string                     `json:"schedulerName,omitempty"`
+	NodeAffinity          *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
 	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
 	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
 	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
@@ -64,10 +69,10 @@ type PostgresSpec struct {
 	ShmVolume             *bool                       `json:"enableShmVolume,omitempty"`
 	EnableLogicalBackup   bool                        `json:"enableLogicalBackup,omitempty"`
 	LogicalBackupSchedule string                      `json:"logicalBackupSchedule,omitempty"`
-	StandbyCluster        *StandbyDescription         `json:"standby"`
-	PodAnnotations        map[string]string           `json:"podAnnotations"`
-	ServiceAnnotations    map[string]string           `json:"serviceAnnotations"`
-	TLS                   *TLSDescription             `json:"tls"`
+	StandbyCluster        *StandbyDescription         `json:"standby,omitempty"`
+	PodAnnotations        map[string]string           `json:"podAnnotations,omitempty"`
+	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
+	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
 
 	// deprecated json tags
@@ -109,14 +114,17 @@ type MaintenanceWindow struct {
 // Volume describes a single volume in the manifest.
 type Volume struct {
 	Size         string `json:"size"`
-	StorageClass string `json:"storageClass"`
+	StorageClass string `json:"storageClass,omitempty"`
 	SubPath      string `json:"subPath,omitempty"`
+	Iops         *int64 `json:"iops,omitempty"`
+	Throughput   *int64 `json:"throughput,omitempty"`
 }
 
+// AdditionalVolume specs additional optional volumes for statefulset
 type AdditionalVolume struct {
 	Name             string          `json:"name"`
 	MountPath        string          `json:"mountPath"`
-	SubPath          string          `json:"subPath"`
+	SubPath          string          `json:"subPath,omitempty"`
 	TargetContainers []string        `json:"targetContainers"`
 	VolumeSource     v1.VolumeSource `json:"volumeSource"`
 }
@@ -124,7 +132,7 @@ type AdditionalVolume struct {
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
 type PostgresqlParam struct {
 	PgVersion  string            `json:"version"`
-	Parameters map[string]string `json:"parameters"`
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
@@ -141,22 +149,23 @@ type Resources struct {
 
 // Patroni contains Patroni-specific configuration
 type Patroni struct {
-	InitDB                map[string]string            `json:"initdb"`
-	PgHba                 []string                     `json:"pg_hba"`
-	TTL                   uint32                       `json:"ttl"`
-	LoopWait              uint32                       `json:"loop_wait"`
-	RetryTimeout          uint32                       `json:"retry_timeout"`
-	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
-	Slots                 map[string]map[string]string `json:"slots"`
-	SynchronousMode       bool                         `json:"synchronous_mode"`
-	SynchronousModeStrict bool                         `json:"synchronous_mode_strict"`
+	InitDB                map[string]string            `json:"initdb,omitempty"`
+	PgHba                 []string                     `json:"pg_hba,omitempty"`
+	TTL                   uint32                       `json:"ttl,omitempty"`
+	LoopWait              uint32                       `json:"loop_wait,omitempty"`
+	RetryTimeout          uint32                       `json:"retry_timeout,omitempty"`
+	MaximumLagOnFailover  float32                      `json:"maximum_lag_on_failover,omitempty"` // float32 because https://github.com/kubernetes/kubernetes/issues/30213
+	Slots                 map[string]map[string]string `json:"slots,omitempty"`
+	SynchronousMode       bool                         `json:"synchronous_mode,omitempty"`
+	SynchronousModeStrict bool                         `json:"synchronous_mode_strict,omitempty"`
 }
 
-//StandbyCluster
+// StandbyDescription contains s3 wal path
 type StandbyDescription struct {
 	S3WalPath string `json:"s3_wal_path,omitempty"`
 }
 
+// TLSDescription specs TLS properties
 type TLSDescription struct {
 	SecretName      string `json:"secretName,omitempty"`
 	CertificateFile string `json:"certificateFile,omitempty"`
@@ -194,7 +203,7 @@ type PostgresStatus struct {
 	PostgresClusterStatus string `json:"PostgresClusterStatus"`
 }
 
-// Options for connection pooler
+// ConnectionPooler Options for connection pooler
 //
 // TODO: prepared snippets of configuration, one can choose via type, e.g.
 // pgbouncer-large (with higher resources) or odyssey-small (with smaller
