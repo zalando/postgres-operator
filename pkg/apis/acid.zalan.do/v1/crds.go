@@ -106,7 +106,6 @@ var OperatorConfigCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition
 
 var min0 = 0.0
 var min1 = 1.0
-var min2 = 2.0
 var minDisable = -1.0
 
 // PostgresCRDResourceValidation to check applied manifest parameters
@@ -232,7 +231,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"numberOfInstances": {
 								Type:    "integer",
-								Minimum: &min2,
+								Minimum: &min1,
 							},
 							"resources": {
 								Type:     "object",
@@ -1470,7 +1469,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"connection_pooler_number_of_instances": {
 								Type:    "integer",
-								Minimum: &min2,
+								Minimum: &min1,
 							},
 							"connection_pooler_schema": {
 								Type: "string",

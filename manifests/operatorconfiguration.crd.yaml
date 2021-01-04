@@ -326,7 +326,7 @@ spec:
                     default: "db.example.com"
                   enable_master_load_balancer:
                     type: boolean
-                    default: false
+                    default: true
                   enable_replica_load_balancer:
                     type: boolean
                     default: false
