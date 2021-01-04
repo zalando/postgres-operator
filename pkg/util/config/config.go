@@ -112,7 +112,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v.1.6.0"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
@@ -176,7 +176,7 @@ type Config struct {
 	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
 	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
 	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`
-	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"true"`
+	EnableMasterLoadBalancer               bool              `name:"enable_master_load_balancer" default:"false"`
 	EnableReplicaLoadBalancer              bool              `name:"enable_replica_load_balancer" default:"false"`
 	CustomServiceAnnotations               map[string]string `name:"custom_service_annotations"`
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
