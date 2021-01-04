@@ -590,6 +590,9 @@ grouped under the `logical_backup` key.
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
 
+* **logical_backup_on_master**
+  When set, value will be in LOGICAL_BACKUP_ON_MASTER env variable. Default is empty.
+
 ## Debugging the operator
 
 Options to aid debugging of the operator itself. Grouped under the `debug` key.

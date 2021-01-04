@@ -2030,6 +2030,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 			Name:  "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials,
 		},
+		{
+			Name:  "LOGICAL_BACKUP_ON_MASTER",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupOnMaster,
+		},
 		// Postgres env vars
 		{
 			Name:  "PG_VERSION",
