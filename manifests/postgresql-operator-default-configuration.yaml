@@ -116,6 +116,8 @@ configuration:
     # wal_s3_bucket: ""
   logical_backup:
     logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v.1.6.0"
+    # logical_backup_google_application_credentials: ""
+    logical_backup_provider: "s3"
     # logical_backup_s3_access_key_id: ""
     logical_backup_s3_bucket: "my-bucket-url"
     # logical_backup_s3_endpoint: ""

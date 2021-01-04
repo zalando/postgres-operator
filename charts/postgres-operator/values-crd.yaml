@@ -249,6 +249,11 @@ configAwsOrGcp:
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.0"
+  # path of google cloud service account json file
+  # logical_backup_google_application_credentials: ""
+
+  # storage provider - either "s3" or "gcs"
+  logical_backup_provider: "s3"
   # S3 Access Key ID
   logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
