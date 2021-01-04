@@ -126,7 +126,7 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **workers**
   number of working routines the operator spawns to process requests to
-  create/update/delete/sync clusters concurrently. The default is `4`.
+  create/update/delete/sync clusters concurrently. The default is `8`.
 
 * **max_instances**
   operator will cap the number of instances in any managed Postgres cluster up
