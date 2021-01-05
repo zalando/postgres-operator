@@ -1480,6 +1480,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"override_config_directory": {
+						Type: "array",
+						Items: &apiextv1beta1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1beta1.JSONSchemaProps{
+								Type: "string",
+							},
+						},
+					},
 				},
 			},
 			"status": {

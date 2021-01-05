@@ -228,6 +228,7 @@ type OperatorConfigurationData struct {
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
 	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	OverrideConfigDirectory    []string                           `json:"override_config_directory,omitempty"`
 }
 
 //Duration shortens this frequently used name

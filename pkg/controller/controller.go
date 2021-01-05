@@ -22,6 +22,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/ringlog"
+	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
+	"path/filepath"
 )
 
 // Controller represents operator controller
@@ -175,6 +177,203 @@ func (c *Controller) initOperatorConfig() {
 
 }
 
+func (c *Controller) modifyConfigFromDir() {
+	if c.opConfig.OverrideConfigDirectory != nil {
+		c.logger.Debugf("Loading file-based override config from: %q", c.opConfig.OverrideConfigDirectory)
+		configFromDir := c.readFileConfig(c.opConfig.OverrideConfigDirectory)
+		c.opConfig = config.MergeWithMap(c.opConfig, configFromDir)
+	} else {
+		c.logger.Debug("No override config directory set. Skipping overrides.")
+	}
+
+}
+
+func (c *Controller) readFileConfig(searchDirectories []string) (ret map[string]string) {
+	//searchDirectories := []string{"../../test-resources/config-dir-1", "../../test-resources/config-dir-does-not-exist", "../../test-resources/config-dir-2"}
+	files := c.collectFiles(searchDirectories)
+	c.logger.Debugf("Found files: %s", files)
+
+	ret = c.toConfigMap(files)
+	c.logger.Debugf("Configs as map: %q", ret)
+
+	return
+}
+
+func (c *Controller) collectFiles(searchDirectories []string) (ret map[string][]os.FileInfo) {
+	ret = make(map[string][]os.FileInfo)
+	for _, searchDirectory := range searchDirectories {
+		files, err := ioutil.ReadDir(searchDirectory)
+		if err != nil {
+			c.logger.Warn(err.Error())
+		} else {
+			// No directories, symlinks, etc.
+			files = is(files, os.FileMode.IsRegular)
+			// Store file info for absolute file path
+			abs, err := filepath.Abs(searchDirectory)
+			if err != nil {
+				panic(err)
+			}
+			ret[abs] = files
+		}
+	}
+
+	return
+}
+
+func (c *Controller) toConfigMap(configFiles map[string][]os.FileInfo) (ret map[string]string) {
+	ret = make(map[string]string)
+	for path, files := range configFiles {
+		for _, file := range files {
+			// Let's hope it is not a large file --> TODO: Filter for files > ? Kb
+			data, err := ioutil.ReadFile(filepath.Join(path, file.Name()))
+			if err != nil {
+				c.logger.Warnf("Ignoring file with error. %s", err.Error())
+			} else {
+				// Let's hope it is text --> TODO: Check mimetype of file
+				ret[strings.ToLower(file.Name())] = string(data)
+			}
+		}
+	}
+
+	return
+}
+
+func isNot(filtered []os.FileInfo, test func(mode os.FileMode) bool) (ret []os.FileInfo) {
+	return is(filtered, func(info os.FileMode) bool {
+		return !test(info)
+	})
+}
+
+func is(filtered []os.FileInfo, test func(mode os.FileMode) bool) (ret []os.FileInfo) {
+	for _, f := range filtered {
+		if test(f.Mode()) {
+			ret = append(ret, f)
+		}
+	}
+	return
+}
+
+//func (c *Controller) _modifyConfigFromDir(configStruct interface{}, configFromDir map[string]string, fieldStack string) (invalidConfigNames map[string] string) {
+//	const logMessageFormat = "Field %q was updated to value \"%v\" based on configuration read from directory."
+//	reflectConfigStructElem := reflect.ValueOf(configStruct).Elem()
+//	reflectConfigStructType := reflectConfigStructElem.Type()
+//
+//	for i := 0; i < reflectConfigStructElem.NumField(); i++ {
+//		fullyQualifiedFieldName := fieldStackPut(fieldStack, reflectConfigStructType.Field(i).Name)
+//		fieldType := reflectConfigStructType.Field(i).Type
+//		c.logger.Debugf("Checking for override configuration for field %q", fullyQualifiedFieldName)
+//		if fieldType.Kind() == reflect.Struct {
+//			myStruct := reflectConfigStructElem.Field(i).Addr().Interface()
+//			// depth-first Struct tree walk
+//			fieldStack = fieldStackPut(fieldStack, reflectConfigStructType.Field(i).Name)
+//			c._modifyConfigFromDir(myStruct, configFromDir, fieldStack)
+//			fieldStack = fieldStackPop(fieldStack)
+//		} else if value := configFromDir[fullyQualifiedFieldName]; value != "" {
+//			delete(configFromDir, fullyQualifiedFieldName)
+//			switch fieldType.Kind() {
+//			case reflect.String:
+//				reflectConfigStructElem.Field(i).SetString(value)
+//				c.logger.Infof(logMessageFormat, fullyQualifiedFieldName, reflectConfigStructElem.Field(i).String())
+//			case reflect.Bool:
+//				setBoolVale(reflectConfigStructElem.Field(i), value)
+//				c.logger.Infof(logMessageFormat, fullyQualifiedFieldName, reflectConfigStructElem.Field(i).Bool())
+//			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+//				setUintValue(reflectConfigStructElem.Field(i), fieldType.Bits(), value)
+//				c.logger.Infof(logMessageFormat, fullyQualifiedFieldName, reflectConfigStructElem.Field(i).Uint())
+//			case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+//				if fieldType.Name() == "Duration" {
+//					setDurationValue(reflectConfigStructElem.Field(i), value)
+//				} else {
+//					setIntValue(reflectConfigStructElem.Field(i), fieldType.Bits(), value)
+//				}
+//				c.logger.Infof(logMessageFormat, fullyQualifiedFieldName, reflectConfigStructElem.Field(i).Int())
+//			default:
+//				c.logger.Warnf("Field %q has unsupported type %q. It will be ignored.", reflectConfigStructType.Field(i).Name, fieldType.String())
+//			}
+//		}
+//	}
+//
+//	return configFromDir
+//}
+//
+//func keyArray(theMap map[string]string) (keyArray []string) {
+//	keys := make([]string, 0, len(theMap))
+//	for key := range theMap {
+//		keys = append(keys, key)
+//	}
+//	return keys
+//}
+//
+//func deepCopy(original map[string]string) (copy map[string]string) {
+//	deepCopy := make(map[string]string, len(original))
+//	for key, value := range original {
+//		deepCopy[key] = value
+//	}
+//	return deepCopy
+//}
+//
+//func fieldStackPut(stack string, putty string) string {
+//	var newStack string
+//
+//	if stack == "" {
+//		newStack = putty
+//	} else {
+//		newStack = strings.Join(append(strings.Split(stack, "."), putty), ".")
+//	}
+//
+//	return newStack
+//}
+//
+//func fieldStackPop(stack string) string {
+//	var newStack string
+//
+//	if stack == "" {
+//		panic("Trying to pop element from empty stack.")
+//	}
+//
+//	stackArray := strings.Split(stack, ".")
+//
+//	if len(stackArray) == 1 {
+//		newStack = ""
+//	} else {
+//		newStack = strings.Join(stackArray[0:len(stackArray)-1], ".")
+//	}
+//
+//	return newStack
+//}
+//
+//func setBoolVale(boolField reflect.Value, boolString string) {
+//	bValue, err := strconv.ParseBool(boolString)
+//	if err != nil {
+//		panic(err.Error())
+//	}
+//	boolField.SetBool(bValue)
+//}
+//
+//func setIntValue(intField reflect.Value, intSize int, intString string)  {
+//	iValue, err := strconv.ParseInt(intString, 10, intSize)
+//	if err != nil {
+//		panic(fmt.Sprintf("Failed to convert to int: %s", err.Error()))
+//	}
+//	intField.SetInt(iValue)
+//}
+//
+//func setDurationValue(intField reflect.Value, intString string) {
+//	dValue, err := time.ParseDuration(intString)
+//	if err != nil {
+//		panic(fmt.Sprintf("Failed to convert to time.Duration: %s", err.Error()))
+//	}
+//	intField.SetInt(int64(dValue))
+//}
+//
+//func setUintValue(intField reflect.Value, intSize int, intString string)  {
+//	iValue, err := strconv.ParseUint(intString, 10, intSize)
+//	if err != nil {
+//		panic(err.Error())
+//	}
+//	intField.SetUint(iValue)
+//}
+
 func (c *Controller) modifyConfigFromEnvironment() {
 	c.opConfig.WatchedNamespace = c.getEffectiveNamespace(os.Getenv("WATCHED_NAMESPACE"), c.opConfig.WatchedNamespace)
 
@@ -187,14 +386,6 @@ func (c *Controller) modifyConfigFromEnvironment() {
 	scalyrAPIKey := os.Getenv("SCALYR_API_KEY")
 	if scalyrAPIKey != "" {
 		c.opConfig.ScalyrAPIKey = scalyrAPIKey
-	}
-	logicalBackupS3AccessKeyID := os.Getenv("S3_ACCESS_KEY_ID")
-	if logicalBackupS3AccessKeyID != "" {
-	    c.opConfig.LogicalBackupS3AccessKeyID = logicalBackupS3AccessKeyID
-	}
-	logicalBackupS3SecretAccessKey := os.Getenv("S3_SECRET_ACCESS_KEY")
-	if logicalBackupS3SecretAccessKey != "" {
-	    c.opConfig.LogicalBackupS3SecretAccessKey = logicalBackupS3SecretAccessKey
 	}
 }
 
@@ -326,6 +517,9 @@ func (c *Controller) initController() {
 	} else {
 		c.initOperatorConfig()
 	}
+
+	c.modifyConfigFromDir()
+
 	c.initPodServiceAccount()
 	c.initRoleBinding()
 
