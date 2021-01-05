@@ -2,6 +2,28 @@ apiVersion: v1
 entries:
   postgres-operator:
   - apiVersion: v1
+    appVersion: 1.5.1
+    created: "2021-01-05T12:07:46.259913369+00:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
+    digest: 455ecf0446dc22c3b65c8ecba9019b4bd711d9a6e0ec0605d9851393b8c835ea
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+      - postgres
+      - operator
+      - cloud-native
+      - patroni
+      - spilo
+    maintainers:
+      - email: opensource@zalando.de
+        name: Zalando
+    name: postgres-operator
+    sources:
+      - https://github.com/zalando/postgres-operator
+    urls:
+      - postgres-operator-1.5.1.tgz
+    version: 1.5.1
+  - apiVersion: v1
     appVersion: 1.5.0
     created: "2020-05-04T16:36:19.646719041+02:00"
     description: Postgres Operator creates and manages PostgreSQL clusters running

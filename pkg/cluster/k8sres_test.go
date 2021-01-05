@@ -965,6 +965,8 @@ func TestTLS(t *testing.T) {
 	var err error
 	var spec acidv1.PostgresSpec
 	var cluster *Cluster
+	var spiloRunAsUser = int64(101)
+	var spiloRunAsGroup = int64(103)
 	var spiloFSGroup = int64(103)
 	var additionalVolumes = spec.AdditionalVolumes
 
@@ -992,6 +994,8 @@ func TestTLS(t *testing.T) {
 					ReplicationUsername: replicationUserName,
 				},
 				Resources: config.Resources{
+				  SpiloRunAsUser:  &spiloRunAsUser,
+        	SpiloRunAsGroup: &spiloRunAsGroup,
 					SpiloFSGroup: &spiloFSGroup,
 				},
 			},

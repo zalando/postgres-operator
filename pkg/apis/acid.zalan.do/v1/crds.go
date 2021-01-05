@@ -519,6 +519,12 @@ var PostgresCRDResourceValidation = apiextv1beta1.CustomResourceValidation{
 							},
 						},
 					},
+					"spiloRunAsUser": {
+            Type: "integer",
+          },
+          "spiloRunAsGroup": {
+            Type: "integer",
+          },
 					"spiloFSGroup": {
 						Type: "integer",
 					},
@@ -974,6 +980,12 @@ var OperatorConfigCRDResourceValidation = apiextv1beta1.CustomResourceValidation
 							"secret_name_template": {
 								Type: "string",
 							},
+							"spilo_runasuser": {
+                Type: "integer",
+              },
+              "spilo_runasgroup": {
+                Type: "integer",
+              },
 							"spilo_fsgroup": {
 								Type: "integer",
 							},
