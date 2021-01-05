@@ -571,6 +571,9 @@ grouped under the `logical_backup` key.
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
 
+* **logical_backup_job_prefix**
+  The prefix to be prepended to the name of a k8s CronJob running the backups. Beware the prefix counts towards the name length restrictions imposed by k8s. Empty string is a legitimate value. Operator does not do the actual renaming: If you change the prefix, you will have to recreate respective CronJobs manually. Default: "logical-backup-".
+
 * **logical_backup_s3_region**
   Specifies the region of the bucket which is required with some non-AWS S3 storage services. The default is empty.
 
