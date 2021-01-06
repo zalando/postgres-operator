@@ -562,7 +562,7 @@ grouped under the `logical_backup` key.
   Specifies the path of the google cloud service account json file. Default is empty.
 
 * **logical_backup_job_prefix**
-  The prefix to be prepended to the name of a k8s CronJob running the backups. Beware the prefix counts towards the name length restrictions imposed by k8s. Empty string is a legitimate value. Operator does not do the actual renaming: If you change the prefix, you will have to recreate respective CronJobs manually. Default: "logical-backup-".
+  The prefix to be prepended to the name of a k8s CronJob running the backups. Beware the prefix counts towards the name length restrictions imposed by k8s. Empty string is a legitimate value. Operator does not do the actual renaming: It simply creates the job with the new prefix. You will have to delete the old cron job manually. Default: "logical-backup-".
 
 * **logical_backup_provider**
   Specifies the storage provider to which the backup should be uploaded (`s3` or `gcs`).
