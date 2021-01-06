@@ -1,5 +1,5 @@
 FROM ubuntu:20.04
-MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
+LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 # We need root certificates to deal with teams api over https
 RUN apk --no-cache add ca-certificates go git musl-dev
