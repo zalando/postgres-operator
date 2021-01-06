@@ -2,7 +2,13 @@ FROM ubuntu:20.04
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 # We need root certificates to deal with teams api over https
-RUN apk --no-cache add ca-certificates go git musl-dev
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        curl \
+        ca-certificates \
+        go \
+        git \
+        musl-dev
 
 COPY build/* /
 

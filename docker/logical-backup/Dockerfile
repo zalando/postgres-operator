@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN apt-get update     \
+RUN apt-get update \
     && apt-get install --no-install-recommends -y \
         apt-utils \
         ca-certificates \

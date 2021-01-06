@@ -175,7 +175,7 @@ go get -u github.com/derekparker/delve/cmd/dlv
 * Add following dependencies to the `Dockerfile`
 
 ```
-RUN apk --no-cache add go git musl-dev
+RUN apt-get update && apt-get install -y go git musl-dev
 RUN go get github.com/derekparker/delve/cmd/dlv
 ```
 

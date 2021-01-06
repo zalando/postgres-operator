@@ -67,7 +67,7 @@ kubectl exec \
   )" \
   -- \
     sh -c '
-      apk add --no-cache socat;
+      apt-get add --no-cache socat;
       pkill socat;
       socat -v TCP-LISTEN:1234,reuseaddr,fork,su=nobody TCP:169.254.169.254:80
     ' \
