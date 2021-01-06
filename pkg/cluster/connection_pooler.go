@@ -545,7 +545,7 @@ func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler, lo
 
 	changelog, err := diff.Diff(oldSpec, newSpec)
 	if err != nil {
-		logger.Infof("Cannot get diff, do not do anything, %+v", err)
+		//logger.Infof("Cannot get diff, do not do anything, %+v", err)
 		return false, reasons
 	}
 
@@ -699,8 +699,16 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	masterChanges, _ := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
 	replicaChanges, _ := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
 
-	if !needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0 {
-		c.logger.Warningln("no need for pooler sync")
+	// skip pooler sync only
+	// 1. if there is no diff in spec, AND
+	// 2. if connection pooler is already there and is also required as per newSpec
+	//
+	// Handling the case when connectionPooler is not there but it is required
+	// as per spec, hence do not skip syncing in that case, even though there
+	// is no diff in specs
+	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0) &&
+		(c.ConnectionPooler != nil && *newSpec.Spec.EnableConnectionPooler) {
+		c.logger.Debugln("syncing pooler is not required")
 		return nil, nil
 	}
 

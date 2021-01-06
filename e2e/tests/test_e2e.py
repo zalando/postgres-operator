@@ -221,8 +221,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label(
                             'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                             2, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
-                             5, "Secret not created")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Pooler secret not created")
 
         # Turn off only master connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -248,8 +248,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label(
                              'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              1, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
-                             5, "Secret not created")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Secret not created")
 
         # Turn off only replica connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -272,43 +272,43 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler replica pods not deleted")
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              1, "No pooler service found")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
-                             5, "Secret not created")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Secret not created")
 
         # scale up connection pooler deployment
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            'acid.zalan.do', 'v1', 'default',
-            'postgresqls', 'acid-minimal-cluster',
-            {
-                'spec': {
-                    'connectionPooler': {
-                        'numberOfInstances': 3,
-                    },
-                }
-            })
+        # k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        #     'acid.zalan.do', 'v1', 'default',
+        #     'postgresqls', 'acid-minimal-cluster',
+        #     {
+        #         'spec': {
+        #             'connectionPooler': {
+        #                 'numberOfInstances': 3,
+        #             },
+        #         }
+        #     })
 
-        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3,
-                             "Deployment replicas is scaled to 3")
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
-                             3, "Scale up of pooler pods does not work")
+        # self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(), 3,
+        #                      "Deployment replicas is scaled to 3")
+        # self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+        #                      3, "Scale up of pooler pods does not work")
 
         # turn it off, keeping config should be overwritten by false
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            'acid.zalan.do', 'v1', 'default',
-            'postgresqls', 'acid-minimal-cluster',
-            {
-                'spec': {
-                    'enableConnectionPooler': False,
-                    'enableReplicaConnectionPooler': False,
-                }
-            })
+        # k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        #     'acid.zalan.do', 'v1', 'default',
+        #     'postgresqls', 'acid-minimal-cluster',
+        #     {
+        #         'spec': {
+        #             'enableConnectionPooler': False,
+        #             'enableReplicaConnectionPooler': False,
+        #         }
+        #     })
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
-                             0, "Pooler pods not scaled down")
-        self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
-                             0, "Pooler service not removed")
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
-                             4, "Secrets not deleted")
+        # self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+        #                      0, "Pooler pods not scaled down")
+        # self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+        #                      0, "Pooler service not removed")
+        # self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
+        #                      4, "Secrets not deleted")
 
         # Verify that all the databases have pooler schema installed.
         # Do this via psql, since otherwise we need to deal with
@@ -363,15 +363,15 @@ class EndToEndTestCase(unittest.TestCase):
             print('Could not find leader pod')
 
         # remove config section to make test work next time
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            'acid.zalan.do', 'v1', 'default',
-            'postgresqls', 'acid-minimal-cluster',
-            {
-                'spec': {
-                    'connectionPooler': None,
-                    'EnableReplicaConnectionPooler': False,
-                }
-            })
+        # k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        #     'acid.zalan.do', 'v1', 'default',
+        #     'postgresqls', 'acid-minimal-cluster',
+        #     {
+        #         'spec': {
+        #             'connectionPooler': None,
+        #             'EnableReplicaConnectionPooler': False,
+        #         }
+        #     })
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_load_balancer(self):

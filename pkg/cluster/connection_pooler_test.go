@@ -366,7 +366,9 @@ func TestConnectionPoolerSynchronization(t *testing.T) {
 		{
 			subTest: "create if doesn't exist",
 			oldSpec: &acidv1.Postgresql{
-				Spec: acidv1.PostgresSpec{},
+				Spec: acidv1.PostgresSpec{
+					ConnectionPooler: &acidv1.ConnectionPooler{},
+				},
 			},
 			newSpec: &acidv1.Postgresql{
 				Spec: acidv1.PostgresSpec{
