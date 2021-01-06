@@ -338,13 +338,13 @@ archive is supported.
   the url to S3 bucket containing the WAL archive of the remote primary.
   Required when the `standby` section is present.
 
-## EBS volume resizing
+## Volume properties
 
 Those parameters are grouped under the `volume` top-level key and define the
 properties of the persistent storage that stores Postgres data.
 
 * **size**
-  the size of the target EBS volume. Usual Kubernetes size modifiers, i.e. `Gi`
+  the size of the target volume. Usual Kubernetes size modifiers, i.e. `Gi`
   or `Mi`, apply. Required.
 
 * **storageClass**
@@ -355,6 +355,14 @@ properties of the persistent storage that stores Postgres data.
 
 * **subPath**
   Subpath to use when mounting volume into Spilo container. Optional.
+
+* **iops**
+  When running the operator on AWS the latest generation of EBS volumes (`gp3`)
+  allows for configuring the number of IOPS. Maximum is 16000. Optional.
+
+* **throughput**
+  When running the operator on AWS the latest generation of EBS volumes (`gp3`)
+  allows for configuring the throughput in MB/s. Maximum is 1000. Optional.
 
 ## Sidecar definitions
 
