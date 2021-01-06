@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var target = map[string]string{"max_instances": "10", "watched_namespace": "test-namespace-name", "pod_terminate_grace_period": "1h", "some_property": "foo=bar"}
+var target = map[string]string{"max_instances": "10", "watched_namespace": "test-namespace-name", "pod_terminate_grace_period": "1h", "some_property": "foo=bar", "symlink_secret":"value_of_symlink_file"}
 
 func newFileConfigTestController() *Controller {
 	var controller = NewController(&spec.ControllerConfig{}, "fileconfig-test")
