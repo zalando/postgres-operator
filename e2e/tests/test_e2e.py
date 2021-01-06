@@ -735,55 +735,6 @@ class EndToEndTestCase(unittest.TestCase):
                 "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-test-cluster")
             time.sleep(5)
 
-
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_zz_node_readiness_label(self):
-        '''
-           Remove node readiness label from master node. This must cause a failover.
-        '''
-        k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        readiness_label = 'lifecycle-status'
-        readiness_value = 'ready'
-
-        try:
-            # get nodes of master and replica(s) (expected target of new master)
-            current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
-            num_replicas = len(current_replica_nodes)
-            failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
-
-            # add node_readiness_label to potential failover nodes
-            patch_readiness_label = {
-                "metadata": {
-                    "labels": {
-                        readiness_label: readiness_value
-                    }
-                }
-            }
-            self.assertTrue(len(failover_targets) > 0, "No failover targets available")
-            for failover_target in failover_targets:
-                k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
-
-            # define node_readiness_label in config map which should trigger a failover of the master
-            patch_readiness_label_config = {
-                "data": {
-                    "node_readiness_label": readiness_label + ':' + readiness_value,
-                }
-            }
-            k8s.update_config(patch_readiness_label_config, "setting readiness label")
-            new_master_node, new_replica_nodes = self.assert_failover(
-                current_master_node, num_replicas, failover_targets, cluster_label)
-
-            # patch also node where master ran before
-            k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
-
-            # toggle pod anti affinity to move replica away from master node
-            self.eventuallyTrue(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label), "Pods are redistributed")
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
         '''
@@ -878,59 +829,55 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test until fixed")
-    def test_zzz_taint_based_eviction(self):
+    def test_z_node_readiness_label(self):
         '''
-           Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
+           Remove node readiness label from master node. This must cause a failover.
         '''
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        readiness_label = 'lifecycle-status'
+        readiness_value = 'ready'
 
-        # verify we are in good state from potential previous tests
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+        try:
+            # get nodes of master and replica(s) (expected target of new master)
+            current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
+            num_replicas = len(current_replica_nodes)
+            failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
 
-        # get nodes of master and replica(s) (expected target of new master)
-        master_nodes, replica_nodes = k8s.get_cluster_nodes()
-
-        self.assertNotEqual(master_nodes, [])
-        self.assertNotEqual(replica_nodes, [])
-
-        # taint node with postgres=:NoExecute to force failover
-        body = {
-            "spec": {
-                "taints": [
-                    {
-                        "effect": "NoExecute",
-                        "key": "postgres"
+            # add node_readiness_label to potential failover nodes
+            patch_readiness_label = {
+                "metadata": {
+                    "labels": {
+                        readiness_label: readiness_value
                     }
-                ]
+                }
             }
-        }
+            self.assertTrue(len(failover_targets) > 0, "No failover targets available")
+            for failover_target in failover_targets:
+                k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
 
-        k8s.api.core_v1.patch_node(master_nodes[0], body)
-        self.eventuallyTrue(lambda: k8s.get_cluster_nodes()[0], replica_nodes)
-        self.assertNotEqual(lambda: k8s.get_cluster_nodes()[0], master_nodes)
-
-        # add toleration to pods
-        patch_toleration_config = {
-            "data": {
-                "toleration": "key:postgres,operator:Exists,effect:NoExecute"
+            # define node_readiness_label in config map which should trigger a failover of the master
+            patch_readiness_label_config = {
+                "data": {
+                    "node_readiness_label": readiness_label + ':' + readiness_value,
+                }
             }
-        }
+            k8s.update_config(patch_readiness_label_config, "setting readiness label")
+            new_master_node, new_replica_nodes = self.assert_failover(
+                current_master_node, num_replicas, failover_targets, cluster_label)
 
-        k8s.update_config(patch_toleration_config, step="allow tainted nodes")
+            # patch also node where master ran before
+            k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+            # toggle pod anti affinity to move replica away from master node
+            self.eventuallyTrue(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label), "Pods are redistributed")
 
-        # toggle pod anti affinity to move replica away from master node
-        nm, new_replica_nodes = k8s.get_cluster_nodes()
-        new_master_node = nm[0]
-        self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_node_affinity(self):
+    def test_zz_node_affinity(self):
         '''
            Add label to a node and update postgres cluster spec to deploy only on a node with that label
         '''
@@ -1034,6 +981,58 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
+    def test_zzz_taint_based_eviction(self):
+        '''
+           Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
+        # get nodes of master and replica(s) (expected target of new master)
+        master_nodes, replica_nodes = k8s.get_cluster_nodes()
+
+        self.assertNotEqual(master_nodes, [])
+        self.assertNotEqual(replica_nodes, [])
+
+        # taint node with postgres=:NoExecute to force failover
+        body = {
+            "spec": {
+                "taints": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "postgres"
+                    }
+                ]
+            }
+        }
+
+        k8s.api.core_v1.patch_node(master_nodes[0], body)
+        self.eventuallyTrue(lambda: k8s.get_cluster_nodes()[0], replica_nodes)
+        self.assertNotEqual(lambda: k8s.get_cluster_nodes()[0], master_nodes)
+
+        # add toleration to pods
+        patch_toleration_config = {
+            "data": {
+                "toleration": "key:postgres,operator:Exists,effect:NoExecute"
+            }
+        }
+
+        k8s.update_config(patch_toleration_config, step="allow tainted nodes")
+
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
+        # toggle pod anti affinity to move replica away from master node
+        nm, new_replica_nodes = k8s.get_cluster_nodes()
+        new_master_node = nm[0]
+        self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
    
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zzzz_cluster_deletion(self):
