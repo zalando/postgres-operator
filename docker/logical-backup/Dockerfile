@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
