@@ -312,18 +312,17 @@ func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
 
 	for _, pod := range pods.Items {
 
+		var state string
+
 		err := retryutil.Retry(3*time.Second, 15*time.Second,
 			func() (bool, error) {
 
-				var state string
 				var err error
 
 				state, err = c.patroni.GetPatroniMemberState(&pod)
 
 				if err != nil {
 					return false, err
-				} else if state == "creating replica" {
-					return false, fmt.Errorf("cannot re-create replica %s: it is currently being initialized", pod.Name)
 				}
 				return true, nil
 			},
@@ -331,6 +330,9 @@ func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
 
 		if err != nil {
 			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
+			return false
+		} else if state == "creating replica" {
+			c.logger.Errorf("cannot re-create replica %s: it is currently being initialized", pod.Name)
 			return false
 		}
 
