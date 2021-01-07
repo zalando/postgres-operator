@@ -11,15 +11,29 @@ switchover (planned failover) of the master to the Pod with new minor version.
 The switch should usually take less than 5 seconds, still clients have to
 reconnect.
 
-Major version upgrades are supported either via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)or in-place.
+Major version upgrades are supported either via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
+or in-place.
 
-With cloning, the new cluster manifest must have a higher `version` string than the source
-cluster and will be created from a basebackup. Depending of the cluster size,
-downtime in this case can be significant as writes to the database should be
-stopped and all WAL files should be archived first before cloning is started.
+With cloning, the new cluster manifest must have a higher `version` string than
+the source cluster and will be created from a basebackup. Depending of the
+cluster size, downtime in this case can be significant as writes to the database
+should be stopped and all WAL files should be archived first before cloning is
+started.
 
-Starting with Spilo 13, Postgres Operator can do in-place major version upgrade, which should be faster than cloning. To trigger the upgrade, simply increase the version in the cluster manifest. As the very last step of
-processing the manifest update event, the operator will call the `inplace_upgrade.py` script in Spilo. The upgrade is usually fast, well under one minute for most DBs. Note the changes become irrevertible once `pg_upgrade` is called. To understand the upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
+Starting with Spilo 13, Postgres Operator can do in-place major version upgrade,
+which should be faster than cloning. However, it is not fully automatic yet.
+First, you need to make sure, that setting the `PGVERSION` environment variable
+is enabled in the configuration. Since `v1.6.0`, `enable_pgversion_env_var` is
+enabled by default.
+
+To trigger the upgrade, increase the version in the cluster manifest. After
+Pods are rotated `configure_spilo` will notice the version mismatch and start
+the old version again. You can then exec into the Postgres container of the
+master instance and call `python3 /scripts/inplace_upgrade.py N` where `N`
+is the number of members of your cluster (see `number_of_instances`). The
+upgrade is usually fast, well under one minute for most DBs. Note, that changes
+become irrevertible once `pg_upgrade` is called. To understand the upgrade
+procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
 
 ## CRD Validation
 

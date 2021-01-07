@@ -87,6 +87,7 @@ SPILO_S3_BACKUP_PREFIX = getenv('SPILO_S3_BACKUP_PREFIX', 'spilo/')
 SUPERUSER_TEAM = getenv('SUPERUSER_TEAM', 'acid')
 TARGET_NAMESPACE = getenv('TARGET_NAMESPACE')
 GOOGLE_ANALYTICS = getenv('GOOGLE_ANALYTICS', False)
+MIN_PODS= getenv('MIN_PODS', 2)
 
 # storage pricing, i.e. https://aws.amazon.com/ebs/pricing/
 COST_EBS = float(getenv('COST_EBS', 0.119))  # GB per month
@@ -302,13 +303,14 @@ DEFAULT_UI_CONFIG = {
     'users_visible': True,
     'databases_visible': True,
     'resources_visible': True,
-    'postgresql_versions': ['9.6', '10', '11'],
+    'postgresql_versions': ['11','12','13'],
     'dns_format_string': '{0}.{1}.{2}',
     'pgui_link': '',
     'static_network_whitelist': {},
     'cost_ebs': COST_EBS,
     'cost_core': COST_CORE,
-    'cost_memory': COST_MEMORY
+    'cost_memory': COST_MEMORY,
+    'min_pods': MIN_PODS
 }
 
 
@@ -320,6 +322,7 @@ def get_config():
     config['resources_visible'] = RESOURCES_VISIBLE
     config['superuser_team'] = SUPERUSER_TEAM
     config['target_namespace'] = TARGET_NAMESPACE
+    config['min_pods'] = MIN_PODS
 
     config['namespaces'] = (
         [TARGET_NAMESPACE]
@@ -493,6 +496,7 @@ def get_postgresqls():
             'uid': uid,
             'namespaced_name': namespace + '/' + name,
             'full_name': namespace + '/' + name + ('/' + uid if uid else ''),
+            'status': status,
         }
         for cluster in these(
             read_postgresqls(
@@ -506,6 +510,7 @@ def get_postgresqls():
             'items',
         )
         for spec in [cluster.get('spec', {}) if cluster.get('spec', {}) is not None else {"error": "Invalid spec in manifest"}]
+        for status in [cluster.get('status', {})]
         for metadata in [cluster['metadata']]
         for namespace in [metadata['namespace']]
         for name in [metadata['name']]

@@ -320,25 +320,39 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 	return
 }
 
-func nodeAffinity(nodeReadinessLabel map[string]string) *v1.Affinity {
-	matchExpressions := make([]v1.NodeSelectorRequirement, 0)
-	if len(nodeReadinessLabel) == 0 {
+func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
+	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
 	}
-	for k, v := range nodeReadinessLabel {
-		matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
-			Key:      k,
-			Operator: v1.NodeSelectorOpIn,
-			Values:   []string{v},
-		})
+	nodeAffinityCopy := *&v1.NodeAffinity{}
+	if nodeAffinity != nil {
+		nodeAffinityCopy = *nodeAffinity.DeepCopy()
+	}
+	if len(nodeReadinessLabel) > 0 {
+		matchExpressions := make([]v1.NodeSelectorRequirement, 0)
+		for k, v := range nodeReadinessLabel {
+			matchExpressions = append(matchExpressions, v1.NodeSelectorRequirement{
+				Key:      k,
+				Operator: v1.NodeSelectorOpIn,
+				Values:   []string{v},
+			})
+		}
+		nodeReadinessSelectorTerm := v1.NodeSelectorTerm{MatchExpressions: matchExpressions}
+		if nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					nodeReadinessSelectorTerm,
+				},
+			}
+		} else {
+			nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
+				NodeSelectorTerms: append(nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, nodeReadinessSelectorTerm),
+			}
+		}
 	}
 
 	return &v1.Affinity{
-		NodeAffinity: &v1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{{MatchExpressions: matchExpressions}},
-			},
-		},
+		NodeAffinity: &nodeAffinityCopy,
 	}
 }
 
@@ -1209,7 +1223,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
 		effectiveFSGroup,
-		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
@@ -1914,7 +1928,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		nil,
 		nil,
 		nil,
-		nodeAffinity(c.OpConfig.NodeReadinessLabel),
+		nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
@@ -1989,6 +2003,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		},
 		// Bucket env vars
 		{
+			Name:  "LOGICAL_BACKUP_PROVIDER",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupProvider,
+		},
+		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET",
 			Value: c.OpConfig.LogicalBackup.LogicalBackupS3Bucket,
 		},
@@ -2007,6 +2025,10 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 		{
 			Name:  "LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX",
 			Value: getBucketScopeSuffix(string(c.Postgresql.GetUID())),
+		},
+		{
+			Name:  "LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS",
+			Value: c.OpConfig.LogicalBackup.LogicalBackupGoogleApplicationCredentials,
 		},
 		// Postgres env vars
 		{
@@ -2057,7 +2079,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
-	return "logical-backup-" + c.clusterName().Name
+	return c.OpConfig.LogicalBackupJobPrefix + c.clusterName().Name
 }
 
 // Return an array of ownerReferences to make an arbitraty object dependent on

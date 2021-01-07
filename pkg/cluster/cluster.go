@@ -113,9 +113,9 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
 	})
-	password_encryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
+	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
 	if !ok {
-		password_encryption = "md5"
+		passwordEncryption = "md5"
 	}
 
 	cluster := &Cluster{
@@ -128,7 +128,7 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy: users.DefaultUserSyncStrategy{PasswordEncryption: password_encryption},
+		userSyncStrategy: users.DefaultUserSyncStrategy{PasswordEncryption: passwordEncryption},
 		deleteOptions:    metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:   podEventsQueue,
 		KubeClient:       kubeClient,
@@ -596,6 +596,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 // for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
+	syncStatetfulSet := false
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -623,6 +624,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	} else if oldSpec.Spec.PostgresqlParam.PgVersion < newSpec.Spec.PostgresqlParam.PgVersion {
 		c.logger.Infof("postgresql version increased (%q -> %q), major version upgrade can be done manually after StatefulSet Sync",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
+		syncStatetfulSet = true
 	}
 
 	// Service
@@ -699,8 +701,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			updateFailed = true
 			return
 		}
-		if !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
+		if syncStatetfulSet || !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
 			c.logger.Debugf("syncing statefulsets")
+			syncStatetfulSet = false
 			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet
 			if err := c.syncStatefulSet(); err != nil {
 				c.logger.Errorf("could not sync statefulsets: %v", err)

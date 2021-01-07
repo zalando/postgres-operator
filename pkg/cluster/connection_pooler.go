@@ -22,7 +22,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 )
 
-// K8S objects that are belong to connection pooler
+// ConnectionPoolerObjects K8s objects that are belong to connection pooler
 type ConnectionPoolerObjects struct {
 	Deployment  *appsv1.Deployment
 	Service     *v1.Service

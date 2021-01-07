@@ -9,7 +9,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
+  dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -36,7 +36,7 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "12"
+    version: "13"
     parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
@@ -93,9 +93,9 @@ spec:
       encoding: "UTF8"
       locale: "en_US.UTF-8"
       data-checksums: "true"
-    pg_hba:
-    - hostssl all all 0.0.0.0/0 md5
-    - host    all all 0.0.0.0/0 md5
+#    pg_hba:
+#      - hostssl all all 0.0.0.0/0 md5
+#      - host    all all 0.0.0.0/0 md5
 #    slots:
 #      permanent_physical_1:
 #        type: physical
@@ -172,3 +172,14 @@ spec:
 # When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
 # if unknown, set it to 103 which is the usual value in the default spilo images.
 # In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.
+
+# Add node affinity support by allowing postgres pods to schedule only on nodes that
+# have label: "postgres-operator:enabled" set.
+#  nodeAffinity:
+#    requiredDuringSchedulingIgnoredDuringExecution:
+#      nodeSelectorTerms:
+#        - matchExpressions:
+#            - key: postgres-operator
+#              operator: In
+#              values:
+#                - enabled

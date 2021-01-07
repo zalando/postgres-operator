@@ -44,13 +44,6 @@ rules:
   - get
   - patch
   - update
-# to read configuration from ConfigMaps
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
 # to send events to the CRs
 - apiGroups:
   - ""
@@ -63,7 +56,35 @@ rules:
   - patch
   - update
   - watch
-# to manage endpoints which are also used by Patroni
+# to manage endpoints/configmaps which are also used by Patroni
+{{- if toString .Values.configGeneral.kubernetes_use_configmaps | eq "true" }}
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+{{- else }}
+# to read configuration from ConfigMaps
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
 - apiGroups:
   - ""
   resources:
@@ -77,6 +98,7 @@ rules:
   - patch
   - update
   - watch
+{{- end }}
 # to CRUD secrets for database access
 - apiGroups:
   - ""

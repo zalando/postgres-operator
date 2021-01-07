@@ -34,8 +34,8 @@ Postgres cluster. This can work in two ways: via a ConfigMap or a custom
 The Postgres Operator can be deployed in the following ways:
 
 * Manual deployment
+* Kustomization
 * Helm chart
-* Operator Lifecycle Manager (OLM)
 
 ### Manual deployment setup
 
@@ -91,20 +91,6 @@ The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
 be skipped with warning when using v3. Documentation for installing applications
 with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
 
-### Operator Lifecycle Manager (OLM)
-
-The [Operator Lifecycle Manager (OLM)](https://github.com/operator-framework/operator-lifecycle-manager)
-has been designed to facilitate management of K8s operators. It has to be
-installed in your K8s environment. When OLM is set up simply download and deploy
-the Postgres Operator with the following command:
-
-```bash
-kubectl create -f https://operatorhub.io/install/postgres-operator.yaml
-```
-
-This installs the operator in the `operators` namespace. More information can be
-found on [operatorhub.io](https://operatorhub.io/operator/postgres-operator).
-
 ## Check if Postgres Operator is running
 
 Starting the operator may take a few seconds. Check if the operator pod is
@@ -141,6 +127,9 @@ To deploy the UI simply apply all its manifests files or use the UI helm chart:
 ```bash
 # manual deployment
 kubectl apply -f ui/manifests/
+
+# or kustomization
+kubectl apply -k github.com/zalando/postgres-operator/ui/manifests
 
 # or helm chart
 helm install postgres-operator-ui ./charts/postgres-operator-ui

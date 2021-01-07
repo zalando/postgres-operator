@@ -202,7 +202,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"timestamp": {
 								Type:        "string",
 								Description: "Date-time format that specifies a timezone as an offset relative to UTC e.g. 1996-12-19T16:39:57-08:00",
-								Pattern:     "^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\\.[0-9]+)?(([Zz])|([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$",
+								Pattern:     "^([0-9]+)-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])[Tt]([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]|60)(\\.[0-9]+)?(([+-]([01][0-9]|2[0-3]):[0-5][0-9]))$",
 							},
 							"uid": {
 								Type:   "string",
@@ -594,6 +594,91 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"caSecretName": {
 								Type: "string",
+							},
+						},
+					},
+					"nodeAffinity": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"preferredDuringSchedulingIgnoredDuringExecution": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type:     "object",
+										Required: []string{"preference, weight"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"preference": {
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"matchExpressions": {
+														Type: "array",
+														Items: &apiextv1.JSONSchemaPropsOrArray{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "object",
+																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+																	Allows: true,
+																},
+															},
+														},
+													},
+													"matchFields": {
+														Type: "array",
+														Items: &apiextv1.JSONSchemaPropsOrArray{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "object",
+																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+																	Allows: true,
+																},
+															},
+														},
+													},
+												},
+											},
+											"weight": {
+												Type:   "integer",
+												Format: "int32",
+											},
+										},
+									},
+								},
+							},
+							"requiredDuringSchedulingIgnoredDuringExecution": {
+								Type:     "object",
+								Required: []string{"nodeSelectorTerms"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"nodeSelectorTerms": {
+										Type: "array",
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"matchExpressions": {
+														Type: "array",
+														Items: &apiextv1.JSONSchemaPropsOrArray{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "object",
+																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+																	Allows: true,
+																},
+															},
+														},
+													},
+													"matchFields": {
+														Type: "array",
+														Items: &apiextv1.JSONSchemaPropsOrArray{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "object",
+																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+																	Allows: true,
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -1204,6 +1289,12 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
 							"logical_backup_docker_image": {
+								Type: "string",
+							},
+							"logical_backup_google_application_credentials": {
+								Type: "string",
+							},
+							"logical_backup_provider": {
 								Type: "string",
 							},
 							"logical_backup_s3_access_key_id": {

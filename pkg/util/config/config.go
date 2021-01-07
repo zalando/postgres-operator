@@ -111,14 +111,17 @@ type Scalyr struct {
 
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
-	LogicalBackupSchedule          string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage       string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
-	LogicalBackupS3Bucket          string `name:"logical_backup_s3_bucket" default:""`
-	LogicalBackupS3Region          string `name:"logical_backup_s3_region" default:""`
-	LogicalBackupS3Endpoint        string `name:"logical_backup_s3_endpoint" default:""`
-	LogicalBackupS3AccessKeyID     string `name:"logical_backup_s3_access_key_id" default:""`
-	LogicalBackupS3SecretAccessKey string `name:"logical_backup_s3_secret_access_key" default:""`
-	LogicalBackupS3SSE             string `name:"logical_backup_s3_sse" default:""`
+	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup"`
+	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
+	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
+	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
+	LogicalBackupS3Endpoint                   string `name:"logical_backup_s3_endpoint" default:""`
+	LogicalBackupS3AccessKeyID                string `name:"logical_backup_s3_access_key_id" default:""`
+	LogicalBackupS3SecretAccessKey            string `name:"logical_backup_s3_secret_access_key" default:""`
+	LogicalBackupS3SSE                        string `name:"logical_backup_s3_sse" default:""`
+	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
+	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
 }
 
 // Operator options for connection pooler
@@ -147,7 +150,7 @@ type Config struct {
 	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
 	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-12:1.6-p3"`
+	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-13:2.0-p2"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
@@ -180,7 +183,7 @@ type Config struct {
 	CustomPodAnnotations                   map[string]string `name:"custom_pod_annotations"`
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
-	StorageResizeMode                      string            `name:"storage_resize_mode" default:"ebs"`
+	StorageResizeMode                      string            `name:"storage_resize_mode" default:"pvc"`
 	EnableLoadBalancer                     *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
 	ExternalTrafficPolicy                  string            `name:"external_traffic_policy" default:"Cluster"`
 	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
@@ -200,7 +203,7 @@ type Config struct {
 	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
-	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"false"`
+	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 }
 

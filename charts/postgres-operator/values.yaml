@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.5.0
+  tag: v1.6.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -25,7 +25,7 @@ configGeneral:
   # update only the statefulsets without immediately doing the rolling update
   enable_lazy_spilo_upgrade: "false"
   # set the PGVERSION env var instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION
-  enable_pgversion_env_var: "false"
+  enable_pgversion_env_var: "true"
   # start any new database pod without limitations on shm memory
   enable_shm_volume: "true"
   # enables backwards compatible path between Spilo 12 and Spilo 13 images
@@ -35,7 +35,7 @@ configGeneral:
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: "false"
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p3
+  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: "-1"
   # min number of instances in Postgres cluster. -1 = no limit
@@ -239,21 +239,28 @@ configAwsOrGcp:
 # configure K8s cron job managed by the operator
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:master-58"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v.1.6.0"
+  # path of google cloud service account json file
+  # logical_backup_google_application_credentials: ""
+  # prefix for the backup job name
+  logical_backup_job_prefix: "logical-backup-"
+  # storage provider - either "s3" or "gcs"
+  logical_backup_provider: "s3"
   # S3 Access Key ID
   logical_backup_s3_access_key_id: ""
   # S3 bucket to store backup results
   logical_backup_s3_bucket: "my-bucket-url"
-  # S3 region of bucket
-  logical_backup_s3_region: ""
   # S3 endpoint url when not using AWS
   logical_backup_s3_endpoint: ""
+  # S3 region of bucket
+  logical_backup_s3_region: ""
   # S3 Secret Access Key
   logical_backup_s3_secret_access_key: ""
   # S3 server side encryption
   logical_backup_s3_sse: "AES256"
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
+
 
 # automate creation of human users with teams API service
 configTeamsApi:
