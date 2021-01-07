@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
@@ -309,12 +311,27 @@ func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
 	}
 
 	for _, pod := range pods.Items {
-		state, err := c.patroni.GetPatroniMemberState(&pod)
+
+		err := retryutil.Retry(3*time.Second, 15*time.Second,
+			func() (bool, error) {
+
+				var state string
+				var err error
+
+				state, err = c.patroni.GetPatroniMemberState(&pod)
+
+				if err != nil {
+					c.logger.Errorf("failed to get Patroni state for pod: %s", err)
+					return false, err
+				} else if state == "creating replica" {
+					c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
+					return false, nil
+				}
+				return true, nil
+			},
+		)
+
 		if err != nil {
-			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
-			return false
-		} else if state == "creating replica" {
-			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
 			return false
 		}
 
