@@ -1,4 +1,4 @@
-FROM alpine
+FROM alpine:3.6
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 EXPOSE 8081
