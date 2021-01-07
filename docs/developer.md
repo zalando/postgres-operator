@@ -175,7 +175,7 @@ go get -u github.com/derekparker/delve/cmd/dlv
 * Add following dependencies to the `Dockerfile`
 
 ```
-RUN apt-get update && apt-get install -y go git musl-dev
+RUN apk --no-cache add go git musl-dev
 RUN go get github.com/derekparker/delve/cmd/dlv
 ```
 
@@ -239,7 +239,7 @@ kubectl logs acid-minimal-cluster-0
 
 The operator provides reference end-to-end (e2e) tests to
 ensure various infrastructure parts work smoothly together. The test code is available at `e2e/tests`.
-The special `registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner` image is used to run the tests. The container mounts the local `e2e/tests` directory at runtime, so whatever you modify in your local copy of the tests will be executed by a test runner. By maintaining a separate test runner image we avoid the need to re-build the e2e test image on every build. 
+The special `registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner` image is used to run the tests. The container mounts the local `e2e/tests` directory at runtime, so whatever you modify in your local copy of the tests will be executed by a test runner. By maintaining a separate test runner image we avoid the need to re-build the e2e test image on every build.
 
 Each e2e execution tests a Postgres Operator image built from the current git branch. The test
 runner creates a new local K8s cluster using [kind](https://kind.sigs.k8s.io/),

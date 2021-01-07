@@ -4,7 +4,7 @@ LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 EXPOSE 8081
 
 RUN \
-  apt-get add --no-cache \
+  apk add --no-cache \
     alpine-sdk \
     autoconf \
     automake \
@@ -25,7 +25,8 @@ RUN \
     && \
   rm -rf \
     /root/.cache \
-    /tmp/*
+    /tmp/* \
+    /var/cache/apk/*
 
 COPY requirements.txt /
 COPY start_server.sh /
