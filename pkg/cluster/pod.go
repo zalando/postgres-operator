@@ -332,7 +332,7 @@ func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
 			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
 			return false
 		} else if state == "creating replica" {
-			c.logger.Errorf("cannot re-create replica %s: it is currently being initialized", pod.Name)
+			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
 			return false
 		}
 
