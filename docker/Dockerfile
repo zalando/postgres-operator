@@ -1,16 +1,14 @@
-FROM ubuntu:20.04
+FROM alpine
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 # We need root certificates to deal with teams api over https
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-        curl \
-        ca-certificates
+RUN apk --no-cache add curl
+RUN apk --no-cache add ca-certificates
 
 COPY build/* /
 
-RUN addgroup --gid 1000 pgo
-RUN adduser pgo --gecos 'Postgres Operator' --uid 1000 --disabled-password --ingroup pgo
+RUN addgroup -g 1000 pgo
+RUN adduser -D -u 1000 -G pgo -g 'Postgres Operator' pgo
 
 USER 1000:1000
 
