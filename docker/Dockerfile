@@ -9,8 +9,8 @@ RUN apt-get update \
 
 COPY build/* /
 
-RUN addgroup -g 1000 pgo
-RUN adduser -D -u 1000 -G pgo -g 'Postgres Operator' pgo
+RUN addgroup --gid 1000 pgo
+RUN adduser pgo --gecos 'Postgres Operator' --uid 1000 --disabled-password --ingroup pgo
 
 USER 1000:1000
 

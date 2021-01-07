@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM alpine
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 EXPOSE 8081
