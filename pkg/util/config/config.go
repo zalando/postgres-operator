@@ -121,6 +121,7 @@ type LogicalBackup struct {
 	LogicalBackupS3SecretAccessKey            string `name:"logical_backup_s3_secret_access_key" default:""`
 	LogicalBackupS3SSE                        string `name:"logical_backup_s3_sse" default:""`
 	LogicalBackupGoogleApplicationCredentials string `name:"logical_backup_google_application_credentials" default:""`
+	LogicalBackupJobPrefix                    string `name:"logical_backup_job_prefix" default:"logical-backup-"`
 }
 
 // Operator options for connection pooler
