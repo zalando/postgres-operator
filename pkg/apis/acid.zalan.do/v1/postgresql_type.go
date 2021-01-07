@@ -118,6 +118,7 @@ type Volume struct {
 	SubPath      string `json:"subPath,omitempty"`
 	Iops         *int64 `json:"iops,omitempty"`
 	Throughput   *int64 `json:"throughput,omitempty"`
+	VolumeType   string `json:"type,omitempty"`
 }
 
 // AdditionalVolume specs additional optional volumes for statefulset

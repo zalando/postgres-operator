@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/aws/aws-sdk-go/aws"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -59,8 +60,79 @@ func (c *Cluster) syncVolumes() error {
 	return nil
 }
 
-func (c *Cluster) syncUnderlyingEBSVolume() {
+func (c *Cluster) syncUnderlyingEBSVolume() error {
+	c.logger.Infof("starting to sync EBS volume: type, iops, throughput and size")
 
+	targetValue := c.Spec.Volume
+
+	awsGp3 := aws.String("gp3")
+
+	for _, volume := range c.EBSVolumes {
+		var modifyIops *int64
+		var modifyThroughput *int64
+		var modifySize *int64
+		var modifyType *string
+
+		if targetValue.Iops != nil {
+			if volume.Iops != *targetValue.Iops {
+				modifyIops = targetValue.Iops
+			}
+		}
+
+		if targetValue.Throughput != nil {
+			if volume.Throughput != *targetValue.Throughput {
+				modifyThroughput = targetValue.Throughput
+			}
+		}
+
+		if modifyIops != nil || modifyThroughput != nil || modifySize != nil {
+			if modifyThroughput != nil || modifyIops != nil {
+				modifyType = awsGp3
+			} else if targetValue.VolumeType == "gp3" && volume.VolumeType != "gp3" {
+				modifyType = awsGp3
+			} else {
+				// do not touch type
+				modifyType = nil
+			}
+
+			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, modifyType, volume.Size, 3000, 125)
+
+		}
+	}
+}
+
+func (c *Cluster) populateVolumeMetaData() error {
+	c.logger.Infof("starting reading ebs meta data")
+
+	// TODO check if all known volumes match expectation, then no API call neeeded
+
+	pvs, err := c.listPersistentVolumes()
+	if err != nil {
+		return fmt.Errorf("could not list persistent volumes: %v", err)
+	}
+	c.logger.Debugf("found %d volumes, size of known volumes %d", len(pvs), len(c.EBSVolumes))
+
+	volumeIds := []string{}
+	var volumeID string
+	for _, pv := range pvs {
+		volumeID, err = c.VolumeResizer.ExtractVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+		if err != nil {
+			continue
+		}
+
+		volumeIds = append(volumeIds, volumeID)
+	}
+
+	awsVolumes, err := c.VolumeResizer.DescribeVolumes(volumeIds)
+	if nil != err {
+		return err
+	}
+
+	for _, volume := range awsVolumes {
+		c.EBSVolumes[volume.VolumeID] = volume
+	}
+
+	return nil
 }
 
 // syncVolumeClaims reads all persistent volume claims and checks that their size matches the one declared in the statefulset.
