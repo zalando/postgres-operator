@@ -314,7 +314,7 @@ func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
 
 		var state string
 
-		err := retryutil.Retry(3*time.Second, 15*time.Second,
+		err := retryutil.Retry(1*time.Second, 5*time.Second,
 			func() (bool, error) {
 
 				var err error
