@@ -1293,6 +1293,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_google_application_credentials": {
 								Type: "string",
 							},
+							"logical_backup_job_prefix": {
+								Type: "string",
+							},
 							"logical_backup_provider": {
 								Type: "string",
 							},

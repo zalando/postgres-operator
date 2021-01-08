@@ -381,6 +381,9 @@ spec:
                     default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.0"
                   logical_backup_google_application_credentials:
                     type: string
+                  logical_backup_job_prefix:
+                    type: string
+                    default: "logical-backup-"
                   logical_backup_provider:
                     type: string
                     default: "s3"
