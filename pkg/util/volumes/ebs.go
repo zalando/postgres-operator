@@ -141,7 +141,7 @@ func (r *EBSVolumeResizer) ResizeVolume(volumeID string, newSize int64) error {
 }
 
 // ModifyVolume Modify EBS volume
-func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize int64, iops int64, throughput int64) error {
+func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType *string, newSize *int64, iops *int64, throughput *int64) error {
 	/* first check if the volume is already of a requested size */
 	volumeOutput, err := r.connection.DescribeVolumes(&ec2.DescribeVolumesInput{VolumeIds: []*string{&volumeID}})
 	if err != nil {
@@ -152,7 +152,7 @@ func (r *EBSVolumeResizer) ModifyVolume(volumeID string, newType string, newSize
 		return fmt.Errorf("describe volume %q returned information about a non-matching volume %q", volumeID, *vol.VolumeId)
 	}
 
-	input := ec2.ModifyVolumeInput{Size: &newSize, VolumeId: &volumeID, VolumeType: &newType, Iops: &iops, Throughput: &throughput}
+	input := ec2.ModifyVolumeInput{Size: newSize, VolumeId: &volumeID, VolumeType: newType, Iops: iops, Throughput: throughput}
 	output, err := r.connection.ModifyVolume(&input)
 	if err != nil {
 		return fmt.Errorf("could not modify persistent volume: %v", err)

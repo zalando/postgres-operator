@@ -63,9 +63,16 @@ func (c *Cluster) syncVolumes() error {
 func (c *Cluster) syncUnderlyingEBSVolume() error {
 	c.logger.Infof("starting to sync EBS volume: type, iops, throughput and size")
 
+	var err error
+
 	targetValue := c.Spec.Volume
+	newSize, err := resource.ParseQuantity(targetValue.Size)
+	targetSize := quantityToGigabyte(newSize)
 
 	awsGp3 := aws.String("gp3")
+	awsIo2 := aws.String("io2")
+
+	errors := []string{}
 
 	for _, volume := range c.EBSVolumes {
 		var modifyIops *int64
@@ -85,9 +92,17 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 			}
 		}
 
+		if targetSize > volume.Size {
+			modifySize = &targetSize
+		}
+
 		if modifyIops != nil || modifyThroughput != nil || modifySize != nil {
 			if modifyThroughput != nil || modifyIops != nil {
+				// we default to gp3 if iops and throughput are configured
 				modifyType = awsGp3
+				if targetValue.VolumeType == "io2" {
+					modifyType = awsIo2
+				}
 			} else if targetValue.VolumeType == "gp3" && volume.VolumeType != "gp3" {
 				modifyType = awsGp3
 			} else {
@@ -95,10 +110,20 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 				modifyType = nil
 			}
 
-			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, modifyType, volume.Size, 3000, 125)
-
+			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, modifyType, &volume.Size, modifyIops, modifyThroughput)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("modify volume failed: volume=%s size=%d iops=%d throughput=%d", volume.VolumeID, volume.Size, volume.Iops, volume.Throughput))
+			}
 		}
 	}
+
+	if len(errors) > 0 {
+		for _, s := range errors {
+			c.logger.Warningf(s)
+		}
+		// c.logger.Errorf("failed to modify %d of %d volumes", len(c.EBSVolumes), len(errors))
+	}
+	return nil
 }
 
 func (c *Cluster) populateVolumeMetaData() error {
@@ -446,10 +471,13 @@ func (c *Cluster) executeEBSMigration() error {
 		return err
 	}
 
+	var i3000 int64 = 3000
+	var i125 int64 = 125
+
 	for _, volume := range awsVolumes {
 		if volume.VolumeType == "gp2" && volume.Size < c.OpConfig.EnableEBSGp3MigrationMaxSize {
 			c.logger.Infof("modifying EBS volume %s to type gp3 migration (%d)", volume.VolumeID, volume.Size)
-			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, "gp3", volume.Size, 3000, 125)
+			err = c.VolumeResizer.ModifyVolume(volume.VolumeID, aws.String("gp3"), &volume.Size, &i3000, &i125)
 			if nil != err {
 				c.logger.Warningf("modifying volume %s failed: %v", volume.VolumeID, err)
 			}
