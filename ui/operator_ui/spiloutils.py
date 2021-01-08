@@ -21,7 +21,7 @@ AWS_ENDPOINT = getenv('AWS_ENDPOINT')
 OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-name')
 
 COMMON_CLUSTER_LABEL = getenv('COMMON_CLUSTER_LABEL', '{"application":"spilo"}')
-COMMON_POOLER_LABEL = getenv('COMMONG_POOLER_LABEL', '{"application":"db-connection-pooler"}')
+COMMON_POOLER_LABEL = getenv('COMMON_POOLER_LABEL', '{"application":"db-connection-pooler"}')
 
 logger.info("Common Cluster Label: {}".format(COMMON_CLUSTER_LABEL))
 logger.info("Common Pooler Label: {}".format(COMMON_POOLER_LABEL))
@@ -107,6 +107,12 @@ def encode_labels(label_selector):
     ])
 
 
+def cluster_labels(spilo_cluster):
+    labels = COMMON_CLUSTER_LABEL
+    labels[OPERATOR_CLUSTER_NAME_LABEL] = spilo_cluster
+    return labels
+
+
 def kubernetes_url(
     resource_type,
     namespace='default',
@@ -151,7 +157,7 @@ def read_pods(cluster, namespace, spilo_cluster):
         cluster=cluster,
         resource_type='pods',
         namespace=namespace,
-        label_selector={OPERATOR_CLUSTER_NAME_LABEL: spilo_cluster},
+        label_selector=cluster_labels(spilo_cluster),
     )
 
 
