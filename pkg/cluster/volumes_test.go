@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/zalando/postgres-operator/mocks"
@@ -256,7 +257,7 @@ func TestMigrateEBS(t *testing.T) {
 			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 100}}, nil)
 
 	// expect only gp2 volume to be modified
-	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq("gp3"), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq(aws.String("ebs-volume-1")), gomock.Eq(aws.String("gp3")), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	cluster.VolumeResizer = resizer
 	cluster.executeEBSMigration()
