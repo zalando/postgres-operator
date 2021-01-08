@@ -551,11 +551,6 @@ These parameters configure a K8s cron job managed by the operator to produce
 Postgres logical backups. In the CRD-based configuration those parameters are
 grouped under the `logical_backup` key.
 
-* **logical_backup_schedule**
-  Backup schedule in the cron format. Please take the
-  [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
-  into account. Default: "30 00 \* \* \*"
-
 * **logical_backup_docker_image**
   An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
@@ -563,32 +558,40 @@ grouped under the `logical_backup` key.
   The default image is the same image built with the Zalando-internal CI
   pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
 
+* **logical_backup_google_application_credentials**
+  Specifies the path of the google cloud service account json file. Default is empty.
+
+* **logical_backup_job_prefix**
+  The prefix to be prepended to the name of a k8s CronJob running the backups. Beware the prefix counts towards the name length restrictions imposed by k8s. Empty string is a legitimate value. Operator does not do the actual renaming: It simply creates the job with the new prefix. You will have to delete the old cron job manually. Default: "logical-backup-".
+
 * **logical_backup_provider**
   Specifies the storage provider to which the backup should be uploaded (`s3` or `gcs`).
   Default: "s3"
+
+* **logical_backup_s3_access_key_id**
+  When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
 
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
 
+* **logical_backup_s3_endpoint**
+  When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.
+
 * **logical_backup_s3_region**
   Specifies the region of the bucket which is required with some non-AWS S3 storage services. The default is empty.
 
-* **logical_backup_s3_endpoint**
-  When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.
+* **logical_backup_s3_secret_access_key**
+  When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
 
 * **logical_backup_s3_sse**
   Specify server side encryption that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
 
-* **logical_backup_s3_access_key_id**
-  When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
-
-* **logical_backup_s3_secret_access_key**
-  When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
-
-* **logical_backup_google_application_credentials**
-  Specifies the path of the google cloud service account json file. Default is empty.
+* **logical_backup_schedule**
+  Backup schedule in the cron format. Please take the
+  [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
+  into account. Default: "30 00 \* \* \*"
 
 ## Debugging the operator
 
