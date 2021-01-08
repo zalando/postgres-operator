@@ -30,10 +30,10 @@ To trigger the upgrade, increase the version in the cluster manifest. After
 Pods are rotated `configure_spilo` will notice the version mismatch and start
 the old version again. You can then exec into the Postgres container of the
 master instance and call `python3 /scripts/inplace_upgrade.py N` where `N`
-is the number of members of your cluster (see `number_of_instances`). The
-upgrade is usually fast, well under one minute for most DBs. Note, that changes
-become irrevertible once `pg_upgrade` is called. To understand the upgrade
-procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
+is the number of members of your cluster (see [`numberOfInstances`](https://github.com/zalando/postgres-operator/blob/50cb5898ea715a1db7e634de928b2d16dc8cd969/manifests/minimal-postgres-manifest.yaml#L10)).
+The upgrade is usually fast, well under one minute for most DBs. Note, that
+changes become irrevertible once `pg_upgrade` is called. To understand the
+upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
 
 ## CRD Validation
 
