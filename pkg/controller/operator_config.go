@@ -141,11 +141,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
 	result.AdditionalSecretMountPath = util.Coalesce(fromCRD.AWSGCP.AdditionalSecretMountPath, "/meta/credentials")
 	result.EnableEBSGp3Migration = fromCRD.AWSGCP.EnableEBSGp3Migration
-	result.EnableEBSGp3MigrationMaxSize = fromCRD.AWSGCP.EnableEBSGp3MigrationMaxSize
+	result.EnableEBSGp3MigrationMaxSize = util.CoalesceInt64(fromCRD.AWSGCP.EnableEBSGp3MigrationMaxSize, 1000)
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.6.0")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 	result.LogicalBackupS3Region = fromCRD.LogicalBackup.S3Region
@@ -154,7 +154,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3SecretAccessKey = fromCRD.LogicalBackup.S3SecretAccessKey
 	result.LogicalBackupS3SSE = fromCRD.LogicalBackup.S3SSE
 	result.LogicalBackupGoogleApplicationCredentials = fromCRD.LogicalBackup.GoogleApplicationCredentials
-	result.LogicalBackupJobPrefix = fromCRD.LogicalBackup.JobPrefix
+	result.LogicalBackupJobPrefix = util.Coalesce(fromCRD.LogicalBackup.JobPrefix, "logical-backup-")
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging
