@@ -545,7 +545,7 @@ func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler, lo
 
 	changelog, err := diff.Diff(oldSpec, newSpec)
 	if err != nil {
-		//logger.Infof("Cannot get diff, do not do anything, %+v", err)
+		logger.Infof("cannot get diff, do not do anything, %+v", err)
 		return false, reasons
 	}
 
@@ -696,8 +696,14 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	}
 
 	needSync, _ := needSyncConnectionPoolerSpecs(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler, c.logger)
-	masterChanges, _ := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
-	replicaChanges, _ := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
+	masterChanges, err := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
+	if err != nil {
+		c.logger.Error("Error in getting diff of master connection pooler changes")
+	}
+	replicaChanges, err := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
+	if err != nil {
+		c.logger.Error("Error in getting diff of replica connection pooler changes")
+	}
 
 	// skip pooler sync only
 	// 1. if there is no diff in spec, AND

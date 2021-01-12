@@ -1563,7 +1563,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	username := pgUser.Name
 	lbls := c.labelsSet(true)
 
-	if username == "pooler" {
+	if username == constants.ConnectionPoolerUserName {
 		lbls = c.connectionPoolerLabels("", false).MatchLabels
 	}
 
