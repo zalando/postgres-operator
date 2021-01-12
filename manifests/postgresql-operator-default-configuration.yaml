@@ -4,6 +4,8 @@ metadata:
   name: postgresql-operator-default-configuration
 configuration:
   docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
+  # image_pull_secrets:
+  # - name: myRegistryKeySecretName
   # enable_crd_validation: true
   # enable_lazy_spilo_upgrade: false
   enable_pgversion_env_var: true

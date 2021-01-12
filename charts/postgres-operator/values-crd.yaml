@@ -33,6 +33,11 @@ configGeneral:
   # kubernetes_use_configmaps: false
   # Spilo docker image
   docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
+  # Optionally specify an array of imagePullSecrets for the spilo pod.
+  # Secrets must be manually created in the namespace.
+  # ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
+  # image_pull_secrets:
+  # - name: myRegistryKeySecretName
   # max number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # min number of instances in Postgres cluster. -1 = no limit
