@@ -457,7 +457,7 @@ spec:
                       log_statement: all
                   teams_api_url:
                     type: string
-                    defaults: "https://teams.example.com/api/"
+                    default: "https://teams.example.com/api/"
               logging_rest_api:
                 type: object
                 properties:
