@@ -8,7 +8,7 @@ furl==2.1.0
 gevent==20.12.1
 jq==1.1.1
 json_delta>=2.0
-kubernetes==12.0.1
+kubernetes==3.0.0
 requests==2.25.1
 stups-tokens>=1.1.19
 wal_e==1.1.1
