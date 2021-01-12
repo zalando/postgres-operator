@@ -929,6 +929,7 @@ class EndToEndTestCase(unittest.TestCase):
         new_master_node = nm[0]
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
+    @unittest.skip("flaky test, to be fixed later")
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_node_affinity(self):
         '''
