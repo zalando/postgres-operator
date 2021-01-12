@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM registry.opensource.zalan.do/library/ubuntu-18.04:18.04-20201005
 LABEL maintainer="Team ACID @ Zalando <team-acid@zalando.de>"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
