@@ -539,13 +539,13 @@ func updateConnectionPoolerAnnotations(KubeClient k8sutil.KubernetesClient, depl
 // Test if two connection pooler configuration needs to be synced. For simplicity
 // compare not the actual K8S objects, but the configuration itself and request
 // sync if there is any difference.
-func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler) (sync bool, reasons []string) {
+func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler, logger *logrus.Entry) (sync bool, reasons []string) {
 	reasons = []string{}
 	sync = false
 
 	changelog, err := diff.Diff(oldSpec, newSpec)
 	if err != nil {
-		//c.logger.Infof("Cannot get diff, do not do anything, %+v", err)
+		logger.Infof("cannot get diff, do not do anything, %+v", err)
 		return false, reasons
 	}
 
@@ -681,12 +681,44 @@ func logPoolerEssentials(log *logrus.Entry, oldSpec, newSpec *acidv1.Postgresql)
 }
 
 func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, LookupFunction InstallFunction) (SyncReason, error) {
-	logPoolerEssentials(c.logger, oldSpec, newSpec)
 
 	var reason SyncReason
 	var err error
 	var newNeedConnectionPooler, oldNeedConnectionPooler bool
 	oldNeedConnectionPooler = false
+
+	if oldSpec == nil {
+		oldSpec = &acidv1.Postgresql{
+			Spec: acidv1.PostgresSpec{
+				ConnectionPooler: &acidv1.ConnectionPooler{},
+			},
+		}
+	}
+
+	needSync, _ := needSyncConnectionPoolerSpecs(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler, c.logger)
+	masterChanges, err := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
+	if err != nil {
+		c.logger.Error("Error in getting diff of master connection pooler changes")
+	}
+	replicaChanges, err := diff.Diff(oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler)
+	if err != nil {
+		c.logger.Error("Error in getting diff of replica connection pooler changes")
+	}
+
+	// skip pooler sync only
+	// 1. if there is no diff in spec, AND
+	// 2. if connection pooler is already there and is also required as per newSpec
+	//
+	// Handling the case when connectionPooler is not there but it is required
+	// as per spec, hence do not skip syncing in that case, even though there
+	// is no diff in specs
+	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0) &&
+		(c.ConnectionPooler != nil && *newSpec.Spec.EnableConnectionPooler) {
+		c.logger.Debugln("syncing pooler is not required")
+		return nil, nil
+	}
+
+	logPoolerEssentials(c.logger, oldSpec, newSpec)
 
 	// Check and perform the sync requirements for each of the roles.
 	for _, role := range [2]PostgresRole{Master, Replica} {
@@ -841,7 +873,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 		var specReason []string
 
 		if oldSpec != nil {
-			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler)
+			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler, c.logger)
 		}
 
 		defaultsSync, defaultsReason := needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
