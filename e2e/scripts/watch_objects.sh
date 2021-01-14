@@ -1,7 +1,9 @@
 #!/bin/bash
 
-watch -c "
+watch -n 0.1 -c "
 kubectl get postgresql --all-namespaces
+echo
+kubectl exec \$(kubectl get pod -l name=postgres-operator --no-headers) -- curl -s localhost:8080/workers/all/status/ | jq .
 echo
 echo -n 'Rolling upgrade pending: '
 kubectl get statefulset -o jsonpath='{.items..metadata.annotations.zalando-postgres-operator-rolling-update-required}'

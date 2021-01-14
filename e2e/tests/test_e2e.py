@@ -35,7 +35,7 @@ class EndToEndTestCase(unittest.TestCase):
     # `kind` pods may stuck in the `Terminating` phase for a few minutes; hence high test timeout
     TEST_TIMEOUT_SEC = 600
 
-    def eventuallyEqual(self, f, x, m, retries=60, interval=2):
+    def eventuallyEqual(self, f, x, m, retries=60, interval=3):
         while True:
             try:
                 y = f()
@@ -47,7 +47,7 @@ class EndToEndTestCase(unittest.TestCase):
                     raise
                 time.sleep(interval)
 
-    def eventuallyNotEqual(self, f, x, m, retries=60, interval=2):
+    def eventuallyNotEqual(self, f, x, m, retries=60, interval=3):
         while True:
             try:
                 y = f()
@@ -59,7 +59,7 @@ class EndToEndTestCase(unittest.TestCase):
                     raise
                 time.sleep(interval)
 
-    def eventuallyTrue(self, f, m, retries=60, interval=2):
+    def eventuallyTrue(self, f, m, retries=60, interval=3):
         while True:
             try:
                 self.assertTrue(f(), m)
@@ -929,7 +929,6 @@ class EndToEndTestCase(unittest.TestCase):
         new_master_node = nm[0]
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
-    @unittest.skip("flaky test, to be fixed later")
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_node_affinity(self):
         '''
