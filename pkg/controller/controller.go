@@ -420,7 +420,8 @@ func (c *Controller) initController() {
 		c.pgTeamMap = teams.PostgresTeamMap{}
 	}
 
-	c.logger.Infof("config: %s", c.opConfig.MustMarshal())
+	// Careful! The configuration may contain sensitive information, e.g. S3 credentials
+	c.logger.Debugf("config: %s", c.opConfig.MustMarshal())
 	logMultiLineConfig(c.logger, c.opConfig.MustMarshal())
 
 	roleDefs := c.getInfrastructureRoleDefinitions()
