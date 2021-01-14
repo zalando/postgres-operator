@@ -263,3 +263,119 @@ func TestMigrateEBS(t *testing.T) {
 	cluster.VolumeResizer = resizer
 	cluster.executeEBSMigration()
 }
+
+func TestMigrateGp3Support(t *testing.T) {
+	client, _ := newFakeK8sPVCclient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+
+	// new cluster with pvc storage resize mode and configured labels
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				Resources: config.Resources{
+					ClusterLabels:    map[string]string{"application": "spilo"},
+					ClusterNameLabel: "cluster-name",
+				},
+				StorageResizeMode:            "mixed",
+				EnableEBSGp3Migration:        false,
+				EnableEBSGp3MigrationMaxSize: 1000,
+			},
+		}, client, acidv1.Postgresql{}, logger, eventRecorder)
+	cluster.Spec.Volume.Size = "150Gi"
+	cluster.Spec.Volume.Iops = aws.Int64(6000)
+	cluster.Spec.Volume.Throughput = aws.Int64(275)
+
+	// set metadata, so that labels will get correct values
+	cluster.Name = clusterName
+	cluster.Namespace = namespace
+	filterLabels := cluster.labelsSet(false)
+
+	pvcList := CreatePVCs(namespace, clusterName, filterLabels, 2, "100Gi")
+
+	ps := v1.PersistentVolumeSpec{}
+	ps.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
+	ps.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-1"
+
+	ps2 := v1.PersistentVolumeSpec{}
+	ps2.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
+	ps2.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-2"
+
+	ps3 := v1.PersistentVolumeSpec{}
+	ps3.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
+	ps3.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-3"
+
+	pvList := &v1.PersistentVolumeList{
+		Items: []v1.PersistentVolume{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "persistent-volume-0",
+				},
+				Spec: ps,
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "persistent-volume-1",
+				},
+				Spec: ps2,
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "persistent-volume-3",
+				},
+				Spec: ps3,
+			},
+		},
+	}
+
+	for _, pvc := range pvcList.Items {
+		cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
+	}
+
+	for _, pv := range pvList.Items {
+		cluster.KubeClient.PersistentVolumes().Create(context.TODO(), &pv, metav1.CreateOptions{})
+	}
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   clusterName + "-0",
+			Labels: filterLabels,
+		},
+		Spec: v1.PodSpec{},
+	}
+
+	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+
+	pod = v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   clusterName + "-1",
+			Labels: filterLabels,
+		},
+		Spec: v1.PodSpec{},
+	}
+
+	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	resizer := mocks.NewMockVolumeResizer(ctrl)
+
+	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-1")).Return("ebs-volume-1", nil)
+	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
+	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-3")).Return("ebs-volume-3", nil)
+
+	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2"})).Return(
+		[]volumes.VolumeProperties{
+			{VolumeID: "ebs-volume-1", VolumeType: "gp3", Size: 100, Iops: 3000},
+			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 105, Iops: 4000},
+			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 150, Iops: 6000, Throughput: 275}}, nil)
+
+	// expect only gp2 volume to be modified
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Eq(aws.Int64(150)), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
+	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-2"), gomock.Eq(aws.String("gp3")), gomock.Eq(aws.Int64(150)), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
+	// resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-3"), gomock.Eq(aws.String("gp3")), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+	cluster.VolumeResizer = resizer
+	cluster.syncVolumes()
+}

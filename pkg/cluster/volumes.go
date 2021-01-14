@@ -16,6 +16,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/filesystems"
+	"github.com/zalando/postgres-operator/pkg/util/volumes"
 )
 
 func (c *Cluster) syncVolumes() error {
@@ -30,7 +31,16 @@ func (c *Cluster) syncVolumes() error {
 
 	if c.OpConfig.StorageResizeMode == "mixed" {
 		// mixed op uses AWS API to adjust size,throughput,iops and calls pvc chance for file system resize
+		// in case of errors we proceed to let K8s do its work, favoring disk space increase of other adjustments
+
+		err = c.populateVolumeMetaData()
+		if err != nil {
+
+		}
 		err = c.syncUnderlyingEBSVolume()
+		if err != nil {
+
+		}
 
 		// resize pvc to adjust filesystem size until better K8s support
 		if err = c.syncVolumeClaims(); err != nil {
@@ -129,8 +139,6 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 func (c *Cluster) populateVolumeMetaData() error {
 	c.logger.Infof("starting reading ebs meta data")
 
-	// TODO check if all known volumes match expectation, then no API call neeeded
-
 	pvs, err := c.listPersistentVolumes()
 	if err != nil {
 		return fmt.Errorf("could not list persistent volumes: %v", err)
@@ -153,6 +161,12 @@ func (c *Cluster) populateVolumeMetaData() error {
 		return err
 	}
 
+	if len(awsVolumes) != len(c.EBSVolumes) {
+		c.logger.Debugf("number of ebs volumes (%d) differs from known volumes (%d)", len(awsVolumes), len(c.EBSVolumes))
+	}
+
+	// reset map, operator is not responsible for dangling ebs volumes
+	c.EBSVolumes = make(map[string]volumes.VolumeProperties)
 	for _, volume := range awsVolumes {
 		c.EBSVolumes[volume.VolumeID] = volume
 	}
