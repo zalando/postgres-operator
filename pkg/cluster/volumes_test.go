@@ -291,7 +291,7 @@ func TestMigrateGp3Support(t *testing.T) {
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
 
-	pvcList := CreatePVCs(namespace, clusterName, filterLabels, 2, "100Gi")
+	pvcList := CreatePVCs(namespace, clusterName, filterLabels, 3, "100Gi")
 
 	ps := v1.PersistentVolumeSpec{}
 	ps.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
@@ -321,7 +321,7 @@ func TestMigrateGp3Support(t *testing.T) {
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "persistent-volume-3",
+					Name: "persistent-volume-2",
 				},
 				Spec: ps3,
 			},
@@ -356,6 +356,16 @@ func TestMigrateGp3Support(t *testing.T) {
 
 	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 
+	pod = v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   clusterName + "-2",
+			Labels: filterLabels,
+		},
+		Spec: v1.PodSpec{},
+	}
+
+	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -365,11 +375,11 @@ func TestMigrateGp3Support(t *testing.T) {
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-2")).Return("ebs-volume-2", nil)
 	resizer.EXPECT().ExtractVolumeID(gomock.Eq("aws://eu-central-1b/ebs-volume-3")).Return("ebs-volume-3", nil)
 
-	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2"})).Return(
+	resizer.EXPECT().DescribeVolumes(gomock.Eq([]string{"ebs-volume-1", "ebs-volume-2", "ebs-volume-3"})).Return(
 		[]volumes.VolumeProperties{
 			{VolumeID: "ebs-volume-1", VolumeType: "gp3", Size: 100, Iops: 3000},
 			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 105, Iops: 4000},
-			{VolumeID: "ebs-volume-2", VolumeType: "gp3", Size: 150, Iops: 6000, Throughput: 275}}, nil)
+			{VolumeID: "ebs-volume-3", VolumeType: "gp3", Size: 151, Iops: 6000, Throughput: 275}}, nil)
 
 	// expect only gp2 volume to be modified
 	resizer.EXPECT().ModifyVolume(gomock.Eq("ebs-volume-1"), gomock.Eq(aws.String("gp3")), gomock.Eq(aws.Int64(150)), gomock.Eq(aws.Int64(6000)), gomock.Eq(aws.Int64(275))).Return(nil)
