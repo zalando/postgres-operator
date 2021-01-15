@@ -1031,10 +1031,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	sort.Slice(customPodEnvVarsList,
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
-	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" {
-		return nil, fmt.Errorf("s3_wal_path is empty for standby cluster")
-	}
-
 	// backward compatible check for InitContainers
 	if spec.InitContainersOld != nil {
 		msg := "Manifest parameter init_containers is deprecated."
