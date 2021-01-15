@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
@@ -294,6 +296,50 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	return pod, nil
 }
 
+func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
+
+	/*
+	 Operator should not re-create pods if there is at least one replica being bootstrapped
+	 because Patroni might use other replicas to take basebackup from (see Patroni's "clonefrom" tag).
+
+	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
+	 after this check succeeds but before a pod is re-created
+	*/
+
+	for _, pod := range pods.Items {
+		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
+	}
+
+	for _, pod := range pods.Items {
+
+		var state string
+
+		err := retryutil.Retry(1*time.Second, 5*time.Second,
+			func() (bool, error) {
+
+				var err error
+
+				state, err = c.patroni.GetPatroniMemberState(&pod)
+
+				if err != nil {
+					return false, err
+				}
+				return true, nil
+			},
+		)
+
+		if err != nil {
+			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
+			return false
+		} else if state == "creating replica" {
+			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
+			return false
+		}
+
+	}
+	return true
+}
+
 func (c *Cluster) recreatePods() error {
 	c.setProcessName("starting to recreate pods")
 	ls := c.labelsSet(false)
@@ -308,6 +354,10 @@ func (c *Cluster) recreatePods() error {
 		return fmt.Errorf("could not get the list of pods: %v", err)
 	}
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
+
+	if !c.isSafeToRecreatePods(pods) {
+		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initialized")
+	}
 
 	var (
 		masterPod, newMasterPod, newPod *v1.Pod

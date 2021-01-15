@@ -6,12 +6,11 @@ metadata:
 #    environment: demo
 #  annotations:
 #    "acid.zalan.do/controller": "second-operator"
+#    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
+#    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-12:1.6-p2
+  dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
   teamId: "acid"
-  volume:
-    size: 1Gi
-#    storageClass: my-sc
   numberOfInstances: 2
   users:  # Application/Robot users
     zalando:
@@ -19,19 +18,59 @@ spec:
     - createdb
   enableMasterLoadBalancer: false
   enableReplicaLoadBalancer: false
-#  enableConnectionPooler: true  # not needed when connectionPooler section is present (see below)
+  enableConnectionPooler: false # enable/disable connection pooler deployment
+  enableReplicaConnectionPooler: false # set to enable connectionPooler for replica service
   allowedSourceRanges:  # load balancers' source ranges for both master and replica services
   - 127.0.0.1/32
   databases:
     foo: zalando
+  preparedDatabases:
+    bar:
+      defaultUsers: true
+      extensions:
+        pg_partman: public
+        pgcrypto: public
+      schemas:
+        data: {}
+        history:
+          defaultRoles: true
+          defaultUsers: false
   postgresql:
-    version: "12"
-    parameters: # Expert section
+    version: "13"
+    parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"
       log_statement: "all"
+  volume:
+    size: 1Gi
+#    storageClass: my-sc
+  additionalVolumes:
+    - name: empty
+      mountPath: /opt/empty
+      targetContainers:
+        - all
+      volumeSource:
+        emptyDir: {}
+#    - name: data
+#      mountPath: /home/postgres/pgdata/partitions
+#      targetContainers:
+#        - postgres
+#      volumeSource:
+#        PersistentVolumeClaim:
+#          claimName: pvc-postgresql-data-partitions
+#          readyOnly: false
+#    - name: conf
+#      mountPath: /etc/telegraf
+#      subPath: telegraf.conf
+#      targetContainers:
+#        - telegraf-sidecar
+#      volumeSource:
+#        configMap:
+#          name: my-config-map
 
   enableShmVolume: true
+#  spiloRunAsUser: 101
+#  spiloRunAsGroup: 103
 #  spiloFSGroup: 103
 #  podAnnotations:
 #    annotation.key: value
@@ -54,9 +93,9 @@ spec:
       encoding: "UTF8"
       locale: "en_US.UTF-8"
       data-checksums: "true"
-    pg_hba:
-    - hostssl all all 0.0.0.0/0 md5
-    - host    all all 0.0.0.0/0 md5
+#    pg_hba:
+#      - hostssl all all 0.0.0.0/0 md5
+#      - host    all all 0.0.0.0/0 md5
 #    slots:
 #      permanent_physical_1:
 #        type: physical
@@ -88,18 +127,19 @@ spec:
 #  - 01:00-06:00  #UTC
 #  - Sat:00:00-04:00
 
-  connectionPooler:
-    numberOfInstances: 2
-    mode: "transaction"
-    schema: "pooler"
-    user: "pooler"
-    resources:
-      requests:
-        cpu: 300m
-        memory: 100Mi
-      limits:
-        cpu: "1"
-        memory: 100Mi
+# overwrite custom properties for connection pooler deployments
+#  connectionPooler:
+#    numberOfInstances: 2
+#    mode: "transaction"
+#    schema: "pooler"
+#    user: "pooler"
+#    resources:
+#      requests:
+#        cpu: 300m
+#        memory: 100Mi
+#      limits:
+#        cpu: "1"
+#        memory: 100Mi
 
   initContainers:
   - name: date
@@ -125,5 +165,21 @@ spec:
     certificateFile: "tls.crt"
     privateKeyFile: "tls.key"
     caFile: ""  # optionally configure Postgres with a CA certificate
+    caSecretName: "" # optionally the ca.crt can come from this secret instead.
+# file names can be also defined with absolute path, and will no longer be relative
+# to the "/tls/" path where the secret is being mounted by default, and "/tlsca/"
+# where the caSecret is mounted by default.
 # When TLS is enabled, also set spiloFSGroup parameter above to the relevant value.
 # if unknown, set it to 103 which is the usual value in the default spilo images.
+# In Openshift, there is no need to set spiloFSGroup/spilo_fsgroup.
+
+# Add node affinity support by allowing postgres pods to schedule only on nodes that
+# have label: "postgres-operator:enabled" set.
+#  nodeAffinity:
+#    requiredDuringSchedulingIgnoredDuringExecution:
+#      nodeSelectorTerms:
+#        - matchExpressions:
+#            - key: postgres-operator
+#              operator: In
+#              values:
+#                - enabled

@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Compose, Zalando SE
+Copyright 2021 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,7 @@ import (
 type AcidV1Interface interface {
 	RESTClient() rest.Interface
 	OperatorConfigurationsGetter
+	PostgresTeamsGetter
 	PostgresqlsGetter
 }
 
@@ -43,6 +44,10 @@ type AcidV1Client struct {
 
 func (c *AcidV1Client) OperatorConfigurations(namespace string) OperatorConfigurationInterface {
 	return newOperatorConfigurations(c, namespace)
+}
+
+func (c *AcidV1Client) PostgresTeams(namespace string) PostgresTeamInterface {
+	return newPostgresTeams(c, namespace)
 }
 
 func (c *AcidV1Client) Postgresqls(namespace string) PostgresqlInterface {

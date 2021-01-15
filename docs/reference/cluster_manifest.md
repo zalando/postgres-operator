@@ -65,6 +65,20 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   custom Docker image that overrides the **docker_image** operator parameter.
   It should be a [Spilo](https://github.com/zalando/spilo) image. Optional.
 
+* **schedulerName**
+  specifies the scheduling profile for database pods. If no value is provided
+  K8s' `default-scheduler` will be used. Optional.
+
+* **spiloRunAsUser**
+  sets the user ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
+* **spiloRunAsGroup**
+  sets the group ID which should be used in the container to run the process.
+  This must be set to run the container without root. By default the container
+  runs with root. This option only works for Spilo versions >= 1.6-p3.
+
 * **spiloFSGroup**
   the Persistent Volumes for the Spilo pods in the StatefulSet will be owned and
   writable by the group ID specified. This will override the **spilo_fsgroup**
@@ -141,9 +155,14 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   configured (so you can override the operator configuration). Optional.
 
 * **enableConnectionPooler**
-  Tells the operator to create a connection pooler with a database. If this
-  field is true, a connection pooler deployment will be created even if
+  Tells the operator to create a connection pooler with a database for the master
+  service. If this field is true, a connection pooler deployment will be created even if
   `connectionPooler` section is empty. Optional, not set by default.
+
+* **enableReplicaConnectionPooler**
+  Tells the operator to create a connection pooler with a database for the replica
+  service. If this field is true, a connection pooler deployment for replica
+  will be created even if `connectionPooler` section is empty. Optional, not set by default.
 
 * **enableLogicalBackup**
   Determines if the logical backup of this cluster should be taken and uploaded
@@ -153,6 +172,18 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   Schedule for the logical backup K8s cron job. Please take
   [the reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
   into account. Optional. Default is: "30 00 \* \* \*"
+
+* **additionalVolumes**
+  List of additional volumes to mount in each container of the statefulset pod.
+  Each item must contain a `name`, `mountPath`, and `volumeSource` which is a
+  [kubernetes volumeSource](https://godoc.org/k8s.io/api/core/v1#VolumeSource).
+  It allows you to mount existing PersistentVolumeClaims, ConfigMaps and Secrets inside the StatefulSet.
+  Also an `emptyDir` volume can be shared between initContainer and statefulSet.
+  Additionaly, you can provide a `SubPath` for volume mount (a file in a configMap source volume, for example).
+  You can also specify in which container the additional Volumes will be mounted with the `targetContainers` array option.
+  If `targetContainers` is empty, additional volumes will be mounted only in the `postgres` container.
+  If you set the `all` special item, it will be mounted in all containers (postgres + sidecars).
+  Else you can set the list of target containers in which the additional volumes will be mounted (eg : postgres, telegraf)
 
 ## Postgres parameters
 
@@ -219,10 +250,10 @@ explanation of `ttl` and `loop_wait` parameters.
 
 * **synchronous_mode**
   Patroni `synchronous_mode` parameter value. The default is set to `false`. Optional.
-  
+
 * **synchronous_mode_strict**
   Patroni `synchronous_mode_strict` parameter value. Can be used in addition to `synchronous_mode`. The default is set to `false`. Optional.
-  
+
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
@@ -392,8 +423,10 @@ CPU and memory limits for the sidecar container.
 
 Parameters are grouped under the `connectionPooler` top-level key and specify
 configuration for connection pooler. If this section is not empty, a connection
-pooler will be created for a database even if `enableConnectionPooler` is not
-present.
+pooler will be created for master service only even if `enableConnectionPooler`
+is not present. But if this section is present then it defines the configuration
+for both master and replica pooler services (if `enableReplicaConnectionPooler`
+ is enabled).
 
 * **numberOfInstances**
   How many instances of connection pooler to create.
@@ -436,5 +469,16 @@ Those parameters are grouped under the `tls` top-level key.
   Filename of the private key. Defaults to "tls.key".
 
 * **caFile**
-  Optional filename to the CA certificate. Useful when the client connects
-  with `sslmode=verify-ca` or `sslmode=verify-full`. Default is empty.
+  Optional filename to the CA certificate (e.g. "ca.crt"). Useful when the
+  client connects with `sslmode=verify-ca` or `sslmode=verify-full`.
+  Default is empty.
+
+* **caSecretName**
+  By setting the `caSecretName` value, the ca certificate file defined by the
+  `caFile` will be fetched from this secret instead of `secretName` above.
+  This secret has to hold a file with that name in its root.
+
+  Optionally one can provide full path for any of them. By default it is
+  relative to the "/tls/", which is mount path of the tls secret.
+  If `caSecretName` is defined, the ca.crt path is relative to "/tlsca/",
+  otherwise to the same "/tls/".

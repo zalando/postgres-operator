@@ -63,10 +63,8 @@ postgresqls
             td(style='white-space: pre')
               | { namespace }
             td
-              a(
-                href='/#/status/{ cluster_path(this) }'
-              )
-                | { name }
+              a(href='/#/status/{ cluster_path(this) }') { name }
+              btn.btn-danger(if='{status.PostgresClusterStatus == "CreateFailed"}') Create Failed
             td { nodes }
             td { cpu } / { cpu_limit }
             td { memory } / { memory_limit }
@@ -230,7 +228,7 @@ postgresqls
     )
 
     const calcCosts = this.calcCosts = (nodes, cpu, memory, disk) => {
-        costs = nodes * (toCores(cpu) * opts.config.cost_core + toMemory(memory) * opts.config.cost_memory + toDisk(disk) * opts.config.cost_ebs)
+        costs = Math.max(nodes, opts.config.min_pods) * (toCores(cpu) * opts.config.cost_core + toMemory(memory) * opts.config.cost_memory + toDisk(disk) * opts.config.cost_ebs)
         return costs.toFixed(2)
     }
 

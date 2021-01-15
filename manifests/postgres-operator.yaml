@@ -2,8 +2,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres-operator
+  labels:
+    application: postgres-operator
 spec:
   replicas: 1
+  strategy:
+    type: "Recreate"
   selector:
     matchLabels:
       name: postgres-operator
@@ -15,7 +19,7 @@ spec:
       serviceAccountName: postgres-operator
       containers:
       - name: postgres-operator
-        image: registry.opensource.zalan.do/acid/postgres-operator:v1.4.0
+        image: registry.opensource.zalan.do/acid/postgres-operator:v1.6.0
         imagePullPolicy: IfNotPresent
         resources:
           requests:

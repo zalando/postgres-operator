@@ -25,6 +25,15 @@ rules:
   - patch
   - update
   - watch
+# operator only reads PostgresTeams
+- apiGroups:
+  - acid.zalan.do
+  resources:
+  - postgresteams
+  verbs:
+  - get
+  - list
+  - watch
 # to create or get/update CRDs when starting up
 - apiGroups:
   - apiextensions.k8s.io
@@ -35,6 +44,40 @@ rules:
   - get
   - patch
   - update
+# to send events to the CRs
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+# to manage endpoints/configmaps which are also used by Patroni
+{{- if toString .Values.configGeneral.kubernetes_use_configmaps | eq "true" }}
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+{{- else }}
 # to read configuration from ConfigMaps
 - apiGroups:
   - ""
@@ -42,7 +85,6 @@ rules:
   - configmaps
   verbs:
   - get
-# to manage endpoints which are also used by Patroni
 - apiGroups:
   - ""
   resources:
@@ -56,6 +98,7 @@ rules:
   - patch
   - update
   - watch
+{{- end }}
 # to CRUD secrets for database access
 - apiGroups:
   - ""
@@ -84,6 +127,10 @@ rules:
   - delete
   - get
   - list
+{{- if toString .Values.configKubernetes.storage_resize_mode | eq "pvc" }}
+  - patch
+  - update
+{{- end }}
  # to read existing PVs. Creation should be done via dynamic provisioning
 - apiGroups:
   - ""
@@ -92,7 +139,9 @@ rules:
   verbs:
   - get
   - list
+{{- if toString .Values.configKubernetes.storage_resize_mode | eq "ebs" }}
   - update  # only for resizing AWS volumes
+{{- end }}
 # to watch Spilo pods and do rolling updates. Creation via StatefulSet
 - apiGroups:
   - ""

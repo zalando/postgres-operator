@@ -240,6 +240,18 @@ new
                   | Enable replica ELB
 
             tr
+              td Enable Connection Pool
+              td
+                label
+                  input(
+                    type='checkbox'
+                    value='{ enableConnectionPooler }'
+                    onchange='{ toggleEnableConnectionPooler }'
+                  )
+                  |
+                  | Enable Connection Pool (using PGBouncer)
+
+            tr
               td Volume size
               td
                 .input-group
@@ -493,6 +505,9 @@ new
         {{#if enableReplicaLoadBalancer}}
         enableReplicaLoadBalancer: true
         {{/if}}
+        {{#if enableConnectionPooler}}
+        enableConnectionPooler: true
+        {{/if}}
         volume:
           size: "{{ volumeSize }}Gi"
         {{#if users}}
@@ -516,13 +531,14 @@ new
           - {{ odd }}/32
         {{/if}}
 
+        {{#if resourcesVisible}}
         resources:
           requests:
             cpu: {{ cpu.state.request.state }}m
             memory: {{ memory.state.request.state }}Mi
           limits:
             cpu: {{ cpu.state.limit.state }}m
-            memory: {{ memory.state.limit.state }}Mi{{#if restoring}}
+            memory: {{ memory.state.limit.state }}Mi{{/if}}{{#if restoring}}
 
         clone:
           cluster: "{{ backup.state.name.state }}"
@@ -542,6 +558,7 @@ new
         instanceCount: this.instanceCount,
         enableMasterLoadBalancer: this.enableMasterLoadBalancer,
         enableReplicaLoadBalancer: this.enableReplicaLoadBalancer,
+        enableConnectionPooler: this.enableConnectionPooler,
         volumeSize: this.volumeSize,
         users: this.users.valids,
         databases: this.databases.valids,
@@ -552,6 +569,7 @@ new
         memory: this.memory,
         backup: this.backup,
         namespace: this.namespace,
+        resourcesVisible: this.config.resources_visible,
         restoring: this.backup.state.type.state !== 'empty',
         pitr: this.backup.state.type.state === 'pitr',
       }
@@ -596,6 +614,10 @@ new
 
     this.toggleEnableReplicaLoadBalancer = e => {
       this.enableReplicaLoadBalancer = !this.enableReplicaLoadBalancer
+    }
+
+    this.toggleEnableConnectionPooler = e => {
+      this.enableConnectionPooler = !this.enableConnectionPooler
     }
 
     this.volumeChange = e => {
@@ -892,6 +914,7 @@ new
       this.odd = ''
       this.enableMasterLoadBalancer = false
       this.enableReplicaLoadBalancer = false
+      this.enableConnectionPooler = false
 
       this.postgresqlVersion = this.postgresqlVersion = (
         this.config.postgresql_versions[0]

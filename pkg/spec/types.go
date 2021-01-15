@@ -31,6 +31,7 @@ const (
 	RoleOriginInfrastructure
 	RoleOriginTeamsAPI
 	RoleOriginSystem
+	RoleOriginBootstrap
 	RoleConnectionPooler
 )
 
@@ -52,6 +53,10 @@ type PgUser struct {
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
 	AdminRole  string            `yaml:"admin_role"`
+}
+
+func (user *PgUser) Valid() bool {
+	return user.Name != "" && user.Password != ""
 }
 
 // PgUserMap maps user names to the definitions.
@@ -109,6 +114,8 @@ type ControllerConfig struct {
 	CRDReadyWaitTimeout  time.Duration
 	ConfigMapName        NamespacedName
 	Namespace            string
+
+	EnableJsonLogging bool
 }
 
 // cached value for the GetOperatorNamespace
@@ -180,6 +187,8 @@ func (r RoleOrigin) String() string {
 		return "teams API role"
 	case RoleOriginSystem:
 		return "system role"
+	case RoleOriginBootstrap:
+		return "bootstrapped role"
 	case RoleConnectionPooler:
 		return "connection pooler role"
 	default:

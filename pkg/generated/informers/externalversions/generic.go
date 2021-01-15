@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Compose, Zalando SE
+Copyright 2021 Compose, Zalando SE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -59,6 +59,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=acid.zalan.do, Version=v1
+	case v1.SchemeGroupVersion.WithResource("postgresteams"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Acid().V1().PostgresTeams().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("postgresqls"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Acid().V1().Postgresqls().Informer()}, nil
 

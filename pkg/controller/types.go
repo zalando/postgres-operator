@@ -1,8 +1,9 @@
 package controller
 
 import (
-	"k8s.io/apimachinery/pkg/types"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 )

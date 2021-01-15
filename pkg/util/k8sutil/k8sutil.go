@@ -6,16 +6,22 @@ import (
 	"reflect"
 
 	b64 "encoding/base64"
+	"encoding/json"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	clientbatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 
+	apiacidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
+	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	"github.com/zalando/postgres-operator/pkg/spec"
 	apiappsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
 	apiextclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextbeta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -24,9 +30,6 @@ import (
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	acidv1client "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Int32ToPointer(value int32) *int32 {
@@ -45,12 +48,16 @@ type KubernetesClient struct {
 	corev1.NodesGetter
 	corev1.NamespacesGetter
 	corev1.ServiceAccountsGetter
+	corev1.EventsGetter
 	appsv1.StatefulSetsGetter
 	appsv1.DeploymentsGetter
 	rbacv1.RoleBindingsGetter
 	policyv1beta1.PodDisruptionBudgetsGetter
-	apiextbeta1.CustomResourceDefinitionsGetter
+	apiextv1.CustomResourceDefinitionsGetter
 	clientbatchv1beta1.CronJobsGetter
+	acidv1.OperatorConfigurationsGetter
+	acidv1.PostgresTeamsGetter
+	acidv1.PostgresqlsGetter
 
 	RESTClient      rest.Interface
 	AcidV1ClientSet *acidv1client.Clientset
@@ -142,23 +149,59 @@ func NewFromConfig(cfg *rest.Config) (KubernetesClient, error) {
 	kubeClient.RESTClient = client.CoreV1().RESTClient()
 	kubeClient.RoleBindingsGetter = client.RbacV1()
 	kubeClient.CronJobsGetter = client.BatchV1beta1()
+	kubeClient.EventsGetter = client.CoreV1()
 
 	apiextClient, err := apiextclient.NewForConfig(cfg)
 	if err != nil {
 		return kubeClient, fmt.Errorf("could not create api client:%v", err)
 	}
 
-	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1beta1()
+	kubeClient.CustomResourceDefinitionsGetter = apiextClient.ApiextensionsV1()
+
 	kubeClient.AcidV1ClientSet = acidv1client.NewForConfigOrDie(cfg)
+	if err != nil {
+		return kubeClient, fmt.Errorf("could not create acid.zalan.do clientset: %v", err)
+	}
+
+	kubeClient.OperatorConfigurationsGetter = kubeClient.AcidV1ClientSet.AcidV1()
+	kubeClient.PostgresTeamsGetter = kubeClient.AcidV1ClientSet.AcidV1()
+	kubeClient.PostgresqlsGetter = kubeClient.AcidV1ClientSet.AcidV1()
 
 	return kubeClient, nil
+}
+
+// SetPostgresCRDStatus of Postgres cluster
+func (client *KubernetesClient) SetPostgresCRDStatus(clusterName spec.NamespacedName, status string) (*apiacidv1.Postgresql, error) {
+	var pg *apiacidv1.Postgresql
+	var pgStatus apiacidv1.PostgresStatus
+	pgStatus.PostgresClusterStatus = status
+
+	patch, err := json.Marshal(struct {
+		PgStatus interface{} `json:"status"`
+	}{&pgStatus})
+
+	if err != nil {
+		return pg, fmt.Errorf("could not marshal status: %v", err)
+	}
+
+	// we cannot do a full scale update here without fetching the previous manifest (as the resourceVersion may differ),
+	// however, we could do patch without it. In the future, once /status subresource is there (starting Kubernetes 1.11)
+	// we should take advantage of it.
+	pg, err = client.PostgresqlsGetter.Postgresqls(clusterName.Namespace).Patch(
+		context.TODO(), clusterName.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+	if err != nil {
+		return pg, fmt.Errorf("could not update status: %v", err)
+	}
+
+	// update the spec, maintaining the new resourceVersion.
+	return pg, nil
 }
 
 // SameService compares the Services
 func SameService(cur, new *v1.Service) (match bool, reason string) {
 	//TODO: improve comparison
 	if cur.Spec.Type != new.Spec.Type {
-		return false, fmt.Sprintf("new service's type %q doesn't match the current one %q",
+		return false, fmt.Sprintf("new service's type %q does not match the current one %q",
 			new.Spec.Type, cur.Spec.Type)
 	}
 
@@ -168,13 +211,13 @@ func SameService(cur, new *v1.Service) (match bool, reason string) {
 	/* work around Kubernetes 1.6 serializing [] as nil. See https://github.com/kubernetes/kubernetes/issues/43203 */
 	if (len(oldSourceRanges) != 0) || (len(newSourceRanges) != 0) {
 		if !reflect.DeepEqual(oldSourceRanges, newSourceRanges) {
-			return false, "new service's LoadBalancerSourceRange doesn't match the current one"
+			return false, "new service's LoadBalancerSourceRange does not match the current one"
 		}
 	}
 
 	match = true
 
-	reasonPrefix := "new service's annotations doesn't match the current one:"
+	reasonPrefix := "new service's annotations does not match the current one:"
 	for ann := range cur.Annotations {
 		if _, ok := new.Annotations[ann]; !ok {
 			match = false
@@ -210,7 +253,7 @@ func SamePDB(cur, new *policybeta1.PodDisruptionBudget) (match bool, reason stri
 	//TODO: improve comparison
 	match = reflect.DeepEqual(new.Spec, cur.Spec)
 	if !match {
-		reason = "new PDB spec doesn't match the current one"
+		reason = "new PDB spec does not match the current one"
 	}
 
 	return
@@ -224,14 +267,14 @@ func getJobImage(cronJob *batchv1beta1.CronJob) string {
 func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason string) {
 
 	if cur.Spec.Schedule != new.Spec.Schedule {
-		return false, fmt.Sprintf("new job's schedule %q doesn't match the current one %q",
+		return false, fmt.Sprintf("new job's schedule %q does not match the current one %q",
 			new.Spec.Schedule, cur.Spec.Schedule)
 	}
 
 	newImage := getJobImage(new)
 	curImage := getJobImage(cur)
 	if newImage != curImage {
-		return false, fmt.Sprintf("new job's image %q doesn't match the current one %q",
+		return false, fmt.Sprintf("new job's image %q does not match the current one %q",
 			newImage, curImage)
 	}
 
@@ -239,31 +282,73 @@ func SameLogicalBackupJob(cur, new *batchv1beta1.CronJob) (match bool, reason st
 }
 
 func (c *mockSecret) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Secret, error) {
-	if name != "infrastructureroles-test" {
-		return nil, fmt.Errorf("NotFound")
-	}
-	secret := &v1.Secret{}
-	secret.Name = "testcluster"
-	secret.Data = map[string][]byte{
+	oldFormatSecret := &v1.Secret{}
+	oldFormatSecret.Name = "testcluster"
+	oldFormatSecret.Data = map[string][]byte{
 		"user1":     []byte("testrole"),
 		"password1": []byte("testpassword"),
 		"inrole1":   []byte("testinrole"),
 		"foobar":    []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
 	}
-	return secret, nil
+
+	newFormatSecret := &v1.Secret{}
+	newFormatSecret.Name = "test-secret-new-format"
+	newFormatSecret.Data = map[string][]byte{
+		"user":       []byte("new-test-role"),
+		"password":   []byte("new-test-password"),
+		"inrole":     []byte("new-test-inrole"),
+		"new-foobar": []byte(b64.StdEncoding.EncodeToString([]byte("password"))),
+	}
+
+	secrets := map[string]*v1.Secret{
+		"infrastructureroles-old-test": oldFormatSecret,
+		"infrastructureroles-new-test": newFormatSecret,
+	}
+
+	for idx := 1; idx <= 2; idx++ {
+		newFormatStandaloneSecret := &v1.Secret{}
+		newFormatStandaloneSecret.Name = fmt.Sprintf("test-secret-new-format%d", idx)
+		newFormatStandaloneSecret.Data = map[string][]byte{
+			"user":     []byte(fmt.Sprintf("new-test-role%d", idx)),
+			"password": []byte(fmt.Sprintf("new-test-password%d", idx)),
+			"inrole":   []byte(fmt.Sprintf("new-test-inrole%d", idx)),
+		}
+
+		secrets[fmt.Sprintf("infrastructureroles-new-test%d", idx)] =
+			newFormatStandaloneSecret
+	}
+
+	if secret, exists := secrets[name]; exists {
+		return secret, nil
+	}
+
+	return nil, fmt.Errorf("NotFound")
 
 }
 
 func (c *mockConfigMap) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.ConfigMap, error) {
-	if name != "infrastructureroles-test" {
-		return nil, fmt.Errorf("NotFound")
-	}
-	configmap := &v1.ConfigMap{}
-	configmap.Name = "testcluster"
-	configmap.Data = map[string]string{
+	oldFormatConfigmap := &v1.ConfigMap{}
+	oldFormatConfigmap.Name = "testcluster"
+	oldFormatConfigmap.Data = map[string]string{
 		"foobar": "{}",
 	}
-	return configmap, nil
+
+	newFormatConfigmap := &v1.ConfigMap{}
+	newFormatConfigmap.Name = "testcluster"
+	newFormatConfigmap.Data = map[string]string{
+		"new-foobar": "{\"user_flags\": [\"createdb\"]}",
+	}
+
+	configmaps := map[string]*v1.ConfigMap{
+		"infrastructureroles-old-test": oldFormatConfigmap,
+		"infrastructureroles-new-test": newFormatConfigmap,
+	}
+
+	if configmap, exists := configmaps[name]; exists {
+		return configmap, nil
+	}
+
+	return nil, fmt.Errorf("NotFound")
 }
 
 // Secrets to be mocked
