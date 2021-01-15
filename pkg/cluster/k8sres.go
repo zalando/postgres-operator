@@ -1017,6 +1017,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 	if spec.StandbyCluster != nil && spec.StandbyCluster.StandbyMethod == "" {
 		return nil, fmt.Errorf("standby_method is empty for standby cluster")
+	}
 
 	// fetch env vars from custom ConfigMap
 	secretEnvVarsList, err := c.getPodEnvironmentSecretVariables()
