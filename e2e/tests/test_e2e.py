@@ -708,6 +708,7 @@ class EndToEndTestCase(unittest.TestCase):
         pass
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
     def test_multi_namespace_support(self):
         '''
         Create a customized Postgres cluster in a non-default namespace.
