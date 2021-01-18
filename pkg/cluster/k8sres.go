@@ -1561,11 +1561,17 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	}
 
 	username := pgUser.Name
+	lbls := c.labelsSet(true)
+
+	if username == constants.ConnectionPoolerUserName {
+		lbls = c.connectionPoolerLabels("", false).MatchLabels
+	}
+
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.credentialSecretName(username),
 			Namespace:   namespace,
-			Labels:      c.labelsSet(true),
+			Labels:      lbls,
 			Annotations: c.annotationsSet(nil),
 		},
 		Type: v1.SecretTypeOpaque,
@@ -1574,6 +1580,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 			"password": []byte(pgUser.Password),
 		},
 	}
+
 	return &secret
 }
 
