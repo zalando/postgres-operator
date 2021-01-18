@@ -303,6 +303,9 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 			},
 		}, client, pg, logger, eventRecorder)
 
+	cluster.Name = "acid-fake-cluster"
+	cluster.Namespace = "default"
+
 	_, err := cluster.createService(Master)
 	assert.NoError(t, err)
 	_, err = cluster.createStatefulSet()
@@ -406,6 +409,9 @@ func TestConnectionPoolerSync(t *testing.T) {
 				},
 			},
 		}, client, pg, logger, eventRecorder)
+
+	cluster.Name = "acid-fake-cluster"
+	cluster.Namespace = "default"
 
 	_, err := cluster.createService(Master)
 	assert.NoError(t, err)
