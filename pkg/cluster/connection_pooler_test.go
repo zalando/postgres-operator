@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 
@@ -47,12 +48,16 @@ func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 	}
 
 	for _, role := range []PostgresRole{Master, Replica} {
-		if cluster.ConnectionPooler[role].Deployment == nil {
-			return fmt.Errorf("Deployment was not saved %s", role)
+		poolerLabels := cluster.labelsSet(false)
+		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
+
+		if cluster.ConnectionPooler[role].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[role].Deployment.Labels, poolerLabels) {
+			return fmt.Errorf("Deployment was not saved or labels not attached %s %s", role, cluster.ConnectionPooler[role].Deployment.Labels)
 		}
 
-		if cluster.ConnectionPooler[role].Service == nil {
-			return fmt.Errorf("Service was not saved %s", role)
+		if cluster.ConnectionPooler[role].Service == nil || !util.MapContains(cluster.ConnectionPooler[role].Service.Labels, poolerLabels) {
+			return fmt.Errorf("Service was not saved or labels not attached %s %s", role, cluster.ConnectionPooler[role].Service.Labels)
 		}
 	}
 
@@ -64,12 +69,16 @@ func MasterobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	if cluster.ConnectionPooler[Master].Deployment == nil {
-		return fmt.Errorf("Deployment was not saved")
+	poolerLabels := cluster.labelsSet(false)
+	poolerLabels["application"] = "db-connection-pooler"
+	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(Master)
+
+	if cluster.ConnectionPooler[Master].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[Master].Deployment.Labels, poolerLabels) {
+		return fmt.Errorf("Deployment was not saved or labels not attached %s", cluster.ConnectionPooler[Master].Deployment.Labels)
 	}
 
-	if cluster.ConnectionPooler[Master].Service == nil {
-		return fmt.Errorf("Service was not saved")
+	if cluster.ConnectionPooler[Master].Service == nil || !util.MapContains(cluster.ConnectionPooler[Master].Service.Labels, poolerLabels) {
+		return fmt.Errorf("Service was not saved or labels not attached %s", cluster.ConnectionPooler[Master].Service.Labels)
 	}
 
 	return nil
@@ -80,12 +89,16 @@ func ReplicaobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) erro
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
 
-	if cluster.ConnectionPooler[Replica].Deployment == nil {
-		return fmt.Errorf("Deployment was not saved")
+	poolerLabels := cluster.labelsSet(false)
+	poolerLabels["application"] = "db-connection-pooler"
+	poolerLabels["connection-pooler"] = cluster.connectionPoolerName(Replica)
+
+	if cluster.ConnectionPooler[Replica].Deployment == nil || !util.MapContains(cluster.ConnectionPooler[Replica].Deployment.Labels, poolerLabels) {
+		return fmt.Errorf("Deployment was not saved or labels not attached %s", cluster.ConnectionPooler[Replica].Deployment.Labels)
 	}
 
-	if cluster.ConnectionPooler[Replica].Service == nil {
-		return fmt.Errorf("Service was not saved")
+	if cluster.ConnectionPooler[Replica].Service == nil || !util.MapContains(cluster.ConnectionPooler[Replica].Service.Labels, poolerLabels) {
+		return fmt.Errorf("Service was not saved or labels not attached %s", cluster.ConnectionPooler[Replica].Service.Labels)
 	}
 
 	return nil
@@ -302,12 +315,16 @@ func TestConnectionPoolerCreateDeletion(t *testing.T) {
 			testName, err, reason)
 	}
 	for _, role := range [2]PostgresRole{Master, Replica} {
+		poolerLabels := cluster.labelsSet(false)
+		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
+
 		if cluster.ConnectionPooler[role] != nil {
-			if cluster.ConnectionPooler[role].Deployment == nil {
+			if cluster.ConnectionPooler[role].Deployment == nil && util.MapContains(cluster.ConnectionPooler[role].Deployment.Labels, poolerLabels) {
 				t.Errorf("%s: Connection pooler deployment is empty for role %s", testName, role)
 			}
 
-			if cluster.ConnectionPooler[role].Service == nil {
+			if cluster.ConnectionPooler[role].Service == nil && util.MapContains(cluster.ConnectionPooler[role].Service.Labels, poolerLabels) {
 				t.Errorf("%s: Connection pooler service is empty for role %s", testName, role)
 			}
 		}
