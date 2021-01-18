@@ -635,6 +635,8 @@ func TestConnectionPoolerSync(t *testing.T) {
 		tt.cluster.OpConfig.ConnectionPooler.NumberOfInstances =
 			int32ToPointer(tt.defaultInstances)
 
+		t.Logf("running test for %s [%s]", testName, tt.subTest)
+
 		reason, err := tt.cluster.syncConnectionPooler(tt.oldSpec,
 			tt.newSpec, mockInstallLookupFunction)
 
