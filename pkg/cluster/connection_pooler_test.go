@@ -33,7 +33,13 @@ func int32ToPointer(value int32) *int32 {
 
 func deploymentUpdated(cluster *Cluster, err error, reason SyncReason) error {
 	for _, role := range [2]PostgresRole{Master, Replica} {
+
+		poolerLabels := cluster.labelsSet(false)
+		poolerLabels["application"] = "db-connection-pooler"
+		poolerLabels["connection-pooler"] = cluster.connectionPoolerName(role)
+
 		if cluster.ConnectionPooler[role] != nil && cluster.ConnectionPooler[role].Deployment != nil &&
+			util.MapContains(cluster.ConnectionPooler[role].Deployment.Labels, poolerLabels) &&
 			(cluster.ConnectionPooler[role].Deployment.Spec.Replicas == nil ||
 				*cluster.ConnectionPooler[role].Deployment.Spec.Replicas != 2) {
 			return fmt.Errorf("Wrong number of instances")
@@ -64,7 +70,7 @@ func objectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 	return nil
 }
 
-func MasterobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
+func MasterObjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 	if cluster.ConnectionPooler == nil {
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
@@ -84,7 +90,7 @@ func MasterobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error
 	return nil
 }
 
-func ReplicaobjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
+func ReplicaObjectsAreSaved(cluster *Cluster, err error, reason SyncReason) error {
 	if cluster.ConnectionPooler == nil {
 		return fmt.Errorf("Connection pooler resources are empty")
 	}
@@ -447,7 +453,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            MasterobjectsAreSaved,
+			check:            MasterObjectsAreSaved,
 		},
 		{
 			subTest: "create if doesn't exist",
@@ -464,7 +470,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            MasterobjectsAreSaved,
+			check:            MasterObjectsAreSaved,
 		},
 		{
 			subTest: "create if doesn't exist with a flag",
@@ -479,7 +485,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            MasterobjectsAreSaved,
+			check:            MasterObjectsAreSaved,
 		},
 		{
 			subTest: "create no replica with flag",
@@ -510,7 +516,7 @@ func TestConnectionPoolerSync(t *testing.T) {
 			cluster:          cluster,
 			defaultImage:     "pooler:1.0",
 			defaultInstances: 1,
-			check:            ReplicaobjectsAreSaved,
+			check:            ReplicaObjectsAreSaved,
 		},
 		{
 			subTest: "create both master and replica",
