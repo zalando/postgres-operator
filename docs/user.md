@@ -71,26 +71,26 @@ kubectl describe postgresql acid-minimal-cluster
 ## Connect to PostgreSQL
 
 With a `port-forward` on one of the database pods (e.g. the master) you can
-connect to the PostgreSQL database. Use labels to filter for the master pod of
-our test cluster.
+connect to the PostgreSQL database from your machine. Use labels to filter for
+the master pod of our test cluster.
 
 ```bash
 # get name of master pod of acid-minimal-cluster
-export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,cluster-name=acid-minimal-cluster,spilo-role=master)
+export PGMASTER=$(kubectl get pods -o jsonpath={.items..metadata.name} -l application=spilo,cluster-name=acid-minimal-cluster,spilo-role=master -n default)
 
 # set up port forward
-kubectl port-forward $PGMASTER 6432:5432
+kubectl port-forward $PGMASTER 6432:5432 -n default
 ```
 
-Open another CLI and connect to the database. Use the generated secret of the
-`postgres` robot user to connect to our `acid-minimal-cluster` master running
-in Minikube. As non-encrypted connections are rejected by default set the SSL
-mode to require:
+Open another CLI and connect to the database using e.g. the psql client.
+When connecting with the `postgres` user read its password from the K8s secret
+which was generated when creating the `acid-minimal-cluster`. As non-encrypted
+connections are rejected by default set the SSL mode to `require`:
 
 ```bash
 export PGPASSWORD=$(kubectl get secret postgres.acid-minimal-cluster.credentials -o 'jsonpath={.data.password}' | base64 -d)
 export PGSSLMODE=require
-psql -U postgres -p 6432
+psql -U postgres -h localhost -p 6432
 ```
 
 ## Defining database roles in the operator
