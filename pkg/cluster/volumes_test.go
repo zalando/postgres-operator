@@ -189,60 +189,16 @@ func TestMigrateEBS(t *testing.T) {
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
 
-	pvcList := CreatePVCs(namespace, clusterName, filterLabels, 2, "1Gi")
-
-	ps := v1.PersistentVolumeSpec{}
-	ps.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
-	ps.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-1"
-
-	ps2 := v1.PersistentVolumeSpec{}
-	ps2.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
-	ps2.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-2"
-
-	pvList := &v1.PersistentVolumeList{
-		Items: []v1.PersistentVolume{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "persistent-volume-0",
-				},
-				Spec: ps,
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "persistent-volume-1",
-				},
-				Spec: ps2,
-			},
+	testVolumes := []testVolume{
+		{
+			size: 100,
+		},
+		{
+			size: 100,
 		},
 	}
 
-	for _, pvc := range pvcList.Items {
-		cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
-	}
-
-	for _, pv := range pvList.Items {
-		cluster.KubeClient.PersistentVolumes().Create(context.TODO(), &pv, metav1.CreateOptions{})
-	}
-
-	pod := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   clusterName + "-0",
-			Labels: filterLabels,
-		},
-		Spec: v1.PodSpec{},
-	}
-
-	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
-
-	pod = v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   clusterName + "-1",
-			Labels: filterLabels,
-		},
-		Spec: v1.PodSpec{},
-	}
-
-	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
