@@ -264,6 +264,63 @@ func TestMigrateEBS(t *testing.T) {
 	cluster.executeEBSMigration()
 }
 
+type testVolume struct {
+	iops        int64
+	throughtput int64
+	size        int64
+	volType     string
+}
+
+func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustername string, labels labels.Set, volumes []testVolume) {
+	i := 0
+	for _, v := range volumes {
+		storage1Gi, _ := resource.ParseQuantity(fmt.Sprintf("%d", v.size))
+
+		ps := v1.PersistentVolumeSpec{}
+		ps.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
+		ps.AWSElasticBlockStore.VolumeID = fmt.Sprintf("aws://eu-central-1b/ebs-volume-%d", i+1)
+
+		pv := v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("persistent-volume-%d", i),
+			},
+			Spec: ps,
+		}
+
+		client.PersistentVolumes().Create(context.TODO(), &pv, metav1.CreateOptions{})
+
+		pvc := v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%s-%d", constants.DataVolumeName, clustername, i),
+				Namespace: namespace,
+				Labels:    labels,
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceStorage: storage1Gi,
+					},
+				},
+				VolumeName: fmt.Sprintf("persistent-volume-%d", i),
+			},
+		}
+
+		client.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
+
+		pod := v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   fmt.Sprintf("%s-%d", clustername, i),
+				Labels: labels,
+			},
+			Spec: v1.PodSpec{},
+		}
+
+		client.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+
+		i = i + 1
+	}
+}
+
 func TestMigrateGp3Support(t *testing.T) {
 	client, _ := newFakeK8sPVCclient()
 	clusterName := "acid-test-cluster"
@@ -282,6 +339,7 @@ func TestMigrateGp3Support(t *testing.T) {
 				EnableEBSGp3MigrationMaxSize: 1000,
 			},
 		}, client, acidv1.Postgresql{}, logger, eventRecorder)
+
 	cluster.Spec.Volume.Size = "150Gi"
 	cluster.Spec.Volume.Iops = aws.Int64(6000)
 	cluster.Spec.Volume.Throughput = aws.Int64(275)
@@ -291,80 +349,19 @@ func TestMigrateGp3Support(t *testing.T) {
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
 
-	pvcList := CreatePVCs(namespace, clusterName, filterLabels, 3, "100Gi")
-
-	ps := v1.PersistentVolumeSpec{}
-	ps.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
-	ps.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-1"
-
-	ps2 := v1.PersistentVolumeSpec{}
-	ps2.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
-	ps2.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-2"
-
-	ps3 := v1.PersistentVolumeSpec{}
-	ps3.AWSElasticBlockStore = &v1.AWSElasticBlockStoreVolumeSource{}
-	ps3.AWSElasticBlockStore.VolumeID = "aws://eu-central-1b/ebs-volume-3"
-
-	pvList := &v1.PersistentVolumeList{
-		Items: []v1.PersistentVolume{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "persistent-volume-0",
-				},
-				Spec: ps,
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "persistent-volume-1",
-				},
-				Spec: ps2,
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "persistent-volume-2",
-				},
-				Spec: ps3,
-			},
+	testVolumes := []testVolume{
+		{
+			size: 100,
+		},
+		{
+			size: 100,
+		},
+		{
+			size: 100,
 		},
 	}
 
-	for _, pvc := range pvcList.Items {
-		cluster.KubeClient.PersistentVolumeClaims(namespace).Create(context.TODO(), &pvc, metav1.CreateOptions{})
-	}
-
-	for _, pv := range pvList.Items {
-		cluster.KubeClient.PersistentVolumes().Create(context.TODO(), &pv, metav1.CreateOptions{})
-	}
-
-	pod := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   clusterName + "-0",
-			Labels: filterLabels,
-		},
-		Spec: v1.PodSpec{},
-	}
-
-	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
-
-	pod = v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   clusterName + "-1",
-			Labels: filterLabels,
-		},
-		Spec: v1.PodSpec{},
-	}
-
-	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
-
-	pod = v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   clusterName + "-2",
-			Labels: filterLabels,
-		},
-		Spec: v1.PodSpec{},
-	}
-
-	cluster.KubeClient.Pods(namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

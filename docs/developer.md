@@ -235,6 +235,24 @@ Then you can for example check the Patroni logs:
 kubectl logs acid-minimal-cluster-0
 ```
 
+## Unit tests with Mocks and K8s Fake API
+
+When ever possible you should rely on leveraging proper mocks and K8s fake client that allows full fledged testing of K8s objects in your unit tests.
+
+To enable mocks, a code annotation is needed:
+[Mock code gen annotation](https://github.com/zalando/postgres-operator/blob/master/pkg/util/volumes/volumes.go#L3)
+
+To generate mocks run:
+```bash
+make mocks
+```
+
+Examples for mocks can be found in:
+[Example mock usage](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/volumes_test.go#L248)
+
+Examples for fake K8s objects can be found in:
+[Example fake K8s client usage](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/volumes_test.go#L166)
+
 ## End-to-end tests
 
 The operator provides reference end-to-end (e2e) tests to
