@@ -36,7 +36,7 @@ func (c *Cluster) syncVolumes() error {
 		err = c.populateVolumeMetaData()
 		if err != nil {
 			c.logger.Errorf("populating EBS meta data failed, skipping potential adjustements: %v", err)
-
+		} else {
 			err = c.syncUnderlyingEBSVolume()
 			if err != nil {
 				c.logger.Errorf("errors occured during EBS volume adjustments: %v", err)
