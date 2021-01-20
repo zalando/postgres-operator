@@ -35,11 +35,12 @@ func (c *Cluster) syncVolumes() error {
 
 		err = c.populateVolumeMetaData()
 		if err != nil {
+			c.logger.Errorf("populating EBS meta data failed, skipping potential adjustements: %v", err)
 
-		}
-		err = c.syncUnderlyingEBSVolume()
-		if err != nil {
-
+			err = c.syncUnderlyingEBSVolume()
+			if err != nil {
+				c.logger.Errorf("errors occured during EBS volume adjustments: %v", err)
+			}
 		}
 
 		// resize pvc to adjust filesystem size until better K8s support
@@ -71,7 +72,7 @@ func (c *Cluster) syncVolumes() error {
 }
 
 func (c *Cluster) syncUnderlyingEBSVolume() error {
-	c.logger.Infof("starting to sync EBS volume: type, iops, throughput and size")
+	c.logger.Infof("starting to sync EBS volumes: type, iops, throughput, and size")
 
 	var err error
 
