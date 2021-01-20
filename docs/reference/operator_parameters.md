@@ -375,7 +375,9 @@ configuration they are grouped under the `kubernetes` key.
 * **storage_resize_mode**
   defines how operator handels the difference between requested volume size and
   actual size. Available options are: ebs - tries to resize EBS volume, pvc -
-  changes PVC definition, off - disables resize of the volumes. Default is "pvc".
+  changes PVC definition, off - disables resize of the volumes. And "mixed" mode.
+  Where mixed mode is needed to support AWS EBS gp3 volumes, to adjust IOPS and Throughput.
+  It relies on pvc resize to deal with file system extension. Default is "pvc".
   When using OpenShift please use one of the other available options.
 
 ## Kubernetes resource requests

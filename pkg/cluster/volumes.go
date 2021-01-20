@@ -30,7 +30,7 @@ func (c *Cluster) syncVolumes() error {
 	}
 
 	if c.OpConfig.StorageResizeMode == "mixed" {
-		// mixed op uses AWS API to adjust size,throughput,iops and calls pvc chance for file system resize
+		// mixed op uses AWS API to adjust size, throughput, iops, and calls pvc change for file system resize
 		// in case of errors we proceed to let K8s do its work, favoring disk space increase of other adjustments
 
 		err = c.populateVolumeMetaData()
