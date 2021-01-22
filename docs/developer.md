@@ -237,7 +237,7 @@ kubectl logs acid-minimal-cluster-0
 
 ## Unit tests with Mocks and K8s Fake API
 
-When ever possible you should rely on leveraging proper mocks and K8s fake client that allows full fledged testing of K8s objects in your unit tests.
+Whenever possible you should rely on leveraging proper mocks and K8s fake client that allows full fledged testing of K8s objects in your unit tests.
 
 To enable mocks, a code annotation is needed:
 [Mock code gen annotation](https://github.com/zalando/postgres-operator/blob/master/pkg/util/volumes/volumes.go#L3)

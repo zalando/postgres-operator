@@ -23,7 +23,7 @@ func (c *Cluster) syncVolumes() error {
 	c.logger.Debugf("syncing volumes using %q storage resize mode", c.OpConfig.StorageResizeMode)
 	var err error
 
-	// check quantity string once, and not bother with it anymore everywhwere
+	// check quantity string once, and do not bother with it anymore anywhere else
 	_, err = resource.ParseQuantity(c.Spec.Volume.Size)
 	if err != nil {
 		return fmt.Errorf("could not parse volume size from the manifest: %v", err)
@@ -157,18 +157,18 @@ func (c *Cluster) populateVolumeMetaData() error {
 		volumeIds = append(volumeIds, volumeID)
 	}
 
-	awsVolumes, err := c.VolumeResizer.DescribeVolumes(volumeIds)
+	currentVolumes, err := c.VolumeResizer.DescribeVolumes(volumeIds)
 	if nil != err {
 		return err
 	}
 
-	if len(awsVolumes) != len(c.EBSVolumes) {
-		c.logger.Debugf("number of ebs volumes (%d) differs from known volumes (%d)", len(awsVolumes), len(c.EBSVolumes))
+	if len(currentVolumes) != len(c.EBSVolumes) {
+		c.logger.Debugf("number of ebs volumes (%d) discovered differs from already known volumes (%d)", len(currentVolumes), len(c.EBSVolumes))
 	}
 
 	// reset map, operator is not responsible for dangling ebs volumes
 	c.EBSVolumes = make(map[string]volumes.VolumeProperties)
-	for _, volume := range awsVolumes {
+	for _, volume := range currentVolumes {
 		c.EBSVolumes[volume.VolumeID] = volume
 	}
 
@@ -179,14 +179,16 @@ func (c *Cluster) populateVolumeMetaData() error {
 func (c *Cluster) syncVolumeClaims() error {
 	c.setProcessName("syncing volume claims")
 
-	act, err := c.volumeClaimsNeedResizing(c.Spec.Volume)
+	needsResizing, err := c.volumeClaimsNeedResizing(c.Spec.Volume)
 	if err != nil {
 		return fmt.Errorf("could not compare size of the volume claims: %v", err)
 	}
-	if !act {
+
+	if !needsResizing {
 		c.logger.Infof("volume claims do not require changes")
 		return nil
 	}
+
 	if err := c.resizeVolumeClaims(c.Spec.Volume); err != nil {
 		return fmt.Errorf("could not sync volume claims: %v", err)
 	}
@@ -325,15 +327,14 @@ func (c *Cluster) resizeVolumes() error {
 
 	c.setProcessName("resizing EBS volumes")
 
-	newQuantity, _ := resource.ParseQuantity(c.Spec.Volume.Size)
-	newSize := quantityToGigabyte(newQuantity)
-	resizer := c.VolumeResizer
-	var totalIncompatible int
-
 	newQuantity, err := resource.ParseQuantity(c.Spec.Volume.Size)
 	if err != nil {
 		return fmt.Errorf("could not parse volume size: %v", err)
 	}
+
+	newSize := quantityToGigabyte(newQuantity)
+	resizer := c.VolumeResizer
+	var totalIncompatible int
 
 	pvs, err := c.listPersistentVolumes()
 	if err != nil {
