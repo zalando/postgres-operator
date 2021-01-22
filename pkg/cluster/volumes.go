@@ -108,7 +108,7 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 		}
 
 		if modifyIops != nil || modifyThroughput != nil || modifySize != nil {
-			if modifyThroughput != nil || modifyIops != nil {
+			if modifyIops != nil || modifyThroughput != nil {
 				// we default to gp3 if iops and throughput are configured
 				modifyType = awsGp3
 				if targetValue.VolumeType == "io2" {
