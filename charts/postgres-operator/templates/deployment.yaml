@@ -55,7 +55,7 @@ spec:
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         securityContext:
-{{ toYaml .Values.securityContext| indent 10 }}
+{{ toYaml .Values.securityContext | indent 10 }}
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml .Values.imagePullSecrets | indent 8 }}
