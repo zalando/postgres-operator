@@ -280,6 +280,9 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 				},
 			},
 		},
+		SecurityContext: &v1.SecurityContext{
+			AllowPrivilegeEscalation: util.False(),
+		},
 	}
 
 	podTemplate := &v1.PodTemplateSpec{
@@ -289,7 +292,6 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Annotations: c.annotationsSet(c.generatePodAnnotations(spec)),
 		},
 		Spec: v1.PodSpec{
-			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers:                    []v1.Container{poolerContainer},
 			// TODO: add tolerations to scheduler pooler on the same node

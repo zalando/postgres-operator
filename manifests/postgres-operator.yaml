@@ -32,6 +32,7 @@ spec:
           runAsUser: 1000
           runAsNonRoot: true
           readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
         env:
         # provided additional ENV vars can overwrite individual config map entries
         - name: CONFIG_MAP_NAME
