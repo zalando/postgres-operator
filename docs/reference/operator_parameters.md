@@ -373,10 +373,13 @@ configuration they are grouped under the `kubernetes` key.
   possible value is `parallel`.
 
 * **storage_resize_mode**
-  defines how operator handels the difference between requested volume size and
-  actual size. Available options are: ebs - tries to resize EBS volume, pvc -
-  changes PVC definition, off - disables resize of the volumes. Default is "pvc".
-  When using OpenShift please use one of the other available options.
+  defines how operator handles the difference between the requested volume size and
+    the actual size. Available options are:
+    1. `ebs` : operator resizes EBS volumes directly and executes `resizefs` within a pod
+    2. `pvc` : operator only changes PVC definition
+    3. `off` : disables resize of the volumes.
+    4. `mixed` :operator  uses AWS API to adjust size, throughput, and IOPS, and calls pvc change for file system resize
+    Default is "pvc".
 
 ## Kubernetes resource requests
 
