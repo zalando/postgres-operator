@@ -54,6 +54,8 @@ spec:
       {{- end }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
+        securityContext:
+{{ toYaml .Values.securityContext| indent 10 }}
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml .Values.imagePullSecrets | indent 8 }}
@@ -62,8 +64,6 @@ spec:
 {{ toYaml .Values.affinity | indent 8 }}
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
-      securityContext:
-{{ toYaml .Values.securityContext| indent 8 }}
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
     {{- if .Values.priorityClassName }}
