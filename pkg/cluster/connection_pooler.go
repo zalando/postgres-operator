@@ -280,6 +280,9 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 				},
 			},
 		},
+		SecurityContext: &v1.SecurityContext{
+			AllowPrivilegeEscalation: util.False(),
+		},
 	}
 
 	podTemplate := &v1.PodTemplateSpec{
