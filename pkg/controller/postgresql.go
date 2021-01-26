@@ -601,14 +601,14 @@ func (c *Controller) createRole(namespace string) error {
 
 	podServiceAccountRoleName := c.PodServiceAccountRole.Name
 
-	_, err := c.KubeClient.Roles(namespace).Get(podServiceAccountRoleName, metav1.GetOptions{})
+	_, err := c.KubeClient.Roles(namespace).Get(context.TODO(), podServiceAccountRoleName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 		c.logger.Infof("creating role %q in the %q namespace", podServiceAccountRoleName, namespace)
 
 		// get a separate copy of the role
 		// to prevent a race condition when setting a namespace for many clusters
 		role := *c.PodServiceAccountRole
-		_, err = c.KubeClient.Roles(namespace).Create(&role)
+		_, err = c.KubeClient.Roles(namespace).Create(context.TODO(), &role, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("cannot create role %q in the %q namespace: %v", podServiceAccountRoleName, namespace, err)
 		}
