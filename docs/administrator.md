@@ -11,17 +11,29 @@ switchover (planned failover) of the master to the Pod with new minor version.
 The switch should usually take less than 5 seconds, still clients have to
 reconnect.
 
-Major version upgrades are supported via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster).
-The new cluster manifest must have a higher `version` string than the source
-cluster and will be created from a basebackup. Depending of the cluster size,
-downtime in this case can be significant as writes to the database should be
-stopped and all WAL files should be archived first before cloning is started.
+Major version upgrades are supported either via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
+or in-place.
 
-Note, that simply changing the version string in the `postgresql` manifest does
-not work at present and leads to errors. Neither Patroni nor Postgres Operator
-can do in place `pg_upgrade`. Still, it can be executed manually in the Postgres
-container, which is tricky (i.e. systems need to be stopped, replicas have to be
-synced) but of course faster than cloning.
+With cloning, the new cluster manifest must have a higher `version` string than
+the source cluster and will be created from a basebackup. Depending of the
+cluster size, downtime in this case can be significant as writes to the database
+should be stopped and all WAL files should be archived first before cloning is
+started.
+
+Starting with Spilo 13, Postgres Operator can do in-place major version upgrade,
+which should be faster than cloning. However, it is not fully automatic yet.
+First, you need to make sure, that setting the `PGVERSION` environment variable
+is enabled in the configuration. Since `v1.6.0`, `enable_pgversion_env_var` is
+enabled by default.
+
+To trigger the upgrade, increase the version in the cluster manifest. After
+Pods are rotated `configure_spilo` will notice the version mismatch and start
+the old version again. You can then exec into the Postgres container of the
+master instance and call `python3 /scripts/inplace_upgrade.py N` where `N`
+is the number of members of your cluster (see [`numberOfInstances`](https://github.com/zalando/postgres-operator/blob/50cb5898ea715a1db7e634de928b2d16dc8cd969/manifests/minimal-postgres-manifest.yaml#L10)).
+The upgrade is usually fast, well under one minute for most DBs. Note, that
+changes become irrevertible once `pg_upgrade` is called. To understand the
+upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
 
 ## CRD Validation
 
@@ -44,7 +56,7 @@ Once the validation is enabled it can only be disabled manually by editing or
 patching the CRD manifest:
 
 ```bash
-zk8 patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
+kubectl patch crd postgresqls.acid.zalan.do -p '{"spec":{"validation": null}}'
 ```
 
 ## Non-default cluster domain
@@ -94,6 +106,96 @@ lacks access rights to any of them (except K8s system namespaces like
 `kube-system`). The reason is that for multiple namespaces operations such as
 'list pods' execute at the cluster scope and fail at the first violation of
 access rights.
+
+## Operators with defined ownership of certain Postgres clusters
+
+By default, multiple operators can only run together in one K8s cluster when
+isolated into their [own namespaces](administrator.md#specify-the-namespace-to-watch).
+But, it is also possible to define ownership between operator instances and
+Postgres clusters running all in the same namespace or K8s cluster without
+interfering.
+
+First, define the [`CONTROLLER_ID`](../../manifests/postgres-operator.yaml#L38)
+environment variable in the operator deployment manifest. Then specify the ID
+in every Postgres cluster manifest you want this operator to watch using the
+`"acid.zalan.do/controller"` annotation:
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: demo-cluster
+  annotations:
+    "acid.zalan.do/controller": "second-operator"
+spec:
+  ...
+```
+
+Every other Postgres cluster which lacks the annotation will be ignored by this
+operator. Conversely, operators without a defined `CONTROLLER_ID` will ignore
+clusters with defined ownership of another operator.
+
+## Delete protection via annotations
+
+To avoid accidental deletes of Postgres clusters the operator can check the
+manifest for two existing annotations containing the cluster name and/or the
+current date (in YYYY-MM-DD format). The name of the annotation keys can be
+defined in the configuration. By default, they are not set which disables the
+delete protection. Thus, one could choose to only go with one annotation.
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  delete_annotation_date_key: "delete-date"
+  delete_annotation_name_key: "delete-clustername"
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    delete_annotation_date_key: "delete-date"
+    delete_annotation_name_key: "delete-clustername"
+```
+
+Now, every cluster manifest must contain the configured annotation keys to
+trigger the delete process when running `kubectl delete pg`. Note, that the
+`Postgresql` resource would still get deleted as K8s' API server does not
+block it. Only the operator logs will tell, that the delete criteria wasn't
+met.
+
+**cluster manifest**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: demo-cluster
+  annotations:
+    delete-date: "2020-08-31"
+    delete-clustername: "demo-cluster"
+spec:
+  ...
+```
+
+In case, the resource has been deleted accidentally or the annotations were
+simply forgotten, it's safe to recreate the cluster with `kubectl create`.
+Existing Postgres cluster are not replaced by the operator. But, as the
+original cluster still exists the status will show `CreateFailed` at first.
+On the next sync event it should change to `Running`. However, as it is in
+fact a new resource for K8s, the UID will differ which can trigger a rolling
+update of the pods because the UID is used as part of backup path to S3.
+
 
 ## Role-based access control for the operator
 
@@ -292,13 +394,21 @@ spec:
 
 
 ## Custom Pod Environment Variables
+It is possible to configure a ConfigMap as well as a Secret which are used by the Postgres pods as
+an additional provider for environment variables. One use case is to customize
+the Spilo image and configure it with environment variables. Another case could be to provide custom
+cloud provider or backup settings.
 
-It is possible to configure a ConfigMap which is used by the Postgres pods as
-an additional provider for environment variables.
+In general the Operator will give preference to the globally configured variables, to not have the custom
+ones interfere with core functionality. Variables with the 'WAL_' and 'LOG_' prefix can be overwritten though, to allow
+backup and logshipping to be specified differently.
 
-One use case is to customize the Spilo image and configure it with environment
-variables. The ConfigMap with the additional settings is configured in the
-operator's main ConfigMap:
+
+### Via ConfigMap
+The ConfigMap with the additional settings is referenced in the operator's main configuration.
+A namespace can be specified along with the name. If left out, the configured
+default namespace of your K8s client will be used and if the ConfigMap is not
+found there, the Postgres cluster's namespace is taken when different:
 
 **postgres-operator ConfigMap**
 
@@ -309,7 +419,7 @@ metadata:
   name: postgres-operator
 data:
   # referencing config map with custom settings
-  pod_environment_configmap: postgres-pod-config
+  pod_environment_configmap: default/postgres-pod-config
 ```
 
 **OperatorConfiguration**
@@ -322,7 +432,7 @@ metadata:
 configuration:
   kubernetes:
     # referencing config map with custom settings
-    pod_environment_configmap: postgres-pod-config
+    pod_environment_configmap: default/postgres-pod-config
 ```
 
 **referenced ConfigMap `postgres-pod-config`**
@@ -337,7 +447,54 @@ data:
   MY_CUSTOM_VAR: value
 ```
 
-This ConfigMap is then added as a source of environment variables to the
+The key-value pairs of the ConfigMap are then added as environment variables to the
+Postgres StatefulSet/pods.
+
+
+### Via Secret
+The Secret with the additional variables is referenced in the operator's main configuration.
+To protect the values of the secret from being exposed in the pod spec they are each referenced
+as SecretKeyRef.
+This does not allow for the secret to be in a different namespace as the pods though
+
+**postgres-operator ConfigMap**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  # referencing secret with custom environment variables
+  pod_environment_secret: postgres-pod-secrets
+```
+
+**OperatorConfiguration**
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-operator-configuration
+configuration:
+  kubernetes:
+    # referencing secret with custom environment variables
+    pod_environment_secret: postgres-pod-secrets
+```
+
+**referenced Secret `postgres-pod-secrets`**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-pod-secrets
+  namespace: default
+data:
+  MY_CUSTOM_VAR: dmFsdWU=
+```
+
+The key-value pairs of the Secret are all accessible as environment variables to the
 Postgres StatefulSet/pods.
 
 ## Limiting the number of min and max instances in clusters
@@ -417,9 +574,12 @@ database.
 * **Human users** originate from the [Teams API](user.md#teams-api-roles) that
 returns a list of the team members given a team id. The operator differentiates
 between (a) product teams that own a particular Postgres cluster and are granted
-admin rights to maintain it, and (b) Postgres superuser teams that get the
-superuser access to all Postgres databases running in a K8s cluster for the
-purposes of maintaining and troubleshooting.
+admin rights to maintain it, (b) Postgres superuser teams that get superuser
+access to all Postgres databases running in a K8s cluster for the purposes of
+maintaining and troubleshooting, and (c) additional teams, superuser teams or
+members associated with the owning team. The latter is managed via the
+[PostgresTeam CRD](user.md#additional-teams-and-members-per-cluster).
+
 
 ## Understanding rolling update of Spilo pods
 
@@ -429,6 +589,17 @@ from numerous escape characters in the latter log entry, view it in CLI with
 `echo -e`. Note that the resultant message will contain some noise because the
 `PodTemplate` used by the operator is yet to be updated with the default values
 used internally in K8s.
+
+The operator also support lazy updates of the Spilo image. That means the pod
+template of a PG cluster's stateful set is updated immediately with the new
+image, but no rolling update follows. This feature saves you a switchover - and
+hence downtime - when you know pods are re-started later anyway, for instance
+due to the node rotation. To force a rolling update, disable this mode by
+setting the `enable_lazy_spilo_upgrade` to `false` in the operator configuration
+and restart the operator pod. With the standard eager rolling updates the
+operator checks during Sync all pods run images specified in their respective
+statefulsets. The operator triggers a rolling upgrade for PG clusters that
+violate this condition.
 
 ## Logical backups
 
@@ -478,6 +649,110 @@ A secret can be pre-provisioned in different ways:
 * Generic secret created via `kubectl create secret generic some-cloud-creds --from-file=some-cloud-credentials-file.json`
 * Automatically provisioned via a custom K8s controller like
   [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)
+
+## Google Cloud Platform setup
+
+To configure the operator on GCP there are some prerequisites that are needed:
+
+* A service account with the proper IAM setup to access the GCS bucket for the WAL-E logs
+* The credentials file for the service account.
+
+The configuration paramaters that we will be using are:
+
+* `additional_secret_mount`
+* `additional_secret_mount_path`
+* `gcp_credentials`
+* `wal_gs_bucket`
+
+### Generate a K8s secret resource
+
+Generate the K8s secret resource that will contain your service account's
+credentials. It's highly recommended to use a service account and limit its
+scope to just the WAL-E bucket.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: psql-wale-creds
+  namespace: default
+type: Opaque
+stringData:
+  key.json: |-
+    <GCP .json credentials>
+```
+
+### Setup your operator configuration values
+
+With the `psql-wale-creds` resource applied to your cluster, ensure that
+the operator's configuration is set up like the following:
+
+```yml
+...
+aws_or_gcp:
+  additional_secret_mount: "pgsql-wale-creds"
+  additional_secret_mount_path: "/var/secrets/google"  # or where ever you want to mount the file
+  # aws_region: eu-central-1
+  # kube_iam_role: ""
+  # log_s3_bucket: ""
+  # wal_s3_bucket: ""
+  wal_gs_bucket: "postgres-backups-bucket-28302F2"  # name of bucket on where to save the WAL-E logs
+  gcp_credentials: "/var/secrets/google/key.json"  # combination of the mount path & key in the K8s resource. (i.e. key.json)
+...
+```
+
+### Setup pod environment configmap
+
+To make postgres-operator work with GCS, use following configmap:
+```yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-env-overrides
+  namespace: postgres-operator-system
+data:
+  # Any env variable used by spilo can be added
+  USE_WALG_BACKUP: "true"
+  USE_WALG_RESTORE: "true"
+  CLONE_USE_WALG_RESTORE: "true"
+```
+This configmap will instruct operator to use WAL-G, instead of WAL-E, for backup and restore.
+
+Then provide this configmap in postgres-operator settings:
+```yml
+...
+# namespaced name of the ConfigMap with environment variables to populate on every pod
+pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
+...
+```
+
+
+## Sidecars for Postgres clusters
+
+A list of sidecars is added to each cluster created by the operator. The default
+is empty.
+
+```yaml
+kind: OperatorConfiguration
+configuration:
+  sidecars:
+  - image: image:123
+    name: global-sidecar
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - mountPath: /custom-pgdata-mountpoint
+      name: pgdata
+  - ...
+```
+
+In addition to any environment variables you specify, the following environment
+variables are always passed to sidecars:
+
+  - `POD_NAME` - field reference to `metadata.name`
+  - `POD_NAMESPACE` - field reference to `metadata.namespace`
+  - `POSTGRES_USER` - the superuser that can be used to connect to the database
+  - `POSTGRES_PASSWORD` - the password for the superuser
 
 ## Setting up the Postgres Operator UI
 

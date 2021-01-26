@@ -37,6 +37,10 @@ spec:
         image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         env:
+      {{- if .Values.enableJsonLogging }}
+        - name: ENABLE_JSON_LOGGING
+          value: "true"
+      {{- end }}
       {{- if eq .Values.configTarget "ConfigMap" }}
         - name: CONFIG_MAP_NAME
           value: {{ template "postgres-operator.fullname" . }}
@@ -44,8 +48,14 @@ spec:
         - name: POSTGRES_OPERATOR_CONFIGURATION_OBJECT
           value: {{ template "postgres-operator.fullname" . }}
       {{- end }}
+      {{- if .Values.controllerID.create }}
+        - name: CONTROLLER_ID
+          value: {{ template "postgres-operator.controllerID" . }}
+      {{- end }}
         resources:
 {{ toYaml .Values.resources | indent 10 }}
+        securityContext:
+{{ toYaml .Values.securityContext | indent 10 }}
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
 {{ toYaml .Values.imagePullSecrets | indent 8 }}

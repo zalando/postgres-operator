@@ -7,6 +7,7 @@ gevent.monkey.patch_all()
 
 import requests
 import tokens
+import sys
 
 from backoff import expo, on_exception
 from click import ParamType, command, echo, option
@@ -25,7 +26,7 @@ from flask import (
 from flask_oauthlib.client import OAuth
 from functools import wraps
 from gevent import sleep, spawn
-from gevent.wsgi import WSGIServer
+from gevent.pywsgi import WSGIServer
 from jq import jq
 from json import dumps, loads
 from logging import DEBUG, ERROR, INFO, basicConfig, exception, getLogger
@@ -44,6 +45,7 @@ from .spiloutils import (
     create_postgresql,
     read_basebackups,
     read_namespaces,
+    read_pooler,
     read_pods,
     read_postgresql,
     read_postgresqls,
@@ -80,10 +82,12 @@ OPERATOR_CLUSTER_NAME_LABEL = getenv('OPERATOR_CLUSTER_NAME_LABEL', 'cluster-nam
 OPERATOR_UI_CONFIG = getenv('OPERATOR_UI_CONFIG', '{}')
 OPERATOR_UI_MAINTENANCE_CHECK = getenv('OPERATOR_UI_MAINTENANCE_CHECK', '{}')
 READ_ONLY_MODE = getenv('READ_ONLY_MODE', False) in [True, 'true']
+RESOURCES_VISIBLE = getenv('RESOURCES_VISIBLE', True)
 SPILO_S3_BACKUP_PREFIX = getenv('SPILO_S3_BACKUP_PREFIX', 'spilo/')
 SUPERUSER_TEAM = getenv('SUPERUSER_TEAM', 'acid')
 TARGET_NAMESPACE = getenv('TARGET_NAMESPACE')
 GOOGLE_ANALYTICS = getenv('GOOGLE_ANALYTICS', False)
+MIN_PODS= getenv('MIN_PODS', 2)
 
 # storage pricing, i.e. https://aws.amazon.com/ebs/pricing/
 COST_EBS = float(getenv('COST_EBS', 0.119))  # GB per month
@@ -100,6 +104,8 @@ WALE_S3_ENDPOINT = getenv(
 USE_AWS_INSTANCE_PROFILE = (
     getenv('USE_AWS_INSTANCE_PROFILE', 'false').lower() != 'false'
 )
+
+AWS_ENDPOINT = getenv('AWS_ENDPOINT')
 
 tokens.configure()
 tokens.manage('read-only')
@@ -297,13 +303,14 @@ DEFAULT_UI_CONFIG = {
     'users_visible': True,
     'databases_visible': True,
     'resources_visible': True,
-    'postgresql_versions': ['9.6', '10', '11'],
+    'postgresql_versions': ['11','12','13'],
     'dns_format_string': '{0}.{1}.{2}',
     'pgui_link': '',
     'static_network_whitelist': {},
     'cost_ebs': COST_EBS,
     'cost_core': COST_CORE,
-    'cost_memory': COST_MEMORY
+    'cost_memory': COST_MEMORY,
+    'min_pods': MIN_PODS
 }
 
 
@@ -312,8 +319,10 @@ DEFAULT_UI_CONFIG = {
 def get_config():
     config = loads(OPERATOR_UI_CONFIG) or DEFAULT_UI_CONFIG
     config['read_only_mode'] = READ_ONLY_MODE
+    config['resources_visible'] = RESOURCES_VISIBLE
     config['superuser_team'] = SUPERUSER_TEAM
     config['target_namespace'] = TARGET_NAMESPACE
+    config['min_pods'] = MIN_PODS
 
     config['namespaces'] = (
         [TARGET_NAMESPACE]
@@ -397,6 +406,22 @@ def get_service(namespace: str, cluster: str):
     )
 
 
+@app.route('/pooler/<namespace>/<cluster>')
+@authorize
+def get_list_poolers(namespace: str, cluster: str):
+
+    if TARGET_NAMESPACE not in ['', '*', namespace]:
+        return wrong_namespace()
+
+    return respond(
+        read_pooler(
+            get_cluster(),
+            namespace,
+            "{}-pooler".format(cluster),
+        ),
+    )
+
+
 @app.route('/statefulsets/<namespace>/<cluster>')
 @authorize
 def get_list_clusters(namespace: str, cluster: str):
@@ -471,6 +496,7 @@ def get_postgresqls():
             'uid': uid,
             'namespaced_name': namespace + '/' + name,
             'full_name': namespace + '/' + name + ('/' + uid if uid else ''),
+            'status': status,
         }
         for cluster in these(
             read_postgresqls(
@@ -484,6 +510,7 @@ def get_postgresqls():
             'items',
         )
         for spec in [cluster.get('spec', {}) if cluster.get('spec', {}) is not None else {"error": "Invalid spec in manifest"}]
+        for status in [cluster.get('status', {})]
         for metadata in [cluster['metadata']]
         for namespace in [metadata['namespace']]
         for name in [metadata['name']]
@@ -586,6 +613,28 @@ def update_postgresql(namespace: str, cluster: str):
             return fail('volume.size is invalid; should be like 123Gi')
 
         spec['volume'] = {'size': size}
+
+    if 'enableConnectionPooler' in postgresql['spec']:
+        cp = postgresql['spec']['enableConnectionPooler']
+        if not cp:
+            if 'enableConnectionPooler' in o['spec']:
+                del o['spec']['enableConnectionPooler']
+        else:
+            spec['enableConnectionPooler'] = True
+    else:
+        if 'enableConnectionPooler' in o['spec']:
+            del o['spec']['enableConnectionPooler']
+
+    if 'enableReplicaConnectionPooler' in postgresql['spec']:
+        cp = postgresql['spec']['enableReplicaConnectionPooler']
+        if not cp:
+            if 'enableReplicaConnectionPooler' in o['spec']:
+                del o['spec']['enableReplicaConnectionPooler']
+        else:
+            spec['enableReplicaConnectionPooler'] = True
+    else:
+        if 'enableReplicaConnectionPooler' in o['spec']:
+            del o['spec']['enableReplicaConnectionPooler']
 
     if 'enableReplicaLoadBalancer' in postgresql['spec']:
         rlb = postgresql['spec']['enableReplicaLoadBalancer']
@@ -1006,7 +1055,7 @@ def init_cluster():
 def main(port, secret_key, debug, clusters: list):
     global TARGET_NAMESPACE
 
-    basicConfig(level=DEBUG if debug else INFO)
+    basicConfig(stream=sys.stdout, level=(DEBUG if debug else INFO), format='%(asctime)s %(levelname)s: %(message)s',)
 
     init_cluster()
 
@@ -1024,6 +1073,7 @@ def main(port, secret_key, debug, clusters: list):
     logger.info(f'Tokeninfo URL: {TOKENINFO_URL}')
     logger.info(f'Use AWS instance_profile: {USE_AWS_INSTANCE_PROFILE}')
     logger.info(f'WAL-E S3 endpoint: {WALE_S3_ENDPOINT}')
+    logger.info(f'AWS S3 endpoint: {AWS_ENDPOINT}')
 
     if TARGET_NAMESPACE is None:
         @on_exception(

@@ -235,11 +235,31 @@ Then you can for example check the Patroni logs:
 kubectl logs acid-minimal-cluster-0
 ```
 
+## Unit tests with Mocks and K8s Fake API
+
+Whenever possible you should rely on leveraging proper mocks and K8s fake client that allows full fledged testing of K8s objects in your unit tests.
+
+To enable mocks, a code annotation is needed:
+[Mock code gen annotation](https://github.com/zalando/postgres-operator/blob/master/pkg/util/volumes/volumes.go#L3)
+
+To generate mocks run:
+```bash
+make mocks
+```
+
+Examples for mocks can be found in:
+[Example mock usage](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/volumes_test.go#L248)
+
+Examples for fake K8s objects can be found in:
+[Example fake K8s client usage](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/volumes_test.go#L166)
+
 ## End-to-end tests
 
-The operator provides reference end-to-end tests (e2e) (as Docker image) to
-ensure various infrastructure parts work smoothly together. Each e2e execution
-tests a Postgres Operator image built from the current git branch. The test
+The operator provides reference end-to-end (e2e) tests to
+ensure various infrastructure parts work smoothly together. The test code is available at `e2e/tests`.
+The special `registry.opensource.zalan.do/acid/postgres-operator-e2e-tests-runner` image is used to run the tests. The container mounts the local `e2e/tests` directory at runtime, so whatever you modify in your local copy of the tests will be executed by a test runner. By maintaining a separate test runner image we avoid the need to re-build the e2e test image on every build. 
+
+Each e2e execution tests a Postgres Operator image built from the current git branch. The test
 runner creates a new local K8s cluster using [kind](https://kind.sigs.k8s.io/),
 utilizes provided manifest examples, and runs e2e tests contained in the `tests`
 folder. The K8s API client in the container connects to the `kind` cluster via
@@ -284,7 +304,7 @@ manifest files:
 
 Postgres manifest parameters are defined in the [api package](../pkg/apis/acid.zalan.do/v1/postgresql_type.go).
 The operator behavior has to be implemented at least in [k8sres.go](../pkg/cluster/k8sres.go).
-Validation of CRD parameters is controlled in [crd.go](../pkg/apis/acid.zalan.do/v1/crds.go).
+Validation of CRD parameters is controlled in [crds.go](../pkg/apis/acid.zalan.do/v1/crds.go).
 Please, reflect your changes in tests, for example in:
 * [config_test.go](../pkg/util/config/config_test.go)
 * [k8sres_test.go](../pkg/cluster/k8sres_test.go)

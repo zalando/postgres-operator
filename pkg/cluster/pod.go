@@ -1,8 +1,10 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
 func (c *Cluster) listPods() ([]v1.Pod, error) {
@@ -17,7 +20,7 @@ func (c *Cluster) listPods() ([]v1.Pod, error) {
 		LabelSelector: c.labelsSet(false).String(),
 	}
 
-	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)
+	pods, err := c.KubeClient.Pods(c.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return nil, fmt.Errorf("could not get list of pods: %v", err)
 	}
@@ -30,7 +33,7 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 		LabelSelector: c.roleLabelsSet(false, role).String(),
 	}
 
-	pods, err := c.KubeClient.Pods(c.Namespace).List(listOptions)
+	pods, err := c.KubeClient.Pods(c.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return nil, fmt.Errorf("could not get list of pods: %v", err)
 	}
@@ -73,7 +76,7 @@ func (c *Cluster) deletePod(podName spec.NamespacedName) error {
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 
-	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, c.deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(podName.Namespace).Delete(context.TODO(), podName.Name, c.deleteOptions); err != nil {
 		return err
 	}
 
@@ -183,7 +186,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 		eol                bool
 	)
 
-	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+	oldMaster, err := c.KubeClient.Pods(podName.Namespace).Get(context.TODO(), podName.Name, metav1.GetOptions{})
 
 	if err != nil {
 		return fmt.Errorf("could not get pod: %v", err)
@@ -206,7 +209,9 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	// we must have a statefulset in the cluster for the migration to work
 	if c.Statefulset == nil {
 		var sset *appsv1.StatefulSet
-		if sset, err = c.KubeClient.StatefulSets(c.Namespace).Get(c.statefulSetName(),
+		if sset, err = c.KubeClient.StatefulSets(c.Namespace).Get(
+			context.TODO(),
+			c.statefulSetName(),
 			metav1.GetOptions{}); err != nil {
 			return fmt.Errorf("could not retrieve cluster statefulset: %v", err)
 		}
@@ -247,7 +252,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 
 // MigrateReplicaPod recreates pod on a new node
 func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName string) error {
-	replicaPod, err := c.KubeClient.Pods(podName.Namespace).Get(podName.Name, metav1.GetOptions{})
+	replicaPod, err := c.KubeClient.Pods(podName.Namespace).Get(context.TODO(), podName.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("could not get pod: %v", err)
 	}
@@ -276,7 +281,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	defer c.unregisterPodSubscriber(podName)
 	stopChan := make(chan struct{})
 
-	if err := c.KubeClient.Pods(podName.Namespace).Delete(podName.Name, c.deleteOptions); err != nil {
+	if err := c.KubeClient.Pods(podName.Namespace).Delete(context.TODO(), podName.Name, c.deleteOptions); err != nil {
 		return nil, fmt.Errorf("could not delete pod: %v", err)
 	}
 
@@ -291,6 +296,50 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	return pod, nil
 }
 
+func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
+
+	/*
+	 Operator should not re-create pods if there is at least one replica being bootstrapped
+	 because Patroni might use other replicas to take basebackup from (see Patroni's "clonefrom" tag).
+
+	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
+	 after this check succeeds but before a pod is re-created
+	*/
+
+	for _, pod := range pods.Items {
+		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
+	}
+
+	for _, pod := range pods.Items {
+
+		var state string
+
+		err := retryutil.Retry(1*time.Second, 5*time.Second,
+			func() (bool, error) {
+
+				var err error
+
+				state, err = c.patroni.GetPatroniMemberState(&pod)
+
+				if err != nil {
+					return false, err
+				}
+				return true, nil
+			},
+		)
+
+		if err != nil {
+			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
+			return false
+		} else if state == "creating replica" {
+			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
+			return false
+		}
+
+	}
+	return true
+}
+
 func (c *Cluster) recreatePods() error {
 	c.setProcessName("starting to recreate pods")
 	ls := c.labelsSet(false)
@@ -300,11 +349,15 @@ func (c *Cluster) recreatePods() error {
 		LabelSelector: ls.String(),
 	}
 
-	pods, err := c.KubeClient.Pods(namespace).List(listOptions)
+	pods, err := c.KubeClient.Pods(namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return fmt.Errorf("could not get the list of pods: %v", err)
 	}
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
+
+	if !c.isSafeToRecreatePods(pods) {
+		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initialized")
+	}
 
 	var (
 		masterPod, newMasterPod, newPod *v1.Pod
@@ -349,7 +402,7 @@ func (c *Cluster) recreatePods() error {
 }
 
 func (c *Cluster) podIsEndOfLife(pod *v1.Pod) (bool, error) {
-	node, err := c.KubeClient.Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	node, err := c.KubeClient.Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}

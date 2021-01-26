@@ -3,6 +3,7 @@ package patroni
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -11,7 +12,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -25,6 +26,7 @@ const (
 type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
+	GetPatroniMemberState(pod *v1.Pod) (string, error)
 }
 
 // Patroni API client
@@ -122,4 +124,37 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 		return err
 	}
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
+}
+
+//GetPatroniMemberState returns a state of member of a Patroni cluster
+func (p *Patroni) GetPatroniMemberState(server *v1.Pod) (string, error) {
+
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return "", err
+	}
+	response, err := p.httpClient.Get(apiURLString)
+	if err != nil {
+		return "", fmt.Errorf("could not perform Get request: %v", err)
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return "", fmt.Errorf("could not read response: %v", err)
+	}
+
+	data := make(map[string]interface{})
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return "", err
+	}
+
+	state, ok := data["state"].(string)
+	if !ok {
+		return "", errors.New("Patroni Get call response contains wrong type for 'state' field")
+	}
+
+	return state, nil
+
 }

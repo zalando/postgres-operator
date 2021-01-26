@@ -1,0 +1,11 @@
+apiVersion: scheduling.k8s.io/v1
+description: 'This priority class must be used only for databases controlled by the
+  Postgres operator'
+kind: PriorityClass
+metadata:
+  labels:
+    application: postgres-operator
+  name: postgres-pod-priority
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+value: 1000000

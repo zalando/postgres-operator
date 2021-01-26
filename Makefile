@@ -1,4 +1,4 @@
-.PHONY: clean local test linux macos docker push scm-source.json e2e
+.PHONY: clean local test linux macos mocks docker push scm-source.json e2e
 
 BINARY ?= postgres-operator
 BUILD_FLAGS ?= -v
@@ -24,10 +24,14 @@ PKG := `go list ./... | grep -v /vendor/`
 
 ifeq ($(DEBUG),1)
 	DOCKERFILE = DebugDockerfile
-	DEBUG_POSTFIX := -debug
+	DEBUG_POSTFIX := -debug-$(shell date hhmmss)
 	BUILD_FLAGS += -gcflags "-N -l"
 else
 	DOCKERFILE = Dockerfile
+endif
+
+ifeq ($(FRESH),1)
+  DEBUG_FRESH=$(shell date +"%H-%M-%S")
 endif
 
 ifdef CDP_PULL_REQUEST_NUMBER
@@ -66,7 +70,7 @@ docker: ${DOCKERDIR}/${DOCKERFILE} docker-context
 	echo "Version ${VERSION}"
 	echo "CDP tag ${CDP_TAG}"
 	echo "git describe $(shell git describe --tags --always --dirty)"
-	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
+	cd "${DOCKERDIR}" && docker build --rm -t "$(IMAGE):$(TAG)$(CDP_TAG)$(DEBUG_FRESH)$(DEBUG_POSTFIX)" -f "${DOCKERFILE}" .
 
 indocker-race:
 	docker run --rm -v "${GOPATH}":"${GOPATH}" -e GOPATH="${GOPATH}" -e RACE=1 -w ${PWD} golang:1.8.1 bash -c "make linux"
@@ -77,9 +81,12 @@ push:
 scm-source.json: .git
 	echo '{\n "url": "git:$(GITURL)",\n "revision": "$(GITHEAD)",\n "author": "$(USER)",\n "status": "$(GITSTATUS)"\n}' > scm-source.json
 
+mocks:
+	GO111MODULE=on go generate ./...
+
 tools:
-	GO111MODULE=on go get -u honnef.co/go/tools/cmd/staticcheck
-	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.16.3
+	GO111MODULE=on go get k8s.io/client-go@kubernetes-1.19.3
+	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.4.4
 	GO111MODULE=on go mod tidy
 
 fmt:
@@ -97,4 +104,4 @@ test:
 	GO111MODULE=on go test ./...
 
 e2e: docker # build operator image to be tested
-	cd e2e; make tools test clean
+	cd e2e; make e2etest
