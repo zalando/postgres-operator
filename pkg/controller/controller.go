@@ -305,20 +305,6 @@ func (c *Controller) initRole() {
 		            "verbs": [
 		                "create"
 		            ]
-		        },
-		        {
-		            "apiGroups": [
-		                "extensions"
-		            ],
-		            "resources": [
-		                "podsecuritypolicies"
-		            ],
-		            "resourceNames": [
-		                "privileged"
-		            ],
-		            "verbs": [
-		                "use"
-		            ]
 		        }
 		    ]
 		}`, c.PodServiceAccount.Name)

@@ -1,6 +1,6 @@
 {{ if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: {{ include "postgres-pod.serviceAccountName" . }}
   labels:
