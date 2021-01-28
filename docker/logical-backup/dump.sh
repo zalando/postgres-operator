@@ -15,6 +15,8 @@ TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 K8S_API_URL=https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT/api/v1
 CERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
+LOGICAL_BACKUP_PROVIDER=${LOGICAL_BACKUP_PROVIDER:="s3"}
+LOGICAL_BACKUP_S3_RETENTION_TIME=${LOGICAL_BACKUP_S3_RETENTION_TIME:=""}
 
 function estimate_size {
     "$PG_BIN"/psql -tqAc "${ALL_DB_SIZE_QUERY}"
