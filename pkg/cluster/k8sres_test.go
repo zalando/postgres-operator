@@ -973,6 +973,10 @@ func TestTLS(t *testing.T) {
 	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
+			Resources: acidv1.Resources{
+				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
+			},
 			Volume: acidv1.Volume{
 				Size: "1G",
 			},
