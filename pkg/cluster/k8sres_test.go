@@ -973,10 +973,6 @@ func TestTLS(t *testing.T) {
 	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
-			Resources: acidv1.Resources{
-				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
-			},
 			Volume: acidv1.Volume{
 				Size: "1G",
 			},
@@ -1488,4 +1484,43 @@ func TestGenerateService(t *testing.T) {
 	service = cluster.generateService(Master, &spec)
 	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
 
+}
+
+func TestGenerateCapabilities(t *testing.T) {
+
+	testName := "TestGenerateCapabilities"
+	tests := []struct {
+		subTest      string
+		configured   []string
+		capabilities v1.Capabilities
+		err          error
+	}{
+		{
+			subTest:      "no capabilities",
+			configured:   nil,
+			capabilities: v1.Capabilities{},
+			err:          fmt.Errorf("could not parse capabilities configuration of nil"),
+		},
+		{
+			subTest:      "empty capabilities",
+			configured:   []string{},
+			capabilities: v1.Capabilities{},
+			err:          fmt.Errorf("could not parse empty capabilities configuration"),
+		},
+		{
+			subTest:    "configured capabilities",
+			configured: []string{"SYS_NICE", "CHOWN"},
+			capabilities: v1.Capabilities{
+				Add: []v1.Capability{"SYS_NICE", "CHOWN"},
+			},
+			err: fmt.Errorf("could not parse empty capabilities configuration"),
+		},
+	}
+	for _, tt := range tests {
+		caps := generateCapabilities(tt.configured)
+		if !reflect.DeepEqual(caps, tt.capabilities) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.capabilities, caps)
+		}
+	}
 }

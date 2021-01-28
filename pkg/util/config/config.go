@@ -23,38 +23,39 @@ type CRD struct {
 
 // Resources describes kubernetes resource specific configuration parameters
 type Resources struct {
-	ResourceCheckInterval   time.Duration       `name:"resource_check_interval" default:"3s"`
-	ResourceCheckTimeout    time.Duration       `name:"resource_check_timeout" default:"10m"`
-	PodLabelWaitTimeout     time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
-	PodDeletionWaitTimeout  time.Duration       `name:"pod_deletion_wait_timeout" default:"10m"`
-	PodTerminateGracePeriod time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
-	SpiloRunAsUser          *int64              `json:"spilo_runasuser,omitempty"`
-	SpiloRunAsGroup         *int64              `json:"spilo_runasgroup,omitempty"`
-	SpiloFSGroup            *int64              `name:"spilo_fsgroup"`
-	PodPriorityClassName    string              `name:"pod_priority_class_name"`
-	ClusterDomain           string              `name:"cluster_domain" default:"cluster.local"`
-	SpiloPrivileged         bool                `name:"spilo_privileged" default:"false"`
-	ClusterLabels           map[string]string   `name:"cluster_labels" default:"application:spilo"`
-	InheritedLabels         []string            `name:"inherited_labels" default:""`
-	InheritedAnnotations    []string            `name:"inherited_annotations" default:""`
-	DownscalerAnnotations   []string            `name:"downscaler_annotations"`
-	ClusterNameLabel        string              `name:"cluster_name_label" default:"cluster-name"`
-	DeleteAnnotationDateKey string              `name:"delete_annotation_date_key"`
-	DeleteAnnotationNameKey string              `name:"delete_annotation_name_key"`
-	PodRoleLabel            string              `name:"pod_role_label" default:"spilo-role"`
-	PodToleration           map[string]string   `name:"toleration" default:""`
-	DefaultCPURequest       string              `name:"default_cpu_request" default:"100m"`
-	DefaultMemoryRequest    string              `name:"default_memory_request" default:"100Mi"`
-	DefaultCPULimit         string              `name:"default_cpu_limit" default:"1"`
-	DefaultMemoryLimit      string              `name:"default_memory_limit" default:"500Mi"`
-	MinCPULimit             string              `name:"min_cpu_limit" default:"250m"`
-	MinMemoryLimit          string              `name:"min_memory_limit" default:"250Mi"`
-	PodEnvironmentConfigMap spec.NamespacedName `name:"pod_environment_configmap"`
-	PodEnvironmentSecret    string              `name:"pod_environment_secret"`
-	NodeReadinessLabel      map[string]string   `name:"node_readiness_label" default:""`
-	MaxInstances            int32               `name:"max_instances" default:"-1"`
-	MinInstances            int32               `name:"min_instances" default:"-1"`
-	ShmVolume               *bool               `name:"enable_shm_volume" default:"true"`
+	ResourceCheckInterval     time.Duration       `name:"resource_check_interval" default:"3s"`
+	ResourceCheckTimeout      time.Duration       `name:"resource_check_timeout" default:"10m"`
+	PodLabelWaitTimeout       time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
+	PodDeletionWaitTimeout    time.Duration       `name:"pod_deletion_wait_timeout" default:"10m"`
+	PodTerminateGracePeriod   time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
+	SpiloRunAsUser            *int64              `json:"spilo_runasuser,omitempty"`
+	SpiloRunAsGroup           *int64              `json:"spilo_runasgroup,omitempty"`
+	SpiloFSGroup              *int64              `name:"spilo_fsgroup"`
+	PodPriorityClassName      string              `name:"pod_priority_class_name"`
+	ClusterDomain             string              `name:"cluster_domain" default:"cluster.local"`
+	SpiloPrivileged           bool                `name:"spilo_privileged" default:"false"`
+	AdditionalPodCapabilities []string            `name:"additional_pod_capabilities" default:""`
+	ClusterLabels             map[string]string   `name:"cluster_labels" default:"application:spilo"`
+	InheritedLabels           []string            `name:"inherited_labels" default:""`
+	InheritedAnnotations      []string            `name:"inherited_annotations" default:""`
+	DownscalerAnnotations     []string            `name:"downscaler_annotations"`
+	ClusterNameLabel          string              `name:"cluster_name_label" default:"cluster-name"`
+	DeleteAnnotationDateKey   string              `name:"delete_annotation_date_key"`
+	DeleteAnnotationNameKey   string              `name:"delete_annotation_name_key"`
+	PodRoleLabel              string              `name:"pod_role_label" default:"spilo-role"`
+	PodToleration             map[string]string   `name:"toleration" default:""`
+	DefaultCPURequest         string              `name:"default_cpu_request" default:"100m"`
+	DefaultMemoryRequest      string              `name:"default_memory_request" default:"100Mi"`
+	DefaultCPULimit           string              `name:"default_cpu_limit" default:"1"`
+	DefaultMemoryLimit        string              `name:"default_memory_limit" default:"500Mi"`
+	MinCPULimit               string              `name:"min_cpu_limit" default:"250m"`
+	MinMemoryLimit            string              `name:"min_memory_limit" default:"250Mi"`
+	PodEnvironmentConfigMap   spec.NamespacedName `name:"pod_environment_configmap"`
+	PodEnvironmentSecret      string              `name:"pod_environment_secret"`
+	NodeReadinessLabel        map[string]string   `name:"node_readiness_label" default:""`
+	MaxInstances              int32               `name:"max_instances" default:"-1"`
+	MinInstances              int32               `name:"min_instances" default:"-1"`
+	ShmVolume                 *bool               `name:"enable_shm_volume" default:"true"`
 }
 
 type InfrastructureRole struct {

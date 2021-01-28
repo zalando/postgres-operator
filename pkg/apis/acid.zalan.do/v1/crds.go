@@ -968,6 +968,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"kubernetes": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"additional_pod_capabilities": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
 							"cluster_domain": {
 								Type: "string",
 							},

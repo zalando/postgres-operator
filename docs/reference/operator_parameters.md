@@ -351,6 +351,12 @@ configuration they are grouped under the `kubernetes` key.
   used for AWS volume resizing and not required if you don't need that
   capability. The default is `false`.
 
+* **additional_pod_capabilities**
+  list of additional capabilities to be added to the postgres container's
+  SecurityContext (e.g. SYS_NICE etc.). Please, make sure first that the
+  PodSecruityPolicy allows the capabilities listed here. Otherwise, the
+  container will not start. The default is empty.
+
 * **master_pod_move_timeout**
   The period of time to wait for the success of migration of master pods from
   an unschedulable node. The migration includes Patroni switchovers to
