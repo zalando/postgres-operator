@@ -1512,12 +1512,20 @@ func TestGenerateCapabilities(t *testing.T) {
 			err:          fmt.Errorf("could not parse empty capabilities configuration"),
 		},
 		{
+			subTest:    "configured capability",
+			configured: []string{"SYS_NICE"},
+			capabilities: v1.Capabilities{
+				Add: []v1.Capability{"SYS_NICE"},
+			},
+			err: fmt.Errorf("could not generate one configured capability"),
+		},
+		{
 			subTest:    "configured capabilities",
 			configured: []string{"SYS_NICE", "CHOWN"},
 			capabilities: v1.Capabilities{
 				Add: []v1.Capability{"SYS_NICE", "CHOWN"},
 			},
-			err: fmt.Errorf("could not parse empty capabilities configuration"),
+			err: fmt.Errorf("could not generate multiple configured capabilities"),
 		},
 	}
 	for _, tt := range tests {
