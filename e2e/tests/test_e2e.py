@@ -160,6 +160,7 @@ class EndToEndTestCase(unittest.TestCase):
         '''
            Extend postgres container capabilities
         '''
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
         capabilities = ["SYS_NICE","CHOWN"]
         patch_capabilities = {
             "data": {
@@ -170,7 +171,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
         
-        self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities),
+        self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
                              2, "Container capabilities not updated")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)

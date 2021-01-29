@@ -182,6 +182,10 @@ class K8s:
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: x.status.phase == 'Running', pods)))
 
+    def count_pods_with_container_capabilities(self, capabilities, labels, namespace='default'):
+        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
+        return len(list(filter(lambda x: x.spec.containers[0].security_context.capabilities.add == capabilities, pods)))
+
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
         new_pod_node = ''
@@ -433,8 +437,8 @@ class K8sBase:
         pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: x.status.phase == 'Running', pods)))
 
-    def count_pods_with_container_capabilities(self, capabilities, namespace='default'):
-        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector='application=spilo,cluster-name=acid-minimal-cluster').items
+    def count_pods_with_container_capabilities(self, capabilities, labels, namespace='default'):
+        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
         return len(list(filter(lambda x: x.spec.containers[0].securityContext.capabilities.add == capabilities, pods)))
 
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
