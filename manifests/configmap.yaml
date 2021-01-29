@@ -3,6 +3,7 @@ kind: ConfigMap
 metadata:
   name: postgres-operator
 data:
+  # additional_pod_capabilities: "SYS_NICE"
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
   api_port: "8080"

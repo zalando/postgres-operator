@@ -1489,3 +1489,42 @@ func TestGenerateService(t *testing.T) {
 	assert.Equal(t, v1.ServiceExternalTrafficPolicyTypeLocal, service.Spec.ExternalTrafficPolicy)
 
 }
+
+func TestGenerateCapabilities(t *testing.T) {
+
+	testName := "TestGenerateCapabilities"
+	tests := []struct {
+		subTest      string
+		configured   []string
+		capabilities v1.Capabilities
+		err          error
+	}{
+		{
+			subTest:      "no capabilities",
+			configured:   nil,
+			capabilities: v1.Capabilities{},
+			err:          fmt.Errorf("could not parse capabilities configuration of nil"),
+		},
+		{
+			subTest:      "empty capabilities",
+			configured:   []string{},
+			capabilities: v1.Capabilities{},
+			err:          fmt.Errorf("could not parse empty capabilities configuration"),
+		},
+		{
+			subTest:    "configured capabilities",
+			configured: []string{"SYS_NICE", "CHOWN"},
+			capabilities: v1.Capabilities{
+				Add: []v1.Capability{"SYS_NICE", "CHOWN"},
+			},
+			err: fmt.Errorf("could not parse empty capabilities configuration"),
+		},
+	}
+	for _, tt := range tests {
+		caps := generateCapabilities(tt.configured)
+		if !reflect.DeepEqual(caps, tt.capabilities) {
+			t.Errorf("%s %s: expected `%v` but got `%v`",
+				testName, tt.subTest, tt.capabilities, caps)
+		}
+	}
+}

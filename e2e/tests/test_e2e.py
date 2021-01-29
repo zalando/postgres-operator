@@ -156,6 +156,25 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_additional_pod_capabilities(self):
+        '''
+           Extend postgres container capabilities
+        '''
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        capabilities = ["SYS_NICE","CHOWN"]
+        patch_capabilities = {
+            "data": {
+                "additional_pod_capabilities": ','.join(capabilities),
+            },
+        }
+        self.k8s.update_config(patch_capabilities)
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+        
+        self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
+                             2, "Container capabilities not updated")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
         self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")

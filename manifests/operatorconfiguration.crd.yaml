@@ -126,6 +126,10 @@ spec:
               kubernetes:
                 type: object
                 properties:
+                  additional_pod_capabilities:
+                    type: array
+                    items:
+                      type: string
                   cluster_domain:
                     type: string
                     default: "cluster.local"
