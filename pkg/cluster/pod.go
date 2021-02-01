@@ -384,6 +384,7 @@ func (c *Cluster) recreatePods() error {
 
 	if masterPod != nil {
 		// failover if we have not observed a master pod when re-creating former replicas.
+		// TODO if masterPod has no rolling update label anymore skip switchover too
 		if newMasterPod == nil && len(replicas) > 0 {
 			if err := c.Switchover(masterPod, masterCandidate(replicas)); err != nil {
 				c.logger.Warningf("could not perform switch over: %v", err)
@@ -393,6 +394,7 @@ func (c *Cluster) recreatePods() error {
 		}
 		c.logger.Infof("recreating old master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
+		// TODO only if rolling update label is present
 		if _, err := c.recreatePod(util.NameFromMeta(masterPod.ObjectMeta)); err != nil {
 			return fmt.Errorf("could not recreate old master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
 		}

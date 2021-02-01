@@ -1279,6 +1279,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	stsAnnotations := make(map[string]string)
+	// TODO remove from sts
 	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
 	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
 
@@ -1305,6 +1306,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 
 func (c *Cluster) generatePodAnnotations(spec *acidv1.PostgresSpec) map[string]string {
 	annotations := make(map[string]string)
+	// TODO annotations[rollingUpdatePodAnnotationKey] = strconv.FormatBool(false)
 	for k, v := range c.OpConfig.CustomPodAnnotations {
 		annotations[k] = v
 	}

@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	// TODO rollingUpdatePodAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 	rollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 )
 
@@ -147,6 +148,7 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 	return nil
 }
 
+// TODO setRollingUpdateFlagForPod
 // setRollingUpdateFlagForStatefulSet sets the indicator or the rolling update requirement
 // in the StatefulSet annotation.
 func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool, msg string) {
@@ -160,6 +162,7 @@ func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, v
 	c.logger.Debugf("set statefulset's rolling update annotation to %t: caller/reason %s", val, msg)
 }
 
+// TODO applyRollingUpdateFlagForPod
 // applyRollingUpdateFlagforStatefulSet sets the rolling update flag for the cluster's StatefulSet
 // and applies that setting to the actual running cluster.
 func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
@@ -172,6 +175,7 @@ func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
 	return nil
 }
 
+// TODO getRollingUpdateFlagFromPod
 // getRollingUpdateFlagFromStatefulSet returns the value of the rollingUpdate flag from the passed
 // StatefulSet, reverting to the default value in case of errors
 func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *appsv1.StatefulSet, defaultValue bool) (flag bool) {
@@ -192,6 +196,7 @@ func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *appsv1.StatefulSet, 
 	return flag
 }
 
+// TODO mergeRollingUpdateFlagUsingCache(runningPod *v1.Pod) bool {
 // mergeRollingUpdateFlagUsingCache returns the value of the rollingUpdate flag from the passed
 // statefulset, however, the value can be cleared if there is a cached flag in the cluster that
 // is set to false (the discrepancy could be a result of a failed StatefulSet update)
@@ -220,6 +225,7 @@ func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *appsv1.St
 	return podsRollingUpdateRequired
 }
 
+// updatePodAnnotations
 func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
 	c.logger.Debugf("patching statefulset annotations")
 	patchData, err := metaAnnotationsPatch(annotations)
@@ -237,8 +243,8 @@ func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*
 		return nil, fmt.Errorf("could not patch statefulset annotations %q: %v", patchData, err)
 	}
 	return result, nil
-
 }
+
 func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
