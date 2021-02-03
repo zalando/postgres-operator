@@ -46,7 +46,7 @@ export -f aws_delete_objects
 function aws_delete_outdated {
       if [[ -z "$LOGICAL_BACKUP_S3_RETENTION_TIME" ]] ; then
           echo "no retention time configured: skip cleanup of outdated backups"
-          exit 0
+          return 0
       fi
 
       # define cutoff date for outdated backups (day precision)
@@ -74,7 +74,7 @@ function aws_delete_outdated {
       count=$(wc -l < /tmp/outdated-backups)
       if [[ $count == 0 ]] ; then
         echo "no outdated backups to delete"
-        exit 0
+        return 0
       fi
       echo "deleting $count outdated backups created before $cutoff_date"
 
