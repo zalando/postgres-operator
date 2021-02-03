@@ -77,10 +77,8 @@ func (c *Cluster) enableRollingUpdateFlagForPod(pod v1.Pod, msg string) error {
 // on pods that do not have it yet
 func (c *Cluster) enableRollingUpdateFlagForPods(pods []v1.Pod, msg string) error {
 	for _, pod := range pods {
-		if c.getRollingUpdateFlagFromPod(&pod, true) {
-			if err := c.enableRollingUpdateFlagForPod(pod, msg); err != nil {
-				return fmt.Errorf("enabling rolling update flag failed for pod %q: %v", pod.Name, err)
-			}
+		if err := c.enableRollingUpdateFlagForPod(pod, msg); err != nil {
+			return fmt.Errorf("enabling rolling update flag failed for pod %q: %v", pod.Name, err)
 		}
 	}
 
@@ -485,7 +483,6 @@ func (c *Cluster) recreatePods() error {
 		}
 		c.logger.Infof("recreating old master pod %q", util.NameFromMeta(masterPod.ObjectMeta))
 
-		// TODO only if rolling update label is present
 		if _, err := c.recreatePod(util.NameFromMeta(masterPod.ObjectMeta)); err != nil {
 			return fmt.Errorf("could not recreate old master pod %q: %v", util.NameFromMeta(masterPod.ObjectMeta), err)
 		}

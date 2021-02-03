@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	// TODO rollingUpdatePodAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 	rollingUpdatePodAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 )
 
