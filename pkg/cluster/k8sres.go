@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -1279,8 +1278,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	stsAnnotations := make(map[string]string)
-	// TODO remove from sts
-	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
 	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
 
 	statefulSet := &appsv1.StatefulSet{

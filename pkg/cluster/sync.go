@@ -280,6 +280,12 @@ func (c *Cluster) syncStatefulSet() error {
 	var (
 		podsRollingUpdateRequired bool
 	)
+
+	pods, err := c.listPods()
+	if err != nil {
+		c.logger.Infof("could not list pods of the statefulset: %v", err)
+	}
+
 	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(context.TODO(), c.statefulSetName(), metav1.GetOptions{})
 	if err != nil {
@@ -289,10 +295,6 @@ func (c *Cluster) syncStatefulSet() error {
 		// statefulset does not exist, try to re-create it
 		c.Statefulset = nil
 		c.logger.Infof("could not find the cluster's statefulset")
-		pods, err := c.listPods()
-		if err != nil {
-			return fmt.Errorf("could not list pods of the statefulset: %v", err)
-		}
 
 		sset, err = c.createStatefulSet()
 		if err != nil {
@@ -305,58 +307,73 @@ func (c *Cluster) syncStatefulSet() error {
 
 		podsRollingUpdateRequired = (len(pods) > 0)
 		if podsRollingUpdateRequired {
-			c.logger.Warningf("found pods from the previous statefulset: trigger rolling update")
-			if err := c.applyRollingUpdateFlagforStatefulSet(podsRollingUpdateRequired); err != nil {
-				return fmt.Errorf("could not set rolling update flag for the statefulset: %v", err)
+			if err = c.enableRollingUpdateFlagForPods(pods, "pods from previous statefulset"); err != nil {
+				c.logger.Warnf("updating rolling update flag for existing pods failed: %v", err)
 			}
 		}
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
 
 	} else {
-		podsRollingUpdateRequired = c.mergeRollingUpdateFlagUsingCache(sset)
+		// check if there are still pods with a rolling update flag
+		// default value for flag depends on a potentially cached StatefulSet
+		podsToRollCount, podCount := c.countPodsWithRollingUpdateFlag(c.Statefulset != nil)
+
+		if podsToRollCount > 0 {
+			c.logger.Debugf("%d / %d pods still need to be rotated", podsToRollCount, podCount)
+			podsRollingUpdateRequired = true
+		}
+
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
-		desiredSS, err := c.generateStatefulSet(&c.Spec)
+		desiredSts, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
-		c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired, "from cache")
 
-		cmp := c.compareStatefulSetWith(desiredSS)
+		cmp := c.compareStatefulSetWith(desiredSts)
 		if !cmp.match {
 			if cmp.rollingUpdate && !podsRollingUpdateRequired {
-				podsRollingUpdateRequired = true
-				c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired, "statefulset changes")
+				podsRollingUpdateRequired = cmp.rollingUpdate
+				if err = c.enableRollingUpdateFlagForPods(pods, "pod changes"); err != nil {
+					return fmt.Errorf("updating rolling update flag for pods failed: %v", err)
+				}
 			}
 
-			c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
+			c.logStatefulSetChanges(c.Statefulset, desiredSts, false, cmp.reasons)
 
 			if !cmp.replace {
-				if err := c.updateStatefulSet(desiredSS); err != nil {
+				if err := c.updateStatefulSet(desiredSts); err != nil {
 					return fmt.Errorf("could not update statefulset: %v", err)
 				}
 			} else {
-				if err := c.replaceStatefulSet(desiredSS); err != nil {
+				if err := c.replaceStatefulSet(desiredSts); err != nil {
 					return fmt.Errorf("could not replace statefulset: %v", err)
 				}
 			}
 		}
 
+		// TODO why is this necessary?
 		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
 
 		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
-			// even if desired and actual statefulsets match
+			// even if the desired and the running statefulsets match
 			// there still may be not up-to-date pods on condition
 			//  (a) the lazy update was just disabled
 			// and
 			//  (b) some of the pods were not restarted when the lazy update was still in place
-			podsRollingUpdateRequired, err = c.mustUpdatePodsAfterLazyUpdate(desiredSS)
-			if err != nil {
-				return fmt.Errorf("could not list pods of the statefulset: %v", err)
+			for _, pod := range pods {
+				effectivePodImage := pod.Spec.Containers[0].Image
+				stsImage := desiredSts.Spec.Template.Spec.Containers[0].Image
+
+				if stsImage != effectivePodImage {
+					podsRollingUpdateRequired = true
+					if err = c.enableRollingUpdateFlagForPod(pod, "pod not yet restarted due to lazy update"); err != nil {
+						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
+					}
+				}
 			}
 		}
-
 	}
 
 	// Apply special PostgreSQL parameters that can only be set via the Patroni API.
@@ -376,9 +393,6 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 		c.logger.Infof("pods have been recreated")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
-		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
-			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
-		}
 	}
 	return nil
 }

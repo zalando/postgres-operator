@@ -20,7 +20,7 @@ import (
 
 const (
 	// TODO rollingUpdatePodAnnotationKey = "zalando-postgres-operator-rolling-update-required"
-	rollingUpdateStatefulsetAnnotationKey = "zalando-postgres-operator-rolling-update-required"
+	rollingUpdatePodAnnotationKey = "zalando-postgres-operator-rolling-update-required"
 )
 
 func (c *Cluster) listResources() error {
@@ -148,84 +148,32 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 	return nil
 }
 
-// TODO setRollingUpdateFlagForPod
-// setRollingUpdateFlagForStatefulSet sets the indicator or the rolling update requirement
-// in the StatefulSet annotation.
-func (c *Cluster) setRollingUpdateFlagForStatefulSet(sset *appsv1.StatefulSet, val bool, msg string) {
-	anno := sset.GetAnnotations()
-	if anno == nil {
-		anno = make(map[string]string)
-	}
-
-	anno[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(val)
-	sset.SetAnnotations(anno)
-	c.logger.Debugf("set statefulset's rolling update annotation to %t: caller/reason %s", val, msg)
-}
-
-// TODO applyRollingUpdateFlagForPod
-// applyRollingUpdateFlagforStatefulSet sets the rolling update flag for the cluster's StatefulSet
-// and applies that setting to the actual running cluster.
-func (c *Cluster) applyRollingUpdateFlagforStatefulSet(val bool) error {
-	c.setRollingUpdateFlagForStatefulSet(c.Statefulset, val, "applyRollingUpdateFlag")
-	sset, err := c.updateStatefulSetAnnotations(c.Statefulset.GetAnnotations())
-	if err != nil {
-		return err
-	}
-	c.Statefulset = sset
-	return nil
-}
-
-// TODO getRollingUpdateFlagFromPod
-// getRollingUpdateFlagFromStatefulSet returns the value of the rollingUpdate flag from the passed
-// StatefulSet, reverting to the default value in case of errors
-func (c *Cluster) getRollingUpdateFlagFromStatefulSet(sset *appsv1.StatefulSet, defaultValue bool) (flag bool) {
-	anno := sset.GetAnnotations()
-	flag = defaultValue
-
-	stringFlag, exists := anno[rollingUpdateStatefulsetAnnotationKey]
-	if exists {
-		var err error
-		if flag, err = strconv.ParseBool(stringFlag); err != nil {
-			c.logger.Warnf("error when parsing %q annotation for the statefulset %q: expected boolean value, got %q\n",
-				rollingUpdateStatefulsetAnnotationKey,
-				types.NamespacedName{Namespace: sset.Namespace, Name: sset.Name},
-				stringFlag)
-			flag = defaultValue
-		}
-	}
-	return flag
-}
-
-// TODO mergeRollingUpdateFlagUsingCache(runningPod *v1.Pod) bool {
 // mergeRollingUpdateFlagUsingCache returns the value of the rollingUpdate flag from the passed
 // statefulset, however, the value can be cleared if there is a cached flag in the cluster that
 // is set to false (the discrepancy could be a result of a failed StatefulSet update)
 func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *appsv1.StatefulSet) bool {
 	var (
-		cachedStatefulsetExists, clearRollingUpdateFromCache, podsRollingUpdateRequired bool
+		cachedStatefulsetExists, podsRollingUpdateRequired bool
 	)
 
 	if c.Statefulset != nil {
 		// if we reset the rolling update flag in the statefulset structure in memory but didn't manage to update
 		// the actual object in Kubernetes for some reason we want to avoid doing an unnecessary update by relying
 		// on the 'cached' in-memory flag.
+		c.logger.Debugf("cached StatefulSet value exists")
 		cachedStatefulsetExists = true
-		clearRollingUpdateFromCache = !c.getRollingUpdateFlagFromStatefulSet(c.Statefulset, true)
-		c.logger.Debugf("cached StatefulSet value exists, rollingUpdate flag is %t", clearRollingUpdateFromCache)
 	}
 
-	if podsRollingUpdateRequired = c.getRollingUpdateFlagFromStatefulSet(runningStatefulSet, false); podsRollingUpdateRequired {
-		if cachedStatefulsetExists && clearRollingUpdateFromCache {
-			c.logger.Infof("clearing the rolling update flag based on the cached information")
-			podsRollingUpdateRequired = false
-		} else {
-			c.logger.Infof("found a statefulset with an unfinished rolling update of the pods")
-		}
+	podsToRollCount, podCount := c.countPodsWithRollingUpdateFlag(cachedStatefulsetExists)
+
+	if podsToRollCount > 0 {
+		c.logger.Debugf("%d / %d pods still need to be rotated", podsToRollCount, podCount)
+		podsRollingUpdateRequired = true
 	}
+
 	return podsRollingUpdateRequired
 }
 
-// updatePodAnnotations
 func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
 	c.logger.Debugf("patching statefulset annotations")
 	patchData, err := metaAnnotationsPatch(annotations)

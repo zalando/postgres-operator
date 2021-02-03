@@ -588,7 +588,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.update_config(unpatch_lazy_spilo_upgrade, step="patch lazy upgrade")
 
             # at this point operator will complete the normal rolling upgrade
-            # so we additonally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
+            # so we additionally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
             self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0),
                                  conf_image, "Rolling upgrade was not executed",
                                  50, 3)
