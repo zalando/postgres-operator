@@ -50,7 +50,7 @@ function aws_delete_outdated {
       fi
 
       # define cutoff date for outdated backups (day precision)
-      cutoff_date=$(date -d "$LOGICAL_BACKUP_S3_RETENTION_TIME ago + 1 day" +%F)
+      cutoff_date=$(date -d "$LOGICAL_BACKUP_S3_RETENTION_TIME ago" +%F)
 
       # mimic bucket setup from Spilo
       prefix="spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"
