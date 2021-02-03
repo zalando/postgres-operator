@@ -47,10 +47,10 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	return pods.Items, nil
 }
 
-// enableRollingUpdateFlagForPod sets the indicator for the rolling update requirement
+// markRollingUpdateFlagForPod sets the indicator for the rolling update requirement
 // in the Pod annotation.
-func (c *Cluster) enableRollingUpdateFlagForPod(pod v1.Pod, msg string) error {
-	c.logger.Debugf("enable rolling update annotation for %s: reason %s", pod.Name, msg)
+func (c *Cluster) markRollingUpdateFlagForPod(pod v1.Pod, msg string) error {
+	c.logger.Debugf("mark rolling update annotation for %s: reason %s", pod.Name, msg)
 	flag := make(map[string]string)
 	flag[rollingUpdatePodAnnotationKey] = strconv.FormatBool(true)
 
@@ -59,13 +59,20 @@ func (c *Cluster) enableRollingUpdateFlagForPod(pod v1.Pod, msg string) error {
 		return fmt.Errorf("could not form patch for pod's rolling update flag: %v", err)
 	}
 
-	_, err = c.KubeClient.Pods(pod.Namespace).Patch(
-		context.TODO(),
-		pod.Name,
-		types.MergePatchType,
-		[]byte(patchData),
-		metav1.PatchOptions{},
-		"")
+	err = retryutil.Retry(1*time.Second, 5*time.Second,
+		func() (bool, error) {
+			_, err2 := c.KubeClient.Pods(pod.Namespace).Patch(
+				context.TODO(),
+				pod.Name,
+				types.MergePatchType,
+				[]byte(patchData),
+				metav1.PatchOptions{},
+				"")
+			if err2 != nil {
+				return false, err2
+			}
+			return true, nil
+		})
 	if err != nil {
 		return fmt.Errorf("could not patch pod rolling update flag %q: %v", patchData, err)
 	}
@@ -73,12 +80,12 @@ func (c *Cluster) enableRollingUpdateFlagForPod(pod v1.Pod, msg string) error {
 	return nil
 }
 
-// enableRollingUpdateFlagForPods sets the indicator for the rolling update requirement
+// markRollingUpdateFlagForPods sets the indicator for the rolling update requirement
 // on pods that do not have it yet
-func (c *Cluster) enableRollingUpdateFlagForPods(pods []v1.Pod, msg string) error {
+func (c *Cluster) markRollingUpdateFlagForPods(pods []v1.Pod, msg string) error {
 	for _, pod := range pods {
-		if err := c.enableRollingUpdateFlagForPod(pod, msg); err != nil {
-			return fmt.Errorf("enabling rolling update flag failed for pod %q: %v", pod.Name, err)
+		if err := c.markRollingUpdateFlagForPod(pod, msg); err != nil {
+			return fmt.Errorf("marking rolling update flag failed for pod %q: %v", pod.Name, err)
 		}
 	}
 
@@ -86,10 +93,9 @@ func (c *Cluster) enableRollingUpdateFlagForPods(pods []v1.Pod, msg string) erro
 }
 
 // getRollingUpdateFlagFromPod returns the value of the rollingUpdate flag from the passed
-// reverting to the default value in case of errors
-func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod, defaultValue bool) (flag bool) {
+func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod) (flag bool) {
 	anno := pod.GetAnnotations()
-	flag = defaultValue
+	flag = false
 
 	stringFlag, exists := anno[rollingUpdatePodAnnotationKey]
 	if exists {
@@ -99,7 +105,6 @@ func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod, defaultValue bool) (f
 				rollingUpdatePodAnnotationKey,
 				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
 				stringFlag)
-			flag = defaultValue
 		}
 	}
 
@@ -107,8 +112,7 @@ func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod, defaultValue bool) (f
 }
 
 // countPodsWithRollingUpdateFlag returns the value of the rollingUpdate flag from the passed pod
-// reverting to the default value in case of errors
-func (c *Cluster) countPodsWithRollingUpdateFlag(defaultValue bool) (int, int) {
+func (c *Cluster) countPodsWithRollingUpdateFlag() (int, int) {
 
 	pods, err := c.listPods()
 	if err != nil {
@@ -124,7 +128,7 @@ func (c *Cluster) countPodsWithRollingUpdateFlag(defaultValue bool) (int, int) {
 	}
 
 	for _, pod := range pods {
-		if c.getRollingUpdateFlagFromPod(&pod, defaultValue) {
+		if c.getRollingUpdateFlagFromPod(&pod) {
 			podsToRollCount++
 		}
 	}
@@ -452,7 +456,7 @@ func (c *Cluster) recreatePods() error {
 	replicas := make([]spec.NamespacedName, 0)
 	for i, pod := range pods.Items {
 		// only recreate pod if rolling update flag is true
-		if c.getRollingUpdateFlagFromPod(&pod, false) {
+		if c.getRollingUpdateFlagFromPod(&pod) {
 			role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
 			if role == Master {

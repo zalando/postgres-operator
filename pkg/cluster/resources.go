@@ -147,32 +147,6 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 	return nil
 }
 
-// mergeRollingUpdateFlagUsingCache returns the value of the rollingUpdate flag from the passed
-// statefulset, however, the value can be cleared if there is a cached flag in the cluster that
-// is set to false (the discrepancy could be a result of a failed StatefulSet update)
-func (c *Cluster) mergeRollingUpdateFlagUsingCache(runningStatefulSet *appsv1.StatefulSet) bool {
-	var (
-		cachedStatefulsetExists, podsRollingUpdateRequired bool
-	)
-
-	if c.Statefulset != nil {
-		// if we reset the rolling update flag in the statefulset structure in memory but didn't manage to update
-		// the actual object in Kubernetes for some reason we want to avoid doing an unnecessary update by relying
-		// on the 'cached' in-memory flag.
-		c.logger.Debugf("cached StatefulSet value exists")
-		cachedStatefulsetExists = true
-	}
-
-	podsToRollCount, podCount := c.countPodsWithRollingUpdateFlag(cachedStatefulsetExists)
-
-	if podsToRollCount > 0 {
-		c.logger.Debugf("%d / %d pods still need to be rotated", podsToRollCount, podCount)
-		podsRollingUpdateRequired = true
-	}
-
-	return podsRollingUpdateRequired
-}
-
 func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
 	c.logger.Debugf("patching statefulset annotations")
 	patchData, err := metaAnnotationsPatch(annotations)

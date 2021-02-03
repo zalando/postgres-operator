@@ -307,7 +307,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 		podsRollingUpdateRequired = (len(pods) > 0)
 		if podsRollingUpdateRequired {
-			if err = c.enableRollingUpdateFlagForPods(pods, "pods from previous statefulset"); err != nil {
+			if err = c.markRollingUpdateFlagForPods(pods, "pods from previous statefulset"); err != nil {
 				c.logger.Warnf("updating rolling update flag for existing pods failed: %v", err)
 			}
 		}
@@ -316,7 +316,7 @@ func (c *Cluster) syncStatefulSet() error {
 	} else {
 		// check if there are still pods with a rolling update flag
 		// default value for flag depends on a potentially cached StatefulSet
-		podsToRollCount, podCount := c.countPodsWithRollingUpdateFlag(c.Statefulset != nil)
+		podsToRollCount, podCount := c.countPodsWithRollingUpdateFlag()
 
 		if podsToRollCount > 0 {
 			c.logger.Debugf("%d / %d pods still need to be rotated", podsToRollCount, podCount)
@@ -335,7 +335,7 @@ func (c *Cluster) syncStatefulSet() error {
 		if !cmp.match {
 			if cmp.rollingUpdate && !podsRollingUpdateRequired {
 				podsRollingUpdateRequired = cmp.rollingUpdate
-				if err = c.enableRollingUpdateFlagForPods(pods, "pod changes"); err != nil {
+				if err = c.markRollingUpdateFlagForPods(pods, "pod changes"); err != nil {
 					return fmt.Errorf("updating rolling update flag for pods failed: %v", err)
 				}
 			}
@@ -368,7 +368,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 				if stsImage != effectivePodImage {
 					podsRollingUpdateRequired = true
-					if err = c.enableRollingUpdateFlagForPod(pod, "pod not yet restarted due to lazy update"); err != nil {
+					if err = c.markRollingUpdateFlagForPod(pod, "pod not yet restarted due to lazy update"); err != nil {
 						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
 					}
 				}
@@ -391,7 +391,6 @@ func (c *Cluster) syncStatefulSet() error {
 		if err := c.recreatePods(); err != nil {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
-		c.logger.Infof("pods have been recreated")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 	}
 	return nil
