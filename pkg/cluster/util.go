@@ -240,7 +240,14 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	c.logger.Debugf("fetching possible additional team members for team %q", teamID)
 	members := []string{}
-	additionalMembers := c.PgTeamMap[teamID].AdditionalMembers
+	additionalMembers := []string{}
+
+	for team, membership := range *c.PgTeamMap {
+		if team == teamID {
+			additionalMembers = membership.AdditionalMembers
+		}
+	}
+
 	for _, member := range additionalMembers {
 		members = append(members, member)
 	}

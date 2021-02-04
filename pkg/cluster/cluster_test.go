@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
+	pgteams "github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -37,6 +38,7 @@ var cl = New(
 				DownscalerAnnotations: []string{"downscaler/*"},
 			},
 		},
+		PgTeamMap: new(pgteams.PostgresTeamMap),
 	},
 	k8sutil.NewMockKubernetesClient(),
 	acidv1.Postgresql{ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "test", Annotations: map[string]string{"downscaler/downtime_replicas": "0"}}},

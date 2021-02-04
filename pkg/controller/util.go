@@ -396,7 +396,7 @@ func (c *Controller) getInfrastructureRole(
 
 func (c *Controller) loadPostgresTeams() {
 	// reset team map
-	c.pgTeamMap = teams.PostgresTeamMap{}
+	c.pgTeamMap = new(teams.PostgresTeamMap)
 
 	pgTeams, err := c.KubeClient.PostgresTeamsGetter.PostgresTeams(c.opConfig.WatchedNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {

@@ -37,7 +37,7 @@ import (
 type Controller struct {
 	config    spec.ControllerConfig
 	opConfig  *config.Config
-	pgTeamMap teams.PostgresTeamMap
+	pgTeamMap *teams.PostgresTeamMap
 
 	logger     *logrus.Entry
 	KubeClient k8sutil.KubernetesClient
@@ -332,7 +332,7 @@ func (c *Controller) initController() {
 	if c.opConfig.EnablePostgresTeamCRD {
 		c.loadPostgresTeams()
 	} else {
-		c.pgTeamMap = teams.PostgresTeamMap{}
+		c.pgTeamMap = new(teams.PostgresTeamMap)
 	}
 
 	if c.opConfig.DebugLogging {
