@@ -332,6 +332,8 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 }
 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
+	// TODO due to delays in sync, should double check if recreate annotation is still present
+
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 	stopChan := make(chan struct{})
@@ -431,7 +433,9 @@ func (c *Cluster) recreatePods(pods []v1.Pod) error {
 		if err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 		}
-		if newRole := PostgresRole(newPod.Labels[c.OpConfig.PodRoleLabel]); newRole == Replica {
+
+		newRole := PostgresRole(newPod.Labels[c.OpConfig.PodRoleLabel])
+		if newRole == Replica {
 			replicas = append(replicas, util.NameFromMeta(pod.ObjectMeta))
 		} else if newRole == Master {
 			newMasterPod = newPod
@@ -439,11 +443,12 @@ func (c *Cluster) recreatePods(pods []v1.Pod) error {
 	}
 
 	if masterPod != nil {
-		// failover if we have not observed a master pod when re-creating former replicas
+		// switchover if we have observed a master pod and replicas
 		if newMasterPod == nil && len(replicas) > 0 {
 			if err := c.Switchover(masterPod, masterCandidate(replicas)); err != nil {
 				c.logger.Warningf("could not perform switch over: %v", err)
 			}
+			// TODO if only the master pod came for recreate, we do not do switchover currently
 		} else if newMasterPod == nil && len(replicas) == 0 {
 			c.logger.Warningf("cannot perform switch over before re-creating the pod: no replicas")
 		}
