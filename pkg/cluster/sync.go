@@ -277,7 +277,9 @@ func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet)
 }
 
 func (c *Cluster) syncStatefulSet() error {
-	var podsToRecreate []v1.Pod
+
+	podsToRecreate := make([]v1.Pod, 0)
+	switchoverCandidates := make([]spec.NamespacedName, 0)
 
 	pods, err := c.listPods()
 	if err != nil {
@@ -318,6 +320,8 @@ func (c *Cluster) syncStatefulSet() error {
 		for _, pod := range pods {
 			if c.getRollingUpdateFlagFromPod(&pod) {
 				podsToRecreate = append(podsToRecreate, pod)
+			} else {
+				switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
 			}
 		}
 
@@ -376,6 +380,8 @@ func (c *Cluster) syncStatefulSet() error {
 						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
 					}
 					podsToRecreate = append(podsToRecreate, pod)
+				} else {
+					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
 				}
 			}
 		}
@@ -393,7 +399,7 @@ func (c *Cluster) syncStatefulSet() error {
 	if len(podsToRecreate) > 0 {
 		c.logger.Debugln("performing rolling update")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
-		if err := c.recreatePods(podsToRecreate); err != nil {
+		if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")

@@ -373,15 +373,14 @@ func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
 	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
 	 after this check succeeds but before a pod is re-created
 	*/
-	for i, pod := range pods {
+	for _, pod := range pods {
 		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
 		var state string
 
 		err := retryutil.Retry(1*time.Second, 5*time.Second,
 			func() (bool, error) {
 				var err error
-				state, err = c.patroni.GetPatroniMemberState(&pods[i])
-
+				state, err = c.patroni.GetPatroniMemberState(&pod)
 				if err != nil {
 					return false, err
 				}
@@ -400,7 +399,7 @@ func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
 	return true
 }
 
-func (c *Cluster) recreatePods(pods []v1.Pod) error {
+func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.NamespacedName) error {
 	c.setProcessName("starting to recreate pods")
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods))
 
@@ -411,7 +410,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod) error {
 	var (
 		masterPod, newMasterPod *v1.Pod
 	)
-	replicas := make([]spec.NamespacedName, 0)
+	replicas := switchoverCandidates
 
 	for i, pod := range pods {
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])

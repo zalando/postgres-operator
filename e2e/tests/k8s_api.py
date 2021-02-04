@@ -211,7 +211,7 @@ class K8s:
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
     def delete_operator_pod(self, step="Delete operator pod"):
-             # patching the pod template in the deployment restarts the operator pod
+        # patching the pod template in the deployment restarts the operator pod
         self.api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", {"spec": {"template": {"metadata": {"annotations": {"step": "{}-{}".format(step, time.time())}}}}})
         self.wait_for_operator_pod_start()
 
@@ -219,8 +219,8 @@ class K8s:
         self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
         self.delete_operator_pod(step=step)
 
-    def patch_statefulset(self, data, name="acid-minimal-cluster", namespace="default"):
-        self.api.apps_v1.patch_namespaced_stateful_set(name, namespace, data)
+    def patch_pod(self, data, pod_name, namespace="default"):
+        self.api.core_v1.patch_namespaced_pod(pod_name, namespace, data)
 
     def create_with_kubectl(self, path):
         return subprocess.run(
