@@ -279,6 +279,7 @@ func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet)
 func (c *Cluster) syncStatefulSet() error {
 	var (
 		podsRollingUpdateRequired bool
+		podsToRecreate            []v1.Pod
 	)
 
 	pods, err := c.listPods()
@@ -307,19 +308,25 @@ func (c *Cluster) syncStatefulSet() error {
 
 		podsRollingUpdateRequired = (len(pods) > 0)
 		if podsRollingUpdateRequired {
-			if err = c.markRollingUpdateFlagForPods(pods, "pods from previous statefulset"); err != nil {
-				c.logger.Warnf("updating rolling update flag for existing pods failed: %v", err)
+			for _, pod := range pods {
+				if err = c.markRollingUpdateFlagForPod(&pod, "pod from previous statefulset"); err != nil {
+					c.logger.Warnf("updating rolling update flag for existing pod failed: %v", err)
+				}
+				podsToRecreate = append(podsToRecreate, pod)
 			}
 		}
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
 
 	} else {
 		// check if there are still pods with a rolling update flag
-		// default value for flag depends on a potentially cached StatefulSet
-		podsToRollCount, podCount := c.countPodsWithRollingUpdateFlag()
+		for _, pod := range pods {
+			if c.getRollingUpdateFlagFromPod(&pod) {
+				podsToRecreate = append(podsToRecreate, pod)
+			}
+		}
 
-		if podsToRollCount > 0 {
-			c.logger.Debugf("%d / %d pods still need to be rotated", podsToRollCount, podCount)
+		if len(podsToRecreate) > 0 {
+			c.logger.Debugf("%d / %d pod(s) still need to be rotated", len(podsToRecreate), len(pods))
 			podsRollingUpdateRequired = true
 		}
 
@@ -335,8 +342,11 @@ func (c *Cluster) syncStatefulSet() error {
 		if !cmp.match {
 			if cmp.rollingUpdate && !podsRollingUpdateRequired {
 				podsRollingUpdateRequired = cmp.rollingUpdate
-				if err = c.markRollingUpdateFlagForPods(pods, "pod changes"); err != nil {
-					return fmt.Errorf("updating rolling update flag for pods failed: %v", err)
+				for _, pod := range pods {
+					if err = c.markRollingUpdateFlagForPod(&pod, "pod changes"); err != nil {
+						return fmt.Errorf("updating rolling update flag for pod failed: %v", err)
+					}
+					podsToRecreate = append(podsToRecreate, pod)
 				}
 			}
 
@@ -368,9 +378,10 @@ func (c *Cluster) syncStatefulSet() error {
 
 				if stsImage != effectivePodImage {
 					podsRollingUpdateRequired = true
-					if err = c.markRollingUpdateFlagForPod(pod, "pod not yet restarted due to lazy update"); err != nil {
+					if err = c.markRollingUpdateFlagForPod(&pod, "pod not yet restarted due to lazy update"); err != nil {
 						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
 					}
+					podsToRecreate = append(podsToRecreate, pod)
 				}
 			}
 		}
@@ -388,7 +399,7 @@ func (c *Cluster) syncStatefulSet() error {
 	if podsRollingUpdateRequired {
 		c.logger.Debugln("performing rolling update")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
-		if err := c.recreatePods(); err != nil {
+		if err := c.recreatePods(podsToRecreate); err != nil {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
