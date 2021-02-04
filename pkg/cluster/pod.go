@@ -373,21 +373,14 @@ func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
 	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
 	 after this check succeeds but before a pod is re-created
 	*/
-
-	for _, pod := range pods {
+	for i, pod := range pods {
 		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
-	}
-
-	for _, pod := range pods {
-
 		var state string
 
 		err := retryutil.Retry(1*time.Second, 5*time.Second,
 			func() (bool, error) {
-
 				var err error
-
-				state, err = c.patroni.GetPatroniMemberState(&pod)
+				state, err = c.patroni.GetPatroniMemberState(&pods[i])
 
 				if err != nil {
 					return false, err
@@ -403,7 +396,6 @@ func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
 			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
 			return false
 		}
-
 	}
 	return true
 }
@@ -420,11 +412,12 @@ func (c *Cluster) recreatePods(pods []v1.Pod) error {
 		masterPod, newMasterPod *v1.Pod
 	)
 	replicas := make([]spec.NamespacedName, 0)
-	for _, pod := range pods {
+
+	for i, pod := range pods {
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
 		if role == Master {
-			masterPod = &pod
+			masterPod = &pods[i]
 			continue
 		}
 
