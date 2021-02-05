@@ -24,6 +24,7 @@ const (
 
 var logger = logrus.New().WithField("test", "cluster")
 var eventRecorder = record.NewFakeRecorder(1)
+var teamMap = make(pgteams.PostgresTeamMap, 0)
 
 var cl = New(
 	Config{
@@ -38,7 +39,7 @@ var cl = New(
 				DownscalerAnnotations: []string{"downscaler/*"},
 			},
 		},
-		PgTeamMap: new(pgteams.PostgresTeamMap),
+		PgTeamMap: &teamMap,
 	},
 	k8sutil.NewMockKubernetesClient(),
 	acidv1.Postgresql{ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "test", Annotations: map[string]string{"downscaler/downtime_replicas": "0"}}},
