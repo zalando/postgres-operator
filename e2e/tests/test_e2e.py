@@ -770,6 +770,9 @@ class EndToEndTestCase(unittest.TestCase):
         # verify we are in good state from potential previous tests
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
 
+        # get nodes of master and replica(s) (expected target of new master)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+
          # rolling update annotation
         flag = {
             "metadata": {
@@ -791,8 +794,9 @@ class EndToEndTestCase(unittest.TestCase):
         # do not wait until the next sync
         k8s.delete_operator_pod()
 
-        # wait for the both pods to be up and running
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        # operator should now recreate the master pod and do a switchover before
+        k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         # check if the former replica is now the new master
         leader = k8s.get_cluster_leader_pod('acid-minimal-cluster')
