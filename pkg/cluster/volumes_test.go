@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/zalando/postgres-operator/mocks"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"

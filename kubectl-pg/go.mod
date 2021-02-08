@@ -1,11 +1,12 @@
 module kubectl-pg
 
-go 1.12
+go 1.15
 
 require (
 	github.com/gogo/protobuf v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/kisielk/errcheck v1.2.0 // indirect
+	github.com/motomux/pretty v0.0.0-20161209205251-b2aad2c9a95d // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/viper v1.4.0
 	github.com/zalando/postgres-operator v1.2.0
