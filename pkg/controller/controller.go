@@ -376,7 +376,8 @@ func (c *Controller) initRoleBinding() {
 func logMultiLineConfig(log *logrus.Entry, config string) {
 	lines := strings.Split(config, "\n")
 	for _, l := range lines {
-		log.Infof("%s", l)
+		// Careful! The configuration may contain sensitive information, e.g. S3 credentials
+		log.Debugf("%s", l)
 	}
 }
 
@@ -420,8 +421,6 @@ func (c *Controller) initController() {
 		c.pgTeamMap = teams.PostgresTeamMap{}
 	}
 
-	// Careful! The configuration may contain sensitive information, e.g. S3 credentials
-	c.logger.Debugf("config: %s", c.opConfig.MustMarshal())
 	logMultiLineConfig(c.logger, c.opConfig.MustMarshal())
 
 	roleDefs := c.getInfrastructureRoleDefinitions()
