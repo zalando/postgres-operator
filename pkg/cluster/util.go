@@ -242,7 +242,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	members := []string{}
 	additionalMembers := []string{}
 
-	for team, membership := range *c.PgTeamMap {
+	for team, membership := range *c.Config.PgTeamMap {
 		if team == teamID {
 			additionalMembers = membership.AdditionalMembers
 		}

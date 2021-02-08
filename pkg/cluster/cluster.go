@@ -1144,7 +1144,7 @@ func (c *Cluster) initHumanUsers() error {
 	superuserTeams := []string{}
 
 	if c.OpConfig.EnablePostgresTeamCRDSuperusers {
-		superuserTeams = c.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
+		superuserTeams = c.Config.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
 	}
 
 	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
@@ -1163,7 +1163,7 @@ func (c *Cluster) initHumanUsers() error {
 		}
 	}
 
-	additionalTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
+	additionalTeams := c.Config.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
 	for _, additionalTeam := range additionalTeams {
 		if !(util.SliceContains(superuserTeams, additionalTeam)) {
 			err := c.initTeamMembers(additionalTeam, false)
