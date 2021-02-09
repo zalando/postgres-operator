@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
-	pgteams "github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -24,7 +23,6 @@ const (
 
 var logger = logrus.New().WithField("test", "cluster")
 var eventRecorder = record.NewFakeRecorder(1)
-var teamMap = make(pgteams.PostgresTeamMap, 0)
 
 var cl = New(
 	Config{
@@ -39,7 +37,6 @@ var cl = New(
 				DownscalerAnnotations: []string{"downscaler/*"},
 			},
 		},
-		PgTeamMap: &teamMap,
 	},
 	k8sutil.NewMockKubernetesClient(),
 	acidv1.Postgresql{ObjectMeta: metav1.ObjectMeta{Name: "acid-test", Namespace: "test", Annotations: map[string]string{"downscaler/downtime_replicas": "0"}}},

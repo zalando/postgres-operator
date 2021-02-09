@@ -3,7 +3,6 @@ package teams
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,14 +106,6 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 			}
 		}
 	}
-}
-
-// TestLoadingPostgresTeamCRD PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
-func TestResetPostgresTeamCRD(t *testing.T) {
-	teamMap := &pgTeamMap
-	teamMap.Reset()
-
-	assert.Equal(t, teamMap, &PostgresTeamMap{})
 }
 
 // TestGetAdditionalTeams if returns teams with and without transitive dependencies

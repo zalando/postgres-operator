@@ -332,7 +332,7 @@ func (c *Controller) initController() {
 	if c.opConfig.EnablePostgresTeamCRD {
 		c.loadPostgresTeams()
 	} else {
-		c.pgTeamMap.Reset()
+		c.pgTeamMap = teams.PostgresTeamMap{}
 	}
 
 	if c.opConfig.DebugLogging {

@@ -1163,12 +1163,14 @@ func (c *Cluster) initHumanUsers() error {
 		}
 	}
 
-	additionalTeams := c.Config.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
-	for _, additionalTeam := range additionalTeams {
-		if !(util.SliceContains(superuserTeams, additionalTeam)) {
-			err := c.initTeamMembers(additionalTeam, false)
-			if err != nil {
-				return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+	if c.Config.PgTeamMap != nil {
+		additionalTeams := c.Config.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
+		for _, additionalTeam := range additionalTeams {
+			if !(util.SliceContains(superuserTeams, additionalTeam)) {
+				err := c.initTeamMembers(additionalTeam, false)
+				if err != nil {
+					return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+				}
 			}
 		}
 	}
