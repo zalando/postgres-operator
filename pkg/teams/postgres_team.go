@@ -6,9 +6,11 @@ import (
 )
 
 // PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
-type PostgresTeamMap map[string]postgresTeamMembership
+type PostgresTeamMap map[string]*PostgresTeamMembership
 
-type postgresTeamMembership struct {
+var emptyTeamMap = make(PostgresTeamMap, 0)
+
+type PostgresTeamMembership struct {
 	AdditionalSuperuserTeams []string
 	AdditionalTeams          []string
 	AdditionalMembers        []string
@@ -94,6 +96,10 @@ func (ptm *PostgresTeamMap) GetAdditionalSuperuserTeams(team string, transitive 
 
 // Load function to import data from PostgresTeam CRD
 func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
+	if ptm == nil {
+		ptm = &emptyTeamMap
+	}
+
 	superuserTeamSet := teamHashSet{}
 	teamSet := teamHashSet{}
 	teamMemberSet := teamHashSet{}
@@ -109,10 +115,17 @@ func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
 	fetchTeams(&teamIDs, teamMemberSet)
 
 	for teamID := range teamIDs {
-		(*ptm)[teamID] = postgresTeamMembership{
+		(*ptm)[teamID] = &PostgresTeamMembership{
 			AdditionalSuperuserTeams: util.CoalesceStrArr(superuserTeamSet.toMap()[teamID], []string{}),
 			AdditionalTeams:          util.CoalesceStrArr(teamSet.toMap()[teamID], []string{}),
 			AdditionalMembers:        util.CoalesceStrArr(teamMemberSet.toMap()[teamID], []string{}),
 		}
+	}
+}
+
+// Reset a PostgresTeamMap
+func (ptm *PostgresTeamMap) Reset() {
+	if ptm != nil {
+		*ptm = emptyTeamMap
 	}
 }

@@ -15,7 +15,6 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -396,8 +395,7 @@ func (c *Controller) getInfrastructureRole(
 
 func (c *Controller) loadPostgresTeams() {
 	// reset team map
-	teamMap := make(teams.PostgresTeamMap, 0)
-	c.pgTeamMap = &teamMap
+	c.pgTeamMap.Reset()
 
 	pgTeams, err := c.KubeClient.PostgresTeamsGetter.PostgresTeams(c.opConfig.WatchedNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {

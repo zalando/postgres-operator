@@ -3,6 +3,7 @@ package teams
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,9 +47,36 @@ var (
 			},
 		},
 	}
+	pgTeamMap = PostgresTeamMap{
+		"teamA": {
+			AdditionalSuperuserTeams: []string{"teamB", "team24x7"},
+			AdditionalTeams:          []string{"teamC"},
+			AdditionalMembers:        []string{},
+		},
+		"teamB": {
+			AdditionalSuperuserTeams: []string{"teamA", "teamC", "team24x7"},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"drno"},
+		},
+		"teamC": {
+			AdditionalSuperuserTeams: []string{"team24x7"},
+			AdditionalTeams:          []string{"teamA", "teamB", "acid"},
+			AdditionalMembers:        []string{},
+		},
+		"team24x7": {
+			AdditionalSuperuserTeams: []string{},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"optimusprime"},
+		},
+		"acid": {
+			AdditionalSuperuserTeams: []string{},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"batman"},
+		},
+	}
 )
 
-// PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
+// TestLoadingPostgresTeamCRD PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
 func TestLoadingPostgresTeamCRD(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -59,33 +87,7 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 		{
 			"Check that CRD is imported correctly into the internal format",
 			pgTeamList,
-			PostgresTeamMap{
-				"teamA": {
-					AdditionalSuperuserTeams: []string{"teamB", "team24x7"},
-					AdditionalTeams:          []string{"teamC"},
-					AdditionalMembers:        []string{},
-				},
-				"teamB": {
-					AdditionalSuperuserTeams: []string{"teamA", "teamC", "team24x7"},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"drno"},
-				},
-				"teamC": {
-					AdditionalSuperuserTeams: []string{"team24x7"},
-					AdditionalTeams:          []string{"teamA", "teamB", "acid"},
-					AdditionalMembers:        []string{},
-				},
-				"team24x7": {
-					AdditionalSuperuserTeams: []string{},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"optimusprime"},
-				},
-				"acid": {
-					AdditionalSuperuserTeams: []string{},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"batman"},
-				},
-			},
+			pgTeamMap,
 			"Mismatch between PostgresTeam CRD and internal map",
 		},
 	}
@@ -105,6 +107,14 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestLoadingPostgresTeamCRD PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
+func TestResetPostgresTeamCRD(t *testing.T) {
+	teamMap := &pgTeamMap
+	teamMap.Reset()
+
+	assert.Equal(t, teamMap, &PostgresTeamMap{})
 }
 
 // TestGetAdditionalTeams if returns teams with and without transitive dependencies
