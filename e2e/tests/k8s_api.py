@@ -280,18 +280,20 @@ class K8s:
             return None
         return pod.items[0].spec.containers[0].image
 
-    def get_cluster_leader_pod(self, pg_cluster_name, namespace='default'):
-        labels = {
-            'application': 'spilo',
-            'cluster-name': pg_cluster_name,
-            'spilo-role': 'master',
-        }
+    def get_cluster_pod(self, role, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
+        labels = labels + ',spilo-role=' + role
 
         pods = self.api.core_v1.list_namespaced_pod(
                 namespace, label_selector=to_selector(labels)).items
 
         if pods:
             return pods[0]
+
+    def get_cluster_leader_pod(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
+        return self.get_cluster_pod('master', labels, namespace)
+
+    def get_cluster_replica_pod(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
+        return self.get_cluster_pod('replica', labels, namespace)
 
 
 class K8sBase:
