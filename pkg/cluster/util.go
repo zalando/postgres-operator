@@ -242,21 +242,21 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 	members := []string{}
 	additionalMembers := []string{}
 
-	if c.Config.PgTeamMap != nil {
+	if c.OpConfig.EnablePostgresTeamCRD && c.Config.PgTeamMap != nil {
 		for team, membership := range *c.Config.PgTeamMap {
 			if team == teamID {
 				additionalMembers = membership.AdditionalMembers
 			}
 		}
-	}
 
-	for _, member := range additionalMembers {
-		members = append(members, member)
-	}
+		for _, member := range additionalMembers {
+			members = append(members, member)
+		}
 
-	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled, only returning %d members for team %q", len(members), teamID)
-		return members, nil
+		if !c.OpConfig.EnableTeamsAPI {
+			c.logger.Debugf("team API is disabled, only returning %d members for team %q", len(members), teamID)
+			return members, nil
+		}
 	}
 
 	token, err := c.oauthTokenGetter.getOAuthToken()
