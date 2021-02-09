@@ -1502,13 +1502,13 @@ func TestGenerateCapabilities(t *testing.T) {
 		{
 			subTest:      "no capabilities",
 			configured:   nil,
-			capabilities: v1.Capabilities{},
+			capabilities: v1.Capabilities{Add: []v1.Capability{}},
 			err:          fmt.Errorf("could not parse capabilities configuration of nil"),
 		},
 		{
 			subTest:      "empty capabilities",
 			configured:   []string{},
-			capabilities: v1.Capabilities{},
+			capabilities: v1.Capabilities{Add: []v1.Capability{}},
 			err:          fmt.Errorf("could not parse empty capabilities configuration"),
 		},
 		{
