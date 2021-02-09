@@ -1143,7 +1143,7 @@ func (c *Cluster) initHumanUsers() error {
 	var clusterIsOwnedBySuperuserTeam bool
 	superuserTeams := []string{}
 
-	if c.OpConfig.EnablePostgresTeamCRDSuperusers {
+	if c.OpConfig.EnablePostgresTeamCRD && c.OpConfig.EnablePostgresTeamCRDSuperusers && c.Config.PgTeamMap != nil {
 		superuserTeams = c.Config.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
 	}
 
@@ -1163,7 +1163,7 @@ func (c *Cluster) initHumanUsers() error {
 		}
 	}
 
-	if c.Config.PgTeamMap != nil {
+	if c.OpConfig.EnablePostgresTeamCRD && c.Config.PgTeamMap != nil {
 		additionalTeams := c.Config.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
 		for _, additionalTeam := range additionalTeams {
 			if !(util.SliceContains(superuserTeams, additionalTeam)) {

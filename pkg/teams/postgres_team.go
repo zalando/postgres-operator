@@ -8,8 +8,6 @@ import (
 // PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
 type PostgresTeamMap map[string]*postgresTeamMembership
 
-var emptyTeamMap = make(PostgresTeamMap, 0)
-
 type postgresTeamMembership struct {
 	AdditionalSuperuserTeams []string
 	AdditionalTeams          []string
@@ -96,9 +94,8 @@ func (ptm *PostgresTeamMap) GetAdditionalSuperuserTeams(team string, transitive 
 
 // Load function to import data from PostgresTeam CRD
 func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
-	if ptm == nil {
-		ptm = &emptyTeamMap
-	}
+	var emptyTeamMap = make(PostgresTeamMap, 0)
+	*ptm = emptyTeamMap
 
 	superuserTeamSet := teamHashSet{}
 	teamSet := teamHashSet{}
