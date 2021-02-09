@@ -806,7 +806,7 @@ class EndToEndTestCase(unittest.TestCase):
             # check that the old master has been recreated
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
             replica = k8s.get_cluster_replica_pod()
-            self.eventuallyTrue(replica.metadata.creation_timestamp > old_creation_timestamp, "Old master pod was not recreated")
+            self.assertTrue(replica.metadata.creation_timestamp > old_creation_timestamp, "Old master pod was not recreated")
 
 
         except timeout_decorator.TimeoutError:
