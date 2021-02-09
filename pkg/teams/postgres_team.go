@@ -125,7 +125,5 @@ func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
 
 // Reset a PostgresTeamMap
 func (ptm *PostgresTeamMap) Reset() {
-	if ptm != nil {
-		*ptm = emptyTeamMap
-	}
+	*ptm = emptyTeamMap
 }
