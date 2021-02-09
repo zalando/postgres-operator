@@ -284,7 +284,7 @@ class K8s:
         labels = labels + ',spilo-role=' + role
 
         pods = self.api.core_v1.list_namespaced_pod(
-                namespace, label_selector=to_selector(labels)).items
+                namespace, label_selector=labels).items
 
         if pods:
             return pods[0]
