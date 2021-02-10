@@ -489,7 +489,6 @@ func (c *Controller) kubeNodesInformer(stopCh <-chan struct{}, wg *sync.WaitGrou
 }
 
 func (c *Controller) getEffectiveNamespace(namespaceFromEnvironment, namespaceFromConfigMap string) string {
-
 	namespace := util.Coalesce(namespaceFromEnvironment, util.Coalesce(namespaceFromConfigMap, spec.GetOperatorNamespace()))
 
 	if namespace == "*" {
