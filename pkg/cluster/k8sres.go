@@ -321,16 +321,13 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 }
 
 func generateCapabilities(capabilities []string) v1.Capabilities {
-	if len(capabilities) > 0 {
-		additionalCapabilities := []v1.Capability{}
-		for _, capability := range capabilities {
-			additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
-		}
-		return v1.Capabilities{
-			Add: additionalCapabilities,
-		}
+	additionalCapabilities := make([]v1.Capability, 0, len(capabilities))
+	for _, capability := range capabilities {
+		additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
 	}
-	return v1.Capabilities{}
+	return v1.Capabilities{
+		Add: additionalCapabilities,
+	}
 }
 
 func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
