@@ -240,9 +240,10 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	c.logger.Debugf("fetching possible additional team members for team %q", teamID)
 	members := []string{}
-	additionalMembers := []string{}
 
 	if c.OpConfig.EnablePostgresTeamCRD && c.Config.PgTeamMap != nil {
+		additionalMembers := []string{}
+
 		for team, membership := range *c.Config.PgTeamMap {
 			if team == teamID {
 				additionalMembers = membership.AdditionalMembers
