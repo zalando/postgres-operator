@@ -749,8 +749,8 @@ class EndToEndTestCase(unittest.TestCase):
             r = r and pods[1].spec.containers[0].resources.limits['cpu'] == minCPULimit
             return r
 
-        self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
         print('Operator log: {}'.format(k8s.get_operator_log()))
+        self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
 
     @classmethod
     def setUp(cls):
