@@ -750,6 +750,7 @@ class EndToEndTestCase(unittest.TestCase):
             return r
 
         self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
+        print('Operator log: {}'.format(k8s.get_operator_log()))
 
     @classmethod
     def setUp(cls):
