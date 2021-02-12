@@ -233,6 +233,12 @@ configAwsOrGcp:
   # S3 bucket to use for shipping WAL segments with WAL-E
   # wal_s3_bucket: ""
 
+  # S3 ID to use for shipping WAL segments with WAL-E
+  # wal_s3_id: ""
+
+  # S3 key to use for shipping WAL segments with WAL-E
+  # wal_s3_key: ""
+
   # GCS bucket to use for shipping WAL segments with WAL-E
   # wal_gs_bucket: ""
 

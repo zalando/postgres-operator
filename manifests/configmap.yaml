@@ -120,5 +120,7 @@ data:
   # toleration: ""
   # wal_gs_bucket: ""
   # wal_s3_bucket: ""
+  # wal_s3_id: ""
+  # wal_s3_key: ""
   watched_namespace: "*"  # listen to all namespaces
   workers: "16"

@@ -119,6 +119,8 @@ type LoadBalancerConfiguration struct {
 // TODO complete Google Cloud Platform (GCP) configuration
 type AWSGCPConfiguration struct {
 	WALES3Bucket                 string `json:"wal_s3_bucket,omitempty"`
+	WALES3Id					 string `json:"wal_s3_id,omitempty"`
+	WALES3Key					 string `json:"wal_s3_key,omitempty"`
 	AWSRegion                    string `json:"aws_region,omitempty"`
 	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
 	GCPCredentials               string `json:"gcp_credentials,omitempty"`
