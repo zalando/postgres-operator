@@ -1040,7 +1040,6 @@ class EndToEndTestCase(unittest.TestCase):
                 plural="postgresqls",
                 name="acid-minimal-cluster",
                 body=patch_node_affinity_config)
-            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
             k8s.wait_for_pod_failover(master_node, 'spilo-role=replica,' + cluster_label)
