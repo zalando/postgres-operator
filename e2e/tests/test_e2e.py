@@ -820,6 +820,7 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        flag = "zalando-postgres-operator-rolling-update-required"
 
         # verify we are in good state from potential previous tests
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
@@ -828,10 +829,10 @@ class EndToEndTestCase(unittest.TestCase):
         _, replica_nodes = k8s.get_pg_nodes(cluster_label)
 
         # rolling update annotation
-        flag = {
+        rolling_update_flag = {
             "metadata": {
                 "annotations": {
-                    "zalando-postgres-operator-rolling-update-required": "true",
+                    flag: "true",
                 }
             }
         }
@@ -847,9 +848,9 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             # patch both pods for rolling update
-            podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
-            for pod in podsList.items:
-                k8s.patch_pod(flag, pod.metadata.name, pod.metadata.namespace)
+            podList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
+            for pod in podList.items:
+                k8s.patch_pod(rolling_update_flag, pod.metadata.name, pod.metadata.namespace)
                 if pod.metadata.labels.get('spilo-role') == 'replica':
                     switchover_target = pod.metadata.name
 
@@ -877,6 +878,12 @@ class EndToEndTestCase(unittest.TestCase):
             # status should again be "SyncFailed" but turn into "Running" on the next sync
             time.sleep(10)
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
+
+            # rolling update should be gone now
+            podList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
+            for pod in podList.items:
+                self.assertTrue(flag not in pod.metadata.annotations, 
+                    "Rolling update flag still present on pod {}".format(pod.metadata.name))
 
             # revert config changes
             patch_resync_config = {
