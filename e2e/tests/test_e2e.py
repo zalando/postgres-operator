@@ -713,6 +713,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "min_memory_limit": minMemoryLimit
             }
         }
+        k8s.update_config(patch_min_resource_limits, "Minimum resource test")
 
         # lower resource limits below minimum
         pg_patch_resources = {
@@ -730,10 +731,8 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
-
-        k8s.patch_statefulset({"metadata": {"annotations": {"zalando-postgres-operator-rolling-update-required": "False"}}})
-        k8s.update_config(patch_min_resource_limits, "Minimum resource test")
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)          
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members()), 2, "Postgres status did not enter running")
@@ -749,7 +748,6 @@ class EndToEndTestCase(unittest.TestCase):
             r = r and pods[1].spec.containers[0].resources.limits['cpu'] == minCPULimit
             return r
 
-        print('Operator log: {}'.format(k8s.get_operator_log()))
         self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
 
     @classmethod
