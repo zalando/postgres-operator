@@ -95,8 +95,7 @@ func (ptm *PostgresTeamMap) GetAdditionalSuperuserTeams(team string, transitive 
 // Load function to import data from PostgresTeam CRD
 func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
 	// reset the team map
-	var emptyTeamMap = make(PostgresTeamMap, 0)
-	*ptm = emptyTeamMap
+	*ptm = make(PostgresTeamMap, 0)
 
 	superuserTeamSet := teamHashSet{}
 	teamSet := teamHashSet{}
