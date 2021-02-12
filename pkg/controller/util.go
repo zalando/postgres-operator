@@ -400,6 +400,7 @@ func (c *Controller) loadPostgresTeams() {
 	}
 
 	c.pgTeamMap.Load(pgTeams)
+	c.logger.Debugf("Internal Postgres Team Cache: %#v", c.pgTeamMap)
 }
 
 func (c *Controller) postgresTeamAdd(obj interface{}) {

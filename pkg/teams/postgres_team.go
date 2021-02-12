@@ -6,7 +6,7 @@ import (
 )
 
 // PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
-type PostgresTeamMap map[string]*postgresTeamMembership
+type PostgresTeamMap map[string]postgresTeamMembership
 
 type postgresTeamMembership struct {
 	AdditionalSuperuserTeams []string
@@ -113,7 +113,7 @@ func (ptm *PostgresTeamMap) Load(pgTeams *acidv1.PostgresTeamList) {
 	fetchTeams(&teamIDs, teamMemberSet)
 
 	for teamID := range teamIDs {
-		(*ptm)[teamID] = &postgresTeamMembership{
+		(*ptm)[teamID] = postgresTeamMembership{
 			AdditionalSuperuserTeams: util.CoalesceStrArr(superuserTeamSet.toMap()[teamID], []string{}),
 			AdditionalTeams:          util.CoalesceStrArr(teamSet.toMap()[teamID], []string{}),
 			AdditionalMembers:        util.CoalesceStrArr(teamMemberSet.toMap()[teamID], []string{}),
