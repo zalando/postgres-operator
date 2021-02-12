@@ -989,7 +989,6 @@ class EndToEndTestCase(unittest.TestCase):
         # verify we are in good state from potential previous tests
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # get nodes of master and replica(s)
         master_node, replica_nodes = k8s.get_pg_nodes(cluster_label)
@@ -1074,6 +1073,9 @@ class EndToEndTestCase(unittest.TestCase):
                 name="acid-minimal-cluster",
                 body=patch_node_remove_affinity_config)
             self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
             # remove node affinity to move replica away from master node
             nm, new_replica_nodes = k8s.get_cluster_nodes()
