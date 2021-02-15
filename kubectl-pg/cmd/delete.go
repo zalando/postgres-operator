@@ -97,7 +97,7 @@ func deleteByFile(file string) {
 	fmt.Printf("Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", postgresSql.Namespace, postgresSql.Name)
 
 	confirmAction(postgresSql.Name, postgresSql.Namespace)
-	err = postgresConfig.Postgresqls(postgresSql.Namespace).Delete(context.TODO(), postgresSql.Name, &metav1.DeleteOptions{})
+	err = postgresConfig.Postgresqls(postgresSql.Namespace).Delete(context.TODO(), postgresSql.Name, metav1.DeleteOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func deleteByName(clusterName string, namespace string) {
 		log.Fatal(err)
 	}
 
-	_, err = postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
+	_, err = postgresConfig.Postgresqls(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
 	if err != nil {
 		fmt.Printf("Postgresql %s not found with the provided namespace %s : %s \n", clusterName, namespace, err)
 		return
@@ -119,7 +119,7 @@ func deleteByName(clusterName string, namespace string) {
 	fmt.Printf("Are you sure you want to remove this PostgreSQL cluster? If so, please type (%s/%s) and hit Enter\n", namespace, clusterName)
 
 	confirmAction(clusterName, namespace)
-	err = postgresConfig.Postgresqls(namespace).Delete(clusterName, &metav1.DeleteOptions{})
+	err = postgresConfig.Postgresqls(namespace).Delete(context.TODO(), clusterName, metav1.DeleteOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -95,7 +95,7 @@ func operatorLogs() {
 		Param("follow", "--follow").
 		Param("container", OperatorName)
 
-	readCloser, err := execRequest.Stream()
+	readCloser, err := execRequest.Stream(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func clusterLogs(clusterName string, master bool, replica string) {
 		Param("follow", "--follow").
 		Param("container", "postgres")
 
-	readCloser, err := execRequest.Stream()
+	readCloser, err := execRequest.Stream(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}

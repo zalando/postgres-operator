@@ -32,7 +32,7 @@ $ $GOPATH/src/github.com/zalando/postgres-operator/kubectl-pg  go install
 # This will place the kubectl-pg binary in your $GOPATH/bin
 ```
 
-### Before using the kubectl pg plugin make sure to set KUBECONFIG env varibale
+### Before using the kubectl pg plugin make sure to set KUBECONFIG env variable
 
 Ideally KUBECONFIG is found in $HOME/.kube/config else specify the KUBECONFIG path here.
 
@@ -62,7 +62,7 @@ Ideally KUBECONFIG is found in $HOME/.kube/config else specify the KUBECONFIG pa
 
 ```kubectl pg delete acid-minimal-cluster```
 
---namespace or -n flag to specify namespace if cluster is in other namespace.
+Use `--namespace` or `-n` flag to specify namespace if cluster is in other namespace.
 
 ```kubectl pg delete acid-minimal-cluster -n namespace01```
 
@@ -92,21 +92,36 @@ Note: A login user is created by default unless NOLOGIN is specified, in which c
 
 ### To find the version of postgres operator and kubectl plugin
 
-```kubectl pg version (optional -n NAMESPACE allows to know specific to a namespace)```
+```kubectl pg version```
+
+Optional `-n NAMESPACE` allows to know specific to a namespace
 
 ### To connect to the shell of a postgres pod
 
-```kubectl pg connect -c CLUSTER``` #This connects to a random pod
-```kubectl pg connect -c CLUSTER -m``` #This connects the master
-```kubectl pg connect -c CLUSTER -r 0``` #This connects to the desired replica
+Connect to the master pod:
+```kubectl pg connect -c CLUSTER -m```
+
+Connect to a random replica pod:
+```kubectl pg connect -c CLUSTER```
+
+Connect to a certain replica pod:
+```kubectl pg connect -c CLUSTER -r 0```
 
 ### To connect to the psql prompt
 
-```kubectl pg connect -c CLUSTER -p -u username``` #This connects to a random pod. Not master
-```kubectl pg connect -c CLUSTER -m -p -u username``` #This connects the master
-```kubectl pg connect -c CLUSTER -r 0 -p -u username``` #This connects to the desired replica
+Adding the `-p` flag allows you to directly connect to a given database with the psql client.
+With `-u` you specify the user. If left out the name of the current OS user is taken.
+`-d` lets you specify the database. If no database is specified, it will be the same as the user name.
 
-Note: -p represents psql prompt
+Connect to `app_db` database on the master with role `app_user`:
+```kubectl pg connect -c CLUSTER -m -p -u app_user -d app_db```
+
+Connect to the `postgres` database on a random replica with role `postgres`:
+```kubectl pg connect -c CLUSTER -p -u postgres```
+
+Connect to a certain replica assuming name of OS user, database role and name are all the same:
+```kubectl pg connect -c CLUSTER -r 0 -p```
+
 
 ### To get the logs of postgres operator
 
@@ -114,11 +129,16 @@ Note: -p represents psql prompt
 
 ### To get the logs of the postgres cluster
 
-```kubectl pg logs -c CLUSTER``` #Fetches the logs of a random pod. Not master
-```kubectl pg logs -c CLUSTER -m``` #Fetches the logs of master
-```kubectl pg logs -c CLUSTER -r 2``` #Fecthes the logs of specified replica
+Fetch logs of master:
+```kubectl pg logs -c CLUSTER -m```
+
+Fetch logs of a random replica pod:
+```kubectl pg logs -c CLUSTER```
+
+Fetch logs of specified replica
+```kubectl pg logs -c CLUSTER -r 2```
 
 ## Development
 
-- When making changes to plugin make sure to change the major or patch version
+When making changes to plugin make sure to change the major or patch version
 of plugin in ```build.sh``` and run ```./build.sh```

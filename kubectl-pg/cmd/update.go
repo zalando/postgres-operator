@@ -75,7 +75,7 @@ func updatePgResources(fileName string) {
 	}
 
 	newPostgresObj.ResourceVersion = oldPostgresObj.ResourceVersion
-	response, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(context.TODO(), newPostgresObj)
+	response, err := postgresConfig.Postgresqls(newPostgresObj.Namespace).Update(context.TODO(), newPostgresObj, metav1.UpdateOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
