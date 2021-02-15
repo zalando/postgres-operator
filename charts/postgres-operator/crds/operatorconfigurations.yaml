@@ -274,6 +274,10 @@ spec:
                       type: string
                   watched_namespace:
                     type: string
+                  override_config_directory:
+                    type: array
+                    items:
+                      type: string
               postgres_pod_resources:
                 type: object
                 properties:
@@ -376,6 +380,10 @@ spec:
                   wal_gs_bucket:
                     type: string
                   wal_s3_bucket:
+                    type: string
+                  wal_s3_id:
+                    type: string
+                  wal_s3_key:
                     type: string
               logical_backup:
                 type: object

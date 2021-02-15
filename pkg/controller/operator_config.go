@@ -49,6 +49,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.ShmVolume = util.CoalesceBool(fromCRD.ShmVolume, util.True())
 	result.SidecarImages = fromCRD.SidecarImages
 	result.SidecarContainers = fromCRD.SidecarContainers
+	result.OverrideConfigDirectory = fromCRD.OverrideConfigDirectory
 
 	// user config
 	result.SuperUsername = util.Coalesce(fromCRD.PostgresUsersConfiguration.SuperUsername, "postgres")

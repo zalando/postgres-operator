@@ -373,6 +373,10 @@ spec:
                     type: string
                   wal_s3_bucket:
                     type: string
+                  wal_s3_id:
+                    type: string
+                  wal_s3_key:
+                    type: string
               logical_backup:
                 type: object
                 properties:

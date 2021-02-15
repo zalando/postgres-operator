@@ -57,6 +57,7 @@ type KubernetesMetaConfiguration struct {
 	PDBNameFormat                          config.StringTemplate        `json:"pdb_name_format,omitempty"`
 	EnablePodDisruptionBudget              *bool                        `json:"enable_pod_disruption_budget,omitempty"`
 	StorageResizeMode                      string                       `json:"storage_resize_mode,omitempty"`
+	OverrideConfigDirectory                []string                     `name:"override_config_directory"`
 	EnableInitContainers                   *bool                        `json:"enable_init_containers,omitempty"`
 	EnableSidecars                         *bool                        `json:"enable_sidecars,omitempty"`
 	SecretNameTemplate                     config.StringTemplate        `json:"secret_name_template,omitempty"`
@@ -120,6 +121,8 @@ type LoadBalancerConfiguration struct {
 // TODO complete Google Cloud Platform (GCP) configuration
 type AWSGCPConfiguration struct {
 	WALES3Bucket                 string `json:"wal_s3_bucket,omitempty"`
+	WALES3Id                     string `json:"wal_s3_id,omitempty"`
+	WALES3Key                    string `json:"wal_s3_key,omitempty"`
 	AWSRegion                    string `json:"aws_region,omitempty"`
 	WALGSBucket                  string `json:"wal_gs_bucket,omitempty"`
 	GCPCredentials               string `json:"gcp_credentials,omitempty"`
@@ -230,6 +233,7 @@ type OperatorConfigurationData struct {
 	Scalyr                     ScalyrConfiguration                `json:"scalyr"`
 	LogicalBackup              OperatorLogicalBackupConfiguration `json:"logical_backup"`
 	ConnectionPooler           ConnectionPoolerConfiguration      `json:"connection_pooler"`
+	OverrideConfigDirectory    []string                           `json:"override_config_directory,omitempty"`
 }
 
 //Duration shortens this frequently used name

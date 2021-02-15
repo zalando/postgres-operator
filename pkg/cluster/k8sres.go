@@ -779,6 +779,14 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
+	if c.OpConfig.WALES3Id != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AWS_ACCESS_KEY_ID", Value: c.OpConfig.WALES3Id})
+	}
+
+	if c.OpConfig.WALES3Key != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.WALES3Key})
+	}
+
 	if c.OpConfig.GCPCredentials != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 	}
@@ -1810,22 +1818,21 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 			result = append(result, v1.EnvVar{Name: "CLONE_WALE_S3_ENDPOINT", Value: description.S3Endpoint})
 		}
 
-		if description.S3AccessKeyId != "" {
+		// Use clone description values if present, otherwise fall back to operator configuration defaults
+		if description.S3AccessKeyId == "" {
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ACCESS_KEY_ID", Value: c.OpConfig.WALES3Id})
+		} else if description.S3AccessKeyId != "" {
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_ACCESS_KEY_ID", Value: description.S3AccessKeyId})
 		}
-
-		if description.S3SecretAccessKey != "" {
+		// Use clone description values if present, otherwise fall back to operator configuration defaults
+		if description.S3SecretAccessKey == "" {
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_SECRET_ACCESS_KEY", Value: c.OpConfig.WALES3Key})
+		} else if description.S3SecretAccessKey != "" {
 			result = append(result, v1.EnvVar{Name: "CLONE_AWS_SECRET_ACCESS_KEY", Value: description.S3SecretAccessKey})
 		}
 
 		if description.S3ForcePathStyle != nil {
-			s3ForcePathStyle := "0"
-
-			if *description.S3ForcePathStyle {
-				s3ForcePathStyle = "1"
-			}
-
-			result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: s3ForcePathStyle})
+			result = append(result, v1.EnvVar{Name: "CLONE_AWS_S3_FORCE_PATH_STYLE", Value: strconv.FormatBool(*description.S3ForcePathStyle)})
 		}
 	}
 

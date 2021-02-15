@@ -162,6 +162,8 @@ type Config struct {
 	DbHostedZone                           string            `name:"db_hosted_zone" default:"db.example.com"`
 	AWSRegion                              string            `name:"aws_region" default:"eu-central-1"`
 	WALES3Bucket                           string            `name:"wal_s3_bucket"`
+	WALES3Id                               string            `name:"wal_s3_id"`
+	WALES3Key                              string            `name:"wal_s3_key"`
 	LogS3Bucket                            string            `name:"log_s3_bucket"`
 	KubeIAMRole                            string            `name:"kube_iam_role"`
 	WALGSBucket                            string            `name:"wal_gs_bucket"`
@@ -185,6 +187,7 @@ type Config struct {
 	EnablePodAntiAffinity                  bool              `name:"enable_pod_antiaffinity" default:"false"`
 	PodAntiAffinityTopologyKey             string            `name:"pod_antiaffinity_topology_key" default:"kubernetes.io/hostname"`
 	StorageResizeMode                      string            `name:"storage_resize_mode" default:"pvc"`
+	OverrideConfigDirectory                []string          `name:"override_config_directory"`
 	EnableLoadBalancer                     *bool             `name:"enable_load_balancer"` // deprecated and kept for backward compatibility
 	ExternalTrafficPolicy                  string            `name:"external_traffic_policy" default:"Cluster"`
 	MasterDNSNameFormat                    StringTemplate    `name:"master_dns_name_format" default:"{cluster}.{team}.{hostedzone}"`
@@ -220,13 +223,22 @@ func (c Config) MustMarshal() string {
 
 // NewFromMap creates Config from the map
 func NewFromMap(m map[string]string) *Config {
-	cfg := Config{}
-	fields, _ := structFields(&cfg)
+	return fromMap(&Config{}, m, true)
+}
+
+// MergeWithMap merges the map into an existing Config
+func MergeWithMap(cfg *Config, m map[string]string) *Config {
+	return fromMap(cfg, m, false)
+}
+
+// fromMap assigns the map values to the Config
+func fromMap(cfg *Config, m map[string]string, applyDefaults bool) *Config {
+	fields, _ := structFields(cfg)
 
 	for _, structField := range fields {
 		key := strings.ToLower(structField.Name)
 		value, ok := m[key]
-		if !ok && structField.Default != "" {
+		if applyDefaults && !ok && structField.Default != "" {
 			value = structField.Default
 		}
 
@@ -238,11 +250,11 @@ func NewFromMap(m map[string]string) *Config {
 			panic(err)
 		}
 	}
-	if err := validate(&cfg); err != nil {
+	if err := validate(cfg); err != nil {
 		panic(err)
 	}
 
-	return &cfg
+	return cfg
 }
 
 // Copy creates a copy of the config

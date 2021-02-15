@@ -22,6 +22,7 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/ringlog"
+	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/reference"
+	"path/filepath"
 )
 
 // Controller represents operator controller
@@ -175,6 +177,82 @@ func (c *Controller) initOperatorConfig() {
 
 }
 
+func (c *Controller) modifyConfigFromDir() {
+	if c.opConfig.OverrideConfigDirectory != nil {
+		c.logger.Debugf("Loading file-based override config from: %q", c.opConfig.OverrideConfigDirectory)
+		configFromDir := c.readFileConfig(c.opConfig.OverrideConfigDirectory)
+		c.opConfig = config.MergeWithMap(c.opConfig, configFromDir)
+	} else {
+		c.logger.Debug("No override config directory set. Skipping overrides.")
+	}
+
+}
+
+func (c *Controller) readFileConfig(searchDirectories []string) (ret map[string]string) {
+	files := c.collectFiles(searchDirectories)
+	c.logger.Debugf("Found files: %s", files)
+
+	ret = c.toConfigMap(files)
+	c.logger.Debugf("Configs as map: %q", ret)
+
+	return
+}
+
+func (c *Controller) collectFiles(searchDirectories []string) (ret map[string][]os.FileInfo) {
+	ret = make(map[string][]os.FileInfo)
+	for _, searchDirectory := range searchDirectories {
+		searchDirectory = strings.TrimSpace(searchDirectory)
+		files, err := ioutil.ReadDir(searchDirectory)
+		if err != nil {
+			c.logger.Warn(err.Error())
+		} else {
+			// Accepting symlinks is potentially dangerous but required for K8S secret mounts
+			files = filter(files, not(os.FileMode.IsDir))
+			// Store file info for absolute file path
+			abs, err := filepath.Abs(searchDirectory)
+			if err != nil {
+				panic(err)
+			}
+			ret[abs] = files
+		}
+	}
+
+	return
+}
+
+func (c *Controller) toConfigMap(configFiles map[string][]os.FileInfo) (ret map[string]string) {
+	ret = make(map[string]string)
+	for path, files := range configFiles {
+		for _, file := range files {
+			// Let's hope it is not a large file --> TODO: Filter for files > ? Kb
+			data, err := ioutil.ReadFile(filepath.Join(path, file.Name()))
+			if err != nil {
+				c.logger.Warnf(err.Error())
+			} else {
+				// Let's hope it is text --> TODO: Check mimetype of file
+				ret[strings.ToLower(file.Name())] = strings.TrimSpace(string(data))
+			}
+		}
+	}
+
+	return
+}
+
+func filter(filtered []os.FileInfo, test func(mode os.FileMode) bool) (ret []os.FileInfo) {
+	for _, f := range filtered {
+		if test(f.Mode()) {
+			ret = append(ret, f)
+		}
+	}
+	return
+}
+
+func not(test func(mode os.FileMode) bool) func(mode os.FileMode) bool {
+	return func(mode os.FileMode) bool {
+		return !test(mode)
+	}
+}
+
 func (c *Controller) modifyConfigFromEnvironment() {
 	c.opConfig.WatchedNamespace = c.getEffectiveNamespace(os.Getenv("WATCHED_NAMESPACE"), c.opConfig.WatchedNamespace)
 
@@ -298,7 +376,8 @@ func (c *Controller) initRoleBinding() {
 func logMultiLineConfig(log *logrus.Entry, config string) {
 	lines := strings.Split(config, "\n")
 	for _, l := range lines {
-		log.Infof("%s", l)
+		// Careful! The configuration may contain sensitive information, e.g. S3 credentials
+		log.Debugf("%s", l)
 	}
 }
 
@@ -318,6 +397,13 @@ func (c *Controller) initController() {
 	} else {
 		c.initOperatorConfig()
 	}
+
+	if c.opConfig.DebugLogging {
+		c.logger.Logger.Level = logrus.DebugLevel
+	}
+
+	c.modifyConfigFromDir()
+
 	c.initPodServiceAccount()
 	c.initRoleBinding()
 
@@ -333,10 +419,6 @@ func (c *Controller) initController() {
 		c.loadPostgresTeams()
 	} else {
 		c.pgTeamMap = teams.PostgresTeamMap{}
-	}
-
-	if c.opConfig.DebugLogging {
-		c.logger.Logger.Level = logrus.DebugLevel
 	}
 
 	logMultiLineConfig(c.logger, c.opConfig.MustMarshal())

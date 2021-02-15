@@ -508,6 +508,12 @@ yet officially supported.
   present and accessible by Postgres pods. At the moment, supported services by
   Spilo are S3 and GCS. The default is empty.
 
+* **wal_s3_id**
+  Default S3 ID to use for shipping WAL segments with WAL-E.
+
+* **wal_s3_key**
+  Default S3 bucket to use for shipping WAL segments with WAL-E.
+  
 * **wal_gs_bucket**
   GCS bucket to use for shipping WAL segments with WAL-E. A bucket has to be
   present and accessible by Postgres pods. Note, only the name of the bucket is

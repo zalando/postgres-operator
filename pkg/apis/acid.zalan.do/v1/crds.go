@@ -1296,6 +1296,12 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"wal_s3_bucket": {
 								Type: "string",
 							},
+							"wal_s3_id": {
+								Type: "string",
+							},
+							"wal_s3_key": {
+								Type: "string",
+							},
 						},
 					},
 					"logical_backup": {
@@ -1492,6 +1498,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "string",
 							},
 							"connection_pooler_user": {
+								Type: "string",
+							},
+						},
+					},
+					"override_config_directory": {
+						Type: "array",
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
 								Type: "string",
 							},
 						},
