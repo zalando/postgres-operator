@@ -23,12 +23,14 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"github.com/spf13/cobra"
+	"context"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"log"
 	"os"
+
+	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // logsCmd represents the logs command
@@ -71,7 +73,7 @@ func operatorLogs() {
 	}
 
 	operator := getPostgresOperator(client)
-	allPods, err := client.CoreV1().Pods(operator.Namespace).List(metav1.ListOptions{})
+	allPods, err := client.CoreV1().Pods(operator.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -93,7 +95,7 @@ func operatorLogs() {
 		Param("follow", "--follow").
 		Param("container", OperatorName)
 
-	readCloser, err := execRequest.Stream()
+	readCloser, err := execRequest.Stream(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -120,7 +122,7 @@ func clusterLogs(clusterName string, master bool, replica string) {
 		Param("follow", "--follow").
 		Param("container", "postgres")
 
-	readCloser, err := execRequest.Stream()
+	readCloser, err := execRequest.Stream(context.TODO())
 	if err != nil {
 		log.Fatal(err)
 	}
