@@ -141,6 +141,13 @@ configKubernetes:
   # operator watches for postgres objects in the given namespace
   watched_namespace: "*"  # listen to all namespaces
 
+  # Directory containing operator configuration to either add to or override the
+  # configuration provided to the chart. E.g. to load S3 default secrets rendered by
+  # Hashicorp's Vault injector.
+  #override_config_directory:
+  #  - /dir_1
+  #  - /som/other/dir
+
 # configure resource requests for the Postgres pods
 configPostgresPodResources:
   # CPU limits for the postgres containers

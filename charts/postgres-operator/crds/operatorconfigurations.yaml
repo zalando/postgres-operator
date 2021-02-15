@@ -233,6 +233,10 @@ spec:
                       type: string
                   watched_namespace:
                     type: string
+                  override_config_directory:
+                    type: array
+                    items:
+                      type: string
               postgres_pod_resources:
                 type: object
                 properties:
