@@ -80,7 +80,7 @@ Those are top-level keys, containing both leaf keys and groups.
   The default is `false`.
 
 * **enable_pgversion_env_var**
-  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `false`.
+  With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `true`.
 
 * **enable_spilo_wal_path_compat**
   enables backwards compatible path between Spilo 12 and Spilo 13 images. The default is `false`.
@@ -126,7 +126,7 @@ Those are top-level keys, containing both leaf keys and groups.
 
 * **workers**
   number of working routines the operator spawns to process requests to
-  create/update/delete/sync clusters concurrently. The default is `4`.
+  create/update/delete/sync clusters concurrently. The default is `8`.
 
 * **max_instances**
   operator will cap the number of instances in any managed Postgres cluster up
@@ -351,6 +351,12 @@ configuration they are grouped under the `kubernetes` key.
   used for AWS volume resizing and not required if you don't need that
   capability. The default is `false`.
 
+* **additional_pod_capabilities**
+  list of additional capabilities to be added to the postgres container's
+  SecurityContext (e.g. SYS_NICE etc.). Please, make sure first that the
+  PodSecruityPolicy allows the capabilities listed here. Otherwise, the
+  container will not start. The default is empty.
+
 * **master_pod_move_timeout**
   The period of time to wait for the success of migration of master pods from
   an unschedulable node. The migration includes Patroni switchovers to
@@ -373,10 +379,13 @@ configuration they are grouped under the `kubernetes` key.
   possible value is `parallel`.
 
 * **storage_resize_mode**
-  defines how operator handels the difference between requested volume size and
-  actual size. Available options are: ebs - tries to resize EBS volume, pvc -
-  changes PVC definition, off - disables resize of the volumes. Default is "ebs".
-  When using OpenShift please use one of the other available options.
+  defines how operator handles the difference between the requested volume size and
+    the actual size. Available options are:
+    1. `ebs` : operator resizes EBS volumes directly and executes `resizefs` within a pod
+    2. `pvc` : operator only changes PVC definition
+    3. `off` : disables resize of the volumes.
+    4. `mixed` :operator  uses AWS API to adjust size, throughput, and IOPS, and calls pvc change for file system resize
+    Default is "pvc".
 
 ## Kubernetes resource requests
 
@@ -551,44 +560,47 @@ These parameters configure a K8s cron job managed by the operator to produce
 Postgres logical backups. In the CRD-based configuration those parameters are
 grouped under the `logical_backup` key.
 
-* **logical_backup_schedule**
-  Backup schedule in the cron format. Please take the
-  [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
-  into account. Default: "30 00 \* \* \*"
-
 * **logical_backup_docker_image**
   An image for pods of the logical backup job. The [example image](../../docker/logical-backup/Dockerfile)
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.0"
+
+* **logical_backup_google_application_credentials**
+  Specifies the path of the google cloud service account json file. Default is empty.
+
+* **logical_backup_job_prefix**
+  The prefix to be prepended to the name of a k8s CronJob running the backups. Beware the prefix counts towards the name length restrictions imposed by k8s. Empty string is a legitimate value. Operator does not do the actual renaming: It simply creates the job with the new prefix. You will have to delete the old cron job manually. Default: "logical-backup-".
 
 * **logical_backup_provider**
   Specifies the storage provider to which the backup should be uploaded (`s3` or `gcs`).
   Default: "s3"
 
+* **logical_backup_s3_access_key_id**
+  When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
+
 * **logical_backup_s3_bucket**
   S3 bucket to store backup results. The bucket has to be present and
   accessible by Postgres pods. Default: empty.
 
+* **logical_backup_s3_endpoint**
+  When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.
+
 * **logical_backup_s3_region**
   Specifies the region of the bucket which is required with some non-AWS S3 storage services. The default is empty.
 
-* **logical_backup_s3_endpoint**
-  When using non-AWS S3 storage, endpoint can be set as a ENV variable. The default is empty.
+* **logical_backup_s3_secret_access_key**
+  When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
 
 * **logical_backup_s3_sse**
   Specify server side encryption that S3 storage is using. If empty string
   is specified, no argument will be passed to `aws s3` command. Default: "AES256".
 
-* **logical_backup_s3_access_key_id**
-  When set, value will be in AWS_ACCESS_KEY_ID env variable. The Default is empty.
-
-* **logical_backup_s3_secret_access_key**
-  When set, value will be in AWS_SECRET_ACCESS_KEY env variable. The Default is empty.
-
-* **logical_backup_google_application_credentials**
-  Specifies the path of the google cloud service account json file. Default is empty.
+* **logical_backup_schedule**
+  Backup schedule in the cron format. Please take the
+  [reference schedule format](https://kubernetes.io/docs/tasks/job/automated-tasks-with-cron-jobs/#schedule)
+  into account. Default: "30 00 \* \* \*"
 
 ## Debugging the operator
 

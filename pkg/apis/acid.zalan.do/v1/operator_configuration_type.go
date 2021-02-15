@@ -52,6 +52,7 @@ type KubernetesMetaConfiguration struct {
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
 	SpiloRunAsGroup                        *int64                       `json:"spilo_runasgroup,omitempty"`
 	SpiloFSGroup                           *int64                       `json:"spilo_fsgroup,omitempty"`
+	AdditionalPodCapabilities              []string                     `json:"additional_pod_capabilities,omitempty"`
 	WatchedNamespace                       string                       `json:"watched_namespace,omitempty"`
 	PDBNameFormat                          config.StringTemplate        `json:"pdb_name_format,omitempty"`
 	EnablePodDisruptionBudget              *bool                        `json:"enable_pod_disruption_budget,omitempty"`
@@ -196,6 +197,7 @@ type OperatorLogicalBackupConfiguration struct {
 	S3SecretAccessKey            string `json:"logical_backup_s3_secret_access_key,omitempty"`
 	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
+	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config

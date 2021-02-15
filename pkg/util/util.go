@@ -271,6 +271,14 @@ func CoalesceUInt32(val, defaultVal uint32) uint32 {
 	return val
 }
 
+// CoalesceInt64 works like coalesce but for int64
+func CoalesceInt64(val, defaultVal int64) int64 {
+	if val == 0 {
+		return defaultVal
+	}
+	return val
+}
+
 // CoalesceBool works like coalesce but for *bool
 func CoalesceBool(val, defaultVal *bool) *bool {
 	if val == nil {

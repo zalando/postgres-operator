@@ -303,7 +303,7 @@ DEFAULT_UI_CONFIG = {
     'users_visible': True,
     'databases_visible': True,
     'resources_visible': True,
-    'postgresql_versions': ['9.6', '10', '11'],
+    'postgresql_versions': ['11','12','13'],
     'dns_format_string': '{0}.{1}.{2}',
     'pgui_link': '',
     'static_network_whitelist': {},

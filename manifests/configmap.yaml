@@ -3,6 +3,7 @@ kind: ConfigMap
 metadata:
   name: postgres-operator
 data:
+  # additional_pod_capabilities: "SYS_NICE"
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
   api_port: "8080"
@@ -31,7 +32,7 @@ data:
   # default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: registry.opensource.zalan.do/acid/spilo-12:1.6-p5
+  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_validation: "true"
@@ -41,16 +42,15 @@ data:
   # enable_init_containers: "true"
   # enable_lazy_spilo_upgrade: "false"
   enable_master_load_balancer: "false"
-  # enable_pgversion_env_var: "false"
+  enable_pgversion_env_var: "true"
   # enable_pod_antiaffinity: "false"
   # enable_pod_disruption_budget: "true"
   # enable_postgres_team_crd: "false"
   # enable_postgres_team_crd_superusers: "false"
   enable_replica_load_balancer: "false"
   # enable_shm_volume: "true"
-  # enable_pgversion_env_var: "false"
   # enable_sidecars: "true"
-  enable_spilo_wal_path_compat: "false"
+  enable_spilo_wal_path_compat: "true"
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
@@ -63,7 +63,10 @@ data:
   # inherited_labels: application,environment
   # kube_iam_role: ""
   # log_s3_bucket: ""
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.0"
+  # logical_backup_google_application_credentials: ""
+  logical_backup_job_prefix: "logical-backup-"
+  logical_backup_provider: "s3"
   # logical_backup_s3_access_key_id: ""
   logical_backup_s3_bucket: "my-bucket-url"
   # logical_backup_s3_region: ""
@@ -122,4 +125,4 @@ data:
   # wal_gs_bucket: ""
   # wal_s3_bucket: ""
   watched_namespace: "*"  # listen to all namespaces
-  workers: "8"
+  workers: "16"

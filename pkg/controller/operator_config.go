@@ -39,7 +39,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSpiloWalPathCompat = fromCRD.EnableSpiloWalPathCompat
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
-	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-12:1.6-p3")
+	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-13:2.0-p2")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
@@ -66,11 +66,12 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.SpiloRunAsUser = fromCRD.Kubernetes.SpiloRunAsUser
 	result.SpiloRunAsGroup = fromCRD.Kubernetes.SpiloRunAsGroup
 	result.SpiloFSGroup = fromCRD.Kubernetes.SpiloFSGroup
+	result.AdditionalPodCapabilities = fromCRD.Kubernetes.AdditionalPodCapabilities
 	result.ClusterDomain = util.Coalesce(fromCRD.Kubernetes.ClusterDomain, "cluster.local")
 	result.WatchedNamespace = fromCRD.Kubernetes.WatchedNamespace
 	result.PDBNameFormat = fromCRD.Kubernetes.PDBNameFormat
 	result.EnablePodDisruptionBudget = util.CoalesceBool(fromCRD.Kubernetes.EnablePodDisruptionBudget, util.True())
-	result.StorageResizeMode = util.Coalesce(fromCRD.Kubernetes.StorageResizeMode, "ebs")
+	result.StorageResizeMode = util.Coalesce(fromCRD.Kubernetes.StorageResizeMode, "pvc")
 	result.EnableInitContainers = util.CoalesceBool(fromCRD.Kubernetes.EnableInitContainers, util.True())
 	result.EnableSidecars = util.CoalesceBool(fromCRD.Kubernetes.EnableSidecars, util.True())
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
@@ -141,11 +142,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
 	result.AdditionalSecretMountPath = util.Coalesce(fromCRD.AWSGCP.AdditionalSecretMountPath, "/meta/credentials")
 	result.EnableEBSGp3Migration = fromCRD.AWSGCP.EnableEBSGp3Migration
-	result.EnableEBSGp3MigrationMaxSize = fromCRD.AWSGCP.EnableEBSGp3MigrationMaxSize
+	result.EnableEBSGp3MigrationMaxSize = util.CoalesceInt64(fromCRD.AWSGCP.EnableEBSGp3MigrationMaxSize, 1000)
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.6.0")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 	result.LogicalBackupS3Region = fromCRD.LogicalBackup.S3Region
@@ -154,6 +155,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3SecretAccessKey = fromCRD.LogicalBackup.S3SecretAccessKey
 	result.LogicalBackupS3SSE = fromCRD.LogicalBackup.S3SSE
 	result.LogicalBackupGoogleApplicationCredentials = fromCRD.LogicalBackup.GoogleApplicationCredentials
+	result.LogicalBackupJobPrefix = util.Coalesce(fromCRD.LogicalBackup.JobPrefix, "logical-backup-")
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging

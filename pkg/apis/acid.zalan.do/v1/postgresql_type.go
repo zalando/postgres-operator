@@ -61,7 +61,7 @@ type PostgresSpec struct {
 	Databases             map[string]string           `json:"databases,omitempty"`
 	PreparedDatabases     map[string]PreparedDatabase `json:"preparedDatabases,omitempty"`
 	SchedulerName         *string                     `json:"schedulerName,omitempty"`
-	NodeAffinity          v1.NodeAffinity             `json:"nodeAffinity,omitempty"`
+	NodeAffinity          *v1.NodeAffinity            `json:"nodeAffinity,omitempty"`
 	Tolerations           []v1.Toleration             `json:"tolerations,omitempty"`
 	Sidecars              []Sidecar                   `json:"sidecars,omitempty"`
 	InitContainers        []v1.Container              `json:"initContainers,omitempty"`
@@ -118,6 +118,7 @@ type Volume struct {
 	SubPath      string `json:"subPath,omitempty"`
 	Iops         *int64 `json:"iops,omitempty"`
 	Throughput   *int64 `json:"throughput,omitempty"`
+	VolumeType   string `json:"type,omitempty"`
 }
 
 // AdditionalVolume specs additional optional volumes for statefulset

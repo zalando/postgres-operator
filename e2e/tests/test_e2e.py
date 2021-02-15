@@ -11,8 +11,8 @@ from kubernetes import client
 from tests.k8s_api import K8s
 from kubernetes.client.rest import ApiException
 
-SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-12:1.6-p5"
-SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-cdp-12:1.6-p114"
+SPILO_CURRENT = "registry.opensource.zalan.do/acid/spilo-13-e2e:0.3"
+SPILO_LAZY = "registry.opensource.zalan.do/acid/spilo-13-e2e:0.4"
 
 
 def to_selector(labels):
@@ -112,6 +112,7 @@ class EndToEndTestCase(unittest.TestCase):
         with open("manifests/configmap.yaml", 'r+') as f:
             configmap = yaml.safe_load(f)
             configmap["data"]["workers"] = "1"
+            configmap["data"]["docker_image"] = SPILO_CURRENT
 
         with open("manifests/configmap.yaml", 'w') as f:
             yaml.dump(configmap, f, Dumper=yaml.Dumper)
@@ -121,7 +122,6 @@ class EndToEndTestCase(unittest.TestCase):
                          "operatorconfiguration.crd.yaml",
                          "postgresteam.crd.yaml",
                          "configmap.yaml",
-                         "postgresql-operator-default-configuration.yaml",
                          "postgres-operator.yaml",
                          "api-service.yaml",
                          "infrastructure-roles.yaml",
@@ -156,11 +156,30 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_additional_pod_capabilities(self):
+        '''
+           Extend postgres container capabilities
+        '''
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        capabilities = ["SYS_NICE","CHOWN"]
+        patch_capabilities = {
+            "data": {
+                "additional_pod_capabilities": ','.join(capabilities),
+            },
+        }
+        self.k8s.update_config(patch_capabilities)
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+        
+        self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
+                             2, "Container capabilities not updated")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
         self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
-                             "Initial broken deplyment not rolled out")
+                             "Initial broken deployment not rolled out")
 
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
@@ -221,6 +240,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label(
                             'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                             2, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Pooler secret not created")
 
         # Turn off only master connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -246,6 +267,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label(
                              'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              1, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Secret not created")
 
         # Turn off only replica connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -268,6 +291,8 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler replica pods not deleted")
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              1, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Secret not created")
 
         # scale up connection pooler deployment
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -301,6 +326,8 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler pods not scaled down")
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              0, "Pooler service not removed")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
+                             4, "Secrets not deleted")
 
         # Verify that all the databases have pooler schema installed.
         # Do this via psql, since otherwise we need to deal with
@@ -1034,7 +1061,7 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
-   
+
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zzzz_cluster_deletion(self):
         '''

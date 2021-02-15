@@ -106,7 +106,6 @@ var OperatorConfigCRDResourceColumns = []apiextv1.CustomResourceColumnDefinition
 
 var min0 = 0.0
 var min1 = 1.0
-var min2 = 2.0
 var minDisable = -1.0
 
 // PostgresCRDResourceValidation to check applied manifest parameters
@@ -232,7 +231,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"numberOfInstances": {
 								Type:    "integer",
-								Minimum: &min2,
+								Minimum: &min1,
 							},
 							"resources": {
 								Type:     "object",
@@ -836,6 +835,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type:     "object",
 						Required: []string{"size"},
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"iops": {
+								Type: "integer",
+							},
 							"size": {
 								Type:        "string",
 								Description: "Value must not be zero",
@@ -846,6 +848,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"subPath": {
 								Type: "string",
+							},
+							"throughput": {
+								Type: "integer",
 							},
 						},
 					},
@@ -963,6 +968,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"kubernetes": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"additional_pod_capabilities": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
 							"cluster_domain": {
 								Type: "string",
 							},
@@ -1291,6 +1304,15 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"logical_backup_docker_image": {
 								Type: "string",
 							},
+							"logical_backup_google_application_credentials": {
+								Type: "string",
+							},
+							"logical_backup_job_prefix": {
+								Type: "string",
+							},
+							"logical_backup_provider": {
+								Type: "string",
+							},
 							"logical_backup_s3_access_key_id": {
 								Type: "string",
 							},
@@ -1464,7 +1486,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"connection_pooler_number_of_instances": {
 								Type:    "integer",
-								Minimum: &min2,
+								Minimum: &min1,
 							},
 							"connection_pooler_schema": {
 								Type: "string",
