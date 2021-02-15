@@ -576,3 +576,12 @@ func mergeContainers(containers ...[]v1.Container) ([]v1.Container, []string) {
 	}
 	return result, conflicts
 }
+
+func trimCronjobName(name string) string {
+	maxLength := 52
+	if len(name) > maxLength {
+		name = name[0:maxLength]
+		name = strings.TrimRight(name, "-")
+	}
+	return name
+}

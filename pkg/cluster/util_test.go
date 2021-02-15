@@ -139,3 +139,43 @@ func TestInheritedAnnotations(t *testing.T) {
 	}
 
 }
+
+func Test_trimCronjobName(t *testing.T) {
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "short name",
+			args: args{
+				name: "short-name",
+			},
+			want: "short-name",
+		},
+		{
+			name: "long name",
+			args: args{
+				name: "very-very-very-very-very-very-very-very-very-long-db-name",
+			},
+			want: "very-very-very-very-very-very-very-very-very-long-db",
+		},
+		{
+			name: "long name should not end with dash",
+			args: args{
+				name: "very-very-very-very-very-very-very-very-very-----------long-db-name",
+			},
+			want: "very-very-very-very-very-very-very-very-very",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := trimCronjobName(tt.args.name); got != tt.want {
+				t.Errorf("trimCronjobName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

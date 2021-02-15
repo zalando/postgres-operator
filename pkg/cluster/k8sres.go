@@ -2101,7 +2101,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
-	return c.OpConfig.LogicalBackupJobPrefix + c.clusterName().Name
+	return trimCronjobName(c.OpConfig.LogicalBackupJobPrefix + c.clusterName().Name)
 }
 
 // Return an array of ownerReferences to make an arbitraty object dependent on
