@@ -14,9 +14,9 @@ require (
 	golang.org/x/mod v0.4.0 // indirect
 	golang.org/x/tools v0.0.0-20201207204333-a835c872fcea // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.19.4
-	k8s.io/apiextensions-apiserver v0.19.3
-	k8s.io/apimachinery v0.19.4
-	k8s.io/client-go v0.19.3
+	k8s.io/api v0.20.2
+	k8s.io/apiextensions-apiserver v0.19.4
+	k8s.io/apimachinery v0.20.2
+	k8s.io/client-go v0.20.2
 	k8s.io/code-generator v0.19.4
 )

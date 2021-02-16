@@ -53,15 +53,16 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
+	// sync volume may already transition volumes to gp3, if iops/throughput or type is specified
+	if err = c.syncVolumes(); err != nil {
+		return err
+	}
+
 	if c.OpConfig.EnableEBSGp3Migration {
 		err = c.executeEBSMigration()
 		if nil != err {
 			return err
 		}
-	}
-
-	if err = c.syncVolumes(); err != nil {
-		return err
 	}
 
 	if err = c.enforceMinResourceLimits(&c.Spec); err != nil {

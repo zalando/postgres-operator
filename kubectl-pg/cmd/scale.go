@@ -23,8 +23,12 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"strconv"
+
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	v1 "k8s.io/api/apps/v1"
@@ -32,8 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"log"
-	"strconv"
 )
 
 // scaleCmd represents the scale command
@@ -76,7 +78,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 		log.Fatal(err)
 	}
 
-	postgresql, err := postgresConfig.Postgresqls(namespace).Get(clusterName, metav1.GetOptions{})
+	postgresql, err := postgresConfig.Postgresqls(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -100,7 +102,7 @@ func scale(numberOfInstances int32, clusterName string, namespace string) {
 	}
 
 	patchInstances := scalePatch(numberOfInstances)
-	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(postgresql.Name, types.MergePatchType, patchInstances, "")
+	UpdatedPostgres, err := postgresConfig.Postgresqls(namespace).Patch(context.TODO(), postgresql.Name, types.MergePatchType, patchInstances, metav1.PatchOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -145,7 +147,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32) {
 	}
 
 	if operatorConfigName == "" {
-		configMap, err := k8sClient.CoreV1().ConfigMaps(operator.Namespace).Get(configMapName, metav1.GetOptions{})
+		configMap, err := k8sClient.CoreV1().ConfigMaps(operator.Namespace).Get(context.TODO(), configMapName, metav1.GetOptions{})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -172,7 +174,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32) {
 			log.Fatal(err)
 		}
 
-		operatorConfig, err := pgClient.OperatorConfigurations(operator.Namespace).Get(operatorConfigName, metav1.GetOptions{})
+		operatorConfig, err := pgClient.OperatorConfigurations(operator.Namespace).Get(context.TODO(), operatorConfigName, metav1.GetOptions{})
 		if err != nil {
 			log.Fatalf("unable to read operator configuration %v", err)
 		}

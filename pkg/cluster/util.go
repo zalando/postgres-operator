@@ -238,15 +238,26 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 		return nil, fmt.Errorf("no teamId specified")
 	}
 
-	c.logger.Debugf("fetching possible additional team members for team %q", teamID)
 	members := []string{}
-	additionalMembers := c.PgTeamMap[teamID].AdditionalMembers
-	for _, member := range additionalMembers {
-		members = append(members, member)
+
+	if c.OpConfig.EnablePostgresTeamCRD && c.Config.PgTeamMap != nil {
+		c.logger.Debugf("fetching possible additional team members for team %q", teamID)
+		additionalMembers := []string{}
+
+		for team, membership := range *c.Config.PgTeamMap {
+			if team == teamID {
+				additionalMembers = membership.AdditionalMembers
+				c.logger.Debugf("found %d additional members for team %q", len(members), teamID)
+			}
+		}
+
+		for _, member := range additionalMembers {
+			members = append(members, member)
+		}
 	}
 
 	if !c.OpConfig.EnableTeamsAPI {
-		c.logger.Debugf("team API is disabled, only returning %d members for team %q", len(members), teamID)
+		c.logger.Debugf("team API is disabled")
 		return members, nil
 	}
 
@@ -575,4 +586,13 @@ func mergeContainers(containers ...[]v1.Container) ([]v1.Container, []string) {
 		}
 	}
 	return result, conflicts
+}
+
+func trimCronjobName(name string) string {
+	maxLength := 52
+	if len(name) > maxLength {
+		name = name[0:maxLength]
+		name = strings.TrimRight(name, "-")
+	}
+	return name
 }

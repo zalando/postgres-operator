@@ -46,9 +46,36 @@ var (
 			},
 		},
 	}
+	pgTeamMap = PostgresTeamMap{
+		"teamA": {
+			AdditionalSuperuserTeams: []string{"teamB", "team24x7"},
+			AdditionalTeams:          []string{"teamC"},
+			AdditionalMembers:        []string{},
+		},
+		"teamB": {
+			AdditionalSuperuserTeams: []string{"teamA", "teamC", "team24x7"},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"drno"},
+		},
+		"teamC": {
+			AdditionalSuperuserTeams: []string{"team24x7"},
+			AdditionalTeams:          []string{"teamA", "teamB", "acid"},
+			AdditionalMembers:        []string{},
+		},
+		"team24x7": {
+			AdditionalSuperuserTeams: []string{},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"optimusprime"},
+		},
+		"acid": {
+			AdditionalSuperuserTeams: []string{},
+			AdditionalTeams:          []string{},
+			AdditionalMembers:        []string{"batman"},
+		},
+	}
 )
 
-// PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
+// TestLoadingPostgresTeamCRD PostgresTeamMap is the operator's internal representation of all PostgresTeam CRDs
 func TestLoadingPostgresTeamCRD(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -59,33 +86,7 @@ func TestLoadingPostgresTeamCRD(t *testing.T) {
 		{
 			"Check that CRD is imported correctly into the internal format",
 			pgTeamList,
-			PostgresTeamMap{
-				"teamA": {
-					AdditionalSuperuserTeams: []string{"teamB", "team24x7"},
-					AdditionalTeams:          []string{"teamC"},
-					AdditionalMembers:        []string{},
-				},
-				"teamB": {
-					AdditionalSuperuserTeams: []string{"teamA", "teamC", "team24x7"},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"drno"},
-				},
-				"teamC": {
-					AdditionalSuperuserTeams: []string{"team24x7"},
-					AdditionalTeams:          []string{"teamA", "teamB", "acid"},
-					AdditionalMembers:        []string{},
-				},
-				"team24x7": {
-					AdditionalSuperuserTeams: []string{},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"optimusprime"},
-				},
-				"acid": {
-					AdditionalSuperuserTeams: []string{},
-					AdditionalTeams:          []string{},
-					AdditionalMembers:        []string{"batman"},
-				},
-			},
+			pgTeamMap,
 			"Mismatch between PostgresTeam CRD and internal map",
 		},
 	}
