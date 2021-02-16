@@ -49,7 +49,7 @@ var (
 type Config struct {
 	OpConfig                     config.Config
 	RestConfig                   *rest.Config
-	PgTeamMap                    pgteams.PostgresTeamMap
+	PgTeamMap                    *pgteams.PostgresTeamMap
 	InfrastructureRoles          map[string]spec.PgUser // inherited from the controller
 	PodServiceAccount            *v1.ServiceAccount
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
@@ -1143,8 +1143,8 @@ func (c *Cluster) initHumanUsers() error {
 	var clusterIsOwnedBySuperuserTeam bool
 	superuserTeams := []string{}
 
-	if c.OpConfig.EnablePostgresTeamCRDSuperusers {
-		superuserTeams = c.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
+	if c.OpConfig.EnablePostgresTeamCRD && c.OpConfig.EnablePostgresTeamCRDSuperusers && c.Config.PgTeamMap != nil {
+		superuserTeams = c.Config.PgTeamMap.GetAdditionalSuperuserTeams(c.Spec.TeamID, true)
 	}
 
 	for _, postgresSuperuserTeam := range c.OpConfig.PostgresSuperuserTeams {
@@ -1163,12 +1163,14 @@ func (c *Cluster) initHumanUsers() error {
 		}
 	}
 
-	additionalTeams := c.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
-	for _, additionalTeam := range additionalTeams {
-		if !(util.SliceContains(superuserTeams, additionalTeam)) {
-			err := c.initTeamMembers(additionalTeam, false)
-			if err != nil {
-				return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+	if c.OpConfig.EnablePostgresTeamCRD && c.Config.PgTeamMap != nil {
+		additionalTeams := c.Config.PgTeamMap.GetAdditionalTeams(c.Spec.TeamID, true)
+		for _, additionalTeam := range additionalTeams {
+			if !(util.SliceContains(superuserTeams, additionalTeam)) {
+				err := c.initTeamMembers(additionalTeam, false)
+				if err != nil {
+					return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+				}
 			}
 		}
 	}
