@@ -148,18 +148,22 @@ spec:
     image: busybox
     command: [ "/bin/date" ]
 #  sidecars:
-#    - name: "telegraf-sidecar"
-#      image: "telegraf:latest"
-#      resources:
-#        limits:
-#          cpu: 500m
-#          memory: 500Mi
-#        requests:
-#          cpu: 100m
-#          memory: 100Mi
-#      env:
-#        - name: "USEFUL_VAR"
-#          value: "perhaps-true"
+#   - name: "telegraf-sidecar"
+#     image: "telegraf:latest"
+#     ports:
+#       name: metrics
+#       containerPort: 8094
+#       protocol: TCP
+#     resources:
+#       limits:
+#         cpu: 500m
+#         memory: 500Mi
+#       requests:
+#         cpu: 100m
+#         memory: 100Mi
+#     env:
+#       - name: "USEFUL_VAR"
+#         value: "perhaps-true"
 
 # Custom TLS certificate. Disabled unless tls.secretName has a value.
   tls:

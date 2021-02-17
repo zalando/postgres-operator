@@ -21,6 +21,7 @@ configuration:
   #   name: global-sidecar-1
   #   ports:
   #   - containerPort: 80
+  #     protocol: TCP
   workers: 8
   users:
     replication_username: standby
