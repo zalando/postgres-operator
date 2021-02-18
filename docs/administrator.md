@@ -643,6 +643,13 @@ archive_command:  `envdir "{WALE_ENV_DIR}" {WALE_BINARY} wal-push "%p"`
 restore_command:  `envdir "{{WALE_ENV_DIR}}" /scripts/restore_command.sh "%f" "%p"`
 ```
 
+You can produce a basebackup manually with the following command and check
+if it ends up in your specified WAL backup path:
+
+```bash
+envdir "/run/etc/wal-e.d/env" /scripts/postgres_backup.sh "/home/postgres/pgdata/pgroot/data"
+```
+
 Depending on the cloud storage provider different [environment variables](https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst)
 have to be set for Spilo. Not all of them are generated automatically by the
 operator by changing its configuration. In this case you have to use an
@@ -705,16 +712,15 @@ This should produce the following settings for the essential environment
 variables:
 
 ```bash
-AWS_ENDPOINT:         'https://s3.eu-central-1.amazonaws.com:443'
-WAL_S3_BUCKET:        '/spilo/{WAL_BUCKET_SCOPE_PREFIX}{SCOPE}{WAL_BUCKET_SCOPE_SUFFIX}/wal/{PGVERSION}'
-WALE_S3_ENDPOINT:     'https+path://s3.eu-central-1.amazonaws.com:443'
-WALE_S3_PREFIX:       's3://your-backup-path'
-WALG_S3_PREFIX:       like WALE_S3_PREFIX
+AWS_ENDPOINT='https://s3.eu-central-1.amazonaws.com:443'
+WALE_S3_ENDPOINT='https+path://s3.eu-central-1.amazonaws.com:443'
+WALE_S3_PREFIX=$WAL_S3_BUCKET/spilo/{WAL_BUCKET_SCOPE_PREFIX}{SCOPE}{WAL_BUCKET_SCOPE_SUFFIX}/wal/{PGVERSION}
 ```
 
-If the prefix is not specified Spilo will generate it from WAL_S3_BUCKET.
-When the AWS_REGION is set you AWS_ENDPOINT and WALE_S3_ENDPOINT are
-generated automatically. `SCOPE` is the Postgres cluster name.
+If the prefix is not specified Spilo will generate it from `WAL_S3_BUCKET`.
+When the `AWS_REGION` is set `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
+generated automatically. `WALG_S3_PREFIX` is identical to `WALE_S3_PREFIX`.
+`SCOPE` is the Postgres cluster name.
 
 ### Google Cloud Platform setup
 
