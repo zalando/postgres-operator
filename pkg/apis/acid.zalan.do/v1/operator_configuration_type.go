@@ -209,6 +209,7 @@ type OperatorConfigurationData struct {
 	EtcdHost                   string                             `json:"etcd_host,omitempty"`
 	KubernetesUseConfigMaps    bool                               `json:"kubernetes_use_configmaps,omitempty"`
 	DockerImage                string                             `json:"docker_image,omitempty"`
+	ImagePullSecrets           []string                           `json:"image_pull_secrets,omitempty"`
 	Workers                    uint32                             `json:"workers,omitempty"`
 	MinInstances               int32                              `json:"min_instances,omitempty"`
 	MaxInstances               int32                              `json:"max_instances,omitempty"`

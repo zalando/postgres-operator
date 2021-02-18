@@ -582,6 +582,7 @@ func (c *Cluster) generatePodTemplate(
 	additionalSecretMount string,
 	additionalSecretMountPath string,
 	additionalVolumes []acidv1.AdditionalVolume,
+	imagePullSecrets []v1.LocalObjectReference,
 ) (*v1.PodTemplateSpec, error) {
 
 	terminateGracePeriodSeconds := terminateGracePeriod
@@ -608,6 +609,10 @@ func (c *Cluster) generatePodTemplate(
 		InitContainers:                initContainers,
 		Tolerations:                   *tolerationsSpec,
 		SecurityContext:               &securityContext,
+	}
+
+	if imagePullSecrets != nil {
+		podSpec.ImagePullSecrets = imagePullSecrets
 	}
 
 	if schedulerName != nil {
@@ -1077,6 +1082,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	// pickup the docker image for the spilo container
 	effectiveDockerImage := util.Coalesce(spec.DockerImage, c.OpConfig.DockerImage)
 
+	// get ImagePullSecrets for spilo pod
+	effectiveImagePullSecrets := c.OpConfig.ImagePullSecrets
+	if spec.ImagePullSecrets != nil {
+		effectiveImagePullSecrets = spec.ImagePullSecrets
+	}
+
 	// determine the User, Group and FSGroup for the spilo pod
 	effectiveRunAsUser := c.OpConfig.Resources.SpiloRunAsUser
 	if spec.SpiloRunAsUser != nil {
@@ -1248,7 +1259,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		c.OpConfig.PodAntiAffinityTopologyKey,
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		additionalVolumes)
+		additionalVolumes,
+		effectiveImagePullSecrets)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not generate pod template: %v", err)
@@ -1961,7 +1973,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		"",
 		c.OpConfig.AdditionalSecretMount,
 		c.OpConfig.AdditionalSecretMountPath,
-		[]acidv1.AdditionalVolume{}); err != nil {
+		[]acidv1.AdditionalVolume{},
+		nil); err != nil {
 		return nil, fmt.Errorf("could not generate pod template for logical backup pod: %v", err)
 	}
 
