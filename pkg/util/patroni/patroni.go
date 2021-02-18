@@ -27,6 +27,7 @@ type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 	GetPatroniMemberState(pod *v1.Pod) (string, error)
+	GetMemberData(server *v1.Pod) (MemberData, error)
 }
 
 // Patroni API client
@@ -157,4 +158,57 @@ func (p *Patroni) GetPatroniMemberState(server *v1.Pod) (string, error) {
 
 	return state, nil
 
+}
+
+// MemberData Patroni member data from Patroni API
+type MemberData struct {
+	State          string
+	Role           string
+	ServerVersion  int
+	Scope          string
+	PatroniVersion string
+}
+
+// GetMemberData read member data from patroni API
+func (p *Patroni) GetMemberData(server *v1.Pod) (MemberData, error) {
+
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return MemberData{}, err
+	}
+	response, err := p.httpClient.Get(apiURLString)
+	if err != nil {
+		return MemberData{}, fmt.Errorf("could not perform Get request: %v", err)
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return MemberData{}, fmt.Errorf("could not read response: %v", err)
+	}
+
+	data := make(map[string]interface{})
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return MemberData{}, err
+	}
+
+	memberData := MemberData{}
+
+	var ok, r bool
+
+	memberData.state, r = data["state"].(string)
+	ok = ok && r
+	memberData.serverVersion, r = data["server_version"].(int)
+	ok = ok && r
+	memberData.role, r = data["role"].(string)
+	ok = ok && r
+	memberData.role, r = data["scope"].(string)
+	ok = ok && r
+
+	if !ok {
+		return MemberData{}, errors.New("Patroni member data could not be read")
+	}
+
+	return memberData, nil
 }

@@ -83,15 +83,16 @@ type Cluster struct {
 	deleteOptions    metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
-	teamsAPIClient   teams.Interface
-	oauthTokenGetter OAuthTokenGetter
-	KubeClient       k8sutil.KubernetesClient //TODO: move clients to the better place?
-	currentProcess   Process
-	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
-	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	ConnectionPooler map[PostgresRole]*ConnectionPoolerObjects
-	EBSVolumes       map[string]volumes.VolumeProperties
-	VolumeResizer    volumes.VolumeResizer
+	teamsAPIClient      teams.Interface
+	oauthTokenGetter    OAuthTokenGetter
+	KubeClient          k8sutil.KubernetesClient //TODO: move clients to the better place?
+	currentProcess      Process
+	processMu           sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
+	specMu              sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+	ConnectionPooler    map[PostgresRole]*ConnectionPoolerObjects
+	EBSVolumes          map[string]volumes.VolumeProperties
+	VolumeResizer       volumes.VolumeResizer
+	currentMajorVersion int
 }
 
 type compareStatefulsetResult struct {
@@ -779,6 +780,10 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
 		updateFailed = true
+	}
+
+	if err := c.majorVersionUpgrade(); err != nil {
+
 	}
 
 	return nil
