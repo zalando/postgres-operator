@@ -162,6 +162,11 @@ func (in *KubernetesMetaConfiguration) DeepCopyInto(out *KubernetesMetaConfigura
 		*out = new(int64)
 		**out = **in
 	}
+	if in.AdditionalPodCapabilities != nil {
+		in, out := &in.AdditionalPodCapabilities, &out.AdditionalPodCapabilities
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.EnablePodDisruptionBudget != nil {
 		in, out := &in.EnablePodDisruptionBudget, &out.EnablePodDisruptionBudget
 		*out = new(bool)

@@ -126,6 +126,7 @@ class EndToEndTestCase(unittest.TestCase):
                          "api-service.yaml",
                          "infrastructure-roles.yaml",
                          "infrastructure-roles-new.yaml",
+                         "custom-team-membership.yaml",
                          "e2e-storage-class.yaml"]:
             result = k8s.create_with_kubectl("manifests/" + filename)
             print("stdout: {}, stderr: {}".format(result.stdout, result.stderr))
@@ -156,11 +157,87 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_additional_pod_capabilities(self):
+        '''
+           Extend postgres container capabilities
+        '''
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        capabilities = ["SYS_NICE","CHOWN"]
+        patch_capabilities = {
+            "data": {
+                "additional_pod_capabilities": ','.join(capabilities),
+            },
+        }
+        self.k8s.update_config(patch_capabilities)
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+        
+        self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
+                             2, "Container capabilities not updated")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_additional_teams_and_members(self):
+        '''
+           Test PostgresTeam CRD with extra teams and members
+        '''
+        # enable PostgresTeam CRD and lower resync
+        enable_postgres_team_crd = {
+            "data": {
+                "enable_postgres_team_crd": "true",
+                "resync_period": "15s",
+            },
+        }
+        self.k8s.update_config(enable_postgres_team_crd)
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+        
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresteams', 'custom-team-membership',
+        {
+            'spec': {
+                'additionalTeams': {
+                    'acid': [
+                        'e2e'
+                    ]
+                },
+                'additionalMembers': {
+                    'e2e': [
+                        'kind'
+                    ]
+                }
+            }
+        })
+
+        # make sure we let one sync pass and the new user being added
+        time.sleep(15)
+
+        leader = self.k8s.get_cluster_leader_pod('acid-minimal-cluster')
+        user_query = """
+            SELECT usename
+              FROM pg_catalog.pg_user
+             WHERE usename IN ('elephant', 'kind');
+        """
+        users = self.query_database(leader.metadata.name, "postgres", user_query)
+        self.eventuallyEqual(lambda: len(users), 2, 
+            "Not all additional users found in database: {}".format(users))
+
+        # revert config change
+        revert_resync = {
+            "data": {
+                "resync_period": "30m",
+            },
+        }
+        self.k8s.update_config(revert_resync)
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
         self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
-                             "Initial broken deplyment not rolled out")
+                             "Initial broken deployment not rolled out")
 
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
@@ -221,6 +298,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label(
                             'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                             2, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Pooler secret not created")
 
         # Turn off only master connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -246,6 +325,8 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label(
                              'application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              1, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Secret not created")
 
         # Turn off only replica connection pooler
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -268,6 +349,8 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler replica pods not deleted")
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              1, "No pooler service found")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
+                             1, "Secret not created")
 
         # scale up connection pooler deployment
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -301,58 +384,25 @@ class EndToEndTestCase(unittest.TestCase):
                              0, "Pooler pods not scaled down")
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              0, "Pooler service not removed")
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
+                             4, "Secrets not deleted")
 
         # Verify that all the databases have pooler schema installed.
         # Do this via psql, since otherwise we need to deal with
         # credentials.
-        dbList = []
+        db_list = []
 
         leader = k8s.get_cluster_leader_pod('acid-minimal-cluster')
-        dbListQuery = "select datname from pg_database"
-        schemasQuery = """
+        schemas_query = """
             select schema_name
             from information_schema.schemata
             where schema_name = 'pooler'
         """
-        exec_query = r"psql -tAq -c \"{}\" -d {}"
 
-        if leader:
-            try:
-                q = exec_query.format(dbListQuery, "postgres")
-                q = "su postgres -c \"{}\"".format(q)
-                print('Get databases: {}'.format(q))
-                result = k8s.exec_with_kubectl(leader.metadata.name, q)
-                dbList = clean_list(result.stdout.split(b'\n'))
-                print('dbList: {}, stdout: {}, stderr {}'.format(
-                    dbList, result.stdout, result.stderr
-                ))
-            except Exception as ex:
-                print('Could not get databases: {}'.format(ex))
-                print('Stdout: {}'.format(result.stdout))
-                print('Stderr: {}'.format(result.stderr))
-
-            for db in dbList:
-                if db in ('template0', 'template1'):
-                    continue
-
-                schemas = []
-                try:
-                    q = exec_query.format(schemasQuery, db)
-                    q = "su postgres -c \"{}\"".format(q)
-                    print('Get schemas: {}'.format(q))
-                    result = k8s.exec_with_kubectl(leader.metadata.name, q)
-                    schemas = clean_list(result.stdout.split(b'\n'))
-                    print('schemas: {}, stdout: {}, stderr {}'.format(
-                        schemas, result.stdout, result.stderr
-                    ))
-                except Exception as ex:
-                    print('Could not get databases: {}'.format(ex))
-                    print('Stdout: {}'.format(result.stdout))
-                    print('Stderr: {}'.format(result.stderr))
-
-                self.assertNotEqual(len(schemas), 0)
-        else:
-            print('Could not find leader pod')
+        db_list = self.list_databases(leader.metadata.name)
+        for db in db_list:
+            self.eventuallyNotEqual(lambda: len(self.query_database(leader.metadata.name, db, schemas_query)), 0, 
+                "Pooler schema not found in database {}".format(db))
 
         # remove config section to make test work next time
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -663,6 +713,7 @@ class EndToEndTestCase(unittest.TestCase):
                 "min_memory_limit": minMemoryLimit
             }
         }
+        k8s.update_config(patch_min_resource_limits, "Minimum resource test")
 
         # lower resource limits below minimum
         pg_patch_resources = {
@@ -680,10 +731,8 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
-
-        k8s.patch_statefulset({"metadata": {"annotations": {"zalando-postgres-operator-rolling-update-required": "False"}}})
-        k8s.update_config(patch_min_resource_limits, "Minimum resource test")
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)          
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members()), 2, "Postgres status did not enter running")
@@ -940,7 +989,6 @@ class EndToEndTestCase(unittest.TestCase):
         # verify we are in good state from potential previous tests
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         # get nodes of master and replica(s)
         master_node, replica_nodes = k8s.get_pg_nodes(cluster_label)
@@ -1026,6 +1074,9 @@ class EndToEndTestCase(unittest.TestCase):
                 body=patch_node_remove_affinity_config)
             self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
+            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
             # remove node affinity to move replica away from master node
             nm, new_replica_nodes = k8s.get_cluster_nodes()
             new_master_node = nm[0]
@@ -1034,7 +1085,7 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
-   
+
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zzzz_cluster_deletion(self):
         '''
@@ -1192,6 +1243,60 @@ class EndToEndTestCase(unittest.TestCase):
         k8s.wait_for_pod_start('spilo-role=replica')
         return True
 
+    def list_databases(self, pod_name):
+        '''
+           Get list of databases we might want to iterate over
+        '''
+        k8s = self.k8s
+        result_set = []
+        db_list = []
+        db_list_query = "select datname from pg_database"
+        exec_query = r"psql -tAq -c \"{}\" -d {}"
+
+        try:
+            q = exec_query.format(db_list_query, "postgres")
+            q = "su postgres -c \"{}\"".format(q)
+            print('Get databases: {}'.format(q))
+            result = k8s.exec_with_kubectl(pod_name, q)
+            db_list = clean_list(result.stdout.split(b'\n'))
+            print('db_list: {}, stdout: {}, stderr {}'.format(
+                db_list, result.stdout, result.stderr
+            ))
+        except Exception as ex:
+            print('Could not get databases: {}'.format(ex))
+            print('Stdout: {}'.format(result.stdout))
+            print('Stderr: {}'.format(result.stderr))
+
+        for db in db_list:
+            if db in ('template0', 'template1'):
+                continue
+            result_set.append(db)
+
+        return result_set
+
+    def query_database(self, pod_name, db_name, query):
+        '''
+           Query database and return result as a list
+        '''
+        k8s = self.k8s
+        result_set = []
+        exec_query = r"psql -tAq -c \"{}\" -d {}"
+
+        try:
+            q = exec_query.format(query, db_name)
+            q = "su postgres -c \"{}\"".format(q)
+            print('Send query: {}'.format(q))
+            result = k8s.exec_with_kubectl(pod_name, q)
+            result_set = clean_list(result.stdout.split(b'\n'))
+            print('result: {}, stdout: {}, stderr {}'.format(
+                result_set, result.stdout, result.stderr
+            ))
+        except Exception as ex:
+            print('Error on query execution: {}'.format(ex))
+            print('Stdout: {}'.format(result.stdout))
+            print('Stderr: {}'.format(result.stderr))
+
+        return result_set
 
 if __name__ == '__main__':
     unittest.main()

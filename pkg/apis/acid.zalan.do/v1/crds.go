@@ -604,7 +604,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
 										Type:     "object",
-										Required: []string{"preference, weight"},
+										Required: []string{"preference", "weight"},
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"preference": {
 												Type: "object",
@@ -835,6 +835,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type:     "object",
 						Required: []string{"size"},
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"iops": {
+								Type: "integer",
+							},
 							"size": {
 								Type:        "string",
 								Description: "Value must not be zero",
@@ -845,6 +848,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"subPath": {
 								Type: "string",
+							},
+							"throughput": {
+								Type: "integer",
 							},
 						},
 					},
@@ -962,6 +968,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"kubernetes": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
+							"additional_pod_capabilities": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
 							"cluster_domain": {
 								Type: "string",
 							},

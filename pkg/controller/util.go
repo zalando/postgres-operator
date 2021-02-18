@@ -15,7 +15,6 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/cluster"
 	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/teams"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -31,7 +30,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
 		RestConfig:          c.config.RestConfig,
 		OpConfig:            config.Copy(c.opConfig),
-		PgTeamMap:           c.pgTeamMap,
+		PgTeamMap:           &c.pgTeamMap,
 		InfrastructureRoles: infrastructureRoles,
 		PodServiceAccount:   c.PodServiceAccount,
 	}
@@ -395,9 +394,6 @@ func (c *Controller) getInfrastructureRole(
 }
 
 func (c *Controller) loadPostgresTeams() {
-	// reset team map
-	c.pgTeamMap = teams.PostgresTeamMap{}
-
 	pgTeams, err := c.KubeClient.PostgresTeamsGetter.PostgresTeams(c.opConfig.WatchedNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		c.logger.Errorf("could not list postgres team objects: %v", err)

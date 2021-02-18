@@ -320,6 +320,16 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 	return
 }
 
+func generateCapabilities(capabilities []string) v1.Capabilities {
+	additionalCapabilities := make([]v1.Capability, 0, len(capabilities))
+	for _, capability := range capabilities {
+		additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
+	}
+	return v1.Capabilities{
+		Add: additionalCapabilities,
+	}
+}
+
 func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
 	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
@@ -430,6 +440,7 @@ func generateContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
+	additionalPodCapabilities v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
 		Name:            name,
@@ -453,8 +464,10 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			Privileged:             &privilegedMode,
-			ReadOnlyRootFilesystem: util.False(),
+			AllowPrivilegeEscalation: &privilegedMode,
+			Privileged:               &privilegedMode,
+			ReadOnlyRootFilesystem:   util.False(),
+			Capabilities:             &additionalPodCapabilities,
 		},
 	}
 }
@@ -1147,6 +1160,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
+		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
 
 	// generate container specs for sidecars specified in the cluster manifest
@@ -1561,11 +1575,17 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	}
 
 	username := pgUser.Name
+	lbls := c.labelsSet(true)
+
+	if username == constants.ConnectionPoolerUserName {
+		lbls = c.connectionPoolerLabels("", false).MatchLabels
+	}
+
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.credentialSecretName(username),
 			Namespace:   namespace,
-			Labels:      c.labelsSet(true),
+			Labels:      lbls,
 			Annotations: c.annotationsSet(nil),
 		},
 		Type: v1.SecretTypeOpaque,
@@ -1574,6 +1594,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 			"password": []byte(pgUser.Password),
 		},
 	}
+
 	return &secret
 }
 
@@ -1893,6 +1914,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		envVars,
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
+		v1.Capabilities{},
 	)
 
 	labels := map[string]string{
@@ -2079,7 +2101,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 
 // getLogicalBackupJobName returns the name; the job itself may not exists
 func (c *Cluster) getLogicalBackupJobName() (jobName string) {
-	return c.OpConfig.LogicalBackupJobPrefix + c.clusterName().Name
+	return trimCronjobName(c.OpConfig.LogicalBackupJobPrefix + c.clusterName().Name)
 }
 
 // Return an array of ownerReferences to make an arbitraty object dependent on
