@@ -706,7 +706,8 @@ spec:
 
 ### Clone directly
 
-Another way to get a fresh copy of your source DB cluster is via basebackup. To
+Another way to get a fresh copy of your source DB cluster is via
+[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html). To
 use this feature simply leave out the timestamp field from the clone section.
 The operator will connect to the service of the source cluster by name. If the
 cluster is called test, then the connection string will look like host=test

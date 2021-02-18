@@ -618,38 +618,35 @@ A secret can be pre-provisioned in different ways:
 * Automatically provisioned via a custom K8s controller like
   [kube-aws-iam-controller](https://github.com/mikkeloscar/kube-aws-iam-controller)
 
-## WAL archiving and basebackups
+## WAL archiving and physical basebackups
 
 Spilo is shipped with [WAL-E](https://github.com/wal-e/wal-e) and its successor
 [WAL-G](https://github.com/wal-g/wal-g) to perform WAL archiving. By default,
-WAL-E is used because it is more battle-tested. Additionally to the continuous
-backup stream a [basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html)
-is initialized every night and 1am UTC.
+WAL-E is used for backups because it is more battle-tested. In addition to the
+continuous backup stream WAL-E/G pushes a physical base backup every night and
+01:00 am UTC.
 
 These are the pre-configured settings in the docker image:
+```bash
+BACKUP_NUM_TO_RETAIN: 5
+BACKUP_SCHEDULE:      '00 01 * * *'
+USE_WALG_BACKUP:      false (true for Azure and SSH)
+USE_WALG_RESTORE:     false (true for S3, Azure and SSH)
+```
+
+Within Postgres you can check the pre-configured commands for archiving and
+restoring WAL files. You can find the log files to the respective commands
+under `$HOME/pgdata/pgroot/pg_log/postgres-?.log`.
 
 ```bash
 archive_command:  `envdir "{WALE_ENV_DIR}" {WALE_BINARY} wal-push "%p"`
 restore_command:  `envdir "{{WALE_ENV_DIR}}" /scripts/restore_command.sh "%f" "%p"`
-
-AWS_ENDPOINT:         'https://s3.AWS_REGION.amazonaws.com:443'
-BACKUP_NUM_TO_RETAIN: 5
-BACKUP_SCHEDULE:      '00 01 * * *'
-USE_WALG_BACKUP:      false (not set)
-USE_WALG_RESTORE:     false (not set)
-WALE_S3_ENDPOINT:     'https+path://s3.AWS_REGION.amazonaws.com:443'
-WALE_S3_PREFIX:       's3://bucket-name/very/long/path'
 ```
 
-If the prefix is not specified Spilo will generate it from `WAL_S3_BUCKET`.
-When the `AWS_REGION` is set you `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
-generated automatically.
-
-The backup path has to be specified in the operator configuration. You have to
-make sure that Postgres is allowed to send compressed WAL files to the backup
-location, e.g. an S3 bucket. If you want to change some settings you have to
-overwrite Spilo's [environment variables](https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst)
-using an [extra configmap or secret](#custom-pod-environment-variables).
+Depending on the cloud storage provider different [environment variables](https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst)
+have to be set for Spilo. Not all of them are generated automatically by the
+operator by changing its configuration. In this case you have to use an
+[extra configmap or secret](#custom-pod-environment-variables).
 
 ### Using AWS S3 or compliant services
 
@@ -683,7 +680,8 @@ configuration:
     wal_s3_bucket: your-backup-path
 ```
 
-The referenced IAM role should contain the following privileges:
+The referenced IAM role should contain the following privileges to make sure
+Postgres can send compressed WAL files to the given S3 bucket:
 
 ```yaml
   PostgresPodRole:
@@ -702,6 +700,21 @@ The referenced IAM role should contain the following privileges:
                   - "arn:aws:s3:::your-backup-path"
                   - "arn:aws:s3:::your-backup-path/*"
 ```
+
+This should produce the following settings for the essential environment
+variables:
+
+```bash
+AWS_ENDPOINT:         'https://s3.eu-central-1.amazonaws.com:443'
+WAL_S3_BUCKET:        '/spilo/{WAL_BUCKET_SCOPE_PREFIX}{SCOPE}{WAL_BUCKET_SCOPE_SUFFIX}/wal/{PGVERSION}'
+WALE_S3_ENDPOINT:     'https+path://s3.eu-central-1.amazonaws.com:443'
+WALE_S3_PREFIX:       's3://your-backup-path'
+WALG_S3_PREFIX:       like WALE_S3_PREFIX
+```
+
+If the prefix is not specified Spilo will generate it from WAL_S3_BUCKET.
+When the AWS_REGION is set you AWS_ENDPOINT and WALE_S3_ENDPOINT are
+generated automatically. `SCOPE` is the Postgres cluster name.
 
 ### Google Cloud Platform setup
 
@@ -772,6 +785,15 @@ pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
 ...
 ```
 
+### Restoring physical backups
+
+If cluster members have to be (re)initialized restoring physical backups
+happens automatically either from the backup location or by running
+[pg_basebackup](https://www.postgresql.org/docs/13/app-pgbasebackup.html)
+on one of the other running instances (preferably replicas if they do not lag
+behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
+clusters.
+
 ## Logical backups
 
 The operator can manage K8s cron jobs to run logical backups (SQL dumps) of
@@ -792,11 +814,12 @@ spec:
 
 There a few things to consider when using logical backups:
 
-1. Logical backups should not seen as a proper alternative to basebackups and WAL
-archiving which are described above. At the moment, the operator cannot restore
-logical backups automatically and you do not get point-in-time recovery but only
-snapshots of your data. In its current state, see logical backups as a way to
-quickly create SQL dumps that you can easily restore in an empty test cluster.
+1. Logical backups should not be seen as a proper alternative to basebackups
+and WAL archiving which are described above. At the moment, the operator cannot
+restore logical backups automatically and you do not get point-in-time recovery
+but only snapshots of your data. In its current state, see logical backups as a
+way to quickly create SQL dumps that you can easily restore in an empty test
+cluster.
 
 2. The [example image](../docker/logical-backup/Dockerfile) implements the backup
 via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket.
