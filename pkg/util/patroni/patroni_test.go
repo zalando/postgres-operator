@@ -94,4 +94,12 @@ func TestPatroniAPI(t *testing.T) {
 
 	mockClient := mocks.NewMockHTTPClient(ctrl)
 	mockClient.EXPECT().Get(gomock.Any()).Return(&response)
+
+	p := New(nil, mockClient)
+
+	_, err := p.GetMemberData(nil)
+
+	if err != nil {
+		t.Errorf("Could not read Patroni data")
+	}
 }

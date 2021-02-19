@@ -1,7 +1,5 @@
 package patroni
 
-//go:generate mockgen -package mocks -destination=$PWD/mocks/$GOFILE -source=$GOFILE -build_flags=-mod=vendor
-
 import (
 	"bytes"
 	"encoding/json"
