@@ -26,7 +26,6 @@ const (
 type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
-	GetPatroniMemberState(pod *v1.Pod) (string, error)
 	GetMemberData(server *v1.Pod) (MemberData, error)
 }
 
@@ -127,39 +126,6 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
 }
 
-//GetPatroniMemberState returns a state of member of a Patroni cluster
-func (p *Patroni) GetPatroniMemberState(server *v1.Pod) (string, error) {
-
-	apiURLString, err := apiURL(server)
-	if err != nil {
-		return "", err
-	}
-	response, err := p.httpClient.Get(apiURLString)
-	if err != nil {
-		return "", fmt.Errorf("could not perform Get request: %v", err)
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return "", fmt.Errorf("could not read response: %v", err)
-	}
-
-	data := make(map[string]interface{})
-	err = json.Unmarshal(body, &data)
-	if err != nil {
-		return "", err
-	}
-
-	state, ok := data["state"].(string)
-	if !ok {
-		return "", errors.New("Patroni Get call response contains wrong type for 'state' field")
-	}
-
-	return state, nil
-
-}
-
 // MemberData Patroni member data from Patroni API
 type MemberData struct {
 	State          string
@@ -197,13 +163,13 @@ func (p *Patroni) GetMemberData(server *v1.Pod) (MemberData, error) {
 
 	var ok, r bool
 
-	memberData.state, r = data["state"].(string)
+	memberData.State, r = data["state"].(string)
 	ok = ok && r
-	memberData.serverVersion, r = data["server_version"].(int)
+	memberData.ServerVersion, r = data["server_version"].(int)
 	ok = ok && r
-	memberData.role, r = data["role"].(string)
+	memberData.Role, r = data["role"].(string)
 	ok = ok && r
-	memberData.role, r = data["scope"].(string)
+	memberData.Role, r = data["scope"].(string)
 	ok = ok && r
 
 	if !ok {
