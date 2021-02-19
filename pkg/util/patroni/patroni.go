@@ -1,5 +1,7 @@
 package patroni
 
+//go:generate mockgen -package mocks -destination=$PWD/mocks/$GOFILE -source=$GOFILE -build_flags=-mod=vendor
+
 import (
 	"bytes"
 	"encoding/json"
@@ -29,21 +31,31 @@ type Interface interface {
 	GetMemberData(server *v1.Pod) (MemberData, error)
 }
 
+// HTTPClient interface
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+	Get(url string) (resp *http.Response, err error)
+}
+
 // Patroni API client
 type Patroni struct {
-	httpClient *http.Client
+	httpClient HTTPClient
 	logger     *logrus.Entry
 }
 
 // New create patroni
-func New(logger *logrus.Entry) *Patroni {
-	cl := http.Client{
-		Timeout: timeout,
+func New(logger *logrus.Entry, client HTTPClient) *Patroni {
+	if client == nil {
+
+	} else {
+		client = &http.Client{
+			Timeout: timeout,
+		}
 	}
 
 	return &Patroni{
 		logger:     logger,
-		httpClient: &cl,
+		httpClient: client,
 	}
 }
 
@@ -161,7 +173,8 @@ func (p *Patroni) GetMemberData(server *v1.Pod) (MemberData, error) {
 
 	memberData := MemberData{}
 
-	var ok, r bool
+	r := false
+	ok := true
 
 	memberData.State, r = data["state"].(string)
 	ok = ok && r

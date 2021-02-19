@@ -1,10 +1,17 @@
 package patroni
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"k8s.io/api/core/v1"
+	"io/ioutil"
+	"net/http"
 	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/zalando/postgres-operator/mocks"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 func newMockPod(ip string) *v1.Pod {
@@ -71,4 +78,21 @@ func TestApiURL(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestPatroniAPI(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	json := `{"name":"Test Name","full_name":"test full name","owner":{"login": "octocat"}}`
+	r := ioutil.NopCloser(bytes.NewReader([]byte(json)))
+
+	response := http.Response{
+		Status: "200",
+		Body:   r,
+	}
+
+	mockClient := mocks.NewMockHTTPClient(ctrl)
+	mockClient.EXPECT().Get(gomock.Any()).Return(&response)
+
 }
