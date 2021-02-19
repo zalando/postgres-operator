@@ -15,6 +15,7 @@ RUN apt-get update     \
         gnupg \
         gcc \
         libffi-dev \
+    && pip3 install --upgrade pip \
     && pip3 install --no-cache-dir awscli --upgrade \
     && pip3 install --no-cache-dir gsutil --upgrade \
     && echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \

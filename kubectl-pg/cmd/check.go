@@ -23,6 +23,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -55,7 +56,7 @@ func check() *v1.CustomResourceDefinition {
 		log.Fatal(err)
 	}
 
-	crdInfo, err := apiExtClient.CustomResourceDefinitions().Get(postgresConstants.PostgresCRDResouceName, metav1.GetOptions{})
+	crdInfo, err := apiExtClient.CustomResourceDefinitions().Get(context.TODO(), postgresConstants.PostgresCRDResouceName, metav1.GetOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}

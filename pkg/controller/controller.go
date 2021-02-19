@@ -329,10 +329,9 @@ func (c *Controller) initController() {
 
 	c.initSharedInformers()
 
+	c.pgTeamMap = teams.PostgresTeamMap{}
 	if c.opConfig.EnablePostgresTeamCRD {
 		c.loadPostgresTeams()
-	} else {
-		c.pgTeamMap = teams.PostgresTeamMap{}
 	}
 
 	if c.opConfig.DebugLogging {

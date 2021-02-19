@@ -21,7 +21,7 @@ type VolumeResizer interface {
 	GetProviderVolumeID(pv *v1.PersistentVolume) (string, error)
 	ExtractVolumeID(volumeID string) (string, error)
 	ResizeVolume(providerVolumeID string, newSize int64) error
-	ModifyVolume(providerVolumeID string, newType string, newSize int64, iops int64, throughput int64) error
+	ModifyVolume(providerVolumeID string, newType *string, newSize *int64, iops *int64, throughput *int64) error
 	DisconnectFromProvider() error
 	DescribeVolumes(providerVolumesID []string) ([]VolumeProperties, error)
 }

@@ -355,13 +355,13 @@ streaming directly from host.
   is need to connect to primary host. Password should be under `password` key
   of a secret. This is *required* be specified when using `streaming_host` standby method.
 
-## EBS volume resizing
+## Volume properties
 
 Those parameters are grouped under the `volume` top-level key and define the
 properties of the persistent storage that stores Postgres data.
 
 * **size**
-  the size of the target EBS volume. Usual Kubernetes size modifiers, i.e. `Gi`
+  the size of the target volume. Usual Kubernetes size modifiers, i.e. `Gi`
   or `Mi`, apply. Required.
 
 * **storageClass**
@@ -372,6 +372,14 @@ properties of the persistent storage that stores Postgres data.
 
 * **subPath**
   Subpath to use when mounting volume into Spilo container. Optional.
+
+* **iops**
+  When running the operator on AWS the latest generation of EBS volumes (`gp3`)
+  allows for configuring the number of IOPS. Maximum is 16000. Optional.
+
+* **throughput**
+  When running the operator on AWS the latest generation of EBS volumes (`gp3`)
+  allows for configuring the throughput in MB/s. Maximum is 1000. Optional.
 
 ## Sidecar definitions
 

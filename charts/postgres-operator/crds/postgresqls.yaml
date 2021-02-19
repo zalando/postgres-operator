@@ -557,6 +557,8 @@ spec:
                 required:
                   - size
                 properties:
+                  iops:
+                    type: integer
                   size:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
@@ -565,6 +567,8 @@ spec:
                     type: string
                   subPath:
                     type: string
+                  throughput:
+                    type: integer
           status:
             type: object
             additionalProperties:

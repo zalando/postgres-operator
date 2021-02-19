@@ -280,6 +280,9 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 				},
 			},
 		},
+		SecurityContext: &v1.SecurityContext{
+			AllowPrivilegeEscalation: util.False(),
+		},
 	}
 
 	podTemplate := &v1.PodTemplateSpec{
@@ -289,7 +292,6 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 			Annotations: c.annotationsSet(c.generatePodAnnotations(spec)),
 		},
 		Spec: v1.PodSpec{
-			ServiceAccountName:            c.OpConfig.PodServiceAccountName,
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers:                    []v1.Container{poolerContainer},
 			// TODO: add tolerations to scheduler pooler on the same node
@@ -713,7 +715,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	// as per spec, hence do not skip syncing in that case, even though there
 	// is no diff in specs
 	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0) &&
-		(c.ConnectionPooler != nil && *newSpec.Spec.EnableConnectionPooler) {
+		(c.ConnectionPooler != nil && (needConnectionPooler(&newSpec.Spec))) {
 		c.logger.Debugln("syncing pooler is not required")
 		return nil, nil
 	}

@@ -228,7 +228,8 @@ rules:
   verbs:
   - get
   - create
-# to grant privilege to run privileged pods
+{{- if toString .Values.configKubernetes.spilo_privileged | eq "true" }}
+# to run privileged pods
 - apiGroups:
   - extensions
   resources:
@@ -237,4 +238,5 @@ rules:
   - privileged
   verbs:
   - use
+{{- end }}
 {{ end }}
