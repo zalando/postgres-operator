@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"time"
 
+	httpclient "github.com/zalando/postgres-operator/pkg/util/httpclient"
+
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 )
@@ -31,20 +33,14 @@ type Interface interface {
 	GetMemberData(server *v1.Pod) (MemberData, error)
 }
 
-// HTTPClient interface
-type HTTPClient interface {
-	Do(req *http.Request) (*http.Response, error)
-	Get(url string) (resp *http.Response, err error)
-}
-
 // Patroni API client
 type Patroni struct {
-	httpClient HTTPClient
+	httpClient httpclient.HTTPClient
 	logger     *logrus.Entry
 }
 
 // New create patroni
-func New(logger *logrus.Entry, client HTTPClient) *Patroni {
+func New(logger *logrus.Entry, client httpclient.HTTPClient) *Patroni {
 	if client == nil {
 
 	} else {
