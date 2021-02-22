@@ -320,14 +320,17 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 	return
 }
 
-func generateCapabilities(capabilities []string) v1.Capabilities {
+func generateCapabilities(capabilities []string) *v1.Capabilities {
 	additionalCapabilities := make([]v1.Capability, 0, len(capabilities))
 	for _, capability := range capabilities {
 		additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
 	}
-	return v1.Capabilities{
-		Add: additionalCapabilities,
+	if len(additionalCapabilities) > 0 {
+		return &v1.Capabilities{
+			Add: additionalCapabilities,
+		}
 	}
+	return nil
 }
 
 func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
@@ -440,7 +443,7 @@ func generateContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
-	additionalPodCapabilities v1.Capabilities,
+	additionalPodCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
 		Name:            name,
@@ -467,7 +470,7 @@ func generateContainer(
 			AllowPrivilegeEscalation: &privilegedMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   util.False(),
-			Capabilities:             &additionalPodCapabilities,
+			Capabilities:             additionalPodCapabilities,
 		},
 	}
 }
@@ -1914,7 +1917,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		envVars,
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
-		v1.Capabilities{},
+		nil,
 	)
 
 	labels := map[string]string{
