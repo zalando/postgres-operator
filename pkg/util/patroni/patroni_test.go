@@ -84,7 +84,7 @@ func TestPatroniAPI(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	json := `{"name":"Test Name","full_name":"test full name","owner":{"login": "octocat"}}`
+	json := `{"state": "running", "postmaster_start_time": "2021-02-19 14:31:50.053 CET", "role": "master", "server_version": 90621, "cluster_unlocked": false, "xlog": {"location": 55978296057856}, "timeline": 6, "database_system_identifier": "6462555844314089962", "pending_restart": true, "patroni": {"version": "2.0.1", "scope": "acid-rest92-standby"}}`
 	r := ioutil.NopCloser(bytes.NewReader([]byte(json)))
 
 	response := http.Response{

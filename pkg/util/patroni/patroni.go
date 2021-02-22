@@ -73,7 +73,9 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 		return fmt.Errorf("could not create request: %v", err)
 	}
 
-	p.logger.Debugf("making %s http request: %s", method, request.URL.String())
+	if p.logger != nil {
+		p.logger.Debugf("making %s http request: %s", method, request.URL.String())
+	}
 
 	resp, err := p.httpClient.Do(request)
 	if err != nil {
@@ -139,10 +141,12 @@ type MemberDataPatroni struct {
 
 // MemberData Patroni member data from Patroni API
 type MemberData struct {
-	State         string            `json:"state"`
-	Role          string            `json:"role"`
-	ServerVersion int               `json:"server_version"`
-	Patroni       MemberDataPatroni `json:"patroni"`
+	State           string            `json:"state"`
+	Role            string            `json:"role"`
+	ServerVersion   int               `json:"server_version"`
+	PendingRestart  string            `json:"pending_restart"`
+	ClusterUnlocked bool              `json:"cluster_unlocked"`
+	Patroni         MemberDataPatroni `json:"patroni"`
 }
 
 // GetMemberData read member data from patroni API
