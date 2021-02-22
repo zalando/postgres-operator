@@ -3,7 +3,6 @@ package patroni
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -132,12 +131,18 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
 }
 
+// MemberDataPatroni child element
+type MemberDataPatroni struct {
+	Version string
+	Scope   string
+}
+
 // MemberData Patroni member data from Patroni API
 type MemberData struct {
 	State          string
 	Role           string
 	ServerVersion  int
-	Scope          string
+	Patroni        MemberDataPatroni
 	PatroniVersion string
 }
 
@@ -159,29 +164,11 @@ func (p *Patroni) GetMemberData(server *v1.Pod) (MemberData, error) {
 		return MemberData{}, fmt.Errorf("could not read response: %v", err)
 	}
 
-	data := make(map[string]interface{})
+	data := MemberData{}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return MemberData{}, err
 	}
 
-	memberData := MemberData{}
-
-	r := false
-	ok := true
-
-	memberData.State, r = data["state"].(string)
-	ok = ok && r
-	memberData.ServerVersion, r = data["server_version"].(int)
-	ok = ok && r
-	memberData.Role, r = data["role"].(string)
-	ok = ok && r
-	memberData.Role, r = data["scope"].(string)
-	ok = ok && r
-
-	if !ok {
-		return MemberData{}, errors.New("Patroni member data could not be read")
-	}
-
-	return memberData, nil
+	return data, nil
 }
