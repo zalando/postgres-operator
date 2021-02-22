@@ -40,10 +40,10 @@ type Patroni struct {
 func New(logger *logrus.Entry, client httpclient.HTTPClient) *Patroni {
 	if client == nil {
 
-	} else {
 		client = &http.Client{
 			Timeout: timeout,
 		}
+
 	}
 
 	return &Patroni{
@@ -133,17 +133,16 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 
 // MemberDataPatroni child element
 type MemberDataPatroni struct {
-	Version string
-	Scope   string
+	Version string `json:"version"`
+	Scope   string `json:"scope"`
 }
 
 // MemberData Patroni member data from Patroni API
 type MemberData struct {
-	State          string
-	Role           string
-	ServerVersion  int
-	Patroni        MemberDataPatroni
-	PatroniVersion string
+	State         string            `json:"state"`
+	Role          string            `json:"role"`
+	ServerVersion int               `json:"server_version"`
+	Patroni       MemberDataPatroni `json:"patroni"`
 }
 
 // GetMemberData read member data from patroni API
