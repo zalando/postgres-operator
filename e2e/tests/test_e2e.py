@@ -928,6 +928,33 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     @unittest.skip("Skipping this test until fixed")
+    def test_zaa_test_major_version_upgrade(self):
+        k8s = self.k8s
+        result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(labels="application=spilo,cluster-name=acid-upgrade-test"), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        pg_patch_version = {
+            "spec": {
+                "postgres": {
+                    "version": "13"
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version)
+
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        def check_version_13():
+            p = k8s.get_patroni_state("acid-upgrade-test-0")
+            version = p["server_version"][0:2]
+            return version
+
+        self.evantuallyEqual(check_version_13, "13", "Version was not upgrade to 13")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
     def test_zzz_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
