@@ -144,7 +144,7 @@ type MemberData struct {
 	State           string            `json:"state"`
 	Role            string            `json:"role"`
 	ServerVersion   int               `json:"server_version"`
-	PendingRestart  string            `json:"pending_restart"`
+	PendingRestart  bool              `json:"pending_restart"`
 	ClusterUnlocked bool              `json:"cluster_unlocked"`
 	Patroni         MemberDataPatroni `json:"patroni"`
 }

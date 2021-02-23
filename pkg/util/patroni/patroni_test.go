@@ -93,13 +93,18 @@ func TestPatroniAPI(t *testing.T) {
 	}
 
 	mockClient := mocks.NewMockHTTPClient(ctrl)
-	mockClient.EXPECT().Get(gomock.Any()).Return(&response)
+	mockClient.EXPECT().Get(gomock.Any()).Return(&response, nil)
 
 	p := New(nil, mockClient)
 
-	_, err := p.GetMemberData(nil)
+	pod := v1.Pod{
+		Status: v1.PodStatus{
+			PodIP: "192.168.100.1",
+		},
+	}
+	_, err := p.GetMemberData(&pod)
 
 	if err != nil {
-		t.Errorf("Could not read Patroni data")
+		t.Errorf("Could not read Patroni data: %v", err)
 	}
 }
