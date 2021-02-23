@@ -48,6 +48,13 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
+	desiredVersion := c.GetDesiredMajorVersionAsInt()
+
+	if c.currentMajorVersion >= desiredVersion {
+		c.logger.Infof("cluster version up to date. current: %d desired: %d", c.currentMajorVersion, desiredVersion)
+		return nil
+	}
+
 	pods, _ := c.listPods()
 	allRunning := true
 
@@ -69,13 +76,11 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	numberOfPods := len(pods)
 	if allRunning && masterPod != nil {
-		desiredVersion := c.GetDesiredMajorVersionAsInt()
-		c.logger.Infof("healthy cluster, version: %d desired: %d", c.currentMajorVersion, desiredVersion)
+		c.logger.Infof("healthy cluster ready to upgrade, current: %d desired: %d", c.currentMajorVersion, desiredVersion)
 		if c.currentMajorVersion < desiredVersion {
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
-			c.logger.Infof("triggering major version upgrade on pod %s", masterPod.Name)
-			command := fmt.Sprintf("su postgres -c \"/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log\"", numberOfPods)
-			c.logger.Infof("executing: %s", command)
+			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
+			command := fmt.Sprintf("/bin/su postgres -c \"/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log\"", numberOfPods)
 			_, err := c.ExecCommand(podName, command)
 			if err != nil {
 				return err
