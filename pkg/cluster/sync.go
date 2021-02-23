@@ -118,6 +118,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
+	if err := c.majorVersionUpgrade(); err != nil {
+		c.logger.Errorf("major version upgrade failed: %v", err)
+	}
+
 	return err
 }
 

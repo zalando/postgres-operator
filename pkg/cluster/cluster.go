@@ -783,7 +783,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	}
 
 	if err := c.majorVersionUpgrade(); err != nil {
-
+		c.logger.Errorf("major version upgrade failed: %v", err)
 	}
 
 	return nil
