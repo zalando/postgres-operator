@@ -360,7 +360,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	}
 	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
 		match = false
-		reasons = append(reasons, "new statefulset's annotations does not match the current one")
+		reasons = append(reasons, "new statefulset's annotations do not match the current one")
 	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
