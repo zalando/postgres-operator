@@ -68,8 +68,11 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	numberOfPods := len(pods)
 	if allRunning && masterPod != nil {
-		if c.currentMajorVersion < c.GetDesiredMajorVersionAsInt() {
+		desiredVersion := c.GetDesiredMajorVersionAsInt()
+		c.logger.Infof("Cluster healthy with version: %d desired: %d", c.currentMajorVersion, desiredVersion)
+		if c.currentMajorVersion < desiredVersion {
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
+			c.logger.Infof("Triggering major version upgrade on pod %s", masterPod.Name)
 			c.ExecCommand(podName, fmt.Sprintf("python3 /scripts/inplace_upgrade.py %d", numberOfPods))
 		}
 	}
