@@ -34,7 +34,7 @@ func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
 		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion) {
-			c.logger.Infof("Overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
+			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion
 		}
 	}
@@ -88,9 +88,5 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 	}
 
-	return nil
-}
-
-func (c *Cluster) getCurrentMajorVersion() error {
 	return nil
 }
