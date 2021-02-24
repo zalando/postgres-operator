@@ -330,6 +330,15 @@ configuration they are grouped under the `kubernetes` key.
   that should be assigned to the Postgres pods. The priority class itself must
   be defined in advance. Default is empty (use the default priority class).
 
+* **host_network**
+  boolean parameter controlling whether to use [hostNetwork](https://kubernetes.io/docs/concepts/policy/pod-security-policy/#host-namespaces).
+  The default is `false`.
+  `kubectl explain statefulset.spec.template.spec.hostNetwork`
+
+* **read_only_root_filesystem**
+  boolean parameter controlling whether containers should use [readOnlyRootFilesystem](https://kubernetes.io/docs/concepts/policy/pod-security-policy/#volumes-and-file-systems).
+  `kubectl explain statefulset.spec.template.spec.securityContext.readOnlyRootFilesystem`
+
 * **spilo_runasuser**
   sets the user ID which should be used in the container to run the process.
   This must be set to run the container without root. By default the container
