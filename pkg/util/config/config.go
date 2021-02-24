@@ -28,11 +28,13 @@ type Resources struct {
 	PodLabelWaitTimeout       time.Duration       `name:"pod_label_wait_timeout" default:"10m"`
 	PodDeletionWaitTimeout    time.Duration       `name:"pod_deletion_wait_timeout" default:"10m"`
 	PodTerminateGracePeriod   time.Duration       `name:"pod_terminate_grace_period" default:"5m"`
+	HostNetwork               bool                `name:"host_network" default:"false"`
 	SpiloRunAsUser            *int64              `name:"spilo_runasuser,omitempty"`
 	SpiloRunAsGroup           *int64              `name:"spilo_runasgroup,omitempty"`
 	SpiloFSGroup              *int64              `name:"spilo_fsgroup"`
 	PodPriorityClassName      string              `name:"pod_priority_class_name"`
 	ClusterDomain             string              `name:"cluster_domain" default:"cluster.local"`
+	ReadOnlyRootFilesystem    *bool               `name:"read_only_root_filesystem" default:"false"`
 	SpiloPrivileged           bool                `name:"spilo_privileged" default:"false"`
 	AdditionalPodCapabilities []string            `name:"additional_pod_capabilities" default:""`
 	ClusterLabels             map[string]string   `name:"cluster_labels" default:"application:spilo"`
