@@ -9,8 +9,8 @@ import (
 
 // VersionMap Map of version numbers
 var VersionMap = map[string]int{
-	"9.5": 95000,
-	"9.6": 96000,
+	"9.5": 90500,
+	"9.6": 90600,
 	"10":  100000,
 	"11":  110000,
 	"12":  120000,
