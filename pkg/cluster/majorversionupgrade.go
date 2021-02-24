@@ -78,7 +78,8 @@ func (c *Cluster) majorVersionUpgrade() error {
 		if c.currentMajorVersion < desiredVersion {
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
-			_, err := c.ExecCommand(podName, "/bin/su", "postgres", "-c", "\"/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log\"")
+			//result, err := c.ExecCommand(podName, "/bin/su", "postgres", "-c", "whoami")
+			_, err := c.ExecCommand(podName, "/bin/su", "postgres", "-c", "/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log")
 			if err != nil {
 				return err
 			}
