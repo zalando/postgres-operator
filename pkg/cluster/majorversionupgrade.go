@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/zalando/postgres-operator/pkg/spec"
 	v1 "k8s.io/api/core/v1"
 )
@@ -78,8 +80,8 @@ func (c *Cluster) majorVersionUpgrade() error {
 		if c.currentMajorVersion < desiredVersion {
 			podName := &spec.NamespacedName{Namespace: masterPod.Namespace, Name: masterPod.Name}
 			c.logger.Infof("triggering major version upgrade on pod %s of %d pods", masterPod.Name, numberOfPods)
-			//result, err := c.ExecCommand(podName, "/bin/su", "postgres", "-c", "whoami")
-			_, err := c.ExecCommand(podName, "/bin/su", "postgres", "-c", "/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log")
+			upgradeCommand := fmt.Sprintf("/usr/bin/python3 /scripts/inplace_upgrade.py %d 2>&1 | tee last_upgrade.log", numberOfPods)
+			_, err := c.ExecCommand(podName, "/bin/su", "postgres", "-c", upgradeCommand)
 			if err != nil {
 				return err
 			}
