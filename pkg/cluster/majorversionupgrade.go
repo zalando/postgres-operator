@@ -55,7 +55,11 @@ func (c *Cluster) majorVersionUpgrade() error {
 		return nil
 	}
 
-	pods, _ := c.listPods()
+	pods, err := c.listPods()
+	if err != nil {
+		return err
+	}
+
 	allRunning := true
 
 	var masterPod *v1.Pod
