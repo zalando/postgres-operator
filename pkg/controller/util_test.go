@@ -480,3 +480,45 @@ func TestInfrastructureRoleDefinitions(t *testing.T) {
 		}
 	}
 }
+
+type SubConfig struct {
+	teammap map[string]string
+}
+
+type SuperConfig struct {
+	sub SubConfig
+}
+
+func TestUnderstandingMapsAndReferences(t *testing.T) {
+	teams := map[string]string{"acid": "Felix"}
+
+	sc := SubConfig{
+		teammap: teams,
+	}
+
+	ssc := SuperConfig{
+		sub: sc,
+	}
+
+	teams["24x7"] = "alex"
+
+	if len(ssc.sub.teammap) != 2 {
+		t.Errorf("Team Map does not contain 2 elements")
+	}
+
+	ssc.sub.teammap["teapot"] = "Mikkel"
+
+	if len(teams) != 3 {
+		t.Errorf("Team Map does not contain 3 elements")
+	}
+
+	teams = make(map[string]string)
+
+	if len(ssc.sub.teammap) != 3 {
+		t.Errorf("Team Map does not contain 0 elements")
+	}
+
+	if &teams == &(ssc.sub.teammap) {
+		t.Errorf("Identical maps")
+	}
+}
