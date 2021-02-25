@@ -11,6 +11,7 @@ pipeline {
         stage('Update Helm dependencies') {
             steps {
                 sh "cd charts/postgres-operator"
+                sh "ls -la"
                 sh "helm dependency update"
             }
         }
