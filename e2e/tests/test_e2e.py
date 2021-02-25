@@ -172,7 +172,7 @@ class EndToEndTestCase(unittest.TestCase):
         # get node and replica (expected target of new master)
         _, replica_nodes = self.k8s.get_pg_nodes(cluster_label)
 
-        try {
+        try:
             self.k8s.update_config(patch_capabilities)
             self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
                                 "Operator does not get in sync")
