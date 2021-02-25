@@ -170,7 +170,7 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         # get node and replica (expected target of new master)
-        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+        _, replica_nodes = self.k8s.get_pg_nodes(cluster_label)
 
         try {
             self.k8s.update_config(patch_capabilities)
@@ -178,8 +178,8 @@ class EndToEndTestCase(unittest.TestCase):
                                 "Operator does not get in sync")
 
             # changed security context of postrges container should trigger a rolling update
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
-            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            self.k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            self.k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
                                 2, "Container capabilities not updated")
