@@ -367,8 +367,7 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 		}
 
-		// TODO why is this necessary?
-		// c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
+		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
 
 		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if the desired and the running statefulsets match
