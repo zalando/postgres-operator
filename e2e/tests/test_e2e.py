@@ -168,12 +168,25 @@ class EndToEndTestCase(unittest.TestCase):
                 "additional_pod_capabilities": ','.join(capabilities),
             },
         }
-        self.k8s.update_config(patch_capabilities)
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
-                             "Operator does not get in sync")
-        
-        self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
-                             2, "Container capabilities not updated")
+
+        # get node and replica (expected target of new master)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+
+        try {
+            self.k8s.update_config(patch_capabilities)
+            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+                                "Operator does not get in sync")
+
+            # changed security context of postrges container should trigger a rolling update
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
+                                2, "Container capabilities not updated")
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_teams_and_members(self):
@@ -789,7 +802,7 @@ class EndToEndTestCase(unittest.TestCase):
         # verify we are in good state from potential previous tests
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
 
-        # get nodes of master and replica(s) (expected target of new master)
+        # get node and replica (expected target of new master)
         _, replica_nodes = k8s.get_pg_nodes(cluster_label)
 
         # rolling update annotation
@@ -844,7 +857,7 @@ class EndToEndTestCase(unittest.TestCase):
         # verify we are in good state from potential previous tests
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
 
-        # get nodes of master and replica(s) (expected target of new master)
+        # get node and replica (expected target of new master)
         _, replica_nodes = k8s.get_pg_nodes(cluster_label)
 
         # rolling update annotation
