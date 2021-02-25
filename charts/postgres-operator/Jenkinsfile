@@ -10,6 +10,7 @@ pipeline {
     stages {
         stage('Update Helm dependencies') {
             steps {
+                sh "cd charts/postgres-operator"
                 sh "helm dependency update"
             }
         }
