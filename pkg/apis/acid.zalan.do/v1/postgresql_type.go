@@ -114,6 +114,7 @@ type MaintenanceWindow struct {
 
 // Volume describes a single volume in the manifest.
 type Volume struct {
+	Selector	 *metav1.LabelSelector `json:"selector,omitempty"`
 	Size         string `json:"size"`
 	StorageClass string `json:"storageClass,omitempty"`
 	SubPath      string `json:"subPath,omitempty"`
