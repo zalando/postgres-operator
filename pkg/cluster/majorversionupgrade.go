@@ -33,7 +33,8 @@ func (c *Cluster) GetDesiredMajorVersionAsInt() int {
 func (c *Cluster) GetDesiredMajorVersion() string {
 
 	if c.Config.OpConfig.MajorVersionUpgradeMode == "full" {
-		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion) {
+		// current is 9.5, minimal is 11 allowing 11 to 13 clusters, everything below is upgraded
+		if IsBiggerPostgresVersion(c.Spec.PgVersion, c.Config.OpConfig.MinimalMajorVersion) {
 			c.logger.Infof("overwriting configured major version %s to %s", c.Spec.PgVersion, c.Config.OpConfig.TargetMajorVersion)
 			return c.Config.OpConfig.TargetMajorVersion
 		}
