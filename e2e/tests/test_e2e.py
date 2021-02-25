@@ -750,10 +750,6 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
 
-    @classmethod
-    def setUp(cls):
-        pass
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
         '''
@@ -812,8 +808,8 @@ class EndToEndTestCase(unittest.TestCase):
                 if pod.metadata.labels.get('spilo-role') == 'master':
                     old_creation_timestamp = pod.metadata.creation_timestamp
                     k8s.patch_pod(flag, pod.metadata.name, pod.metadata.namespace)
-                # operator will perform a switchover to an existing replica before recreating the master pod
                 else:
+                    # remember replica name to check if operator does a switchover
                     switchover_target = pod.metadata.name
 
             # do not wait until the next sync
@@ -852,7 +848,7 @@ class EndToEndTestCase(unittest.TestCase):
         _, replica_nodes = k8s.get_pg_nodes(cluster_label)
 
         # rolling update annotation
-        rolling_update_flag = {
+        rolling_update_patch = {
             "metadata": {
                 "annotations": {
                     flag: "true",
@@ -861,7 +857,8 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         # make pod_label_wait_timeout so short that rolling update fails on first try
-        # temporarily lower resync interval to simulate that pods get healthy in between SYNCs
+        # temporarily lower resync interval to reduce waiting for further tests
+        # pods should get healthy in the meantime
         patch_resync_config = {
             "data": {
                 "pod_label_wait_timeout": "2s",
@@ -873,7 +870,7 @@ class EndToEndTestCase(unittest.TestCase):
             # patch both pods for rolling update
             podList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
             for pod in podList.items:
-                k8s.patch_pod(rolling_update_flag, pod.metadata.name, pod.metadata.namespace)
+                k8s.patch_pod(rolling_update_patch, pod.metadata.name, pod.metadata.namespace)
                 if pod.metadata.labels.get('spilo-role') == 'replica':
                     switchover_target = pod.metadata.name
 
@@ -888,7 +885,6 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "SyncFailed", "Expected SYNC event to fail")
 
             # wait for next sync, replica should be running normally by now and be ready for switchover
-            time.sleep(10)
             k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
 
             # check if the former replica is now the new master
@@ -901,12 +897,6 @@ class EndToEndTestCase(unittest.TestCase):
             # status should again be "SyncFailed" but turn into "Running" on the next sync
             time.sleep(10)
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
-
-            # rolling update should be gone now
-            podList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
-            for pod in podList.items:
-                self.assertTrue(flag not in pod.metadata.annotations, 
-                    "Rolling update flag still present on pod {}".format(pod.metadata.name))
 
             # revert config changes
             patch_resync_config = {

@@ -322,6 +322,10 @@ func (c *Cluster) syncStatefulSet() error {
 			if c.getRollingUpdateFlagFromPod(&pod) {
 				podsToRecreate = append(podsToRecreate, pod)
 			} else {
+				role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+				if role == Master {
+					continue
+				}
 				switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
 			}
 		}
@@ -382,6 +386,10 @@ func (c *Cluster) syncStatefulSet() error {
 					}
 					podsToRecreate = append(podsToRecreate, pod)
 				} else {
+					role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+					if role == Master {
+						continue
+					}
 					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
 				}
 			}

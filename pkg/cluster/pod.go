@@ -50,6 +50,11 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 // markRollingUpdateFlagForPod sets the indicator for the rolling update requirement
 // in the Pod annotation.
 func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
+	// no need to patch pod if annotation is already there
+	if c.getRollingUpdateFlagFromPod(pod) {
+		return nil
+	}
+
 	c.logger.Debugf("mark rolling update annotation for %s: reason %s", pod.Name, msg)
 	flag := make(map[string]string)
 	flag[rollingUpdatePodAnnotationKey] = strconv.FormatBool(true)
@@ -80,7 +85,7 @@ func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
 	return nil
 }
 
-// getRollingUpdateFlagFromPod returns the value of the rollingUpdate flag from the passed
+// getRollingUpdateFlagFromPod returns the value of the rollingUpdate flag from the given pod
 func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod) (flag bool) {
 	anno := pod.GetAnnotations()
 	flag = false
@@ -332,8 +337,6 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 }
 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
-	// TODO due to delays in sync, should double check if recreate annotation is still present
-
 	ch := c.registerPodSubscriber(podName)
 	defer c.unregisterPodSubscriber(podName)
 	stopChan := make(chan struct{})
@@ -420,6 +423,11 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 			continue
 		}
 
+		// double check one more time if the rolling update flag is still there
+		if !c.getRollingUpdateFlagFromPod(&pod) {
+			continue
+		}
+
 		podName := util.NameFromMeta(pod.ObjectMeta)
 		newPod, err := c.recreatePod(podName)
 		if err != nil {
@@ -435,12 +443,13 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 	}
 
 	if masterPod != nil {
-		// switchover if we have observed a master pod and replicas
+		// switchover if
+		// 1. we have not observed a new master pod when re-creating former replicas
+		// 2. we know possible switchover targets even when no replicas were recreated
 		if newMasterPod == nil && len(replicas) > 0 {
 			if err := c.Switchover(masterPod, masterCandidate(replicas)); err != nil {
 				c.logger.Warningf("could not perform switch over: %v", err)
 			}
-			// TODO if only the master pod came for recreate, we do not do switchover currently
 		} else if newMasterPod == nil && len(replicas) == 0 {
 			c.logger.Warningf("cannot perform switch over before re-creating the pod: no replicas")
 		}
