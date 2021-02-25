@@ -1,0 +1,44 @@
+pipeline {
+    
+    agent {
+        dockerfile {
+            args '-u root:root --network="host"'
+        }
+    }
+
+    stages {
+        stage('Update Helm dependencies') {
+            steps {
+                sh "helm dependency update"
+            }
+        }
+
+        stage('Run Helm lint') {
+            steps {
+                sh script: "helm lint --with-subcharts", returnStatus: true
+            }
+        }
+
+        stage('Package Helm chart') {
+            steps {
+                sh "helm package ."
+            }
+        }
+
+        stage('Push Helm chart') {
+            when {
+                branch "main"
+            }
+            steps {
+                sh "curl --fail --data-binary \"@\$(ls postgres-operator-ui*.tgz)\" http://localhost:8081/api/charts"
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "chmod -R 777 ."
+            cleanWs ()
+        }
+    }
+}
