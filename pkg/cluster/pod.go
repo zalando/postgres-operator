@@ -14,6 +14,7 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
@@ -378,12 +379,17 @@ func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
 	*/
 	for _, pod := range pods {
 		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
-		var state string
+	}
+
+	for _, pod := range pods {
+
+		var data patroni.MemberData
 
 		err := retryutil.Retry(1*time.Second, 5*time.Second,
 			func() (bool, error) {
 				var err error
-				state, err = c.patroni.GetPatroniMemberState(&pod)
+				data, err = c.patroni.GetMemberData(&pod)
+
 				if err != nil {
 					return false, err
 				}
@@ -394,7 +400,7 @@ func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
 		if err != nil {
 			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
 			return false
-		} else if state == "creating replica" {
+		} else if data.State == "creating replica" {
 			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
 			return false
 		}

@@ -206,6 +206,10 @@ type Config struct {
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
+	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.5"`
+	TargetMajorVersion                     string            `name:"target_major_version" default:"13"`
+	AllowedMajorUpgradeVersions            []string          `name:"allowed_major_upgrade_versions" default:"12,13"`
 }
 
 // MustMarshal marshals the config or panics
