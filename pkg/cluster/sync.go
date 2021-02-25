@@ -118,6 +118,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
 	}
 
+	// Major version upgrade must only run after success of all earlier operations, must remain last item in sync
+	if err := c.majorVersionUpgrade(); err != nil {
+		c.logger.Errorf("major version upgrade failed: %v", err)
+	}
+
 	return err
 }
 
@@ -471,7 +476,7 @@ func (c *Cluster) syncSecrets() error {
 	for secretUsername, secretSpec := range secrets {
 		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %q, uid: %q", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			c.logger.Debugf("created new secret %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
@@ -480,7 +485,7 @@ func (c *Cluster) syncSecrets() error {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
 			if secretUsername != string(secret.Data["username"]) {
-				c.logger.Errorf("secret %s does not contain the role %q", secretSpec.Name, secretUsername)
+				c.logger.Errorf("secret %s does not contain the role %s", secretSpec.Name, secretUsername)
 				continue
 			}
 			c.Secrets[secret.UID] = secret
@@ -499,7 +504,7 @@ func (c *Cluster) syncSecrets() error {
 			if pwdUser.Password != string(secret.Data["password"]) &&
 				pwdUser.Origin == spec.RoleOriginInfrastructure {
 
-				c.logger.Debugf("updating the secret %q from the infrastructure roles", secretSpec.Name)
+				c.logger.Debugf("updating the secret %s from the infrastructure roles", secretSpec.Name)
 				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secretSpec, metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
 				}
@@ -509,7 +514,7 @@ func (c *Cluster) syncSecrets() error {
 				userMap[secretUsername] = pwdUser
 			}
 		} else {
-			return fmt.Errorf("could not create secret for user %q: %v", secretUsername, err)
+			return fmt.Errorf("could not create secret for user %s: %v", secretUsername, err)
 		}
 	}
 
