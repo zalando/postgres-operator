@@ -61,7 +61,7 @@ spec:
             properties:
               docker_image:
                 type: string
-                default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p2"
+                default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p4"
               enable_crd_validation:
                 type: boolean
                 default: true
@@ -378,7 +378,7 @@ spec:
                 properties:
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.0"
+                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.1"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -507,7 +507,7 @@ spec:
                     default: "pooler"
                   connection_pooler_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-12"
+                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-14"
                   connection_pooler_max_db_connections:
                     type: integer
                     default: 60

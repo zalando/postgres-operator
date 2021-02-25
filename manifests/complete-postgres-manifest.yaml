@@ -9,7 +9,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.0-p2
+  dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.0-p4
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -148,18 +148,22 @@ spec:
     image: busybox
     command: [ "/bin/date" ]
 #  sidecars:
-#    - name: "telegraf-sidecar"
-#      image: "telegraf:latest"
-#      resources:
-#        limits:
-#          cpu: 500m
-#          memory: 500Mi
-#        requests:
-#          cpu: 100m
-#          memory: 100Mi
-#      env:
-#        - name: "USEFUL_VAR"
-#          value: "perhaps-true"
+#   - name: "telegraf-sidecar"
+#     image: "telegraf:latest"
+#     ports:
+#       name: metrics
+#       containerPort: 8094
+#       protocol: TCP
+#     resources:
+#       limits:
+#         cpu: 500m
+#         memory: 500Mi
+#       requests:
+#         cpu: 100m
+#         memory: 100Mi
+#     env:
+#       - name: "USEFUL_VAR"
+#         value: "perhaps-true"
 
 # Custom TLS certificate. Disabled unless tls.secretName has a value.
   tls:
