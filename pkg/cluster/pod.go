@@ -429,11 +429,6 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 			continue
 		}
 
-		// double check one more time if the rolling update flag is still there
-		if !c.getRollingUpdateFlagFromPod(&pod) {
-			continue
-		}
-
 		podName := util.NameFromMeta(pod.ObjectMeta)
 		newPod, err := c.recreatePod(podName)
 		if err != nil {

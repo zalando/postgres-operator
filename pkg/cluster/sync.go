@@ -351,6 +351,7 @@ func (c *Cluster) syncStatefulSet() error {
 		if !cmp.match {
 			if cmp.rollingUpdate {
 				podsToRecreate = make([]v1.Pod, 0)
+				switchoverCandidates = make([]spec.NamespacedName, 0)
 				for _, pod := range pods {
 					if err = c.markRollingUpdateFlagForPod(&pod, "pod changes"); err != nil {
 						return fmt.Errorf("updating rolling update flag for pod failed: %v", err)
