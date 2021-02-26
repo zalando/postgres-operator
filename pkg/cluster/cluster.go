@@ -1309,7 +1309,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
-		err = fmt.Errorf("could not switch over: %v", err)
+		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
 	}
 
 	// signal the role label waiting goroutine to close the shop and go home
