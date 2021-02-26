@@ -123,6 +123,25 @@ spec:
                   super_username:
                      type: string
                      default: postgres
+              major_version_upgrade:
+                type: object
+                properties:
+                  allowed_major_upgrade_versions:
+                    type: array
+                    items:
+                      type: string
+                    default:
+                    - "12"
+                    - "13"
+                  major_version_upgrade_mode:
+                    type: string
+                    default: "off"
+                  minimal_major_version:
+                    type: string
+                    default: "9.5"
+                  target_major_version:
+                    type: string
+                    default: "13"
               kubernetes:
                 type: object
                 properties:

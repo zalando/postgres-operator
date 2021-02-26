@@ -26,6 +26,13 @@ configuration:
   users:
     replication_username: standby
     super_username: postgres
+  major_version_upgrade:
+    allowed_major_upgrade_versions:
+      - "12"
+      - "13"
+    major_version_upgrade_mode: "off"
+    minimal_major_version: "9.5"
+    target_major_version: "13"
   kubernetes:
     # additional_pod_capabilities:
     # - "SYS_NICE"

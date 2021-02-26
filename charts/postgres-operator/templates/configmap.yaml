@@ -15,6 +15,7 @@ data:
   pod_service_account_name: {{ include "postgres-pod.serviceAccountName" . }}
 {{ toYaml .Values.configGeneral | indent 2 }}
 {{ toYaml .Values.configUsers | indent 2 }}
+{{ toYaml .Values.configMajorVersionUpgrade | indent 2 }}
 {{ toYaml .Values.configKubernetes | indent 2 }}
 {{ toYaml .Values.configTimeouts | indent 2 }}
 {{ toYaml .Values.configLoadBalancer | indent 2 }}

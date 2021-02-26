@@ -6,6 +6,7 @@ data:
   # additional_pod_capabilities: "SYS_NICE"
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
+  # allowed_major_upgrade_versions: "12,13"
   api_port: "8080"
   aws_region: eu-central-1
   cluster_domain: cluster.local
@@ -81,6 +82,7 @@ data:
   # min_instances: "-1"
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
+  # minimal_major_version: "9.5"
   # node_readiness_label: ""
   # oauth_token_secret_name: postgresql-operator
   # pam_configuration: |
@@ -119,6 +121,7 @@ data:
   spilo_privileged: "false"
   storage_resize_mode: "pvc"
   super_username: postgres
+  # target_major_version: "13"
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
