@@ -168,12 +168,25 @@ class EndToEndTestCase(unittest.TestCase):
                 "additional_pod_capabilities": ','.join(capabilities),
             },
         }
-        self.k8s.update_config(patch_capabilities)
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
-                             "Operator does not get in sync")
-        
-        self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
-                             2, "Container capabilities not updated")
+
+        # get node and replica (expected target of new master)
+        _, replica_nodes = self.k8s.get_pg_nodes(cluster_label)
+
+        try:
+            self.k8s.update_config(patch_capabilities)
+            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+                                "Operator does not get in sync")
+
+            # changed security context of postrges container should trigger a rolling update
+            self.k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            self.k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
+                                2, "Container capabilities not updated")
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_additional_teams_and_members(self):
@@ -212,7 +225,7 @@ class EndToEndTestCase(unittest.TestCase):
         # make sure we let one sync pass and the new user being added
         time.sleep(15)
 
-        leader = self.k8s.get_cluster_leader_pod('acid-minimal-cluster')
+        leader = self.k8s.get_cluster_leader_pod()
         user_query = """
             SELECT usename
               FROM pg_catalog.pg_user
@@ -392,7 +405,7 @@ class EndToEndTestCase(unittest.TestCase):
         # credentials.
         db_list = []
 
-        leader = k8s.get_cluster_leader_pod('acid-minimal-cluster')
+        leader = k8s.get_cluster_leader_pod()
         schemas_query = """
             select schema_name
             from information_schema.schemata
@@ -611,7 +624,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.update_config(unpatch_lazy_spilo_upgrade, step="patch lazy upgrade")
 
             # at this point operator will complete the normal rolling upgrade
-            # so we additonally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
+            # so we additionally test if disabling the lazy upgrade - forcing the normal rolling upgrade - works
             self.eventuallyEqual(lambda: k8s.get_effective_pod_image(pod0),
                                  conf_image, "Rolling upgrade was not executed",
                                  50, 3)
@@ -750,12 +763,6 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyTrue(verify_pod_limits, "Pod limits where not adjusted")
 
-    @classmethod
-    def setUp(cls):
-        # cls.k8s.update_config({}, step="Setup")
-        cls.k8s.patch_statefulset({"meta": {"annotations": {"zalando-postgres-operator-rolling-update-required": False}}})
-        pass
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_multi_namespace_support(self):
         '''
@@ -784,6 +791,139 @@ class EndToEndTestCase(unittest.TestCase):
                 "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-test-cluster")
             time.sleep(5)
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_rolling_update_flag(self):
+        '''
+            Add rolling update flag to only the master and see it failing over
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+
+        # get node and replica (expected target of new master)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+
+        # rolling update annotation
+        flag = {
+            "metadata": {
+                "annotations": {
+                    "zalando-postgres-operator-rolling-update-required": "true",
+                }
+            }
+        }
+
+        try:
+            podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
+            for pod in podsList.items:
+                # add flag only to the master to make it appear to the operator as a leftover from a rolling update
+                if pod.metadata.labels.get('spilo-role') == 'master':
+                    old_creation_timestamp = pod.metadata.creation_timestamp
+                    k8s.patch_pod(flag, pod.metadata.name, pod.metadata.namespace)
+                else:
+                    # remember replica name to check if operator does a switchover
+                    switchover_target = pod.metadata.name
+
+            # do not wait until the next sync
+            k8s.delete_operator_pod()
+
+            # operator should now recreate the master pod and do a switchover before
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+
+            # check if the former replica is now the new master
+            leader = k8s.get_cluster_leader_pod()
+            self.eventuallyEqual(lambda: leader.metadata.name, switchover_target, "Rolling update flag did not trigger switchover")
+
+            # check that the old master has been recreated
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            replica = k8s.get_cluster_replica_pod()
+            self.assertTrue(replica.metadata.creation_timestamp > old_creation_timestamp, "Old master pod was not recreated")
+
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_rolling_update_label_timeout(self):
+        '''
+            Simulate case when replica does not receive label in time and rolling update does not finish
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        flag = "zalando-postgres-operator-rolling-update-required"
+
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+
+        # get node and replica (expected target of new master)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
+
+        # rolling update annotation
+        rolling_update_patch = {
+            "metadata": {
+                "annotations": {
+                    flag: "true",
+                }
+            }
+        }
+
+        # make pod_label_wait_timeout so short that rolling update fails on first try
+        # temporarily lower resync interval to reduce waiting for further tests
+        # pods should get healthy in the meantime
+        patch_resync_config = {
+            "data": {
+                "pod_label_wait_timeout": "2s",
+                "resync_period": "20s",
+            }
+        }
+
+        try:
+            # patch both pods for rolling update
+            podList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
+            for pod in podList.items:
+                k8s.patch_pod(rolling_update_patch, pod.metadata.name, pod.metadata.namespace)
+                if pod.metadata.labels.get('spilo-role') == 'replica':
+                    switchover_target = pod.metadata.name
+
+            # update config and restart operator
+            k8s.update_config(patch_resync_config, "update resync interval and pod_label_wait_timeout")
+
+            # operator should now recreate the replica pod first and do a switchover after
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            # pod_label_wait_timeout should have been exceeded hence the rolling update is continued on next sync
+            # check if the cluster state is "SyncFailed"
+            self.eventuallyEqual(lambda: k8s.pg_get_status(), "SyncFailed", "Expected SYNC event to fail")
+
+            # wait for next sync, replica should be running normally by now and be ready for switchover
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+
+            # check if the former replica is now the new master
+            leader = k8s.get_cluster_leader_pod()
+            self.eventuallyEqual(lambda: leader.metadata.name, switchover_target, "Rolling update flag did not trigger switchover")
+
+            # wait for the old master to get restarted
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            # status should again be "SyncFailed" but turn into "Running" on the next sync
+            time.sleep(10)
+            self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
+
+            # revert config changes
+            patch_resync_config = {
+                "data": {
+                    "pod_label_wait_timeout": "10m",
+                    "resync_period": "30m",
+                }
+            }
+            k8s.update_config(patch_resync_config, "revert resync interval and pod_label_wait_timeout")
+
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_node_readiness_label(self):
