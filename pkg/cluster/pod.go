@@ -9,6 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
@@ -44,6 +45,33 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	}
 
 	return pods.Items, nil
+}
+
+func (c *Cluster) getTerminatingPodsCount() (int32) {
+	var count int32
+	listOptions := metav1.ListOptions{
+		LabelSelector: c.labelsSet(false).String(),
+	}
+
+	pods, err := c.KubeClient.Pods(c.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return 0
+	}
+	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil {
+			rc := clock.RealClock{}
+			now := rc.Now()
+			deletionTime := pod.DeletionTimestamp.Time
+			gracePeriod := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
+			if now.After(deletionTime.Add(gracePeriod)) {
+				count++
+			}
+		}
+	}
+	c.logger.Debugf("Found %v pods in terminating status after DeletionGracePeriod", count)
+
+	return count
+
 }
 
 func (c *Cluster) deletePods() error {
