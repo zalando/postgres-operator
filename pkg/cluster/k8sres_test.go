@@ -1496,25 +1496,25 @@ func TestGenerateCapabilities(t *testing.T) {
 	tests := []struct {
 		subTest      string
 		configured   []string
-		capabilities v1.Capabilities
+		capabilities *v1.Capabilities
 		err          error
 	}{
 		{
 			subTest:      "no capabilities",
 			configured:   nil,
-			capabilities: v1.Capabilities{Add: []v1.Capability{}},
+			capabilities: nil,
 			err:          fmt.Errorf("could not parse capabilities configuration of nil"),
 		},
 		{
 			subTest:      "empty capabilities",
 			configured:   []string{},
-			capabilities: v1.Capabilities{Add: []v1.Capability{}},
+			capabilities: nil,
 			err:          fmt.Errorf("could not parse empty capabilities configuration"),
 		},
 		{
 			subTest:    "configured capability",
 			configured: []string{"SYS_NICE"},
-			capabilities: v1.Capabilities{
+			capabilities: &v1.Capabilities{
 				Add: []v1.Capability{"SYS_NICE"},
 			},
 			err: fmt.Errorf("could not generate one configured capability"),
@@ -1522,7 +1522,7 @@ func TestGenerateCapabilities(t *testing.T) {
 		{
 			subTest:    "configured capabilities",
 			configured: []string{"SYS_NICE", "CHOWN"},
-			capabilities: v1.Capabilities{
+			capabilities: &v1.Capabilities{
 				Add: []v1.Capability{"SYS_NICE", "CHOWN"},
 			},
 			err: fmt.Errorf("could not generate multiple configured capabilities"),

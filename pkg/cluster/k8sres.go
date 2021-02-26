@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -320,14 +319,17 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 	return
 }
 
-func generateCapabilities(capabilities []string) v1.Capabilities {
+func generateCapabilities(capabilities []string) *v1.Capabilities {
 	additionalCapabilities := make([]v1.Capability, 0, len(capabilities))
 	for _, capability := range capabilities {
 		additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
 	}
-	return v1.Capabilities{
-		Add: additionalCapabilities,
+	if len(additionalCapabilities) > 0 {
+		return &v1.Capabilities{
+			Add: additionalCapabilities,
+		}
 	}
+	return nil
 }
 
 func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
@@ -442,7 +444,7 @@ func generateContainer(
 	volumeMounts []v1.VolumeMount,
 	readOnlyRootFilesystem *bool,
 	privilegedMode bool,
-	additionalPodCapabilities v1.Capabilities,
+	additionalPodCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
 		Name:            name,
@@ -469,7 +471,7 @@ func generateContainer(
 			AllowPrivilegeEscalation: &privilegedMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   readOnlyRootFilesystem,
-			Capabilities:             &additionalPodCapabilities,
+			Capabilities:             additionalPodCapabilities,
 		},
 	}
 }
@@ -735,7 +737,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		},
 	}
 	if c.OpConfig.EnablePgVersionEnvVar {
-		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.Spec.PgVersion})
+		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}
 	// Spilo expects cluster labels as JSON
 	if clusterLabels, err := json.Marshal(labels.Set(c.OpConfig.ClusterLabels)); err != nil {
@@ -1278,7 +1280,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	stsAnnotations := make(map[string]string)
-	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
 	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
 
 	statefulSet := &appsv1.StatefulSet{
@@ -1917,7 +1918,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		[]v1.VolumeMount{},
 		c.OpConfig.ReadOnlyRootFilesystem,
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
-		v1.Capabilities{},
+		nil,
 	)
 
 	labels := map[string]string{

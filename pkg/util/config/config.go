@@ -115,7 +115,7 @@ type Scalyr struct {
 // LogicalBackup defines configuration for logical backup
 type LogicalBackup struct {
 	LogicalBackupSchedule                     string `name:"logical_backup_schedule" default:"30 00 * * *"`
-	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.6.0"`
+	LogicalBackupDockerImage                  string `name:"logical_backup_docker_image" default:"registry.opensource.zalan.do/acid/logical-backup:v1.6.1"`
 	LogicalBackupProvider                     string `name:"logical_backup_provider" default:"s3"`
 	LogicalBackupS3Bucket                     string `name:"logical_backup_s3_bucket" default:""`
 	LogicalBackupS3Region                     string `name:"logical_backup_s3_region" default:""`
@@ -153,7 +153,7 @@ type Config struct {
 	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
 	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-13:2.0-p2"`
+	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-13:2.0-p4"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
@@ -208,6 +208,10 @@ type Config struct {
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
+	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.5"`
+	TargetMajorVersion                     string            `name:"target_major_version" default:"13"`
+	AllowedMajorUpgradeVersions            []string          `name:"allowed_major_upgrade_versions" default:"12,13"`
 }
 
 // MustMarshal marshals the config or panics

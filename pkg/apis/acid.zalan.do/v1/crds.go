@@ -604,7 +604,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Items: &apiextv1.JSONSchemaPropsOrArray{
 									Schema: &apiextv1.JSONSchemaProps{
 										Type:     "object",
-										Required: []string{"preference, weight"},
+										Required: []string{"preference", "weight"},
 										Properties: map[string]apiextv1.JSONSchemaProps{
 											"preference": {
 												Type: "object",

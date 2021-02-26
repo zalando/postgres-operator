@@ -7,7 +7,7 @@
 <img src="docs/diagrams/logo.png" width="200">
 
 The Postgres Operator delivers an easy to run highly-available [PostgreSQL](https://www.postgresql.org/)
-clusters on Kubernetes (K8s) powered by [Patroni](https://github.com/zalando/spilo).
+clusters on Kubernetes (K8s) powered by [Patroni](https://github.com/zalando/patroni).
 It is configured only through Postgres manifests (CRDs) to ease integration into automated CI/CD
 pipelines with no access to Kubernetes API directly, promoting infrastructure as code vs manual operations.
 
@@ -24,7 +24,7 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Support for custom TLS certificates
 * UI to create and edit Postgres cluster manifests
 * Works well on Amazon AWS, Google Cloud, OpenShift and locally on Kind
-* Base support for AWS EBS gp3 migration (iops, throughput pending)
+* Support for AWS EBS gp3 migration
 
 ### PostgreSQL features
 
@@ -65,7 +65,7 @@ We introduce the major version into the backup path to smoothen the [major versi
 The new operator configuration can set a compatibility flag *enable_spilo_wal_path_compat* to make Spilo look for wal segments in the current path but also old format paths.
 This comes at potential performance costs and should be disabled after a few days.
 
-The new Spilo 13 image is: `registry.opensource.zalan.do/acid/spilo-13:2.0-p2`
+The newest Spilo 13 image is: `registry.opensource.zalan.do/acid/spilo-13:2.0-p4`
 
 The last Spilo 12 image is: `registry.opensource.zalan.do/acid/spilo-12:1.6-p5`
 

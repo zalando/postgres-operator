@@ -211,7 +211,7 @@ class K8s:
         self.wait_for_logical_backup_job(expected_num_of_jobs=1)
 
     def delete_operator_pod(self, step="Delete operator pod"):
-             # patching the pod template in the deployment restarts the operator pod
+        # patching the pod template in the deployment restarts the operator pod
         self.api.apps_v1.patch_namespaced_deployment("postgres-operator", "default", {"spec": {"template": {"metadata": {"annotations": {"step": "{}-{}".format(step, time.time())}}}}})
         self.wait_for_operator_pod_start()
 
@@ -219,8 +219,8 @@ class K8s:
         self.api.core_v1.patch_namespaced_config_map("postgres-operator", "default", config_map_patch)
         self.delete_operator_pod(step=step)
 
-    def patch_statefulset(self, data, name="acid-minimal-cluster", namespace="default"):
-        self.api.apps_v1.patch_namespaced_stateful_set(name, namespace, data)
+    def patch_pod(self, data, pod_name, namespace="default"):
+        self.api.core_v1.patch_namespaced_pod(pod_name, namespace, data)
 
     def create_with_kubectl(self, path):
         return subprocess.run(
@@ -280,18 +280,20 @@ class K8s:
             return None
         return pod.items[0].spec.containers[0].image
 
-    def get_cluster_leader_pod(self, pg_cluster_name, namespace='default'):
-        labels = {
-            'application': 'spilo',
-            'cluster-name': pg_cluster_name,
-            'spilo-role': 'master',
-        }
+    def get_cluster_pod(self, role, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
+        labels = labels + ',spilo-role=' + role
 
         pods = self.api.core_v1.list_namespaced_pod(
-                namespace, label_selector=to_selector(labels)).items
+                namespace, label_selector=labels).items
 
         if pods:
             return pods[0]
+
+    def get_cluster_leader_pod(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
+        return self.get_cluster_pod('master', labels, namespace)
+
+    def get_cluster_replica_pod(self, labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
+        return self.get_cluster_pod('replica', labels, namespace)
 
 
 class K8sBase:
