@@ -848,7 +848,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "array",
 										Items: &apiextv1.JSONSchemaPropsOrArray{
 											Schema: &apiextv1.JSONSchemaProps{
-												Type: "object",
+												Type:     "object",
 												Required: []string{"key", "operator", "values"},
 												Properties: map[string]apiextv1.JSONSchemaProps{
 													"key": {
@@ -884,7 +884,7 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										},
 									},
 									"matchLabels": {
-										Type: "object",
+										Type:                   "object",
 										XPreserveUnknownFields: util.True(),
 									},
 								},
