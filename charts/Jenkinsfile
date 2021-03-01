@@ -1,4 +1,7 @@
+def VERSION_TO_DEPLOY = '1.6.1'
+
 pipeline {
+
     
     agent {
         dockerfile {
@@ -34,8 +37,8 @@ pipeline {
                 branch "master"
             }
             steps {
-                sh "cd charts/postgres-operator; curl --data-binary \"@\$(ls postgres-operator-*.tgz)\" http://localhost:8081/api/charts"
-                sh "cd charts/postgres-operator-ui; curl --data-binary \"@\$(ls postgres-operator-ui*.tgz)\" http://localhost:8081/api/charts"
+                sh "cd charts/postgres-operator; curl --data-binary \"@postgres-operator-${VERSION_TO_DEPLOY}.tgz\" http://localhost:8081/api/charts"
+                sh "cd charts/postgres-operator-ui; curl --data-binary \"@postgres-operator-ui-${VERSION_TO_DEPLOY}.tgz\" http://localhost:8081/api/charts"
             }
         }
     }
