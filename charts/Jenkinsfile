@@ -2,7 +2,7 @@ pipeline {
     
     agent {
         dockerfile {
-            dir 'charts/postgres-operator'
+            dir 'charts'
             args '-u root:root --network="host"'
         }
     }
