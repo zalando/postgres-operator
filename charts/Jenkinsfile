@@ -11,27 +11,31 @@ pipeline {
         stage('Update Helm dependencies') {
             steps {
                 sh "cd charts/postgres-operator; helm dependency update"
+                sh "cd charts/postgres-operator-ui; helm dependency update"
             }
         }
 
         stage('Run Helm lint') {
             steps {
                 sh script: "cd charts/postgres-operator; helm lint --with-subcharts", returnStatus: true
+                sh script: "cd charts/postgres-operator-ui; helm lint --with-subcharts", returnStatus: true
             }
         }
 
-        stage('Package Helm chart') {
+        stage('Package Helm charts') {
             steps {
                 sh "cd charts/postgres-operator; helm package ."
+                sh "cd charts/postgres-operator-ui; helm package ."
             }
         }
 
-        stage('Push Helm chart') {
+        stage('Push Helm charts') {
             when {
-                branch "main"
+                branch "master"
             }
             steps {
-                sh "cd charts/postgres-operator; curl --fail --data-binary \"@\$(ls postgres-operator-*.tgz)\" http://localhost:8081/api/charts"
+                sh "cd charts/postgres-operator; curl --data-binary \"@\$(ls postgres-operator-*.tgz)\" http://localhost:8081/api/charts"
+                sh "cd charts/postgres-operator-ui; curl --data-binary \"@\$(ls postgres-operator-ui*.tgz)\" http://localhost:8081/api/charts"
             }
         }
     }

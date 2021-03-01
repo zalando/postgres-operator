@@ -1,10 +1,20 @@
 # Postgres Operator
 
+
 ![Tests](https://github.com/zalando/postgres-operator/workflows/operator-tests/badge.svg)
 ![E2E Tests](https://github.com/zalando/postgres-operator/workflows/operator-e2e-tests/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/zalando/postgres-operator/badge.svg?branch=master)](https://coveralls.io/github/zalando/postgres-operator?branch=master)
 
 <img src="docs/diagrams/logo.png" width="200">
+
+
+## Important for NUM Project
+
+This is a forked repo of the Zalando Postgres-operator repository. That repository was forked over, since the Helm chart of the project
+is not hosted in any of the public Helm repositories, so we built a simple pipeline to manually deploy the latest Helm chart to our own
+chart repository.
+
+### About Postgres Operator
 
 The Postgres Operator delivers an easy to run highly-available [PostgreSQL](https://www.postgresql.org/)
 clusters on Kubernetes (K8s) powered by [Patroni](https://github.com/zalando/patroni).
