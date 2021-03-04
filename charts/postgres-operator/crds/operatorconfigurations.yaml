@@ -130,13 +130,6 @@ spec:
               major_version_upgrade:
                 type: object
                 properties:
-                  allowed_major_upgrade_versions:
-                    type: array
-                    items:
-                      type: string
-                    default:
-                    - "12"
-                    - "13"
                   major_version_upgrade_mode:
                     type: string
                     default: "off"

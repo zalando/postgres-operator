@@ -6,7 +6,6 @@ data:
   # additional_pod_capabilities: "SYS_NICE"
   # additional_secret_mount: "some-secret-name"
   # additional_secret_mount_path: "/some/dir"
-  # allowed_major_upgrade_versions: "12,13"
   api_port: "8080"
   aws_region: eu-central-1
   cluster_domain: cluster.local

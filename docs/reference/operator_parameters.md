@@ -193,11 +193,6 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   which violate the configured allowed `minimal_major_version` when
   `major_version_upgrade_mode` is set to `"full"`. The default is `"13"`.
 
-* **allowed_major_upgrade_versions**
-  Allow major version upgrades only to certain Postgres versions.
-  The default is `["12", "13"]`.
-
-
 ## Kubernetes resources
 
 Parameters to configure cluster-related Kubernetes objects created by the

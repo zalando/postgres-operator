@@ -61,8 +61,6 @@ configUsers:
   super_username: postgres
 
 configMajorVersionUpgrade:
-  # to allow major version upgrades only to certain Postgres versions
-  allowed_major_upgrade_versions: "12,13"
   # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
   major_version_upgrade_mode: "off"
   # minimal Postgres major version that will not automatically be upgraded

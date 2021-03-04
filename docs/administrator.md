@@ -32,8 +32,8 @@ In-place major version upgrades can be configured to be executed by the
 operator with the `major_version_upgrade_mode` option. By default it is set
 to `off` which means the cluster version will not change when increased in
 the manifest. Still, a rolling update would be triggered updating the
-`PGVERSION` variable. But `configure_spilo` will notice the version mismatch
-and start the old version again.
+`PGVERSION` variable. But Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
+script will notice the version mismatch and start the old version again.
 
 In this scenario the major version could then be run by a user from within the
 master pod. Exec into the container and run:
