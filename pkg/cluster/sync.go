@@ -261,9 +261,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 }
 
 func (c *Cluster) syncStatefulSet() error {
-	var (
-		podsRollingUpdateRequired, instancesRestartRequired bool
-	)
+	var instancesRestartRequired bool
 
 	podsToRecreate := make([]v1.Pod, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
@@ -394,8 +392,6 @@ func (c *Cluster) syncStatefulSet() error {
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
 		if err := c.restartInstances(); err != nil {
 			c.logger.Warningf("could not restart Postgres server within pods: %v", err)
-			// Perform rolling update if couldn'r restart instances
-			podsRollingUpdateRequired = true
 		}
 		c.logger.Infof("Postgres server successfuly restarted on all pods")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done - all instances have been restarted")
@@ -409,9 +405,6 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
-		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
-			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
-		}
 	}
 	return nil
 }
