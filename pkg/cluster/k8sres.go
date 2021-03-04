@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -734,7 +733,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		},
 	}
 	if c.OpConfig.EnablePgVersionEnvVar {
-		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.Spec.PgVersion})
+		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}
 	// Spilo expects cluster labels as JSON
 	if clusterLabels, err := json.Marshal(labels.Set(c.OpConfig.ClusterLabels)); err != nil {
@@ -1279,7 +1278,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	stsAnnotations := make(map[string]string)
-	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
 	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
 
 	statefulSet := &appsv1.StatefulSet{
