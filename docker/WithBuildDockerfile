@@ -1,0 +1,32 @@
+###########################################################
+###  builder image          ###############################
+###########################################################
+FROM golang:1.14.6-alpine AS builder
+
+RUN apk --no-cache add ca-certificates make git && update-ca-certificates
+WORKDIR /go/src/github.com/zalando/postgres-operator/
+COPY . .
+RUN make linux
+
+################################################################
+### operator image -> the more secure version (from scratch) ###
+################################################################
+FROM scratch AS postgres-operator-secure
+MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
+LABEL org.opencontainers.image.authors "Team ACID @ Zalando <team-acid@zalando.de>"
+LABEL org.opencontainers.image.url "https://github.com/zalando/postgres-operator/"
+LABEL org.opencontainers.image.documentation "https://github.com/zalando/postgres-operator/"
+LABEL org.opencontainers.image.source "https://github.com/zalando/postgres-operator/"
+LABEL org.opencontainers.image.title "zalando/posgress-operator"
+LABEL org.opencontainers.image.description "posgress-operator-secure from scratch image"
+
+COPY --from=builder /etc/passwd /etc/group /etc/
+
+# We need root certificates to deal with teams api over https
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /go/src/github.com/zalando/postgres-operator/build/* /
+
+USER nobody
+ENTRYPOINT ["/postgres-operator"]
+
+

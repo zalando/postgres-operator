@@ -1,0 +1,41 @@
+###########################################################
+###  builder image          ###############################
+###########################################################
+FROM golang:1.14.6-alpine AS builder
+
+RUN apk --no-cache add ca-certificates make git && update-ca-certificates
+WORKDIR /go/src/github.com/zalando/postgres-operator/
+COPY . .
+RUN make linux
+
+###########################################################
+### operator image -> debug version      ##################
+###########################################################
+FROM golang:1.14.6-alpine AS postgres-operator-debug
+MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
+LABEL org.opencontainers.image.authors "Team ACID @ Zalando <team-acid@zalando.de>"
+LABEL org.opencontainers.image.url "https://github.com/zalando/postgres-operator/"
+LABEL org.opencontainers.image.documentation "https://github.com/zalando/postgres-operator/"
+LABEL org.opencontainers.image.source "https://github.com/zalando/postgres-operator/"
+LABEL org.opencontainers.image.title "zalando/posgress-operator"
+LABEL org.opencontainers.image.description "posgress-operator-debug"
+
+# We need root certificates to deal with teams api over https
+COPY --from=builder /go/src/github.com/zalando/postgres-operator/build/* /
+
+# We need root certificates to deal with teams api over https
+RUN apk --no-cache add ca-certificates git musl-dev
+
+RUN addgroup -g 1000 pgo
+RUN adduser -D -u 1000 -G pgo -g 'Postgres Operator' pgo
+
+RUN go get github.com/derekparker/delve/cmd/dlv
+RUN cp /go/bin/dlv /dlv
+RUN chown -R pgo:pgo /dlv
+
+USER pgo:pgo
+EXPOSE 7777
+RUN ls -l /
+
+CMD ["/dlv", "--listen=:7777", "--headless=true", "--api-version=2", "exec", "/postgres-operator"]
+
