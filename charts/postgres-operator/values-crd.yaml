@@ -58,6 +58,14 @@ configUsers:
   # postgres superuser name to be created by initdb
   super_username: postgres
 
+configMajorVersionUpgrade:
+  # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
+  major_version_upgrade_mode: "off"
+  # minimal Postgres major version that will not automatically be upgraded
+  minimal_major_version: "9.5"
+  # target Postgres major version when upgrading clusters automatically
+  target_major_version: "13"
+
 configKubernetes:
   # list of additional capabilities for postgres container
   # additional_pod_capabilities:

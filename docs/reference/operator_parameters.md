@@ -170,6 +170,29 @@ under the `users` key.
   Postgres username used for replication between instances. The default is
   `standby`.
 
+## Major version upgrades
+
+Parameters configuring automatic major version upgrades. In a 
+CRD-configuration, they are grouped under the `major_version_upgrade` key.
+
+* **major_version_upgrade_mode**
+  Postgres Operator supports [in-place major version upgrade](../administrator.md#in-place-major-version-upgrade) 
+  with three different modes:
+  `"off"` = no upgrade by the operator,
+  `"manual"` = manifest triggers action,
+  `"full"` = manifest and minimal version violation trigger upgrade.
+  Note, that with all three modes increasing the version in the manifest will
+  trigger a rolling update of the pods. The default is `"off"`.
+
+* **minimal_major_version**
+  The minimal Postgres major version that will not automatically be upgraded
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"9.5"`.
+
+* **target_major_version**
+  The target Postgres major version when upgrading clusters automatically
+  which violate the configured allowed `minimal_major_version` when
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"13"`.
+
 ## Kubernetes resources
 
 Parameters to configure cluster-related Kubernetes objects created by the
