@@ -273,6 +273,9 @@ spec:
                   spilo_privileged:
                     type: boolean
                     default: false
+                  spilo_allow_privilege_escalation:
+                    type: boolean
+                    default: true
                   storage_resize_mode:
                     type: string
                     enum:

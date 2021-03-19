@@ -83,6 +83,7 @@ configuration:
     # spilo_runasgroup: 103
     # spilo_fsgroup: 103
     spilo_privileged: false
+    spilo_allow_privilege_escalation: true
     storage_resize_mode: pvc
     # toleration: {}
     # watched_namespace: ""
