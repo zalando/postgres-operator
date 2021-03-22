@@ -1163,7 +1163,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type: "boolean",
 							},
 							"spilo_allow_privilege_escalation": {
-                                                                Type: "boolean",
+                                Type: "boolean",
 							},
 							"storage_resize_mode": {
 								Type: "string",
