@@ -1,7 +1,7 @@
 ###########################################################
 ###  builder image          ###############################
 ###########################################################
-FROM golang:1.14.6-alpine AS builder
+FROM golang:1.15.10-alpine3.13 AS builder
 
 RUN apk --no-cache add ca-certificates make git && update-ca-certificates
 WORKDIR /go/src/github.com/zalando/postgres-operator/
@@ -12,7 +12,7 @@ RUN make linux
 ### operator image -> the version with full alpine image ##
 ###########################################################
 ## This is optional, only as example. Only last image is used
-FROM alpine:3.12.0 as postgres-operator-alpine
+FROM alpine:3.13.2 as postgres-operator-alpine
 MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
 LABEL org.opencontainers.image.authors "Team ACID @ Zalando <team-acid@zalando.de>"
 LABEL org.opencontainers.image.url "https://github.com/zalando/postgres-operator/"
