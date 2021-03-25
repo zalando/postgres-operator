@@ -661,6 +661,9 @@ func (c *Cluster) syncDatabases() error {
 
 	// set default privileges for prepared database
 	for _, preparedDatabase := range preparedDatabases {
+		if err := c.initDbConnWithName(preparedDatabase); err != nil {
+			return fmt.Errorf("could not init database connection to %s", preparedDatabase)
+		}
 		if err = c.execAlterGlobalDefaultPrivileges(preparedDatabase+constants.OwnerRoleNameSuffix, preparedDatabase); err != nil {
 			return err
 		}
