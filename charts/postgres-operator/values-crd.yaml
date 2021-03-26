@@ -33,9 +33,9 @@ configGeneral:
   # kubernetes_use_configmaps: false
   # Spilo docker image
   docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p4
-  # max number of instances in Postgres cluster. -1 = no limit
-  min_instances: -1
   # min number of instances in Postgres cluster. -1 = no limit
+  min_instances: -1
+  # max number of instances in Postgres cluster. -1 = no limit
   max_instances: -1
   # period between consecutive repair requests
   repair_period: 5m
