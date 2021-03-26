@@ -264,6 +264,9 @@ spec:
                   secret_name_template:
                     type: string
                     default: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+                  spilo_allow_privilege_escalation:
+                    type: boolean
+                    default: true
                   spilo_runasuser:
                     type: integer
                   spilo_runasgroup:
@@ -273,9 +276,6 @@ spec:
                   spilo_privileged:
                     type: boolean
                     default: false
-                  spilo_allow_privilege_escalation:
-                    type: boolean
-                    default: true
                   storage_resize_mode:
                     type: string
                     enum:
