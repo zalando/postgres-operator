@@ -11,29 +11,42 @@ switchover (planned failover) of the master to the Pod with new minor version.
 The switch should usually take less than 5 seconds, still clients have to
 reconnect.
 
-Major version upgrades are supported either via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
-or in-place.
+### Upgrade on cloning
 
-With cloning, the new cluster manifest must have a higher `version` string than
-the source cluster and will be created from a basebackup. Depending of the
-cluster size, downtime in this case can be significant as writes to the database
-should be stopped and all WAL files should be archived first before cloning is
-started.
+With [cloning](user.md#how-to-clone-an-existing-postgresql-cluster), the new
+cluster manifest must have a higher `version` string than the source cluster
+and will be created from a basebackup. Depending of the cluster size, downtime
+in this case can be significant as writes to the database should be stopped
+and all WAL files should be archived first before cloning is started.
+Therefore, use cloning only to test major version upgrades and check for
+compatibility of your app with to Postgres server of a higher version.
 
-Starting with Spilo 13, Postgres Operator can do in-place major version upgrade,
-which should be faster than cloning. However, it is not fully automatic yet.
-First, you need to make sure, that setting the `PGVERSION` environment variable
-is enabled in the configuration. Since `v1.6.0`, `enable_pgversion_env_var` is
-enabled by default.
+### In-place major version upgrade
 
-To trigger the upgrade, increase the version in the cluster manifest. After
-Pods are rotated `configure_spilo` will notice the version mismatch and start
-the old version again. You can then exec into the Postgres container of the
-master instance and call `python3 /scripts/inplace_upgrade.py N` where `N`
-is the number of members of your cluster (see [`numberOfInstances`](https://github.com/zalando/postgres-operator/blob/50cb5898ea715a1db7e634de928b2d16dc8cd969/manifests/minimal-postgres-manifest.yaml#L10)).
+Starting with Spilo 13, Postgres Operator can run an in-place major version
+upgrade which is much faster than cloning. First, you need to make sure, that
+the `PGVERSION` environment variable is set for the database pods. Since
+`v1.6.0` the related option `enable_pgversion_env_var` is enabled by default.
+
+In-place major version upgrades can be configured to be executed by the
+operator with the `major_version_upgrade_mode` option. By default it is set
+to `off` which means the cluster version will not change when increased in
+the manifest. Still, a rolling update would be triggered updating the
+`PGVERSION` variable. But Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
+script will notice the version mismatch and start the old version again.
+
+In this scenario the major version could then be run by a user from within the
+master pod. Exec into the container and run:
+```bash
+python3 /scripts/inplace_upgrade.py N
+```
+where `N` is the number of members of your cluster (see [`numberOfInstances`](https://github.com/zalando/postgres-operator/blob/50cb5898ea715a1db7e634de928b2d16dc8cd969/manifests/minimal-postgres-manifest.yaml#L10)).
 The upgrade is usually fast, well under one minute for most DBs. Note, that
 changes become irrevertible once `pg_upgrade` is called. To understand the
 upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
+
+When `major_version_upgrade_mode` is set to `manual` the operator will run
+the upgrade script for you after the manifest is updated and pods are rotated.
 
 ## CRD Validation
 

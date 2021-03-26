@@ -36,9 +36,9 @@ configGeneral:
   # kubernetes_use_configmaps: "false"
   # Spilo docker image
   docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p4
-  # max number of instances in Postgres cluster. -1 = no limit
-  min_instances: "-1"
   # min number of instances in Postgres cluster. -1 = no limit
+  min_instances: "-1"
+  # max number of instances in Postgres cluster. -1 = no limit
   max_instances: "-1"
   # period between consecutive repair requests
   repair_period: 5m
@@ -59,6 +59,14 @@ configUsers:
   replication_username: standby
   # postgres superuser name to be created by initdb
   super_username: postgres
+
+configMajorVersionUpgrade:
+  # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
+  major_version_upgrade_mode: "off"
+  # minimal Postgres major version that will not automatically be upgraded
+  minimal_major_version: "9.5"
+  # target Postgres major version when upgrading clusters automatically
+  target_major_version: "13"
 
 configKubernetes:
   # list of additional capabilities for postgres container

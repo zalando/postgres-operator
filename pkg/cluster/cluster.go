@@ -1310,6 +1310,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 		}
 	} else {
 		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	}
 
 	// signal the role label waiting goroutine to close the shop and go home
@@ -1320,9 +1321,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	// close the label waiting channel no sooner than the waiting goroutine terminates.
 	close(podLabelErr)
 
-	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	return err
-
 }
 
 // Lock locks the cluster

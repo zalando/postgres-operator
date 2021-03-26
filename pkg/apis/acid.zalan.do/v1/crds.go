@@ -965,6 +965,20 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"major_version_upgrade": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"major_version_upgrade_mode": {
+								Type: "string",
+							},
+							"minimal_major_version": {
+								Type: "string",
+							},
+							"target_major_version": {
+								Type: "string",
+							},
+						},
+					},
 					"kubernetes": {
 						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
