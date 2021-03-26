@@ -79,11 +79,11 @@ configuration:
     # pod_service_account_role_binding_definition: ""
     pod_terminate_grace_period: 5m
     secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+    spilo_allow_privilege_escalation: true
     # spilo_runasuser: 101
     # spilo_runasgroup: 103
     # spilo_fsgroup: 103
     spilo_privileged: false
-    spilo_allow_privilege_escalation: true
     storage_resize_mode: pvc
     # toleration: {}
     # watched_namespace: ""
