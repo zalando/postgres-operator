@@ -15,7 +15,7 @@ image:
 # Secrets must be manually created in the namespace.
 # ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
 # imagePullSecrets:
-#   - name: 
+#   - name:
 
 rbac:
   # Specifies whether RBAC resources should be created
@@ -45,6 +45,8 @@ envs:
   operatorClusterNameLabel: "cluster-name"
   resourcesVisible: "False"
   targetNamespace: "default"
+  teams:
+    - "acid"
 
 # configure UI service
 service:
