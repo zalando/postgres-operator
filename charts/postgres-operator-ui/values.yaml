@@ -45,7 +45,8 @@ envs:
   operatorClusterNameLabel: "cluster-name"
   resourcesVisible: "False"
   targetNamespace: "default"
-  teams: ["acid"]
+  teams:
+    - "acid"
 
 # configure UI service
 service:
