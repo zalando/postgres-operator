@@ -376,8 +376,8 @@ configuration they are grouped under the `kubernetes` key.
 
 * **spilo_allow_privilege_escalation**
   Controls whether a process can gain more privileges than its parent
-  process. Required by cron which needs setuid. Without this parameter, certification
-  rotation & backups will not be done. The default is `true`.
+  process. Required by cron which needs setuid. Without this parameter,
+  certification rotation & backups will not be done. The default is `true`.
 
 * **additional_pod_capabilities**
   list of additional capabilities to be added to the postgres container's
