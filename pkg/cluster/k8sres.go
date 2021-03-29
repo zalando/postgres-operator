@@ -442,6 +442,7 @@ func generateContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
+	privilegeEscalationMode bool,
 	additionalPodCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
@@ -466,7 +467,7 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			AllowPrivilegeEscalation: &privilegedMode,
+			AllowPrivilegeEscalation: &privilegeEscalationMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   util.False(),
 			Capabilities:             additionalPodCapabilities,
@@ -1162,6 +1163,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
+		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
 
@@ -1915,6 +1917,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		envVars,
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
+		c.OpConfig.SpiloAllowPrivilegeEscalation,
 		nil,
 	)
 

@@ -34,6 +34,7 @@ type Resources struct {
 	PodPriorityClassName      string              `name:"pod_priority_class_name"`
 	ClusterDomain             string              `name:"cluster_domain" default:"cluster.local"`
 	SpiloPrivileged           bool                `name:"spilo_privileged" default:"false"`
+	SpiloAllowPrivilegeEscalation bool            `name:"spilo_allow_privilege_escalation" default:"false"`
 	AdditionalPodCapabilities []string            `name:"additional_pod_capabilities" default:""`
 	ClusterLabels             map[string]string   `name:"cluster_labels" default:"application:spilo"`
 	InheritedLabels           []string            `name:"inherited_labels" default:""`

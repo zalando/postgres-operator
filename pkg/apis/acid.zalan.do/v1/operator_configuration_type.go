@@ -56,6 +56,7 @@ type KubernetesMetaConfiguration struct {
 	PodServiceAccountRoleBindingDefinition string                       `json:"pod_service_account_role_binding_definition,omitempty"`
 	PodTerminateGracePeriod                Duration                     `json:"pod_terminate_grace_period,omitempty"`
 	SpiloPrivileged                        bool                         `json:"spilo_privileged,omitempty"`
+	SpiloAllowPrivilegeEscalation          bool                         `json:"spilo_allow_privilege_escalation,omitempty"`       
 	SpiloRunAsUser                         *int64                       `json:"spilo_runasuser,omitempty"`
 	SpiloRunAsGroup                        *int64                       `json:"spilo_runasgroup,omitempty"`
 	SpiloFSGroup                           *int64                       `json:"spilo_fsgroup,omitempty"`
