@@ -114,6 +114,7 @@ data:
   secret_name_template: "{username}.{cluster}.credentials"
   # sidecar_docker_images: ""
   # set_memory_request_to_limit: "false"
+  spilo_allow_privilege_escalation: "true"
   # spilo_runasuser: 101
   # spilo_runasgroup: 103
   # spilo_fsgroup: 103

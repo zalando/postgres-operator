@@ -1162,6 +1162,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"spilo_privileged": {
 								Type: "boolean",
 							},
+							"spilo_allow_privilege_escalation": {
+								Type: "boolean",
+							},
 							"storage_resize_mode": {
 								Type: "string",
 								Enum: []apiextv1.JSON{
