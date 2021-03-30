@@ -442,7 +442,7 @@ func generateContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
-	privilegeEscalationMode bool,
+	privilegeEscalationMode *bool,
 	additionalPodCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{

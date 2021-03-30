@@ -39,7 +39,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSpiloWalPathCompat = fromCRD.EnableSpiloWalPathCompat
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
-	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-13:2.0-p4")
+	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-13:2.0-p6")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
@@ -68,7 +68,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.PodEnvironmentSecret = fromCRD.Kubernetes.PodEnvironmentSecret
 	result.PodTerminateGracePeriod = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.PodTerminateGracePeriod), "5m")
 	result.SpiloPrivileged = fromCRD.Kubernetes.SpiloPrivileged
-	result.SpiloAllowPrivilegeEscalation = fromCRD.Kubernetes.SpiloAllowPrivilegeEscalation
+	result.SpiloAllowPrivilegeEscalation = util.CoalesceBool(fromCRD.Kubernetes.SpiloAllowPrivilegeEscalation, util.True())
 	result.SpiloRunAsUser = fromCRD.Kubernetes.SpiloRunAsUser
 	result.SpiloRunAsGroup = fromCRD.Kubernetes.SpiloRunAsGroup
 	result.SpiloFSGroup = fromCRD.Kubernetes.SpiloFSGroup
@@ -152,7 +152,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.6.1")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.6.2")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 	result.LogicalBackupS3Region = fromCRD.LogicalBackup.S3Region
