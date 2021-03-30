@@ -467,7 +467,7 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			AllowPrivilegeEscalation: &privilegeEscalationMode,
+			AllowPrivilegeEscalation: privilegeEscalationMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   util.False(),
 			Capabilities:             additionalPodCapabilities,
