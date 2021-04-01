@@ -52,7 +52,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 	desiredVersion := c.GetDesiredMajorVersionAsInt()
 
 	if c.currentMajorVersion >= desiredVersion {
-		c.logger.Infof("cluster version up to date. current: %d desired: %d", c.currentMajorVersion, desiredVersion)
+		c.logger.Infof("cluster version up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
 		return nil
 	}
 

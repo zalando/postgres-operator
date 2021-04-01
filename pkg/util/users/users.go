@@ -119,7 +119,7 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 	queries := produceAlterRoleSetStmts(user)
 	query := fmt.Sprintf(doBlockStmt, strings.Join(queries, ";"))
 	if _, err := db.Exec(query); err != nil {
-		return fmt.Errorf("dB error: %v, query: %s", err, query)
+		return err
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.D
 	query := fmt.Sprintf(createUserSQL, user.Name, strings.Join(userFlags, " "), userPassword)
 
 	if _, err := db.Exec(query); err != nil { // TODO: Try several times
-		return fmt.Errorf("dB error: %v, query: %s", err, query)
+		return err
 	}
 
 	if len(user.Parameters) > 0 {
@@ -174,7 +174,7 @@ func (strategy DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB
 		query := fmt.Sprintf(doBlockStmt, strings.Join(resultStmt, ";"))
 
 		if _, err := db.Exec(query); err != nil { // TODO: Try several times
-			return fmt.Errorf("dB error: %v query %s", err, query)
+			return err
 		}
 	}
 
