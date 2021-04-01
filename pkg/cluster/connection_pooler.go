@@ -714,9 +714,8 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	// Handling the case when connectionPooler is not there but it is required
 	// as per spec, hence do not skip syncing in that case, even though there
 	// is no diff in specs
-	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0 &&
-		c.ConnectionPooler != nil && (needConnectionPooler(&newSpec.Spec))) ||
-		(c.ConnectionPooler == nil && !(needConnectionPooler(&newSpec.Spec))) {
+	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0) &&
+		(c.ConnectionPooler != nil && (needConnectionPooler(&newSpec.Spec))) {
 		c.logger.Debugln("syncing pooler is not required")
 		return nil, nil
 	}
