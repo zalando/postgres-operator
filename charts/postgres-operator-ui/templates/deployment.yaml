@@ -18,7 +18,7 @@ spec:
       labels:
         app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
-        team: "acid" # Parameterize?
+        team: "{{ join "," .Values.envs.teams }}"
     spec:
       serviceAccountName: {{ include "postgres-operator-ui.serviceAccountName" . }}
       {{- if .Values.imagePullSecrets }}
@@ -54,7 +54,10 @@ spec:
             - name: "TEAMS"
               value: |-
                 [
-                  "acid"
+                  {{- range(initial .Values.envs.teams) }}
+                  {{ . | quote }},
+                  {{- end }}
+                  {{ last .Values.envs.teams | quote }}
                 ]
             - name: "OPERATOR_UI_CONFIG"
               value: |-

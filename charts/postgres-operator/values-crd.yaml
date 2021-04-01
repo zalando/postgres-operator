@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.6.1
+  tag: v1.6.2
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -32,10 +32,10 @@ configGeneral:
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: false
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p4
-  # max number of instances in Postgres cluster. -1 = no limit
-  min_instances: -1
+  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p6
   # min number of instances in Postgres cluster. -1 = no limit
+  min_instances: -1
+  # max number of instances in Postgres cluster. -1 = no limit
   max_instances: -1
   # period between consecutive repair requests
   repair_period: 5m
@@ -57,6 +57,14 @@ configUsers:
   replication_username: standby
   # postgres superuser name to be created by initdb
   super_username: postgres
+
+configMajorVersionUpgrade:
+  # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
+  major_version_upgrade_mode: "off"
+  # minimal Postgres major version that will not automatically be upgraded
+  minimal_major_version: "9.5"
+  # target Postgres major version when upgrading clusters automatically
+  target_major_version: "13"
 
 configKubernetes:
   # list of additional capabilities for postgres container
@@ -147,6 +155,9 @@ configKubernetes:
 
   # whether the Spilo container should run in privileged mode
   spilo_privileged: false
+  # whether the Spilo container should run with additional permissions other than parent.
+  # required by cron which needs setuid
+  spilo_allow_privilege_escalation: true
   # storage resize strategy, available options are: ebs, pvc, off
   storage_resize_mode: pvc
   # operator watches for postgres objects in the given namespace
@@ -252,7 +263,7 @@ configAwsOrGcp:
 # configure K8s cron job managed by the operator
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.1"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -315,7 +326,7 @@ configConnectionPooler:
   # db user for pooler to use
   connection_pooler_user: "pooler"
   # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-14"
+  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-16"
   # max db connections the pooler should hold
   connection_pooler_max_db_connections: 60
   # default pooling mode

@@ -65,7 +65,7 @@ spec:
             properties:
               docker_image:
                 type: string
-                default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p4"
+                default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p6"
               enable_crd_validation:
                 type: boolean
                 default: true
@@ -127,6 +127,18 @@ spec:
                   super_username:
                      type: string
                      default: postgres
+              major_version_upgrade:
+                type: object
+                properties:
+                  major_version_upgrade_mode:
+                    type: string
+                    default: "off"
+                  minimal_major_version:
+                    type: string
+                    default: "9.5"
+                  target_major_version:
+                    type: string
+                    default: "13"
               kubernetes:
                 type: object
                 properties:
@@ -252,6 +264,9 @@ spec:
                   secret_name_template:
                     type: string
                     default: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
+                  spilo_allow_privilege_escalation:
+                    type: boolean
+                    default: true
                   spilo_runasuser:
                     type: integer
                   spilo_runasgroup:
@@ -382,7 +397,7 @@ spec:
                 properties:
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.1"
+                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -511,7 +526,7 @@ spec:
                     default: "pooler"
                   connection_pooler_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-14"
+                    default: "registry.opensource.zalan.do/acid/pgbouncer:master-16"
                   connection_pooler_max_db_connections:
                     type: integer
                     default: 60

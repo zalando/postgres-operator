@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -443,6 +442,7 @@ func generateContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
+	privilegeEscalationMode *bool,
 	additionalPodCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
@@ -467,7 +467,7 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			AllowPrivilegeEscalation: &privilegedMode,
+			AllowPrivilegeEscalation: privilegeEscalationMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   util.False(),
 			Capabilities:             additionalPodCapabilities,
@@ -734,7 +734,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		},
 	}
 	if c.OpConfig.EnablePgVersionEnvVar {
-		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.Spec.PgVersion})
+		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}
 	// Spilo expects cluster labels as JSON
 	if clusterLabels, err := json.Marshal(labels.Set(c.OpConfig.ClusterLabels)); err != nil {
@@ -1163,6 +1163,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
+		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
 
@@ -1279,7 +1280,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	stsAnnotations := make(map[string]string)
-	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
 	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
 
 	statefulSet := &appsv1.StatefulSet{
@@ -1917,6 +1917,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		envVars,
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
+		c.OpConfig.SpiloAllowPrivilegeEscalation,
 		nil,
 	)
 

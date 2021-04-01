@@ -170,6 +170,29 @@ under the `users` key.
   Postgres username used for replication between instances. The default is
   `standby`.
 
+## Major version upgrades
+
+Parameters configuring automatic major version upgrades. In a 
+CRD-configuration, they are grouped under the `major_version_upgrade` key.
+
+* **major_version_upgrade_mode**
+  Postgres Operator supports [in-place major version upgrade](../administrator.md#in-place-major-version-upgrade) 
+  with three different modes:
+  `"off"` = no upgrade by the operator,
+  `"manual"` = manifest triggers action,
+  `"full"` = manifest and minimal version violation trigger upgrade.
+  Note, that with all three modes increasing the version in the manifest will
+  trigger a rolling update of the pods. The default is `"off"`.
+
+* **minimal_major_version**
+  The minimal Postgres major version that will not automatically be upgraded
+  when `major_version_upgrade_mode` is set to `"full"`. The default is `"9.5"`.
+
+* **target_major_version**
+  The target Postgres major version when upgrading clusters automatically
+  which violate the configured allowed `minimal_major_version` when
+  `major_version_upgrade_mode` is set to `"full"`. The default is `"13"`.
+
 ## Kubernetes resources
 
 Parameters to configure cluster-related Kubernetes objects created by the
@@ -350,6 +373,11 @@ configuration they are grouped under the `kubernetes` key.
   whether the Spilo container should run in privileged mode. Privileged mode is
   used for AWS volume resizing and not required if you don't need that
   capability. The default is `false`.
+
+* **spilo_allow_privilege_escalation**
+  Controls whether a process can gain more privileges than its parent
+  process. Required by cron which needs setuid. Without this parameter,
+  certification rotation & backups will not be done. The default is `true`.
 
 * **additional_pod_capabilities**
   list of additional capabilities to be added to the postgres container's
@@ -565,7 +593,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.1"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
