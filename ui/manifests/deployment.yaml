@@ -5,7 +5,6 @@ metadata:
   namespace: "default"
   labels:
     name: "postgres-operator-ui"
-    team: "acid"
 spec:
   replicas: 1
   selector:
@@ -15,7 +14,6 @@ spec:
     metadata:
       labels:
         name: "postgres-operator-ui"
-        team: "acid"
     spec:
       serviceAccountName: postgres-operator-ui
       containers:
