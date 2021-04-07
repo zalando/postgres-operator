@@ -169,6 +169,7 @@ type StandbyDescription struct {
 	UID         string `json:"uid,omitempty"`
 	PgVersion   string `json:"version,omitempty"`
 	S3WalPath   string `json:"s3_wal_path,omitempty"`
+	GSWalPath   string `json:"gs_wal_path,omitempty"`
 }
 
 // TLSDescription specs TLS properties

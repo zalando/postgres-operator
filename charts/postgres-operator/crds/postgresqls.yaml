@@ -469,8 +469,6 @@ spec:
                 properties:
                   cluster:
                     type: string
-                  s3_wal_path:
-                    type: string
                   uid:
                     format: uuid
                     type: string
@@ -485,6 +483,10 @@ spec:
                       - "11"
                       - "12"
                       - "13"
+                  s3_wal_path:
+                    type: string
+                  gs_wal_path:
+                    type: string
               teamId:
                 type: string
               tls:
