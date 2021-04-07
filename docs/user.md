@@ -275,7 +275,7 @@ Postgres clusters are associated with one team by providing the `teamID` in
 the manifest. Additional superuser teams can be configured as mentioned in
 the previous paragraph. However, this is a global setting. To assign
 additional teams, superuser teams and single users to clusters of a given
-team, use the [PostgresTeam CRD](../manifests/postgresteam.yaml).
+team, use the [PostgresTeam CRD](../manifests/postgresteam.crd.yaml).
 
 Note, by default the `PostgresTeam` support is disabled in the configuration.
 Switch `enable_postgres_team_crd` flag to `true` and the operator will start to
