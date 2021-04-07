@@ -657,6 +657,10 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"s3_wal_path": {
 								Type: "string",
 							},
+							"uid": {
+								Type:   "string",
+								Format: "uuid",
+							},
 						},
 					},
 					"teamId": {
