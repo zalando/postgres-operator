@@ -566,7 +566,7 @@ func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler, lo
 
 // Check if we need to synchronize connection pooler deployment due to new
 // defaults, that are different from what we see in the DeploymentSpec
-func needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment) (sync bool, reasons []string) {
+func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment) (sync bool, reasons []string) {
 
 	reasons = []string{}
 	sync = false
@@ -619,14 +619,14 @@ func needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPoo
 			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
 			secretName := Config.OpConfig.SecretNameTemplate.Format(
 				"username", strings.Replace(config.User, "_", "-", -1),
-				"cluster", deployment.ClusterName,
+				"cluster", c.Name,
 				"tprkind", acidv1.PostgresCRDResourceKind,
 				"tprgroup", acidzalando.GroupName)
 
 			if ref.Name != secretName {
 				sync = true
-				msg := fmt.Sprintf("pooler user is different (having %s, required %s)",
-					ref.Name, config.User)
+				msg := fmt.Sprintf("pooler user and secret are different (having %s, required %s)",
+					ref.Name, secretName)
 				reasons = append(reasons, msg)
 			}
 		}
@@ -747,7 +747,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 				Deployment:     nil,
 				Service:        nil,
 				Name:           c.connectionPoolerName(role),
-				ClusterName:    c.ClusterName,
+				ClusterName:    c.Name,
 				Namespace:      c.Namespace,
 				LookupFunction: false,
 				Role:           role,
@@ -878,7 +878,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler, c.logger)
 		}
 
-		defaultsSync, defaultsReason := needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
+		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
 		reason := append(specReason, defaultsReason...)
 
 		if specSync || defaultsSync {
