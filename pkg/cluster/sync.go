@@ -373,8 +373,6 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 		}
 
-		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
-
 		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if the desired and the running statefulsets match
 			// there still may be not up-to-date pods on condition

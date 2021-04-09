@@ -361,6 +361,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	}
 	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
 		match = false
+		needsReplace = true
 		reasons = append(reasons, "new statefulset's annotations do not match the current one")
 	}
 
