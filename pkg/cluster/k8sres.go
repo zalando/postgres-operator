@@ -441,6 +441,7 @@ func generateContainer(
 	resourceRequirements *v1.ResourceRequirements,
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
+	readOnlyRootFilesystem *bool,
 	privilegedMode bool,
 	privilegeEscalationMode *bool,
 	additionalPodCapabilities *v1.Capabilities,
@@ -469,7 +470,7 @@ func generateContainer(
 		SecurityContext: &v1.SecurityContext{
 			AllowPrivilegeEscalation: privilegeEscalationMode,
 			Privileged:               &privilegedMode,
-			ReadOnlyRootFilesystem:   util.False(),
+			ReadOnlyRootFilesystem:   readOnlyRootFilesystem,
 			Capabilities:             additionalPodCapabilities,
 		},
 	}
@@ -931,7 +932,6 @@ func extractPgVersionFromBinPath(binPath string, template string) (string, error
 }
 
 func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.StatefulSet, error) {
-
 	var (
 		err                 error
 		initContainers      []v1.Container
@@ -945,7 +945,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	if c.OpConfig.SetMemoryRequestToLimit {
 
 		// controller adjusts the default memory request at operator startup
-
 		request := spec.Resources.ResourceRequests.Memory
 		if request == "" {
 			request = c.OpConfig.Resources.DefaultMemoryRequest
@@ -963,7 +962,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		if isSmaller {
 			c.logger.Warningf("The memory request of %v for the Postgres container is increased to match the memory limit of %v.", request, limit)
 			spec.Resources.ResourceRequests.Memory = limit
-
 		}
 
 		// controller adjusts the Scalyr sidecar request at operator startup
@@ -992,7 +990,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 				sidecar.Resources.ResourceRequests.Memory = sidecar.Resources.ResourceLimits.Memory
 			}
 		}
-
 	}
 
 	defaultResources := c.makeDefaultResources()
@@ -1162,6 +1159,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		resourceRequirements,
 		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
 		volumeMounts,
+		c.OpConfig.Resources.ReadOnlyRootFilesystem,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
@@ -1916,6 +1914,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		resourceRequirements,
 		envVars,
 		[]v1.VolumeMount{},
+		c.OpConfig.ReadOnlyRootFilesystem,
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
 		c.OpConfig.SpiloAllowPrivilegeEscalation,
 		nil,
