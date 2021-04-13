@@ -57,7 +57,6 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 					DefaultCPULimit:       "300m",
 					DefaultMemoryRequest:  "300Mi",
 					DefaultMemoryLimit:    "300Mi",
-					InheritedAnnotations:  []string{"test-anno"},
 					PodRoleLabel:          "spilo-role",
 					ResourceCheckInterval: time.Duration(3),
 					ResourceCheckTimeout:  time.Duration(10),
@@ -88,6 +87,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	cluster.Statefulset = newSts
 
 	// first compare running with desired statefulset - they should not match
+	// because no inherited annotations or downscaler annotations are configured
 	desiredSts, err := cluster.generateStatefulSet(&cluster.Postgresql.Spec)
 	assert.NoError(t, err)
 
@@ -96,9 +96,10 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 		t.Errorf("%s: match between current and desired statefulsets albeit differences: %#v", testName, cmp)
 	}
 
-	// now sync statefulset - the diff should trigger a update
+	// now sync statefulset - the diff will trigger a replacement of the statefulset
 	cluster.syncStatefulSet()
 
+	// compare again after the SYNC - must be identical to the desired state
 	cmp = cluster.compareStatefulSetWith(desiredSts)
 	if !cmp.match {
 		t.Errorf("%s: current and desired statefulsets are not matching %#v", testName, cmp)
