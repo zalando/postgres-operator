@@ -733,7 +733,7 @@ func TestInitSystemUsers(t *testing.T) {
 	cl.OpConfig.ConnectionPooler.User = "pooler"
 
 	cl.initSystemUsers()
-	if _, exist := cl.pgUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers["pooler"]; !exist {
 		t.Errorf("%s, Superuser is not allowed to be a connection pool user", testName)
 	}
 
@@ -745,7 +745,7 @@ func TestInitSystemUsers(t *testing.T) {
 	cl.OpConfig.ProtectedRoles = []string{"admin"}
 
 	cl.initSystemUsers()
-	if _, exist := cl.pgUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers["pooler"]; !exist {
 		t.Errorf("%s, Protected user are not allowed to be a connection pool user", testName)
 	}
 
@@ -755,7 +755,7 @@ func TestInitSystemUsers(t *testing.T) {
 	}
 
 	cl.initSystemUsers()
-	if _, exist := cl.pgUsers["pooler"]; !exist {
+	if _, exist := cl.systemUsers["pooler"]; !exist {
 		t.Errorf("%s, System users are not allowed to be a connection pool user", testName)
 	}
 }
