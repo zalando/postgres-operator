@@ -957,6 +957,10 @@ func (c *Cluster) initSystemUsers() {
 			Password: util.RandomPassword(constants.PasswordLength),
 		}
 
+		if _, exists := c.pgUsers[username]; !exists {
+			c.pgUsers[username] = connectionPoolerUser
+		}
+
 		if _, exists := c.systemUsers[constants.ConnectionPoolerUserKeyName]; !exists {
 			c.systemUsers[constants.ConnectionPoolerUserKeyName] = connectionPoolerUser
 		}

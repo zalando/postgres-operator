@@ -528,9 +528,6 @@ func (c *Cluster) syncSecrets() error {
 			} else if secretUsername == c.systemUsers[constants.ReplicationUserKeyName].Name {
 				secretUsername = constants.ReplicationUserKeyName
 				userMap = c.systemUsers
-			} else if secretUsername == c.systemUsers[constants.ConnectionPoolerUserName].Name {
-				secretUsername = constants.ConnectionPoolerUserName
-				userMap = c.systemUsers
 			} else {
 				userMap = c.pgUsers
 			}
@@ -580,12 +577,21 @@ func (c *Cluster) syncRoles() (err error) {
 	}()
 
 	for _, u := range c.systemUsers {
-		systemUserNames = append(systemUserNames, u.Name)
+		if u.Origin == spec.RoleOriginSystem {
+			systemUserNames = append(systemUserNames, u.Name)
+		}
 	}
 
 	dbUsers, err = c.readPgUsersFromDatabase(systemUserNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)
+	}
+
+	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {
+		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
+		if _, exists := c.pgUsers[connectionPoolerUser.Name]; !exists {
+			c.pgUsers[connectionPoolerUser.Name] = connectionPoolerUser
+		}
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)
