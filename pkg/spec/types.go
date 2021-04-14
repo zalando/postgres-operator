@@ -42,6 +42,7 @@ const (
 	PGSyncUserAdd = iota
 	PGsyncUserAlter
 	PGSyncAlterSet // handle ALTER ROLE SET parameter = value
+	PGSyncUserRename
 )
 
 // PgUser contains information about a single user.

@@ -18,5 +18,6 @@ const (
 	ReaderRoleNameSuffix        = "_reader"
 	WriterRoleNameSuffix        = "_writer"
 	UserRoleNameSuffix          = "_user"
+	RoleRenameSuffix            = "_delete_me"
 	DefaultSearchPath           = "\"$user\""
 )

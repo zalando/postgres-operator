@@ -9,11 +9,13 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
 const (
 	createUserSQL        = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s %s;`
 	alterUserSQL         = `ALTER ROLE "%s" %s`
+	alterUserRenameSQL   = `ALTER ROLE "%s" RENAME TO "%s%s"`
 	alterRoleResetAllSQL = `ALTER ROLE "%s" RESET ALL`
 	alterRoleSetSQL      = `ALTER ROLE "%s" SET %s TO %s`
 	grantToUserSQL       = `GRANT %s TO "%s"`
@@ -36,7 +38,6 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 	newUsers spec.PgUserMap) []spec.PgSyncUserRequest {
 
 	var reqs []spec.PgSyncUserRequest
-	// No existing roles are deleted or stripped of role memebership/flags
 	for name, newUser := range newUsers {
 		dbUser, exists := dbUsers[name]
 		if !exists {
@@ -70,6 +71,16 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 		}
 	}
 
+	// No existing roles are deleted or stripped of role memebership/flags
+	// but they will be renamed acting as a simple blocker
+	for name, dbUser := range dbUsers {
+		_, exists := newUsers[name]
+		nameSuffixDiff := len(name) - len(constants.RoleRenameSuffix)
+
+		if !exists && (nameSuffixDiff <= 0 || (nameSuffixDiff > 0 && name[nameSuffixDiff:] != constants.RoleRenameSuffix)) {
+			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserRename, User: dbUser})
+		}
+	}
 	return reqs
 }
 
@@ -93,6 +104,11 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 			if err := strategy.alterPgUserSet(request.User, db); err != nil {
 				reqretries = append(reqretries, request)
 				errors = append(errors, fmt.Sprintf("could not set custom user %q parameters: %v", request.User.Name, err))
+			}
+		case spec.PGSyncUserRename:
+			if err := strategy.alterPgUserRename(request.User, db); err != nil {
+				reqretries = append(reqretries, request)
+				errors = append(errors, fmt.Sprintf("could not rename custom user %q: %v", request.User.Name, err))
 			}
 		default:
 			return fmt.Errorf("unrecognized operation: %v", request.Kind)
@@ -118,6 +134,14 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql.DB) error {
 	queries := produceAlterRoleSetStmts(user)
 	query := fmt.Sprintf(doBlockStmt, strings.Join(queries, ";"))
+	if _, err := db.Exec(query); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (strategy DefaultUserSyncStrategy) alterPgUserRename(user spec.PgUser, db *sql.DB) error {
+	query := fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name, constants.RoleRenameSuffix)
 	if _, err := db.Exec(query); err != nil {
 		return err
 	}
