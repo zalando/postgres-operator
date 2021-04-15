@@ -37,6 +37,14 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
+	// save current state of pgUsers to check for deleted roles later
+	if len(c.pgUsers) > 0 {
+		usersCache := map[string]spec.PgUser{}
+		for k, v := range c.pgUsers {
+			usersCache[k] = v
+		}
+		c.pgUsersCache = usersCache
+	}
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
 		return err
@@ -557,8 +565,8 @@ func (c *Cluster) syncRoles() (err error) {
 	c.setProcessName("syncing roles")
 
 	var (
-		dbUsers         spec.PgUserMap
-		systemUserNames []string
+		dbUsers   spec.PgUserMap
+		userNames []string
 	)
 
 	err = c.initDbConn()
@@ -576,33 +584,33 @@ func (c *Cluster) syncRoles() (err error) {
 		}
 	}()
 
-	for _, u := range c.systemUsers {
-		systemUserNames = append(systemUserNames, u.Name)
+	for _, u := range c.pgUsers {
+		userNames = append(userNames, u.Name)
 	}
 
-	dbUsers, err = c.readPgUsersFromDatabase(systemUserNames)
-	if err != nil {
-		return fmt.Errorf("error getting users from the database: %v", err)
+	// add removed additional team members from cache
+	// to trigger a rename of the role in ProduceSyncRequests
+	for _, cachedUser := range c.pgUsersCache {
+		if cachedUser.Origin != spec.RoleOriginTeamsAPI {
+			continue
+		}
+		if _, exists := c.pgUsers[cachedUser.Name]; !exists {
+			userNames = append(userNames, cachedUser.Name)
+		}
 	}
 
 	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {
 		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
+		userNames = append(userNames, connectionPoolerUser.Name)
 
-		// check if pooler user exists in the database
-		dbPoolerUserMap, err := c.readPgUsersFromDatabase([]string{})
-		if err != nil {
-			return fmt.Errorf("error getting pooler user from the database: %v", err)
-		}
-
-		// if yes add role to dbUsers list so that there will be no add request
-		if _, exists := dbPoolerUserMap[connectionPoolerUser.Name]; exists {
-			dbUsers[connectionPoolerUser.Name] = dbPoolerUserMap[connectionPoolerUser.Name]
-		}
-
-		// add to pgUsers to trigger add request in case no pooler user exists in DB
 		if _, exists := c.pgUsers[connectionPoolerUser.Name]; !exists {
 			c.pgUsers[connectionPoolerUser.Name] = connectionPoolerUser
 		}
+	}
+
+	dbUsers, err = c.readPgUsersFromDatabase(userNames)
+	if err != nil {
+		return fmt.Errorf("error getting users from the database: %v", err)
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)

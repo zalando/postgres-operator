@@ -24,8 +24,7 @@ const (
 	              JOIN pg_catalog.pg_authid b ON (m.roleid = b.oid)
 	             WHERE m.member = a.oid) as memberof
 	 FROM pg_catalog.pg_authid a LEFT JOIN pg_db_role_setting s ON (a.oid = s.setrole AND s.setdatabase = 0::oid)
-	 WHERE a.rolname != ALL($1)
-	   AND (rolcanlogin OR (NOT rolcanlogin AND rolpassword IS NOT NULL))
+	 WHERE a.rolname = ANY($1)
 	 ORDER BY 1;`
 
 	getDatabasesSQL = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`

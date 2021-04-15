@@ -74,6 +74,7 @@ type Cluster struct {
 	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
+	pgUsersCache     map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
 	podSubscribers   map[spec.NamespacedName]chan PodEvent
 	podSubscribersMu sync.RWMutex
@@ -642,7 +643,15 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
 		needReplicaConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
-		c.logger.Debugf("syncing secrets")
+		c.logger.Debugf("initialize users")
+		// save current state of pgUsers to check for deleted roles later
+		if len(c.pgUsers) > 0 {
+			usersCache := map[string]spec.PgUser{}
+			for k, v := range c.pgUsers {
+				usersCache[k] = v
+			}
+			c.pgUsersCache = usersCache
+		}
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
 			updateFailed = true
