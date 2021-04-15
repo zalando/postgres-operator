@@ -33,11 +33,13 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	client, _ := newFakeK8sSyncClient()
 	clusterName := "acid-test-cluster"
 	namespace := "default"
+	inheritedAnnotation := "environment"
 
 	pg := acidv1.Postgresql{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      clusterName,
-			Namespace: namespace,
+			Name:        clusterName,
+			Namespace:   namespace,
+			Annotations: map[string]string{inheritedAnnotation: "test"},
 		},
 		Spec: acidv1.PostgresSpec{
 			Volume: acidv1.Volume{
@@ -57,6 +59,7 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 					DefaultCPULimit:       "300m",
 					DefaultMemoryRequest:  "300Mi",
 					DefaultMemoryLimit:    "300Mi",
+					InheritedAnnotations:  []string{inheritedAnnotation},
 					PodRoleLabel:          "spilo-role",
 					ResourceCheckInterval: time.Duration(3),
 					ResourceCheckTimeout:  time.Duration(10),
@@ -103,5 +106,10 @@ func TestSyncStatefulSetsAnnotations(t *testing.T) {
 	cmp = cluster.compareStatefulSetWith(desiredSts)
 	if !cmp.match {
 		t.Errorf("%s: current and desired statefulsets are not matching %#v", testName, cmp)
+	}
+
+	// check if inherited annotation exists
+	if _, exists := desiredSts.Annotations[inheritedAnnotation]; !exists {
+		t.Errorf("%s: inherited annotation not found in desired statefulset: %#v", testName, desiredSts.Annotations)
 	}
 }
