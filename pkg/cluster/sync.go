@@ -577,9 +577,7 @@ func (c *Cluster) syncRoles() (err error) {
 	}()
 
 	for _, u := range c.systemUsers {
-		if u.Origin == spec.RoleOriginSystem {
-			systemUserNames = append(systemUserNames, u.Name)
-		}
+		systemUserNames = append(systemUserNames, u.Name)
 	}
 
 	dbUsers, err = c.readPgUsersFromDatabase(systemUserNames)
@@ -589,6 +587,19 @@ func (c *Cluster) syncRoles() (err error) {
 
 	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {
 		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
+
+		// check if pooler user exists in the database
+		dbPoolerUserMap, err := c.readPgUsersFromDatabase([]string{})
+		if err != nil {
+			return fmt.Errorf("error getting pooler user from the database: %v", err)
+		}
+
+		// if yes add role to dbUsers list so that there will be no add request
+		if _, exists := dbPoolerUserMap[connectionPoolerUser.Name]; exists {
+			dbUsers[connectionPoolerUser.Name] = dbPoolerUserMap[connectionPoolerUser.Name]
+		}
+
+		// add to pgUsers to trigger add request in case no pooler user exists in DB
 		if _, exists := c.pgUsers[connectionPoolerUser.Name]; !exists {
 			c.pgUsers[connectionPoolerUser.Name] = connectionPoolerUser
 		}
