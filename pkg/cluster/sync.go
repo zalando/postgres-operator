@@ -586,6 +586,10 @@ func (c *Cluster) syncRoles() (err error) {
 
 	for _, u := range c.pgUsers {
 		userNames = append(userNames, u.Name)
+		// add team user name with rename suffix in case we need to rename it back
+		if u.Origin == spec.RoleOriginTeamsAPI {
+			userNames = append(userNames, u.Name+constants.RoleRenameSuffix)
+		}
 	}
 
 	// add removed additional team members from cache

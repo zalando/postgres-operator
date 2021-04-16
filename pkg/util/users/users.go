@@ -40,7 +40,8 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 	var reqs []spec.PgSyncUserRequest
 	for name, newUser := range newUsers {
 		dbUser, exists := dbUsers[name]
-		if !exists {
+		_, existsRenamed := dbUsers[name+constants.RoleRenameSuffix]
+		if !exists && !existsRenamed {
 			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserAdd, User: newUser})
 			if len(newUser.Parameters) > 0 {
 				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncAlterSet, User: newUser})
@@ -74,10 +75,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 	// No existing roles are deleted or stripped of role memebership/flags
 	// but they will be renamed acting as a simple blocker
 	for name, dbUser := range dbUsers {
-		_, exists := newUsers[name]
-		nameSuffixDiff := len(name) - len(constants.RoleRenameSuffix)
-
-		if !exists && (nameSuffixDiff <= 0 || (nameSuffixDiff > 0 && name[nameSuffixDiff:] != constants.RoleRenameSuffix)) {
+		if _, exists := newUsers[name]; !exists {
 			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserRename, User: dbUser})
 		}
 	}
@@ -141,7 +139,23 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 }
 
 func (strategy DefaultUserSyncStrategy) alterPgUserRename(user spec.PgUser, db *sql.DB) error {
-	query := fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name, constants.RoleRenameSuffix)
+	var query string
+
+	renamedBack := false
+
+	nameSuffixDiff := len(user.Name) - len(constants.RoleRenameSuffix)
+
+	if nameSuffixDiff > 0 {
+		if user.Name[nameSuffixDiff:] == constants.RoleRenameSuffix {
+			query = fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name[:nameSuffixDiff], "")
+			renamedBack = true
+		}
+	}
+
+	if !renamedBack {
+		query = fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name, constants.RoleRenameSuffix)
+	}
+
 	if _, err := db.Exec(query); err != nil {
 		return err
 	}
