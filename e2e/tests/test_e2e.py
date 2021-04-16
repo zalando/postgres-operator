@@ -222,7 +222,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        # make sure we let one sync pass and the new user being added
+        # make sure we let one sync pass and check if the new user being added
         time.sleep(15)
 
         leader = self.k8s.get_cluster_leader_pod()
@@ -234,6 +234,58 @@ class EndToEndTestCase(unittest.TestCase):
         users = self.query_database(leader.metadata.name, "postgres", user_query)
         self.eventuallyEqual(lambda: len(users), 2, 
             "Not all additional users found in database: {}".format(users))
+
+        # replace additional member and check if the removed member's role is renamed
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresteams', 'custom-team-membership',
+        {
+            'spec': {
+                'additionalMembers': {
+                    'e2e': [
+                        'tester'
+                    ]
+                },
+            }
+        })
+
+        # wait for another sync
+        time.sleep(15)
+
+        user_query = """
+            SELECT usename
+              FROM pg_catalog.pg_user
+             WHERE usename IN ('tester', 'kind_delete_me');
+        """
+        users = self.query_database(leader.metadata.name, "postgres", user_query)
+        self.eventuallyEqual(lambda: len(users), 2, 
+            "CRD changes not reflected in database: {}".format(users))
+
+        # re-add additional member and check if the role is renamed back
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresteams', 'custom-team-membership',
+        {
+            'spec': {
+                'additionalMembers': {
+                    'e2e': [
+                        'kind'
+                    ]
+                },
+            }
+        })
+
+        # wait for another sync
+        time.sleep(15)
+
+        user_query = """
+            SELECT usename
+              FROM pg_catalog.pg_user
+             WHERE usename IN ('tester_delete_me', 'kind');
+        """
+        users = self.query_database(leader.metadata.name, "postgres", user_query)
+        self.eventuallyEqual(lambda: len(users), 2, 
+            "CRD changes not reflected in database: {}".format(users))
 
         # revert config change
         revert_resync = {
