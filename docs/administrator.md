@@ -48,6 +48,11 @@ upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/z
 When `major_version_upgrade_mode` is set to `manual` the operator will run
 the upgrade script for you after the manifest is updated and pods are rotated.
 
+A major version upgrade will reset the archive timeline to 1. If you are archiving
+to cloud storage you will need to manually remove basebackups and WAL segments from
+pre-upgrade timelines so Postgres does not try to restore from these seemingly-later
+timelines.
+
 ## CRD Validation
 
 [CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
