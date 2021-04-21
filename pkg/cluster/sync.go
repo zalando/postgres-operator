@@ -39,11 +39,10 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 
 	// save current state of pgUsers to check for deleted roles later
 	if len(c.pgUsers) > 0 {
-		usersCache := map[string]spec.PgUser{}
+		c.pgUsersCache = map[string]spec.PgUser{}
 		for k, v := range c.pgUsers {
-			usersCache[k] = v
+			c.pgUsersCache[k] = v
 		}
-		c.pgUsersCache = usersCache
 	}
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
@@ -586,7 +585,7 @@ func (c *Cluster) syncRoles() (err error) {
 
 	for _, u := range c.pgUsers {
 		userNames = append(userNames, u.Name)
-		// add team user name with rename suffix in case we need to rename it back
+		// add team member role name with rename suffix in case we need to rename it back
 		if u.Origin == spec.RoleOriginTeamsAPI {
 			userNames = append(userNames, u.Name+constants.RoleRenameSuffix)
 		}
