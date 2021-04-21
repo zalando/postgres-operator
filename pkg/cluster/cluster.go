@@ -645,12 +645,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("initialize users")
 		// save current state of pgUsers to check for deleted roles later
-		if len(c.pgUsers) > 0 {
-			c.pgUsersCache = map[string]spec.PgUser{}
-			for k, v := range c.pgUsers {
-				c.pgUsersCache[k] = v
-			}
+		c.pgUsersCache = map[string]spec.PgUser{}
+		for k, v := range c.pgUsers {
+			c.pgUsersCache[k] = v
 		}
+
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
 			updateFailed = true
