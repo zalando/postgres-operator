@@ -686,6 +686,11 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ReadOnlyRootFilesystem != nil {
+		in, out := &in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
+		*out = new(bool)
+		**out = **in
+	}
 	if in.ShmVolume != nil {
 		in, out := &in.ShmVolume, &out.ShmVolume
 		*out = new(bool)
