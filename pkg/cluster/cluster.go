@@ -1144,7 +1144,6 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 			Flags:      flags,
 			MemberOf:   memberOf,
 			Parameters: c.OpConfig.TeamAPIRoleConfiguration,
-			Deprecated: false,
 		}
 
 		if currentRole, present := c.pgUsers[username]; present {
