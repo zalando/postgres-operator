@@ -420,9 +420,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
-	var deployment *appsv1.Deployment
-	deployment = c.ConnectionPooler[role].Deployment
-
+	deployment := c.ConnectionPooler[role].Deployment
 	policy := metav1.DeletePropagationForeground
 	options := metav1.DeleteOptions{PropagationPolicy: &policy}
 
@@ -445,8 +443,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	}
 
 	// Repeat the same for the service object
-	var service *v1.Service
-	service = c.ConnectionPooler[role].Service
+	service := c.ConnectionPooler[role].Service
 	if service == nil {
 		c.logger.Debugf("no connection pooler service object to delete")
 	} else {

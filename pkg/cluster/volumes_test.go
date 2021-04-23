@@ -221,10 +221,10 @@ func TestMigrateEBS(t *testing.T) {
 }
 
 type testVolume struct {
-	iops        int64
-	throughtput int64
-	size        int64
-	volType     string
+	size int64
+	//iops        int64
+	//throughtput int64
+	//volType     string
 }
 
 func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustername string, labels labels.Set, volumes []testVolume) {

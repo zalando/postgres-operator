@@ -930,15 +930,6 @@ func TestNodeAffinity(t *testing.T) {
 	assert.Equal(t, s.Spec.Template.Spec.Affinity.NodeAffinity, nodeAff, "cluster template has correct node affinity")
 }
 
-func testCustomPodTemplate(cluster *Cluster, podSpec *v1.PodTemplateSpec) error {
-	if podSpec.ObjectMeta.Name != "test-pod-template" {
-		return fmt.Errorf("Custom pod template is not used, current spec %+v",
-			podSpec)
-	}
-
-	return nil
-}
-
 func testDeploymentOwnerReference(cluster *Cluster, deployment *appsv1.Deployment) error {
 	owner := deployment.ObjectMeta.OwnerReferences[0]
 
@@ -970,6 +961,19 @@ func TestTLS(t *testing.T) {
 	var spiloFSGroup = int64(103)
 	var additionalVolumes = spec.AdditionalVolumes
 
+	defaultMode := int32(0640)
+	mountPath := "/tls"
+	additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
+		Name:      spec.TLS.SecretName,
+		MountPath: mountPath,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName:  spec.TLS.SecretName,
+				DefaultMode: &defaultMode,
+			},
+		},
+	})
+
 	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
@@ -980,7 +984,8 @@ func TestTLS(t *testing.T) {
 			Volume: acidv1.Volume{
 				Size: "1G",
 			},
-			TLS: &tls,
+			TLS:               &tls,
+			AdditionalVolumes: additionalVolumes,
 		}
 	}
 
@@ -1008,19 +1013,6 @@ func TestTLS(t *testing.T) {
 
 	fsGroup := int64(103)
 	assert.Equal(t, &fsGroup, s.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
-
-	defaultMode := int32(0640)
-	mountPath := "/tls"
-	additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
-		Name:      spec.TLS.SecretName,
-		MountPath: mountPath,
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName:  spec.TLS.SecretName,
-				DefaultMode: &defaultMode,
-			},
-		},
-	})
 
 	volume := v1.Volume{
 		Name: "my-secret",
