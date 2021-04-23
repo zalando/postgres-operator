@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
@@ -24,8 +25,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
+
+func newFakeK8sTestClient() (k8sutil.KubernetesClient, *fake.Clientset) {
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset()
+
+	return k8sutil.KubernetesClient{
+		PodsGetter:         clientSet.CoreV1(),
+		PostgresqlsGetter:  acidClientSet.AcidV1(),
+		StatefulSetsGetter: clientSet.AppsV1(),
+	}, clientSet
+}
 
 // For testing purposes
 type ExpectedValue struct {
@@ -953,29 +966,23 @@ func testServiceOwnerReference(cluster *Cluster, service *v1.Service, role Postg
 }
 
 func TestTLS(t *testing.T) {
-	var err error
-	var spec acidv1.PostgresSpec
-	var cluster *Cluster
-	var spiloRunAsUser = int64(101)
-	var spiloRunAsGroup = int64(103)
-	var spiloFSGroup = int64(103)
-	var additionalVolumes = spec.AdditionalVolumes
 
+	client, _ := newFakeK8sTestClient()
+	clusterName := "acid-test-cluster"
+	namespace := "default"
+	tlsSecretName := "my-secret"
+	spiloRunAsUser := int64(101)
+	spiloRunAsGroup := int64(103)
+	spiloFSGroup := int64(103)
 	defaultMode := int32(0640)
 	mountPath := "/tls"
-	additionalVolumes = append(additionalVolumes, acidv1.AdditionalVolume{
-		Name:      spec.TLS.SecretName,
-		MountPath: mountPath,
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName:  spec.TLS.SecretName,
-				DefaultMode: &defaultMode,
-			},
-		},
-	})
 
-	makeSpec := func(tls acidv1.TLSDescription) acidv1.PostgresSpec {
-		return acidv1.PostgresSpec{
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
 			Resources: acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
@@ -984,12 +991,24 @@ func TestTLS(t *testing.T) {
 			Volume: acidv1.Volume{
 				Size: "1G",
 			},
-			TLS:               &tls,
-			AdditionalVolumes: additionalVolumes,
-		}
+			TLS: &acidv1.TLSDescription{
+				SecretName: tlsSecretName, CAFile: "ca.crt"},
+			AdditionalVolumes: []acidv1.AdditionalVolume{
+				acidv1.AdditionalVolume{
+					Name:      tlsSecretName,
+					MountPath: mountPath,
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName:  tlsSecretName,
+							DefaultMode: &defaultMode,
+						},
+					},
+				},
+			},
+		},
 	}
 
-	cluster = New(
+	var cluster = New(
 		Config{
 			OpConfig: config.Config{
 				PodManagementPolicy: "ordered_ready",
@@ -1004,15 +1023,14 @@ func TestTLS(t *testing.T) {
 					SpiloFSGroup:    &spiloFSGroup,
 				},
 			},
-		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
-	spec = makeSpec(acidv1.TLSDescription{SecretName: "my-secret", CAFile: "ca.crt"})
-	s, err := cluster.generateStatefulSet(&spec)
-	if err != nil {
-		assert.NoError(t, err)
-	}
+		}, client, pg, logger, eventRecorder)
+
+	// create a statefulset
+	sts, err := cluster.createStatefulSet()
+	assert.NoError(t, err)
 
 	fsGroup := int64(103)
-	assert.Equal(t, &fsGroup, s.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
+	assert.Equal(t, &fsGroup, sts.Spec.Template.Spec.SecurityContext.FSGroup, "has a default FSGroup assigned")
 
 	volume := v1.Volume{
 		Name: "my-secret",
@@ -1023,16 +1041,16 @@ func TestTLS(t *testing.T) {
 			},
 		},
 	}
-	assert.Contains(t, s.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
+	assert.Contains(t, sts.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
 
-	assert.Contains(t, s.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+	assert.Contains(t, sts.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
 		MountPath: "/tls",
 		Name:      "my-secret",
 	}, "the volume gets mounted in /tls")
 
-	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
-	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
-	assert.Contains(t, s.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
+	assert.Contains(t, sts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
+	assert.Contains(t, sts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
+	assert.Contains(t, sts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
 }
 
 func TestAdditionalVolume(t *testing.T) {

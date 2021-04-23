@@ -71,7 +71,7 @@ func addDb(dbName string, dbOwner string, clusterName string) {
 
 	var dbOwnerExists bool
 	dbUsers := postgresql.Spec.Users
-	for key, _ := range dbUsers {
+	for key := range dbUsers {
 		if key == dbOwner {
 			dbOwnerExists = true
 		}
