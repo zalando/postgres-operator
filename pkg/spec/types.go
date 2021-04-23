@@ -54,6 +54,7 @@ type PgUser struct {
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
 	AdminRole  string            `yaml:"admin_role"`
+	Deprecated bool              `yaml:"deprecated"`
 }
 
 func (user *PgUser) Valid() bool {

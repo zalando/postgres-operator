@@ -9,7 +9,6 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
 const (
@@ -30,7 +29,8 @@ const (
 // an existing roles of another role membership, nor it removes the already assigned flag
 // (except for the NOLOGIN). TODO: process other NOflags, i.e. NOSUPERUSER correctly.
 type DefaultUserSyncStrategy struct {
-	PasswordEncryption string
+	PasswordEncryption    string
+	RoleDeprecationSuffix string
 }
 
 // ProduceSyncRequests figures out the types of changes that need to happen with the given users.
@@ -39,9 +39,11 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 
 	var reqs []spec.PgSyncUserRequest
 	for name, newUser := range newUsers {
+		if newUser.Deprecated {
+			continue
+		}
 		dbUser, exists := dbUsers[name]
-		_, existsRenamed := dbUsers[name+constants.RoleRenameSuffix]
-		if !exists && !existsRenamed {
+		if !exists {
 			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserAdd, User: newUser})
 			if len(newUser.Parameters) > 0 {
 				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncAlterSet, User: newUser})
@@ -141,11 +143,11 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 func (strategy DefaultUserSyncStrategy) alterPgUserRename(user spec.PgUser, db *sql.DB) error {
 	var query string
 
-	if strings.HasSuffix(user.Name, constants.RoleRenameSuffix) {
-		newName := strings.TrimSuffix(user.Name, constants.RoleRenameSuffix)
+	if user.Deprecated {
+		newName := strings.TrimSuffix(user.Name, strategy.RoleDeprecationSuffix)
 		query = fmt.Sprintf(alterUserRenameSQL, user.Name, newName, "")
 	} else {
-		query = fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name, constants.RoleRenameSuffix)
+		query = fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name, strategy.RoleDeprecationSuffix)
 	}
 
 	if _, err := db.Exec(query); err != nil {

@@ -37,12 +37,6 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		}
 	}()
 
-	// save current state of pgUsers to check for deleted roles later
-	c.pgUsersCache = map[string]spec.PgUser{}
-	for k, v := range c.pgUsers {
-		c.pgUsersCache[k] = v
-	}
-
 	if err = c.initUsers(); err != nil {
 		err = fmt.Errorf("could not init users: %v", err)
 		return err
@@ -582,25 +576,29 @@ func (c *Cluster) syncRoles() (err error) {
 		}
 	}()
 
+	// mapping between deprecated and original role name
+	deprecatedUsers := map[string]string{}
+
+	// create list of database roles to query
 	for _, u := range c.pgUsers {
 		userNames = append(userNames, u.Name)
 		// add team member role name with rename suffix in case we need to rename it back
 		if u.Origin == spec.RoleOriginTeamsAPI {
-			userNames = append(userNames, u.Name+constants.RoleRenameSuffix)
+			deprecatedUsers[u.Name+c.OpConfig.RoleDeprecationSuffix] = u.Name
+			userNames = append(userNames, u.Name+c.OpConfig.RoleDeprecationSuffix)
 		}
 	}
 
-	// add removed additional team members from cache
+	// add team members that exist only in cache
 	// to trigger a rename of the role in ProduceSyncRequests
 	for _, cachedUser := range c.pgUsersCache {
-		if cachedUser.Origin != spec.RoleOriginTeamsAPI {
-			continue
-		}
 		if _, exists := c.pgUsers[cachedUser.Name]; !exists {
 			userNames = append(userNames, cachedUser.Name)
 		}
 	}
 
+	// add pooler user to list of pgUsers, too
+	// to check if the pooler user exists or has to be created
 	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {
 		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
 		userNames = append(userNames, connectionPoolerUser.Name)
@@ -613,6 +611,16 @@ func (c *Cluster) syncRoles() (err error) {
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)
+	}
+
+	// update pgUsers where a deprecated role was found
+	// so that they are skipped in ProduceSyncRequests
+	for _, dbUser := range dbUsers {
+		if originalUser, exists := deprecatedUsers[dbUser.Name]; exists {
+			recreatedUser := c.pgUsers[originalUser]
+			recreatedUser.Deprecated = true
+			c.pgUsers[originalUser] = recreatedUser
+		}
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)

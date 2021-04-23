@@ -312,6 +312,10 @@ configTeamsApi:
   # List of roles that cannot be overwritten by an application, team or infrastructure role
   protected_role_names:
   - admin
+
+  # Suffix to add if members are removed from TeamsAPI or PostgresTeam CRD
+  # role_deprecation_suffix: "_delete_me"
+
   # role name to grant to team members created from the Teams API
   team_admin_role: admin
   # postgres config parameters to apply to each team member role

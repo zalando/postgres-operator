@@ -130,7 +130,9 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy:    users.DefaultUserSyncStrategy{PasswordEncryption: passwordEncryption},
+		userSyncStrategy: users.DefaultUserSyncStrategy{
+			PasswordEncryption:    passwordEncryption,
+			RoleDeprecationSuffix: cfg.OpConfig.RoleDeprecationSuffix},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
@@ -190,6 +192,14 @@ func (c *Cluster) isNewCluster() bool {
 // initUsers populates c.systemUsers and c.pgUsers maps.
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
+
+	// save current state of pgUsers to check for deleted roles later
+	c.pgUsersCache = map[string]spec.PgUser{}
+	for k, v := range c.pgUsers {
+		if v.Origin == spec.RoleOriginTeamsAPI {
+			c.pgUsersCache[k] = v
+		}
+	}
 
 	// clear our the previous state of the cluster users (in case we are
 	// running a sync).
@@ -644,12 +654,6 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		needReplicaConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
 		c.logger.Debugf("initialize users")
-		// save current state of pgUsers to check for deleted roles later
-		c.pgUsersCache = map[string]spec.PgUser{}
-		for k, v := range c.pgUsers {
-			c.pgUsersCache[k] = v
-		}
-
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
 			updateFailed = true
@@ -1140,6 +1144,7 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 			Flags:      flags,
 			MemberOf:   memberOf,
 			Parameters: c.OpConfig.TeamAPIRoleConfiguration,
+			Deprecated: false,
 		}
 
 		if currentRole, present := c.pgUsers[username]; present {
@@ -1170,7 +1175,7 @@ func (c *Cluster) initHumanUsers() error {
 	for _, superuserTeam := range superuserTeams {
 		err := c.initTeamMembers(superuserTeam, true)
 		if err != nil {
-			return fmt.Errorf("Cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
+			return fmt.Errorf("cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
 		}
 		if superuserTeam == c.Spec.TeamID {
 			clusterIsOwnedBySuperuserTeam = true
@@ -1183,7 +1188,7 @@ func (c *Cluster) initHumanUsers() error {
 			if !(util.SliceContains(superuserTeams, additionalTeam)) {
 				err := c.initTeamMembers(additionalTeam, false)
 				if err != nil {
-					return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+					return fmt.Errorf("cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
 				}
 			}
 		}
@@ -1196,7 +1201,7 @@ func (c *Cluster) initHumanUsers() error {
 
 	err := c.initTeamMembers(c.Spec.TeamID, false)
 	if err != nil {
-		return fmt.Errorf("Cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
+		return fmt.Errorf("cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil

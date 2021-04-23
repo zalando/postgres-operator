@@ -461,6 +461,9 @@ spec:
                       type: string
                     default:
                     - admin
+                  role_deprecation_suffix:
+                    type: string
+                    default: "_delete_me"
                   team_admin_role:
                     type: string
                     default: "admin"

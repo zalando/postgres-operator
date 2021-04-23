@@ -704,6 +704,13 @@ key.
   cluster to administer Postgres and maintain infrastructure built around it.
   The default is empty.
 
+* **role_deprecation_suffix**
+  defines a suffix that will be appended to database role names of team members
+  that were removed from either PostgresTeam CRDs (additionalMembers) or from
+  the team in the teams API. When readded to the manifest, the operator will
+  rename roles with the defined suffix back to the original role name.
+  The default is `_delete_me`.
+
 * **enable_postgres_team_crd**
   toggle to make the operator watch for created or updated `PostgresTeam` CRDs
   and create roles for specified additional teams and members.

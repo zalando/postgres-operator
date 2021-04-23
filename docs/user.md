@@ -407,6 +407,17 @@ spec:
     - "briggs"
 ```
 
+#### Removed members
+
+The Postgres Operator does not delete database roles when users are removed
+from manifests. But, when using the PostgresTeam CRD or Teams API it is very
+easy to (accidently) add roles to many clusters. Manually reverting such a
+change is cumbersome. Therefore, if members are removed from the team CRD or
+teams API the operator will rename roles appending a configured suffix to the
+name (see `role_deprecation_suffix` option) so that old members cannot login
+anymore. When a role is readded to the manifest the operator will check for
+roles with the configured suffix and rename the role back to the original name.
+
 ## Prepared databases with roles and default privileges
 
 The `users` section in the manifests only allows for creating database roles
