@@ -160,32 +160,38 @@ func generateResourceRequirements(resources acidv1.Resources, defaultResources a
 
 func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceDescription) (v1.ResourceList, error) {
 	var err error
-	requests := v1.ResourceList{}
+	resources := v1.ResourceList{}
 
 	if spec.CPU != "" {
-		requests[v1.ResourceCPU], err = resource.ParseQuantity(spec.CPU)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse CPU quantity: %v", err)
+		if spec.CPU != "0" {
+			resources[v1.ResourceCPU], err = resource.ParseQuantity(spec.CPU)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse CPU quantity: %v", err)
+			}
 		}
 	} else {
-		requests[v1.ResourceCPU], err = resource.ParseQuantity(defaults.CPU)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
+		if spec.CPU != "0" {
+			resources[v1.ResourceCPU], err = resource.ParseQuantity(defaults.CPU)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse default CPU quantity: %v", err)
+			}
 		}
 	}
 	if spec.Memory != "" {
-		requests[v1.ResourceMemory], err = resource.ParseQuantity(spec.Memory)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse memory quantity: %v", err)
+		if spec.Memory != "0" {
+			resources[v1.ResourceMemory], err = resource.ParseQuantity(spec.Memory)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse memory quantity: %v", err)
+			}
 		}
 	} else {
-		requests[v1.ResourceMemory], err = resource.ParseQuantity(defaults.Memory)
+		resources[v1.ResourceMemory], err = resource.ParseQuantity(defaults.Memory)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse default memory quantity: %v", err)
 		}
 	}
 
-	return requests, nil
+	return resources, nil
 }
 
 func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, EnablePgVersionEnvVar bool, logger *logrus.Entry) (string, error) {
