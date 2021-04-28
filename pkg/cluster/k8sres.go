@@ -1455,7 +1455,7 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 			continue
 		}
 
-		if v.TargetContainers == nil {
+		if v.TargetContainers == nil || len(v.TargetContainers) == 0 {
 			spiloContainer := podSpec.Containers[0]
 			additionalVolumes[i].TargetContainers = []string{spiloContainer.Name}
 		}
