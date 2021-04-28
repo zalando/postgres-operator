@@ -446,6 +446,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
+	if len(c.Statefulset.Spec.Template.Spec.Volumes) != len(statefulSet.Spec.Template.Spec.Volumes) {
+		needsReplace = true
+		reasons = append(reasons, fmt.Sprintf("new statefulset's Volumes contains different number of volumes to the old one"))
+	}
+
 	// we assume any change in priority happens by rolling out a new priority class
 	// changing the priority value in an existing class is not supproted
 	if c.Statefulset.Spec.Template.Spec.PriorityClassName != statefulSet.Spec.Template.Spec.PriorityClassName {
@@ -503,6 +508,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 		newCheck("new statefulset %s's %s (index %d) security context does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
+		newCheck("new statefulset %s's %s (index %d) volume mounts do not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
