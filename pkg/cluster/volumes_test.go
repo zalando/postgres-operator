@@ -203,7 +203,7 @@ func TestMigrateEBS(t *testing.T) {
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
 
-	testVolumes := []testVolume{testVol, testVol, testVol}
+	testVolumes := []testVolume{testVol, testVol}
 
 	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
 
