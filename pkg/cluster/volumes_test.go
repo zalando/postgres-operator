@@ -361,7 +361,14 @@ func TestManualGp2Gp3Support(t *testing.T) {
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
 
-	testVolumes := []testVolume{testVol, testVol}
+	testVolumes := []testVolume{
+		{
+			size: 150,
+		},
+		{
+			size: 150,
+		},
+	}
 
 	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
 
