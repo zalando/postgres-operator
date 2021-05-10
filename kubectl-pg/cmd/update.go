@@ -57,6 +57,9 @@ kubectl pg update -f cluster-manifest.yaml
 func updatePgResources(fileName string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ymlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatal(err)

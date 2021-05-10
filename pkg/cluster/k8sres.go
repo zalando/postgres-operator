@@ -213,10 +213,10 @@ PatroniInitDBParams:
 	for _, k := range initdbOptionNames {
 		v := patroni.InitDB[k]
 		for i, defaultParam := range config.Bootstrap.Initdb {
-			switch defaultParam.(type) {
+			switch t := defaultParam.(type) {
 			case map[string]string:
 				{
-					for k1 := range defaultParam.(map[string]string) {
+					for k1 := range t {
 						if k1 == k {
 							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
 							continue PatroniInitDBParams
@@ -226,7 +226,7 @@ PatroniInitDBParams:
 			case string:
 				{
 					/* if the option already occurs in the list */
-					if defaultParam.(string) == v {
+					if t == v {
 						continue PatroniInitDBParams
 					}
 				}
@@ -264,7 +264,7 @@ PatroniInitDBParams:
 	if patroni.SynchronousMode {
 		config.Bootstrap.DCS.SynchronousMode = patroni.SynchronousMode
 	}
-	if patroni.SynchronousModeStrict != false {
+	if patroni.SynchronousModeStrict {
 		config.Bootstrap.DCS.SynchronousModeStrict = patroni.SynchronousModeStrict
 	}
 
@@ -336,7 +336,7 @@ func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAff
 	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
 	}
-	nodeAffinityCopy := *&v1.NodeAffinity{}
+	nodeAffinityCopy := v1.NodeAffinity{}
 	if nodeAffinity != nil {
 		nodeAffinityCopy = *nodeAffinity.DeepCopy()
 	}
@@ -1279,15 +1279,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	stsAnnotations := make(map[string]string)
-	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
-
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: stsAnnotations,
+			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,

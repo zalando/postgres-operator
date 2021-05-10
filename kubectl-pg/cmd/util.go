@@ -99,9 +99,9 @@ func confirmAction(clusterName string, namespace string) {
 
 func getPodName(clusterName string, master bool, replicaNumber string) string {
 	config := getConfig()
-	client, er := kubernetes.NewForConfig(config)
-	if er != nil {
-		log.Fatal(er)
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)

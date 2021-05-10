@@ -23,13 +23,14 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"log"
+	"os"
+	user "os/user"
+
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"log"
-	"os"
-	user "os/user"
 )
 
 // connectCmd represents the kubectl pg connect command
@@ -80,13 +81,13 @@ kubectl pg connect -c cluster -p -u user01 -d db01
 
 func connect(clusterName string, master bool, replica string, psql bool, user string, dbName string) {
 	config := getConfig()
-	client, er := kubernetes.NewForConfig(config)
-	if er != nil {
-		log.Fatal(er)
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	podName := getPodName(clusterName, master, replica)
-	execRequest := &rest.Request{}
+	var execRequest *rest.Request
 
 	if psql {
 		execRequest = client.CoreV1().RESTClient().Post().Resource("pods").

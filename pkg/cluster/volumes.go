@@ -74,10 +74,15 @@ func (c *Cluster) syncVolumes() error {
 func (c *Cluster) syncUnderlyingEBSVolume() error {
 	c.logger.Infof("starting to sync EBS volumes: type, iops, throughput, and size")
 
-	var err error
+	var (
+		err     error
+		newSize resource.Quantity
+	)
 
 	targetValue := c.Spec.Volume
-	newSize, err := resource.ParseQuantity(targetValue.Size)
+	if newSize, err = resource.ParseQuantity(targetValue.Size); err != nil {
+		return fmt.Errorf("could not parse volume size: %v", err)
+	}
 	targetSize := quantityToGigabyte(newSize)
 
 	awsGp3 := aws.String("gp3")
