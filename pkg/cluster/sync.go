@@ -11,7 +11,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -260,28 +259,6 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	return nil
 }
 
-func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet) (bool, error) {
-
-	pods, err := c.listPods()
-	if err != nil {
-		return false, fmt.Errorf("could not list pods of the statefulset: %v", err)
-	}
-
-	for _, pod := range pods {
-
-		effectivePodImage := pod.Spec.Containers[0].Image
-		ssImage := desiredSset.Spec.Template.Spec.Containers[0].Image
-
-		if ssImage != effectivePodImage {
-			c.logger.Infof("not all pods were re-started when the lazy upgrade was enabled; forcing the rolling upgrade now")
-			return true, nil
-		}
-
-	}
-
-	return false, nil
-}
-
 func (c *Cluster) syncStatefulSet() error {
 
 	podsToRecreate := make([]v1.Pod, 0)
@@ -372,8 +349,6 @@ func (c *Cluster) syncStatefulSet() error {
 				}
 			}
 		}
-
-		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
 
 		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if the desired and the running statefulsets match
