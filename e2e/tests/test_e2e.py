@@ -250,7 +250,7 @@ class EndToEndTestCase(unittest.TestCase):
         })
 
         # wait for another sync
-        time.sleep(15)
+        time.sleep(20)
 
         user_query = """
             SELECT rolname
@@ -277,7 +277,7 @@ class EndToEndTestCase(unittest.TestCase):
         })
 
         # wait for another sync
-        time.sleep(15)
+        time.sleep(20)
 
         user_query = """
             SELECT rolname
