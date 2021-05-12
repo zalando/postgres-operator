@@ -222,18 +222,14 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        # make sure we let one sync pass and check if the new user being added
-        time.sleep(15)
-
         leader = self.k8s.get_cluster_leader_pod()
         user_query = """
             SELECT rolname
               FROM pg_catalog.pg_roles
              WHERE rolname IN ('elephant', 'kind');
         """
-        users = self.query_database(leader.metadata.name, "postgres", user_query)
-        self.eventuallyEqual(lambda: len(users), 2, 
-            "Not all additional users found in database: {}".format(users))
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+            "Not all additional users found in database", 10, 5)
 
         # replace additional member and check if the removed member's role is renamed
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -249,18 +245,14 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        # wait for another sync
-        time.sleep(20)
-
         user_query = """
             SELECT rolname
               FROM pg_catalog.pg_roles
              WHERE (rolname = 'tester' AND rolcanlogin)
                 OR (rolname = 'kind_delete_me' AND NOT rolcanlogin);
         """
-        users = self.query_database(leader.metadata.name, "postgres", user_query)
-        self.eventuallyEqual(lambda: len(users), 2, 
-            "CRD changes not reflected in database: {}".format(users))
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+            "PostgresTeam change not reflected in database", 10, 5)
 
         # re-add additional member and check if the role is renamed back
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -276,18 +268,14 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        # wait for another sync
-        time.sleep(20)
-
         user_query = """
             SELECT rolname
               FROM pg_catalog.pg_roles
              WHERE (rolname = 'kind' AND rolcanlogin)
                 OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
         """
-        users = self.query_database(leader.metadata.name, "postgres", user_query)
-        self.eventuallyEqual(lambda: len(users), 2, 
-            "CRD changes not reflected in database: {}".format(users))
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+            "PostgresTeam change not reflected in database", 10, 5)
 
         # revert config change
         revert_resync = {
