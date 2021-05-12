@@ -227,9 +227,9 @@ class EndToEndTestCase(unittest.TestCase):
 
         leader = self.k8s.get_cluster_leader_pod()
         user_query = """
-            SELECT usename
-              FROM pg_catalog.pg_user
-             WHERE usename IN ('elephant', 'kind');
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname IN ('elephant', 'kind');
         """
         users = self.query_database(leader.metadata.name, "postgres", user_query)
         self.eventuallyEqual(lambda: len(users), 2, 
@@ -253,9 +253,10 @@ class EndToEndTestCase(unittest.TestCase):
         time.sleep(15)
 
         user_query = """
-            SELECT usename
-              FROM pg_catalog.pg_user
-             WHERE usename IN ('tester', 'kind_delete_me');
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE (rolname = 'tester' AND rolcanlogin)
+                OR (rolname = 'kind_delete_me' AND NOT rolcanlogin);
         """
         users = self.query_database(leader.metadata.name, "postgres", user_query)
         self.eventuallyEqual(lambda: len(users), 2, 
@@ -279,9 +280,10 @@ class EndToEndTestCase(unittest.TestCase):
         time.sleep(15)
 
         user_query = """
-            SELECT usename
-              FROM pg_catalog.pg_user
-             WHERE usename IN ('tester_delete_me', 'kind');
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE (rolname = 'kind' AND rolcanlogin)
+                OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
         """
         users = self.query_database(leader.metadata.name, "postgres", user_query)
         self.eventuallyEqual(lambda: len(users), 2, 
@@ -459,9 +461,9 @@ class EndToEndTestCase(unittest.TestCase):
 
         leader = k8s.get_cluster_leader_pod()
         schemas_query = """
-            select schema_name
-            from information_schema.schemata
-            where schema_name = 'pooler'
+            SELECT schema_name
+              FROM information_schema.schemata
+             WHERE schema_name = 'pooler'
         """
 
         db_list = self.list_databases(leader.metadata.name)
@@ -1470,7 +1472,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         result_set = []
         db_list = []
-        db_list_query = "select datname from pg_database"
+        db_list_query = "SELECT datname FROM pg_database"
         exec_query = r"psql -tAq -c \"{}\" -d {}"
 
         try:

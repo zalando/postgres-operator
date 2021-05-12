@@ -9,6 +9,7 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
 const (
@@ -75,9 +76,21 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 	}
 
 	// No existing roles are deleted or stripped of role membership/flags
-	// but they will be renamed acting as a simple login blocker
+	// but team roles will be renamed and denied from LOGIN
 	for name, dbUser := range dbUsers {
 		if _, exists := newUsers[name]; !exists {
+			// toggle LOGIN flag based on role deprecation
+			userFlags := make([]string, len(dbUser.Flags))
+			userFlags = append(userFlags, dbUser.Flags...)
+			if dbUser.Deprecated {
+				util.StringSliceReplaceElement(&dbUser.Flags, constants.RoleFlagNoLogin, constants.RoleFlagLogin)
+			} else {
+				util.StringSliceReplaceElement(&dbUser.Flags, constants.RoleFlagLogin, constants.RoleFlagNoLogin)
+			}
+			if !util.IsEqualIgnoreOrder(userFlags, dbUser.Flags) {
+				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGsyncUserAlter, User: dbUser})
+			}
+
 			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserRename, User: dbUser})
 		}
 	}
