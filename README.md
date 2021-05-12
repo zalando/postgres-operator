@@ -15,7 +15,8 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 
 * Rolling updates on Postgres cluster changes, incl. quick minor version updates
 * Live volume resize without pod restarts (AWS EBS, PVC)
-* Database connection pooler with PGBouncer
+* Database connection pooling with PGBouncer
+* Support fast in place major version upgrade to PG13. Supports global upgrade of all clusters.
 * Restore and cloning Postgres clusters (incl. major version upgrade)
 * Additionally logical backups to S3 bucket can be configured
 * Standby cluster from S3 WAL archive
@@ -24,11 +25,11 @@ pipelines with no access to Kubernetes API directly, promoting infrastructure as
 * Support for custom TLS certificates
 * UI to create and edit Postgres cluster manifests
 * Works well on Amazon AWS, Google Cloud, OpenShift and locally on Kind
-* Support for AWS EBS gp3 migration
+* Support for AWS EBS gp2 to gp3 migration, supporting iops and throughput configuration
 
 ### PostgreSQL features
 
-* Supports PostgreSQL 13, starting from 9.5+
+* Supports PostgreSQL 13, starting from 9.6+
 * Streaming replication cluster via Patroni
 * Point-In-Time-Recovery with
 [pg_basebackup](https://www.postgresql.org/docs/11/app-pgbasebackup.html) /
