@@ -152,16 +152,15 @@ func IsEqualIgnoreOrder(a, b []string) bool {
 }
 
 // SliceReplaceElement
-func StringSliceReplaceElement(s *[]string, a, b string) *[]string {
-	tmp := *s
-	for _, str := range tmp {
+func StringSliceReplaceElement(s []string, a, b string) (result []string) {
+	tmp := make([]string, 0, len(s))
+	for _, str := range s {
 		if str == a {
 			str = b
 		}
 		tmp = append(tmp, str)
 	}
-	*s = tmp
-	return s
+	return tmp
 }
 
 // SubstractStringSlices finds elements in a that are not in b and return them as a result slice.

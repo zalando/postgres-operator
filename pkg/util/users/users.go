@@ -83,9 +83,9 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 			userFlags := make([]string, len(dbUser.Flags))
 			userFlags = append(userFlags, dbUser.Flags...)
 			if dbUser.Deprecated {
-				util.StringSliceReplaceElement(&dbUser.Flags, constants.RoleFlagNoLogin, constants.RoleFlagLogin)
+				dbUser.Flags = util.StringSliceReplaceElement(dbUser.Flags, constants.RoleFlagNoLogin, constants.RoleFlagLogin)
 			} else {
-				util.StringSliceReplaceElement(&dbUser.Flags, constants.RoleFlagLogin, constants.RoleFlagNoLogin)
+				dbUser.Flags = util.StringSliceReplaceElement(dbUser.Flags, constants.RoleFlagLogin, constants.RoleFlagNoLogin)
 			}
 			if !util.IsEqualIgnoreOrder(userFlags, dbUser.Flags) {
 				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGsyncUserAlter, User: dbUser})
