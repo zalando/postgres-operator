@@ -255,7 +255,7 @@ explanation of `ttl` and `loop_wait` parameters.
   Patroni `synchronous_mode_strict` parameter value. Can be used in addition to `synchronous_mode`. The default is set to `false`. Optional.
 
 * **synchronous_node_count**
-  Patroni `synchronous_node_count` parameter value. The default is set to `1`. Optional.
+  Patroni `synchronous_node_count` parameter value. The default is set to `1`. Optional. Only available for Spilo images with Patroni 2.0+
 ## Postgres container resources
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
