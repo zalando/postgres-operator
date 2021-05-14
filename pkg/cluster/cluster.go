@@ -1089,6 +1089,16 @@ func (c *Cluster) initRobotUsers() error {
 		if c.shouldAvoidProtectedOrSystemRole(username, "manifest robot role") {
 			continue
 		}
+		name := username
+		namespace := "default"
+
+		if strings.Contains(username, ".") {
+			splits := strings.Split(username, ".")
+			name = splits[1]
+			namespace = splits[0]
+			username = name
+		}
+
 		flags, err := normalizeUserFlags(userFlags)
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
@@ -1099,7 +1109,8 @@ func (c *Cluster) initRobotUsers() error {
 		}
 		newRole := spec.PgUser{
 			Origin:    spec.RoleOriginManifest,
-			Name:      username,
+			Name:      name,
+			Namespace: namespace,
 			Password:  util.RandomPassword(constants.PasswordLength),
 			Flags:     flags,
 			AdminRole: adminRole,

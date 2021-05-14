@@ -48,6 +48,7 @@ const (
 type PgUser struct {
 	Origin     RoleOrigin        `yaml:"-"`
 	Name       string            `yaml:"-"`
+	Namespace  string            `yaml:"."`
 	Password   string            `yaml:"-"`
 	Flags      []string          `yaml:"user_flags"`
 	MemberOf   []string          `yaml:"inrole"`
