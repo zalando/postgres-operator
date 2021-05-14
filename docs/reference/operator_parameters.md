@@ -706,9 +706,9 @@ key.
 
 * **role_deprecation_suffix**
   defines a suffix that will be appended to database role names of team members
-  that were removed from either PostgresTeam CRDs (additionalMembers) or from
-  the team in the teams API. When readded to the manifest, the operator will
-  rename roles with the defined suffix back to the original role name.
+  that were removed from either the team in the Teams API or a `PostgresTeam`
+  custom resource (additionalMembers). When re-added, the operator will rename
+  roles with the defined suffix back to the original role name.
   The default is `_delete_me`.
 
 * **enable_postgres_team_crd**
