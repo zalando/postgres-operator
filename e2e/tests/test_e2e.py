@@ -571,7 +571,7 @@ class EndToEndTestCase(unittest.TestCase):
                             "Parameters": None,
                             "AdminRole": "",
                             "Origin": 2,
-                            "Deprecated": False
+                            "Deleted": False
                         })
                         return True
                 except:
