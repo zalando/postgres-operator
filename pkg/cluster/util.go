@@ -242,7 +242,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 		for team, membership := range *c.Config.PgTeamMap {
 			if team == teamID {
 				additionalMembers = membership.AdditionalMembers
-				c.logger.Debugf("found %d additional members for team %q", len(members), teamID)
+				c.logger.Debugf("found %d additional members for team %q", len(additionalMembers), teamID)
 			}
 		}
 
