@@ -30,8 +30,8 @@ const (
 // an existing roles of another role membership, nor it removes the already assigned flag
 // (except for the NOLOGIN). TODO: process other NOflags, i.e. NOSUPERUSER correctly.
 type DefaultUserSyncStrategy struct {
-	PasswordEncryption    string
-	RoleDeprecationSuffix string
+	PasswordEncryption string
+	RoleDeletionSuffix string
 }
 
 // ProduceSyncRequests figures out the types of changes that need to happen with the given users.
@@ -40,7 +40,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 
 	var reqs []spec.PgSyncUserRequest
 	for name, newUser := range newUsers {
-		if newUser.Deprecated {
+		if newUser.Deleted {
 			continue
 		}
 		dbUser, exists := dbUsers[name]
@@ -79,10 +79,10 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 	// but team roles will be renamed and denied from LOGIN
 	for name, dbUser := range dbUsers {
 		if _, exists := newUsers[name]; !exists {
-			// toggle LOGIN flag based on role deprecation
+			// toggle LOGIN flag based on role deletion
 			userFlags := make([]string, len(dbUser.Flags))
 			userFlags = append(userFlags, dbUser.Flags...)
-			if dbUser.Deprecated {
+			if dbUser.Deleted {
 				dbUser.Flags = util.StringSliceReplaceElement(dbUser.Flags, constants.RoleFlagNoLogin, constants.RoleFlagLogin)
 			} else {
 				dbUser.Flags = util.StringSliceReplaceElement(dbUser.Flags, constants.RoleFlagLogin, constants.RoleFlagNoLogin)
@@ -156,11 +156,11 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 func (strategy DefaultUserSyncStrategy) alterPgUserRename(user spec.PgUser, db *sql.DB) error {
 	var query string
 
-	if user.Deprecated {
-		newName := strings.TrimSuffix(user.Name, strategy.RoleDeprecationSuffix)
+	if user.Deleted {
+		newName := strings.TrimSuffix(user.Name, strategy.RoleDeletionSuffix)
 		query = fmt.Sprintf(alterUserRenameSQL, user.Name, newName, "")
 	} else {
-		query = fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name, strategy.RoleDeprecationSuffix)
+		query = fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name, strategy.RoleDeletionSuffix)
 	}
 
 	if _, err := db.Exec(query); err != nil {

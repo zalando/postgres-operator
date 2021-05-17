@@ -704,12 +704,12 @@ key.
   cluster to administer Postgres and maintain infrastructure built around it.
   The default is empty.
 
-* **role_deprecation_suffix**
+* **role_deletion_suffix**
   defines a suffix that will be appended to database role names of team members
   that were removed from either the team in the Teams API or a `PostgresTeam`
   custom resource (additionalMembers). When re-added, the operator will rename
   roles with the defined suffix back to the original role name.
-  The default is `_delete_me`.
+  The default is `_deleted`.
 
 * **enable_postgres_team_crd**
   toggle to make the operator watch for created or updated `PostgresTeam` CRDs

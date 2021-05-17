@@ -149,7 +149,7 @@ configuration:
     # - postgres_superusers
     protected_role_names:
     - admin
-    # role_deprecation_suffix: "_delete_me"
+    # role_deletion_suffix: "_deleted"
     team_admin_role: admin
     team_api_role_configuration:
       log_statement: all

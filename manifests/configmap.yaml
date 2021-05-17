@@ -111,7 +111,7 @@ data:
   resource_check_timeout: 10m
   resync_period: 30m
   ring_log_lines: "100"
-  # role_deprecation_suffix: "_delete_me"
+  # role_deletion_suffix: "_deleted"
   secret_name_template: "{username}.{cluster}.credentials"
   # sidecar_docker_images: ""
   # set_memory_request_to_limit: "false"

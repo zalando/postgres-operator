@@ -198,7 +198,7 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 			rolname, rolpassword                                          string
 			rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool
 			roloptions, memberof                                          []string
-			roldeprecated                                                 bool
+			roldeleted                                                    bool
 		)
 		err := rows.Scan(&rolname, &rolpassword, &rolsuper, &rolinherit,
 			&rolcreaterole, &rolcreatedb, &rolcanlogin, pq.Array(&roloptions), pq.Array(&memberof))
@@ -217,11 +217,11 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 			parameters[fields[0]] = fields[1]
 		}
 
-		if strings.HasSuffix(rolname, c.OpConfig.RoleDeprecationSuffix) {
-			roldeprecated = true
+		if strings.HasSuffix(rolname, c.OpConfig.RoleDeletionSuffix) {
+			roldeleted = true
 		}
 
-		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof, Parameters: parameters, Deprecated: roldeprecated}
+		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof, Parameters: parameters, Deleted: roldeleted}
 	}
 
 	return users, nil

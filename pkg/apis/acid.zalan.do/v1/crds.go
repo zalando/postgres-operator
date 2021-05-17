@@ -1405,7 +1405,7 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
-							"role_deprecation_suffix": {
+							"role_deletion_suffix": {
 								Type: "string",
 							},
 							"team_admin_role": {

@@ -414,13 +414,14 @@ from manifests. But, using the `PostgresTeam` custom resource or Teams API it
 is very easy to add roles to many clusters. Manually reverting such a change
 is cumbersome. Therefore, if members are removed from a `PostgresTeam` or the
 Teams API the operator will rename roles appending a configured suffix to the
-name (see `role_deprecation_suffix` option) and revoke the `LOGIN` privilege.
+name (see `role_deletion_suffix` option) and revoke the `LOGIN` privilege.
 The suffix makes it easy then for a cleanup script to remove those deprecated
 roles completely.
 
-When a role is re-added to a PostgresTeam manifest (or to the source behind
+When a role is re-added to a `PostgresTeam` manifest (or to the source behind
 the Teams API) the operator will check for roles with the configured suffix
-and if found, rename the role back to the original name and grant LOGIN again.
+and if found, rename the role back to the original name and grant `LOGIN`
+again.
 
 ## Prepared databases with roles and default privileges
 

@@ -551,16 +551,16 @@ func (c *Cluster) syncRoles() (err error) {
 		}
 	}()
 
-	// mapping between deprecated and original role name
-	deprecatedUsers := map[string]string{}
+	// mapping between original role name and with deletion suffix
+	deletedUsers := map[string]string{}
 
 	// create list of database roles to query
 	for _, u := range c.pgUsers {
 		userNames = append(userNames, u.Name)
 		// add team member role name with rename suffix in case we need to rename it back
 		if u.Origin == spec.RoleOriginTeamsAPI {
-			deprecatedUsers[u.Name+c.OpConfig.RoleDeprecationSuffix] = u.Name
-			userNames = append(userNames, u.Name+c.OpConfig.RoleDeprecationSuffix)
+			deletedUsers[u.Name+c.OpConfig.RoleDeletionSuffix] = u.Name
+			userNames = append(userNames, u.Name+c.OpConfig.RoleDeletionSuffix)
 		}
 	}
 
@@ -588,12 +588,12 @@ func (c *Cluster) syncRoles() (err error) {
 		return fmt.Errorf("error getting users from the database: %v", err)
 	}
 
-	// update pgUsers where a deprecated role was found
+	// update pgUsers where a deleted role was found
 	// so that they are skipped in ProduceSyncRequests
 	for _, dbUser := range dbUsers {
-		if originalUser, exists := deprecatedUsers[dbUser.Name]; exists {
+		if originalUser, exists := deletedUsers[dbUser.Name]; exists {
 			recreatedUser := c.pgUsers[originalUser]
-			recreatedUser.Deprecated = true
+			recreatedUser.Deleted = true
 			c.pgUsers[originalUser] = recreatedUser
 		}
 	}

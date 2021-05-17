@@ -249,7 +249,7 @@ class EndToEndTestCase(unittest.TestCase):
             SELECT rolname
               FROM pg_catalog.pg_roles
              WHERE (rolname = 'tester' AND rolcanlogin)
-                OR (rolname = 'kind_delete_me' AND NOT rolcanlogin);
+                OR (rolname = 'kind_deleted' AND NOT rolcanlogin);
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
             "PostgresTeam change not reflected in database", 10, 5)
@@ -272,7 +272,7 @@ class EndToEndTestCase(unittest.TestCase):
             SELECT rolname
               FROM pg_catalog.pg_roles
              WHERE (rolname = 'kind' AND rolcanlogin)
-                OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
+                OR (rolname = 'tester_deleted' AND NOT rolcanlogin);
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
             "PostgresTeam change not reflected in database", 10, 5)
