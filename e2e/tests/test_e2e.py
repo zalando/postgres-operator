@@ -203,7 +203,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.k8s.update_config(enable_postgres_team_crd)
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
-        
+
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresteams', 'custom-team-membership',
@@ -232,7 +232,7 @@ class EndToEndTestCase(unittest.TestCase):
              WHERE usename IN ('elephant', 'kind');
         """
         users = self.query_database(leader.metadata.name, "postgres", user_query)
-        self.eventuallyEqual(lambda: len(users), 2, 
+        self.eventuallyEqual(lambda: len(users), 2,
             "Not all additional users found in database: {}".format(users))
 
         # revert config change
@@ -414,7 +414,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         db_list = self.list_databases(leader.metadata.name)
         for db in db_list:
-            self.eventuallyNotEqual(lambda: len(self.query_database(leader.metadata.name, db, schemas_query)), 0, 
+            self.eventuallyNotEqual(lambda: len(self.query_database(leader.metadata.name, db, schemas_query)), 0,
                 "Pooler schema not found in database {}".format(db))
 
         # remove config section to make test work next time
@@ -541,6 +541,25 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_cross_namespace_secrets(self):
+        '''
+            Test secrets in different namespace
+        '''
+        k8s = self.k8s
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'users':{
+                        'appspace.db_user': [],
+                    }
+                }
+            })
+        self.eventuallyEqual(lambda: k8s.count_secrets_in_namespace('appspace'),
+                             1, "Secret not created in user namespace")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
@@ -744,7 +763,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)          
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
