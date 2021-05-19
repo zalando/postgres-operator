@@ -24,6 +24,20 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+type testVolume struct {
+	size        int64
+	iops        int64
+	throughtput int64
+	volType     string
+}
+
+var testVol = testVolume{
+	size:        100,
+	iops:        300,
+	throughtput: 125,
+	volType:     "gp2",
+}
+
 func newFakeK8sPVCclient() (k8sutil.KubernetesClient, *fake.Clientset) {
 	clientSet := fake.NewSimpleClientset()
 
@@ -189,14 +203,7 @@ func TestMigrateEBS(t *testing.T) {
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
 
-	testVolumes := []testVolume{
-		{
-			size: 100,
-		},
-		{
-			size: 100,
-		},
-	}
+	testVolumes := []testVolume{testVol, testVol}
 
 	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
 
@@ -218,13 +225,6 @@ func TestMigrateEBS(t *testing.T) {
 
 	cluster.VolumeResizer = resizer
 	cluster.executeEBSMigration()
-}
-
-type testVolume struct {
-	iops        int64
-	throughtput int64
-	size        int64
-	volType     string
 }
 
 func initTestVolumesAndPods(client k8sutil.KubernetesClient, namespace, clustername string, labels labels.Set, volumes []testVolume) {
@@ -305,17 +305,7 @@ func TestMigrateGp3Support(t *testing.T) {
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
 
-	testVolumes := []testVolume{
-		{
-			size: 100,
-		},
-		{
-			size: 100,
-		},
-		{
-			size: 100,
-		},
-	}
+	testVolumes := []testVolume{testVol, testVol, testVol}
 
 	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
 
@@ -371,14 +361,7 @@ func TestManualGp2Gp3Support(t *testing.T) {
 	cluster.Namespace = namespace
 	filterLabels := cluster.labelsSet(false)
 
-	testVolumes := []testVolume{
-		{
-			size: 100,
-		},
-		{
-			size: 100,
-		},
-	}
+	testVolumes := []testVolume{testVol, testVol}
 
 	initTestVolumesAndPods(cluster.KubeClient, namespace, clusterName, filterLabels, testVolumes)
 

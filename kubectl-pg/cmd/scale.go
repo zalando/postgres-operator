@@ -31,7 +31,6 @@ import (
 
 	"github.com/spf13/cobra"
 	PostgresqlLister "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
-	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -46,6 +45,9 @@ var scaleCmd = &cobra.Command{
 Scaling to 0 leads to down time.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		clusterName, err := cmd.Flags().GetString("cluster")
+		if err != nil {
+			log.Fatal(err)
+		}
 		namespace, err := cmd.Flags().GetString("namespace")
 		if err != nil {
 			log.Fatal(err)
@@ -129,8 +131,7 @@ func allowedMinMaxInstances(config *rest.Config) (int32, int32) {
 		log.Fatal(err)
 	}
 
-	var operator *v1.Deployment
-	operator = getPostgresOperator(k8sClient)
+	operator := getPostgresOperator(k8sClient)
 
 	operatorContainer := operator.Spec.Template.Spec.Containers
 	var configMapName, operatorConfigName string

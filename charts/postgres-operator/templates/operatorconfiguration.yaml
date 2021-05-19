@@ -12,6 +12,8 @@ configuration:
 {{ toYaml .Values.configGeneral | indent 2 }}
   users:
 {{ toYaml .Values.configUsers | indent 4 }}
+  major_version_upgrade:
+{{ toYaml .Values.configMajorVersionUpgrade | indent 4 }}
   kubernetes:
     {{- if .Values.podPriorityClassName }}
     pod_priority_class_name: {{ .Values.podPriorityClassName }}

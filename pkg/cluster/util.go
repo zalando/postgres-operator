@@ -227,11 +227,6 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 	}
 }
 
-func (c *Cluster) logVolumeChanges(old, new acidv1.Volume) {
-	c.logger.Infof("volume specification has been changed")
-	logNiceDiff(c.logger, old, new)
-}
-
 func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	if teamID == "" {
@@ -251,9 +246,7 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 			}
 		}
 
-		for _, member := range additionalMembers {
-			members = append(members, member)
-		}
+		members = append(members, additionalMembers...)
 	}
 
 	if !c.OpConfig.EnableTeamsAPI {
@@ -292,12 +285,10 @@ func (c *Cluster) annotationsSet(annotations map[string]string) map[string]strin
 	pgCRDAnnotations := c.ObjectMeta.Annotations
 
 	// allow to inherit certain labels from the 'postgres' object
-	if pgCRDAnnotations != nil {
-		for k, v := range pgCRDAnnotations {
-			for _, match := range c.OpConfig.InheritedAnnotations {
-				if k == match {
-					annotations[k] = v
-				}
+	for k, v := range pgCRDAnnotations {
+		for _, match := range c.OpConfig.InheritedAnnotations {
+			if k == match {
+				annotations[k] = v
 			}
 		}
 	}

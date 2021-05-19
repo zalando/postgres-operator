@@ -83,15 +83,16 @@ type Cluster struct {
 	deleteOptions    metav1.DeleteOptions
 	podEventsQueue   *cache.FIFO
 
-	teamsAPIClient   teams.Interface
-	oauthTokenGetter OAuthTokenGetter
-	KubeClient       k8sutil.KubernetesClient //TODO: move clients to the better place?
-	currentProcess   Process
-	processMu        sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
-	specMu           sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
-	ConnectionPooler map[PostgresRole]*ConnectionPoolerObjects
-	EBSVolumes       map[string]volumes.VolumeProperties
-	VolumeResizer    volumes.VolumeResizer
+	teamsAPIClient      teams.Interface
+	oauthTokenGetter    OAuthTokenGetter
+	KubeClient          k8sutil.KubernetesClient //TODO: move clients to the better place?
+	currentProcess      Process
+	processMu           sync.RWMutex // protects the current operation for reporting, no need to hold the master mutex
+	specMu              sync.RWMutex // protects the spec for reporting, no need to hold the master mutex
+	ConnectionPooler    map[PostgresRole]*ConnectionPoolerObjects
+	EBSVolumes          map[string]volumes.VolumeProperties
+	VolumeResizer       volumes.VolumeResizer
+	currentMajorVersion int
 }
 
 type compareStatefulsetResult struct {
@@ -128,15 +129,16 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy: users.DefaultUserSyncStrategy{PasswordEncryption: passwordEncryption},
-		deleteOptions:    metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
-		podEventsQueue:   podEventsQueue,
-		KubeClient:       kubeClient,
+		userSyncStrategy:    users.DefaultUserSyncStrategy{PasswordEncryption: passwordEncryption},
+		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
+		podEventsQueue:      podEventsQueue,
+		KubeClient:          kubeClient,
+		currentMajorVersion: 0,
 	}
 	cluster.logger = logger.WithField("pkg", "cluster").WithField("cluster-name", cluster.clusterName())
 	cluster.teamsAPIClient = teams.NewTeamsAPI(cfg.OpConfig.TeamsAPIUrl, logger)
 	cluster.oauthTokenGetter = newSecretOauthTokenGetter(&kubeClient, cfg.OpConfig.OAuthTokenSecretName)
-	cluster.patroni = patroni.New(cluster.logger)
+	cluster.patroni = patroni.New(cluster.logger, nil)
 	cluster.eventRecorder = eventRecorder
 
 	cluster.EBSVolumes = make(map[string]volumes.VolumeProperties)
@@ -359,7 +361,8 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	}
 	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
 		match = false
-		reasons = append(reasons, "new statefulset's annotations does not match the current one")
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's annotations do not match the current one")
 	}
 
 	needsRollUpdate, reasons = c.compareContainers("initContainers", c.Statefulset.Spec.Template.Spec.InitContainers, statefulSet.Spec.Template.Spec.InitContainers, needsRollUpdate, reasons)
@@ -443,6 +446,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
+	if len(c.Statefulset.Spec.Template.Spec.Volumes) != len(statefulSet.Spec.Template.Spec.Volumes) {
+		needsReplace = true
+		reasons = append(reasons, fmt.Sprintf("new statefulset's Volumes contains different number of volumes to the old one"))
+	}
+
 	// we assume any change in priority happens by rolling out a new priority class
 	// changing the priority value in an existing class is not supproted
 	if c.Statefulset.Spec.Template.Spec.PriorityClassName != statefulSet.Spec.Template.Spec.PriorityClassName {
@@ -500,6 +508,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 		newCheck("new statefulset %s's %s (index %d) security context does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
+		newCheck("new statefulset %s's %s (index %d) volume mounts do not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
@@ -596,7 +606,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 // for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
-	syncStatetfulSet := false
+	syncStatefulSet := false
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -614,17 +624,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	logNiceDiff(c.logger, oldSpec, newSpec)
 
-	if oldSpec.Spec.PostgresqlParam.PgVersion > newSpec.Spec.PostgresqlParam.PgVersion {
-		c.logger.Warningf("postgresql version change(%q -> %q) has no effect",
+	if IsBiggerPostgresVersion(oldSpec.Spec.PostgresqlParam.PgVersion, c.GetDesiredMajorVersion()) {
+		c.logger.Infof("postgresql version increased (%s -> %s), depending on config manual upgrade needed",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
-		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeWarning, "PostgreSQL", "postgresql version change(%q -> %q) has no effect",
-			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
-		// we need that hack to generate statefulset with the old version
+		syncStatefulSet = true
+	} else {
+		c.logger.Infof("postgresql major version unchanged or smaller, no changes needed")
+		// sticking with old version, this will also advance GetDesiredVersion next time.
 		newSpec.Spec.PostgresqlParam.PgVersion = oldSpec.Spec.PostgresqlParam.PgVersion
-	} else if oldSpec.Spec.PostgresqlParam.PgVersion < newSpec.Spec.PostgresqlParam.PgVersion {
-		c.logger.Infof("postgresql version increased (%q -> %q), major version upgrade can be done manually after StatefulSet Sync",
-			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
-		syncStatetfulSet = true
 	}
 
 	// Service
@@ -689,9 +696,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			updateFailed = true
 			return
 		}
-		if syncStatetfulSet || !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
+		if syncStatefulSet || !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
 			c.logger.Debugf("syncing statefulsets")
-			syncStatetfulSet = false
+			syncStatefulSet = false
 			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet
 			if err := c.syncStatefulSet(); err != nil {
 				c.logger.Errorf("could not sync statefulsets: %v", err)
@@ -779,6 +786,14 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
 		updateFailed = true
+	}
+
+	if !updateFailed {
+		// Major version upgrade must only fire after success of earlier operations and should stay last
+		if err := c.majorVersionUpgrade(); err != nil {
+			c.logger.Errorf("major version upgrade failed: %v", err)
+			updateFailed = true
+		}
 	}
 
 	return nil
@@ -1156,7 +1171,7 @@ func (c *Cluster) initHumanUsers() error {
 	for _, superuserTeam := range superuserTeams {
 		err := c.initTeamMembers(superuserTeam, true)
 		if err != nil {
-			return fmt.Errorf("Cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
+			return fmt.Errorf("cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
 		}
 		if superuserTeam == c.Spec.TeamID {
 			clusterIsOwnedBySuperuserTeam = true
@@ -1169,7 +1184,7 @@ func (c *Cluster) initHumanUsers() error {
 			if !(util.SliceContains(superuserTeams, additionalTeam)) {
 				err := c.initTeamMembers(additionalTeam, false)
 				if err != nil {
-					return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+					return fmt.Errorf("cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
 				}
 			}
 		}
@@ -1182,7 +1197,7 @@ func (c *Cluster) initHumanUsers() error {
 
 	err := c.initTeamMembers(c.Spec.TeamID, false)
 	if err != nil {
-		return fmt.Errorf("Cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
+		return fmt.Errorf("cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil
@@ -1302,7 +1317,8 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 			err = fmt.Errorf("could not get master pod label: %v", err)
 		}
 	} else {
-		err = fmt.Errorf("could not switch over: %v", err)
+		err = fmt.Errorf("could not switch over from %q to %q: %v", curMaster.Name, candidate, err)
+		c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	}
 
 	// signal the role label waiting goroutine to close the shop and go home
@@ -1313,9 +1329,7 @@ func (c *Cluster) Switchover(curMaster *v1.Pod, candidate spec.NamespacedName) e
 	// close the label waiting channel no sooner than the waiting goroutine terminates.
 	close(podLabelErr)
 
-	c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Switchover", "Switchover from %q to %q FAILED: %v", curMaster.Name, candidate, err)
 	return err
-
 }
 
 // Lock locks the cluster

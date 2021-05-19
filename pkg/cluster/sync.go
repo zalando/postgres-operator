@@ -11,7 +11,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -116,6 +115,11 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	// sync connection pooler
 	if _, err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
+	}
+
+	// Major version upgrade must only run after success of all earlier operations, must remain last item in sync
+	if err := c.majorVersionUpgrade(); err != nil {
+		c.logger.Errorf("major version upgrade failed: %v", err)
 	}
 
 	return err
@@ -255,45 +259,25 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	return nil
 }
 
-func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet) (bool, error) {
+func (c *Cluster) syncStatefulSet() error {
+
+	podsToRecreate := make([]v1.Pod, 0)
+	switchoverCandidates := make([]spec.NamespacedName, 0)
 
 	pods, err := c.listPods()
 	if err != nil {
-		return false, fmt.Errorf("could not list pods of the statefulset: %v", err)
+		c.logger.Infof("could not list pods of the statefulset: %v", err)
 	}
 
-	for _, pod := range pods {
-
-		effectivePodImage := pod.Spec.Containers[0].Image
-		ssImage := desiredSset.Spec.Template.Spec.Containers[0].Image
-
-		if ssImage != effectivePodImage {
-			c.logger.Infof("not all pods were re-started when the lazy upgrade was enabled; forcing the rolling upgrade now")
-			return true, nil
-		}
-
-	}
-
-	return false, nil
-}
-
-func (c *Cluster) syncStatefulSet() error {
-	var (
-		podsRollingUpdateRequired bool
-	)
 	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
 	sset, err := c.KubeClient.StatefulSets(c.Namespace).Get(context.TODO(), c.statefulSetName(), metav1.GetOptions{})
 	if err != nil {
 		if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("could not get statefulset: %v", err)
+			return fmt.Errorf("error during reading of statefulset: %v", err)
 		}
 		// statefulset does not exist, try to re-create it
 		c.Statefulset = nil
-		c.logger.Infof("could not find the cluster's statefulset")
-		pods, err := c.listPods()
-		if err != nil {
-			return fmt.Errorf("could not list pods of the statefulset: %v", err)
-		}
+		c.logger.Infof("cluster's statefulset does not exist")
 
 		sset, err = c.createStatefulSet()
 		if err != nil {
@@ -304,60 +288,92 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("cluster is not ready: %v", err)
 		}
 
-		podsRollingUpdateRequired = (len(pods) > 0)
-		if podsRollingUpdateRequired {
-			c.logger.Warningf("found pods from the previous statefulset: trigger rolling update")
-			if err := c.applyRollingUpdateFlagforStatefulSet(podsRollingUpdateRequired); err != nil {
-				return fmt.Errorf("could not set rolling update flag for the statefulset: %v", err)
+		if len(pods) > 0 {
+			for _, pod := range pods {
+				if err = c.markRollingUpdateFlagForPod(&pod, "pod from previous statefulset"); err != nil {
+					c.logger.Warnf("marking old pod for rolling update failed: %v", err)
+				}
+				podsToRecreate = append(podsToRecreate, pod)
 			}
 		}
 		c.logger.Infof("created missing statefulset %q", util.NameFromMeta(sset.ObjectMeta))
 
 	} else {
-		podsRollingUpdateRequired = c.mergeRollingUpdateFlagUsingCache(sset)
+		// check if there are still pods with a rolling update flag
+		for _, pod := range pods {
+			if c.getRollingUpdateFlagFromPod(&pod) {
+				podsToRecreate = append(podsToRecreate, pod)
+			} else {
+				role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+				if role == Master {
+					continue
+				}
+				switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
+			}
+		}
+
+		if len(podsToRecreate) > 0 {
+			c.logger.Debugf("%d / %d pod(s) still need to be rotated", len(podsToRecreate), len(pods))
+		}
+
 		// statefulset is already there, make sure we use its definition in order to compare with the spec.
 		c.Statefulset = sset
 
-		desiredSS, err := c.generateStatefulSet(&c.Spec)
+		desiredSts, err := c.generateStatefulSet(&c.Spec)
 		if err != nil {
 			return fmt.Errorf("could not generate statefulset: %v", err)
 		}
-		c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired, "from cache")
 
-		cmp := c.compareStatefulSetWith(desiredSS)
+		cmp := c.compareStatefulSetWith(desiredSts)
 		if !cmp.match {
-			if cmp.rollingUpdate && !podsRollingUpdateRequired {
-				podsRollingUpdateRequired = true
-				c.setRollingUpdateFlagForStatefulSet(desiredSS, podsRollingUpdateRequired, "statefulset changes")
+			if cmp.rollingUpdate {
+				podsToRecreate = make([]v1.Pod, 0)
+				switchoverCandidates = make([]spec.NamespacedName, 0)
+				for _, pod := range pods {
+					if err = c.markRollingUpdateFlagForPod(&pod, "pod changes"); err != nil {
+						return fmt.Errorf("updating rolling update flag for pod failed: %v", err)
+					}
+					podsToRecreate = append(podsToRecreate, pod)
+				}
 			}
 
-			c.logStatefulSetChanges(c.Statefulset, desiredSS, false, cmp.reasons)
+			c.logStatefulSetChanges(c.Statefulset, desiredSts, false, cmp.reasons)
 
 			if !cmp.replace {
-				if err := c.updateStatefulSet(desiredSS); err != nil {
+				if err := c.updateStatefulSet(desiredSts); err != nil {
 					return fmt.Errorf("could not update statefulset: %v", err)
 				}
 			} else {
-				if err := c.replaceStatefulSet(desiredSS); err != nil {
+				if err := c.replaceStatefulSet(desiredSts); err != nil {
 					return fmt.Errorf("could not replace statefulset: %v", err)
 				}
 			}
 		}
 
-		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
-
-		if !podsRollingUpdateRequired && !c.OpConfig.EnableLazySpiloUpgrade {
-			// even if desired and actual statefulsets match
+		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade {
+			// even if the desired and the running statefulsets match
 			// there still may be not up-to-date pods on condition
 			//  (a) the lazy update was just disabled
 			// and
 			//  (b) some of the pods were not restarted when the lazy update was still in place
-			podsRollingUpdateRequired, err = c.mustUpdatePodsAfterLazyUpdate(desiredSS)
-			if err != nil {
-				return fmt.Errorf("could not list pods of the statefulset: %v", err)
+			for _, pod := range pods {
+				effectivePodImage := pod.Spec.Containers[0].Image
+				stsImage := desiredSts.Spec.Template.Spec.Containers[0].Image
+
+				if stsImage != effectivePodImage {
+					if err = c.markRollingUpdateFlagForPod(&pod, "pod not yet restarted due to lazy update"); err != nil {
+						c.logger.Warnf("updating rolling update flag failed for pod %q: %v", pod.Name, err)
+					}
+					podsToRecreate = append(podsToRecreate, pod)
+				} else {
+					role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+					if role == Master {
+						continue
+					}
+					switchoverCandidates = append(switchoverCandidates, util.NameFromMeta(pod.ObjectMeta))
+				}
 			}
 		}
-
 	}
 
 	// Apply special PostgreSQL parameters that can only be set via the Patroni API.
@@ -369,17 +385,13 @@ func (c *Cluster) syncStatefulSet() error {
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
-	if podsRollingUpdateRequired {
+	if len(podsToRecreate) > 0 {
 		c.logger.Debugln("performing rolling update")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Performing rolling update")
-		if err := c.recreatePods(); err != nil {
+		if err := c.recreatePods(podsToRecreate, switchoverCandidates); err != nil {
 			return fmt.Errorf("could not recreate pods: %v", err)
 		}
-		c.logger.Infof("pods have been recreated")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
-		if err := c.applyRollingUpdateFlagforStatefulSet(false); err != nil {
-			c.logger.Warningf("could not clear rolling update for the statefulset: %v", err)
-		}
 	}
 	return nil
 }
@@ -471,7 +483,7 @@ func (c *Cluster) syncSecrets() error {
 	for secretUsername, secretSpec := range secrets {
 		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %q, uid: %q", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			c.logger.Debugf("created new secret %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
@@ -480,7 +492,7 @@ func (c *Cluster) syncSecrets() error {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
 			if secretUsername != string(secret.Data["username"]) {
-				c.logger.Errorf("secret %s does not contain the role %q", secretSpec.Name, secretUsername)
+				c.logger.Errorf("secret %s does not contain the role %s", secretSpec.Name, secretUsername)
 				continue
 			}
 			c.Secrets[secret.UID] = secret
@@ -499,7 +511,7 @@ func (c *Cluster) syncSecrets() error {
 			if pwdUser.Password != string(secret.Data["password"]) &&
 				pwdUser.Origin == spec.RoleOriginInfrastructure {
 
-				c.logger.Debugf("updating the secret %q from the infrastructure roles", secretSpec.Name)
+				c.logger.Debugf("updating the secret %s from the infrastructure roles", secretSpec.Name)
 				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secretSpec, metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
 				}
@@ -509,7 +521,7 @@ func (c *Cluster) syncSecrets() error {
 				userMap[secretUsername] = pwdUser
 			}
 		} else {
-			return fmt.Errorf("could not create secret for user %q: %v", secretUsername, err)
+			return fmt.Errorf("could not create secret for user %s: %v", secretUsername, err)
 		}
 	}
 
@@ -624,6 +636,9 @@ func (c *Cluster) syncDatabases() error {
 
 	// set default privileges for prepared database
 	for _, preparedDatabase := range preparedDatabases {
+		if err := c.initDbConnWithName(preparedDatabase); err != nil {
+			return fmt.Errorf("could not init database connection to %s", preparedDatabase)
+		}
 		if err = c.execAlterGlobalDefaultPrivileges(preparedDatabase+constants.OwnerRoleNameSuffix, preparedDatabase); err != nil {
 			return err
 		}

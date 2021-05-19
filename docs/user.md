@@ -275,7 +275,7 @@ Postgres clusters are associated with one team by providing the `teamID` in
 the manifest. Additional superuser teams can be configured as mentioned in
 the previous paragraph. However, this is a global setting. To assign
 additional teams, superuser teams and single users to clusters of a given
-team, use the [PostgresTeam CRD](../manifests/postgresteam.yaml).
+team, use the [PostgresTeam CRD](../manifests/postgresteam.crd.yaml).
 
 Note, by default the `PostgresTeam` support is disabled in the configuration.
 Switch `enable_postgres_team_crd` flag to `true` and the operator will start to
@@ -646,7 +646,13 @@ spec:
 
 ## In-place major version upgrade
 
-Starting with Spilo 13, operator supports in-place major version upgrade to a higher major version (e.g. from PG 10 to PG 12). To trigger the upgrade, simply increase the version in the manifest. It is your responsibility to test your applications against the new version before the upgrade; downgrading is not supported. The easiest way to do so is to try the upgrade on the cloned cluster first. For details of how Spilo does the upgrade [see here](https://github.com/zalando/spilo/pull/488), operator implementation is described [in the admin docs](administrator.md#minor-and-major-version-upgrade).
+Starting with Spilo 13, operator supports in-place major version upgrade to a
+higher major version (e.g. from PG 10 to PG 12). To trigger the upgrade,
+simply increase the version in the manifest. It is your responsibility to test
+your applications against the new version before the upgrade; downgrading is
+not supported. The easiest way to do so is to try the upgrade on the cloned
+cluster first (see next chapter). More details can be found in the
+[admin docs](administrator.md#minor-and-major-version-upgrade).
 
 ## How to clone an existing PostgreSQL cluster
 

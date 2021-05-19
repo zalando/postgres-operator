@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -214,10 +213,10 @@ PatroniInitDBParams:
 	for _, k := range initdbOptionNames {
 		v := patroni.InitDB[k]
 		for i, defaultParam := range config.Bootstrap.Initdb {
-			switch defaultParam.(type) {
+			switch t := defaultParam.(type) {
 			case map[string]string:
 				{
-					for k1 := range defaultParam.(map[string]string) {
+					for k1 := range t {
 						if k1 == k {
 							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
 							continue PatroniInitDBParams
@@ -227,7 +226,7 @@ PatroniInitDBParams:
 			case string:
 				{
 					/* if the option already occurs in the list */
-					if defaultParam.(string) == v {
+					if t == v {
 						continue PatroniInitDBParams
 					}
 				}
@@ -265,7 +264,7 @@ PatroniInitDBParams:
 	if patroni.SynchronousMode {
 		config.Bootstrap.DCS.SynchronousMode = patroni.SynchronousMode
 	}
-	if patroni.SynchronousModeStrict != false {
+	if patroni.SynchronousModeStrict {
 		config.Bootstrap.DCS.SynchronousModeStrict = patroni.SynchronousModeStrict
 	}
 
@@ -337,7 +336,7 @@ func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAff
 	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
 	}
-	nodeAffinityCopy := *&v1.NodeAffinity{}
+	nodeAffinityCopy := v1.NodeAffinity{}
 	if nodeAffinity != nil {
 		nodeAffinityCopy = *nodeAffinity.DeepCopy()
 	}
@@ -443,6 +442,7 @@ func generateContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
+	privilegeEscalationMode *bool,
 	additionalPodCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
@@ -467,7 +467,7 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			AllowPrivilegeEscalation: &privilegedMode,
+			AllowPrivilegeEscalation: privilegeEscalationMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   util.False(),
 			Capabilities:             additionalPodCapabilities,
@@ -734,7 +734,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		},
 	}
 	if c.OpConfig.EnablePgVersionEnvVar {
-		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.Spec.PgVersion})
+		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}
 	// Spilo expects cluster labels as JSON
 	if clusterLabels, err := json.Marshal(labels.Set(c.OpConfig.ClusterLabels)); err != nil {
@@ -1163,6 +1163,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
+		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
 
@@ -1278,16 +1279,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	stsAnnotations := make(map[string]string)
-	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
-	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
-
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: stsAnnotations,
+			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -1917,6 +1914,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		envVars,
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
+		c.OpConfig.SpiloAllowPrivilegeEscalation,
 		nil,
 	)
 

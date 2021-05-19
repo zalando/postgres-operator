@@ -3,13 +3,14 @@ package patroni
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
+
+	httpclient "github.com/zalando/postgres-operator/pkg/util/httpclient"
 
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -26,24 +27,28 @@ const (
 type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
-	GetPatroniMemberState(pod *v1.Pod) (string, error)
+	GetMemberData(server *v1.Pod) (MemberData, error)
 }
 
 // Patroni API client
 type Patroni struct {
-	httpClient *http.Client
+	httpClient httpclient.HTTPClient
 	logger     *logrus.Entry
 }
 
 // New create patroni
-func New(logger *logrus.Entry) *Patroni {
-	cl := http.Client{
-		Timeout: timeout,
+func New(logger *logrus.Entry, client httpclient.HTTPClient) *Patroni {
+	if client == nil {
+
+		client = &http.Client{
+			Timeout: timeout,
+		}
+
 	}
 
 	return &Patroni{
 		logger:     logger,
-		httpClient: &cl,
+		httpClient: client,
 	}
 }
 
@@ -68,7 +73,9 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 		return fmt.Errorf("could not create request: %v", err)
 	}
 
-	p.logger.Debugf("making %s http request: %s", method, request.URL.String())
+	if p.logger != nil {
+		p.logger.Debugf("making %s http request: %s", method, request.URL.String())
+	}
 
 	resp, err := p.httpClient.Do(request)
 	if err != nil {
@@ -126,35 +133,45 @@ func (p *Patroni) SetPostgresParameters(server *v1.Pod, parameters map[string]st
 	return p.httpPostOrPatch(http.MethodPatch, apiURLString+configPath, buf)
 }
 
-//GetPatroniMemberState returns a state of member of a Patroni cluster
-func (p *Patroni) GetPatroniMemberState(server *v1.Pod) (string, error) {
+// MemberDataPatroni child element
+type MemberDataPatroni struct {
+	Version string `json:"version"`
+	Scope   string `json:"scope"`
+}
+
+// MemberData Patroni member data from Patroni API
+type MemberData struct {
+	State           string            `json:"state"`
+	Role            string            `json:"role"`
+	ServerVersion   int               `json:"server_version"`
+	PendingRestart  bool              `json:"pending_restart"`
+	ClusterUnlocked bool              `json:"cluster_unlocked"`
+	Patroni         MemberDataPatroni `json:"patroni"`
+}
+
+// GetMemberData read member data from patroni API
+func (p *Patroni) GetMemberData(server *v1.Pod) (MemberData, error) {
 
 	apiURLString, err := apiURL(server)
 	if err != nil {
-		return "", err
+		return MemberData{}, err
 	}
 	response, err := p.httpClient.Get(apiURLString)
 	if err != nil {
-		return "", fmt.Errorf("could not perform Get request: %v", err)
+		return MemberData{}, fmt.Errorf("could not perform Get request: %v", err)
 	}
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return "", fmt.Errorf("could not read response: %v", err)
+		return MemberData{}, fmt.Errorf("could not read response: %v", err)
 	}
 
-	data := make(map[string]interface{})
+	data := MemberData{}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		return "", err
+		return MemberData{}, err
 	}
 
-	state, ok := data["state"].(string)
-	if !ok {
-		return "", errors.New("Patroni Get call response contains wrong type for 'state' field")
-	}
-
-	return state, nil
-
+	return data, nil
 }

@@ -4,7 +4,7 @@ watch -c "
 kubectl get postgresql --all-namespaces
 echo
 echo -n 'Rolling upgrade pending: '
-kubectl get statefulset -o jsonpath='{.items..metadata.annotations.zalando-postgres-operator-rolling-update-required}'
+kubectl get pods -o jsonpath='{.items[].metadata.annotations.zalando-postgres-operator-rolling-update-required}'
 echo
 echo
 echo 'Pods'
