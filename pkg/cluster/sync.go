@@ -481,6 +481,9 @@ func (c *Cluster) syncSecrets() error {
 	secrets := c.generateUserSecrets()
 
 	for secretUsername, secretSpec := range secrets {
+		if len(secretSpec.Namespace) < 0 {
+			c.logger.Warningf("found empty namespace for user %s", secretUsername)
+		}
 		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
 			c.Secrets[secret.UID] = secret
 			c.logger.Debugf("created new secret %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
@@ -521,7 +524,7 @@ func (c *Cluster) syncSecrets() error {
 				userMap[secretUsername] = pwdUser
 			}
 		} else {
-			return fmt.Errorf("could not create secret for user %s: %v", secretUsername, err)
+			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, secretSpec.Namespace, err)
 		}
 	}
 

@@ -547,7 +547,9 @@ class EndToEndTestCase(unittest.TestCase):
         '''
             Test secrets in different namespace
         '''
+        app_namespace = "appspace"
         k8s = self.k8s
+        k8s.api.core_v1.create_namespace(app_namespace)
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
@@ -558,7 +560,7 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             })
-        self.eventuallyEqual(lambda: k8s.count_secrets_in_namespace('appspace'),
+        self.eventuallyEqual(lambda: k8s.count_secrets_in_namespace(app_namespace),
                              1, "Secret not created in user namespace")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
