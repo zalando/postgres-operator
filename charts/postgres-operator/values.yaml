@@ -295,7 +295,7 @@ configTeamsApi:
   # pam_configuration: https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
 
   # operator will add all team member roles to this group and add a pg_hba line
-  pam_role_name: zalandos
+  pam_role_name: "zalandos"
   # List of teams which members need the superuser role in each Postgres cluster
   postgres_superuser_teams: "postgres_superusers"
   # List of roles that cannot be overwritten by an application, team or infrastructure role
