@@ -197,6 +197,7 @@ class EndToEndTestCase(unittest.TestCase):
         enable_postgres_team_crd = {
             "data": {
                 "enable_postgres_team_crd": "true",
+                "enable_team_member_deprecation": "true",
                 "resync_period": "15s",
             },
         }

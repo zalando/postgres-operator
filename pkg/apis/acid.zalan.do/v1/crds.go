@@ -1377,6 +1377,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_postgres_team_crd_superusers": {
 								Type: "boolean",
 							},
+							"enable_team_member_deprecation": {
+								Type: "boolean",
+							},
 							"enable_team_superuser": {
 								Type: "boolean",
 							},

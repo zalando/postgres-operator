@@ -193,11 +193,14 @@ func (c *Cluster) isNewCluster() bool {
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
 
-	// save current state of pgUsers to check for deleted roles later
+	// if team member deprecation is enabled save current state of pgUsers
+	// to check for deleted roles
 	c.pgUsersCache = map[string]spec.PgUser{}
-	for k, v := range c.pgUsers {
-		if v.Origin == spec.RoleOriginTeamsAPI {
-			c.pgUsersCache[k] = v
+	if c.OpConfig.EnableTeamMemberDeprecation {
+		for k, v := range c.pgUsers {
+			if v.Origin == spec.RoleOriginTeamsAPI {
+				c.pgUsersCache[k] = v
+			}
 		}
 	}
 
