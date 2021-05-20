@@ -252,7 +252,7 @@ class EndToEndTestCase(unittest.TestCase):
                 OR (rolname = 'kind_deleted' AND NOT rolcanlogin);
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
-            "PostgresTeam change not reflected in database", 10, 5)
+            "Database role of replaced member in PostgresTeam not renamed", 10, 5)
 
         # re-add additional member and check if the role is renamed back
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
@@ -275,7 +275,7 @@ class EndToEndTestCase(unittest.TestCase):
                 OR (rolname = 'tester_deleted' AND NOT rolcanlogin);
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
-            "PostgresTeam change not reflected in database", 10, 5)
+            "Database role of recreated member in PostgresTeam not renamed back to original name", 10, 5)
 
         # revert config change
         revert_resync = {

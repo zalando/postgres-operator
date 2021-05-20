@@ -256,14 +256,12 @@ func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	token, err := c.oauthTokenGetter.getOAuthToken()
 	if err != nil {
-		c.logger.Warnf("could not get oauth token to authenticate to team service API, only returning %d members for team %q: %v", len(members), teamID, err)
-		return members, nil
+		return nil, fmt.Errorf("could not get oauth token to authenticate to team service API: %v", err)
 	}
 
 	teamInfo, err := c.teamsAPIClient.TeamInfo(teamID, token)
 	if err != nil {
-		c.logger.Warnf("could not get team info for team %q, only returning %d members: %v", teamID, len(members), err)
-		return members, nil
+		return nil, fmt.Errorf("could not get team info for team %q: %v", teamID, err)
 	}
 
 	for _, member := range teamInfo.Members {

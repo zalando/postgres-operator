@@ -40,6 +40,7 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 
 	var reqs []spec.PgSyncUserRequest
 	for name, newUser := range newUsers {
+		// do not create user that exists in DB with deletion suffix
 		if newUser.Deleted {
 			continue
 		}
@@ -156,6 +157,7 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 func (strategy DefaultUserSyncStrategy) alterPgUserRename(user spec.PgUser, db *sql.DB) error {
 	var query string
 
+	// append or trim deletion suffix depending if the user has the suffix or not
 	if user.Deleted {
 		newName := strings.TrimSuffix(user.Name, strategy.RoleDeletionSuffix)
 		query = fmt.Sprintf(alterUserRenameSQL, user.Name, newName, "")
