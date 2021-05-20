@@ -46,9 +46,9 @@ const (
 
 // PgUser contains information about a single user.
 type PgUser struct {
-	Origin     RoleOrigin        `yaml:"-"`
-	Name       string            `yaml:"-"`
-	Namespace  string            `yaml:"."`
+	Origin     RoleOrigin `yaml:"-"`
+	Name       string     `yaml:"-"`
+	Namespace  string
 	Password   string            `yaml:"-"`
 	Flags      []string          `yaml:"user_flags"`
 	MemberOf   []string          `yaml:"inrole"`

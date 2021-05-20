@@ -481,12 +481,9 @@ func (c *Cluster) syncSecrets() error {
 	secrets := c.generateUserSecrets()
 
 	for secretUsername, secretSpec := range secrets {
-		if len(secretSpec.Namespace) < 0 {
-			c.logger.Warningf("found empty namespace for user %s", secretUsername)
-		}
 		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secretSpec.Namespace, secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
@@ -555,7 +552,11 @@ func (c *Cluster) syncRoles() (err error) {
 	}()
 
 	for _, u := range c.pgUsers {
-		userNames = append(userNames, u.Name)
+		if u.Namespace != c.Namespace {
+			userNames = append(userNames, u.Name+"."+"u.Namespace")
+		} else {
+			userNames = append(userNames, u.Name)
+		}
 	}
 
 	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {

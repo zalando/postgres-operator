@@ -32,7 +32,7 @@ func (c *Cluster) listResources() error {
 	}
 
 	for _, obj := range c.Secrets {
-		c.logger.Infof("found secret: %q (uid: %q)", util.NameFromMeta(obj.ObjectMeta), obj.UID)
+		c.logger.Infof("found secret: %q (uid: %q) namesapce: %s", util.NameFromMeta(obj.ObjectMeta), obj.UID, obj.ObjectMeta.Namespace)
 	}
 
 	for role, endpoint := range c.Endpoints {

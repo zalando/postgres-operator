@@ -1122,7 +1122,11 @@ func (c *Cluster) initRobotUsers() error {
 			AdminRole: adminRole,
 		}
 		if currentRole, present := c.pgUsers[username]; present {
-			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
+			if namespace == c.pgUsers[username].Namespace {
+				c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
+			} else {
+				c.pgUsers[username+"."+namespace] = newRole
+			}
 		} else {
 			c.pgUsers[username] = newRole
 		}
