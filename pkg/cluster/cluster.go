@@ -1099,7 +1099,7 @@ func (c *Cluster) initRobotUsers() error {
 		if strings.Contains(username, ".") {
 			splits := strings.Split(username, ".")
 			name = splits[1]
-			if splits[0] != "" {
+			if len(splits[0]) > 0 {
 				namespace = splits[0]
 			}
 			username = name
@@ -1159,7 +1159,6 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 		newRole := spec.PgUser{
 			Origin:     spec.RoleOriginTeamsAPI,
 			Name:       username,
-			Namespace:  c.Namespace,
 			Flags:      flags,
 			MemberOf:   memberOf,
 			Parameters: c.OpConfig.TeamAPIRoleConfiguration,

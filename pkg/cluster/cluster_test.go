@@ -81,8 +81,8 @@ func TestInitRobotUsers(t *testing.T) {
 	}{
 		{
 			manifestUsers: map[string]acidv1.UserFlags{"foo": {"superuser", "createdb"}},
-			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Password: "bar"}},
-			result:        map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Password: "bar"}},
+			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Namespace: cl.Namespace, Password: "bar"}},
+			result:        map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Namespace: cl.Namespace, Password: "bar"}},
 			err:           nil,
 		},
 		{
@@ -872,6 +872,7 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 			},
 			Users: map[string]acidv1.UserFlags{
 				"appspace.db_user": {},
+				"db_user":          {},
 			},
 		},
 	}
@@ -899,12 +900,23 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 			},
 		}, client, pg, logger, eventRecorder)
 
+	userNamespaceMap := map[string]string{
+		cluster.Namespace: "db_user",
+		"appspace":        "db_user",
+	}
+
 	err := cluster.initRobotUsers()
 	if err != nil {
 		t.Errorf("%s Could not create namespaced users with error: %s", testName, err)
 	}
 
-	if cluster.pgUsers["db_user"].Namespace == cluster.Namespace {
-		t.Errorf("%s: Could not create namespaced users", testName)
+	for _, u := range cluster.pgUsers {
+		if u.Name != userNamespaceMap[u.Namespace] {
+			t.Errorf("%s: Could not create namespaced user in its correct namespaces", testName)
+		}
+	}
+	err = cluster.syncRoles()
+	if err != nil {
+		t.Errorf("%s Could not create namespaced users with error: %s", testName, err)
 	}
 }
