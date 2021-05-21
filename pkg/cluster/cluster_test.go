@@ -915,8 +915,4 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 			t.Errorf("%s: Could not create namespaced user in its correct namespaces", testName)
 		}
 	}
-	err = cluster.syncRoles()
-	if err != nil {
-		t.Errorf("%s Could not create namespaced users with error: %s", testName, err)
-	}
 }
