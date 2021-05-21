@@ -199,13 +199,13 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_postgres_team_crd": "true",
                 "enable_team_member_deprecation": "true",
                 "role_deletion_suffix": "_delete_me",
-                "resync_period": "15s",
+                "resync_period": "15s"
             },
         }
         self.k8s.update_config(enable_postgres_team_crd)
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
-        
+
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresteams', 'custom-team-membership',
