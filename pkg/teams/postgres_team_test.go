@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	True       = true
-	False      = false
 	pgTeamList = acidv1.PostgresTeamList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "List",

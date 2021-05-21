@@ -197,13 +197,15 @@ class EndToEndTestCase(unittest.TestCase):
         enable_postgres_team_crd = {
             "data": {
                 "enable_postgres_team_crd": "true",
-                "resync_period": "15s",
+                "enable_team_member_deprecation": "true",
+                "role_deletion_suffix": "_delete_me",
+                "resync_period": "15s"
             },
         }
         self.k8s.update_config(enable_postgres_team_crd)
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
-        
+
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresteams', 'custom-team-membership',
@@ -222,18 +224,60 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        # make sure we let one sync pass and the new user being added
-        time.sleep(15)
-
         leader = self.k8s.get_cluster_leader_pod()
         user_query = """
-            SELECT usename
-              FROM pg_catalog.pg_user
-             WHERE usename IN ('elephant', 'kind');
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname IN ('elephant', 'kind');
         """
-        users = self.query_database(leader.metadata.name, "postgres", user_query)
-        self.eventuallyEqual(lambda: len(users), 2, 
-            "Not all additional users found in database: {}".format(users))
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+            "Not all additional users found in database", 10, 5)
+
+        # replace additional member and check if the removed member's role is renamed
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresteams', 'custom-team-membership',
+        {
+            'spec': {
+                'additionalMembers': {
+                    'e2e': [
+                        'tester'
+                    ]
+                },
+            }
+        })
+
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE (rolname = 'tester' AND rolcanlogin)
+                OR (rolname = 'kind_delete_me' AND NOT rolcanlogin);
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+            "Database role of replaced member in PostgresTeam not renamed", 10, 5)
+
+        # re-add additional member and check if the role is renamed back
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresteams', 'custom-team-membership',
+        {
+            'spec': {
+                'additionalMembers': {
+                    'e2e': [
+                        'kind'
+                    ]
+                },
+            }
+        })
+
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE (rolname = 'kind' AND rolcanlogin)
+                OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+            "Database role of recreated member in PostgresTeam not renamed back to original name", 10, 5)
 
         # revert config change
         revert_resync = {
@@ -407,9 +451,9 @@ class EndToEndTestCase(unittest.TestCase):
 
         leader = k8s.get_cluster_leader_pod()
         schemas_query = """
-            select schema_name
-            from information_schema.schemata
-            where schema_name = 'pooler'
+            SELECT schema_name
+              FROM information_schema.schemata
+             WHERE schema_name = 'pooler'
         """
 
         db_list = self.list_databases(leader.metadata.name)
@@ -529,6 +573,7 @@ class EndToEndTestCase(unittest.TestCase):
                             "Parameters": None,
                             "AdminRole": "",
                             "Origin": 2,
+                            "Deleted": False
                         })
                         return True
                 except:
@@ -1417,7 +1462,7 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         result_set = []
         db_list = []
-        db_list_query = "select datname from pg_database"
+        db_list_query = "SELECT datname FROM pg_database"
         exec_query = r"psql -tAq -c \"{}\" -d {}"
 
         try:

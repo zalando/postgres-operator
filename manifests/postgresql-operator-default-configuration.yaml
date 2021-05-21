@@ -141,6 +141,7 @@ configuration:
     # enable_admin_role_for_users: true
     # enable_postgres_team_crd: false
     # enable_postgres_team_crd_superusers: false
+    enable_team_member_deprecation: false
     enable_team_superuser: false
     enable_teams_api: false
     # pam_configuration: ""
@@ -149,6 +150,7 @@ configuration:
     # - postgres_superusers
     protected_role_names:
     - admin
+    role_deletion_suffix: "_deleted"
     team_admin_role: admin
     team_api_role_configuration:
       log_statement: all

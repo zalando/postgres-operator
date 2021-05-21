@@ -74,6 +74,7 @@ type Cluster struct {
 	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
+	pgUsersCache     map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
 	podSubscribers   map[spec.NamespacedName]chan PodEvent
 	podSubscribersMu sync.RWMutex
@@ -129,7 +130,9 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy:    users.DefaultUserSyncStrategy{PasswordEncryption: passwordEncryption},
+		userSyncStrategy: users.DefaultUserSyncStrategy{
+			PasswordEncryption: passwordEncryption,
+			RoleDeletionSuffix: cfg.OpConfig.RoleDeletionSuffix},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
@@ -189,6 +192,17 @@ func (c *Cluster) isNewCluster() bool {
 // initUsers populates c.systemUsers and c.pgUsers maps.
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
+
+	// if team member deprecation is enabled save current state of pgUsers
+	// to check for deleted roles
+	c.pgUsersCache = map[string]spec.PgUser{}
+	if c.OpConfig.EnableTeamMemberDeprecation {
+		for k, v := range c.pgUsers {
+			if v.Origin == spec.RoleOriginTeamsAPI {
+				c.pgUsersCache[k] = v
+			}
+		}
+	}
 
 	// clear our the previous state of the cluster users (in case we are
 	// running a sync).
@@ -650,7 +664,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
 		needReplicaConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
-		c.logger.Debugf("syncing secrets")
+		c.logger.Debugf("initialize users")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
 			updateFailed = true
