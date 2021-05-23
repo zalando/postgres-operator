@@ -809,9 +809,9 @@ pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
 To configure phyiscal backups and WAL to be sent to an azure storage account perform the
 following steps.
 
-1. Generate the K8s secret resource that will contain your service account's
-credentials. It's highly recommended to use a service account and limit its
-scope to just the WAL-e bucket.
+1. Generate the K8s secret resource that will contain your storage account
+credentials.
+
 ```yaml
 apiVersion: v1
 kind: Secret
