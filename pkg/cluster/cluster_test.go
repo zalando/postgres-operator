@@ -920,7 +920,7 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 func TestValidUsernames(t *testing.T) {
 	testName := "test username validity"
 
-	invalidUsernames := []string{"_", ".", ".user", "appspace.", "appspace.user.extra", "user_", "_user", "-user", "user-"}
+	invalidUsernames := []string{"_", ".", ".user", "appspace.", "appspace.user.extra", "user_", "_user", "-user", "user-", ",", ",user", "user,", "namespace,user"}
 
 	for _, username := range invalidUsernames {
 		if isValidUsername(username) {
