@@ -552,11 +552,13 @@ func (c *Cluster) syncRoles() (err error) {
 	}()
 
 	for _, u := range c.pgUsers {
+		pg_role := u.Name
 		if u.Namespace != c.Namespace {
-			userNames = append(userNames, u.Name+"."+"u.Namespace")
-		} else {
-			userNames = append(userNames, u.Name)
+			// to avoid the conflict of having multiple users of same name
+			// but each in different namespace.
+			pg_role = fmt.Sprintf("%s.%s", u.Name, u.Namespace)
 		}
+		userNames = append(userNames, pg_role)
 	}
 
 	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {

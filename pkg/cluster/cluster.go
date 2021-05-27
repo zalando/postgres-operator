@@ -41,7 +41,7 @@ import (
 var (
 	alphaNumericRegexp    = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
 	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
-	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
+	userRegexp            = regexp.MustCompile(`^[a-z0-9,]+\.?[-_a-z0-9,]+[a-z0-9,]$`)
 	patroniObjectSuffixes = []string{"config", "failover", "sync"}
 )
 
@@ -1093,16 +1093,12 @@ func (c *Cluster) initRobotUsers() error {
 		if c.shouldAvoidProtectedOrSystemRole(username, "manifest robot role") {
 			continue
 		}
-		name := username
 		namespace := c.Namespace
 
+		//more than one dot in the username is reported invalid by regexp
 		if strings.Contains(username, ".") {
 			splits := strings.Split(username, ".")
-			name = splits[1]
-			if len(splits[0]) > 0 {
-				namespace = splits[0]
-			}
-			username = name
+			namespace = splits[0]
 		}
 
 		flags, err := normalizeUserFlags(userFlags)
@@ -1115,18 +1111,14 @@ func (c *Cluster) initRobotUsers() error {
 		}
 		newRole := spec.PgUser{
 			Origin:    spec.RoleOriginManifest,
-			Name:      name,
+			Name:      username,
 			Namespace: namespace,
 			Password:  util.RandomPassword(constants.PasswordLength),
 			Flags:     flags,
 			AdminRole: adminRole,
 		}
 		if currentRole, present := c.pgUsers[username]; present {
-			if namespace == c.pgUsers[username].Namespace {
-				c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
-			} else {
-				c.pgUsers[username+"."+namespace] = newRole
-			}
+			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
 		} else {
 			c.pgUsers[username] = newRole
 		}

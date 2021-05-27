@@ -902,7 +902,7 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 
 	userNamespaceMap := map[string]string{
 		cluster.Namespace: "db_user",
-		"appspace":        "db_user",
+		"appspace":        "appspace.db_user",
 	}
 
 	err := cluster.initRobotUsers()
@@ -912,7 +912,19 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 
 	for _, u := range cluster.pgUsers {
 		if u.Name != userNamespaceMap[u.Namespace] {
-			t.Errorf("%s: Could not create namespaced user in its correct namespaces", testName)
+			t.Errorf("%s: Could not create namespaced user in its correct namespaces for user %s in namespace %s", testName, u.Name, u.Namespace)
+		}
+	}
+}
+
+func TestValidUsernames(t *testing.T) {
+	testName := "test username validity"
+
+	invalidUsernames := []string{"_", ".", ".user", "appspace.", "appspace.user.extra", "user_", "_user", "-user", "user-"}
+
+	for _, username := range invalidUsernames {
+		if isValidUsername(username) {
+			t.Errorf("%s Invalid username is allowed: %s", testName, username)
 		}
 	}
 }
