@@ -12,7 +12,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
-	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
 //ExecCommand executes arbitrary command inside the pod
@@ -32,14 +31,14 @@ func (c *Cluster) ExecCommand(podName *spec.NamespacedName, command ...string) (
 	// iterate through all containers looking for the one running PostgreSQL.
 	targetContainer := -1
 	for i, cr := range pod.Spec.Containers {
-		if cr.Name == constants.PostgresContainerName {
+		if cr.Name == c.containerName() {
 			targetContainer = i
 			break
 		}
 	}
 
 	if targetContainer < 0 {
-		return "", fmt.Errorf("could not find %s container to exec to", constants.PostgresContainerName)
+		return "", fmt.Errorf("could not find %s container to exec to", c.containerName())
 	}
 
 	req := c.KubeClient.RESTClient.Post().

@@ -357,8 +357,8 @@ func (c *Cluster) syncStatefulSet() error {
 			// and
 			//  (b) some of the pods were not restarted when the lazy update was still in place
 			for _, pod := range pods {
-				effectivePodImage := pod.Spec.Containers[0].Image
-				stsImage := desiredSts.Spec.Template.Spec.Containers[0].Image
+				effectivePodImage := c.getPostgresContainer(&pod.Spec).Image
+				stsImage := c.getPostgresContainer(&desiredSts.Spec.Template.Spec).Image
 
 				if stsImage != effectivePodImage {
 					if err = c.markRollingUpdateFlagForPod(&pod, "pod not yet restarted due to lazy update"); err != nil {
