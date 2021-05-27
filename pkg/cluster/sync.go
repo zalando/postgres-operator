@@ -551,6 +551,10 @@ func (c *Cluster) syncRoles() (err error) {
 		}
 	}()
 
+	// mapping between original role name and with deletion suffix
+	deletedUsers := map[string]string{}
+
+	// create list of database roles to query
 	for _, u := range c.pgUsers {
 		pg_role := u.Name
 		if u.Namespace != c.Namespace {
@@ -561,6 +565,8 @@ func (c *Cluster) syncRoles() (err error) {
 		userNames = append(userNames, pg_role)
 	}
 
+	// add pooler user to list of pgUsers, too
+	// to check if the pooler user exists or has to be created
 	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {
 		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
 		userNames = append(userNames, connectionPoolerUser.Name)
@@ -573,6 +579,16 @@ func (c *Cluster) syncRoles() (err error) {
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)
+	}
+
+	// update pgUsers where a deleted role was found
+	// so that they are skipped in ProduceSyncRequests
+	for _, dbUser := range dbUsers {
+		if originalUser, exists := deletedUsers[dbUser.Name]; exists {
+			recreatedUser := c.pgUsers[originalUser]
+			recreatedUser.Deleted = true
+			c.pgUsers[originalUser] = recreatedUser
+		}
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)

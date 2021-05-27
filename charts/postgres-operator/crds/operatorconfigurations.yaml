@@ -443,6 +443,9 @@ spec:
                   enable_postgres_team_crd_superusers:
                     type: boolean
                     default: false
+                  enable_team_member_deprecation:
+                    type: boolean
+                    default: false
                   enable_team_superuser:
                     type: boolean
                     default: false
@@ -465,6 +468,9 @@ spec:
                       type: string
                     default:
                     - admin
+                  role_deletion_suffix:
+                    type: string
+                    default: "_deleted"
                   team_admin_role:
                     type: string
                     default: "admin"

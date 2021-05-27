@@ -176,6 +176,8 @@ type Config struct {
 	EnableTeamsAPI                         bool              `name:"enable_teams_api" default:"true"`
 	EnableTeamSuperuser                    bool              `name:"enable_team_superuser" default:"false"`
 	TeamAdminRole                          string            `name:"team_admin_role" default:"admin"`
+	RoleDeletionSuffix                     string            `name:"role_deletion_suffix" default:"_deleted"`
+	EnableTeamMemberDeprecation            bool              `name:"enable_team_member_deprecation" default:"false"`
 	EnableAdminRoleForUsers                bool              `name:"enable_admin_role_for_users" default:"true"`
 	EnablePostgresTeamCRD                  bool              `name:"enable_postgres_team_crd" default:"false"`
 	EnablePostgresTeamCRDSuperusers        bool              `name:"enable_postgres_team_crd_superusers" default:"false"`

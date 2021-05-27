@@ -51,6 +51,7 @@ data:
   # enable_shm_volume: "true"
   # enable_sidecars: "true"
   enable_spilo_wal_path_compat: "true"
+  enable_team_member_deprecation: "false"
   # enable_team_superuser: "false"
   enable_teams_api: "false"
   # etcd_host: ""
@@ -111,6 +112,7 @@ data:
   resource_check_timeout: 10m
   resync_period: 30m
   ring_log_lines: "100"
+  role_deletion_suffix: "_deleted"
   secret_name_template: "{username}.{cluster}.credentials"
   # sidecar_docker_images: ""
   # set_memory_request_to_limit: "false"
