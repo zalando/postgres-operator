@@ -1478,20 +1478,22 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 
 	c.logger.Infof("Mount additional volumes: %+v", additionalVolumes)
 
-	for i := range podSpec.Containers {
-		mounts := podSpec.Containers[i].VolumeMounts
-		for _, v := range additionalVolumes {
-			for _, target := range v.TargetContainers {
-				if podSpec.Containers[i].Name == target || target == "all" {
-					mounts = append(mounts, v1.VolumeMount{
-						Name:      v.Name,
-						MountPath: v.MountPath,
-						SubPath:   v.SubPath,
-					})
+	for _, containers := range [][]v1.Container{podSpec.Containers, podSpec.InitContainers} {
+		for i := range containers {
+			mounts := containers[i].VolumeMounts
+			for _, v := range additionalVolumes {
+				for _, target := range v.TargetContainers {
+					if containers[i].Name == target || target == "all" {
+						mounts = append(mounts, v1.VolumeMount{
+							Name:      v.Name,
+							MountPath: v.MountPath,
+							SubPath:   v.SubPath,
+						})
+					}
 				}
 			}
+			containers[i].VolumeMounts = mounts
 		}
-		podSpec.Containers[i].VolumeMounts = mounts
 	}
 
 	podSpec.Volumes = volumes
