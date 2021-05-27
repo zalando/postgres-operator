@@ -413,6 +413,7 @@ func TestShmVolume(t *testing.T) {
 				Volumes: []v1.Volume{},
 				Containers: []v1.Container{
 					{
+						Name:         "postgres",
 						VolumeMounts: []v1.VolumeMount{},
 					},
 				},
@@ -425,6 +426,7 @@ func TestShmVolume(t *testing.T) {
 				Volumes: []v1.Volume{{}},
 				Containers: []v1.Container{
 					{
+						Name: "postgres",
 						VolumeMounts: []v1.VolumeMount{
 							{},
 						},

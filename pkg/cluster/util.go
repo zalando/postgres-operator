@@ -227,6 +227,16 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 	}
 }
 
+func (c *Cluster) getPostgresContainer(podSpec *v1.PodSpec) v1.Container {
+	var pgContainer v1.Container
+	for _, container := range podSpec.Containers {
+		if container.Name == constants.PostgresContainerName {
+			pgContainer = container
+		}
+	}
+	return pgContainer
+}
+
 func (c *Cluster) getTeamMembers(teamID string) ([]string, error) {
 
 	if teamID == "" {
