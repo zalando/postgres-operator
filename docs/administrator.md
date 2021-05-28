@@ -244,14 +244,15 @@ kubectl create -f manifests/postgres-operator.yaml
 kubectl create -f manifests/minimal-postgres-manifest.yaml
 ```
 
-### Namespaced service account and role binding
+### Namespaced service account, role and role binding
 
-For each namespace the operator watches it creates (or reads) a service account
-and role binding to be used by the Postgres Pods. The service account is bound
-to the `postgres-pod` cluster role. The name and definitions of these resources
-can be [configured](reference/operator_parameters.md#kubernetes-resources).
-Note, that the operator performs **no** further syncing of namespaced service
-accounts and role bindings.
+For each namespace the operator watches it creates (or reads) a service account,
+a role and a role binding to be used by the Postgres pods. The name and RBAC
+definitions can be [configured](reference/operator_parameters.md#kubernetes-resources).
+Note, that the operator performs **no** further syncing of these namespaced
+resources. Therefore, to manage changes of the pod role it is currently easier
+to make `postgres-pod` a [cluster role](../manifests/postgres-pod-rbac.yaml) and
+overwrite the `pod_service_account_role_binding_definition` to reference it.
 
 ### Give K8s users access to create/list `postgresqls`
 

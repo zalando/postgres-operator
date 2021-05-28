@@ -132,6 +132,9 @@ configKubernetes:
   # service account definition as JSON/YAML string to be used by postgres cluster pods
   # pod_service_account_definition: ""
 
+  # role definition as JSON/YAML string to be used by postgres cluster pods
+  # pod_service_account_role_definition: ""
+
   # role binding definition as JSON/YAML string to be used by pod service account
   # pod_service_account_role_binding_definition: ""
 

@@ -158,6 +158,7 @@ type Config struct {
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
 	// value of this string must be valid JSON or YAML; see initPodServiceAccount
 	PodServiceAccountDefinition            string            `name:"pod_service_account_definition" default:""`
+	PodServiceAccountRoleDefinition        string            `name:"pod_service_account_role_definition" default:""`
 	PodServiceAccountRoleBindingDefinition string            `name:"pod_service_account_role_binding_definition" default:""`
 	MasterPodMoveTimeout                   time.Duration     `name:"master_pod_move_timeout" default:"20m"`
 	DbHostedZone                           string            `name:"db_hosted_zone" default:"db.example.com"`

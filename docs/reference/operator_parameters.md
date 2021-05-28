@@ -212,13 +212,20 @@ configuration they are grouped under the `kubernetes` key.
   with this parameter. Make sure to provide a valid YAML or JSON string. The
   default is empty.
 
+* **pod_service_account_role_definition**
+  operator will try to create a role in the namespace to be used by pod service
+  account. The internal default definition contains permissions to manage pods
+  and endpoints necessary for Patroni to work. Therefore, when overwriting the
+  definition with this parameter make sure to provide sufficient access rights
+  in a valid YAML/JSON string. The default is empty.
+
 * **pod_service_account_role_binding_definition**
-  This definition must bind the pod service account to a role with permission
-  sufficient for the pods to start and for Patroni to access K8s endpoints;
-  service account on its own lacks any such rights starting with K8s v1.8. If
-  not explicitly defined by the user, a simple definition that binds the
-  account to the 'postgres-pod' [cluster role](../../manifests/operator-service-account-rbac.yaml#L198)
-  will be used. The default is empty.
+  the created service account and role are referenced with a role binding. When
+  overwriting its definition with this parameters using a valid YAML/JSON string
+  check that the specified service account and role either exist in the K8s
+  cluster or will be created by the operator. While it's possible to also
+  reference cluster roles, the binding itself can only be of kind `RoleBinding`,
+  not `ClusterRoleBinding`. The default is empty.
 
 * **pod_terminate_grace_period**
   Postgres pods are [terminated forcefully](https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods)

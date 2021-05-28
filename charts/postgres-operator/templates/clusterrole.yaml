@@ -220,11 +220,12 @@ rules:
   verbs:
   - get
   - create
-# to create role bindings to the postgres-pod service account
+# to create roles and role bindings to the pod service account
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings
+  - roles
   verbs:
   - get
   - create

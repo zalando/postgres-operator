@@ -71,6 +71,7 @@ type Controller struct {
 	workerLogs map[uint32]ringlog.RingLogger
 
 	PodServiceAccount            *v1.ServiceAccount
+	PodServiceAccountRole        *rbacv1.Role
 	PodServiceAccountRoleBinding *rbacv1.RoleBinding
 }
 
@@ -248,6 +249,86 @@ func (c *Controller) initPodServiceAccount() {
 	// actual service accounts are deployed at the time of Postgres/Spilo cluster creation
 }
 
+func (c *Controller) initRole() {
+
+	// service account on its own lacks any rights starting with k8s v1.8
+	// operator binds it to the namespaced role with sufficient privileges
+	if c.opConfig.PodServiceAccountRoleDefinition == "" {
+		c.opConfig.PodServiceAccountRoleDefinition = fmt.Sprintf(`
+		{
+			"apiVersion": "rbac.authorization.k8s.io/v1",
+			"kind": "Role",
+			"metadata": {
+				"name": "%s"
+			},
+			"rules": [
+		        {
+		            "apiGroups": [
+		                ""
+		            ],
+		            "resources": [
+		                "endpoints"
+		            ],
+		            "verbs": [
+		                "create",
+		                "delete",
+		                "deletecollection",
+		                "get",
+		                "list",
+		                "patch",
+		                "update",
+		                "watch"
+		            ]
+		        },
+		        {
+		            "apiGroups": [
+		                ""
+		            ],
+		            "resources": [
+		                "pods"
+		            ],
+		            "verbs": [
+		                "get",
+		                "list",
+		                "patch",
+		                "update",
+		                "watch"
+		            ]
+		        },
+		        {
+		            "apiGroups": [
+		                ""
+		            ],
+		            "resources": [
+		                "services"
+		            ],
+		            "verbs": [
+		                "create"
+		            ]
+		        }
+		    ]
+		}`, c.PodServiceAccount.Name)
+	}
+	c.logger.Info("Parse roles")
+	// re-uses k8s internal parsing. See k8s client-go issue #193 for explanation
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	obj, groupVersionKind, err := decode([]byte(c.opConfig.PodServiceAccountRoleDefinition), nil, nil)
+
+	switch {
+	case err != nil:
+		panic(fmt.Errorf("unable to parse the role definition from the operator configuration: %v", err))
+	case groupVersionKind.Kind != "Role":
+		panic(fmt.Errorf("role definition in the operator configuration defines another type of resource: %v", groupVersionKind.Kind))
+	default:
+		c.PodServiceAccountRole = obj.(*rbacv1.Role)
+		c.PodServiceAccountRole.Namespace = ""
+		c.logger.Info("successfully parsed")
+
+	}
+
+	// actual roles bindings are deployed at the time of Postgres/Spilo cluster creation
+}
+
 func (c *Controller) initRoleBinding() {
 
 	// service account on its own lacks any rights starting with k8s v1.8
@@ -263,7 +344,7 @@ func (c *Controller) initRoleBinding() {
 			},
 			"roleRef": {
 				"apiGroup": "rbac.authorization.k8s.io",
-				"kind": "ClusterRole",
+				"kind": "Role",
 				"name": "%s"
 			},
 			"subjects": [
@@ -320,6 +401,10 @@ func (c *Controller) initController() {
 	}
 	c.initPodServiceAccount()
 	c.initRoleBinding()
+	// init role only if binding references a role
+	if c.PodServiceAccountRoleBinding != nil && c.PodServiceAccountRoleBinding.RoleRef.Kind == "Role" {
+		c.initRole()
+	}
 
 	c.modifyConfigFromEnvironment()
 

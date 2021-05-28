@@ -1141,6 +1141,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"pod_service_account_name": {
 								Type: "string",
 							},
+							"pod_service_account_role_definition": {
+								Type: "string",
+							},
 							"pod_service_account_role_binding_definition": {
 								Type: "string",
 							},
