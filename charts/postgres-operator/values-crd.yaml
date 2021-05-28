@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.6.2
+  tag: v1.6.3
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -32,7 +32,7 @@ configGeneral:
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: false
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p6
+  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p7
   # min number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # max number of instances in Postgres cluster. -1 = no limit
@@ -263,7 +263,7 @@ configAwsOrGcp:
 # configure K8s cron job managed by the operator
 configLogicalBackup:
   # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.3"
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
@@ -289,13 +289,13 @@ configLogicalBackup:
 # automate creation of human users with teams API service
 configTeamsApi:
   # team_admin_role will have the rights to grant roles coming from PG manifests
-  # enable_admin_role_for_users: true
-
+  enable_admin_role_for_users: true
   # operator watches for PostgresTeam CRs to assign additional teams and members to clusters
   enable_postgres_team_crd: false
   # toogle to create additional superuser teams from PostgresTeam CRs
-  # enable_postgres_team_crd_superusers: false
-
+  enable_postgres_team_crd_superusers: false
+  # toggle to automatically rename roles of former team members and deny LOGIN
+  enable_team_member_deprecation: false
   # toggle to grant superuser to team members created from the Teams API
   enable_team_superuser: false
   # toggles usage of the Teams API by the operator
@@ -306,12 +306,13 @@ configTeamsApi:
   # operator will add all team member roles to this group and add a pg_hba line
   pam_role_name: zalandos
   # List of teams which members need the superuser role in each Postgres cluster
-  # postgres_superuser_teams:
-  # - postgres_superusers
-
+  postgres_superuser_teams:
+  - postgres_superusers
   # List of roles that cannot be overwritten by an application, team or infrastructure role
   protected_role_names:
   - admin
+  # Suffix to add if members are removed from TeamsAPI or PostgresTeam CRD
+  role_deletion_suffix: "_deleted"
   # role name to grant to team members created from the Teams API
   team_admin_role: admin
   # postgres config parameters to apply to each team member role

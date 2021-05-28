@@ -593,7 +593,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.3"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.
@@ -703,6 +703,19 @@ key.
   List of teams which members need the superuser role in each PG database
   cluster to administer Postgres and maintain infrastructure built around it.
   The default is empty.
+
+* **role_deletion_suffix**
+  defines a suffix that - when `enable_team_member_deprecation` is set to
+  `true` - will be appended to database role names of team members that were
+  removed from either the team in the Teams API or a `PostgresTeam` custom
+  resource (additionalMembers). When re-added, the operator will rename roles
+  with the defined suffix back to the original role name.
+  The default is `_deleted`.
+
+* **enable_team_member_deprecation**
+  if `true` database roles of former team members will be renamed by appending
+  the configured `role_deletion_suffix` and `LOGIN` privilege will be revoked.
+  The default is `false`.
 
 * **enable_postgres_team_crd**
   toggle to make the operator watch for created or updated `PostgresTeam` CRDs

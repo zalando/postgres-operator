@@ -166,6 +166,14 @@ func TestIsEqualIgnoreOrder(t *testing.T) {
 	}
 }
 
+func TestStringSliceReplaceElement(t *testing.T) {
+	testSlice := []string{"a", "b", "c"}
+	testSlice = StringSliceReplaceElement(testSlice, "b", "d")
+	if !SliceContains(testSlice, "d") {
+		t.Errorf("testSlide item not replaced: %v", testSlice)
+	}
+}
+
 func TestSubstractSlices(t *testing.T) {
 	for _, tt := range substractTest {
 		actualRes, actualEqual := SubstractStringSlices(tt.inA, tt.inB)

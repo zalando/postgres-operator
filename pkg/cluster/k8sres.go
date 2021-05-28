@@ -66,10 +66,6 @@ type spiloConfiguration struct {
 	Bootstrap            pgBootstrap            `json:"bootstrap"`
 }
 
-func (c *Cluster) containerName() string {
-	return "postgres"
-}
-
 func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
@@ -213,10 +209,10 @@ PatroniInitDBParams:
 	for _, k := range initdbOptionNames {
 		v := patroni.InitDB[k]
 		for i, defaultParam := range config.Bootstrap.Initdb {
-			switch defaultParam.(type) {
+			switch t := defaultParam.(type) {
 			case map[string]string:
 				{
-					for k1 := range defaultParam.(map[string]string) {
+					for k1 := range t {
 						if k1 == k {
 							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
 							continue PatroniInitDBParams
@@ -226,7 +222,7 @@ PatroniInitDBParams:
 			case string:
 				{
 					/* if the option already occurs in the list */
-					if defaultParam.(string) == v {
+					if t == v {
 						continue PatroniInitDBParams
 					}
 				}
@@ -264,7 +260,7 @@ PatroniInitDBParams:
 	if patroni.SynchronousMode {
 		config.Bootstrap.DCS.SynchronousMode = patroni.SynchronousMode
 	}
-	if patroni.SynchronousModeStrict != false {
+	if patroni.SynchronousModeStrict {
 		config.Bootstrap.DCS.SynchronousModeStrict = patroni.SynchronousModeStrict
 	}
 
@@ -336,7 +332,7 @@ func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAff
 	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
 	}
-	nodeAffinityCopy := *&v1.NodeAffinity{}
+	nodeAffinityCopy := v1.NodeAffinity{}
 	if nodeAffinity != nil {
 		nodeAffinityCopy = *nodeAffinity.DeepCopy()
 	}
@@ -1157,10 +1153,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	c.logger.Debugf("Generating Spilo container, environment variables")
 	c.logger.Debugf("%v", spiloEnvVars)
 
-	spiloContainer := generateContainer(c.containerName(),
+	spiloContainer := generateContainer(constants.PostgresContainerName,
 		&effectiveDockerImage,
 		resourceRequirements,
-		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
+		deduplicateEnvVars(spiloEnvVars, constants.PostgresContainerName, c.logger),
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
@@ -1279,15 +1275,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	stsAnnotations := make(map[string]string)
-	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
-
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: stsAnnotations,
+			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -1395,6 +1388,9 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 //
 // see https://docs.okd.io/latest/dev_guide/shared_memory.html
 func addShmVolume(podSpec *v1.PodSpec) {
+
+	postgresContainerIdx := 0
+
 	volumes := append(podSpec.Volumes, v1.Volume{
 		Name: constants.ShmVolumeName,
 		VolumeSource: v1.VolumeSource{
@@ -1404,14 +1400,20 @@ func addShmVolume(podSpec *v1.PodSpec) {
 		},
 	})
 
-	pgIdx := constants.PostgresContainerIdx
-	mounts := append(podSpec.Containers[pgIdx].VolumeMounts,
+	for i, container := range podSpec.Containers {
+		if container.Name == constants.PostgresContainerName {
+			postgresContainerIdx = i
+		}
+	}
+
+	mounts := append(podSpec.Containers[postgresContainerIdx].VolumeMounts,
 		v1.VolumeMount{
 			Name:      constants.ShmVolumeName,
 			MountPath: constants.ShmVolumePath,
 		})
 
-	podSpec.Containers[0].VolumeMounts = mounts
+	podSpec.Containers[postgresContainerIdx].VolumeMounts = mounts
+
 	podSpec.Volumes = volumes
 }
 
@@ -1442,54 +1444,55 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 
 	volumes := podSpec.Volumes
 	mountPaths := map[string]acidv1.AdditionalVolume{}
-	for i, v := range additionalVolumes {
-		if previousVolume, exist := mountPaths[v.MountPath]; exist {
+	for i, additionalVolume := range additionalVolumes {
+		if previousVolume, exist := mountPaths[additionalVolume.MountPath]; exist {
 			msg := "Volume %+v cannot be mounted to the same path as %+v"
-			c.logger.Warningf(msg, v, previousVolume)
+			c.logger.Warningf(msg, additionalVolume, previousVolume)
 			continue
 		}
 
-		if v.MountPath == constants.PostgresDataMount {
+		if additionalVolume.MountPath == constants.PostgresDataMount {
 			msg := "Cannot mount volume on postgresql data directory, %+v"
-			c.logger.Warningf(msg, v)
+			c.logger.Warningf(msg, additionalVolume)
 			continue
 		}
 
-		if v.TargetContainers == nil {
-			spiloContainer := podSpec.Containers[0]
-			additionalVolumes[i].TargetContainers = []string{spiloContainer.Name}
+		// if no target container is defined assign it to postgres container
+		if len(additionalVolume.TargetContainers) == 0 {
+			postgresContainer := getPostgresContainer(podSpec)
+			additionalVolumes[i].TargetContainers = []string{postgresContainer.Name}
 		}
 
-		for _, target := range v.TargetContainers {
-			if target == "all" && len(v.TargetContainers) != 1 {
+		for _, target := range additionalVolume.TargetContainers {
+			if target == "all" && len(additionalVolume.TargetContainers) != 1 {
 				msg := `Target containers could be either "all" or a list
 						of containers, mixing those is not allowed, %+v`
-				c.logger.Warningf(msg, v)
+				c.logger.Warningf(msg, additionalVolume)
 				continue
 			}
 		}
 
 		volumes = append(volumes,
 			v1.Volume{
-				Name:         v.Name,
-				VolumeSource: v.VolumeSource,
+				Name:         additionalVolume.Name,
+				VolumeSource: additionalVolume.VolumeSource,
 			},
 		)
 
-		mountPaths[v.MountPath] = v
+		mountPaths[additionalVolume.MountPath] = additionalVolume
 	}
 
 	c.logger.Infof("Mount additional volumes: %+v", additionalVolumes)
 
 	for i := range podSpec.Containers {
 		mounts := podSpec.Containers[i].VolumeMounts
-		for _, v := range additionalVolumes {
-			for _, target := range v.TargetContainers {
+		for _, additionalVolume := range additionalVolumes {
+			for _, target := range additionalVolume.TargetContainers {
 				if podSpec.Containers[i].Name == target || target == "all" {
 					mounts = append(mounts, v1.VolumeMount{
-						Name:      v.Name,
-						MountPath: v.MountPath,
-						SubPath:   v.SubPath,
+						Name:      additionalVolume.Name,
+						MountPath: additionalVolume.MountPath,
+						SubPath:   additionalVolume.SubPath,
 					})
 				}
 			}

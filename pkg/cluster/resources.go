@@ -147,25 +147,6 @@ func (c *Cluster) preScaleDown(newStatefulSet *appsv1.StatefulSet) error {
 	return nil
 }
 
-func (c *Cluster) updateStatefulSetAnnotations(annotations map[string]string) (*appsv1.StatefulSet, error) {
-	c.logger.Debugf("patching statefulset annotations")
-	patchData, err := metaAnnotationsPatch(annotations)
-	if err != nil {
-		return nil, fmt.Errorf("could not form patch for the statefulset metadata: %v", err)
-	}
-	result, err := c.KubeClient.StatefulSets(c.Statefulset.Namespace).Patch(
-		context.TODO(),
-		c.Statefulset.Name,
-		types.MergePatchType,
-		[]byte(patchData),
-		metav1.PatchOptions{},
-		"")
-	if err != nil {
-		return nil, fmt.Errorf("could not patch statefulset annotations %q: %v", patchData, err)
-	}
-	return result, nil
-}
-
 func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 	c.setProcessName("updating statefulset")
 	if c.Statefulset == nil {
@@ -195,13 +176,6 @@ func (c *Cluster) updateStatefulSet(newStatefulSet *appsv1.StatefulSet) error {
 		"")
 	if err != nil {
 		return fmt.Errorf("could not patch statefulset spec %q: %v", statefulSetName, err)
-	}
-
-	if newStatefulSet.Annotations != nil {
-		statefulSet, err = c.updateStatefulSetAnnotations(newStatefulSet.Annotations)
-		if err != nil {
-			return err
-		}
 	}
 
 	c.Statefulset = statefulSet
