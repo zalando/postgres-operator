@@ -3,7 +3,7 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p6
+  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p7
   # enable_crd_validation: true
   # enable_lazy_spilo_upgrade: false
   enable_pgversion_env_var: true
@@ -123,7 +123,7 @@ configuration:
     # wal_gs_bucket: ""
     # wal_s3_bucket: ""
   logical_backup:
-    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
+    logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.3"
     # logical_backup_google_application_credentials: ""
     logical_backup_job_prefix: "logical-backup-"
     logical_backup_provider: "s3"

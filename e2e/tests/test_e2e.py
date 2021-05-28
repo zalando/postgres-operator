@@ -230,7 +230,7 @@ class EndToEndTestCase(unittest.TestCase):
               FROM pg_catalog.pg_roles
              WHERE rolname IN ('elephant', 'kind');
         """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
             "Not all additional users found in database", 10, 5)
 
         # replace additional member and check if the removed member's role is renamed
@@ -458,7 +458,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         db_list = self.list_databases(leader.metadata.name)
         for db in db_list:
-            self.eventuallyNotEqual(lambda: len(self.query_database(leader.metadata.name, db, schemas_query)), 0, 
+            self.eventuallyNotEqual(lambda: len(self.query_database(leader.metadata.name, db, schemas_query)), 0,
                 "Pooler schema not found in database {}".format(db))
 
         # remove config section to make test work next time
@@ -789,7 +789,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)          
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_resources)
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
         self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No two pods running after lazy rolling upgrade")
