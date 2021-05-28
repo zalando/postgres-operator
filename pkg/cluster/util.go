@@ -227,9 +227,7 @@ func (c *Cluster) logServiceChanges(role PostgresRole, old, new *v1.Service, isU
 	}
 }
 
-func getPostgresContainer(podSpec *v1.PodSpec) v1.Container {
-	var pgContainer v1.Container
-
+func getPostgresContainer(podSpec *v1.PodSpec) (pgContainer v1.Container) {
 	for _, container := range podSpec.Containers {
 		if container.Name == constants.PostgresContainerName {
 			pgContainer = container
