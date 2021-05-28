@@ -413,7 +413,6 @@ func TestShmVolume(t *testing.T) {
 				Volumes: []v1.Volume{},
 				Containers: []v1.Container{
 					{
-						Name:         "postgres",
 						VolumeMounts: []v1.VolumeMount{},
 					},
 				},
@@ -438,9 +437,10 @@ func TestShmVolume(t *testing.T) {
 	}
 	for _, tt := range tests {
 		addShmVolume(tt.podSpec)
+		postgresContainer := getPostgresContainer(tt.podSpec)
 
 		volumeName := tt.podSpec.Volumes[tt.shmPos].Name
-		volumeMountName := tt.podSpec.Containers[0].VolumeMounts[tt.shmPos].Name
+		volumeMountName := postgresContainer.VolumeMounts[tt.shmPos].Name
 
 		if volumeName != constants.ShmVolumeName {
 			t.Errorf("%s %s: Expected volume %s was not created, have %s instead",
@@ -612,8 +612,9 @@ func TestSecretVolume(t *testing.T) {
 	for _, tt := range tests {
 		additionalSecretMount := "aws-iam-s3-role"
 		additionalSecretMountPath := "/meta/credentials"
+		postgresContainer := getPostgresContainer(tt.podSpec)
 
-		numMounts := len(tt.podSpec.Containers[0].VolumeMounts)
+		numMounts := len(postgresContainer.VolumeMounts)
 
 		addSecretVolume(tt.podSpec, additionalSecretMount, additionalSecretMountPath)
 
@@ -633,7 +634,8 @@ func TestSecretVolume(t *testing.T) {
 			}
 		}
 
-		numMountsCheck := len(tt.podSpec.Containers[0].VolumeMounts)
+		postgresContainer = getPostgresContainer(tt.podSpec)
+		numMountsCheck := len(postgresContainer.VolumeMounts)
 
 		if numMountsCheck != numMounts+1 {
 			t.Errorf("Unexpected number of VolumeMounts: got %v instead of %v",
@@ -865,7 +867,8 @@ func testEnvs(cluster *Cluster, podSpec *v1.PodTemplateSpec, role PostgresRole) 
 		"CONNECTION_POOLER_PORT": false,
 	}
 
-	envs := podSpec.Spec.Containers[0].Env
+	container := getPostgresContainer(&podSpec.Spec)
+	envs := container.Env
 	for _, env := range envs {
 		required[env.Name] = true
 	}
@@ -1045,14 +1048,15 @@ func TestTLS(t *testing.T) {
 	}
 	assert.Contains(t, sts.Spec.Template.Spec.Volumes, volume, "the pod gets a secret volume")
 
-	assert.Contains(t, sts.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+	postgresContainer := getPostgresContainer(&sts.Spec.Template.Spec)
+	assert.Contains(t, postgresContainer.VolumeMounts, v1.VolumeMount{
 		MountPath: "/tls",
 		Name:      "my-secret",
 	}, "the volume gets mounted in /tls")
 
-	assert.Contains(t, sts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
-	assert.Contains(t, sts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
-	assert.Contains(t, sts.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
+	assert.Contains(t, postgresContainer.Env, v1.EnvVar{Name: "SSL_CERTIFICATE_FILE", Value: "/tls/tls.crt"})
+	assert.Contains(t, postgresContainer.Env, v1.EnvVar{Name: "SSL_PRIVATE_KEY_FILE", Value: "/tls/tls.key"})
+	assert.Contains(t, postgresContainer.Env, v1.EnvVar{Name: "SSL_CA_FILE", Value: "/tls/ca.crt"})
 }
 
 func TestAdditionalVolume(t *testing.T) {
@@ -1147,7 +1151,7 @@ func TestAdditionalVolume(t *testing.T) {
 	}{
 		{
 			subTest:        "checking volume mounts of postgres container",
-			container:      cluster.containerName(),
+			container:      constants.PostgresContainerName,
 			expectedMounts: []string{"pgdata", "test1", "test3", "test4"},
 		},
 		{

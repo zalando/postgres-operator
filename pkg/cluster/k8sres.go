@@ -66,10 +66,6 @@ type spiloConfiguration struct {
 	Bootstrap            pgBootstrap            `json:"bootstrap"`
 }
 
-func (c *Cluster) containerName() string {
-	return constants.PostgresContainerName
-}
-
 func (c *Cluster) statefulSetName() string {
 	return c.Name
 }
@@ -1157,10 +1153,10 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	c.logger.Debugf("Generating Spilo container, environment variables")
 	c.logger.Debugf("%v", spiloEnvVars)
 
-	spiloContainer := generateContainer(c.containerName(),
+	spiloContainer := generateContainer(constants.PostgresContainerName,
 		&effectiveDockerImage,
 		resourceRequirements,
-		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
+		deduplicateEnvVars(spiloEnvVars, constants.PostgresContainerName, c.logger),
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
 		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
@@ -1392,6 +1388,9 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 //
 // see https://docs.okd.io/latest/dev_guide/shared_memory.html
 func addShmVolume(podSpec *v1.PodSpec) {
+
+	postgresContainerIdx := 0
+
 	volumes := append(podSpec.Volumes, v1.Volume{
 		Name: constants.ShmVolumeName,
 		VolumeSource: v1.VolumeSource{
@@ -1403,15 +1402,17 @@ func addShmVolume(podSpec *v1.PodSpec) {
 
 	for i, container := range podSpec.Containers {
 		if container.Name == constants.PostgresContainerName {
-			mounts := append(container.VolumeMounts,
-				v1.VolumeMount{
-					Name:      constants.ShmVolumeName,
-					MountPath: constants.ShmVolumePath,
-				})
-
-			podSpec.Containers[i].VolumeMounts = mounts
+			postgresContainerIdx = i
 		}
 	}
+
+	mounts := append(podSpec.Containers[postgresContainerIdx].VolumeMounts,
+		v1.VolumeMount{
+			Name:      constants.ShmVolumeName,
+			MountPath: constants.ShmVolumePath,
+		})
+
+	podSpec.Containers[postgresContainerIdx].VolumeMounts = mounts
 
 	podSpec.Volumes = volumes
 }
@@ -1458,11 +1459,8 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 
 		// if no target container is defined assign it to postgres container
 		if len(additionalVolume.TargetContainers) == 0 {
-			for j := range podSpec.Containers {
-				if podSpec.Containers[j].Name == c.containerName() {
-					additionalVolumes[i].TargetContainers = []string{c.containerName()}
-				}
-			}
+			postgresContainer := getPostgresContainer(podSpec)
+			additionalVolumes[i].TargetContainers = []string{postgresContainer.Name}
 		}
 
 		for _, target := range additionalVolume.TargetContainers {
