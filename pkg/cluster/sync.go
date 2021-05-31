@@ -556,13 +556,26 @@ func (c *Cluster) syncRoles() (err error) {
 
 	// create list of database roles to query
 	for _, u := range c.pgUsers {
-		pg_role := u.Name
+		pgRole := u.Name
 		if u.Namespace != c.Namespace {
 			// to avoid the conflict of having multiple users of same name
 			// but each in different namespace.
-			pg_role = fmt.Sprintf("%s.%s", u.Name, u.Namespace)
+			pgRole = fmt.Sprintf("%s.%s", u.Name, u.Namespace)
 		}
-		userNames = append(userNames, pg_role)
+		userNames = append(userNames, pgRole)
+		// add team member role name with rename suffix in case we need to rename it back
+		if u.Origin == spec.RoleOriginTeamsAPI && c.OpConfig.EnableTeamMemberDeprecation {
+			deletedUsers[u.Name+c.OpConfig.RoleDeletionSuffix] = u.Name
+			userNames = append(userNames, u.Name+c.OpConfig.RoleDeletionSuffix)
+		}
+	}
+
+	// add team members that exist only in cache
+	// to trigger a rename of the role in ProduceSyncRequests
+	for _, cachedUser := range c.pgUsersCache {
+		if _, exists := c.pgUsers[cachedUser.Name]; !exists {
+			userNames = append(userNames, cachedUser.Name)
+		}
 	}
 
 	// add pooler user to list of pgUsers, too

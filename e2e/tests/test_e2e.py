@@ -594,7 +594,13 @@ class EndToEndTestCase(unittest.TestCase):
         '''
         app_namespace = "appspace"
         k8s = self.k8s
-        k8s.api.core_v1.create_namespace(app_namespace)
+        v1_appnamespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=app_namespace))
+        try:
+            k8s.api.core_v1.create_namespace(v1_appnamespace)
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
@@ -606,7 +612,7 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             })
         self.eventuallyEqual(lambda: k8s.count_secrets_in_namespace(app_namespace),
-                             1, "Secret not created in user namespace")
+                             1, "Secret not created for user in namespace", app_namespace)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
