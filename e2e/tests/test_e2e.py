@@ -322,7 +322,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
 
-
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
         '''
@@ -611,7 +610,7 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             })
-        self.eventuallyEqual(lambda: k8s.count_secrets_in_namespace(app_namespace),
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label("cluster_name=acid-minimal-cluster,application=spilo", app_namespace),
                              1, "Secret not created for user in namespace", app_namespace)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)

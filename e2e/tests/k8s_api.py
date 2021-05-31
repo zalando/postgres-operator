@@ -168,9 +168,6 @@ class K8s:
     def count_secrets_with_label(self, labels, namespace='default'):
         return len(self.api.core_v1.list_namespaced_secret(namespace, label_selector=labels).items)
 
-    def count_secrets_in_namespace(self, labels, namespace):
-        return len(self.api.core_v1.list_namespaced_secret(namespace).items)
-
     def count_statefulsets_with_label(self, labels, namespace='default'):
         return len(self.api.apps_v1.list_namespaced_stateful_set(namespace, label_selector=labels).items)
 
