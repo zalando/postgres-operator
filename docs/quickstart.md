@@ -81,12 +81,6 @@ the repo root. With Helm v3 installed you should be able to run:
 helm install postgres-operator ./charts/postgres-operator
 ```
 
-To use CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
-
-```bash
-helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-crd.yaml
-```
-
 The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
 be skipped with warning when using v3. Documentation for installing applications
 with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
