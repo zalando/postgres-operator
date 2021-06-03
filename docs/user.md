@@ -503,7 +503,8 @@ The roles described in the previous paragraph can be granted to LOGIN roles from
 the `users` section in the manifest. Optionally, the Postgres Operator can also
 create default LOGIN roles for the database an each schema individually. These
 roles will get the `_user` suffix and they inherit all rights from their NOLOGIN
-counterparts.
+counterparts. Therefore, you cannot have `defaultRoles` set to `false` and enable
+`defaultUsers` at the same time.
 
 | Role name           | Member of      | Admin         |
 | ------------------- | -------------- | ------------- |
@@ -525,6 +526,10 @@ spec:
         bar:
           defaultUsers: true
 ```
+
+Default access privileges are also defined for LOGIN roles one database and
+schema creation. This mean they are currently not set when `defaultUsers`
+(or `defaultRoles` for schemas) are enabled at a later point in time.
 
 ### Schema `search_path` for default roles
 
