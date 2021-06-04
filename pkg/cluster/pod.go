@@ -304,7 +304,7 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 
 	masterCandidateName := util.NameFromMeta(masterCandidatePod.ObjectMeta)
-	_ = retryutil.Retry(1*time.Minute, 5*time.Minute,
+	err = retryutil.Retry(1*time.Minute, 5*time.Minute,
 		func() (bool, error) {
 			err := c.Switchover(oldMaster, masterCandidateName)
 			if err != nil {
@@ -314,6 +314,10 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 			return true, nil
 		},
 	)
+
+	if err != nil {
+		return fmt.Errorf("could not migrate master pod: %v", err)
+	}
 
 	return nil
 }
