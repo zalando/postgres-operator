@@ -362,6 +362,17 @@ class K8sBase:
 
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
+    def wait_for_namespace_creation(self, namespace='default'):
+        ns_found = False
+        while ns_found != True:
+            ns = self.api.core_v1.list_namespaces()
+            for n in ns:
+                if n == "appspace":
+                    ns_found = True
+                    break
+
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
     def get_service_type(self, svc_labels, namespace='default'):
         svc_type = ''
         svcs = self.api.core_v1.list_namespaced_service(namespace, label_selector=svc_labels, limit=1).items

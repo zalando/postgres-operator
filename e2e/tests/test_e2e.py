@@ -594,11 +594,8 @@ class EndToEndTestCase(unittest.TestCase):
         app_namespace = "appspace"
         k8s = self.k8s
         v1_appnamespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=app_namespace))
-        try:
-            k8s.api.core_v1.create_namespace(v1_appnamespace)
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
+        k8s.api.core_v1.create_namespace(v1_appnamespace)
+        k8s.wait_for_namespace_creation(app_namespace)
 
         k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
