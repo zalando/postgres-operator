@@ -870,6 +870,7 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
+			EnableNamespacedSecret: boolToPointer(true),
 			Users: map[string]acidv1.UserFlags{
 				"appspace.db_user": {},
 				"db_user":          {},
@@ -920,11 +921,16 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 func TestValidUsernames(t *testing.T) {
 	testName := "test username validity"
 
-	invalidUsernames := []string{"_", ".", ".user", "appspace.", "appspace.user.extra", "user_", "_user", "-user", "user-", ",", "-", ",user", "user,", "namespace,user"}
-
+	invalidUsernames := []string{"_", ".", ".user", "appspace.", "user_", "_user", "-user", "user-", ",", "-", ",user", "user,", "namespace,user"}
+	validUsernames := []string{"user", "appspace.user", "appspace.dot.user", "user_name", "app_space.user_name"}
 	for _, username := range invalidUsernames {
 		if isValidUsername(username) {
 			t.Errorf("%s Invalid username is allowed: %s", testName, username)
+		}
+	}
+	for _, username := range validUsernames {
+		if !isValidUsername(username) {
+			t.Errorf("%s Valid username is not allowed: %s", testName, username)
 		}
 	}
 }

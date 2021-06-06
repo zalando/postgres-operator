@@ -41,7 +41,7 @@ import (
 var (
 	alphaNumericRegexp    = regexp.MustCompile("^[a-zA-Z][a-zA-Z0-9]*$")
 	databaseNameRegexp    = regexp.MustCompile("^[a-zA-Z_][a-zA-Z0-9_]*$")
-	userRegexp            = regexp.MustCompile(`^[a-z0-9]+\.?[-_a-z0-9]+[a-z0-9]$`)
+	userRegexp            = regexp.MustCompile(`^[a-z0-9]([-_a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-_a-z0-9]*[a-z0-9])?)*$`)
 	patroniObjectSuffixes = []string{"config", "failover", "sync"}
 )
 
@@ -1111,10 +1111,13 @@ func (c *Cluster) initRobotUsers() error {
 		}
 		namespace := c.Namespace
 
-		//more than one dot in the username is reported invalid by regexp
-		if strings.Contains(username, ".") {
-			splits := strings.Split(username, ".")
-			namespace = splits[0]
+		//if namespaced secrets are allowed
+		if c.Postgresql.Spec.EnableNamespacedSecret != nil &&
+			*c.Postgresql.Spec.EnableNamespacedSecret {
+			if strings.Contains(username, ".") {
+				splits := strings.Split(username, ".")
+				namespace = splits[0]
+			}
 		}
 
 		flags, err := normalizeUserFlags(userFlags)

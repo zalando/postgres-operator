@@ -314,7 +314,7 @@ class EndToEndTestCase(unittest.TestCase):
         'postgresqls', 'acid-minimal-cluster',
         {
             'spec': {
-                'enableConnectionPooler': False
+                c
             }
         })
 
@@ -592,23 +592,24 @@ class EndToEndTestCase(unittest.TestCase):
             Test secrets in different namespace
         '''
         app_namespace = "appspace"
-        k8s = self.k8s
+        # k8s = self.k8s
         v1_appnamespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=app_namespace))
-        k8s.api.core_v1.create_namespace(v1_appnamespace)
-        k8s.wait_for_namespace_creation(app_namespace)
+        self.k8s.api.core_v1.create_namespace(v1_appnamespace)
+        self.k8s.wait_for_namespace_creation(app_namespace)
 
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
             {
                 'spec': {
+                    'enableNamespacedSecret': True,
                     'users':{
                         'appspace.db_user': [],
                     }
                 }
             })
-        self.eventuallyEqual(lambda: k8s.count_secrets_with_label("cluster_name=acid-minimal-cluster,application=spilo", app_namespace),
-                             1, "Secret not created for user in namespace", app_namespace)
+        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster_name=acid-minimal-cluster,application=spilo", app_namespace),
+                             1, "Secret not created for user in namespace")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):

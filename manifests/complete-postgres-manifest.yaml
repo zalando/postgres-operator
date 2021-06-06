@@ -12,7 +12,10 @@ spec:
   dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.0-p7
   teamId: "acid"
   numberOfInstances: 2
+  enableNamespacedSecret: True
   users:  # Application/Robot users
+    appspace.db_user: []
+    appspace.db_user.with.dots: []
     zalando:
     - superuser
     - createdb

@@ -730,6 +730,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type:        "boolean",
 						Description: "Deprecated",
 					},
+					"enableNamespacedSecret": {
+						Type: "boolean",
+					},
 					"users": {
 						Type: "object",
 						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
