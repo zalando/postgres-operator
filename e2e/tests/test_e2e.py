@@ -314,7 +314,7 @@ class EndToEndTestCase(unittest.TestCase):
         'postgresqls', 'acid-minimal-cluster',
         {
             'spec': {
-                c
+                'enableConnectionPooler': False
             }
         })
 
