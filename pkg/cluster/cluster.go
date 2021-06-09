@@ -1170,6 +1170,7 @@ func (c *Cluster) initTeamMembers(teamID string, isPostgresSuperuserTeam bool) e
 		newRole := spec.PgUser{
 			Origin:     spec.RoleOriginTeamsAPI,
 			Name:       username,
+			Namespace:  c.Namespace,
 			Flags:      flags,
 			MemberOf:   memberOf,
 			Parameters: c.OpConfig.TeamAPIRoleConfiguration,

@@ -565,8 +565,8 @@ func (c *Cluster) syncRoles() (err error) {
 		userNames = append(userNames, pgRole)
 		// add team member role name with rename suffix in case we need to rename it back
 		if u.Origin == spec.RoleOriginTeamsAPI && c.OpConfig.EnableTeamMemberDeprecation {
-			deletedUsers[u.Name+c.OpConfig.RoleDeletionSuffix] = u.Name
-			userNames = append(userNames, u.Name+c.OpConfig.RoleDeletionSuffix)
+			deletedUsers[pgRole+c.OpConfig.RoleDeletionSuffix] = pgRole
+			userNames = append(userNames, pgRole+c.OpConfig.RoleDeletionSuffix)
 		}
 	}
 
