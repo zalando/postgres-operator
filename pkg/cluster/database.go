@@ -221,7 +221,7 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 			roldeleted = true
 		}
 
-		users[rolname] = spec.PgUser{Name: rolname, Namespace: c.Namespace, Password: rolpassword, Flags: flags, MemberOf: memberof, Parameters: parameters, Deleted: roldeleted}
+		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof, Parameters: parameters, Deleted: roldeleted}
 	}
 
 	return users, nil
