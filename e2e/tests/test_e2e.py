@@ -587,12 +587,12 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_cross_namespace_secrets(self):
+    def test_zz_cross_namespace_secrets(self):
         '''
             Test secrets in different namespace
         '''
         app_namespace = "appspace"
-        # k8s = self.k8s
+
         v1_appnamespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=app_namespace))
         self.k8s.api.core_v1.create_namespace(v1_appnamespace)
         self.k8s.wait_for_namespace_creation(app_namespace)
@@ -610,6 +610,16 @@ class EndToEndTestCase(unittest.TestCase):
             })
         self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", app_namespace),
                              1, "Secret not created for user in namespace")
+
+        #reset the flag
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableNamespacedSecret': False,
+                }
+            })
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
