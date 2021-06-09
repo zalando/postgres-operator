@@ -19,8 +19,8 @@ var VersionMap = map[string]int{
 
 // IsBiggerPostgresVersion Compare two Postgres version numbers
 func IsBiggerPostgresVersion(old string, new string) bool {
-	oldN, _ := VersionMap[old]
-	newN, _ := VersionMap[new]
+	oldN := VersionMap[old]
+	newN := VersionMap[new]
 	return newN > oldN
 }
 
@@ -52,7 +52,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 	desiredVersion := c.GetDesiredMajorVersionAsInt()
 
 	if c.currentMajorVersion >= desiredVersion {
-		c.logger.Infof("cluster version up to date. current: %d desired: %d", c.currentMajorVersion, desiredVersion)
+		c.logger.Infof("cluster version up to date. current: %d, min desired: %d", c.currentMajorVersion, desiredVersion)
 		return nil
 	}
 

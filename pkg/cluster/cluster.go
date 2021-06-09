@@ -74,6 +74,7 @@ type Cluster struct {
 	eventRecorder    record.EventRecorder
 	patroni          patroni.Interface
 	pgUsers          map[string]spec.PgUser
+	pgUsersCache     map[string]spec.PgUser
 	systemUsers      map[string]spec.PgUser
 	podSubscribers   map[spec.NamespacedName]chan PodEvent
 	podSubscribersMu sync.RWMutex
@@ -129,7 +130,9 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy:    users.DefaultUserSyncStrategy{PasswordEncryption: passwordEncryption},
+		userSyncStrategy: users.DefaultUserSyncStrategy{
+			PasswordEncryption: passwordEncryption,
+			RoleDeletionSuffix: cfg.OpConfig.RoleDeletionSuffix},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
@@ -189,6 +192,17 @@ func (c *Cluster) isNewCluster() bool {
 // initUsers populates c.systemUsers and c.pgUsers maps.
 func (c *Cluster) initUsers() error {
 	c.setProcessName("initializing users")
+
+	// if team member deprecation is enabled save current state of pgUsers
+	// to check for deleted roles
+	c.pgUsersCache = map[string]spec.PgUser{}
+	if c.OpConfig.EnableTeamMemberDeprecation {
+		for k, v := range c.pgUsers {
+			if v.Origin == spec.RoleOriginTeamsAPI {
+				c.pgUsersCache[k] = v
+			}
+		}
+	}
 
 	// clear our the previous state of the cluster users (in case we are
 	// running a sync).
@@ -361,6 +375,7 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 	}
 	if !reflect.DeepEqual(c.Statefulset.Annotations, statefulSet.Annotations) {
 		match = false
+		needsReplace = true
 		reasons = append(reasons, "new statefulset's annotations do not match the current one")
 	}
 
@@ -445,6 +460,11 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 		}
 	}
 
+	if len(c.Statefulset.Spec.Template.Spec.Volumes) != len(statefulSet.Spec.Template.Spec.Volumes) {
+		needsReplace = true
+		reasons = append(reasons, "new statefulset's volumes contains different number of volumes to the old one")
+	}
+
 	// we assume any change in priority happens by rolling out a new priority class
 	// changing the priority value in an existing class is not supproted
 	if c.Statefulset.Spec.Template.Spec.PriorityClassName != statefulSet.Spec.Template.Spec.PriorityClassName {
@@ -456,7 +476,9 @@ func (c *Cluster) compareStatefulSetWith(statefulSet *appsv1.StatefulSet) *compa
 
 	// lazy Spilo update: modify the image in the statefulset itself but let its pods run with the old image
 	// until they are re-created for other reasons, for example node rotation
-	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(c.Statefulset.Spec.Template.Spec.Containers[0].Image, statefulSet.Spec.Template.Spec.Containers[0].Image) {
+	effectivePodImage := getPostgresContainer(&c.Statefulset.Spec.Template.Spec).Image
+	desiredImage := getPostgresContainer(&statefulSet.Spec.Template.Spec).Image
+	if c.OpConfig.EnableLazySpiloUpgrade && !reflect.DeepEqual(effectivePodImage, desiredImage) {
 		needsReplace = true
 		reasons = append(reasons, "lazy Spilo update: new statefulset's pod image does not match the current one")
 	}
@@ -502,6 +524,8 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 		newCheck("new statefulset %s's %s (index %d) security context does not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.SecurityContext, b.SecurityContext) }),
+		newCheck("new statefulset %s's %s (index %d) volume mounts do not match the current one",
+			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.VolumeMounts, b.VolumeMounts) }),
 	}
 
 	if !c.OpConfig.EnableLazySpiloUpgrade {
@@ -598,7 +622,7 @@ func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
 // for a cluster that had no such job before. In this case a missing job is not an error.
 func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	updateFailed := false
-	syncStatetfulSet := false
+	syncStatefulSet := false
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -619,7 +643,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	if IsBiggerPostgresVersion(oldSpec.Spec.PostgresqlParam.PgVersion, c.GetDesiredMajorVersion()) {
 		c.logger.Infof("postgresql version increased (%s -> %s), depending on config manual upgrade needed",
 			oldSpec.Spec.PostgresqlParam.PgVersion, newSpec.Spec.PostgresqlParam.PgVersion)
-		syncStatetfulSet = true
+		syncStatefulSet = true
 	} else {
 		c.logger.Infof("postgresql major version unchanged or smaller, no changes needed")
 		// sticking with old version, this will also advance GetDesiredVersion next time.
@@ -642,7 +666,7 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 	needConnectionPooler := needMasterConnectionPoolerWorker(&newSpec.Spec) ||
 		needReplicaConnectionPoolerWorker(&newSpec.Spec)
 	if !sameUsers || needConnectionPooler {
-		c.logger.Debugf("syncing secrets")
+		c.logger.Debugf("initialize users")
 		if err := c.initUsers(); err != nil {
 			c.logger.Errorf("could not init users: %v", err)
 			updateFailed = true
@@ -688,9 +712,9 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 			updateFailed = true
 			return
 		}
-		if syncStatetfulSet || !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
+		if syncStatefulSet || !reflect.DeepEqual(oldSs, newSs) || !reflect.DeepEqual(oldSpec.Annotations, newSpec.Annotations) {
 			c.logger.Debugf("syncing statefulsets")
-			syncStatetfulSet = false
+			syncStatefulSet = false
 			// TODO: avoid generating the StatefulSet object twice by passing it to syncStatefulSet
 			if err := c.syncStatefulSet(); err != nil {
 				c.logger.Errorf("could not sync statefulsets: %v", err)
@@ -1163,7 +1187,7 @@ func (c *Cluster) initHumanUsers() error {
 	for _, superuserTeam := range superuserTeams {
 		err := c.initTeamMembers(superuserTeam, true)
 		if err != nil {
-			return fmt.Errorf("Cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
+			return fmt.Errorf("cannot initialize members for team %q of Postgres superusers: %v", superuserTeam, err)
 		}
 		if superuserTeam == c.Spec.TeamID {
 			clusterIsOwnedBySuperuserTeam = true
@@ -1176,7 +1200,7 @@ func (c *Cluster) initHumanUsers() error {
 			if !(util.SliceContains(superuserTeams, additionalTeam)) {
 				err := c.initTeamMembers(additionalTeam, false)
 				if err != nil {
-					return fmt.Errorf("Cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
+					return fmt.Errorf("cannot initialize members for additional team %q for cluster owned by %q: %v", additionalTeam, c.Spec.TeamID, err)
 				}
 			}
 		}
@@ -1189,7 +1213,7 @@ func (c *Cluster) initHumanUsers() error {
 
 	err := c.initTeamMembers(c.Spec.TeamID, false)
 	if err != nil {
-		return fmt.Errorf("Cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
+		return fmt.Errorf("cannot initialize members for team %q who owns the Postgres cluster: %v", c.Spec.TeamID, err)
 	}
 
 	return nil

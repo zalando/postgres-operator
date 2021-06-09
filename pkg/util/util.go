@@ -151,6 +151,18 @@ func IsEqualIgnoreOrder(a, b []string) bool {
 	return reflect.DeepEqual(a_copy, b_copy)
 }
 
+// SliceReplaceElement
+func StringSliceReplaceElement(s []string, a, b string) (result []string) {
+	tmp := make([]string, 0, len(s))
+	for _, str := range s {
+		if str == a {
+			str = b
+		}
+		tmp = append(tmp, str)
+	}
+	return tmp
+}
+
 // SubstractStringSlices finds elements in a that are not in b and return them as a result slice.
 func SubstractStringSlices(a []string, b []string) (result []string, equal bool) {
 	// Slices are assumed to contain unique elements only

@@ -18,7 +18,6 @@ spec:
       labels:
         app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
-        team: "{{ join "," .Values.envs.teams }}"
     spec:
       serviceAccountName: {{ include "postgres-operator-ui.serviceAccountName" . }}
       {{- if .Values.imagePullSecrets }}
@@ -44,13 +43,13 @@ spec:
             - name: "APP_URL"
               value: "http://localhost:8081"
             - name: "OPERATOR_API_URL"
-              value: {{ .Values.envs.operatorApiUrl }}
+              value: {{ .Values.envs.operatorApiUrl | quote }}
             - name: "OPERATOR_CLUSTER_NAME_LABEL"
-              value: {{ .Values.envs.operatorClusterNameLabel }}
+              value: {{ .Values.envs.operatorClusterNameLabel | quote }}
             - name: "RESOURCES_VISIBLE"
-              value: "{{ .Values.envs.resourcesVisible }}"
+              value: {{ .Values.envs.resourcesVisible | quote }}
             - name: "TARGET_NAMESPACE"
-              value: "{{ .Values.envs.targetNamespace }}"
+              value: {{ .Values.envs.targetNamespace | quote }}
             - name: "TEAMS"
               value: |-
                 [

@@ -275,7 +275,7 @@ Postgres clusters are associated with one team by providing the `teamID` in
 the manifest. Additional superuser teams can be configured as mentioned in
 the previous paragraph. However, this is a global setting. To assign
 additional teams, superuser teams and single users to clusters of a given
-team, use the [PostgresTeam CRD](../manifests/postgresteam.yaml).
+team, use the [PostgresTeam CRD](../manifests/postgresteam.crd.yaml).
 
 Note, by default the `PostgresTeam` support is disabled in the configuration.
 Switch `enable_postgres_team_crd` flag to `true` and the operator will start to
@@ -406,6 +406,23 @@ spec:
     - "rdecker"
     - "briggs"
 ```
+
+#### Removed members
+
+The Postgres Operator does not delete database roles when users are removed
+from manifests. But, using the `PostgresTeam` custom resource or Teams API it
+is very easy to add roles to many clusters. Manually reverting such a change
+is cumbersome. Therefore, if members are removed from a `PostgresTeam` or the
+Teams API the operator can rename roles appending a configured suffix to the
+name (see `role_deletion_suffix` option) and revoke the `LOGIN` privilege.
+The suffix makes it easy then for a cleanup script to remove those deprecated
+roles completely. Switch `enable_team_member_deprecation` to `true` to enable
+this behavior.
+
+When a role is re-added to a `PostgresTeam` manifest (or to the source behind
+the Teams API) the operator will check for roles with the configured suffix
+and if found, rename the role back to the original name and grant `LOGIN`
+again.
 
 ## Prepared databases with roles and default privileges
 

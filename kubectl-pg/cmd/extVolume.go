@@ -67,7 +67,7 @@ func extVolume(increasedVolumeSize string, clusterName string) {
 	namespace := getCurrentNamespace()
 	postgresql, err := postgresConfig.Postgresqls(namespace).Get(context.TODO(), clusterName, metav1.GetOptions{})
 	if err != nil {
-		log.Fatalf("hii %v", err)
+		log.Fatal(err)
 	}
 
 	oldSize, err := resource.ParseQuantity(postgresql.Spec.Volume.Size)

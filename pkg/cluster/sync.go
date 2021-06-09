@@ -11,7 +11,6 @@ import (
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	policybeta1 "k8s.io/api/policy/v1beta1"
@@ -260,28 +259,6 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 	return nil
 }
 
-func (c *Cluster) mustUpdatePodsAfterLazyUpdate(desiredSset *appsv1.StatefulSet) (bool, error) {
-
-	pods, err := c.listPods()
-	if err != nil {
-		return false, fmt.Errorf("could not list pods of the statefulset: %v", err)
-	}
-
-	for _, pod := range pods {
-
-		effectivePodImage := pod.Spec.Containers[0].Image
-		ssImage := desiredSset.Spec.Template.Spec.Containers[0].Image
-
-		if ssImage != effectivePodImage {
-			c.logger.Infof("not all pods were re-started when the lazy upgrade was enabled; forcing the rolling upgrade now")
-			return true, nil
-		}
-
-	}
-
-	return false, nil
-}
-
 func (c *Cluster) syncStatefulSet() error {
 
 	podsToRecreate := make([]v1.Pod, 0)
@@ -373,8 +350,6 @@ func (c *Cluster) syncStatefulSet() error {
 			}
 		}
 
-		c.updateStatefulSetAnnotations(c.AnnotationsToPropagate(c.annotationsSet(c.Statefulset.Annotations)))
-
 		if len(podsToRecreate) == 0 && !c.OpConfig.EnableLazySpiloUpgrade {
 			// even if the desired and the running statefulsets match
 			// there still may be not up-to-date pods on condition
@@ -382,8 +357,8 @@ func (c *Cluster) syncStatefulSet() error {
 			// and
 			//  (b) some of the pods were not restarted when the lazy update was still in place
 			for _, pod := range pods {
-				effectivePodImage := pod.Spec.Containers[0].Image
-				stsImage := desiredSts.Spec.Template.Spec.Containers[0].Image
+				effectivePodImage := getPostgresContainer(&pod.Spec).Image
+				stsImage := getPostgresContainer(&desiredSts.Spec.Template.Spec).Image
 
 				if stsImage != effectivePodImage {
 					if err = c.markRollingUpdateFlagForPod(&pod, "pod not yet restarted due to lazy update"); err != nil {
@@ -576,10 +551,29 @@ func (c *Cluster) syncRoles() (err error) {
 		}
 	}()
 
+	// mapping between original role name and with deletion suffix
+	deletedUsers := map[string]string{}
+
+	// create list of database roles to query
 	for _, u := range c.pgUsers {
 		userNames = append(userNames, u.Name)
+		// add team member role name with rename suffix in case we need to rename it back
+		if u.Origin == spec.RoleOriginTeamsAPI && c.OpConfig.EnableTeamMemberDeprecation {
+			deletedUsers[u.Name+c.OpConfig.RoleDeletionSuffix] = u.Name
+			userNames = append(userNames, u.Name+c.OpConfig.RoleDeletionSuffix)
+		}
 	}
 
+	// add team members that exist only in cache
+	// to trigger a rename of the role in ProduceSyncRequests
+	for _, cachedUser := range c.pgUsersCache {
+		if _, exists := c.pgUsers[cachedUser.Name]; !exists {
+			userNames = append(userNames, cachedUser.Name)
+		}
+	}
+
+	// add pooler user to list of pgUsers, too
+	// to check if the pooler user exists or has to be created
 	if needMasterConnectionPooler(&c.Spec) || needReplicaConnectionPooler(&c.Spec) {
 		connectionPoolerUser := c.systemUsers[constants.ConnectionPoolerUserKeyName]
 		userNames = append(userNames, connectionPoolerUser.Name)
@@ -592,6 +586,16 @@ func (c *Cluster) syncRoles() (err error) {
 	dbUsers, err = c.readPgUsersFromDatabase(userNames)
 	if err != nil {
 		return fmt.Errorf("error getting users from the database: %v", err)
+	}
+
+	// update pgUsers where a deleted role was found
+	// so that they are skipped in ProduceSyncRequests
+	for _, dbUser := range dbUsers {
+		if originalUser, exists := deletedUsers[dbUser.Name]; exists {
+			recreatedUser := c.pgUsers[originalUser]
+			recreatedUser.Deleted = true
+			c.pgUsers[originalUser] = recreatedUser
+		}
 	}
 
 	pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(dbUsers, c.pgUsers)

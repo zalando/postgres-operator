@@ -27,7 +27,7 @@ spec:
     additionalPrinterColumns:
     - name: Team
       type: string
-      description: Team responsible for Postgres CLuster
+      description: Team responsible for Postgres cluster
       jsonPath: .spec.teamId
     - name: Version
       type: string
