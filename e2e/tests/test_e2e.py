@@ -608,7 +608,7 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             })
-        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster_name=acid-minimal-cluster,application=spilo", app_namespace),
+        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", app_namespace),
                              1, "Secret not created for user in namespace")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
