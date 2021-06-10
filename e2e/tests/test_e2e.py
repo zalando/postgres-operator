@@ -567,6 +567,7 @@ class EndToEndTestCase(unittest.TestCase):
                         role.pop("Password", None)
                         self.assertDictEqual(role, {
                             "Name": "robot_zmon_acid_monitoring_new",
+                            "Namespace":"",
                             "Flags": None,
                             "MemberOf": ["robot_zmon"],
                             "Parameters": None,
