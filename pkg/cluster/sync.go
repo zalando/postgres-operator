@@ -483,7 +483,7 @@ func (c *Cluster) syncSecrets() error {
 	for secretUsername, secretSpec := range secrets {
 		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secretSpec.Namespace, secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
@@ -521,7 +521,7 @@ func (c *Cluster) syncSecrets() error {
 				userMap[secretUsername] = pwdUser
 			}
 		} else {
-			return fmt.Errorf("could not create secret for user %s: %v", secretUsername, err)
+			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, secretSpec.Namespace, err)
 		}
 	}
 
@@ -556,11 +556,17 @@ func (c *Cluster) syncRoles() (err error) {
 
 	// create list of database roles to query
 	for _, u := range c.pgUsers {
-		userNames = append(userNames, u.Name)
+		pgRole := u.Name
+		if u.Namespace != c.Namespace && u.Namespace != "" {
+			// to avoid the conflict of having multiple users of same name
+			// but each in different namespace.
+			pgRole = fmt.Sprintf("%s.%s", u.Name, u.Namespace)
+		}
+		userNames = append(userNames, pgRole)
 		// add team member role name with rename suffix in case we need to rename it back
 		if u.Origin == spec.RoleOriginTeamsAPI && c.OpConfig.EnableTeamMemberDeprecation {
-			deletedUsers[u.Name+c.OpConfig.RoleDeletionSuffix] = u.Name
-			userNames = append(userNames, u.Name+c.OpConfig.RoleDeletionSuffix)
+			deletedUsers[pgRole+c.OpConfig.RoleDeletionSuffix] = pgRole
+			userNames = append(userNames, pgRole+c.OpConfig.RoleDeletionSuffix)
 		}
 	}
 

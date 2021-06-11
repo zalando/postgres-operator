@@ -1547,10 +1547,11 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		secret := c.generateSingleUserSecret(namespace, pgUser)
+		secret := c.generateSingleUserSecret(pgUser.Namespace, pgUser)
 		if secret != nil {
 			secrets[username] = secret
 		}
+		namespace = pgUser.Namespace
 	}
 	/* special case for the system user */
 	for _, systemUser := range c.systemUsers {
@@ -1590,7 +1591,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.credentialSecretName(username),
-			Namespace:   namespace,
+			Namespace:   pgUser.Namespace,
 			Labels:      lbls,
 			Annotations: c.annotationsSet(nil),
 		},

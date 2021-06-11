@@ -7,12 +7,14 @@ import (
 
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
+	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	"github.com/zalando/postgres-operator/pkg/util/teams"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 )
 
@@ -79,8 +81,8 @@ func TestInitRobotUsers(t *testing.T) {
 	}{
 		{
 			manifestUsers: map[string]acidv1.UserFlags{"foo": {"superuser", "createdb"}},
-			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Password: "bar"}},
-			result:        map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Password: "bar"}},
+			infraRoles:    map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Namespace: cl.Namespace, Password: "bar"}},
+			result:        map[string]spec.PgUser{"foo": {Origin: spec.RoleOriginInfrastructure, Name: "foo", Namespace: cl.Namespace, Password: "bar"}},
 			err:           nil,
 		},
 		{
@@ -842,6 +844,93 @@ func TestPreparedDatabases(t *testing.T) {
 		}
 		if user.AdminRole != tt.admin {
 			t.Errorf("%s, incorrect admin role for default role %q. Expected %q, got %q", tt.subTest, tt.role, tt.admin, user.AdminRole)
+		}
+	}
+}
+
+func TestCrossNamespacedSecrets(t *testing.T) {
+	testName := "test secrets in different namespace"
+	clientSet := fake.NewSimpleClientset()
+	acidClientSet := fakeacidv1.NewSimpleClientset()
+	namespace := "default"
+
+	client := k8sutil.KubernetesClient{
+		StatefulSetsGetter: clientSet.AppsV1(),
+		ServicesGetter:     clientSet.CoreV1(),
+		DeploymentsGetter:  clientSet.AppsV1(),
+		PostgresqlsGetter:  acidClientSet.AcidV1(),
+		SecretsGetter:      clientSet.CoreV1(),
+	}
+	pg := acidv1.Postgresql{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "acid-fake-cluster",
+			Namespace: namespace,
+		},
+		Spec: acidv1.PostgresSpec{
+			Volume: acidv1.Volume{
+				Size: "1Gi",
+			},
+			EnableNamespacedSecret: boolToPointer(true),
+			Users: map[string]acidv1.UserFlags{
+				"appspace.db_user": {},
+				"db_user":          {},
+			},
+		},
+	}
+
+	var cluster = New(
+		Config{
+			OpConfig: config.Config{
+				ConnectionPooler: config.ConnectionPooler{
+					ConnectionPoolerDefaultCPURequest:    "100m",
+					ConnectionPoolerDefaultCPULimit:      "100m",
+					ConnectionPoolerDefaultMemoryRequest: "100Mi",
+					ConnectionPoolerDefaultMemoryLimit:   "100Mi",
+					NumberOfInstances:                    int32ToPointer(1),
+				},
+				PodManagementPolicy: "ordered_ready",
+				Resources: config.Resources{
+					ClusterLabels:        map[string]string{"application": "spilo"},
+					ClusterNameLabel:     "cluster-name",
+					DefaultCPURequest:    "300m",
+					DefaultCPULimit:      "300m",
+					DefaultMemoryRequest: "300Mi",
+					DefaultMemoryLimit:   "300Mi",
+					PodRoleLabel:         "spilo-role",
+				},
+			},
+		}, client, pg, logger, eventRecorder)
+
+	userNamespaceMap := map[string]string{
+		cluster.Namespace: "db_user",
+		"appspace":        "appspace.db_user",
+	}
+
+	err := cluster.initRobotUsers()
+	if err != nil {
+		t.Errorf("Could not create secret for namespaced users with error: %s", err)
+	}
+
+	for _, u := range cluster.pgUsers {
+		if u.Name != userNamespaceMap[u.Namespace] {
+			t.Errorf("%s: Could not create namespaced user in its correct namespaces for user %s in namespace %s", testName, u.Name, u.Namespace)
+		}
+	}
+}
+
+func TestValidUsernames(t *testing.T) {
+	testName := "test username validity"
+
+	invalidUsernames := []string{"_", ".", ".user", "appspace.", "user_", "_user", "-user", "user-", ",", "-", ",user", "user,", "namespace,user"}
+	validUsernames := []string{"user", "appspace.user", "appspace.dot.user", "user_name", "app_space.user_name"}
+	for _, username := range invalidUsernames {
+		if isValidUsername(username) {
+			t.Errorf("%s Invalid username is allowed: %s", testName, username)
+		}
+	}
+	for _, username := range validUsernames {
+		if !isValidUsername(username) {
+			t.Errorf("%s Valid username is not allowed: %s", testName, username)
 		}
 	}
 }
