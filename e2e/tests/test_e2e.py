@@ -253,7 +253,7 @@ class EndToEndTestCase(unittest.TestCase):
              WHERE (rolname = 'tester' AND rolcanlogin)
                 OR (rolname = 'kind_delete_me' AND NOT rolcanlogin);
         """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
             "Database role of replaced member in PostgresTeam not renamed", 10, 5)
 
         # re-add additional member and check if the role is renamed back
@@ -276,7 +276,7 @@ class EndToEndTestCase(unittest.TestCase):
              WHERE (rolname = 'kind' AND rolcanlogin)
                 OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
         """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
             "Database role of recreated member in PostgresTeam not renamed back to original name", 10, 5)
 
         # revert config change
@@ -321,7 +321,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
-
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
@@ -568,6 +567,7 @@ class EndToEndTestCase(unittest.TestCase):
                         role.pop("Password", None)
                         self.assertDictEqual(role, {
                             "Name": "robot_zmon_acid_monitoring_new",
+                            "Namespace":"",
                             "Flags": None,
                             "MemberOf": ["robot_zmon"],
                             "Parameters": None,
@@ -586,6 +586,41 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_zz_cross_namespace_secrets(self):
+        '''
+            Test secrets in different namespace
+        '''
+        app_namespace = "appspace"
+
+        v1_appnamespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=app_namespace))
+        self.k8s.api.core_v1.create_namespace(v1_appnamespace)
+        self.k8s.wait_for_namespace_creation(app_namespace)
+
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableNamespacedSecret': True,
+                    'users':{
+                        'appspace.db_user': [],
+                    }
+                }
+            })
+        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", app_namespace),
+                             1, "Secret not created for user in namespace")
+
+        #reset the flag
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableNamespacedSecret': False,
+                }
+            })
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):

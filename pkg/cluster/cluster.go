@@ -991,14 +991,16 @@ func (c *Cluster) initSystemUsers() {
 	// secrets, therefore, setting flags like SUPERUSER or REPLICATION
 	// is not necessary here
 	c.systemUsers[constants.SuperuserKeyName] = spec.PgUser{
-		Origin:   spec.RoleOriginSystem,
-		Name:     c.OpConfig.SuperUsername,
-		Password: util.RandomPassword(constants.PasswordLength),
+		Origin:    spec.RoleOriginSystem,
+		Name:      c.OpConfig.SuperUsername,
+		Namespace: c.Namespace,
+		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
-		Origin:   spec.RoleOriginSystem,
-		Name:     c.OpConfig.ReplicationUsername,
-		Password: util.RandomPassword(constants.PasswordLength),
+		Origin:    spec.RoleOriginSystem,
+		Name:      c.OpConfig.ReplicationUsername,
+		Namespace: c.Namespace,
+		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 
 	// Connection pooler user is an exception, if requested it's going to be
@@ -1026,10 +1028,11 @@ func (c *Cluster) initSystemUsers() {
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{
-			Origin:   spec.RoleConnectionPooler,
-			Name:     username,
-			Flags:    []string{constants.RoleFlagLogin},
-			Password: util.RandomPassword(constants.PasswordLength),
+			Origin:    spec.RoleConnectionPooler,
+			Name:      username,
+			Namespace: c.Namespace,
+			Flags:     []string{constants.RoleFlagLogin},
+			Password:  util.RandomPassword(constants.PasswordLength),
 		}
 
 		if _, exists := c.pgUsers[username]; !exists {
@@ -1132,6 +1135,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		newRole := spec.PgUser{
 			Origin:     spec.RoleOriginBootstrap,
 			Name:       roleName,
+			Namespace:  c.Namespace,
 			Password:   util.RandomPassword(constants.PasswordLength),
 			Flags:      flags,
 			MemberOf:   memberOf,
@@ -1156,6 +1160,17 @@ func (c *Cluster) initRobotUsers() error {
 		if c.shouldAvoidProtectedOrSystemRole(username, "manifest robot role") {
 			continue
 		}
+		namespace := c.Namespace
+
+		//if namespaced secrets are allowed
+		if c.Postgresql.Spec.EnableNamespacedSecret != nil &&
+			*c.Postgresql.Spec.EnableNamespacedSecret {
+			if strings.Contains(username, ".") {
+				splits := strings.Split(username, ".")
+				namespace = splits[0]
+			}
+		}
+
 		flags, err := normalizeUserFlags(userFlags)
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
@@ -1167,6 +1182,7 @@ func (c *Cluster) initRobotUsers() error {
 		newRole := spec.PgUser{
 			Origin:    spec.RoleOriginManifest,
 			Name:      username,
+			Namespace: namespace,
 			Password:  util.RandomPassword(constants.PasswordLength),
 			Flags:     flags,
 			AdminRole: adminRole,
@@ -1284,6 +1300,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
 		newRole.Flags = flags
+		newRole.Namespace = c.Namespace
 
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)

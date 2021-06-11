@@ -197,6 +197,16 @@ class K8s:
                 pod_phase = pods[0].status.phase
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
+    def wait_for_namespace_creation(self, namespace='default'):
+        ns_found = False
+        while ns_found != True:
+            ns = self.api.core_v1.list_namespace().items
+            for n in ns:
+                if n.metadata.name == namespace:
+                    ns_found = True
+                    break
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
     def get_logical_backup_job(self, namespace='default'):
         return self.api.batch_v1_beta1.list_namespaced_cron_job(namespace, label_selector="application=spilo")
 
