@@ -1418,6 +1418,54 @@ class EndToEndTestCase(unittest.TestCase):
         }
         k8s.update_config(patch_delete_annotations)
 
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_decrease_max_connections(self):
+        '''
+            Test decreasing max_connections and restarting cluster through rest api
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        labels = 'spilo-role=master,' + cluster_label
+        new_max_connections_value = "99"
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector=labels).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+        creationTimestamp = masterPod.metadata.creation_timestamp
+
+        # adjust max_connection
+        pg_patch_max_connections = {
+            "spec": {
+                "postgresql": {
+                    "parameters": {
+                        "max_connections": new_max_connections_value
+                     }
+                 }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
+
+        def get_max_connections():
+            pods = k8s.api.core_v1.list_namespaced_pod(
+                'default', label_selector=labels).items
+            self.assert_master_is_unique()
+            masterPod = pods[0]
+            get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
+            result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
+            max_connections_value = int(result.stdout)
+            return max_connections_value
+
+        #Make sure that max_connections decreased
+        self.eventuallyEqual(get_max_connections, int(new_max_connections_value), "max_connections didn't decrease")
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector=labels).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+        #Make sure that pod didn't restart
+        self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
+                         "Master pod creation timestamp is updated")
+
     def get_failover_targets(self, master_node, replica_nodes):
         '''
            If all pods live on the same node, failover will happen to other worker(s)

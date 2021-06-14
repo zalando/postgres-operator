@@ -5,6 +5,7 @@ package cluster
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -519,7 +520,7 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
 		newCheck("new statefulset %s's %s (index %d) environment does not match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
+			func(a, b v1.Container) bool { return !compareEnv(a.Env, b.Env) }),
 		newCheck("new statefulset %s's %s (index %d) environment sources do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 		newCheck("new statefulset %s's %s (index %d) security context does not match the current one",
@@ -574,6 +575,56 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 	}
 	return true
 
+}
+
+func compareEnv(a, b []v1.EnvVar) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	equal := true
+	for _, enva := range a {
+		hasmatch := false
+		for _, envb := range b {
+			if enva.Name == envb.Name {
+				hasmatch = true
+				if enva.Name == "SPILO_CONFIGURATION" {
+					equal = compareSpiloConfiguration(enva.Value, envb.Value)
+				} else {
+					if enva.Value == "" && envb.Value == "" {
+						equal = reflect.DeepEqual(enva.ValueFrom, envb.ValueFrom)
+					} else {
+						equal = (enva.Value == envb.Value)
+					}
+				}
+				if !equal {
+					return false
+				}
+			}
+		}
+		if !hasmatch {
+			return false
+		}
+	}
+	return true
+}
+
+func compareSpiloConfiguration(configa, configb string) bool {
+	var (
+		oa, ob spiloConfiguration
+	)
+
+	var err error
+	err = json.Unmarshal([]byte(configa), &oa)
+	if err != nil {
+		return false
+	}
+	oa.Bootstrap.DCS = patroniDCS{}
+	err = json.Unmarshal([]byte(configb), &ob)
+	if err != nil {
+		return false
+	}
+	ob.Bootstrap.DCS = patroniDCS{}
+	return reflect.DeepEqual(oa, ob)
 }
 
 func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {

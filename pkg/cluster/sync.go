@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -260,6 +261,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 }
 
 func (c *Cluster) syncStatefulSet() error {
+	var instancesRestartRequired bool
 
 	podsToRecreate := make([]v1.Pod, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
@@ -379,10 +381,21 @@ func (c *Cluster) syncStatefulSet() error {
 	// Apply special PostgreSQL parameters that can only be set via the Patroni API.
 	// it is important to do it after the statefulset pods are there, but before the rolling update
 	// since those parameters require PostgreSQL restart.
-	if err := c.checkAndSetGlobalPostgreSQLConfiguration(); err != nil {
+	instancesRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration()
+	if err != nil {
 		return fmt.Errorf("could not set cluster-wide PostgreSQL configuration options: %v", err)
 	}
 
+
+	if instancesRestartRequired {
+		c.logger.Debugln("restarting Postgres server within pods")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
+		if err := c.restartInstances(); err != nil {
+			c.logger.Warningf("could not restart Postgres server within pods: %v", err)
+		}
+		c.logger.Infof("Postgres server successfuly restarted on all pods")
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done - all instances have been restarted")
+	}
 	// if we get here we also need to re-create the pods (either leftovers from the old
 	// statefulset or those that got their configuration from the outdated statefulset)
 	if len(podsToRecreate) > 0 {
@@ -393,6 +406,57 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 	}
+	return nil
+}
+
+func (c *Cluster) restartInstances() error {
+	c.setProcessName("starting to restart Postgres servers")
+	ls := c.labelsSet(false)
+	namespace := c.Namespace
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: ls.String(),
+	}
+
+	pods, err := c.KubeClient.Pods(namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return fmt.Errorf("could not get the list of pods: %v", err)
+	}
+	c.logger.Infof("there are %d pods in the cluster which resquire Postgres server restart", len(pods.Items))
+
+	var (
+		masterPod *v1.Pod
+	)
+	for i, pod := range pods.Items {
+		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+
+		if role == Master {
+			masterPod = &pods.Items[i]
+			continue
+		}
+
+		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
+		config, err := c.patroni.GetConfig(&pod)
+		if err != nil {
+			return fmt.Errorf("could not get config for pod %s: %v", podName, err)
+		}
+		ttl, ok := config["ttl"].(int32)
+		if !ok {
+			ttl = 30
+		}
+		if err = c.patroni.Restart(&pod); err != nil {
+			return fmt.Errorf("could not restart Postgres server on pod %s: %v", podName, err)
+		}
+		time.Sleep(time.Duration(ttl) * time.Second)
+	}
+
+	if masterPod != nil {
+		podName := util.NameFromMeta(masterPod.ObjectMeta)
+		if err = c.patroni.Restart(masterPod); err != nil {
+			return fmt.Errorf("could not restart postgres server on masterPod %s: %v", podName, err)
+		}
+	}
+
 	return nil
 }
 
@@ -430,10 +494,11 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) has changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() (bool, error) {
 	var (
-		err  error
-		pods []v1.Pod
+		err             error
+		pods            []v1.Pod
+		restartRequired bool
 	)
 
 	// we need to extract those options from the cluster manifest.
@@ -447,14 +512,14 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 	}
 
 	if len(optionsToSet) == 0 {
-		return nil
+		return restartRequired, nil
 	}
 
 	if pods, err = c.listPods(); err != nil {
-		return err
+		return restartRequired, err
 	}
 	if len(pods) == 0 {
-		return fmt.Errorf("could not call Patroni API: cluster has no pods")
+		return restartRequired, fmt.Errorf("could not call Patroni API: cluster has no pods")
 	}
 	// try all pods until the first one that is successful, as it doesn't matter which pod
 	// carries the request to change configuration through
@@ -463,11 +528,12 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
 		c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %v",
 			podName, optionsToSet)
 		if err = c.patroni.SetPostgresParameters(&pod, optionsToSet); err == nil {
-			return nil
+			restartRequired = true
+			return restartRequired, nil
 		}
 		c.logger.Warningf("could not patch postgres parameters with a pod %s: %v", podName, err)
 	}
-	return fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
+	return restartRequired, fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
 		len(pods))
 }
 
