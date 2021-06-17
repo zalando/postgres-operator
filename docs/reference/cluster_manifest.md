@@ -102,6 +102,16 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   `enable_replica_load_balancer` parameter) to define whether to enable the
   load balancer pointing to the Postgres standby instances. Optional.
 
+* **masterLoadBalancerIP**
+  specify the IP address to be used on the load balancer pointing to
+  the Postgres primary. A dynamic address will be allocated if not
+  specified. Optional.
+
+* **replicaLoadBalancerIP**
+  specify the IP address to be used on the load balancer pointing to
+  the Postgres standby instances. A dynamic address will be allocated
+  if not specified. Optional.
+
 * **enableReplicaPoolerLoadBalancer**
   boolean flag to override the operator defaults (set by the
   `enable_replica_pooler_load_balancer` parameter) to define whether to enable
