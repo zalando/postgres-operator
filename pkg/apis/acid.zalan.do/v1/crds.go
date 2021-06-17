@@ -496,6 +496,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"masterLoadBalancerIP": {
+						Type: "string",
+					},
 					"numberOfInstances": {
 						Type:    "integer",
 						Minimum: &min0,
@@ -653,6 +656,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"replicaLoadBalancer": {
 						Type:        "boolean",
 						Description: "deprecated",
+					},
+					"replicaLoadBalancerIP": {
+						Type: "string",
 					},
 					"resources": {
 						Type: "object",

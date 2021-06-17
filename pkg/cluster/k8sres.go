@@ -1728,7 +1728,7 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	}
 
 	if c.shouldCreateLoadBalancerForService(role, spec) {
-		c.configureLoadBalanceService(&serviceSpec, spec.AllowedSourceRanges)
+		c.configureLoadBalanceService(&serviceSpec, role, spec)
 	}
 
 	service := &v1.Service{
@@ -1744,14 +1744,22 @@ func (c *Cluster) generateService(role PostgresRole, spec *acidv1.PostgresSpec) 
 	return service
 }
 
-func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, sourceRanges []string) {
+func (c *Cluster) configureLoadBalanceService(serviceSpec *v1.ServiceSpec, role PostgresRole, spec *acidv1.PostgresSpec) {
 	// spec.AllowedSourceRanges evaluates to the empty slice of zero length
 	// when omitted or set to 'null'/empty sequence in the PG manifest
-	if len(sourceRanges) > 0 {
-		serviceSpec.LoadBalancerSourceRanges = sourceRanges
+	if len(spec.AllowedSourceRanges) > 0 {
+		serviceSpec.LoadBalancerSourceRanges = spec.AllowedSourceRanges
 	} else {
 		// safe default value: lock a load balancer only to the local address unless overridden explicitly
 		serviceSpec.LoadBalancerSourceRanges = []string{localHost}
+	}
+
+	if role == Master && spec.MasterLoadBalancerIP != "" {
+		serviceSpec.LoadBalancerIP = spec.MasterLoadBalancerIP
+	}
+
+	if role == Replica && spec.ReplicaLoadBalancerIP != "" {
+		serviceSpec.LoadBalancerIP = spec.ReplicaLoadBalancerIP
 	}
 
 	c.logger.Debugf("final load balancer source ranges as seen in a service spec (not necessarily applied): %q", serviceSpec.LoadBalancerSourceRanges)

@@ -314,6 +314,8 @@ spec:
                                     type: array
                                     items:
                                       type: string
+              masterLoadBalancerIP:
+                type: string
               numberOfInstances:
                 type: integer
                 minimum: 0
@@ -401,6 +403,8 @@ spec:
               replicaLoadBalancer:
                 type: boolean
                 description: deprecated
+              replicaLoadBalancerIP:
+                type: string
               resources:
                 type: object
                 properties:
