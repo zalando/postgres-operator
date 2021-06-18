@@ -10,9 +10,11 @@
 
 ## Important for NUM Project
 
-This is a forked repo of the Zalando Postgres-operator repository. That repository was forked over, since the Helm chart of the project
-is not hosted in any of the public Helm repositories, so we built a simple pipeline to manually deploy the latest Helm chart to our own
-chart repository.
+This is a forked repo of the Zalando Postgres-operator repository. That repository was forked over, since we felt that
+this was now the most sensible place to store our values.yaml files for different deployments and it could also hopefully
+eventually enable us to automatically create and deploy our clusters to different environments. Currently the values yamls
+to different environments are suffixed with instance and environment name. For example, central-research-repository
+non-production environment cluster configuration can be found from values-crr-dev.yaml file.
 
 ### About Postgres Operator
 
