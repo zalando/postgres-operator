@@ -27,7 +27,7 @@ spec:
     additionalPrinterColumns:
     - name: Team
       type: string
-      description: Team responsible for Postgres CLuster
+      description: Team responsible for Postgres cluster
       jsonPath: .spec.teamId
     - name: Version
       type: string
@@ -514,6 +514,8 @@ spec:
                     tolerationSeconds:
                       type: integer
               useLoadBalancer:  # deprecated
+                type: boolean
+              enableNamespacedSecret:
                 type: boolean
               users:
                 type: object

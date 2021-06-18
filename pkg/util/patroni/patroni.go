@@ -19,6 +19,8 @@ import (
 const (
 	failoverPath = "/failover"
 	configPath   = "/config"
+	statusPath   = "/patroni"
+	restartPath  = "/restart"
 	apiPort      = 8008
 	timeout      = 30 * time.Second
 )
@@ -28,6 +30,8 @@ type Interface interface {
 	Switchover(master *v1.Pod, candidate string) error
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 	GetMemberData(server *v1.Pod) (MemberData, error)
+	Restart(server *v1.Pod) error
+	GetConfig(server *v1.Pod) (map[string]interface{}, error)
 }
 
 // Patroni API client
@@ -103,6 +107,32 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 	return nil
 }
 
+func (p *Patroni) httpGet(url string) (string, error) {
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("could not create request: %v", err)
+	}
+
+	p.logger.Debugf("making GET http request: %s", request.URL.String())
+
+	resp, err := p.httpClient.Do(request)
+	if err != nil {
+		return "", fmt.Errorf("could not make request: %v", err)
+	}
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("could not read response: %v", err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		return "", fmt.Errorf("could not close request: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return string(bodyBytes), fmt.Errorf("patroni returned '%d'", resp.StatusCode)
+	}
+	return string(bodyBytes), nil
+}
+
 // Switchover by calling Patroni REST API
 func (p *Patroni) Switchover(master *v1.Pod, candidate string) error {
 	buf := &bytes.Buffer{}
@@ -147,6 +177,48 @@ type MemberData struct {
 	PendingRestart  bool              `json:"pending_restart"`
 	ClusterUnlocked bool              `json:"cluster_unlocked"`
 	Patroni         MemberDataPatroni `json:"patroni"`
+}
+
+func (p *Patroni) GetConfigOrStatus(server *v1.Pod, path string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return result, err
+	}
+	body, err := p.httpGet(apiURLString + path)
+	err = json.Unmarshal([]byte(body), &result)
+	if err != nil {
+		return result, err
+	}
+
+	return result, err
+}
+
+func (p *Patroni) GetStatus(server *v1.Pod) (map[string]interface{}, error) {
+	return p.GetConfigOrStatus(server, statusPath)
+}
+
+func (p *Patroni) GetConfig(server *v1.Pod) (map[string]interface{}, error) {
+	return p.GetConfigOrStatus(server, configPath)
+}
+
+//Restart method restarts instance via Patroni POST API call.
+func (p *Patroni) Restart(server *v1.Pod) error {
+	buf := &bytes.Buffer{}
+	err := json.NewEncoder(buf).Encode(map[string]interface{}{"restart_pending": true})
+	if err != nil {
+		return fmt.Errorf("could not encode json: %v", err)
+	}
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return err
+	}
+	status, err := p.GetStatus(server)
+	pending_restart, ok := status["pending_restart"]
+	if !ok || !pending_restart.(bool) {
+		return nil
+	}
+	return p.httpPostOrPatch(http.MethodPost, apiURLString+restartPath, buf)
 }
 
 // GetMemberData read member data from patroni API

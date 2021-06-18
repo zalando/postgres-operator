@@ -168,6 +168,10 @@ operator checks during Sync all pods run images specified in their respective
 statefulsets. The operator triggers a rolling upgrade for PG clusters that
 violate this condition.
 
+Changes in $SPILO\_CONFIGURATION under path bootstrap.dcs are ignored when
+StatefulSets are being compared, if there are changes under this path, they are
+applied through rest api interface and following restart of patroni instance
+
 ## Delete protection via annotations
 
 To avoid accidental deletes of Postgres clusters the operator can check the
@@ -950,7 +954,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.6.2 .
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.6.3 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/

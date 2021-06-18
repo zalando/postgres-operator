@@ -159,6 +159,8 @@ type TeamsAPIConfiguration struct {
 	PostgresSuperuserTeams          []string          `json:"postgres_superuser_teams,omitempty"`
 	EnablePostgresTeamCRD           bool              `json:"enable_postgres_team_crd,omitempty"`
 	EnablePostgresTeamCRDSuperusers bool              `json:"enable_postgres_team_crd_superusers,omitempty"`
+	EnableTeamMemberDeprecation     bool              `json:"enable_team_member_deprecation,omitempty"`
+	RoleDeletionSuffix              string            `json:"role_deletion_suffix,omitempty"`
 }
 
 // LoggingRESTAPIConfiguration defines Logging API conf

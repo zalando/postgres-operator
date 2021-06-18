@@ -65,7 +65,7 @@ spec:
             properties:
               docker_image:
                 type: string
-                default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p6"
+                default: "registry.opensource.zalan.do/acid/spilo-13:2.0-p7"
               enable_crd_validation:
                 type: boolean
                 default: true
@@ -397,7 +397,7 @@ spec:
                 properties:
                   logical_backup_docker_image:
                     type: string
-                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
+                    default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.3"
                   logical_backup_google_application_credentials:
                     type: string
                   logical_backup_job_prefix:
@@ -443,6 +443,9 @@ spec:
                   enable_postgres_team_crd_superusers:
                     type: boolean
                     default: false
+                  enable_team_member_deprecation:
+                    type: boolean
+                    default: false
                   enable_team_superuser:
                     type: boolean
                     default: false
@@ -465,6 +468,9 @@ spec:
                       type: string
                     default:
                     - admin
+                  role_deletion_suffix:
+                    type: string
+                    default: "_deleted"
                   team_admin_role:
                     type: string
                     default: "admin"

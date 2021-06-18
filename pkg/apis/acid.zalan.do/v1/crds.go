@@ -730,6 +730,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type:        "boolean",
 						Description: "Deprecated",
 					},
+					"enableNamespacedSecret": {
+						Type: "boolean",
+					},
 					"users": {
 						Type: "object",
 						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
@@ -1377,6 +1380,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"enable_postgres_team_crd_superusers": {
 								Type: "boolean",
 							},
+							"enable_team_member_deprecation": {
+								Type: "boolean",
+							},
 							"enable_team_superuser": {
 								Type: "boolean",
 							},
@@ -1404,6 +1410,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "string",
 									},
 								},
+							},
+							"role_deletion_suffix": {
+								Type: "string",
 							},
 							"team_admin_role": {
 								Type: "string",
