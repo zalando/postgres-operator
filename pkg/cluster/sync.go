@@ -740,8 +740,11 @@ func (c *Cluster) syncDatabases() error {
 		if err := c.initDbConnWithName(preparedDatabase); err != nil {
 			return fmt.Errorf("could not init database connection to %s", preparedDatabase)
 		}
-		if err = c.execAlterGlobalDefaultPrivileges(preparedDatabase+constants.OwnerRoleNameSuffix, preparedDatabase); err != nil {
-			return err
+
+		for _, owner := range c.getOwnerRoles(preparedDatabase, c.Spec.PreparedDatabases[preparedDatabase].DefaultUsers) {
+			if err = c.execAlterGlobalDefaultPrivileges(owner, preparedDatabase); err != nil {
+				return err
+			}
 		}
 	}
 

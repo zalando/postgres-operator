@@ -351,10 +351,30 @@ func (c *Cluster) execCreateDatabaseSchema(databaseName, schemaName, dbOwner, sc
 	}
 
 	// set default privileges for schema
+	// the schemaOwner defines them for global database roles
 	c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, databaseName)
+
+	// if schemaOwner and dbOwner differ we know that <databaseName>_<schemaName> default roles were created
 	if schemaOwner != dbOwner {
-		c.execAlterSchemaDefaultPrivileges(schemaName, dbOwner, databaseName+"_"+schemaName)
-		c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner, databaseName+"_"+schemaName)
+		defaultUsers := c.Spec.PreparedDatabases[databaseName].PreparedSchemas[schemaName].DefaultUsers
+
+		// define schema privileges of <databaseName>_<schemaName>_owner_user for global roles, too
+		if defaultUsers {
+			c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName)
+		}
+
+		// collect all possible owner roles and define default schema privileges
+		// for <databaseName>_<schemaName>_reader/writer roles
+		owners := c.getOwnerRoles(databaseName, c.Spec.PreparedDatabases[databaseName].DefaultUsers)
+		owners = append(owners, c.getOwnerRoles(databaseName+"_"+schemaName, defaultUsers)...)
+		for _, owner := range owners {
+			c.execAlterSchemaDefaultPrivileges(schemaName, owner, databaseName+"_"+schemaName)
+		}
+	} else {
+		// define schema privileges of <databaseName>_owner_user for global roles, too
+		if c.Spec.PreparedDatabases[databaseName].DefaultUsers {
+			c.execAlterSchemaDefaultPrivileges(schemaName, schemaOwner+constants.UserRoleNameSuffix, databaseName)
+		}
 	}
 
 	return nil
@@ -416,6 +436,15 @@ func makeUserFlags(rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin
 	}
 
 	return result
+}
+
+func (c *Cluster) getOwnerRoles(dbObjPath string, withUser bool) (owners []string) {
+	owners = append(owners, dbObjPath+constants.OwnerRoleNameSuffix)
+	if withUser {
+		owners = append(owners, dbObjPath+constants.OwnerRoleNameSuffix+constants.UserRoleNameSuffix)
+	}
+
+	return owners
 }
 
 // getExtension returns the list of current database extensions
