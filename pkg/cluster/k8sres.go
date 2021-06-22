@@ -412,13 +412,33 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 // Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
 // See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
 func isBootstrapOnlyParameter(param string) bool {
-	return param == "max_connections" ||
-		param == "max_locks_per_transaction" ||
-		param == "max_worker_processes" ||
-		param == "max_prepared_transactions" ||
-		param == "wal_level" ||
-		param == "wal_log_hints" ||
-		param == "track_commit_timestamp"
+	params := map[string]bool{
+		"archive_command":                  false,
+		"shared_buffers":                   false,
+		"logging_collector":                false,
+		"log_destination":                  false,
+		"log_directory":                    false,
+		"log_filename":                     false,
+		"log_file_mode":                    false,
+		"log_rotation_age":                 false,
+		"log_truncate_on_rotation":         false,
+		"ssl":                              false,
+		"ssl_ca_file":                      false,
+		"ssl_crl_file":                     false,
+		"ssl_cert_file":                    false,
+		"ssl_key_file":                     false,
+		"shared_preload_libraries":         false,
+		"bg_mon.listen_address":            false,
+		"bg_mon.history_buckets":           false,
+		"pg_stat_statements.track_utility": false,
+		"extwlist.extensions":              false,
+		"extwlist.custom_path":             false,
+	}
+	result, ok := params[param]
+	if !ok {
+		result = true
+	}
+	return result
 }
 
 func generateVolumeMounts(volume acidv1.Volume) []v1.VolumeMount {
@@ -1547,10 +1567,11 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		secret := c.generateSingleUserSecret(namespace, pgUser)
+		secret := c.generateSingleUserSecret(pgUser.Namespace, pgUser)
 		if secret != nil {
 			secrets[username] = secret
 		}
+		namespace = pgUser.Namespace
 	}
 	/* special case for the system user */
 	for _, systemUser := range c.systemUsers {
@@ -1590,7 +1611,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.credentialSecretName(username),
-			Namespace:   namespace,
+			Namespace:   pgUser.Namespace,
 			Labels:      lbls,
 			Annotations: c.annotationsSet(nil),
 		},

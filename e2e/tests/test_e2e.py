@@ -253,7 +253,7 @@ class EndToEndTestCase(unittest.TestCase):
              WHERE (rolname = 'tester' AND rolcanlogin)
                 OR (rolname = 'kind_delete_me' AND NOT rolcanlogin);
         """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
             "Database role of replaced member in PostgresTeam not renamed", 10, 5)
 
         # re-add additional member and check if the role is renamed back
@@ -276,7 +276,7 @@ class EndToEndTestCase(unittest.TestCase):
              WHERE (rolname = 'kind' AND rolcanlogin)
                 OR (rolname = 'tester_delete_me' AND NOT rolcanlogin);
         """
-        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2, 
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
             "Database role of recreated member in PostgresTeam not renamed back to original name", 10, 5)
 
         # revert config change
@@ -321,7 +321,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
-
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
@@ -568,6 +567,7 @@ class EndToEndTestCase(unittest.TestCase):
                         role.pop("Password", None)
                         self.assertDictEqual(role, {
                             "Name": "robot_zmon_acid_monitoring_new",
+                            "Namespace":"",
                             "Flags": None,
                             "MemberOf": ["robot_zmon"],
                             "Parameters": None,
@@ -586,6 +586,41 @@ class EndToEndTestCase(unittest.TestCase):
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_zz_cross_namespace_secrets(self):
+        '''
+            Test secrets in different namespace
+        '''
+        app_namespace = "appspace"
+
+        v1_appnamespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=app_namespace))
+        self.k8s.api.core_v1.create_namespace(v1_appnamespace)
+        self.k8s.wait_for_namespace_creation(app_namespace)
+
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableNamespacedSecret': True,
+                    'users':{
+                        'appspace.db_user': [],
+                    }
+                }
+            })
+        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", app_namespace),
+                             1, "Secret not created for user in namespace")
+
+        #reset the flag
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            'acid.zalan.do', 'v1', 'default',
+            'postgresqls', 'acid-minimal-cluster',
+            {
+                'spec': {
+                    'enableNamespacedSecret': False,
+                }
+            })
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
@@ -1382,6 +1417,54 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_decrease_max_connections(self):
+        '''
+            Test decreasing max_connections and restarting cluster through rest api
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        labels = 'spilo-role=master,' + cluster_label
+        new_max_connections_value = "99"
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector=labels).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+        creationTimestamp = masterPod.metadata.creation_timestamp
+
+        # adjust max_connection
+        pg_patch_max_connections = {
+            "spec": {
+                "postgresql": {
+                    "parameters": {
+                        "max_connections": new_max_connections_value
+                     }
+                 }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
+
+        def get_max_connections():
+            pods = k8s.api.core_v1.list_namespaced_pod(
+                'default', label_selector=labels).items
+            self.assert_master_is_unique()
+            masterPod = pods[0]
+            get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
+            result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
+            max_connections_value = int(result.stdout)
+            return max_connections_value
+
+        #Make sure that max_connections decreased
+        self.eventuallyEqual(get_max_connections, int(new_max_connections_value), "max_connections didn't decrease")
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector=labels).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+        #Make sure that pod didn't restart
+        self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
+                         "Master pod creation timestamp is updated")
 
     def get_failover_targets(self, master_node, replica_nodes):
         '''

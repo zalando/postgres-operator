@@ -139,6 +139,25 @@ secret, without ever sharing it outside of the cluster.
 At the moment it is not possible to define membership of the manifest role in
 other roles.
 
+To define the secrets for the users in a different namespace than that of the cluster,
+one can use the flag `EnableNamespacedSecret` and declare the namespace for the
+secrets in the manifest in the following manner,
+
+```yaml
+spec:
+  users:
+  #users with secret in dfferent namespace
+   appspace.db_user:
+    - createdb
+```
+Here, anything before the first dot is taken as the namespace and the text after
+the first dot is the username. Also, the postgres roles of these usernames would
+be in the form of `namespace.username`.
+
+For such usernames, the secret is created in the given namespace and its name is
+of the following form,
+`{namespace}.{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do`
+
 ### Infrastructure roles
 
 An infrastructure role is a role that should be present on every PostgreSQL
@@ -330,7 +349,7 @@ spec:
 
 This creates roles for members of the `c-team` team not only in all clusters
 owned by `a-team`, but as well in cluster owned by `b-team`, as `a-team` is
-an `additionalTeam` to `b-team` 
+an `additionalTeam` to `b-team`
 
 Not, you can also define `additionalSuperuserTeams` in the `PostgresTeam`
 manifest. By default, this option is disabled and must be configured with
