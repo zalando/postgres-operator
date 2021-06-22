@@ -546,8 +546,8 @@ spec:
           defaultUsers: true
 ```
 
-Default access privileges are also defined for LOGIN roles one database and
-schema creation. This mean they are currently not set when `defaultUsers`
+Default access privileges are also defined for LOGIN roles on database and
+schema creation. This means they are currently not set when `defaultUsers`
 (or `defaultRoles` for schemas) are enabled at a later point in time.
 
 ### Schema `search_path` for default roles
