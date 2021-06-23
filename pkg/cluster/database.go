@@ -36,8 +36,8 @@ const (
 	createDatabaseSQL       = `CREATE DATABASE "%s" OWNER "%s";`
 	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA IF NOT EXISTS "%s" AUTHORIZATION "%s"`
 	alterDatabaseOwnerSQL   = `ALTER DATABASE "%s" OWNER TO "%s";`
-	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
-	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
+	createExtensionSQL      = `SET ROLE TO "%s"; CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
+	alterExtensionSQL       = `SET ROLE TO "%s"; ALTER EXTENSION "%s" SET SCHEMA "%s"`
 
 	globalDefaultPrivilegesSQL = `SET ROLE TO "%s";
 			ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO "%s","%s";
@@ -504,22 +504,22 @@ func (c *Cluster) getExtensions() (dbExtensions map[string]string, err error) {
 
 // executeCreateExtension creates new extension in the given schema.
 // The caller is responsible for opening and closing the database connection.
-func (c *Cluster) executeCreateExtension(extName, schemaName string) error {
-	return c.execCreateOrAlterExtension(extName, schemaName, createExtensionSQL,
+func (c *Cluster) executeCreateExtension(extName, schemaName, schemaOwner string) error {
+	return c.execCreateOrAlterExtension(extName, schemaName, schemaOwner, createExtensionSQL,
 		"creating extension", "create extension")
 }
 
 // executeAlterExtension changes the schema of the given extension.
 // The caller is responsible for opening and closing the database connection.
-func (c *Cluster) executeAlterExtension(extName, schemaName string) error {
-	return c.execCreateOrAlterExtension(extName, schemaName, alterExtensionSQL,
+func (c *Cluster) executeAlterExtension(extName, schemaName, schemaOwner string) error {
+	return c.execCreateOrAlterExtension(extName, schemaName, schemaOwner, alterExtensionSQL,
 		"changing schema for extension", "alter extension schema")
 }
 
-func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doing, operation string) error {
+func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, schemaOwner, statement, doing, operation string) error {
 
 	c.logger.Infof("%s %q schema %q", doing, extName, schemaName)
-	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, extName, schemaName)); err != nil {
+	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, schemaOwner, extName, schemaName)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}
 

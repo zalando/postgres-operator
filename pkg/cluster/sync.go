@@ -833,7 +833,7 @@ func (c *Cluster) syncExtensions(databaseName string, extensions map[string]stri
 	}
 
 	for extName, schema := range createExtensions {
-		if err = c.executeCreateExtension(extName, schema); err != nil {
+		if err = c.executeCreateExtension(extName, schema, databaseName+constants.OwnerRoleNameSuffix); err != nil {
 			return err
 		}
 		// grant privileges on objects created by the extension to default database roles
@@ -846,7 +846,7 @@ func (c *Cluster) syncExtensions(databaseName string, extensions map[string]stri
 		}
 	}
 	for extName, schema := range alterExtensions {
-		if err = c.executeAlterExtension(extName, schema); err != nil {
+		if err = c.executeAlterExtension(extName, schema, databaseName+constants.OwnerRoleNameSuffix); err != nil {
 			return err
 		}
 	}
