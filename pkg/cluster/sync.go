@@ -403,7 +403,7 @@ func (c *Cluster) syncStatefulSet() error {
 			return fmt.Errorf("could not get config for pod %s: %v", podName, err)
 		}
 
-		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod)
+		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, config)
 		if err != nil {
 			return fmt.Errorf("could not set cluster-wide PostgreSQL configuration options: %v", err)
 		}
@@ -487,7 +487,7 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod) (bool, error) {
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig map[string]interface{}) (bool, error) {
 	var (
 		err             error
 		pods            []v1.Pod
@@ -496,11 +496,14 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod) (bool, e
 
 	// we need to extract those options from the cluster manifest.
 	optionsToSet := make(map[string]string)
-	pgOptions := c.Spec.Parameters
+	desiredConfig := c.Spec.Parameters
+	effectiveConfig := patroniConfig["postgresql"].(map[string]interface{})
+	effectiveParameters := effectiveConfig["parameters"].(map[string]string)
 
-	for k, v := range pgOptions {
-		if isBootstrapOnlyParameter(k) {
-			optionsToSet[k] = v
+	for desiredOption, desiredValue := range desiredConfig {
+		effectiveValue, exists := effectiveParameters[desiredOption]
+		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue || !exists) {
+			optionsToSet[desiredOption] = desiredValue
 		}
 	}
 
