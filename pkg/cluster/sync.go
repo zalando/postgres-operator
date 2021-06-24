@@ -498,7 +498,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 	optionsToSet := make(map[string]string)
 	desiredConfig := c.Spec.Parameters
 	effectiveConfig := patroniConfig["postgresql"].(map[string]interface{})
-	effectiveParameters := effectiveConfig["parameters"].(map[string]string)
+	effectiveParameters := effectiveConfig["parameters"].(map[string]interface{})
 
 	for desiredOption, desiredValue := range desiredConfig {
 		effectiveValue, exists := effectiveParameters[desiredOption]
