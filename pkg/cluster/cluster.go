@@ -1163,8 +1163,7 @@ func (c *Cluster) initRobotUsers() error {
 		namespace := c.Namespace
 
 		//if namespaced secrets are allowed
-		if c.Postgresql.Spec.EnableNamespacedSecret != nil &&
-			*c.Postgresql.Spec.EnableNamespacedSecret {
+		if c.Config.OpConfig.EnableCrossNamespaceSecret {
 			if strings.Contains(username, ".") {
 				splits := strings.Split(username, ".")
 				namespace = splits[0]

@@ -730,9 +730,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type:        "boolean",
 						Description: "Deprecated",
 					},
-					"enableNamespacedSecret": {
-						Type: "boolean",
-					},
 					"users": {
 						Type: "object",
 						AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
@@ -903,6 +900,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "boolean",
 					},
 					"enable_lazy_spilo_upgrade": {
+						Type: "boolean",
+					},
+					"enable_cross_namespace_secret": {
 						Type: "boolean",
 					},
 					"enable_shm_volume": {

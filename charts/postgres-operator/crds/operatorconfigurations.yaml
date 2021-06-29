@@ -72,6 +72,9 @@ spec:
               enable_lazy_spilo_upgrade:
                 type: boolean
                 default: false
+              enable_cross_namespace_secret:
+                type: boolean
+                default: false
               enable_pgversion_env_var:
                 type: boolean
                 default: true

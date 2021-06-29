@@ -140,7 +140,7 @@ At the moment it is not possible to define membership of the manifest role in
 other roles.
 
 To define the secrets for the users in a different namespace than that of the cluster,
-one can use the flag `EnableNamespacedSecret` and declare the namespace for the
+one can use the flag `EnableCrossNamespaceSecret` and declare the namespace for the
 secrets in the manifest in the following manner,
 
 ```yaml
