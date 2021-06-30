@@ -96,13 +96,13 @@ func (c *Cluster) syncUnderlyingEBSVolume() error {
 		var modifySize *int64
 		var modifyType *string
 
-		if targetValue.Iops != nil {
+		if targetValue.Iops != nil && targetValue.Iops >= 3000 {
 			if volume.Iops != *targetValue.Iops {
 				modifyIops = targetValue.Iops
 			}
 		}
 
-		if targetValue.Throughput != nil {
+		if targetValue.Throughput != nil && targetValue.Throughput >= 125{
 			if volume.Throughput != *targetValue.Throughput {
 				modifyThroughput = targetValue.Throughput
 			}
