@@ -714,6 +714,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"gs_wal_path": {
 								Type: "string",
 							},
+							"standby_host": {
+								Type: "string",
+							},
+							"standby_port": {
+								Type: "string",
+							},
 						},
 					},
 					"streams": {

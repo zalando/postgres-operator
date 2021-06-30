@@ -474,6 +474,10 @@ spec:
                     type: string
                   gs_wal_path:
                     type: string
+                  standby_host:
+                    type: string
+                  standby_port:
+                    type: string
               streams:
                 type: array
                 nullable: true
