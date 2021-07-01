@@ -264,6 +264,13 @@ configuration they are grouped under the `kubernetes` key.
   [admin docs](../administrator.md#pod-disruption-budget) for more information.
   Default is true.
 
+* **enable_cross_namespace_secrets**
+  To create secrets in a different namespace other than the cluster namespace,
+  enable this option. Once, enabled user names of the intented users are to be
+  provided with the namespace in the form `{appnamespace}`.`{username}`. This
+  makes everything before the first `.` namespace where the secret for that
+  user has to be created and everything after that as the username.
+
 * **enable_init_containers**
   global option to allow for creating init containers in the cluster manifest to
   run actions before Spilo is started. Default is true.

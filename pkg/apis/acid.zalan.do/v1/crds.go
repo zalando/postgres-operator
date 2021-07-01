@@ -902,9 +902,6 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"enable_lazy_spilo_upgrade": {
 						Type: "boolean",
 					},
-					"enable_cross_namespace_secret": {
-						Type: "boolean",
-					},
 					"enable_shm_volume": {
 						Type: "boolean",
 					},
@@ -1028,6 +1025,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "string",
 									},
 								},
+							},
+							"enable_cross_namespace_secret": {
+								Type: "boolean",
 							},
 							"enable_init_containers": {
 								Type: "boolean",
