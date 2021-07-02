@@ -173,6 +173,9 @@ spec:
                   enable_init_containers:
                     type: boolean
                     default: true
+                  enable_cross_namespace_secret:
+                    type: boolean
+                    default: false
                   enable_pod_antiaffinity:
                     type: boolean
                     default: false

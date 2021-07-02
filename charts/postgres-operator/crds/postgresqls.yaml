@@ -515,8 +515,6 @@ spec:
                       type: integer
               useLoadBalancer:  # deprecated
                 type: boolean
-              enableNamespacedSecret:
-                type: boolean
               users:
                 type: object
                 additionalProperties:

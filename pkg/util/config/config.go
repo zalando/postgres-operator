@@ -207,6 +207,7 @@ type Config struct {
 	PostgresSuperuserTeams                 []string          `name:"postgres_superuser_teams" default:""`
 	SetMemoryRequestToLimit                bool              `name:"set_memory_request_to_limit" default:"false"`
 	EnableLazySpiloUpgrade                 bool              `name:"enable_lazy_spilo_upgrade" default:"false"`
+	EnableCrossNamespaceSecret             bool              `name:"enable_cross_namespace_secret" default:"false"`
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"`

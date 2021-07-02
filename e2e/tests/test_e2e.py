@@ -598,29 +598,36 @@ class EndToEndTestCase(unittest.TestCase):
         self.k8s.api.core_v1.create_namespace(v1_appnamespace)
         self.k8s.wait_for_namespace_creation(app_namespace)
 
+        patch_cross_namespace_secret = {
+            "data": {
+                "enable_cross_namespace_secret": "true"
+            }
+        }
+        self.k8s.update_config(patch_cross_namespace_secret,
+                          step="cross namespace secrets enabled")
+
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
             {
                 'spec': {
-                    'enableNamespacedSecret': True,
                     'users':{
                         'appspace.db_user': [],
                     }
                 }
             })
+
         self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", app_namespace),
                              1, "Secret not created for user in namespace")
 
         #reset the flag
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            'acid.zalan.do', 'v1', 'default',
-            'postgresqls', 'acid-minimal-cluster',
-            {
-                'spec': {
-                    'enableNamespacedSecret': False,
+        unpatch_cross_namespace_secret = {
+                "data": {
+                    "enable_cross_namespace_secret": "false",
                 }
-            })
+            }
+        self.k8s.update_config(unpatch_cross_namespace_secret, step="disable cross namespace secrets")
+
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
