@@ -85,7 +85,7 @@ The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
 be skipped with warning when using v3. Documentation for installing applications
 with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
 
-The chart can also be found at: https://opensource.zalando.com/postgres-operator/charts/postgres-operator/
+The chart can also be found at: https://opensource.zalando.com/postgres-operator/charts/postgres-operator/postgres-operator-1.6.3.tgz
 
 ## Check if Postgres Operator is running
 
