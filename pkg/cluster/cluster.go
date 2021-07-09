@@ -361,6 +361,10 @@ func (c *Cluster) Create() error {
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
 
+	if len(c.Spec.Streams) > 0 {
+		c.createStreams()
+	}
+
 	return nil
 }
 
@@ -852,6 +856,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 
 	if _, err := c.syncConnectionPooler(oldSpec, newSpec, c.installLookupFunction); err != nil {
 		c.logger.Errorf("could not sync connection pooler: %v", err)
+		updateFailed = true
+	}
+
+	if err := c.syncStreams(); err != nil {
+		c.logger.Errorf("could not sync streams: %v", err)
 		updateFailed = true
 	}
 

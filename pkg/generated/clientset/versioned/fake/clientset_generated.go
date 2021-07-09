@@ -28,6 +28,8 @@ import (
 	clientset "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned"
 	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
 	fakeacidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1/fake"
+	zalandov1alpha1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1alpha1"
+	fakezalandov1alpha1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -85,4 +87,9 @@ var _ clientset.Interface = &Clientset{}
 // AcidV1 retrieves the AcidV1Client
 func (c *Clientset) AcidV1() acidv1.AcidV1Interface {
 	return &fakeacidv1.FakeAcidV1{Fake: &c.Fake}
+}
+
+// ZalandoV1alpha1 retrieves the ZalandoV1alpha1Client
+func (c *Clientset) ZalandoV1alpha1() zalandov1alpha1.ZalandoV1alpha1Interface {
+	return &fakezalandov1alpha1.FakeZalandoV1alpha1{Fake: &c.Fake}
 }

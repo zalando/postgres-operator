@@ -74,6 +74,7 @@ type PostgresSpec struct {
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
 	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
+	Streams               []Stream                    `json:"stream,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
@@ -223,4 +224,15 @@ type ConnectionPooler struct {
 	MaxDBConnections  *int32 `json:"maxDBConnections,omitempty"`
 
 	Resources `json:"resources,omitempty"`
+}
+
+type Stream struct {
+	Type      string            `json:"type"`
+	Database  string            `json:"database,omitempty"`
+	Tables    map[string]string `json:"tables,omitempty"`
+	Filter    map[string]string `json:"filter,omitempty"`
+	BatchSize uint32            `json:"batchSize,omitempty"`
+	SqsArn    string            `json:"sqsArn,omitempty"`
+	QueueName string            `json:"queueName,omitempty"`
+	User      string            `json:"user,omitempty"`
 }

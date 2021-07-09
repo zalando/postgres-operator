@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
+set -eou pipefail
 
-set -o errexit
-set -o nounset
-set -o pipefail
+GOPKG="github.com/zalando/postgres-operator"
+SCRIPT_ROOT="$(dirname "${BASH_SOURCE[0]}")/.."
 
-SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
-CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ${GOPATH}/src/k8s.io/code-generator)}
+rm -rf "${SCRIPT_ROOT}/generated"
 
-bash "${CODEGEN_PKG}/generate-groups.sh" all \
-  github.com/zalando/postgres-operator/pkg/generated github.com/zalando/postgres-operator/pkg/apis \
-  "acid.zalan.do:v1" \
-  --go-header-file "${SCRIPT_ROOT}"/hack/custom-boilerplate.go.txt
+go run k8s.io/code-generator/cmd/deepcopy-gen \
+ --input-dirs ${GOPKG}/pkg/apis/acid.zalan.do/v1,${GOPKG}/pkg/apis/zalando.org/v1alpha1 \
+ -O zz_generated.deepcopy \
+ --bounding-dirs ${GOPKG}/pkg/apis \
+ --go-header-file "${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt" \
+ -o "${SCRIPT_ROOT}/generated"
+
+cp -rv "${SCRIPT_ROOT}/generated/${GOPKG}"/* .
+
+rm -rf "${SCRIPT_ROOT}/generated"

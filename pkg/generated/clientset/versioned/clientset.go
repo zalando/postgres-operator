@@ -28,6 +28,7 @@ import (
 	"fmt"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/acid.zalan.do/v1"
+	zalandov1alpha1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/typed/zalando.org/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -36,18 +37,25 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	AcidV1() acidv1.AcidV1Interface
+	ZalandoV1alpha1() zalandov1alpha1.ZalandoV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	acidV1 *acidv1.AcidV1Client
+	acidV1          *acidv1.AcidV1Client
+	zalandoV1alpha1 *zalandov1alpha1.ZalandoV1alpha1Client
 }
 
 // AcidV1 retrieves the AcidV1Client
 func (c *Clientset) AcidV1() acidv1.AcidV1Interface {
 	return c.acidV1
+}
+
+// ZalandoV1alpha1 retrieves the ZalandoV1alpha1Client
+func (c *Clientset) ZalandoV1alpha1() zalandov1alpha1.ZalandoV1alpha1Interface {
+	return c.zalandoV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -72,6 +80,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	var cs Clientset
 	var err error
 	cs.acidV1, err = acidv1.NewForConfig(&configShallowCopy)
+	cs.zalandoV1alpha1, err = zalandov1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +97,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.acidV1 = acidv1.NewForConfigOrDie(c)
+	cs.zalandoV1alpha1 = zalandov1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -97,6 +107,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.acidV1 = acidv1.New(c)
+	cs.zalandoV1alpha1 = zalandov1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

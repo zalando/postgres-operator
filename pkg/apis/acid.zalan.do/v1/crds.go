@@ -657,6 +657,53 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"streams": {
+						Type: "array",
+						Items: &apiextv1.JSONSchemaPropsOrArray{
+							Schema: &apiextv1.JSONSchemaProps{
+								Type:     "object",
+								Required: []string{"type"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"database": {
+										Type: "string",
+									},
+									"filter": {
+										Type: "object",
+										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type:        "string",
+											},
+										},
+									},
+									"sqsArn": {
+										Type: "string",
+									},
+									"tables": {
+										Type: "object",
+										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type:        "string",
+											},
+										},
+									},
+									"type": {
+										Type: "string",
+										Enum: []apiextv1.JSON{
+											{
+												Raw: []byte(`"nakadi"`),
+											},
+											{
+												Raw: []byte(`"sqs"`),
+											},
+											{
+												Raw: []byte(`"wal"`),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					"teamId": {
 						Type: "string",
 					},
