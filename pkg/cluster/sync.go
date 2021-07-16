@@ -273,7 +273,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 	pods, err := c.listPods()
 	if err != nil {
-		c.logger.Infof("could not list pods of the statefulset: %v", err)
+		c.logger.Warnf("could not list pods of the statefulset: %v", err)
 	}
 
 	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
@@ -388,7 +388,7 @@ func (c *Cluster) syncStatefulSet() error {
 	// since those parameters require PostgreSQL restart.
 	pods, err = c.listPods()
 	if err != nil {
-		c.logger.Infof("could not list pods of the statefulset: %v", err)
+		c.logger.Warnf("could not get list of pods to apply special PostgreSQL parameters only to be set via Patroni API: %v", err)
 	}
 
 	for i, pod := range pods {
@@ -407,7 +407,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, config)
 		if err != nil {
-			return fmt.Errorf("could not set cluster-wide PostgreSQL configuration options: %v", err)
+			return fmt.Errorf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 		}
 
 		if instanceRestartRequired {

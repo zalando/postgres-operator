@@ -1431,13 +1431,14 @@ class EndToEndTestCase(unittest.TestCase):
         masterPod = k8s.get_cluster_leader_pod()
         labels = 'application=spilo,cluster-name=acid-minimal-cluster,spilo-role=master'
         creationTimestamp = masterPod.metadata.creation_timestamp
+        new_max_connections_value = "50"
 
         # adjust max_connection
         pg_patch_config = {
             "spec": {
                 "postgresql": {
                     "parameters": {
-                        "max_connections": "50"
+                        "max_connections": new_max_connections_value
                      }
                  },
                  "patroni": {
@@ -1466,7 +1467,7 @@ class EndToEndTestCase(unittest.TestCase):
                 desired_parameters = pg_patch_config["spec"]["postgresql"]["parameters"]
                 effective_parameters = effective_config["postgresql"]["parameters"]
                 self.assertEqual(desired_parameters["max_connections"], effective_parameters["max_connections"],
-                            "max_connectoins not updated")
+                            "max_connections not updated")
                 self.assertTrue(effective_config["slots"] is not None, "physical replication slot not added")
                 self.assertEqual(desired_patroni["ttl"], effective_config["ttl"],
                             "ttl not updated")
@@ -1479,8 +1480,14 @@ class EndToEndTestCase(unittest.TestCase):
                 return True
 
             self.eventuallyTrue(compare_config, "Postgres config not applied")
-            pods = k8s.api.core_v1.list_namespaced_pod(
-                'default', label_selector=labels).items
+
+            setting_query = """
+               SELECT setting
+                 FROM pg_settings
+                WHERE name = 'max_connections';
+            """
+            self.eventuallyEqual(lambda: self.query_database(masterPod.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "New max_connections setting not applied", 10, 5)
 
             # make sure that pod wasn't recreated
             self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
