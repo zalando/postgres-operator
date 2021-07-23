@@ -314,28 +314,39 @@ class EndToEndTestCase(unittest.TestCase):
                  }
             }
         }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
 
-        def get_max_connections():
+        try:
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
+
+            def get_max_connections():
+                pods = k8s.api.core_v1.list_namespaced_pod(
+                    'default', label_selector=labels).items
+                self.assert_master_is_unique()
+                masterPod = pods[0]
+                get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
+                result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
+                max_connections_value = int(result.stdout)
+                return max_connections_value
+
+            #Make sure that max_connections decreased
+            self.eventuallyEqual(get_max_connections, int(new_max_connections_value), "max_connections didn't decrease")
             pods = k8s.api.core_v1.list_namespaced_pod(
                 'default', label_selector=labels).items
             self.assert_master_is_unique()
             masterPod = pods[0]
-            get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
-            result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
-            max_connections_value = int(result.stdout)
-            return max_connections_value
+            #Make sure that pod didn't restart
+            self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
+                            "Master pod creation timestamp is updated")
 
-        #Make sure that max_connections decreased
-        self.eventuallyEqual(get_max_connections, int(new_max_connections_value), "max_connections didn't decrease")
-        pods = k8s.api.core_v1.list_namespaced_pod(
-            'default', label_selector=labels).items
-        self.assert_master_is_unique()
-        masterPod = pods[0]
-        #Make sure that pod didn't restart
-        self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
-                         "Master pod creation timestamp is updated")
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+        # make sure cluster is in a good state for further tests
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2,
+                             "No 2 pods running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
