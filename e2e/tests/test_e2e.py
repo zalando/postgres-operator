@@ -502,7 +502,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: k8s.count_services_with_label('application=db-connection-pooler,cluster-name=acid-minimal-cluster'),
                              0, "Pooler service not removed")
         self.eventuallyEqual(lambda: k8s.count_secrets_with_label('application=spilo,cluster-name=acid-minimal-cluster'),
-                             5, "Secrets not deleted")
+                             4, "Secrets not deleted")
 
         # Verify that all the databases have pooler schema installed.
         # Do this via psql, since otherwise we need to deal with
