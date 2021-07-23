@@ -290,37 +290,52 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_overwrite_pooler_deployment(self):
-        self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
-                             "Initial broken deployment not rolled out")
+    def test_decrease_max_connections(self):
+        '''
+            Test decreasing max_connections and restarting cluster through rest api
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        labels = 'spilo-role=master,' + cluster_label
+        new_max_connections_value = "99"
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector=labels).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+        creationTimestamp = masterPod.metadata.creation_timestamp
 
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
-        'acid.zalan.do', 'v1', 'default',
-        'postgresqls', 'acid-minimal-cluster',
-        {
-            'spec': {
-                'enableConnectionPooler': True
+        # adjust max_connection
+        pg_patch_max_connections = {
+            "spec": {
+                "postgresql": {
+                    "parameters": {
+                        "max_connections": new_max_connections_value
+                     }
+                 }
             }
-        })
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
 
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
-                             "Operator did not succeed in overwriting labels")
+        def get_max_connections():
+            pods = k8s.api.core_v1.list_namespaced_pod(
+                'default', label_selector=labels).items
+            self.assert_master_is_unique()
+            masterPod = pods[0]
+            get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
+            result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
+            max_connections_value = int(result.stdout)
+            return max_connections_value
 
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
-        'acid.zalan.do', 'v1', 'default',
-        'postgresqls', 'acid-minimal-cluster',
-        {
-            'spec': {
-                'enableConnectionPooler': False
-            }
-        })
-
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
-                             0, "Pooler pods not scaled down")
+        #Make sure that max_connections decreased
+        self.eventuallyEqual(get_max_connections, int(new_max_connections_value), "max_connections didn't decrease")
+        pods = k8s.api.core_v1.list_namespaced_pod(
+            'default', label_selector=labels).items
+        self.assert_master_is_unique()
+        masterPod = pods[0]
+        #Make sure that pod didn't restart
+        self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
+                         "Master pod creation timestamp is updated")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_enable_disable_connection_pooler(self):
@@ -588,7 +603,7 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_zz_cross_namespace_secrets(self):
+    def test_cross_namespace_secrets(self):
         '''
             Test secrets in different namespace
         '''
@@ -796,6 +811,33 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
+    def test_major_version_upgrade(self):
+        k8s = self.k8s
+        result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
+        self.eventuallyEqual(lambda: k8s.count_running_pods(labels="application=spilo,cluster-name=acid-upgrade-test"), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        pg_patch_version = {
+            "spec": {
+                "postgres": {
+                    "version": "13"
+                }
+            }
+        }
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
+            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version)
+
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+        def check_version_13():
+            p = k8s.get_patroni_state("acid-upgrade-test-0")
+            version = p["server_version"][0:2]
+            return version
+
+        self.evantuallyEqual(check_version_13, "13", "Version was not upgrade to 13")
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):
         '''
         Lower resource limits below configured minimum and let operator fix it
@@ -865,6 +907,7 @@ class EndToEndTestCase(unittest.TestCase):
         try:
             k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
             k8s.wait_for_pod_start("spilo-role=master", self.test_namespace)
+            k8s.wait_for_pod_start("spilo-role=replica", self.test_namespace)
             self.assert_master_is_unique(self.test_namespace, "acid-test-cluster")
 
         except timeout_decorator.TimeoutError:
@@ -877,6 +920,196 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.delete_namespaced_custom_object(
                 "acid.zalan.do", "v1", self.test_namespace, "postgresqls", "acid-test-cluster")
             time.sleep(5)
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
+    def test_node_affinity(self):
+        '''
+           Add label to a node and update postgres cluster spec to deploy only on a node with that label
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
+        # get nodes of master and replica(s)
+        master_node, replica_nodes = k8s.get_pg_nodes(cluster_label)
+
+        self.assertNotEqual(master_node, [])
+        self.assertNotEqual(replica_nodes, [])
+
+        # label node with environment=postgres
+        node_label_body = {
+            "metadata": {
+                "labels": {
+                    "node-affinity-test": "postgres"
+                }
+            }
+        }
+
+        try:
+            # patch current master node with the label
+            print('patching master node: {}'.format(master_node))
+            k8s.api.core_v1.patch_node(master_node, node_label_body)
+
+            # add node affinity to cluster
+            patch_node_affinity_config = {
+                "spec": {
+                    "nodeAffinity" : {
+                        "requiredDuringSchedulingIgnoredDuringExecution": {
+                            "nodeSelectorTerms": [
+                                {
+                                    "matchExpressions": [
+                                        {
+                                            "key": "node-affinity-test",
+                                            "operator": "In",
+                                            "values": [
+                                                "postgres"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                group="acid.zalan.do",
+                version="v1",
+                namespace="default",
+                plural="postgresqls",
+                name="acid-minimal-cluster",
+                body=patch_node_affinity_config)
+            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
+            k8s.wait_for_pod_failover(master_node, 'spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
+            for pod in podsList.items:
+                if pod.metadata.labels.get('spilo-role') == 'replica':
+                    self.assertEqual(master_node, pod.spec.node_name,
+                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(master_node, pod.spec.node_name))
+
+                    # check that pod has correct node affinity
+                    key = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].key
+                    value = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].values[0]
+                    self.assertEqual("node-affinity-test", key,
+                        "Sanity check: expect node selector key to be equal to 'node-affinity-test' but got {}".format(key))
+                    self.assertEqual("postgres", value,
+                        "Sanity check: expect node selector value to be equal to 'postgres' but got {}".format(value))
+
+            patch_node_remove_affinity_config = {
+                "spec": {
+                    "nodeAffinity" : None
+                }
+            }
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                group="acid.zalan.do",
+                version="v1",
+                namespace="default",
+                plural="postgresqls",
+                name="acid-minimal-cluster",
+                body=patch_node_remove_affinity_config)
+            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
+            # remove node affinity to move replica away from master node
+            nm, new_replica_nodes = k8s.get_cluster_nodes()
+            new_master_node = nm[0]
+            self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_node_readiness_label(self):
+        '''
+           Remove node readiness label from master node. This must cause a failover.
+        '''
+        k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
+        readiness_label = 'lifecycle-status'
+        readiness_value = 'ready'
+
+        try:
+            # get nodes of master and replica(s) (expected target of new master)
+            current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
+            num_replicas = len(current_replica_nodes)
+            failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
+
+            # add node_readiness_label to potential failover nodes
+            patch_readiness_label = {
+                "metadata": {
+                    "labels": {
+                        readiness_label: readiness_value
+                    }
+                }
+            }
+            self.assertTrue(len(failover_targets) > 0, "No failover targets available")
+            for failover_target in failover_targets:
+                k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
+
+            # define node_readiness_label in config map which should trigger a failover of the master
+            patch_readiness_label_config = {
+                "data": {
+                    "node_readiness_label": readiness_label + ':' + readiness_value,
+                }
+            }
+            k8s.update_config(patch_readiness_label_config, "setting readiness label")
+            new_master_node, new_replica_nodes = self.assert_failover(
+                current_master_node, num_replicas, failover_targets, cluster_label)
+
+            # patch also node where master ran before
+            k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
+
+            # toggle pod anti affinity to move replica away from master node
+            self.eventuallyTrue(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label), "Pods are redistributed")
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_overwrite_pooler_deployment(self):
+        self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
+                             "Initial broken deployment not rolled out")
+
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresqls', 'acid-minimal-cluster',
+        {
+            'spec': {
+                'enableConnectionPooler': True
+            }
+        })
+
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
+                             "Operator did not succeed in overwriting labels")
+
+        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        'acid.zalan.do', 'v1', 'default',
+        'postgresqls', 'acid-minimal-cluster',
+        {
+            'spec': {
+                'enableConnectionPooler': False
+            }
+        })
+
+        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+                             0, "Pooler pods not scaled down")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_rolling_update_flag(self):
@@ -1013,54 +1246,6 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_zz_node_readiness_label(self):
-        '''
-           Remove node readiness label from master node. This must cause a failover.
-        '''
-        k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        readiness_label = 'lifecycle-status'
-        readiness_value = 'ready'
-
-        try:
-            # get nodes of master and replica(s) (expected target of new master)
-            current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
-            num_replicas = len(current_replica_nodes)
-            failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
-
-            # add node_readiness_label to potential failover nodes
-            patch_readiness_label = {
-                "metadata": {
-                    "labels": {
-                        readiness_label: readiness_value
-                    }
-                }
-            }
-            self.assertTrue(len(failover_targets) > 0, "No failover targets available")
-            for failover_target in failover_targets:
-                k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
-
-            # define node_readiness_label in config map which should trigger a failover of the master
-            patch_readiness_label_config = {
-                "data": {
-                    "node_readiness_label": readiness_label + ':' + readiness_value,
-                }
-            }
-            k8s.update_config(patch_readiness_label_config, "setting readiness label")
-            new_master_node, new_replica_nodes = self.assert_failover(
-                current_master_node, num_replicas, failover_targets, cluster_label)
-
-            # patch also node where master ran before
-            k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
-
-            # toggle pod anti affinity to move replica away from master node
-            self.eventuallyTrue(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label), "Pods are redistributed")
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
-
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_scaling(self):
         '''
            Scale up from 2 to 3 and back to 2 pods by updating the Postgres manifest at runtime.
@@ -1155,34 +1340,7 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     @unittest.skip("Skipping this test until fixed")
-    def test_zaa_test_major_version_upgrade(self):
-        k8s = self.k8s
-        result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest-12.yaml")
-        self.eventuallyEqual(lambda: k8s.count_running_pods(labels="application=spilo,cluster-name=acid-upgrade-test"), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-        pg_patch_version = {
-            "spec": {
-                "postgres": {
-                    "version": "13"
-                }
-            }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-upgrade-test", pg_patch_version)
-
-        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-        def check_version_13():
-            p = k8s.get_patroni_state("acid-upgrade-test-0")
-            version = p["server_version"][0:2]
-            return version
-
-        self.evantuallyEqual(check_version_13, "13", "Version was not upgrade to 13")
-
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test until fixed")
-    def test_zzz_taint_based_eviction(self):
+    def test_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
         '''
@@ -1233,115 +1391,7 @@ class EndToEndTestCase(unittest.TestCase):
         self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_node_affinity(self):
-        '''
-           Add label to a node and update postgres cluster spec to deploy only on a node with that label
-        '''
-        k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-
-        # verify we are in good state from potential previous tests
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
-
-        # get nodes of master and replica(s)
-        master_node, replica_nodes = k8s.get_pg_nodes(cluster_label)
-
-        self.assertNotEqual(master_node, [])
-        self.assertNotEqual(replica_nodes, [])
-
-        # label node with environment=postgres
-        node_label_body = {
-            "metadata": {
-                "labels": {
-                    "node-affinity-test": "postgres"
-                }
-            }
-        }
-
-        try:
-            # patch current master node with the label
-            print('patching master node: {}'.format(master_node))
-            k8s.api.core_v1.patch_node(master_node, node_label_body)
-
-            # add node affinity to cluster
-            patch_node_affinity_config = {
-                "spec": {
-                    "nodeAffinity" : {
-                        "requiredDuringSchedulingIgnoredDuringExecution": {
-                            "nodeSelectorTerms": [
-                                {
-                                    "matchExpressions": [
-                                        {
-                                            "key": "node-affinity-test",
-                                            "operator": "In",
-                                            "values": [
-                                                "postgres"
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                group="acid.zalan.do",
-                version="v1",
-                namespace="default",
-                plural="postgresqls",
-                name="acid-minimal-cluster",
-                body=patch_node_affinity_config)
-            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-            # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
-            k8s.wait_for_pod_failover(master_node, 'spilo-role=replica,' + cluster_label)
-            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-
-            podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
-            for pod in podsList.items:
-                if pod.metadata.labels.get('spilo-role') == 'replica':
-                    self.assertEqual(master_node, pod.spec.node_name,
-                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(master_node, pod.spec.node_name))
-
-                    # check that pod has correct node affinity
-                    key = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].key
-                    value = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].values[0]
-                    self.assertEqual("node-affinity-test", key,
-                        "Sanity check: expect node selector key to be equal to 'node-affinity-test' but got {}".format(key))
-                    self.assertEqual("postgres", value,
-                        "Sanity check: expect node selector value to be equal to 'postgres' but got {}".format(value))
-
-            patch_node_remove_affinity_config = {
-                "spec": {
-                    "nodeAffinity" : None
-                }
-            }
-            k8s.api.custom_objects_api.patch_namespaced_custom_object(
-                group="acid.zalan.do",
-                version="v1",
-                namespace="default",
-                plural="postgresqls",
-                name="acid-minimal-cluster",
-                body=patch_node_remove_affinity_config)
-            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-
-            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
-
-            # remove node affinity to move replica away from master node
-            nm, new_replica_nodes = k8s.get_cluster_nodes()
-            new_master_node = nm[0]
-            self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
-
-        except timeout_decorator.TimeoutError:
-            print('Operator log: {}'.format(k8s.get_operator_log()))
-            raise
-
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_zzzz_cluster_deletion(self):
+    def test_zz_cluster_deletion(self):
         '''
            Test deletion with configured protection
         '''
@@ -1424,54 +1474,6 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
-
-    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_decrease_max_connections(self):
-        '''
-            Test decreasing max_connections and restarting cluster through rest api
-        '''
-        k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        labels = 'spilo-role=master,' + cluster_label
-        new_max_connections_value = "99"
-        pods = k8s.api.core_v1.list_namespaced_pod(
-            'default', label_selector=labels).items
-        self.assert_master_is_unique()
-        masterPod = pods[0]
-        creationTimestamp = masterPod.metadata.creation_timestamp
-
-        # adjust max_connection
-        pg_patch_max_connections = {
-            "spec": {
-                "postgresql": {
-                    "parameters": {
-                        "max_connections": new_max_connections_value
-                     }
-                 }
-            }
-        }
-        k8s.api.custom_objects_api.patch_namespaced_custom_object(
-            "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
-
-        def get_max_connections():
-            pods = k8s.api.core_v1.list_namespaced_pod(
-                'default', label_selector=labels).items
-            self.assert_master_is_unique()
-            masterPod = pods[0]
-            get_max_connections_cmd = '''psql -At -U postgres -c "SELECT setting FROM pg_settings WHERE name = 'max_connections';"'''
-            result = k8s.exec_with_kubectl(masterPod.metadata.name, get_max_connections_cmd)
-            max_connections_value = int(result.stdout)
-            return max_connections_value
-
-        #Make sure that max_connections decreased
-        self.eventuallyEqual(get_max_connections, int(new_max_connections_value), "max_connections didn't decrease")
-        pods = k8s.api.core_v1.list_namespaced_pod(
-            'default', label_selector=labels).items
-        self.assert_master_is_unique()
-        masterPod = pods[0]
-        #Make sure that pod didn't restart
-        self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
-                         "Master pod creation timestamp is updated")
 
     def get_failover_targets(self, master_node, replica_nodes):
         '''

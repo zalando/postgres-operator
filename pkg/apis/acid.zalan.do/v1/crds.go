@@ -341,6 +341,91 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"nodeAffinity": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"preferredDuringSchedulingIgnoredDuringExecution": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type:     "object",
+										Required: []string{"preference", "weight"},
+										Properties: map[string]apiextv1.JSONSchemaProps{
+											"preference": {
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"matchExpressions": {
+														Type: "array",
+														Items: &apiextv1.JSONSchemaPropsOrArray{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "object",
+																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+																	Allows: true,
+																},
+															},
+														},
+													},
+													"matchFields": {
+														Type: "array",
+														Items: &apiextv1.JSONSchemaPropsOrArray{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "object",
+																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+																	Allows: true,
+																},
+															},
+														},
+													},
+												},
+											},
+											"weight": {
+												Type:   "integer",
+												Format: "int32",
+											},
+										},
+									},
+								},
+							},
+							"requiredDuringSchedulingIgnoredDuringExecution": {
+								Type:     "object",
+								Required: []string{"nodeSelectorTerms"},
+								Properties: map[string]apiextv1.JSONSchemaProps{
+									"nodeSelectorTerms": {
+										Type: "array",
+										Items: &apiextv1.JSONSchemaPropsOrArray{
+											Schema: &apiextv1.JSONSchemaProps{
+												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"matchExpressions": {
+														Type: "array",
+														Items: &apiextv1.JSONSchemaPropsOrArray{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "object",
+																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+																	Allows: true,
+																},
+															},
+														},
+													},
+													"matchFields": {
+														Type: "array",
+														Items: &apiextv1.JSONSchemaPropsOrArray{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "object",
+																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+																	Allows: true,
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 					"numberOfInstances": {
 						Type:    "integer",
 						Minimum: &min0,
@@ -593,91 +678,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 							"caSecretName": {
 								Type: "string",
-							},
-						},
-					},
-					"nodeAffinity": {
-						Type: "object",
-						Properties: map[string]apiextv1.JSONSchemaProps{
-							"preferredDuringSchedulingIgnoredDuringExecution": {
-								Type: "array",
-								Items: &apiextv1.JSONSchemaPropsOrArray{
-									Schema: &apiextv1.JSONSchemaProps{
-										Type:     "object",
-										Required: []string{"preference", "weight"},
-										Properties: map[string]apiextv1.JSONSchemaProps{
-											"preference": {
-												Type: "object",
-												Properties: map[string]apiextv1.JSONSchemaProps{
-													"matchExpressions": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type: "object",
-																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-																	Allows: true,
-																},
-															},
-														},
-													},
-													"matchFields": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type: "object",
-																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-																	Allows: true,
-																},
-															},
-														},
-													},
-												},
-											},
-											"weight": {
-												Type:   "integer",
-												Format: "int32",
-											},
-										},
-									},
-								},
-							},
-							"requiredDuringSchedulingIgnoredDuringExecution": {
-								Type:     "object",
-								Required: []string{"nodeSelectorTerms"},
-								Properties: map[string]apiextv1.JSONSchemaProps{
-									"nodeSelectorTerms": {
-										Type: "array",
-										Items: &apiextv1.JSONSchemaPropsOrArray{
-											Schema: &apiextv1.JSONSchemaProps{
-												Type: "object",
-												Properties: map[string]apiextv1.JSONSchemaProps{
-													"matchExpressions": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type: "object",
-																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-																	Allows: true,
-																},
-															},
-														},
-													},
-													"matchFields": {
-														Type: "array",
-														Items: &apiextv1.JSONSchemaPropsOrArray{
-															Schema: &apiextv1.JSONSchemaProps{
-																Type: "object",
-																AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
-																	Allows: true,
-																},
-															},
-														},
-													},
-												},
-											},
-										},
-									},
-								},
 							},
 						},
 					},
