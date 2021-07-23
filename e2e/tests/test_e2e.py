@@ -1232,7 +1232,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # status should again be "SyncFailed" but turn into "Running" on the next sync
-            time.sleep(10)
+            time.sleep(20)
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
 
             # revert config changes
