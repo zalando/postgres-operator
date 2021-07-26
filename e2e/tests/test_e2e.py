@@ -290,6 +290,7 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def test_cross_namespace_secrets(self):
         '''
             Test secrets in different namespace
         '''
