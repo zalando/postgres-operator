@@ -1233,6 +1233,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # status should again be "SyncFailed" but turn into "Running" on the next sync
             time.sleep(20)
+            print('Operator log: {}'.format(k8s.get_operator_log()))
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
 
             # revert config changes
