@@ -622,11 +622,6 @@ func (c *Cluster) syncRoles() (err error) {
 	// create list of database roles to query
 	for _, u := range c.pgUsers {
 		pgRole := u.Name
-		if u.Namespace != c.Namespace && u.Namespace != "" {
-			// to avoid the conflict of having multiple users of same name
-			// but each in different namespace.
-			pgRole = fmt.Sprintf("%s.%s", u.Namespace, u.Name)
-		}
 		userNames = append(userNames, pgRole)
 		// add team member role name with rename suffix in case we need to rename it back
 		if u.Origin == spec.RoleOriginTeamsAPI && c.OpConfig.EnableTeamMemberDeprecation {
