@@ -1199,7 +1199,7 @@ class EndToEndTestCase(unittest.TestCase):
         patch_resync_config = {
             "data": {
                 "pod_label_wait_timeout": "2s",
-                "resync_period": "20s",
+                "resync_period": "1m",
             }
         }
 
@@ -1232,7 +1232,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # status should again be "SyncFailed" but turn into "Running" on the next sync
-            time.sleep(20)
+            time.sleep(60)
             print('Operator log: {}'.format(k8s.get_operator_log()))
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
 
