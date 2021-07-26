@@ -290,10 +290,11 @@ class EndToEndTestCase(unittest.TestCase):
                              "Operator does not get in sync")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_cross_namespace_secrets(self):
         '''
             Test secrets in different namespace
         '''
+        k8s = self.k8s
+
         # enable secret creation in separate namespace
         patch_cross_namespace_secret = {
             "data": {
@@ -301,8 +302,8 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         self.k8s.update_config(patch_cross_namespace_secret,
-                               step="cross namespace secrets enabled")
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+                          step="cross namespace secrets enabled")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
 
         # create secret in test namespace
@@ -316,7 +317,9 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             })
-
+        
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
         self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", self.test_namespace),
                              1, "Secret not created for user in namespace")
 
@@ -1229,6 +1232,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # status should again be "SyncFailed" but turn into "Running" on the next sync
             time.sleep(60)
+            print('Operator log: {}'.format(k8s.get_operator_log()))
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
 
             # revert config changes
