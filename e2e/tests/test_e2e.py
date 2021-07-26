@@ -592,6 +592,8 @@ class EndToEndTestCase(unittest.TestCase):
         '''
             Test secrets in different namespace
         '''
+        k8s = self.k8s
+
         # enable secret creation in separate namespace
         patch_cross_namespace_secret = {
             "data": {
