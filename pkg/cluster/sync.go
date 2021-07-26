@@ -386,7 +386,6 @@ func (c *Cluster) syncStatefulSet() error {
 		return fmt.Errorf("could not set cluster-wide PostgreSQL configuration options: %v", err)
 	}
 
-
 	if instancesRestartRequired {
 		c.logger.Debugln("restarting Postgres server within pods")
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pods")
@@ -626,7 +625,7 @@ func (c *Cluster) syncRoles() (err error) {
 		if u.Namespace != c.Namespace && u.Namespace != "" {
 			// to avoid the conflict of having multiple users of same name
 			// but each in different namespace.
-			pgRole = fmt.Sprintf("%s.%s", u.Name, u.Namespace)
+			pgRole = fmt.Sprintf("%s.%s", u.Namespace, u.Name)
 		}
 		userNames = append(userNames, pgRole)
 		// add team member role name with rename suffix in case we need to rename it back

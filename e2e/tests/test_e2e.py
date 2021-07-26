@@ -294,12 +294,7 @@ class EndToEndTestCase(unittest.TestCase):
         '''
             Test secrets in different namespace
         '''
-        app_namespace = "appspace"
-
-        v1_appnamespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=app_namespace))
-        self.k8s.api.core_v1.create_namespace(v1_appnamespace)
-        self.k8s.wait_for_namespace_creation(app_namespace)
-
+        # enable secret creation in separate namespace
         patch_cross_namespace_secret = {
             "data": {
                 "enable_cross_namespace_secret": "true"
@@ -310,18 +305,19 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
 
+        # create secret in test namespace
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
             {
                 'spec': {
                     'users':{
-                        'appspace.db_user': [],
+                        'test.db_user': [],
                     }
                 }
             })
 
-        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", app_namespace),
+        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", self.test_namespace),
                              1, "Secret not created for user in namespace")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -1233,7 +1229,6 @@ class EndToEndTestCase(unittest.TestCase):
 
             # status should again be "SyncFailed" but turn into "Running" on the next sync
             time.sleep(60)
-            print('Operator log: {}'.format(k8s.get_operator_log()))
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
 
             # revert config changes
