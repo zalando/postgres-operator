@@ -926,7 +926,6 @@ class EndToEndTestCase(unittest.TestCase):
             time.sleep(5)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test until fixed")
     def test_node_affinity(self):
         '''
            Add label to a node and update postgres cluster spec to deploy only on a node with that label
@@ -1199,7 +1198,7 @@ class EndToEndTestCase(unittest.TestCase):
         patch_resync_config = {
             "data": {
                 "pod_label_wait_timeout": "2s",
-                "resync_period": "1m",
+                "resync_period": "30s",
             }
         }
 
@@ -1232,8 +1231,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # status should again be "SyncFailed" but turn into "Running" on the next sync
-            time.sleep(60)
-            print('Operator log: {}'.format(k8s.get_operator_log()))
+            time.sleep(30)
             self.eventuallyEqual(lambda: k8s.pg_get_status(), "Running", "Expected running cluster after two syncs")
 
             # revert config changes
