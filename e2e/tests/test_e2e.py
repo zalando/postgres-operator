@@ -588,16 +588,13 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    def test_zz_cross_namespace_secrets(self):
+    def test_cross_namespace_secrets(self):
         '''
             Test secrets in different namespace
         '''
-        app_namespace = "appspace"
+        k8s = self.k8s
 
-        v1_appnamespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=app_namespace))
-        self.k8s.api.core_v1.create_namespace(v1_appnamespace)
-        self.k8s.wait_for_namespace_creation(app_namespace)
-
+        # enable secret creation in separate namespace
         patch_cross_namespace_secret = {
             "data": {
                 "enable_cross_namespace_secret": "true"
@@ -605,29 +602,25 @@ class EndToEndTestCase(unittest.TestCase):
         }
         self.k8s.update_config(patch_cross_namespace_secret,
                           step="cross namespace secrets enabled")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
 
+        # create secret in test namespace
         self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
             {
                 'spec': {
                     'users':{
-                        'appspace.db_user': [],
+                        'test.db_user': [],
                     }
                 }
             })
-
-        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", app_namespace),
+        
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", self.test_namespace),
                              1, "Secret not created for user in namespace")
-
-        #reset the flag
-        unpatch_cross_namespace_secret = {
-                "data": {
-                    "enable_cross_namespace_secret": "false",
-                }
-            }
-        self.k8s.update_config(unpatch_cross_namespace_secret, step="disable cross namespace secrets")
-
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_lazy_spilo_upgrade(self):
