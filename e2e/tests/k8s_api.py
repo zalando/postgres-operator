@@ -469,12 +469,17 @@ class K8sBase:
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
         new_pod_node = ''
+        pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
 
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
                 new_pod_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+        while pods_with_update_flag != 0:
+            pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_logical_backup_job(self, namespace='default'):
