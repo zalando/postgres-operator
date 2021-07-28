@@ -614,11 +614,6 @@ func (in *PostgresSpec) DeepCopyInto(out *PostgresSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.EnableNamespacedSecret != nil {
-		in, out := &in.EnableNamespacedSecret, &out.EnableNamespacedSecret
-		*out = new(bool)
-		**out = **in
-	}
 	if in.Users != nil {
 		in, out := &in.Users, &out.Users
 		*out = make(map[string]UserFlags, len(*in))
