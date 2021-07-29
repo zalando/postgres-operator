@@ -263,10 +263,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 }
 
 func (c *Cluster) syncStatefulSet() error {
-	var (
-		masterPod               *v1.Pod
-		instanceRestartRequired bool
-	)
+	var masterPod *v1.Pod
 
 	podsToRecreate := make([]v1.Pod, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
@@ -393,43 +390,15 @@ func (c *Cluster) syncStatefulSet() error {
 
 	for i, pod := range pods {
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-
 		if role == Master {
 			masterPod = &pods[i]
 			continue
 		}
-
-		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		config, err := c.patroni.GetConfig(&pod)
-		if err != nil {
-			return fmt.Errorf("could not get config for pod %s: %v", podName, err)
-		}
-
-		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, config)
-		if err != nil {
-			return fmt.Errorf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
-		}
-
-		if instanceRestartRequired {
-			c.logger.Debugf("restarting Postgres server within pod %s", podName)
-			ttl, ok := config["ttl"].(int32)
-			if !ok {
-				ttl = 30
-			}
-			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pod "+pod.Name)
-			if err := c.restartInstance(&pod, ttl); err != nil {
-				c.logger.Warningf("could not restart Postgres server within pod %s: %v", podName, err)
-			}
-			c.logger.Infof("Postgres server successfuly restarted in pod %s", podName)
-			c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done for pod "+pod.Name)
-		}
+		c.restartInstance(&pod)
 	}
 
 	if masterPod != nil {
-		masterPodName := util.NameFromMeta(masterPod.ObjectMeta)
-		if err := c.restartInstance(masterPod, 0); err != nil {
-			c.logger.Warningf("could not restart Postgres master within pod %s: %v", masterPodName, err)
-		}
+		c.restartInstance(masterPod)
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
@@ -445,14 +414,36 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) restartInstance(pod *v1.Pod, ttl int32) error {
+func (c *Cluster) restartInstance(pod *v1.Pod) {
 
-	if err := c.patroni.Restart(pod); err != nil {
-		return err
+	podName := util.NameFromMeta(pod.ObjectMeta)
+	role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+	config, err := c.patroni.GetConfig(pod)
+	if err != nil {
+		c.logger.Warningf("could not get config for %s pod %s: %v", role, podName, err)
+		return
 	}
-	time.Sleep(time.Duration(ttl) * time.Second)
 
-	return nil
+	instanceRestartRequired, err := c.checkAndSetPostgreSQLConfiguration(pod, config)
+	if err != nil {
+		c.logger.Warningf("could not set PostgreSQL configuration options for %s pod %s: %v", role, podName, err)
+		return
+	}
+
+	if instanceRestartRequired {
+		c.logger.Debugf("restarting Postgres server within %s pod %s", podName)
+		ttl, ok := config["ttl"].(int32)
+		if !ok {
+			ttl = 30
+		}
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pod "+pod.Name)
+		if err := c.patroni.Restart(pod); err != nil {
+			c.logger.Warningf("could not restart Postgres server within %s pod %s: %v", role, podName, err)
+		}
+		time.Sleep(time.Duration(ttl) * time.Second)
+		c.logger.Infof("Postgres server successfuly restarted in %s pod %s", role, podName)
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done for pod "+pod.Name)
+	}
 }
 
 // AnnotationsToPropagate get the annotations to update if required
@@ -487,9 +478,9 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 	return nil
 }
 
-// checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
+// checkAndSetPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig map[string]interface{}) (bool, error) {
+func (c *Cluster) checkAndSetPostgreSQLConfiguration(pod *v1.Pod, patroniConfig map[string]interface{}) (bool, error) {
 	var (
 		err             error
 		pods            []v1.Pod
