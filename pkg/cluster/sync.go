@@ -431,18 +431,18 @@ func (c *Cluster) restartInstance(pod *v1.Pod) {
 	}
 
 	if instanceRestartRequired {
-		c.logger.Debugf("restarting Postgres server within %s pod %s", podName)
+		c.logger.Debugf("restarting Postgres server within %s pod %s", role, podName)
 		ttl, ok := config["ttl"].(int32)
 		if !ok {
 			ttl = 30
 		}
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "restarting Postgres server within pod "+pod.Name)
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("restarting Postgres server within %s pod %s", role, pod.Name))
 		if err := c.patroni.Restart(pod); err != nil {
 			c.logger.Warningf("could not restart Postgres server within %s pod %s: %v", role, podName, err)
 		}
 		time.Sleep(time.Duration(ttl) * time.Second)
 		c.logger.Infof("Postgres server successfuly restarted in %s pod %s", role, podName)
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Postgres server restart done for pod "+pod.Name)
+		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for pod %s pod %s", role, pod.Name))
 	}
 }
 
