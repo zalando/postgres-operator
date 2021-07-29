@@ -19,13 +19,41 @@ var outboxTableNameTemplate config.StringTemplate = "{table}_{eventtype}_outbox"
 func (c *Cluster) createStreams() error {
 	c.setProcessName("creating streams")
 
+	logicalDecodingEnabled, err := c.logicalDecodingEnabled()
+	if !logicalDecodingEnabled || err != nil {
+		return fmt.Errorf("logical decoding setup incomplete: %v", err)
+	}
+
 	fes := c.generateFabricEventStream()
-	_, err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Create(context.TODO(), fes, metav1.CreateOptions{})
+	_, err = c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Create(context.TODO(), fes, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("could not create event stream custom resource: %v", err)
 	}
 
 	return nil
+}
+
+func (c *Cluster) logicalDecodingEnabled() (bool, error) {
+	var errors []string
+
+	walLevel := c.Spec.PostgresqlParam.Parameters["wal_level"]
+	if walLevel == "" || walLevel != "logical" {
+		errors = append(errors, "setting 'wal_level: logical' missing under spec.postgresql.parameters")
+	}
+
+	for _, stream := range c.Spec.Streams {
+		slotName := c.getLogicalReplicationSlot(stream.Database)
+
+		if slotName == "" {
+			errors = append(errors, fmt.Sprintf("no logical replication slot defined under spec.patroni.slots for database %q", stream.Database))
+		}
+	}
+
+	if len(errors) > 0 {
+		return false, fmt.Errorf("logical decoding setup incomplete: %v", errors)
+	}
+
+	return true, nil
 }
 
 func (c *Cluster) syncStreamDbResources() error {
@@ -148,7 +176,7 @@ func getOutboxTable(tableName, eventType string) zalandov1alpha1.EventStreamTabl
 func (c *Cluster) getStreamConnection(database, user string) zalandov1alpha1.Connection {
 	return zalandov1alpha1.Connection{
 		Url:      fmt.Sprintf("jdbc:postgresql://%s.%s/%s?user=%s&ssl=true&sslmode=require", c.Name, c.Namespace, database, user),
-		SlotName: constants.EventStreamSourceSlotName,
+		SlotName: c.getLogicalReplicationSlot(database),
 		DBAuth: zalandov1alpha1.DBAuth{
 			Type:        constants.EventStreamSourceAuthType,
 			Name:        c.credentialSecretNameForCluster(user, c.ClusterName),
@@ -156,6 +184,16 @@ func (c *Cluster) getStreamConnection(database, user string) zalandov1alpha1.Con
 			PasswordKey: "password",
 		},
 	}
+}
+
+func (c *Cluster) getLogicalReplicationSlot(database string) string {
+	for slotName, slot := range c.Spec.Patroni.Slots {
+		if strings.HasPrefix(slotName, constants.EventStreamSourceSlotPrefix) && slot["type"] == "logical" && slot["database"] == database {
+			return slotName
+		}
+	}
+
+	return ""
 }
 
 func (c *Cluster) syncStreams() error {

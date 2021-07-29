@@ -4,7 +4,7 @@ package constants
 const (
 	FESsuffix                     = "-event-streams"
 	EventStreamSourcePGType       = "PostgresLogicalReplication"
-	EventStreamSourceSlotName     = "fes"
+	EventStreamSourceSlotPrefix   = "fes"
 	EventStreamSourceAuthType     = "DatabaseAuthenticationSecret"
 	EventStreamFlowPgNakadiType   = "PostgresWalToNakadiDataEvent"
 	EventStreamFlowPgApiType      = "PostgresWalToApiCallHomeEvent"

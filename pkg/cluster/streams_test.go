@@ -40,6 +40,20 @@ func TestGenerateFabricEventStream(t *testing.T) {
 			Databases: map[string]string{
 				"foo": "foo_user",
 			},
+			Patroni: acidv1.Patroni{
+				Slots: map[string]map[string]string{
+					"fes": {
+						"type":     "logical",
+						"database": "foo",
+						"plugin":   "wal2json",
+					},
+				},
+			},
+			PostgresqlParam: acidv1.PostgresqlParam{
+				Parameters: map[string]string{
+					"wal_level": "logical",
+				},
+			},
 			Streams: []acidv1.Stream{
 				{
 					Type:     "nakadi",
@@ -93,7 +107,8 @@ func TestGenerateFabricEventStream(t *testing.T) {
 			},
 		}, client, pg, logger, eventRecorder)
 
-	cluster.syncStreams()
+	err := cluster.syncStreams()
+	assert.NoError(t, err)
 
 	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), cluster.Name+constants.FESsuffix, metav1.GetOptions{})
 	assert.NoError(t, err)
