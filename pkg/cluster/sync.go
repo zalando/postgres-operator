@@ -411,7 +411,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 	// if the config update requires a restart, call Patroni restart for replicas first, then master
 	if instanceRestartRequired {
-		c.logger.Info("restarting Postgres server within pods")
+		c.logger.Debug("restarting Postgres server within pods")
 		ttl, ok := postgresConfig["ttl"].(int32)
 		if !ok {
 			ttl = 30
@@ -456,7 +456,7 @@ func (c *Cluster) restartInstance(pod *v1.Pod, ttl int32) {
 
 	time.Sleep(time.Duration(ttl) * time.Second)
 	c.logger.Debugf("Postgres server successfuly restarted in %s pod %s", role, podName)
-	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for pod %s pod %s", role, pod.Name))
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for %s pod %s", role, pod.Name))
 }
 
 // AnnotationsToPropagate get the annotations to update if required
@@ -556,7 +556,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 	// try all pods until the first one that is successful, as it doesn't matter which pod
 	// carries the request to change configuration through
 	podName := util.NameFromMeta(pod.ObjectMeta)
-	c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %s",
+	c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
 		podName, configToSetJson)
 	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
 		return true, fmt.Errorf("could not patch postgres parameters with a pod %s: %v", podName, err)
