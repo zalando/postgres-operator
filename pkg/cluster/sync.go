@@ -394,11 +394,11 @@ func (c *Cluster) syncStatefulSet() error {
 			masterPod = &pods[i]
 			continue
 		}
-		c.restartInstance(&pod)
+		c.syncPostgreSQLConfiguration(&pod)
 	}
 
 	if masterPod != nil {
-		c.restartInstance(masterPod)
+		c.syncPostgreSQLConfiguration(masterPod)
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
@@ -414,7 +414,7 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) restartInstance(pod *v1.Pod) {
+func (c *Cluster) syncPostgreSQLConfiguration(pod *v1.Pod) {
 
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])

@@ -852,7 +852,7 @@ class EndToEndTestCase(unittest.TestCase):
         try:
             k8s.create_with_kubectl("manifests/complete-postgres-manifest.yaml")
             k8s.wait_for_pod_start("spilo-role=master", self.test_namespace)
-            k8s.wait_for_pod_start('spilo-role=replica', self.test_namespace)
+            k8s.wait_for_pod_start("spilo-role=replica", self.test_namespace)
             self.assert_master_is_unique(self.test_namespace, "acid-test-cluster")
 
         except timeout_decorator.TimeoutError:
@@ -1500,7 +1500,6 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
-
 
     def get_failover_targets(self, master_node, replica_nodes):
         '''
