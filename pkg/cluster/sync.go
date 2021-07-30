@@ -263,7 +263,11 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 }
 
 func (c *Cluster) syncStatefulSet() error {
-	var masterPod *v1.Pod
+	var (
+		masterPod               *v1.Pod
+		postgresConfig          map[string]interface{}
+		instanceRestartRequired bool
+	)
 
 	podsToRecreate := make([]v1.Pod, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
@@ -388,17 +392,42 @@ func (c *Cluster) syncStatefulSet() error {
 		c.logger.Warnf("could not get list of pods to apply special PostgreSQL parameters only to be set via Patroni API: %v", err)
 	}
 
+	// get Postgres config, compare with manifest and update via Patroni PATCH endpoint if it differs
+	// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used.
 	for i, pod := range pods {
-		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-		if role == Master {
-			masterPod = &pods[i]
+		podName := util.NameFromMeta(pods[i].ObjectMeta)
+		config, err := c.patroni.GetConfig(&pod)
+		if err != nil {
+			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
 			continue
 		}
-		c.syncPostgreSQLConfiguration(&pod)
+		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, config)
+		if err != nil {
+			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
+			continue
+		}
+		break
 	}
 
-	if masterPod != nil {
-		c.syncPostgreSQLConfiguration(masterPod)
+	// if the config update requires a restart, call Patroni restart for replicas first, then master
+	if instanceRestartRequired {
+		c.logger.Info("restarting Postgres server within pods")
+		ttl, ok := postgresConfig["ttl"].(int32)
+		if !ok {
+			ttl = 30
+		}
+		for i, pod := range pods {
+			role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+			if role == Master {
+				masterPod = &pods[i]
+				continue
+			}
+			c.restartInstance(&pod, ttl)
+		}
+
+		if masterPod != nil {
+			c.restartInstance(masterPod, ttl)
+		}
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
@@ -414,36 +443,20 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) syncPostgreSQLConfiguration(pod *v1.Pod) {
-
+func (c *Cluster) restartInstance(pod *v1.Pod, ttl int32) {
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-	config, err := c.patroni.GetConfig(pod)
-	if err != nil {
-		c.logger.Warningf("could not get config for %s pod %s: %v", role, podName, err)
+
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("restarting Postgres server within %s pod %s", role, pod.Name))
+
+	if err := c.patroni.Restart(pod); err != nil {
+		c.logger.Warningf("could not restart Postgres server within %s pod %s: %v", role, podName, err)
 		return
 	}
 
-	instanceRestartRequired, err := c.checkAndSetPostgreSQLConfiguration(pod, config)
-	if err != nil {
-		c.logger.Warningf("could not set PostgreSQL configuration options for %s pod %s: %v", role, podName, err)
-		return
-	}
-
-	if instanceRestartRequired {
-		c.logger.Debugf("restarting Postgres server within %s pod %s", role, podName)
-		ttl, ok := config["ttl"].(int32)
-		if !ok {
-			ttl = 30
-		}
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("restarting Postgres server within %s pod %s", role, pod.Name))
-		if err := c.patroni.Restart(pod); err != nil {
-			c.logger.Warningf("could not restart Postgres server within %s pod %s: %v", role, podName, err)
-		}
-		time.Sleep(time.Duration(ttl) * time.Second)
-		c.logger.Infof("Postgres server successfuly restarted in %s pod %s", role, podName)
-		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for pod %s pod %s", role, pod.Name))
-	}
+	time.Sleep(time.Duration(ttl) * time.Second)
+	c.logger.Debugf("Postgres server successfuly restarted in %s pod %s", role, podName)
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for pod %s pod %s", role, pod.Name))
 }
 
 // AnnotationsToPropagate get the annotations to update if required
@@ -478,15 +491,9 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 	return nil
 }
 
-// checkAndSetPostgreSQLConfiguration checks whether cluster-wide API parameters
+// checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetPostgreSQLConfiguration(pod *v1.Pod, patroniConfig map[string]interface{}) (bool, error) {
-	var (
-		err             error
-		pods            []v1.Pod
-		restartRequired bool
-	)
-
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig map[string]interface{}) (bool, error) {
 	configToSet := make(map[string]interface{})
 	parametersToSet := make(map[string]string)
 	effectivePgParameters := make(map[string]interface{})
@@ -538,7 +545,7 @@ func (c *Cluster) checkAndSetPostgreSQLConfiguration(pod *v1.Pod, patroniConfig 
 	}
 
 	if len(configToSet) == 0 {
-		return restartRequired, nil
+		return false, nil
 	}
 
 	configToSetJson, err := json.Marshal(configToSet)
@@ -551,14 +558,11 @@ func (c *Cluster) checkAndSetPostgreSQLConfiguration(pod *v1.Pod, patroniConfig 
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %s",
 		podName, configToSetJson)
-	if err = c.patroni.SetConfig(pod, configToSet); err == nil {
-		restartRequired = true
-		return restartRequired, nil
+	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
+		return true, fmt.Errorf("could not patch postgres parameters with a pod %s: %v", podName, err)
 	}
-	c.logger.Warningf("could not patch postgres parameters with a pod %s: %v", podName, err)
 
-	return restartRequired, fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
-		len(pods))
+	return true, nil
 }
 
 func (c *Cluster) syncSecrets() error {
