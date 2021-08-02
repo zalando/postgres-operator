@@ -786,6 +786,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 	}
 
 	if c.OpConfig.WALES3Bucket != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AWS_REGION", Value: c.OpConfig.AWSRegion})
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_S3_BUCKET", Value: c.OpConfig.WALES3Bucket})
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
@@ -1796,6 +1797,10 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 					{
 						Name:  "CLONE_WAL_S3_BUCKET",
 						Value: c.OpConfig.WALES3Bucket,
+					},
+					{
+						Name:  "CLONE_AWS_REGION",
+						Value: c.OpConfig.AWSRegion,
 					},
 				}
 				result = append(result, envs...)
