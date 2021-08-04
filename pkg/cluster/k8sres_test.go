@@ -492,13 +492,26 @@ func TestCloneEnv(t *testing.T) {
 				Name:  "CLONE_TARGET_TIME",
 				Value: "somewhen",
 			},
-			envPos: 4,
+			envPos: 5,
+		},
+		{
+			subTest: "generated s3 path, AWS region",
+			cloneOpts: &acidv1.CloneDescription{
+				ClusterName:  "test-cluster",
+				EndTimestamp: "somewhen",
+			},
+			env: v1.EnvVar{
+				Name:  "CLONE_AWS_REGION",
+				Value: "test-region",
+			},
+			envPos: 2,
 		},
 	}
 
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
+				AWSRegion:      "test-region",
 				WALES3Bucket:   "wale-bucket",
 				ProtectedRoles: []string{"admin"},
 				Auth: config.Auth{
