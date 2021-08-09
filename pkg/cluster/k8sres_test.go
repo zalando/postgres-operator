@@ -505,7 +505,6 @@ func TestCloneEnv(t *testing.T) {
 	var cluster = New(
 		Config{
 			OpConfig: config.Config{
-				AWSRegion:      "test-region",
 				WALES3Bucket:   "wale-bucket",
 				ProtectedRoles: []string{"admin"},
 				Auth: config.Auth{
