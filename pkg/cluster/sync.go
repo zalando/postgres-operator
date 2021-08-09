@@ -422,11 +422,12 @@ func (c *Cluster) syncStatefulSet() error {
 				masterPod = &pods[i]
 				continue
 			}
-			c.restartInstance(&pod, ttl)
+			c.restartInstance(&pod)
+			time.Sleep(time.Duration(ttl) * time.Second)
 		}
 
 		if masterPod != nil {
-			c.restartInstance(masterPod, ttl)
+			c.restartInstance(masterPod)
 		}
 	}
 
@@ -443,7 +444,7 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) restartInstance(pod *v1.Pod, ttl int32) {
+func (c *Cluster) restartInstance(pod *v1.Pod) {
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
@@ -454,7 +455,6 @@ func (c *Cluster) restartInstance(pod *v1.Pod, ttl int32) {
 		return
 	}
 
-	time.Sleep(time.Duration(ttl) * time.Second)
 	c.logger.Debugf("Postgres server successfuly restarted in %s pod %s", role, podName)
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for %s pod %s", role, pod.Name))
 }
