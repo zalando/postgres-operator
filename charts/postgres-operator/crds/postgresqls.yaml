@@ -470,7 +470,7 @@ spec:
                 properties:
                   s3_wal_path:
                     type: string
-					    streams:
+              streams:
                 type: array
                 nullable: true
                 items:
@@ -479,18 +479,18 @@ spec:
                     - streamType
                   properties:
                     batchSize:
-										  type: integer
-									  database:
-										  type: string
-									  filter:
+                      type: integer
+                    database:
+                      type: string
+                    filter:
                       type: object
                       additionalProperties:
                         type: string
-									  queueName:
-										  type: string
-									  sqsArn:
-										  type: string
-									  tables:
+                    queueName:
+                      type: string
+                    sqsArn:
+                      type: string
+                    tables:
                       type: object
                       additionalProperties:
                         type: string
