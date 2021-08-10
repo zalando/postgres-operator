@@ -236,7 +236,7 @@ func (c *Cluster) syncStreams() error {
 
 	err := c.syncPostgresConfig()
 	if err != nil {
-		return fmt.Errorf("logical decoding setup incomplete: %v", err)
+		return fmt.Errorf("could not update Postgres config for event streaming: %v", err)
 	}
 
 	effectiveStreams, err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Get(context.TODO(), c.Name+constants.FESsuffix, metav1.GetOptions{})
@@ -253,7 +253,7 @@ func (c *Cluster) syncStreams() error {
 	} else {
 		err := c.syncStreamDbResources()
 		if err != nil {
-			return fmt.Warnf("database setup incomplete: %v", err)
+			c.logger.Warnf("database setup might be incomplete : %v", err)
 		}
 		desiredStreams := c.generateFabricEventStream()
 		if reflect.DeepEqual(effectiveStreams.Spec, desiredStreams.Spec) {
