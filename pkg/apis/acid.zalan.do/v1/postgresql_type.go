@@ -227,12 +227,11 @@ type ConnectionPooler struct {
 }
 
 type Stream struct {
-	Type      string            `json:"type"`
-	Database  string            `json:"database,omitempty"`
-	Tables    map[string]string `json:"tables,omitempty"`
-	Filter    map[string]string `json:"filter,omitempty"`
-	BatchSize uint32            `json:"batchSize,omitempty"`
-	SqsArn    string            `json:"sqsArn,omitempty"`
-	QueueName string            `json:"queueName,omitempty"`
-	User      string            `json:"user,omitempty"`
+	StreamType string            `json:"streamType"`
+	Database   string            `json:"database,omitempty"`
+	Tables     map[string]string `json:"tables,omitempty"`
+	Filter     map[string]string `json:"filter,omitempty"`
+	BatchSize  uint32            `json:"batchSize,omitempty"`
+	SqsArn     string            `json:"sqsArn,omitempty"`
+	QueueName  string            `json:"queueName,omitempty"`
 }

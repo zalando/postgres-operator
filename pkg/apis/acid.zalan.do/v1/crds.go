@@ -662,8 +662,11 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Items: &apiextv1.JSONSchemaPropsOrArray{
 							Schema: &apiextv1.JSONSchemaProps{
 								Type:     "object",
-								Required: []string{"type"},
+								Required: []string{"streamType"},
 								Properties: map[string]apiextv1.JSONSchemaProps{
+									"batchSize": {
+										Type: "integer",
+									},
 									"database": {
 										Type: "string",
 									},
@@ -671,9 +674,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "object",
 										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 											Schema: &apiextv1.JSONSchemaProps{
-												Type:        "string",
+												Type: "string",
 											},
 										},
+									},
+									"queueName": {
+										Type: "string",
 									},
 									"sqsArn": {
 										Type: "string",
@@ -682,11 +688,11 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "object",
 										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 											Schema: &apiextv1.JSONSchemaProps{
-												Type:        "string",
+												Type: "string",
 											},
 										},
 									},
-									"type": {
+									"streamType": {
 										Type: "string",
 										Enum: []apiextv1.JSON{
 											{

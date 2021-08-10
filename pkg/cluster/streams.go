@@ -8,6 +8,7 @@ import (
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	zalandov1alpha1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1alpha1"
+	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -19,13 +20,8 @@ var outboxTableNameTemplate config.StringTemplate = "{table}_{eventtype}_outbox"
 func (c *Cluster) createStreams() error {
 	c.setProcessName("creating streams")
 
-	err := c.syncLogicalDecoding()
-	if err != nil {
-		return fmt.Errorf("logical decoding setup incomplete: %v", err)
-	}
-
 	fes := c.generateFabricEventStream()
-	_, err = c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Create(context.TODO(), fes, metav1.CreateOptions{})
+	_, err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Create(context.TODO(), fes, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("could not create event stream custom resource: %v", err)
 	}
@@ -33,27 +29,61 @@ func (c *Cluster) createStreams() error {
 	return nil
 }
 
-func (c *Cluster) syncLogicalDecoding() error {
+func (c *Cluster) updateStreams(newEventStreams *zalandov1alpha1.FabricEventStream) error {
+	c.setProcessName("updating event streams")
 
-	walLevel := c.Spec.PostgresqlParam.Parameters["wal_level"]
-	if walLevel == "" || walLevel != "logical" {
-		c.logger.Debugf("setting wal level to 'logical' in postgres configuration")
-		pods, err := c.listPods()
-		if err != nil || len(pods) == 0 {
-			return err
-		}
-		for _, pod := range pods {
-			if err := c.patroni.SetPostgresParameters(&pod, map[string]string{"wal_level": "logical"}); err == nil {
-				return fmt.Errorf("could not set wal_level to 'logical' calling Patroni REST API: %v", err)
-			}
-		}
+	_, err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Update(context.TODO(), newEventStreams, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("could not update event stream custom resource: %v", err)
 	}
+
+	return nil
+}
+
+func (c *Cluster) syncPostgresConfig() error {
+
+	desiredPostgresConfig := make(map[string]interface{})
+	slots := make(map[string]map[string]string)
+
+	c.logger.Debugf("setting wal level to 'logical' in postgres configuration")
+	desiredPostgresConfig["postgresql"] = map[string]interface{}{patroniPGParametersParameterName: map[string]string{"wal_level": "logical"}}
 
 	for _, stream := range c.Spec.Streams {
 		slotName := c.getLogicalReplicationSlot(stream.Database)
 
 		if slotName == "" {
-			c.logger.Debugf("creating logical replication slot %d in database %d", constants.EventStreamSourceSlotPrefix+stream.Database, stream.Database)
+			c.logger.Debugf("creating logical replication slot %q in database %q", constants.EventStreamSourceSlotPrefix+stream.Database, stream.Database)
+			slot := map[string]string{
+				"database": stream.Database,
+				"plugin":   "wal2json",
+				"type":     "logical",
+			}
+			slots[constants.EventStreamSourceSlotPrefix+stream.Database] = slot
+		}
+	}
+
+	if len(slots) > 0 {
+		desiredPostgresConfig["slots"] = slots
+	} else {
+		return nil
+	}
+
+	pods, err := c.listPods()
+	if err != nil || len(pods) == 0 {
+		return err
+	}
+	for i, pod := range pods {
+		podName := util.NameFromMeta(pods[i].ObjectMeta)
+		effectivePostgresConfig, err := c.patroni.GetConfig(&pod)
+		if err != nil {
+			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
+			continue
+		}
+
+		_, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePostgresConfig, desiredPostgresConfig)
+		if err != nil {
+			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
+			continue
 		}
 	}
 
@@ -64,18 +94,18 @@ func (c *Cluster) syncStreamDbResources() error {
 
 	for _, stream := range c.Spec.Streams {
 		if err := c.initDbConnWithName(stream.Database); err != nil {
-			return fmt.Errorf("could not init connection to database %s specified for event stream: %v", stream.Database, err)
+			return fmt.Errorf("could not init connection to database %q specified for event stream: %v", stream.Database, err)
 		}
 
 		for table, eventType := range stream.Tables {
 			tableName, schemaName := getTableSchema(table)
 			if exists, err := c.tableExists(tableName, schemaName); !exists {
-				return fmt.Errorf("could not find table %s specified for event stream: %v", table, err)
+				return fmt.Errorf("could not find table %q specified for event stream: %v", table, err)
 			}
 			// check if outbox table exists and if not, create it
 			outboxTable := outboxTableNameTemplate.Format("table", tableName, "eventtype", eventType)
 			if exists, err := c.tableExists(outboxTable, schemaName); !exists {
-				return fmt.Errorf("could not find outbox table %s specified for event stream: %v", outboxTable, err)
+				return fmt.Errorf("could not find outbox table %q specified for event stream: %v", outboxTable, err)
 			}
 		}
 	}
@@ -120,12 +150,12 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, table, eventType st
 		Schema:           schema,
 		EventStreamTable: getOutboxTable(table, eventType),
 		Filter:           streamFilter,
-		Connection:       c.getStreamConnection(stream.Database, stream.User),
+		Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
 	}
 }
 
 func getEventStreamFlow(stream acidv1.Stream) zalandov1alpha1.EventStreamFlow {
-	switch stream.Type {
+	switch stream.StreamType {
 	case "nakadi":
 		return zalandov1alpha1.EventStreamFlow{
 			Type:           constants.EventStreamFlowPgNakadiType,
@@ -144,7 +174,7 @@ func getEventStreamFlow(stream acidv1.Stream) zalandov1alpha1.EventStreamFlow {
 }
 
 func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1alpha1.EventStreamSink {
-	switch stream.Type {
+	switch stream.StreamType {
 	case "nakadi":
 		return zalandov1alpha1.EventStreamSink{
 			Type:         constants.EventStreamSinkNakadiType,
@@ -204,6 +234,11 @@ func (c *Cluster) syncStreams() error {
 
 	c.setProcessName("syncing streams")
 
+	err := c.syncPostgresConfig()
+	if err != nil {
+		return fmt.Errorf("logical decoding setup incomplete: %v", err)
+	}
+
 	effectiveStreams, err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Get(context.TODO(), c.Name+constants.FESsuffix, metav1.GetOptions{})
 	if err != nil {
 		if !k8sutil.ResourceNotFound(err) {
@@ -216,22 +251,14 @@ func (c *Cluster) syncStreams() error {
 			return fmt.Errorf("could not create missing streams: %v", err)
 		}
 	} else {
-		c.syncStreamDbResources()
+		err := c.syncStreamDbResources()
+		if err != nil {
+			return fmt.Warnf("database setup incomplete: %v", err)
+		}
 		desiredStreams := c.generateFabricEventStream()
 		if reflect.DeepEqual(effectiveStreams.Spec, desiredStreams.Spec) {
 			c.updateStreams(desiredStreams)
 		}
-	}
-
-	return nil
-}
-
-func (c *Cluster) updateStreams(newEventStreams *zalandov1alpha1.FabricEventStream) error {
-	c.setProcessName("updating event streams")
-
-	_, err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Update(context.TODO(), newEventStreams, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("could not update event stream custom resource: %v", err)
 	}
 
 	return nil

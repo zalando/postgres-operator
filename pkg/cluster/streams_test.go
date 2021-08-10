@@ -23,6 +23,7 @@ func newFakeK8sStreamClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 
 	return k8sutil.KubernetesClient{
 		FabricEventStreamsGetter: zalandoClientSet.ZalandoV1alpha1(),
+		PodsGetter:               clientSet.CoreV1(),
 	}, clientSet
 }
 
@@ -40,50 +41,32 @@ func TestGenerateFabricEventStream(t *testing.T) {
 			Databases: map[string]string{
 				"foo": "foo_user",
 			},
-			Patroni: acidv1.Patroni{
-				Slots: map[string]map[string]string{
-					"fes": {
-						"type":     "logical",
-						"database": "foo",
-						"plugin":   "wal2json",
-					},
-				},
-			},
-			PostgresqlParam: acidv1.PostgresqlParam{
-				Parameters: map[string]string{
-					"wal_level": "logical",
-				},
-			},
 			Streams: []acidv1.Stream{
 				{
-					Type:     "nakadi",
-					Database: "foo",
+					StreamType: "nakadi",
+					Database:   "foo",
 					Tables: map[string]string{
 						"bar": "stream_type_a",
 					},
 					BatchSize: uint32(100),
-					User:      "foo_user",
 				},
 				{
-					Type:     "wal",
-					Database: "foo",
+					StreamType: "wal",
+					Database:   "foo",
 					Tables: map[string]string{
 						"bar": "stream_type_a",
 					},
 					BatchSize: uint32(100),
-					User:      "zalando",
 				},
 				{
-					Type:      "sqs",
-					Database:  "foo",
-					SqsArn:    "arn:aws:sqs:eu-central-1:111122223333",
-					QueueName: "foo-queue",
-					User:      "foo_user",
+					StreamType: "sqs",
+					Database:   "foo",
+					SqsArn:     "arn:aws:sqs:eu-central-1:111122223333",
+					QueueName:  "foo-queue",
 				},
 			},
 			Users: map[string]acidv1.UserFlags{
-				"foo_user": {},
-				"zalando":  {},
+				"foo_user": []string{"replication"},
 			},
 			Volume: acidv1.Volume{
 				Size: "1Gi",

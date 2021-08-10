@@ -265,10 +265,11 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 func (c *Cluster) syncStatefulSet() error {
 	var (
 		masterPod               *v1.Pod
-		postgresConfig          map[string]interface{}
+		effectivePostgresConfig map[string]interface{}
 		instanceRestartRequired bool
 	)
 
+	desiredPostgresConfig := make(map[string]interface{})
 	podsToRecreate := make([]v1.Pod, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
 
@@ -394,14 +395,25 @@ func (c *Cluster) syncStatefulSet() error {
 
 	// get Postgres config, compare with manifest and update via Patroni PATCH endpoint if it differs
 	// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used.
+	desiredPostgresConfig["postgresql"] = map[string]interface{}{patroniPGParametersParameterName: c.Spec.Parameters}
+	desiredPostgresConfig["loop_wait"] = c.Spec.Patroni.LoopWait
+	desiredPostgresConfig["maximum_lag_on_failover"] = c.Spec.Patroni.MaximumLagOnFailover
+	desiredPostgresConfig["pg_hba"] = c.Spec.Patroni.PgHba
+	desiredPostgresConfig["retry_timeout"] = c.Spec.Patroni.RetryTimeout
+	desiredPostgresConfig["slots"] = c.Spec.Patroni.Slots
+	desiredPostgresConfig["synchronous_mode"] = c.Spec.Patroni.SynchronousMode
+	desiredPostgresConfig["synchronous_mode_strict"] = c.Spec.Patroni.SynchronousModeStrict
+	desiredPostgresConfig["ttl"] = c.Spec.Patroni.TTL
+
 	for i, pod := range pods {
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		config, err := c.patroni.GetConfig(&pod)
+		effectivePostgresConfig, err := c.patroni.GetConfig(&pod)
 		if err != nil {
 			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
 			continue
 		}
-		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, config)
+
+		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePostgresConfig, desiredPostgresConfig)
 		if err != nil {
 			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 			continue
@@ -412,7 +424,7 @@ func (c *Cluster) syncStatefulSet() error {
 	// if the config update requires a restart, call Patroni restart for replicas first, then master
 	if instanceRestartRequired {
 		c.logger.Debug("restarting Postgres server within pods")
-		ttl, ok := postgresConfig["ttl"].(int32)
+		ttl, ok := effectivePostgresConfig["ttl"].(int32)
 		if !ok {
 			ttl = 30
 		}
@@ -493,62 +505,13 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig map[string]interface{}) (bool, error) {
-	configToSet := make(map[string]interface{})
-	parametersToSet := make(map[string]string)
-	effectivePgParameters := make(map[string]interface{})
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectivePatroniConfig, desiredPatroniConfig map[string]interface{}) (bool, error) {
 
-	// read effective Patroni config if set
-	if patroniConfig != nil {
-		effectivePostgresql := patroniConfig["postgresql"].(map[string]interface{})
-		effectivePgParameters = effectivePostgresql[patroniPGParametersParameterName].(map[string]interface{})
-	}
-
-	// compare parameters under postgresql section with c.Spec.Postgresql.Parameters from manifest
-	desiredPgParameters := c.Spec.Parameters
-	for desiredOption, desiredValue := range desiredPgParameters {
-		effectiveValue := effectivePgParameters[desiredOption]
-		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
-			parametersToSet[desiredOption] = desiredValue
-		}
-	}
-
-	if len(parametersToSet) > 0 {
-		configToSet["postgresql"] = map[string]interface{}{patroniPGParametersParameterName: parametersToSet}
-	}
-
-	// compare other options from config with c.Spec.Patroni from manifest
-	desiredPatroniConfig := c.Spec.Patroni
-	if desiredPatroniConfig.LoopWait > 0 && desiredPatroniConfig.LoopWait != uint32(patroniConfig["loop_wait"].(float64)) {
-		configToSet["loop_wait"] = desiredPatroniConfig.LoopWait
-	}
-	if desiredPatroniConfig.MaximumLagOnFailover > 0 && desiredPatroniConfig.MaximumLagOnFailover != float32(patroniConfig["maximum_lag_on_failover"].(float64)) {
-		configToSet["maximum_lag_on_failover"] = desiredPatroniConfig.MaximumLagOnFailover
-	}
-	if desiredPatroniConfig.PgHba != nil && !reflect.DeepEqual(desiredPatroniConfig.PgHba, (patroniConfig["pg_hba"])) {
-		configToSet["pg_hba"] = desiredPatroniConfig.PgHba
-	}
-	if desiredPatroniConfig.RetryTimeout > 0 && desiredPatroniConfig.RetryTimeout != uint32(patroniConfig["retry_timeout"].(float64)) {
-		configToSet["retry_timeout"] = desiredPatroniConfig.RetryTimeout
-	}
-	if desiredPatroniConfig.Slots != nil && !reflect.DeepEqual(desiredPatroniConfig.Slots, patroniConfig["slots"]) {
-		configToSet["slots"] = desiredPatroniConfig.Slots
-	}
-	if desiredPatroniConfig.SynchronousMode != patroniConfig["synchronous_mode"] {
-		configToSet["synchronous_mode"] = desiredPatroniConfig.SynchronousMode
-	}
-	if desiredPatroniConfig.SynchronousModeStrict != patroniConfig["synchronous_mode_strict"] {
-		configToSet["synchronous_mode_strict"] = desiredPatroniConfig.SynchronousModeStrict
-	}
-	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != uint32(patroniConfig["ttl"].(float64)) {
-		configToSet["ttl"] = desiredPatroniConfig.TTL
-	}
-
-	if len(configToSet) == 0 {
+	if reflect.DeepEqual(effectivePatroniConfig, desiredPatroniConfig) {
 		return false, nil
 	}
 
-	configToSetJson, err := json.Marshal(configToSet)
+	configToSetJson, err := json.Marshal(desiredPatroniConfig)
 	if err != nil {
 		c.logger.Debugf("could not convert config patch to JSON: %v", err)
 	}
@@ -558,8 +521,8 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
 		podName, configToSetJson)
-	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
-		return true, fmt.Errorf("could not patch postgres parameters with a pod %s: %v", podName, err)
+	if err = c.patroni.SetConfig(pod, desiredPatroniConfig); err != nil {
+		return true, fmt.Errorf("could not patch postgres parameters within pod %s: %v", podName, err)
 	}
 
 	return true, nil
