@@ -416,10 +416,10 @@ func (c *Cluster) syncStatefulSet() error {
 	if c.Spec.Patroni.TTL > 0 {
 		desiredPostgresConfig["ttl"] = c.Spec.Patroni.TTL
 	}
-	if effectivePostgresConfig["synchronous_mode"] != desiredPostgresConfig["synchronous_mode"] {
+	if effectivePostgresConfig["synchronous_mode"] != c.Spec.Patroni.SynchronousMode {
 		desiredPostgresConfig["synchronous_mode"] = c.Spec.Patroni.SynchronousMode
 	}
-	if effectivePostgresConfig["synchronous_mode_strict"] != desiredPostgresConfig["synchronous_mode_strict"] {
+	if effectivePostgresConfig["synchronous_mode_strict"] != c.Spec.Patroni.SynchronousModeStrict {
 		desiredPostgresConfig["synchronous_mode_strict"] = c.Spec.Patroni.SynchronousModeStrict
 	}
 
