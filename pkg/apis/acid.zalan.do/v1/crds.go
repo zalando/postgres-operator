@@ -573,6 +573,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 											},
 										},
 									},
+									"secretNamespace": {
+										Type: "string",
+									},
 								},
 							},
 						},

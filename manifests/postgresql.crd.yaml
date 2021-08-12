@@ -390,6 +390,8 @@ spec:
                             type: boolean
                           defaultRoles:
                             type: boolean
+                    secretNamespace:
+                      type: string
               replicaLoadBalancer:  # deprecated
                 type: boolean
               resources:

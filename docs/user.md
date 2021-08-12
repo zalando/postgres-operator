@@ -139,9 +139,9 @@ secret, without ever sharing it outside of the cluster.
 At the moment it is not possible to define membership of the manifest role in
 other roles.
 
-To define the secrets for the users in a different namespace than that of the cluster,
-one can set `enable_cross_namespace_secret` and declare the namespace for the
-secrets in the manifest in the following manner,
+To define the secrets for the users in a different namespace than that of the
+cluster, one can set `enable_cross_namespace_secret` and declare the namespace
+for the secrets in the manifest in the following manner,
 
 ```yaml
 spec:
@@ -150,7 +150,8 @@ spec:
    appspace.db_user:
     - createdb
 ```
-Here, anything before the first dot is taken as the namespace and the text after
+
+Here, anything before the first dot is considered the namespace and the text after
 the first dot is the username. Also, the postgres roles of these usernames would
 be in the form of `namespace.username`.
 
@@ -520,7 +521,7 @@ Then, the schemas are owned by the database owner, too.
 
 The roles described in the previous paragraph can be granted to LOGIN roles from
 the `users` section in the manifest. Optionally, the Postgres Operator can also
-create default LOGIN roles for the database an each schema individually. These
+create default LOGIN roles for the database and each schema individually. These
 roles will get the `_user` suffix and they inherit all rights from their NOLOGIN
 counterparts. Therefore, you cannot have `defaultRoles` set to `false` and enable
 `defaultUsers` at the same time.
@@ -549,6 +550,19 @@ spec:
 Default access privileges are also defined for LOGIN roles on database and
 schema creation. This means they are currently not set when `defaultUsers`
 (or `defaultRoles` for schemas) are enabled at a later point in time.
+
+For all LOGIN roles the operator will create K8s secrets in the namespace
+specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
+`true` in the config. Otherwise, they are created in the same namespace like
+the Postgres cluster.
+
+```yaml
+spec:
+  preparedDatabases:
+    foo:
+      defaultUsers: true
+      secretNamespace: appspace
+```
 
 ### Schema `search_path` for default roles
 

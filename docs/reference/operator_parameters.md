@@ -267,9 +267,7 @@ configuration they are grouped under the `kubernetes` key.
 * **enable_cross_namespace_secrets**
   To allow secrets in a different namespace other than the Postgres cluster
   namespace. Once enabled, specify the namespace in the user name under the
-  `users` section in the form `{namespace}.{username}`. The operator will then
-  create the user secret in that namespace. The part after the first `.` is
-  considered to be the user name. The default is `false`.
+  `users` section in the form `{namespace}.{username}`. The default is `false`.
 
 * **enable_init_containers**
   global option to allow for creating init containers in the cluster manifest to
