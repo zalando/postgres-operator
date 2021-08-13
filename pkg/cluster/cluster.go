@@ -1115,8 +1115,12 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 
 		namespace := c.Namespace
 		//if namespaced secrets are allowed
-		if c.Config.OpConfig.EnableCrossNamespaceSecret && secretNamespace != "" {
-			namespace = secretNamespace
+		if secretNamespace != "" {
+			if c.Config.OpConfig.EnableCrossNamespaceSecret {
+				namespace = secretNamespace
+			} else {
+				c.logger.Warn("secretNamespace ignored because enable_cross_namespace_secret set to false. Creating secrets in cluster namespace.")
+			}
 		}
 		roleName := prefix + defaultRole
 
