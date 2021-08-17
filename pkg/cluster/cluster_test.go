@@ -1024,7 +1024,6 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
-			EnableNamespacedSecret: boolToPointer(true),
 			Users: map[string]acidv1.UserFlags{
 				"appspace.db_user": {},
 				"db_user":          {},
@@ -1052,6 +1051,7 @@ func TestCrossNamespacedSecrets(t *testing.T) {
 					DefaultMemoryLimit:   "300Mi",
 					PodRoleLabel:         "spilo-role",
 				},
+				EnableCrossNamespaceSecret: true,
 			},
 		}, client, pg, logger, eventRecorder)
 
