@@ -473,3 +473,41 @@ Those parameters are grouped under the `tls` top-level key.
   relative to the "/tls/", which is mount path of the tls secret.
   If `caSecretName` is defined, the ca.crt path is relative to "/tlsca/",
   otherwise to the same "/tls/".
+
+## Change data capture streams
+
+This sections enables change data capture (CDC) streams e.g. into Zalando’s
+distributed event broker [Nakadi](https://nakadi.io/). Parameters grouped
+under the `streams` top-level key will be used by the operator to create a
+CRD for Zalando's internal CDC operator. Each stream can have the following
+properties:
+
+* **streamType**
+  Defines the sink. Either `nakadi`, `sqs` or `wal` (which is just plain wal
+  files). Required.
+
+* **database**
+  Name of the database from where events will be published via Postgres'
+  logical decoding feature. The operator will take care of updating the
+  database configuration (setting `wal_level: logical`, creating logical
+  replication slots, using output plugin `wal2json` and creating a dedicated
+  replication user).
+
+* **tables**
+  Defines a map of table names and event types. The CDC operator is following
+  the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/)
+  meaning changes are only consumed from an extra table that already has the
+  structure of the event in the target sink. The operator will assume that this
+  outbox table is called like `<table>_<event_type>_outbox`.
+
+* **filter**
+  Streamed events can be filtered by a jsonpath expression for each table.
+
+* **batchSize**
+  Defines the size of batches in which events are consumed.
+
+* **sqsArn**
+  ARN to the SQS service used as event sink when streamType is `sqs`.
+
+* **queueName**
+  Name of the queue to be used in SQS service when streamType is `sqs`.
