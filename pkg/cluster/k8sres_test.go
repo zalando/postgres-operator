@@ -498,7 +498,7 @@ func TestCloneEnv(t *testing.T) {
 			subTest: "generated s3 path, AWS region",
 			cloneOpts: &acidv1.CloneDescription{
 				ClusterName:  "test-cluster",
-				S3WalPath:    "s3://some/path/",
+				S3WalPath:    "",
 				EndTimestamp: "somewhen",
 			},
 			env: v1.EnvVar{
