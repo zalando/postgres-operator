@@ -95,6 +95,7 @@ type PreparedDatabase struct {
 	PreparedSchemas map[string]PreparedSchema `json:"schemas,omitempty"`
 	DefaultUsers    bool                      `json:"defaultUsers,omitempty" defaults:"false"`
 	Extensions      map[string]string         `json:"extensions,omitempty"`
+	SecretNamespace string                    `json:"secretNamespace,omitempty"`
 }
 
 // PreparedSchema describes elements to be bootstrapped per schema

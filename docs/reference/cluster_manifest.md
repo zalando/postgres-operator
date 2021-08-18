@@ -109,7 +109,11 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   `SUPERUSER`, `REPLICATION`, `INHERIT`, `LOGIN`, `NOLOGIN`, `CREATEROLE`,
   `CREATEDB`, `BYPASSURL`. A login user is created by default unless NOLOGIN is
   specified, in which case the operator creates a role. One can specify empty
-  flags by providing a JSON empty array '*[]*'. Optional.
+  flags by providing a JSON empty array '*[]*'. If the config option
+  `enable_cross_namespace_secrets` is enabled you can specify the namespace in
+  the user name in the form `{namespace}.{username}` and the operator will
+  create the K8s secret in that namespace. The part after the first `.` is
+  considered to be the user name. Optional.
 
 * **databases**
   a map of database names to database owners for the databases that should be
@@ -185,6 +189,35 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   If you set the `all` special item, it will be mounted in all containers (postgres + sidecars).
   Else you can set the list of target containers in which the additional volumes will be mounted (eg : postgres, telegraf)
 
+## Prepared Databases
+
+The operator can create databases with default owner, reader and writer roles
+without the need to specifiy them under `users` or `databases` sections. Those
+parameters are grouped under the `preparedDatabases` top-level key. For more
+information, see [user docs](../user.md#prepared-databases-with-roles-and-default-privileges).
+
+* **defaultUsers**
+  The operator will always create default `NOLOGIN` roles for defined prepared
+  databases, but if `defaultUsers` is set to `true` three additional `LOGIN`
+  roles with `_user` suffix will get created. Default is `false`.
+
+* **extensions**
+  map of extensions with target database schema that the operator will install
+  in the database. Optional.
+
+* **schemas**
+  map of schemas that the operator will create. Optional - if no schema is
+  listed, the operator will create a schema called `data`. Under each schema
+  key, it can be defined if `defaultRoles` (NOLOGIN) and `defaultUsers` (LOGIN)
+  roles shall be created that have schema-exclusive privileges. Both flags are
+  set to `false` by default.
+
+* **secretNamespace**
+  for each default LOGIN role the operator will create a secret. You can
+  specify the namespace in which these secrets will get created, if
+  `enable_cross_namespace_secrets` is set to `true` in the config. Otherwise,
+  the cluster namespace is used.
+
 ## Postgres parameters
 
 Those parameters are grouped under the `postgresql` top-level key, which is
@@ -258,7 +291,9 @@ explanation of `ttl` and `loop_wait` parameters.
 
 Those parameters define [CPU and memory requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/)
 for the Postgres container. They are grouped under the `resources` top-level
-key with subgroups `requests` and `limits`.
+key with subgroups `requests` and `limits`. The whole section is optional,
+however if you specify a request or limit you have to define everything
+(unless you are not modifying the default CRD schema validation). 
 
 ### Requests
 
@@ -266,11 +301,11 @@ CPU and memory requests for the Postgres container.
 
 * **cpu**
   CPU requests for the Postgres container. Optional, overrides the
-  `default_cpu_requests` operator configuration parameter. Optional.
+  `default_cpu_requests` operator configuration parameter.
 
 * **memory**
   memory requests for the Postgres container. Optional, overrides the
-  `default_memory_request` operator configuration parameter. Optional.
+  `default_memory_request` operator configuration parameter.
 
 ### Limits
 
@@ -278,11 +313,11 @@ CPU and memory limits for the Postgres container.
 
 * **cpu**
   CPU limits for the Postgres container. Optional, overrides the
-  `default_cpu_limits` operator configuration parameter. Optional.
+  `default_cpu_limits` operator configuration parameter.
 
 * **memory**
   memory limits for the Postgres container. Optional, overrides the
-  `default_memory_limits` operator configuration parameter. Optional.
+  `default_memory_limits` operator configuration parameter.
 
 ## Parameters defining how to clone the cluster from another one
 
