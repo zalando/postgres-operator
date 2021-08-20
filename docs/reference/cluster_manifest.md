@@ -479,8 +479,8 @@ Those parameters are grouped under the `tls` top-level key.
 This sections enables change data capture (CDC) streams e.g. into Zalando’s
 distributed event broker [Nakadi](https://nakadi.io/). Parameters grouped
 under the `streams` top-level key will be used by the operator to create a
-CRD for Zalando's internal CDC operator. Each stream can have the following
-properties:
+CRD for Zalando's internal CDC operator named like the Postgres cluster.
+Each stream object can have the following properties:
 
 * **streamType**
   Defines the sink. Either `nakadi`, `sqs` or `wal` (which is just plain wal

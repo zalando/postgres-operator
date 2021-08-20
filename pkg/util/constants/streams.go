@@ -2,7 +2,6 @@ package constants
 
 // PostgreSQL specific constants
 const (
-	FESsuffix                     = "-event-streams"
 	EventStreamSourcePGType       = "PostgresLogicalReplication"
 	EventStreamSourceSlotPrefix   = "fes_"
 	EventStreamSourceAuthType     = "DatabaseAuthenticationSecret"

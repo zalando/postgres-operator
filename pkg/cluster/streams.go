@@ -131,7 +131,7 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 
 	return &zalandov1alpha1.FabricEventStream{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.Name + constants.FESsuffix,
+			Name:        c.Name,
 			Namespace:   c.Namespace,
 			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 		},
@@ -239,7 +239,7 @@ func (c *Cluster) syncStreams() error {
 		return fmt.Errorf("could not update Postgres config for event streaming: %v", err)
 	}
 
-	effectiveStreams, err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Get(context.TODO(), c.Name+constants.FESsuffix, metav1.GetOptions{})
+	effectiveStreams, err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Get(context.TODO(), c.Name, metav1.GetOptions{})
 	if err != nil {
 		if !k8sutil.ResourceNotFound(err) {
 			return fmt.Errorf("error during reading of event streams: %v", err)
