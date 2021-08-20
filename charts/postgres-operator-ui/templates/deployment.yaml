@@ -76,3 +76,6 @@ spec:
                     "11"
                   ]
                 }
+            {{- if .Values.extraEnvs }}
+            {{- .Values.extraEnvs | toYaml | nindent 12 }}
+            {{- end }}
