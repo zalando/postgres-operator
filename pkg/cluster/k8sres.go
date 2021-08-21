@@ -133,11 +133,18 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 	}
 }
 
-func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
+func generateResourceRequirements(resources *acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
 	var err error
 
-	specRequests := resources.ResourceRequests
-	specLimits := resources.ResourceLimits
+	var specRequests acidv1.ResourceDescription
+	var specLimits acidv1.ResourceDescription
+	if resources == nil {
+		specRequests = acidv1.ResourceDescription{}
+		specLimits = acidv1.ResourceDescription{}
+	} else {
+		specRequests = resources.ResourceRequests
+		specLimits = resources.ResourceLimits
+	}
 
 	result := v1.ResourceRequirements{}
 
@@ -497,16 +504,14 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 	if len(sidecars) > 0 {
 		result := make([]v1.Container, 0)
 		for index, sidecar := range sidecars {
+			var resourcesSpec acidv1.Resources
+			if sidecar.Resources == nil {
+				resourcesSpec = acidv1.Resources{}
+			} else {
+				sidecar.Resources.DeepCopyInto(&resourcesSpec)
+			}
 
-			resources, err := generateResourceRequirements(
-				makeResources(
-					sidecar.Resources.ResourceRequests.CPU,
-					sidecar.Resources.ResourceRequests.Memory,
-					sidecar.Resources.ResourceLimits.CPU,
-					sidecar.Resources.ResourceLimits.Memory,
-				),
-				defaultResources,
-			)
+			resources, err := generateResourceRequirements(&resourcesSpec, defaultResources)
 			if err != nil {
 				return nil, err
 			}
@@ -1349,7 +1354,7 @@ func generateScalyrSidecarSpec(clusterName, APIKey, serverURL, dockerImage strin
 		scalyrCPULimit,
 		scalyrMemoryLimit,
 	)
-	resourceRequirementsScalyrSidecar, err := generateResourceRequirements(resourcesScalyrSidecar, defaultResources)
+	resourceRequirementsScalyrSidecar, err := generateResourceRequirements(&resourcesScalyrSidecar, defaultResources)
 	if err != nil {
 		return nil, fmt.Errorf("invalid resources for Scalyr sidecar: %v", err)
 	}

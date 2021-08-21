@@ -893,7 +893,7 @@ func TestNodeAffinity(t *testing.T) {
 	makeSpec := func(nodeAffinity *v1.NodeAffinity) acidv1.PostgresSpec {
 		return acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
-			Resources: acidv1.Resources{
+			Resources: &acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},
@@ -989,7 +989,7 @@ func TestTLS(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
-			Resources: acidv1.Resources{
+			Resources: &acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},
@@ -1108,7 +1108,7 @@ func TestAdditionalVolume(t *testing.T) {
 		},
 		Spec: acidv1.PostgresSpec{
 			TeamID: "myapp", NumberOfInstances: 1,
-			Resources: acidv1.Resources{
+			Resources: &acidv1.Resources{
 				ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 				ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			},
@@ -1214,7 +1214,7 @@ func TestSidecars(t *testing.T) {
 			},
 		},
 		TeamID: "myapp", NumberOfInstances: 1,
-		Resources: acidv1.Resources{
+		Resources: &acidv1.Resources{
 			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 		},
@@ -1227,7 +1227,7 @@ func TestSidecars(t *testing.T) {
 			},
 			acidv1.Sidecar{
 				Name: "cluster-specific-sidecar-with-resources",
-				Resources: acidv1.Resources{
+				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
@@ -1389,7 +1389,7 @@ func TestGenerateService(t *testing.T) {
 	var enableLB bool = true
 	spec = acidv1.PostgresSpec{
 		TeamID: "myapp", NumberOfInstances: 1,
-		Resources: acidv1.Resources{
+		Resources: &acidv1.Resources{
 			ResourceRequests: acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 			ResourceLimits:   acidv1.ResourceDescription{CPU: "1", Memory: "10"},
 		},
@@ -1402,7 +1402,7 @@ func TestGenerateService(t *testing.T) {
 			},
 			acidv1.Sidecar{
 				Name: "cluster-specific-sidecar-with-resources",
-				Resources: acidv1.Resources{
+				Resources: &acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
