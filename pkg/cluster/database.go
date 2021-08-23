@@ -33,8 +33,6 @@ const (
 	getExtensionsSQL = `SELECT e.extname, n.nspname FROM pg_catalog.pg_extension e
 	        LEFT JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace ORDER BY 1;`
 
-	tableExistsSQL = `SELECT TRUE FROM pg_tables WHERE tablename = $1 AND schemaname = $2;`
-
 	createDatabaseSQL       = `CREATE DATABASE "%s" OWNER "%s";`
 	createDatabaseSchemaSQL = `SET ROLE TO "%s"; CREATE SCHEMA IF NOT EXISTS "%s" AUTHORIZATION "%s"`
 	alterDatabaseOwnerSQL   = `ALTER DATABASE "%s" OWNER TO "%s";`
@@ -506,42 +504,6 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 	}
 
 	return nil
-}
-
-// getExtension returns the list of current database extensions
-// The caller is responsible for opening and closing the database connection
-func (c *Cluster) tableExists(tableName, schemaName string) (bool, error) {
-	var (
-		rows   *sql.Rows
-		exists bool
-		err    error
-	)
-
-	if rows, err = c.pgDb.Query(tableExistsSQL, tableName, schemaName); err != nil {
-		return false, fmt.Errorf("could not check table for existence: %v", err)
-	}
-
-	defer func() {
-		if err2 := rows.Close(); err2 != nil {
-			if err != nil {
-				err = fmt.Errorf("error when closing query cursor: %v, previous error: %v", err2, err)
-			} else {
-				err = fmt.Errorf("error when closing query cursor: %v", err2)
-			}
-		}
-	}()
-
-	for rows.Next() {
-		if err = rows.Scan(&exists); err != nil {
-			return false, fmt.Errorf("error when processing row: %v", err)
-		}
-	}
-
-	if exists {
-		return true, nil
-	} else {
-		return false, fmt.Errorf("table %s not found", schemaName+"."+tableName)
-	}
 }
 
 // Creates a connection pool credentials lookup function in every database to

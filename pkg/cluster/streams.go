@@ -40,6 +40,17 @@ func (c *Cluster) updateStreams(newEventStreams *zalandov1alpha1.FabricEventStre
 	return nil
 }
 
+func (c *Cluster) deleteStreams() error {
+	c.setProcessName("updating event streams")
+
+	err := c.KubeClient.FabricEventStreamsGetter.FabricEventStreams(c.Namespace).Delete(context.TODO(), c.Name, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("could not delete event stream custom resource: %v", err)
+	}
+
+	return nil
+}
+
 func (c *Cluster) syncPostgresConfig() error {
 
 	desiredPostgresConfig := make(map[string]interface{})
@@ -84,29 +95,6 @@ func (c *Cluster) syncPostgresConfig() error {
 		if err != nil {
 			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 			continue
-		}
-	}
-
-	return nil
-}
-
-func (c *Cluster) syncStreamDbResources() error {
-
-	for _, stream := range c.Spec.Streams {
-		if err := c.initDbConnWithName(stream.Database); err != nil {
-			return fmt.Errorf("could not init connection to database %q specified for event stream: %v", stream.Database, err)
-		}
-
-		for table, eventType := range stream.Tables {
-			tableName, schemaName := getTableSchema(table)
-			if exists, err := c.tableExists(tableName, schemaName); !exists {
-				return fmt.Errorf("could not find table %q specified for event stream: %v", table, err)
-			}
-			// check if outbox table exists and if not, create it
-			outboxTable := outboxTableNameTemplate.Format("table", tableName, "eventtype", eventType)
-			if exists, err := c.tableExists(outboxTable, schemaName); !exists {
-				return fmt.Errorf("could not find outbox table %q specified for event stream: %v", outboxTable, err)
-			}
 		}
 	}
 
@@ -251,12 +239,11 @@ func (c *Cluster) syncStreams() error {
 			return fmt.Errorf("could not create missing streams: %v", err)
 		}
 	} else {
-		err := c.syncStreamDbResources()
 		if err != nil {
 			c.logger.Warnf("database setup might be incomplete : %v", err)
 		}
 		desiredStreams := c.generateFabricEventStream()
-		if reflect.DeepEqual(effectiveStreams.Spec, desiredStreams.Spec) {
+		if !reflect.DeepEqual(effectiveStreams.Spec, desiredStreams.Spec) {
 			c.updateStreams(desiredStreams)
 		}
 	}

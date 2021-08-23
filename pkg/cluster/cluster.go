@@ -899,6 +899,10 @@ func (c *Cluster) Delete() {
 	defer c.mu.Unlock()
 	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Delete", "Started deletion of new cluster resources")
 
+	if err := c.deleteStreams(); err != nil {
+		c.logger.Warningf("could not delete event streams: %v", err)
+	}
+
 	// delete the backup job before the stateful set of the cluster to prevent connections to non-existing pods
 	// deleting the cron job also removes pods and batch jobs it created
 	if err := c.deleteLogicalBackupJob(); err != nil {
