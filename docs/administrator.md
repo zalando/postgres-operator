@@ -157,20 +157,26 @@ from numerous escape characters in the latter log entry, view it in CLI with
 `PodTemplate` used by the operator is yet to be updated with the default values
 used internally in K8s.
 
-The operator also support lazy updates of the Spilo image. That means the pod
-template of a PG cluster's stateful set is updated immediately with the new
-image, but no rolling update follows. This feature saves you a switchover - and
-hence downtime - when you know pods are re-started later anyway, for instance
-due to the node rotation. To force a rolling update, disable this mode by
-setting the `enable_lazy_spilo_upgrade` to `false` in the operator configuration
-and restart the operator pod. With the standard eager rolling updates the
-operator checks during Sync all pods run images specified in their respective
-statefulsets. The operator triggers a rolling upgrade for PG clusters that
-violate this condition.
+The StatefulSet is replaced if the following properties change:
+- annotations
+- volumeClaimTemplates
+- template volumes
 
-Changes in $SPILO\_CONFIGURATION under path bootstrap.dcs are ignored when
-StatefulSets are being compared, if there are changes under this path, they are
-applied through rest api interface and following restart of patroni instance
+The StatefulSet is replaced and a rolling updates is triggered if the following
+properties differ between the old and new state:
+- container name, ports, image, resources, env, envFrom, securityContext and volumeMounts
+- template labels, annotations, service account, securityContext, affinity, priority class and termination grace period
+
+Note that, changes in `SPILO_CONFIGURATION` env variable under `bootstrap.dcs`
+path are ignored for the diff. They will be applied through Patroni's rest api
+interface, following a restart of all instances.
+
+The operator also support lazy updates of the Spilo image. In this case the
+StatefulSet is only updated, but no rolling update follows. This feature saves
+you a switchover - and hence downtime - when you know pods are re-started later
+anyway, for instance due to the node rotation. To force a rolling update,
+disable this mode by setting the `enable_lazy_spilo_upgrade` to `false` in the
+operator configuration and restart the operator pod.
 
 ## Delete protection via annotations
 
@@ -734,8 +740,15 @@ WALE_S3_ENDPOINT='https+path://s3.eu-central-1.amazonaws.com:443'
 WALE_S3_PREFIX=$WAL_S3_BUCKET/spilo/{WAL_BUCKET_SCOPE_PREFIX}{SCOPE}{WAL_BUCKET_SCOPE_SUFFIX}/wal/{PGVERSION}
 ```
 
-If the prefix is not specified Spilo will generate it from `WAL_S3_BUCKET`.
-When the `AWS_REGION` is set `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
+The operator sets the prefix to an empty string so that spilo will generate it
+from the configured `WAL_S3_BUCKET`. 
+
+:warning: When you overwrite the configuration by defining `WAL_S3_BUCKET` in
+the [pod_environment_configmap](#custom-pod-environment-variables) you have
+to set `WAL_BUCKET_SCOPE_PREFIX = ""`, too. Otherwise Spilo will not find
+the physical backups on restore (next chapter).
+
+When the `AWS_REGION` is set, `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
 generated automatically. `WALG_S3_PREFIX` is identical to `WALE_S3_PREFIX`.
 `SCOPE` is the Postgres cluster name.
 
@@ -816,6 +829,12 @@ happens automatically either from the backup location or by running
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.
+
+If you need to provide a [custom clone environment](#custom-pod-environment-variables)
+copy existing variables about your setup (backup location, prefix, access
+keys etc.) and prepend the `CLONE_` prefix to get them copied to the correct
+directory within Spilo.
+
 
 ## Logical backups
 

@@ -733,20 +733,21 @@ spec:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-batman"
     timestamp: "2017-12-19T12:40:33+01:00"
+    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
 Note, that a time zone is required for `timestamp` in the format of +00:00 which
-is UTC. The `uid` field is also mandatory. The operator will use it to find a
-correct key inside an S3 bucket. You can find this field in the metadata of the
-source cluster:
+is UTC. You can specify the `s3_wal_path` of the source cluster or let the
+operator try to find it based on the configured `wal_[s3|gs]_bucket` and the
+specified `uid`. You can find the UID of the source cluster in its metadata:
 
 ```yaml
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
-  name: acid-test-cluster
+  name: acid-batman
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
 
@@ -799,7 +800,7 @@ no statefulset will be created.
 ```yaml
 spec:
   standby:
-    s3_wal_path: "s3 bucket path to the master"
+    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 At the moment, the operator only allows to stream from the WAL archive of the
