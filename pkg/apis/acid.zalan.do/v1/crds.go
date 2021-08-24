@@ -658,35 +658,6 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 								Type:   "string",
 								Format: "uuid",
 							},
-							"version": {
-								Type: "string",
-								Enum: []apiextv1.JSON{
-									{
-										Raw: []byte(`"9.3"`),
-									},
-									{
-										Raw: []byte(`"9.4"`),
-									},
-									{
-										Raw: []byte(`"9.5"`),
-									},
-									{
-										Raw: []byte(`"9.6"`),
-									},
-									{
-										Raw: []byte(`"10"`),
-									},
-									{
-										Raw: []byte(`"11"`),
-									},
-									{
-										Raw: []byte(`"12"`),
-									},
-									{
-										Raw: []byte(`"13"`),
-									},
-								},
-							},
 							"s3_wal_path": {
 								Type: "string",
 							},
