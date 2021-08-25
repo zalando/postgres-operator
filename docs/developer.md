@@ -267,7 +267,7 @@ the standard Docker `bridge` network. The kind cluster is deleted if tests
 finish successfully or on each new run in case it still exists.
 
 End-to-end tests are executed automatically during builds (for more details,
-see the [README](../e2e/README.md) in the `e2e` folder):
+see the [README](https://github.com/zalando/postgres-operator/blob/master/e2e/README.md) in the `e2e` folder):
 
 ```bash
 make e2e
@@ -291,35 +291,35 @@ parameters (with exceptions for certain Patroni/Postgres options) and
 variables if you feel a per-cluster configuration is necessary.
 
 Note: If one option is defined in the operator configuration and in the cluster
-[manifest](../manifests/complete-postgres-manifest.yaml), the latter takes
+[manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml), the latter takes
 precedence.
 
 ### Go code
 
 Update the following Go files that obtain the configuration parameter from the
 manifest files:
-* [operator_configuration_type.go](../pkg/apis/acid.zalan.do/v1/operator_configuration_type.go)
-* [operator_config.go](../pkg/controller/operator_config.go)
-* [config.go](../pkg/util/config/config.go)
+* [operator_configuration_type.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/operator_configuration_type.go)
+* [operator_config.go](https://github.com/zalando/postgres-operator/blob/master/pkg/controller/operator_config.go)
+* [config.go](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config.go)
 
-Postgres manifest parameters are defined in the [api package](../pkg/apis/acid.zalan.do/v1/postgresql_type.go).
-The operator behavior has to be implemented at least in [k8sres.go](../pkg/cluster/k8sres.go).
-Validation of CRD parameters is controlled in [crds.go](../pkg/apis/acid.zalan.do/v1/crds.go).
+Postgres manifest parameters are defined in the [api package](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/postgresql_type.go).
+The operator behavior has to be implemented at least in [k8sres.go](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/k8sres.go).
+Validation of CRD parameters is controlled in [crds.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/crds.go).
 Please, reflect your changes in tests, for example in:
-* [config_test.go](../pkg/util/config/config_test.go)
-* [k8sres_test.go](../pkg/cluster/k8sres_test.go)
-* [util_test.go](../pkg/apis/acid.zalan.do/v1/util_test.go)
+* [config_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/util/config/config_test.go)
+* [k8sres_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/cluster/k8sres_test.go)
+* [util_test.go](https://github.com/zalando/postgres-operator/blob/master/pkg/apis/acid.zalan.do/v1/util_test.go)
 
 ### Updating manifest files
 
 For the CRD-based configuration, please update the following files:
-* the default [OperatorConfiguration](../manifests/postgresql-operator-default-configuration.yaml)
-* the CRD's [validation](../manifests/operatorconfiguration.crd.yaml)
-* the CRD's validation in the [Helm chart](../charts/postgres-operator/crds/operatorconfigurations.yaml)
+* the default [OperatorConfiguration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml)
+* the CRD's [validation](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml)
+* the CRD's validation in the [Helm chart](https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator/crds/operatorconfigurations.yaml)
 
-Add new options also to the Helm chart's [values file](../charts/postgres-operator/values.yaml) file.
+Add new options also to the Helm chart's [values file](https://github.com/zalando/postgres-operator/blob/master/charts/postgres-operator/values.yaml) file.
 It follows the OperatorConfiguration CRD layout. Nested values will be flattened for the ConfigMap.
-Last but no least, update the [ConfigMap](../manifests/configmap.yaml) manifest example as well.
+Last but no least, update the [ConfigMap](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml) manifest example as well.
 
 ### Updating documentation
 

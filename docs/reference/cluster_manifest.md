@@ -4,9 +4,9 @@ Individual Postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgresql` CRD (custom resource
 definition). The following section describes the structure of the manifest and
 the purpose of individual keys. You can take a look at the examples of the
-[minimal](../../manifests/minimal-postgres-manifest.yaml)
+[minimal](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
 and the
-[complete](../../manifests/complete-postgres-manifest.yaml)
+[complete](https://github.com/zalando/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml)
 cluster manifests.
 
 When Kubernetes resources, such as memory, CPU or volumes, are configured,
