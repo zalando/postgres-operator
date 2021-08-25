@@ -758,6 +758,13 @@ func (c *Cluster) syncDatabases() error {
 		}
 	}
 
+	if len(createDatabases) > 0 {
+		// create the pooler objects in new database if needed
+		if needConnectionPooler(&c.Spec) {
+			c.syncConnectionPoolerSchema(c.installLookupFunction)
+		}
+	}
+
 	// set default privileges for prepared database
 	for _, preparedDatabase := range preparedDatabases {
 		if err := c.initDbConnWithName(preparedDatabase); err != nil {

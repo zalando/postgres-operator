@@ -72,7 +72,7 @@ type ClusterStatus struct {
 
 type TemplateParams map[string]interface{}
 
-type InstallFunction func(schema string, user string, role PostgresRole) error
+type InstallFunction func(schema string, user string) error
 
 type SyncReason []string
 

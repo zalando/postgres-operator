@@ -684,7 +684,7 @@ func logPoolerEssentials(log *logrus.Entry, oldSpec, newSpec *acidv1.Postgresql)
 		}
 	}
 
-	log.Debugf("syncing connection pooler from (%v, %v) to (%v, %v)", v[0], v[1], v[2], v[3])
+	log.Debugf("syncing connection pooler (master, replica) from (%v, %v) to (%v, %v)", v[0], v[1], v[2], v[3])
 }
 
 func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, LookupFunction InstallFunction) (SyncReason, error) {
@@ -760,27 +760,9 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 			// in between
 
 			// in this case also do not forget to install lookup function
-			// new databases could have been created that need the pooler schema
-			if !c.ConnectionPooler[role].LookupFunction {
-				newConnectionPooler := newSpec.Spec.ConnectionPooler
-
-				specSchema := ""
-				specUser := ""
-
-				if newConnectionPooler != nil {
-					specSchema = newConnectionPooler.Schema
-					specUser = newConnectionPooler.User
-				}
-
-				schema := util.Coalesce(
-					specSchema,
-					c.OpConfig.ConnectionPooler.Schema)
-
-				user := util.Coalesce(
-					specUser,
-					c.OpConfig.ConnectionPooler.User)
-
-				if err = LookupFunction(schema, user, role); err != nil {
+			if c.ConnectionPooler[role].LookupFunction {
+				if err = c.syncConnectionPoolerSchema(LookupFunction); err != nil {
+					c.ConnectionPooler[role].LookupFunction = true
 					return NoSync, err
 				}
 			}
@@ -934,4 +916,30 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 	}
 
 	return NoSync, nil
+}
+
+func (c *Cluster) syncConnectionPoolerSchema(LookupFunction InstallFunction) error {
+
+	connectionPooler := c.Spec.ConnectionPooler
+	specSchema := ""
+	specUser := ""
+
+	if connectionPooler != nil {
+		specSchema = connectionPooler.Schema
+		specUser = connectionPooler.User
+	}
+
+	schema := util.Coalesce(
+		specSchema,
+		c.OpConfig.ConnectionPooler.Schema)
+
+	user := util.Coalesce(
+		specUser,
+		c.OpConfig.ConnectionPooler.User)
+
+	if err := LookupFunction(schema, user); err != nil {
+		return err
+	}
+
+	return nil
 }
