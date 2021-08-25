@@ -499,7 +499,6 @@ spec:
                       enum:
                         - "nakadi"
                         - "sqs"
-                        - "wal"
               teamId:
                 type: string
               tls:

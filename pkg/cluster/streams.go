@@ -131,15 +131,26 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 }
 
 func (c *Cluster) getEventStreamSource(stream acidv1.Stream, table, eventType string) zalandov1alpha1.EventStreamSource {
-	streamFilter := stream.Filter[table]
 	_, schema := getTableSchema(table)
-	return zalandov1alpha1.EventStreamSource{
-		Type:             constants.EventStreamSourcePGType,
-		Schema:           schema,
-		EventStreamTable: getOutboxTable(table, eventType),
-		Filter:           streamFilter,
-		Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
+	switch stream.StreamType {
+	case "nakadi":
+		streamFilter := stream.Filter[table]
+		return zalandov1alpha1.EventStreamSource{
+			Type:             constants.EventStreamSourcePGType,
+			Schema:           schema,
+			EventStreamTable: getOutboxTable(table, eventType),
+			Filter:           streamFilter,
+			Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
+		}
+	case "sqs":
+		return zalandov1alpha1.EventStreamSource{
+			Type:             constants.EventStreamSourcePGType,
+			EventStreamTable: getSqsTable(table),
+			Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
+		}
 	}
+
+	return zalandov1alpha1.EventStreamSource{}
 }
 
 func getEventStreamFlow(stream acidv1.Stream) zalandov1alpha1.EventStreamFlow {
@@ -192,6 +203,12 @@ func getOutboxTable(tableName, eventType string) zalandov1alpha1.EventStreamTabl
 	return zalandov1alpha1.EventStreamTable{
 		Name:     outboxTableNameTemplate.Format("table", tableName, "eventtype", eventType),
 		IDColumn: "id",
+	}
+}
+
+func getSqsTable(tableName string) zalandov1alpha1.EventStreamTable {
+	return zalandov1alpha1.EventStreamTable{
+		Name: outboxTableNameTemplate.Format("table", tableName),
 	}
 }
 

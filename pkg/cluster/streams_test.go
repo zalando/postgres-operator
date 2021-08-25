@@ -55,18 +55,13 @@ var (
 					BatchSize: uint32(100),
 				},
 				{
-					StreamType: "wal",
+					StreamType: "sqs",
 					Database:   "foo",
 					Tables: map[string]string{
 						"bar": "stream_type_a",
 					},
-					BatchSize: uint32(100),
-				},
-				{
-					StreamType: "sqs",
-					Database:   "foo",
-					SqsArn:     "arn:aws:sqs:eu-central-1:111122223333",
-					QueueName:  "foo-queue",
+					SqsArn:    "arn:aws:sqs:eu-central-1:111122223333",
+					QueueName: "foo-queue",
 				},
 			},
 			Users: map[string]acidv1.UserFlags{

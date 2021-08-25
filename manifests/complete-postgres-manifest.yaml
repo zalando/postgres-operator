@@ -189,3 +189,19 @@ spec:
 #              operator: In
 #              values:
 #                - enabled
+
+# Enables change data capture streams for defined database tables
+#  streams:
+#  - type: nakadi
+#    batchSize: 100
+#    database: foo
+#    tables:
+#       ta: event_type_a
+#       tb: event_type_b
+#  - type: sqs
+#    database: foo
+#    tables:
+#       ta: ""
+#       tb: ""
+#    sqsArn: arn:aws:sqs:eu-central-1:111122223333
+#    queueName: foo-queue

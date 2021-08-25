@@ -69,7 +69,7 @@ type EventStreamSource struct {
 // EventStreamTable defines the name and ID column to be used for streaming
 type EventStreamTable struct {
 	Name     string `json:"name"`
-	IDColumn string `json:"idColumn,omitempty" defaults:"id"`
+	IDColumn string `json:"idColumn,omitempty"`
 }
 
 // Connection to be used for allowing the FES operator to connect to a database
