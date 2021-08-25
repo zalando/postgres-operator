@@ -60,7 +60,7 @@ func needMasterConnectionPooler(spec *acidv1.PostgresSpec) bool {
 }
 
 func needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) ||
+	return (spec.EnableConnectionPooler != nil && *spec.EnableConnectionPooler) ||
 		(spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
 }
 
@@ -691,8 +691,7 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 
 	var reason SyncReason
 	var err error
-	var newNeedConnectionPooler, oldNeedConnectionPooler bool
-	oldNeedConnectionPooler = false
+	var connectionPoolerNeeded bool
 
 	if oldSpec == nil {
 		oldSpec = &acidv1.Postgresql{
@@ -731,15 +730,9 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	for _, role := range [2]PostgresRole{Master, Replica} {
 
 		if role == Master {
-			newNeedConnectionPooler = needMasterConnectionPoolerWorker(&newSpec.Spec)
-			if oldSpec != nil {
-				oldNeedConnectionPooler = needMasterConnectionPoolerWorker(&oldSpec.Spec)
-			}
+			connectionPoolerNeeded = needMasterConnectionPoolerWorker(&newSpec.Spec)
 		} else {
-			newNeedConnectionPooler = needReplicaConnectionPoolerWorker(&newSpec.Spec)
-			if oldSpec != nil {
-				oldNeedConnectionPooler = needReplicaConnectionPoolerWorker(&oldSpec.Spec)
-			}
+			connectionPoolerNeeded = needReplicaConnectionPoolerWorker(&newSpec.Spec)
 		}
 
 		// if the call is via createConnectionPooler, then it is required to initialize
@@ -759,16 +752,16 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 			}
 		}
 
-		if newNeedConnectionPooler {
+		if connectionPoolerNeeded {
 			// Try to sync in any case. If we didn't needed connection pooler before,
 			// it means we want to create it. If it was already present, still sync
 			// since it could happen that there is no difference in specs, and all
 			// the resources are remembered, but the deployment was manually deleted
 			// in between
 
-			// in this case also do not forget to install lookup function as for
-			// creating cluster
-			if !oldNeedConnectionPooler || !c.ConnectionPooler[role].LookupFunction {
+			// in this case also do not forget to install lookup function
+			// new databases could have been created that need the pooler schema
+			if !c.ConnectionPooler[role].LookupFunction {
 				newConnectionPooler := newSpec.Spec.ConnectionPooler
 
 				specSchema := ""
@@ -808,8 +801,8 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 			}
 		}
 	}
-	if !needMasterConnectionPoolerWorker(&newSpec.Spec) &&
-		!needReplicaConnectionPoolerWorker(&newSpec.Spec) {
+	if (needMasterConnectionPoolerWorker(&oldSpec.Spec) || needReplicaConnectionPoolerWorker(&oldSpec.Spec)) &&
+		!needMasterConnectionPoolerWorker(&newSpec.Spec) && !needReplicaConnectionPoolerWorker(&newSpec.Spec) {
 		if err = c.deleteConnectionPoolerSecret(); err != nil {
 			c.logger.Warningf("could not remove connection pooler secret: %v", err)
 		}
