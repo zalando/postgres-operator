@@ -760,11 +760,11 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 			// in between
 
 			// in this case also do not forget to install lookup function
-			if c.ConnectionPooler[role].LookupFunction {
+			if !c.ConnectionPooler[role].LookupFunction {
 				if err = c.syncConnectionPoolerSchema(LookupFunction); err != nil {
-					c.ConnectionPooler[role].LookupFunction = true
 					return NoSync, err
 				}
+				c.ConnectionPooler[role].LookupFunction = true
 			}
 
 			if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec, role); err != nil {

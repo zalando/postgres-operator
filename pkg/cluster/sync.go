@@ -760,7 +760,7 @@ func (c *Cluster) syncDatabases() error {
 
 	if len(createDatabases) > 0 {
 		// create the pooler objects in new database if needed
-		if needConnectionPooler(&c.Spec) {
+		if c.ConnectionPooler != nil && needConnectionPooler(&c.Spec) {
 			c.syncConnectionPoolerSchema(c.installLookupFunction)
 		}
 	}
