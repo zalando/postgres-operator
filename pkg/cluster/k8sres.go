@@ -798,6 +798,12 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
 
+	if c.OpConfig.WALAZStorageAccount != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+	}
+
 	if c.OpConfig.GCPCredentials != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "GOOGLE_APPLICATION_CREDENTIALS", Value: c.OpConfig.GCPCredentials})
 	}
@@ -1170,9 +1176,6 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate the spilo container
-	c.logger.Debugf("Generating Spilo container, environment variables")
-	c.logger.Debugf("%v", spiloEnvVars)
-
 	spiloContainer := generateContainer(constants.PostgresContainerName,
 		&effectiveDockerImage,
 		resourceRequirements,
@@ -1275,7 +1278,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
-		spec.Volume.StorageClass); err != nil {
+		spec.Volume.StorageClass, spec.Volume.Selector); err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
@@ -1523,7 +1526,8 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 	podSpec.Volumes = volumes
 }
 
-func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
+func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
+	volumeSelector *metav1.LabelSelector) (*v1.PersistentVolumeClaim, error) {
 
 	var storageClassName *string
 
@@ -1556,6 +1560,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 			},
 			StorageClassName: storageClassName,
 			VolumeMode:       &volumeMode,
+			Selector:         volumeSelector,
 		},
 	}
 
@@ -1803,6 +1808,14 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 					{
 						Name:  "CLONE_GOOGLE_APPLICATION_CREDENTIALS",
 						Value: c.OpConfig.GCPCredentials,
+					},
+				}
+				result = append(result, envs...)
+			} else if c.OpConfig.WALAZStorageAccount != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_AZURE_STORAGE_ACCOUNT",
+						Value: c.OpConfig.WALAZStorageAccount,
 					},
 				}
 				result = append(result, envs...)
