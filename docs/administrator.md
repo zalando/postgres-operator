@@ -688,6 +688,12 @@ if it ends up in your specified WAL backup path:
 envdir "/run/etc/wal-e.d/env" /scripts/postgres_backup.sh "/home/postgres/pgdata/pgroot/data"
 ```
 
+You can also check if Spilo is able to find any backups:
+
+```bash
+envdir "/home/postgres/etc/wal-e.d/env" wal-g backup-list
+```
+
 Depending on the cloud storage provider different [environment variables](https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst)
 have to be set for Spilo. Not all of them are generated automatically by the
 operator by changing its configuration. In this case you have to use an
@@ -922,6 +928,15 @@ data:
   CLONE_AWS_SECRET_ACCESS_KEY: "****"
   ...
 ```
+
+### Standby clusters
+
+The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is very
+similar to cloning. At the moment, the operator only allows for streaming from
+the S3 WAL archive of the master specified in the manifest. Like with cloning,
+if you are using [additional environment variables](#custom-pod-environment-variables)
+to access your backup location you have to copy those variables and prepend the
+`STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
 
 ## Logical backups
 
