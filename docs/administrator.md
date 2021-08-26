@@ -3,6 +3,21 @@
 Learn how to configure and manage the Postgres Operator in your Kubernetes (K8s)
 environment.
 
+## Upgrading the operator
+
+The Postgres Operator is upgraded by changing the docker image within the
+deployment. Before doing so, it is recommended to check the release notes
+for new configuration options or changed behavior you might want to reflect
+in the ConfigMap or config CRD. E.g. a new feature might get introduced which
+is enabled or disabled by default and you want to change it to the opposite
+with the corresponding flag option.
+
+When using helm, be aware that installing the new chart will not update the
+`Postgresql` and `OperatorConfiguration` CRD. Make sure to update them before
+with the provided manifests in the `crds` folder. Otherwise, you might face
+errors about new Postgres manifest or configuration options being unknown
+to the CRD schema validation.
+
 ## Minor and major version upgrade
 
 Minor version upgrades for PostgreSQL are handled via updating the Spilo Docker
@@ -835,6 +850,21 @@ copy existing variables about your setup (backup location, prefix, access
 keys etc.) and prepend the `CLONE_` prefix to get them copied to the correct
 directory within Spilo.
 
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-pod-config
+data:
+  AWS_REGION: "eu-west-1"
+  AWS_ACCESS_KEY_ID: "****"
+  AWS_SECRET_ACCESS_KEY: "****"
+  ...
+  CLONE_AWS_REGION: "eu-west-1"
+  CLONE_AWS_ACCESS_KEY_ID: "****"
+  CLONE_AWS_SECRET_ACCESS_KEY: "****"
+  ...
+```
 
 ## Logical backups
 
