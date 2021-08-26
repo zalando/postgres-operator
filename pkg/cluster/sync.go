@@ -759,9 +759,9 @@ func (c *Cluster) syncDatabases() error {
 	}
 
 	if len(createDatabases) > 0 {
-		// create the pooler objects in new database if needed
-		if c.ConnectionPooler != nil && needConnectionPooler(&c.Spec) {
-			c.syncConnectionPoolerSchema(c.installLookupFunction)
+		// trigger creation of pooler objects in new database in syncConnectionPooler
+		for _, role := range [2]PostgresRole{Master, Replica} {
+			c.ConnectionPooler[role].LookupFunction = false
 		}
 	}
 
