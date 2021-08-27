@@ -486,6 +486,8 @@ spec:
                       type: string
                     sqsArn:
                       type: string
+                    sqsFifo:
+                      type: boolean
                     tables:
                       type: object
                       additionalProperties:
@@ -495,6 +497,7 @@ spec:
                       enum:
                         - "nakadi"
                         - "sqs"
+                        - "wal"
               teamId:
                 type: string
               tls:

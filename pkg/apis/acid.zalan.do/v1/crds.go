@@ -684,6 +684,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 									"sqsArn": {
 										Type: "string",
 									},
+									"sqsFifo": {
+										Type: "boolean",
+									},
 									"tables": {
 										Type: "object",
 										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
@@ -700,6 +703,9 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 											},
 											{
 												Raw: []byte(`"sqs"`),
+											},
+											{
+												Raw: []byte(`"wal"`),
 											},
 										},
 									},

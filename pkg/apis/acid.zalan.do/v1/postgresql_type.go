@@ -233,5 +233,6 @@ type Stream struct {
 	Filter     map[string]string `json:"filter,omitempty"`
 	BatchSize  uint32            `json:"batchSize,omitempty"`
 	SqsArn     string            `json:"sqsArn,omitempty"`
+	SqsFifo    bool              `json:"sqsFifo,omitempty"`
 	QueueName  string            `json:"queueName,omitempty"`
 }

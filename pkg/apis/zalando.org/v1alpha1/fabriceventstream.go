@@ -45,6 +45,7 @@ type EventStreamFlow struct {
 	DataOpColumn     string `json:"dataOpColumn,omitempty"`
 	MetadataColumn   string `json:"metadataColumn,omitempty"`
 	DataColumn       string `json:"dataColumn,omitempty"`
+	PayloadColumn    string `json:"payloadColumn,omitempty"`
 	CallHomeIdColumn string `json:"callHomeIdColumn,omitempty"`
 	CallHomeUrl      string `json:"callHomeUrl,omitempty"`
 }
@@ -55,6 +56,7 @@ type EventStreamSink struct {
 	EventType    string `json:"eventType,omitempty"`
 	MaxBatchSize uint32 `json:"maxBatchSize,omitempty"`
 	QueueName    string `json:"queueName,omitempty"`
+	QueueUrl     string `json:"queueUrl,omitempty"`
 }
 
 // EventStreamSource defines the source of the event stream and connection for FES operator

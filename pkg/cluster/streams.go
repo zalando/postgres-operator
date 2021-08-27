@@ -142,10 +142,11 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, table, eventType st
 			Filter:           streamFilter,
 			Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
 		}
-	case "sqs":
+	case "default":
 		return zalandov1alpha1.EventStreamSource{
 			Type:             constants.EventStreamSourcePGType,
-			EventStreamTable: getSqsTable(table),
+			Schema:           schema,
+			EventStreamTable: getSourceTable(table),
 			Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
 		}
 	}
@@ -161,12 +162,13 @@ func getEventStreamFlow(stream acidv1.Stream) zalandov1alpha1.EventStreamFlow {
 			DataTypeColumn: constants.EventStreamFlowDataTypeColumn,
 			DataOpColumn:   constants.EventStreamFlowDataOpColumn,
 			MetadataColumn: constants.EventStreamFlowMetadataColumn,
-			DataColumn:     constants.EventStreamFlowDataColumn}
-	case "sqs":
+			DataColumn:     constants.EventStreamFlowDataColumn,
+		}
+	case "default":
 		return zalandov1alpha1.EventStreamFlow{
-			Type:             constants.EventStreamFlowPgApiType,
-			CallHomeIdColumn: "id",
-			CallHomeUrl:      stream.SqsArn}
+			Type:          constants.EventStreamFlowPgGenericType,
+			PayloadColumn: constants.EventStreamFlowPayloadColumn,
+		}
 	}
 
 	return zalandov1alpha1.EventStreamFlow{}
@@ -174,15 +176,23 @@ func getEventStreamFlow(stream acidv1.Stream) zalandov1alpha1.EventStreamFlow {
 
 func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1alpha1.EventStreamSink {
 	switch stream.StreamType {
-	case "nakadi":
+	case "sqs":
+		sqsSinkType := constants.EventStreamSinkSqsStandardType
+		if stream.SqsFifo {
+			sqsSinkType = constants.EventStreamSinkSqsFifoType
+		}
+		return zalandov1alpha1.EventStreamSink{
+			Type:         sqsSinkType,
+			QueueName:    stream.QueueName,
+			QueueUrl:     stream.SqsArn,
+			MaxBatchSize: stream.BatchSize,
+		}
+	case "default":
 		return zalandov1alpha1.EventStreamSink{
 			Type:         constants.EventStreamSinkNakadiType,
 			EventType:    eventType,
-			MaxBatchSize: stream.BatchSize}
-	case "sqs":
-		return zalandov1alpha1.EventStreamSink{
-			Type:      constants.EventStreamSinkSqsType,
-			QueueName: stream.QueueName}
+			MaxBatchSize: stream.BatchSize,
+		}
 	}
 
 	return zalandov1alpha1.EventStreamSink{}
@@ -206,7 +216,7 @@ func getOutboxTable(tableName, eventType string) zalandov1alpha1.EventStreamTabl
 	}
 }
 
-func getSqsTable(tableName string) zalandov1alpha1.EventStreamTable {
+func getSourceTable(tableName string) zalandov1alpha1.EventStreamTable {
 	return zalandov1alpha1.EventStreamTable{
 		Name: outboxTableNameTemplate.Format("table", tableName),
 	}

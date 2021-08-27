@@ -55,6 +55,14 @@ var (
 					BatchSize: uint32(100),
 				},
 				{
+					StreamType: "wal",
+					Database:   "foo",
+					Tables: map[string]string{
+						"bar": "stream_type_a",
+					},
+					BatchSize: uint32(100),
+				},
+				{
 					StreamType: "sqs",
 					Database:   "foo",
 					Tables: map[string]string{
