@@ -758,6 +758,15 @@ func (c *Cluster) syncDatabases() error {
 		}
 	}
 
+	if len(createDatabases) > 0 {
+		// trigger creation of pooler objects in new database in syncConnectionPooler
+		if c.ConnectionPooler != nil {
+			for _, role := range [2]PostgresRole{Master, Replica} {
+				c.ConnectionPooler[role].LookupFunction = false
+			}
+		}
+	}
+
 	// set default privileges for prepared database
 	for _, preparedDatabase := range preparedDatabases {
 		if err := c.initDbConnWithName(preparedDatabase); err != nil {
