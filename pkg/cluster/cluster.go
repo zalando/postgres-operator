@@ -1006,9 +1006,9 @@ func (c *Cluster) initSystemUsers() {
 	// Connection pooler user is an exception, if requested it's going to be
 	// created by operator as a normal pgUser
 	if needConnectionPooler(&c.Spec) {
-		// initialize empty connection pooler if not done yet
-		if c.Spec.ConnectionPooler == nil {
-			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
+		connectionPoolerSpec := c.Spec.ConnectionPooler
+		if connectionPoolerSpec == nil {
+			connectionPoolerSpec = &acidv1.ConnectionPooler{}
 		}
 
 		// Using superuser as pooler user is not a good idea. First of all it's
@@ -1016,13 +1016,13 @@ func (c *Cluster) initSystemUsers() {
 		// and second it's a bad practice.
 		username := c.OpConfig.ConnectionPooler.User
 
-		isSuperUser := c.Spec.ConnectionPooler.User == c.OpConfig.SuperUsername
+		isSuperUser := connectionPoolerSpec.User == c.OpConfig.SuperUsername
 		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
-			c.Spec.ConnectionPooler.User, "connection pool role")
+			connectionPoolerSpec.User, "connection pool role")
 
 		if !isSuperUser && !isProtectedUser {
 			username = util.Coalesce(
-				c.Spec.ConnectionPooler.User,
+				connectionPoolerSpec.User,
 				c.OpConfig.ConnectionPooler.User)
 		}
 
