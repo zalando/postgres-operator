@@ -691,7 +691,7 @@ envdir "/run/etc/wal-e.d/env" /scripts/postgres_backup.sh "/home/postgres/pgdata
 You can also check if Spilo is able to find any backups:
 
 ```bash
-envdir "/home/postgres/etc/wal-e.d/env" wal-g backup-list
+envdir "/run/etc/wal-e.d/env" wal-g backup-list
 ```
 
 Depending on the cloud storage provider different [environment variables](https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst)
