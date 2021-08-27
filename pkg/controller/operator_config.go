@@ -39,7 +39,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSpiloWalPathCompat = fromCRD.EnableSpiloWalPathCompat
 	result.EtcdHost = fromCRD.EtcdHost
 	result.KubernetesUseConfigMaps = fromCRD.KubernetesUseConfigMaps
-	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-13:2.0-p7")
+	result.DockerImage = util.Coalesce(fromCRD.DockerImage, "registry.opensource.zalan.do/acid/spilo-13:2.1-p1")
 	result.Workers = util.CoalesceUInt32(fromCRD.Workers, 8)
 	result.MinInstances = fromCRD.MinInstances
 	result.MaxInstances = fromCRD.MaxInstances
@@ -82,6 +82,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.EnableSidecars = util.CoalesceBool(fromCRD.Kubernetes.EnableSidecars, util.True())
 	result.SecretNameTemplate = fromCRD.Kubernetes.SecretNameTemplate
 	result.OAuthTokenSecretName = fromCRD.Kubernetes.OAuthTokenSecretName
+	result.EnableCrossNamespaceSecret = fromCRD.Kubernetes.EnableCrossNamespaceSecret
 
 	result.InfrastructureRolesSecretName = fromCRD.Kubernetes.InfrastructureRolesSecretName
 	if fromCRD.Kubernetes.InfrastructureRolesDefs != nil {
@@ -145,6 +146,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.KubeIAMRole = fromCRD.AWSGCP.KubeIAMRole
 	result.WALGSBucket = fromCRD.AWSGCP.WALGSBucket
 	result.GCPCredentials = fromCRD.AWSGCP.GCPCredentials
+	result.WALAZStorageAccount = fromCRD.AWSGCP.WALAZStorageAccount
 	result.AdditionalSecretMount = fromCRD.AWSGCP.AdditionalSecretMount
 	result.AdditionalSecretMountPath = util.Coalesce(fromCRD.AWSGCP.AdditionalSecretMountPath, "/meta/credentials")
 	result.EnableEBSGp3Migration = fromCRD.AWSGCP.EnableEBSGp3Migration
@@ -152,7 +154,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 
 	// logical backup config
 	result.LogicalBackupSchedule = util.Coalesce(fromCRD.LogicalBackup.Schedule, "30 00 * * *")
-	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.6.3")
+	result.LogicalBackupDockerImage = util.Coalesce(fromCRD.LogicalBackup.DockerImage, "registry.opensource.zalan.do/acid/logical-backup:v1.7.0")
 	result.LogicalBackupProvider = util.Coalesce(fromCRD.LogicalBackup.BackupProvider, "s3")
 	result.LogicalBackupS3Bucket = fromCRD.LogicalBackup.S3Bucket
 	result.LogicalBackupS3Region = fromCRD.LogicalBackup.S3Region

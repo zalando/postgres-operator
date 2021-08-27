@@ -5,6 +5,7 @@ package cluster
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -519,7 +520,7 @@ func (c *Cluster) compareContainers(description string, setA, setB []v1.Containe
 		newCheck("new statefulset %s's %s (index %d) resources do not match the current ones",
 			func(a, b v1.Container) bool { return !compareResources(&a.Resources, &b.Resources) }),
 		newCheck("new statefulset %s's %s (index %d) environment does not match the current one",
-			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.Env, b.Env) }),
+			func(a, b v1.Container) bool { return !compareEnv(a.Env, b.Env) }),
 		newCheck("new statefulset %s's %s (index %d) environment sources do not match the current one",
 			func(a, b v1.Container) bool { return !reflect.DeepEqual(a.EnvFrom, b.EnvFrom) }),
 		newCheck("new statefulset %s's %s (index %d) security context does not match the current one",
@@ -574,6 +575,56 @@ func compareResourcesAssumeFirstNotNil(a *v1.ResourceRequirements, b *v1.Resourc
 	}
 	return true
 
+}
+
+func compareEnv(a, b []v1.EnvVar) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	equal := true
+	for _, enva := range a {
+		hasmatch := false
+		for _, envb := range b {
+			if enva.Name == envb.Name {
+				hasmatch = true
+				if enva.Name == "SPILO_CONFIGURATION" {
+					equal = compareSpiloConfiguration(enva.Value, envb.Value)
+				} else {
+					if enva.Value == "" && envb.Value == "" {
+						equal = reflect.DeepEqual(enva.ValueFrom, envb.ValueFrom)
+					} else {
+						equal = (enva.Value == envb.Value)
+					}
+				}
+				if !equal {
+					return false
+				}
+			}
+		}
+		if !hasmatch {
+			return false
+		}
+	}
+	return true
+}
+
+func compareSpiloConfiguration(configa, configb string) bool {
+	var (
+		oa, ob spiloConfiguration
+	)
+
+	var err error
+	err = json.Unmarshal([]byte(configa), &oa)
+	if err != nil {
+		return false
+	}
+	oa.Bootstrap.DCS = patroniDCS{}
+	err = json.Unmarshal([]byte(configb), &ob)
+	if err != nil {
+		return false
+	}
+	ob.Bootstrap.DCS = patroniDCS{}
+	return reflect.DeepEqual(oa, ob)
 }
 
 func (c *Cluster) enforceMinResourceLimits(spec *acidv1.PostgresSpec) error {
@@ -940,22 +991,24 @@ func (c *Cluster) initSystemUsers() {
 	// secrets, therefore, setting flags like SUPERUSER or REPLICATION
 	// is not necessary here
 	c.systemUsers[constants.SuperuserKeyName] = spec.PgUser{
-		Origin:   spec.RoleOriginSystem,
-		Name:     c.OpConfig.SuperUsername,
-		Password: util.RandomPassword(constants.PasswordLength),
+		Origin:    spec.RoleOriginSystem,
+		Name:      c.OpConfig.SuperUsername,
+		Namespace: c.Namespace,
+		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
-		Origin:   spec.RoleOriginSystem,
-		Name:     c.OpConfig.ReplicationUsername,
-		Password: util.RandomPassword(constants.PasswordLength),
+		Origin:    spec.RoleOriginSystem,
+		Name:      c.OpConfig.ReplicationUsername,
+		Namespace: c.Namespace,
+		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 
 	// Connection pooler user is an exception, if requested it's going to be
 	// created by operator as a normal pgUser
 	if needConnectionPooler(&c.Spec) {
-		// initialize empty connection pooler if not done yet
-		if c.Spec.ConnectionPooler == nil {
-			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
+		connectionPoolerSpec := c.Spec.ConnectionPooler
+		if connectionPoolerSpec == nil {
+			connectionPoolerSpec = &acidv1.ConnectionPooler{}
 		}
 
 		// Using superuser as pooler user is not a good idea. First of all it's
@@ -963,22 +1016,23 @@ func (c *Cluster) initSystemUsers() {
 		// and second it's a bad practice.
 		username := c.OpConfig.ConnectionPooler.User
 
-		isSuperUser := c.Spec.ConnectionPooler.User == c.OpConfig.SuperUsername
+		isSuperUser := connectionPoolerSpec.User == c.OpConfig.SuperUsername
 		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
-			c.Spec.ConnectionPooler.User, "connection pool role")
+			connectionPoolerSpec.User, "connection pool role")
 
 		if !isSuperUser && !isProtectedUser {
 			username = util.Coalesce(
-				c.Spec.ConnectionPooler.User,
+				connectionPoolerSpec.User,
 				c.OpConfig.ConnectionPooler.User)
 		}
 
 		// connection pooler application should be able to login with this role
 		connectionPoolerUser := spec.PgUser{
-			Origin:   spec.RoleConnectionPooler,
-			Name:     username,
-			Flags:    []string{constants.RoleFlagLogin},
-			Password: util.RandomPassword(constants.PasswordLength),
+			Origin:    spec.RoleConnectionPooler,
+			Name:      username,
+			Namespace: c.Namespace,
+			Flags:     []string{constants.RoleFlagLogin},
+			Password:  util.RandomPassword(constants.PasswordLength),
 		}
 
 		if _, exists := c.pgUsers[username]; !exists {
@@ -1023,11 +1077,11 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		}
 
 		// default roles per database
-		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String()); err != nil {
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String(), preparedDB.SecretNamespace); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
 		if preparedDB.DefaultUsers {
-			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String()); err != nil {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String(), preparedDB.SecretNamespace); err != nil {
 				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 			}
 		}
@@ -1038,14 +1092,14 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 				if err := c.initDefaultRoles(defaultRoles,
 					preparedDbName+constants.OwnerRoleNameSuffix,
 					preparedDbName+"_"+preparedSchemaName,
-					constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
+					constants.DefaultSearchPath+", "+preparedSchemaName, preparedDB.SecretNamespace); err != nil {
 					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
 				}
 				if preparedSchema.DefaultUsers {
 					if err := c.initDefaultRoles(defaultUsers,
 						preparedDbName+constants.OwnerRoleNameSuffix,
 						preparedDbName+"_"+preparedSchemaName,
-						constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
+						constants.DefaultSearchPath+", "+preparedSchemaName, preparedDB.SecretNamespace); err != nil {
 						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
 					}
 				}
@@ -1055,10 +1109,19 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 	return nil
 }
 
-func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string, searchPath string) error {
+func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix, searchPath, secretNamespace string) error {
 
 	for defaultRole, inherits := range defaultRoles {
 
+		namespace := c.Namespace
+		//if namespaced secrets are allowed
+		if secretNamespace != "" {
+			if c.Config.OpConfig.EnableCrossNamespaceSecret {
+				namespace = secretNamespace
+			} else {
+				c.logger.Warn("secretNamespace ignored because enable_cross_namespace_secret set to false. Creating secrets in cluster namespace.")
+			}
+		}
 		roleName := prefix + defaultRole
 
 		flags := []string{constants.RoleFlagNoLogin}
@@ -1081,6 +1144,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		newRole := spec.PgUser{
 			Origin:     spec.RoleOriginBootstrap,
 			Name:       roleName,
+			Namespace:  namespace,
 			Password:   util.RandomPassword(constants.PasswordLength),
 			Flags:      flags,
 			MemberOf:   memberOf,
@@ -1105,6 +1169,16 @@ func (c *Cluster) initRobotUsers() error {
 		if c.shouldAvoidProtectedOrSystemRole(username, "manifest robot role") {
 			continue
 		}
+		namespace := c.Namespace
+
+		//if namespaced secrets are allowed
+		if c.Config.OpConfig.EnableCrossNamespaceSecret {
+			if strings.Contains(username, ".") {
+				splits := strings.Split(username, ".")
+				namespace = splits[0]
+			}
+		}
+
 		flags, err := normalizeUserFlags(userFlags)
 		if err != nil {
 			return fmt.Errorf("invalid flags for user %q: %v", username, err)
@@ -1116,6 +1190,7 @@ func (c *Cluster) initRobotUsers() error {
 		newRole := spec.PgUser{
 			Origin:    spec.RoleOriginManifest,
 			Name:      username,
+			Namespace: namespace,
 			Password:  util.RandomPassword(constants.PasswordLength),
 			Flags:     flags,
 			AdminRole: adminRole,
@@ -1233,6 +1308,7 @@ func (c *Cluster) initInfrastructureRoles() error {
 			return fmt.Errorf("invalid flags for user '%v': %v", username, err)
 		}
 		newRole.Flags = flags
+		newRole.Namespace = c.Namespace
 
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)

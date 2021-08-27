@@ -139,6 +139,26 @@ secret, without ever sharing it outside of the cluster.
 At the moment it is not possible to define membership of the manifest role in
 other roles.
 
+To define the secrets for the users in a different namespace than that of the
+cluster, one can set `enable_cross_namespace_secret` and declare the namespace
+for the secrets in the manifest in the following manner,
+
+```yaml
+spec:
+  users:
+  #users with secret in dfferent namespace
+   appspace.db_user:
+    - createdb
+```
+
+Here, anything before the first dot is considered the namespace and the text after
+the first dot is the username. Also, the postgres roles of these usernames would
+be in the form of `namespace.username`.
+
+For such usernames, the secret is created in the given namespace and its name is
+of the following form,
+`{namespace}.{username}.{team}-{clustername}.credentials.postgresql.acid.zalan.do`
+
 ### Infrastructure roles
 
 An infrastructure role is a role that should be present on every PostgreSQL
@@ -330,7 +350,7 @@ spec:
 
 This creates roles for members of the `c-team` team not only in all clusters
 owned by `a-team`, but as well in cluster owned by `b-team`, as `a-team` is
-an `additionalTeam` to `b-team` 
+an `additionalTeam` to `b-team`
 
 Not, you can also define `additionalSuperuserTeams` in the `PostgresTeam`
 manifest. By default, this option is disabled and must be configured with
@@ -501,9 +521,10 @@ Then, the schemas are owned by the database owner, too.
 
 The roles described in the previous paragraph can be granted to LOGIN roles from
 the `users` section in the manifest. Optionally, the Postgres Operator can also
-create default LOGIN roles for the database an each schema individually. These
+create default LOGIN roles for the database and each schema individually. These
 roles will get the `_user` suffix and they inherit all rights from their NOLOGIN
-counterparts.
+counterparts. Therefore, you cannot have `defaultRoles` set to `false` and enable
+`defaultUsers` at the same time.
 
 | Role name           | Member of      | Admin         |
 | ------------------- | -------------- | ------------- |
@@ -524,6 +545,23 @@ spec:
       schemas:
         bar:
           defaultUsers: true
+```
+
+Default access privileges are also defined for LOGIN roles on database and
+schema creation. This means they are currently not set when `defaultUsers`
+(or `defaultRoles` for schemas) are enabled at a later point in time.
+
+For all LOGIN roles the operator will create K8s secrets in the namespace
+specified in `secretNamespace`, if `enable_cross_namespace_secret` is set to
+`true` in the config. Otherwise, they are created in the same namespace like
+the Postgres cluster.
+
+```yaml
+spec:
+  preparedDatabases:
+    foo:
+      defaultUsers: true
+      secretNamespace: appspace
 ```
 
 ### Schema `search_path` for default roles
@@ -695,20 +733,21 @@ spec:
     uid: "efd12e58-5786-11e8-b5a7-06148230260c"
     cluster: "acid-batman"
     timestamp: "2017-12-19T12:40:33+01:00"
+    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 Here `cluster` is a name of a source cluster that is going to be cloned. A new
 cluster will be cloned from S3, using the latest backup before the `timestamp`.
 Note, that a time zone is required for `timestamp` in the format of +00:00 which
-is UTC. The `uid` field is also mandatory. The operator will use it to find a
-correct key inside an S3 bucket. You can find this field in the metadata of the
-source cluster:
+is UTC. You can specify the `s3_wal_path` of the source cluster or let the
+operator try to find it based on the configured `wal_[s3|gs]_bucket` and the
+specified `uid`. You can find the UID of the source cluster in its metadata:
 
 ```yaml
 apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
-  name: acid-test-cluster
+  name: acid-batman
   uid: efd12e58-5786-11e8-b5a7-06148230260c
 ```
 
@@ -761,7 +800,7 @@ no statefulset will be created.
 ```yaml
 spec:
   standby:
-    s3_wal_path: "s3 bucket path to the master"
+    s3_wal_path: "s3://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 At the moment, the operator only allows to stream from the WAL archive of the

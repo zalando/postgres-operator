@@ -14,7 +14,7 @@ solutions:
 * [kind](https://kind.sigs.k8s.io/) and [k3d](https://k3d.io), which allows creating multi-nodes K8s
   clusters running on Docker (requires Docker)
 
-To interact with the K8s infrastructure install it's CLI runtime [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl).
+To interact with the K8s infrastructure install its CLI runtime [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl-binary-via-curl).
 
 This quickstart assumes that you have started minikube or created a local kind
 cluster. Note that you can also use built-in K8s support in the Docker Desktop
@@ -81,15 +81,11 @@ the repo root. With Helm v3 installed you should be able to run:
 helm install postgres-operator ./charts/postgres-operator
 ```
 
-To use CRD-based configuration you need to specify the [values-crd yaml file](../charts/postgres-operator/values-crd.yaml).
-
-```bash
-helm install postgres-operator ./charts/postgres-operator -f ./charts/postgres-operator/values-crd.yaml
-```
-
 The chart works with both Helm 2 and Helm 3. The `crd-install` hook from v2 will
 be skipped with warning when using v3. Documentation for installing applications
 with Helm 2 can be found in the [v2 docs](https://v2.helm.sh/docs/).
+
+The chart is also hosted at: https://opensource.zalando.com/postgres-operator/charts/postgres-operator/
 
 ## Check if Postgres Operator is running
 

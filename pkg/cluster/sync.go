@@ -2,9 +2,12 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
@@ -260,13 +263,18 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 }
 
 func (c *Cluster) syncStatefulSet() error {
+	var (
+		masterPod               *v1.Pod
+		postgresConfig          map[string]interface{}
+		instanceRestartRequired bool
+	)
 
 	podsToRecreate := make([]v1.Pod, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
 
 	pods, err := c.listPods()
 	if err != nil {
-		c.logger.Infof("could not list pods of the statefulset: %v", err)
+		c.logger.Warnf("could not list pods of the statefulset: %v", err)
 	}
 
 	// NB: Be careful to consider the codepath that acts on podsRollingUpdateRequired before returning early.
@@ -379,8 +387,48 @@ func (c *Cluster) syncStatefulSet() error {
 	// Apply special PostgreSQL parameters that can only be set via the Patroni API.
 	// it is important to do it after the statefulset pods are there, but before the rolling update
 	// since those parameters require PostgreSQL restart.
-	if err := c.checkAndSetGlobalPostgreSQLConfiguration(); err != nil {
-		return fmt.Errorf("could not set cluster-wide PostgreSQL configuration options: %v", err)
+	pods, err = c.listPods()
+	if err != nil {
+		c.logger.Warnf("could not get list of pods to apply special PostgreSQL parameters only to be set via Patroni API: %v", err)
+	}
+
+	// get Postgres config, compare with manifest and update via Patroni PATCH endpoint if it differs
+	// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used.
+	for i, pod := range pods {
+		podName := util.NameFromMeta(pods[i].ObjectMeta)
+		config, err := c.patroni.GetConfig(&pod)
+		if err != nil {
+			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
+			continue
+		}
+		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, config)
+		if err != nil {
+			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
+			continue
+		}
+		break
+	}
+
+	// if the config update requires a restart, call Patroni restart for replicas first, then master
+	if instanceRestartRequired {
+		c.logger.Debug("restarting Postgres server within pods")
+		ttl, ok := postgresConfig["ttl"].(int32)
+		if !ok {
+			ttl = 30
+		}
+		for i, pod := range pods {
+			role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+			if role == Master {
+				masterPod = &pods[i]
+				continue
+			}
+			c.restartInstance(&pod)
+			time.Sleep(time.Duration(ttl) * time.Second)
+		}
+
+		if masterPod != nil {
+			c.restartInstance(masterPod)
+		}
 	}
 
 	// if we get here we also need to re-create the pods (either leftovers from the old
@@ -394,6 +442,21 @@ func (c *Cluster) syncStatefulSet() error {
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", "Rolling update done - pods have been recreated")
 	}
 	return nil
+}
+
+func (c *Cluster) restartInstance(pod *v1.Pod) {
+	podName := util.NameFromMeta(pod.ObjectMeta)
+	role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
+
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("restarting Postgres server within %s pod %s", role, pod.Name))
+
+	if err := c.patroni.Restart(pod); err != nil {
+		c.logger.Warningf("could not restart Postgres server within %s pod %s: %v", role, podName, err)
+		return
+	}
+
+	c.logger.Debugf("Postgres server successfuly restarted in %s pod %s", role, podName)
+	c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for %s pod %s", role, pod.Name))
 }
 
 // AnnotationsToPropagate get the annotations to update if required
@@ -429,46 +492,77 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 }
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
-// (like max_connections) has changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration() error {
-	var (
-		err  error
-		pods []v1.Pod
-	)
+// (like max_connections) have changed and if necessary sets it via the Patroni API
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig map[string]interface{}) (bool, error) {
+	configToSet := make(map[string]interface{})
+	parametersToSet := make(map[string]string)
+	effectivePgParameters := make(map[string]interface{})
 
-	// we need to extract those options from the cluster manifest.
-	optionsToSet := make(map[string]string)
-	pgOptions := c.Spec.Parameters
+	// read effective Patroni config if set
+	if patroniConfig != nil {
+		effectivePostgresql := patroniConfig["postgresql"].(map[string]interface{})
+		effectivePgParameters = effectivePostgresql[patroniPGParametersParameterName].(map[string]interface{})
+	}
 
-	for k, v := range pgOptions {
-		if isBootstrapOnlyParameter(k) {
-			optionsToSet[k] = v
+	// compare parameters under postgresql section with c.Spec.Postgresql.Parameters from manifest
+	desiredPgParameters := c.Spec.Parameters
+	for desiredOption, desiredValue := range desiredPgParameters {
+		effectiveValue := effectivePgParameters[desiredOption]
+		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
+			parametersToSet[desiredOption] = desiredValue
 		}
 	}
 
-	if len(optionsToSet) == 0 {
-		return nil
+	if len(parametersToSet) > 0 {
+		configToSet["postgresql"] = map[string]interface{}{patroniPGParametersParameterName: parametersToSet}
 	}
 
-	if pods, err = c.listPods(); err != nil {
-		return err
+	// compare other options from config with c.Spec.Patroni from manifest
+	desiredPatroniConfig := c.Spec.Patroni
+	if desiredPatroniConfig.LoopWait > 0 && desiredPatroniConfig.LoopWait != uint32(patroniConfig["loop_wait"].(float64)) {
+		configToSet["loop_wait"] = desiredPatroniConfig.LoopWait
 	}
-	if len(pods) == 0 {
-		return fmt.Errorf("could not call Patroni API: cluster has no pods")
+	if desiredPatroniConfig.MaximumLagOnFailover > 0 && desiredPatroniConfig.MaximumLagOnFailover != float32(patroniConfig["maximum_lag_on_failover"].(float64)) {
+		configToSet["maximum_lag_on_failover"] = desiredPatroniConfig.MaximumLagOnFailover
 	}
+	if desiredPatroniConfig.PgHba != nil && !reflect.DeepEqual(desiredPatroniConfig.PgHba, (patroniConfig["pg_hba"])) {
+		configToSet["pg_hba"] = desiredPatroniConfig.PgHba
+	}
+	if desiredPatroniConfig.RetryTimeout > 0 && desiredPatroniConfig.RetryTimeout != uint32(patroniConfig["retry_timeout"].(float64)) {
+		configToSet["retry_timeout"] = desiredPatroniConfig.RetryTimeout
+	}
+	if desiredPatroniConfig.Slots != nil && !reflect.DeepEqual(desiredPatroniConfig.Slots, patroniConfig["slots"]) {
+		configToSet["slots"] = desiredPatroniConfig.Slots
+	}
+	if desiredPatroniConfig.SynchronousMode != patroniConfig["synchronous_mode"] {
+		configToSet["synchronous_mode"] = desiredPatroniConfig.SynchronousMode
+	}
+	if desiredPatroniConfig.SynchronousModeStrict != patroniConfig["synchronous_mode_strict"] {
+		configToSet["synchronous_mode_strict"] = desiredPatroniConfig.SynchronousModeStrict
+	}
+	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != uint32(patroniConfig["ttl"].(float64)) {
+		configToSet["ttl"] = desiredPatroniConfig.TTL
+	}
+
+	if len(configToSet) == 0 {
+		return false, nil
+	}
+
+	configToSetJson, err := json.Marshal(configToSet)
+	if err != nil {
+		c.logger.Debugf("could not convert config patch to JSON: %v", err)
+	}
+
 	// try all pods until the first one that is successful, as it doesn't matter which pod
 	// carries the request to change configuration through
-	for _, pod := range pods {
-		podName := util.NameFromMeta(pod.ObjectMeta)
-		c.logger.Debugf("calling Patroni API on a pod %s to set the following Postgres options: %v",
-			podName, optionsToSet)
-		if err = c.patroni.SetPostgresParameters(&pod, optionsToSet); err == nil {
-			return nil
-		}
-		c.logger.Warningf("could not patch postgres parameters with a pod %s: %v", podName, err)
+	podName := util.NameFromMeta(pod.ObjectMeta)
+	c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
+		podName, configToSetJson)
+	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
+		return true, fmt.Errorf("could not patch postgres parameters with a pod %s: %v", podName, err)
 	}
-	return fmt.Errorf("could not reach Patroni API to set Postgres options: failed on every pod (%d total)",
-		len(pods))
+
+	return true, nil
 }
 
 func (c *Cluster) syncSecrets() error {
@@ -483,7 +577,7 @@ func (c *Cluster) syncSecrets() error {
 	for secretUsername, secretSpec := range secrets {
 		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secret.UID)
+			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), secretSpec.Namespace, secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
@@ -521,7 +615,7 @@ func (c *Cluster) syncSecrets() error {
 				userMap[secretUsername] = pwdUser
 			}
 		} else {
-			return fmt.Errorf("could not create secret for user %s: %v", secretUsername, err)
+			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, secretSpec.Namespace, err)
 		}
 	}
 
@@ -556,11 +650,12 @@ func (c *Cluster) syncRoles() (err error) {
 
 	// create list of database roles to query
 	for _, u := range c.pgUsers {
-		userNames = append(userNames, u.Name)
+		pgRole := u.Name
+		userNames = append(userNames, pgRole)
 		// add team member role name with rename suffix in case we need to rename it back
 		if u.Origin == spec.RoleOriginTeamsAPI && c.OpConfig.EnableTeamMemberDeprecation {
-			deletedUsers[u.Name+c.OpConfig.RoleDeletionSuffix] = u.Name
-			userNames = append(userNames, u.Name+c.OpConfig.RoleDeletionSuffix)
+			deletedUsers[pgRole+c.OpConfig.RoleDeletionSuffix] = pgRole
+			userNames = append(userNames, pgRole+c.OpConfig.RoleDeletionSuffix)
 		}
 	}
 
@@ -663,13 +758,25 @@ func (c *Cluster) syncDatabases() error {
 		}
 	}
 
+	if len(createDatabases) > 0 {
+		// trigger creation of pooler objects in new database in syncConnectionPooler
+		if c.ConnectionPooler != nil {
+			for _, role := range [2]PostgresRole{Master, Replica} {
+				c.ConnectionPooler[role].LookupFunction = false
+			}
+		}
+	}
+
 	// set default privileges for prepared database
 	for _, preparedDatabase := range preparedDatabases {
 		if err := c.initDbConnWithName(preparedDatabase); err != nil {
 			return fmt.Errorf("could not init database connection to %s", preparedDatabase)
 		}
-		if err = c.execAlterGlobalDefaultPrivileges(preparedDatabase+constants.OwnerRoleNameSuffix, preparedDatabase); err != nil {
-			return err
+
+		for _, owner := range c.getOwnerRoles(preparedDatabase, c.Spec.PreparedDatabases[preparedDatabase].DefaultUsers) {
+			if err = c.execAlterGlobalDefaultPrivileges(owner, preparedDatabase); err != nil {
+				return err
+			}
 		}
 	}
 

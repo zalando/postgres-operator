@@ -156,6 +156,10 @@ class K8s:
         while not get_services():
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
+    def count_pods_with_rolling_update_flag(self, labels, namespace='default'):
+        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
+        return len(list(filter(lambda x: "zalando-postgres-operator-rolling-update-required" in x.metadata.annotations, pods)))
+
     def count_pods_with_label(self, labels, namespace='default'):
         return len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items)
 
@@ -189,12 +193,27 @@ class K8s:
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
         new_pod_node = ''
+        pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
 
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
                 new_pod_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+        
+        while pods_with_update_flag != 0:
+            pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+    def wait_for_namespace_creation(self, namespace='default'):
+        ns_found = False
+        while ns_found != True:
+            ns = self.api.core_v1.list_namespace().items
+            for n in ns:
+                if n.metadata.name == namespace:
+                    ns_found = True
+                    break
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_logical_backup_job(self, namespace='default'):
@@ -232,6 +251,13 @@ class K8s:
         return subprocess.run(["./exec.sh", pod, cmd],
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE)
+
+    def patroni_rest(self, pod, path):
+        r = self.exec_with_kubectl(pod, "curl localhost:8008/" + path)
+        if not r.returncode == 0 or not r.stdout.decode()[0:1] == "{":
+            return None
+
+        return json.loads(r.stdout.decode())
 
     def get_patroni_state(self, pod):
         r = self.exec_with_kubectl(pod, "patronictl list -f json")
@@ -413,6 +439,10 @@ class K8sBase:
         while not get_services():
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
+    def count_pods_with_rolling_update_flag(self, labels, namespace='default'):
+        pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
+        return len(list(filter(lambda x: "zalando-postgres-operator-rolling-update-required" in x.metadata.annotations, pods)))
+
     def count_pods_with_label(self, labels, namespace='default'):
         return len(self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items)
 
@@ -446,12 +476,17 @@ class K8sBase:
     def wait_for_pod_failover(self, failover_targets, labels, namespace='default'):
         pod_phase = 'Failing over'
         new_pod_node = ''
+        pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
 
         while (pod_phase != 'Running') or (new_pod_node not in failover_targets):
             pods = self.api.core_v1.list_namespaced_pod(namespace, label_selector=labels).items
             if pods:
                 new_pod_node = pods[0].spec.node_name
                 pod_phase = pods[0].status.phase
+            time.sleep(self.RETRY_TIMEOUT_SEC)
+
+        while pods_with_update_flag != 0:
+            pods_with_update_flag = self.count_pods_with_rolling_update_flag(labels, namespace)
             time.sleep(self.RETRY_TIMEOUT_SEC)
 
     def get_logical_backup_job(self, namespace='default'):
@@ -485,6 +520,13 @@ class K8sBase:
         return subprocess.run(["./exec.sh", pod, cmd],
                               stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE)
+
+    def patroni_rest(self, pod, path):
+        r = self.exec_with_kubectl(pod, "curl localhost:8008/" + path)
+        if not r.returncode == 0 or not r.stdout.decode()[0:1] == "{":
+            return None
+
+        return json.loads(r.stdout.decode())
 
     def get_patroni_state(self, pod):
         r = self.exec_with_kubectl(pod, "patronictl list -f json")

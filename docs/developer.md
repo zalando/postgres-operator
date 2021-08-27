@@ -314,13 +314,12 @@ Please, reflect your changes in tests, for example in:
 
 For the CRD-based configuration, please update the following files:
 * the default [OperatorConfiguration](../manifests/postgresql-operator-default-configuration.yaml)
-* the Helm chart's [values-crd file](../charts/postgres-operator/values.yaml)
 * the CRD's [validation](../manifests/operatorconfiguration.crd.yaml)
+* the CRD's validation in the [Helm chart](../charts/postgres-operator/crds/operatorconfigurations.yaml)
 
-Reflect the changes in the ConfigMap configuration as well (note that numeric
-and boolean parameters have to use double quotes here):
-* [ConfigMap](../manifests/configmap.yaml) manifest
-* the Helm chart's default [values file](../charts/postgres-operator/values.yaml)
+Add new options also to the Helm chart's [values file](../charts/postgres-operator/values.yaml) file.
+It follows the OperatorConfiguration CRD layout. Nested values will be flattened for the ConfigMap.
+Last but no least, update the [ConfigMap](../manifests/configmap.yaml) manifest example as well.
 
 ### Updating documentation
 

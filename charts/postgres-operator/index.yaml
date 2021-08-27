@@ -2,9 +2,32 @@ apiVersion: v1
 entries:
   postgres-operator:
   - apiVersion: v1
+    appVersion: 1.7.0
+    created: "2021-08-27T10:21:42.643185124+02:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
+    digest: 1c4a1d289188ef72e409892fd2b86c008a37420af04a9796a8829ff84ab09e61
+    home: https://github.com/zalando/postgres-operator
+    keywords:
+    - postgres
+    - operator
+    - cloud-native
+    - patroni
+    - spilo
+    maintainers:
+    - email: opensource@zalando.de
+      name: Zalando
+    name: postgres-operator
+    sources:
+    - https://github.com/zalando/postgres-operator
+    urls:
+    - postgres-operator-1.7.0.tgz
+    version: 1.7.0
+  - apiVersion: v1
     appVersion: 1.6.3
-    created: "2021-05-27T19:04:25.199523943+02:00"
-    description: Postgres Operator creates and manages PostgreSQL clusters running in Kubernetes
+    created: "2021-08-27T10:21:42.640069574+02:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
     digest: ea08f991bf23c9ad114bca98ebcbe3e2fa15beab163061399394905eaee89b35
     home: https://github.com/zalando/postgres-operator
     keywords:
@@ -24,8 +47,9 @@ entries:
     version: 1.6.3
   - apiVersion: v1
     appVersion: 1.6.2
-    created: "2021-05-27T19:04:25.198182197+02:00"
-    description: Postgres Operator creates and manages PostgreSQL clusters running in Kubernetes
+    created: "2021-08-27T10:21:42.638502739+02:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
     digest: d886f8a0879ca07d1e5246ee7bc55710e1c872f3977280fe495db6fc2057a7f4
     home: https://github.com/zalando/postgres-operator
     keywords:
@@ -45,8 +69,9 @@ entries:
     version: 1.6.2
   - apiVersion: v1
     appVersion: 1.6.1
-    created: "2021-05-27T19:04:25.19687586+02:00"
-    description: Postgres Operator creates and manages PostgreSQL clusters running in Kubernetes
+    created: "2021-08-27T10:21:42.636936467+02:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
     digest: 4ba5972cd486dcaa2d11c5613a6f97f6b7b831822e610fe9e10a57ea1db23556
     home: https://github.com/zalando/postgres-operator
     keywords:
@@ -66,8 +91,9 @@ entries:
     version: 1.6.1
   - apiVersion: v1
     appVersion: 1.6.0
-    created: "2021-05-27T19:04:25.195600766+02:00"
-    description: Postgres Operator creates and manages PostgreSQL clusters running in Kubernetes
+    created: "2021-08-27T10:21:42.63533527+02:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
     digest: f52149718ea364f46b4b9eec9a65f6253ad182bb78df541d14cd5277b9c8a8c3
     home: https://github.com/zalando/postgres-operator
     keywords:
@@ -87,8 +113,9 @@ entries:
     version: 1.6.0
   - apiVersion: v1
     appVersion: 1.5.0
-    created: "2021-05-27T19:04:25.193985032+02:00"
-    description: Postgres Operator creates and manages PostgreSQL clusters running in Kubernetes
+    created: "2021-08-27T10:21:42.632932257+02:00"
+    description: Postgres Operator creates and manages PostgreSQL clusters running
+      in Kubernetes
     digest: 198351d5db52e65cdf383d6f3e1745d91ac1e2a01121f8476f8b1be728b09531
     home: https://github.com/zalando/postgres-operator
     keywords:
@@ -106,4 +133,4 @@ entries:
     urls:
     - postgres-operator-1.5.0.tgz
     version: 1.5.0
-generated: "2021-05-27T19:04:25.191897769+02:00"
+generated: "2021-08-27T10:21:42.631372502+02:00"

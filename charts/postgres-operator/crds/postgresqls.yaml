@@ -223,6 +223,97 @@ spec:
                 items:
                   type: string
                   pattern: '^\ *((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))-((Mon|Tue|Wed|Thu|Fri|Sat|Sun):(2[0-3]|[01]?\d):([0-5]?\d)|(2[0-3]|[01]?\d):([0-5]?\d))\ *$'
+              nodeAffinity:
+                type: object
+                properties:
+                  preferredDuringSchedulingIgnoredDuringExecution:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - weight
+                      - preference
+                      properties:
+                        preference:
+                          type: object
+                          properties:
+                            matchExpressions:
+                              type: array
+                              items:
+                                type: object
+                                required:
+                                - key
+                                - operator
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    type: array
+                                    items:
+                                      type: string
+                            matchFields:
+                              type: array
+                              items:
+                                type: object
+                                required:
+                                - key
+                                - operator
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    type: array
+                                    items:
+                                      type: string
+                        weight:
+                          format: int32
+                          type: integer
+                  requiredDuringSchedulingIgnoredDuringExecution:
+                    type: object
+                    required:
+                    - nodeSelectorTerms
+                    properties:
+                      nodeSelectorTerms:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            matchExpressions:
+                              type: array
+                              items:
+                                type: object
+                                required:
+                                - key
+                                - operator
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    type: array
+                                    items:
+                                      type: string
+                            matchFields:
+                              type: array
+                              items:
+                                type: object
+                                required:
+                                - key
+                                - operator
+                                properties:
+                                  key:
+                                    type: string
+                                  operator:
+                                    type: string
+                                  values:
+                                    type: array
+                                    items:
+                                      type: string
               numberOfInstances:
                 type: integer
                 minimum: 0
@@ -303,6 +394,8 @@ spec:
                             type: boolean
                           defaultRoles:
                             type: boolean
+                    secretNamespace:
+                      type: string
               replicaLoadBalancer:  # deprecated
                 type: boolean
               resources:
@@ -396,97 +489,6 @@ spec:
                     type: string
                   caSecretName:
                     type: string
-              nodeAffinity:
-                type: object
-                properties:
-                  preferredDuringSchedulingIgnoredDuringExecution:
-                    type: array
-                    items:
-                      type: object
-                      required:
-                      - weight
-                      - preference
-                      properties:
-                        preference:
-                          type: object
-                          properties:
-                            matchExpressions:
-                              type: array
-                              items:
-                                type: object
-                                required:
-                                - key
-                                - operator
-                                properties:
-                                  key:
-                                    type: string
-                                  operator:
-                                    type: string
-                                  values:
-                                    type: array
-                                    items:
-                                      type: string
-                            matchFields:
-                              type: array
-                              items:
-                                type: object
-                                required:
-                                - key
-                                - operator
-                                properties:
-                                  key:
-                                    type: string
-                                  operator:
-                                    type: string
-                                  values:
-                                    type: array
-                                    items:
-                                      type: string
-                        weight:
-                          format: int32
-                          type: integer
-                  requiredDuringSchedulingIgnoredDuringExecution:
-                    type: object
-                    required:
-                    - nodeSelectorTerms
-                    properties:
-                      nodeSelectorTerms:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            matchExpressions:
-                              type: array
-                              items:
-                                type: object
-                                required:
-                                - key
-                                - operator
-                                properties:
-                                  key:
-                                    type: string
-                                  operator:
-                                    type: string
-                                  values:
-                                    type: array
-                                    items:
-                                      type: string
-                            matchFields:
-                              type: array
-                              items:
-                                type: object
-                                required:
-                                - key
-                                - operator
-                                properties:
-                                  key:
-                                    type: string
-                                  operator:
-                                    type: string
-                                  values:
-                                    type: array
-                                    items:
-                                      type: string
               tolerations:
                 type: array
                 items:
@@ -559,6 +561,24 @@ spec:
                 properties:
                   iops:
                     type: integer
+                  selector:
+                    type: object
+                    properties:
+                      matchExpressions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            key:
+                              type: string
+                            operator:
+                              type: string
+                            values:
+                              type: array
+                              items:
+                                type: string
+                      matchLabels:
+                        type: object
                   size:
                     type: string
                     pattern: '^(\d+(e\d+)?|\d+(\.\d+)?(e\d+)?[EPTGMK]i?)$'
