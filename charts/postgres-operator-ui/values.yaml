@@ -8,7 +8,7 @@ replicaCount: 1
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator-ui
-  tag: v1.6.3
+  tag: v1.7.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
