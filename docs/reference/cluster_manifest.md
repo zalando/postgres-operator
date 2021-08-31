@@ -369,24 +369,13 @@ On startup, an existing `standby` top-level key creates a standby Postgres
 cluster streaming from a remote location. So far streaming from S3 and GCS WAL
 archives is supported.
 
-* **cluster**
-  name of the cluster to clone from. Used to identify the S3 or GS bucket to replicate
-  from. Optional, but `cluster`, `s3_wal_path`  or `gs_wal_path` is required.
-
-* **uid**
-  Kubernetes UID of the cluster to replicate from. Since cluster name is not a
-  unique identifier of the cluster (as identically named clusters may exist in
-  different namespaces) , the operator uses UID in the bucket name in order
-  to guarantee uniqueness. Can be omitted for buckets which do not include the
-  UID in their path. Optional.
-
 * **s3_wal_path**
   the url to S3 bucket containing the WAL archive of the remote primary.
-  Optional, but `cluster`, `s3_wal_path`  or `gs_wal_path` is required. 
+  Optional, but `s3_wal_path`  or `gs_wal_path` is required.
 
 * **gs_wal_path**
   the url to GS bucket containing the WAL archive of the remote primary.
-  Optional, but `cluster`, `s3_wal_path`  or `gs_wal_path` is required. 
+  Optional, but `s3_wal_path`  or `gs_wal_path` is required.
 
 ## Volume properties
 

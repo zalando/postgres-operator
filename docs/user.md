@@ -794,10 +794,8 @@ different location than its source database. Unlike cloning, the PostgreSQL
 version between source and target cluster has to be the same.
 
 To start a cluster as standby, add the following `standby` section in the YAML
-file. Specify either the S3/GS bucket path or a cluster name to use the default layout.
-Omitting both settings will result in an error and no statefulset will be created.
-Note that when specifying cluster name you may also optionally provide a UID
-if one is used in your bucket path.
+file. Specify the S3/GS bucket path. Omitting both settings will result in an error
+and no statefulset will be created.
 
 ```yaml
 spec:
@@ -808,8 +806,7 @@ spec:
 ```yaml
 spec:
   standby:
-    cluster: "acid-batman"
-    uid: "efd12e58-5786-11e8-b5a7-06148230260c"
+    gs_wal_path: "gs://<bucketname>/spilo/<source_db_cluster>/<UID>/wal/<PGVERSION>"
 ```
 
 At the moment, the operator only allows to stream from the WAL archive of the

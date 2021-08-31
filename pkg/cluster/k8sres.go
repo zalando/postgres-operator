@@ -1059,8 +1059,8 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		func(i, j int) bool { return customPodEnvVarsList[i].Name < customPodEnvVarsList[j].Name })
 
 	if spec.StandbyCluster != nil && spec.StandbyCluster.S3WalPath == "" &&
-		spec.StandbyCluster.GSWalPath == "" && spec.StandbyCluster.ClusterName == "" {
-		return nil, fmt.Errorf("one of s3_wal_path, gs_wal_path or cluster must be set for standby cluster")
+		spec.StandbyCluster.GSWalPath == "" {
+		return nil, fmt.Errorf("one of s3_wal_path or gs_wal_path must be set for standby cluster")
 	}
 
 	// backward compatible check for InitContainers
@@ -1898,45 +1898,6 @@ func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescript
 				Value: c.OpConfig.GCPCredentials,
 			},
 		}
-		result = append(result, envs...)
-
-	} else {
-		msg := "Figure out which S3 bucket to use from env"
-		c.logger.Info(msg, description.S3WalPath)
-
-		cluster := description.ClusterName
-		result = append(result, v1.EnvVar{Name: "STANDBY_SCOPE", Value: cluster})
-		if c.OpConfig.WALES3Bucket != "" {
-			envs := []v1.EnvVar{
-				{
-					Name:  "STANDBY_WAL_S3_BUCKET",
-					Value: c.OpConfig.WALES3Bucket,
-				},
-			}
-			result = append(result, envs...)
-		} else if c.OpConfig.WALGSBucket != "" {
-			envs := []v1.EnvVar{
-				{
-					Name:  "STANDBY_WAL_GS_BUCKET",
-					Value: c.OpConfig.WALGSBucket,
-				},
-				{
-					Name:  "STANDBY_GOOGLE_APPLICATION_CREDENTIALS",
-					Value: c.OpConfig.GCPCredentials,
-				},
-			}
-			result = append(result, envs...)
-		} else {
-			c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
-		}
-
-		envs := []v1.EnvVar{
-			{
-				Name:  "STANDBY_WAL_BUCKET_SCOPE_SUFFIX",
-				Value: getBucketScopeSuffix(description.UID),
-			},
-		}
-
 		result = append(result, envs...)
 
 	}
