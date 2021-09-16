@@ -1019,9 +1019,9 @@ func (c *Cluster) initSystemUsers() {
 	// Connection pooler user is an exception, if requested it's going to be
 	// created by operator as a normal pgUser
 	if needConnectionPooler(&c.Spec) {
-		// initialize empty connection pooler if not done yet
-		if c.Spec.ConnectionPooler == nil {
-			c.Spec.ConnectionPooler = &acidv1.ConnectionPooler{}
+		connectionPoolerSpec := c.Spec.ConnectionPooler
+		if connectionPoolerSpec == nil {
+			connectionPoolerSpec = &acidv1.ConnectionPooler{}
 		}
 
 		// Using superuser as pooler user is not a good idea. First of all it's
@@ -1029,13 +1029,13 @@ func (c *Cluster) initSystemUsers() {
 		// and second it's a bad practice.
 		username := c.OpConfig.ConnectionPooler.User
 
-		isSuperUser := c.Spec.ConnectionPooler.User == c.OpConfig.SuperUsername
+		isSuperUser := connectionPoolerSpec.User == c.OpConfig.SuperUsername
 		isProtectedUser := c.shouldAvoidProtectedOrSystemRole(
-			c.Spec.ConnectionPooler.User, "connection pool role")
+			connectionPoolerSpec.User, "connection pool role")
 
 		if !isSuperUser && !isProtectedUser {
 			username = util.Coalesce(
-				c.Spec.ConnectionPooler.User,
+				connectionPoolerSpec.User,
 				c.OpConfig.ConnectionPooler.User)
 		}
 
@@ -1107,11 +1107,11 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 		}
 
 		// default roles per database
-		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String()); err != nil {
+		if err := c.initDefaultRoles(defaultRoles, "admin", preparedDbName, searchPath.String(), preparedDB.SecretNamespace); err != nil {
 			return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 		}
 		if preparedDB.DefaultUsers {
-			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String()); err != nil {
+			if err := c.initDefaultRoles(defaultUsers, "admin", preparedDbName, searchPath.String(), preparedDB.SecretNamespace); err != nil {
 				return fmt.Errorf("could not initialize default roles for database %s: %v", preparedDbName, err)
 			}
 		}
@@ -1122,14 +1122,14 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 				if err := c.initDefaultRoles(defaultRoles,
 					preparedDbName+constants.OwnerRoleNameSuffix,
 					preparedDbName+"_"+preparedSchemaName,
-					constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
+					constants.DefaultSearchPath+", "+preparedSchemaName, preparedDB.SecretNamespace); err != nil {
 					return fmt.Errorf("could not initialize default roles for database schema %s: %v", preparedSchemaName, err)
 				}
 				if preparedSchema.DefaultUsers {
 					if err := c.initDefaultRoles(defaultUsers,
 						preparedDbName+constants.OwnerRoleNameSuffix,
 						preparedDbName+"_"+preparedSchemaName,
-						constants.DefaultSearchPath+", "+preparedSchemaName); err != nil {
+						constants.DefaultSearchPath+", "+preparedSchemaName, preparedDB.SecretNamespace); err != nil {
 						return fmt.Errorf("could not initialize default users for database schema %s: %v", preparedSchemaName, err)
 					}
 				}
@@ -1139,10 +1139,19 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 	return nil
 }
 
-func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix string, searchPath string) error {
+func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix, searchPath, secretNamespace string) error {
 
 	for defaultRole, inherits := range defaultRoles {
 
+		namespace := c.Namespace
+		//if namespaced secrets are allowed
+		if secretNamespace != "" {
+			if c.Config.OpConfig.EnableCrossNamespaceSecret {
+				namespace = secretNamespace
+			} else {
+				c.logger.Warn("secretNamespace ignored because enable_cross_namespace_secret set to false. Creating secrets in cluster namespace.")
+			}
+		}
 		roleName := prefix + defaultRole
 
 		flags := []string{constants.RoleFlagNoLogin}
@@ -1165,7 +1174,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		newRole := spec.PgUser{
 			Origin:     spec.RoleOriginBootstrap,
 			Name:       roleName,
-			Namespace:  c.Namespace,
+			Namespace:  namespace,
 			Password:   util.RandomPassword(constants.PasswordLength),
 			Flags:      flags,
 			MemberOf:   memberOf,

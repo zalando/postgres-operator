@@ -9,7 +9,7 @@ metadata:
 #    "delete-date": "2020-08-31"  # can only be deleted on that day if "delete-date "key is configured
 #    "delete-clustername": "acid-test-cluster"  # can only be deleted when name matches if "delete-clustername" key is configured
 spec:
-  dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.0-p7
+  dockerImage: registry.opensource.zalan.do/acid/spilo-13:2.1-p1
   teamId: "acid"
   numberOfInstances: 2
   users:  # Application/Robot users
@@ -46,6 +46,12 @@ spec:
 #    storageClass: my-sc
 #    iops: 1000  # for EBS gp3
 #    throughput: 250  # in MB/s for EBS gp3
+#    selector:
+#      matchExpressions:
+#        - { key: flavour, operator: In, values: [ "banana", "chocolate" ] }
+#      matchLabels:
+#        environment: dev
+#        service: postgres
   additionalVolumes:
     - name: empty
       mountPath: /opt/empty
@@ -151,7 +157,7 @@ spec:
 #   - name: "telegraf-sidecar"
 #     image: "telegraf:latest"
 #     ports:
-#       name: metrics
+#     - name: metrics
 #       containerPort: 8094
 #       protocol: TCP
 #     resources:

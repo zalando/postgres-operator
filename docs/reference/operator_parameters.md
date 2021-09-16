@@ -267,9 +267,7 @@ configuration they are grouped under the `kubernetes` key.
 * **enable_cross_namespace_secrets**
   To allow secrets in a different namespace other than the Postgres cluster
   namespace. Once enabled, specify the namespace in the user name under the
-  `users` section in the form `{namespace}.{username}`. The operator will then
-  create the user secret in that namespace. The part after the first `.` is
-  considered to be the user name. The default is `false`.
+  `users` section in the form `{namespace}.{username}`. The default is `false`.
 
 * **enable_init_containers**
   global option to allow for creating init containers in the cluster manifest to
@@ -559,6 +557,12 @@ yet officially supported.
   [service accounts](https://cloud.google.com/kubernetes-engine/docs/tutorials/authenticating-to-cloud-platform).
   The default is empty
 
+* **wal_az_storage_account**
+  Azure Storage Account to use for shipping WAL segments with WAL-G. The
+  storage account must exist and be accessible by Postgres pods. Note, only the
+  name of the storage account is required.
+  The default is empty.
+
 * **log_s3_bucket**
   S3 bucket to use for shipping Postgres daily logs. Works only with S3 on AWS.
   The bucket has to be present and accessible by Postgres pods. The default is
@@ -602,7 +606,7 @@ grouped under the `logical_backup` key.
   runs `pg_dumpall` on a replica if possible and uploads compressed results to
   an S3 bucket under the key `/spilo/pg_cluster_name/cluster_k8s_uuid/logical_backups`.
   The default image is the same image built with the Zalando-internal CI
-  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.6.3"
+  pipeline. Default: "registry.opensource.zalan.do/acid/logical-backup:v1.7.0"
 
 * **logical_backup_google_application_credentials**
   Specifies the path of the google cloud service account json file. Default is empty.

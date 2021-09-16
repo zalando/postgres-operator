@@ -8,7 +8,7 @@ replicaCount: 1
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator-ui
-  tag: v1.6.3
+  tag: v1.7.0
   pullPolicy: "IfNotPresent"
 
 # Optionally specify an array of imagePullSecrets.
@@ -48,6 +48,36 @@ envs:
   teams:
     - "acid"
 
+# configure extra UI ENVs
+# Extra ENVs are writen in kubenertes format and added "as is" to the pod's env variables
+# https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/
+# https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#environment-variables
+# UI specific env variables can be found here: https://github.com/zalando/postgres-operator/blob/master/ui/operator_ui/main.py
+extraEnvs:
+  []
+  # Exemple of settings to make snapshot view working in the ui when using AWS
+  # - name: WALE_S3_ENDPOINT
+  #   value: https+path://s3.us-east-1.amazonaws.com:443
+  # - name: SPILO_S3_BACKUP_PREFIX
+  #   value: spilo/
+  # - name: AWS_ACCESS_KEY_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: <postgres operator secret with AWS token>
+  #       key: AWS_ACCESS_KEY_ID
+  # - name: AWS_SECRET_ACCESS_KEY
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: <postgres operator secret with AWS token>
+  #       key: AWS_SECRET_ACCESS_KEY
+  # - name: AWS_DEFAULT_REGION
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: <postgres operator secret with AWS token>
+  #       key: AWS_DEFAULT_REGION
+  # - name: SPILO_S3_BACKUP_BUCKET
+  #   value: <s3 bucket used by the operator>
+
 # configure UI service
 service:
   type: "ClusterIP"
@@ -59,7 +89,8 @@ service:
 # configure UI ingress. If needed: "enabled: true"
 ingress:
   enabled: false
-  annotations: {}
+  annotations:
+    {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
   hosts:

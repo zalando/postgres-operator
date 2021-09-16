@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func mockInstallLookupFunction(schema string, user string, role PostgresRole) error {
+func mockInstallLookupFunction(schema string, user string) error {
 	return nil
 }
 
