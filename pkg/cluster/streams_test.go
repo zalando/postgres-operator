@@ -62,15 +62,6 @@ var (
 					},
 					BatchSize: uint32(100),
 				},
-				{
-					StreamType: "sqs",
-					Database:   "foo",
-					Tables: map[string]string{
-						"bar": "stream_type_a",
-					},
-					SqsArn:    "arn:aws:sqs:eu-central-1:111122223333",
-					QueueName: "foo-queue",
-				},
 			},
 			Users: map[string]acidv1.UserFlags{
 				"foo_user": []string{"replication"},

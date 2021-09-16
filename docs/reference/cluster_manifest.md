@@ -523,8 +523,9 @@ CRD for Zalando's internal CDC operator named like the Postgres cluster.
 Each stream object can have the following properties:
 
 * **streamType**
-  Defines the sink. Either `nakadi`, `sqs` or `wal` (which is just plain wal
-  files). Required.
+  Defines the stream flow. Choose `nakadi` when you want to specify certain
+  nakadi event types of or `wal` if changes should be mapped to a generic
+  event type. Default is `wal`. 
 
 * **database**
   Name of the database from where events will be published via Postgres'
@@ -545,9 +546,3 @@ Each stream object can have the following properties:
 
 * **batchSize**
   Defines the size of batches in which events are consumed.
-
-* **sqsArn**
-  ARN to the SQS service used as event sink when streamType is `sqs`.
-
-* **queueName**
-  Name of the queue to be used in SQS service when streamType is `sqs`.

@@ -72,7 +72,7 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 		return err
 	}
 
-	c.logger.Debugf("syncing statefulsets")
+	c.logger.Debug("syncing statefulsets")
 	if err = c.syncStatefulSet(); err != nil {
 		if !k8sutil.ResourceAlreadyExists(err) {
 			err = fmt.Errorf("could not sync statefulsets: %v", err)
@@ -98,17 +98,17 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 
 	// create database objects unless we are running without pods or disabled that feature explicitly
 	if !(c.databaseAccessDisabled() || c.getNumberOfInstances(&newSpec.Spec) <= 0 || c.Spec.StandbyCluster != nil) {
-		c.logger.Debugf("syncing roles")
+		c.logger.Debug("syncing roles")
 		if err = c.syncRoles(); err != nil {
 			err = fmt.Errorf("could not sync roles: %v", err)
 			return err
 		}
-		c.logger.Debugf("syncing databases")
+		c.logger.Debug("syncing databases")
 		if err = c.syncDatabases(); err != nil {
 			err = fmt.Errorf("could not sync databases: %v", err)
 			return err
 		}
-		c.logger.Debugf("syncing prepared databases with schemas")
+		c.logger.Debug("syncing prepared databases with schemas")
 		if err = c.syncPreparedDatabases(); err != nil {
 			err = fmt.Errorf("could not sync prepared database: %v", err)
 			return err
@@ -118,6 +118,12 @@ func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
 	// sync connection pooler
 	if _, err = c.syncConnectionPooler(&oldSpec, newSpec, c.installLookupFunction); err != nil {
 		return fmt.Errorf("could not sync connection pooler: %v", err)
+	}
+
+	c.logger.Debug("syncing streams")
+	if err = c.syncStreams(); err != nil {
+		err = fmt.Errorf("could not sync streams: %v", err)
+		return err
 	}
 
 	// Major version upgrade must only run after success of all earlier operations, must remain last item in sync

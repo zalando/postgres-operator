@@ -477,8 +477,6 @@ spec:
                 nullable: true
                 items:
                   type: object
-                  required:
-                    - streamType
                   properties:
                     batchSize:
                       type: integer
@@ -488,12 +486,6 @@ spec:
                       type: object
                       additionalProperties:
                         type: string
-                    queueName:
-                      type: string
-                    sqsArn:
-                      type: string
-                    sqsFifo:
-                      type: boolean
                     tables:
                       type: object
                       additionalProperties:
@@ -502,7 +494,6 @@ spec:
                       type: string
                       enum:
                         - "nakadi"
-                        - "sqs"
                         - "wal"
               teamId:
                 type: string

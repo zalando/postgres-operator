@@ -198,23 +198,15 @@ spec:
 
 # Enables change data capture streams for defined database tables
 #  streams:
-#  - type: nakadi
+#  - streamType: nakadi
 #    batchSize: 100
 #    database: foo
 #    tables:
-#       ta: event_type_a
-#       tb: event_type_b
-#  - type: wal
+#      ta: event_type_a
+#      tb: event_type_b
+#  - streamType: wal
 #    batchSize: 100
 #    database: foo
 #    tables:
-#       public.tx: event_type_a
-#       public.ty: event_type_b
-#  - type: sqs
-#    database: foo
-#    tables:
-#       ta: ""
-#       tb: ""
-#    sqsArn: arn:aws:sqs:eu-central-1:111122223333
-#    sqsFifo: true
-#    queueName: foo-queue
+#      public.tx: event_type_a
+#      public.ty: event_type_b

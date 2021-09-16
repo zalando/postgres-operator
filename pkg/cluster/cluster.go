@@ -361,8 +361,8 @@ func (c *Cluster) Create() error {
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
 
-	if len(c.Spec.Streams) > 0 {
-		c.syncStreams()
+	if err = c.syncStreams(); err != nil {
+		return fmt.Errorf("could not create streams: %v", err)
 	}
 
 	return nil
@@ -1060,7 +1060,7 @@ func (c *Cluster) initSystemUsers() {
 	// replication users for event streams are another exception
 	// the operator will create one replication user for all streams
 	if len(c.Spec.Streams) > 0 {
-		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+		username := constants.EventStreamSourceSlotPrefix + "user"
 		streamUser := spec.PgUser{
 			Origin:    spec.RoleConnectionPooler,
 			Name:      username,

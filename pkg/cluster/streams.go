@@ -56,14 +56,13 @@ func (c *Cluster) syncPostgresConfig() error {
 	desiredPostgresConfig := make(map[string]interface{})
 	slots := make(map[string]map[string]string)
 
-	c.logger.Debugf("setting wal level to 'logical' in postgres configuration")
+	// if streams are defined wal_level must be switched to logical and slots have to be defined
 	desiredPostgresConfig["postgresql"] = map[string]interface{}{patroniPGParametersParameterName: map[string]string{"wal_level": "logical"}}
 
 	for _, stream := range c.Spec.Streams {
 		slotName := c.getLogicalReplicationSlot(stream.Database)
 
 		if slotName == "" {
-			c.logger.Debugf("creating logical replication slot %q in database %q", constants.EventStreamSourceSlotPrefix+stream.Database, stream.Database)
 			slot := map[string]string{
 				"database": stream.Database,
 				"plugin":   "wal2json",
@@ -74,6 +73,10 @@ func (c *Cluster) syncPostgresConfig() error {
 	}
 
 	if len(slots) > 0 {
+		c.logger.Debugf("setting wal level to 'logical' in Postgres configuration")
+		for slotName, slot := range slots {
+			c.logger.Debugf("creating logical replication slot %q in database %q", slotName, slot["database"])
+		}
 		desiredPostgresConfig["slots"] = slots
 	} else {
 		return nil
@@ -175,27 +178,11 @@ func getEventStreamFlow(stream acidv1.Stream) zalandov1alpha1.EventStreamFlow {
 }
 
 func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1alpha1.EventStreamSink {
-	switch stream.StreamType {
-	case "sqs":
-		sqsSinkType := constants.EventStreamSinkSqsStandardType
-		if stream.SqsFifo {
-			sqsSinkType = constants.EventStreamSinkSqsFifoType
-		}
-		return zalandov1alpha1.EventStreamSink{
-			Type:         sqsSinkType,
-			QueueName:    stream.QueueName,
-			QueueUrl:     stream.SqsArn,
-			MaxBatchSize: stream.BatchSize,
-		}
-	case "default":
-		return zalandov1alpha1.EventStreamSink{
-			Type:         constants.EventStreamSinkNakadiType,
-			EventType:    eventType,
-			MaxBatchSize: stream.BatchSize,
-		}
+	return zalandov1alpha1.EventStreamSink{
+		Type:         constants.EventStreamSinkNakadiType,
+		EventType:    eventType,
+		MaxBatchSize: stream.BatchSize,
 	}
-
-	return zalandov1alpha1.EventStreamSink{}
 }
 
 func getTableSchema(fullTableName string) (tableName, schemaName string) {
