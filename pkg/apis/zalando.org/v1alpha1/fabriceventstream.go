@@ -40,14 +40,12 @@ type EventStream struct {
 
 // EventStreamFlow defines the flow characteristics of the event stream
 type EventStreamFlow struct {
-	Type             string `json:"type"`
-	DataTypeColumn   string `json:"dataTypeColumn,omitempty"`
-	DataOpColumn     string `json:"dataOpColumn,omitempty"`
-	MetadataColumn   string `json:"metadataColumn,omitempty"`
-	DataColumn       string `json:"dataColumn,omitempty"`
-	PayloadColumn    string `json:"payloadColumn,omitempty"`
-	CallHomeIdColumn string `json:"callHomeIdColumn,omitempty"`
-	CallHomeUrl      string `json:"callHomeUrl,omitempty"`
+	Type           string `json:"type"`
+	DataTypeColumn string `json:"dataTypeColumn,omitempty"`
+	DataOpColumn   string `json:"dataOpColumn,omitempty"`
+	MetadataColumn string `json:"metadataColumn,omitempty"`
+	DataColumn     string `json:"dataColumn,omitempty"`
+	PayloadColumn  string `json:"payloadColumn,omitempty"`
 }
 
 // EventStreamSink defines the target of the event stream
@@ -55,8 +53,6 @@ type EventStreamSink struct {
 	Type         string `json:"type"`
 	EventType    string `json:"eventType,omitempty"`
 	MaxBatchSize uint32 `json:"maxBatchSize,omitempty"`
-	QueueName    string `json:"queueName,omitempty"`
-	QueueUrl     string `json:"queueUrl,omitempty"`
 }
 
 // EventStreamSource defines the source of the event stream and connection for FES operator

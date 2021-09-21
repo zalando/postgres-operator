@@ -3,11 +3,10 @@ package constants
 // PostgreSQL specific constants
 const (
 	EventStreamSourcePGType       = "PostgresLogicalReplication"
-	EventStreamSourceSlotPrefix   = "fes_"
+	EventStreamSourceSlotPrefix   = "fes"
 	EventStreamSourceAuthType     = "DatabaseAuthenticationSecret"
 	EventStreamFlowPgNakadiType   = "PostgresWalToNakadiDataEvent"
 	EventStreamFlowPgGenericType  = "PostgresWalToGenericNakadiEvent"
-	EventStreamFlowPgApiType      = "PostgresWalToApiCallHomeEvent"
 	EventStreamFlowDataTypeColumn = "data_type"
 	EventStreamFlowDataOpColumn   = "data_op"
 	EventStreamFlowMetadataColumn = "metadata"

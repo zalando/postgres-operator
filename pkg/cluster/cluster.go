@@ -1060,7 +1060,7 @@ func (c *Cluster) initSystemUsers() {
 	// replication users for event streams are another exception
 	// the operator will create one replication user for all streams
 	if len(c.Spec.Streams) > 0 {
-		username := constants.EventStreamSourceSlotPrefix + "user"
+		username := constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
 		streamUser := spec.PgUser{
 			Origin:    spec.RoleConnectionPooler,
 			Name:      username,
