@@ -43,6 +43,7 @@ func (c *Cluster) updateStreams(newEventStreams *zalandov1alpha1.FabricEventStre
 func (c *Cluster) deleteStreams() error {
 	c.setProcessName("deleting event streams")
 
+	// check if stream CRD is installed before trying a delete
 	_, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), constants.EventStreamSourceCRDName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 		return nil

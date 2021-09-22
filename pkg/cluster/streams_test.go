@@ -83,7 +83,7 @@ func TestGenerateFabricEventStream(t *testing.T) {
 			},
 		}, client, pg, logger, eventRecorder)
 
-	err := cluster.syncStreams()
+	err := cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
 	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), cluster.Name, metav1.GetOptions{})
@@ -117,7 +117,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	_, err := cluster.KubeClient.Postgresqls(namespace).Create(
 		context.TODO(), &pg, metav1.CreateOptions{})
 	assert.NoError(t, err)
-	err = cluster.syncStreams()
+	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
 	var pgSpec acidv1.PostgresSpec
@@ -140,7 +140,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	assert.NoError(t, err)
 
 	cluster.Postgresql.Spec = pgPatched.Spec
-	err = cluster.syncStreams()
+	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
 	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), cluster.Name, metav1.GetOptions{})
