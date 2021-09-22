@@ -473,6 +473,9 @@ spec:
                 nullable: true
                 items:
                   type: object
+                  required:
+                    - database
+                    - tables
                   properties:
                     batchSize:
                       type: integer
@@ -486,11 +489,6 @@ spec:
                       type: object
                       additionalProperties:
                         type: string
-                    streamType:
-                      type: string
-                      enum:
-                        - "nakadi"
-                        - "wal"
               teamId:
                 type: string
               tls:

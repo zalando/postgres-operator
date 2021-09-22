@@ -198,15 +198,11 @@ spec:
 
 # Enables change data capture streams for defined database tables
 #  streams:
-#  - streamType: nakadi
-#    batchSize: 100
-#    database: foo
+#  - database: foo
 #    tables:
-#      ta: event_type_a
-#      tb: event_type_b
-#  - streamType: wal
-#    batchSize: 100
-#    database: foo
-#    tables:
-#      public.tx: event_type_a
-#      public.ty: event_type_b
+#      data.ta: event_type_a
+#      data.tb: event_type_b
+#    # Optional. Filter ignores events before a certain txnId and lsn. Can be used to skip bad events
+#    filter:
+#      data.ta: "[?(@.source.txId > 500 && @.source.lsn > 123456)]"
+#    batchSize: 1000

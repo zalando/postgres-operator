@@ -150,23 +150,9 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, table, eventType st
 }
 
 func getEventStreamFlow(stream acidv1.Stream) zalandov1alpha1.EventStreamFlow {
-	switch stream.StreamType {
-	case "nakadi":
-		return zalandov1alpha1.EventStreamFlow{
-			Type:           constants.EventStreamFlowPgNakadiType,
-			DataTypeColumn: constants.EventStreamFlowDataTypeColumn,
-			DataOpColumn:   constants.EventStreamFlowDataOpColumn,
-			MetadataColumn: constants.EventStreamFlowMetadataColumn,
-			DataColumn:     constants.EventStreamFlowDataColumn,
-		}
-	case "wal":
-		return zalandov1alpha1.EventStreamFlow{
-			Type:          constants.EventStreamFlowPgGenericType,
-			PayloadColumn: constants.EventStreamFlowPayloadColumn,
-		}
+	return zalandov1alpha1.EventStreamFlow{
+		Type: constants.EventStreamFlowPgGenericType,
 	}
-
-	return zalandov1alpha1.EventStreamFlow{}
 }
 
 func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1alpha1.EventStreamSink {
@@ -190,8 +176,7 @@ func getTableSchema(fullTableName string) (tableName, schemaName string) {
 
 func getOutboxTable(tableName, eventType string) zalandov1alpha1.EventStreamTable {
 	return zalandov1alpha1.EventStreamTable{
-		Name:     outboxTableNameTemplate.Format("table", tableName, "eventtype", eventType),
-		IDColumn: "id",
+		Name: outboxTableNameTemplate.Format("table", tableName, "eventtype", eventType),
 	}
 }
 
@@ -236,15 +221,16 @@ func (c *Cluster) syncStreams() error {
 		c.logger.Infof("event streams do not exist, create it")
 		err := c.createStreams()
 		if err != nil {
-			return fmt.Errorf("event stream creation failed: %v", err)
+			return fmt.Errorf("event streams creation failed: %v", err)
 		}
 	} else {
 		desiredStreams := c.generateFabricEventStream()
 		if !reflect.DeepEqual(effectiveStreams.Spec, desiredStreams.Spec) {
+			c.logger.Debug("updating event streams")
 			desiredStreams.ObjectMeta.ResourceVersion = effectiveStreams.ObjectMeta.ResourceVersion
 			err = c.updateStreams(desiredStreams)
 			if err != nil {
-				return fmt.Errorf("event stream update failed: %v", err)
+				return fmt.Errorf("event streams update failed: %v", err)
 			}
 		}
 	}

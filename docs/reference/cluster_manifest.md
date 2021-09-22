@@ -522,27 +522,24 @@ under the `streams` top-level key will be used by the operator to create a
 CRD for Zalando's internal CDC operator named like the Postgres cluster.
 Each stream object can have the following properties:
 
-* **streamType**
-  Defines the stream flow. Choose `nakadi` when you want to specify certain
-  nakadi event types of or `wal` if changes should be mapped to a generic
-  event type. Default is `wal`. 
-
 * **database**
   Name of the database from where events will be published via Postgres'
   logical decoding feature. The operator will take care of updating the
   database configuration (setting `wal_level: logical`, creating logical
   replication slots, using output plugin `wal2json` and creating a dedicated
-  replication user).
+  replication user). Required.
 
 * **tables**
   Defines a map of table names and event types. The CDC operator is following
   the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/)
   meaning changes are only consumed from an extra table that already has the
   structure of the event in the target sink. The operator will assume that this
-  outbox table is called like `<table>_<event_type>_outbox`.
+  outbox table is called like `<table>_<event_type>_outbox`. Required.
 
 * **filter**
   Streamed events can be filtered by a jsonpath expression for each table.
+  Optional.
 
 * **batchSize**
-  Defines the size of batches in which events are consumed.
+  Defines the size of batches in which events are consumed. Optional.
+  Defaults to 1.

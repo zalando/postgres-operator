@@ -47,16 +47,7 @@ var (
 			},
 			Streams: []acidv1.Stream{
 				{
-					StreamType: "nakadi",
-					Database:   "foo",
-					Tables: map[string]string{
-						"bar": "stream_type_a",
-					},
-					BatchSize: uint32(100),
-				},
-				{
-					StreamType: "wal",
-					Database:   "foo",
+					Database: "foo",
 					Tables: map[string]string{
 						"bar": "stream_type_a",
 					},
@@ -132,8 +123,7 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	var pgSpec acidv1.PostgresSpec
 	pgSpec.Streams = []acidv1.Stream{
 		{
-			StreamType: "nakadi",
-			Database:   "foo",
+			Database: "foo",
 			Tables: map[string]string{
 				"bar": "stream_type_b",
 			},
