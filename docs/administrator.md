@@ -808,7 +808,7 @@ is set up like the following:
 ```yml
 ...
 aws_or_gcp:
-  additional_secret_mount: "pgsql-wale-creds"
+  additional_secret_mount: "psql-wale-creds"
   additional_secret_mount_path: "/var/secrets/google"  # or where ever you want to mount the file
   # aws_region: eu-central-1
   # kube_iam_role: ""
@@ -893,7 +893,7 @@ is set up like the following:
 ```yml
 ...
 aws_or_gcp:
-  pod_environment_secret: "pgsql-backup-creds"
+  pod_environment_secret: "psql-backup-creds"
   pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
   wal_az_storage_account: "postgresbackupsbucket28302F2"  # name of storage account to save the WAL-G logs
 ...
