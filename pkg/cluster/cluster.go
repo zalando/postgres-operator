@@ -362,7 +362,7 @@ func (c *Cluster) Create() error {
 	c.createConnectionPooler(c.installLookupFunction)
 
 	if err = c.syncStreams(); err != nil {
-		return fmt.Errorf("could not create streams: %v", err)
+		c.logger.Errorf("could not create streams: %v", err)
 	}
 
 	return nil

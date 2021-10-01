@@ -79,7 +79,7 @@ func (c *Cluster) syncPostgresConfig() error {
 	}
 
 	if len(slots) > 0 {
-		c.logger.Debugf("setting wal level to 'logical' in Postgres configuration")
+		c.logger.Debugf("setting wal level to 'logical' in Postgres configuration to allow for decoding changes")
 		for slotName, slot := range slots {
 			c.logger.Debugf("creating logical replication slot %q in database %q", slotName, slot["database"])
 		}
@@ -90,7 +90,7 @@ func (c *Cluster) syncPostgresConfig() error {
 
 	pods, err := c.listPods()
 	if err != nil || len(pods) == 0 {
-		return err
+		c.logger.Warnf("could not list pods of the statefulset: %v", err)
 	}
 	for i, pod := range pods {
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
@@ -135,6 +135,8 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 			Name:        c.Name,
 			Namespace:   c.Namespace,
 			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
+			// make cluster StatefulSet the owner (like with connection pooler objects)
+			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: zalandov1alpha1.FabricEventStreamSpec{
 			ApplicationId: "",

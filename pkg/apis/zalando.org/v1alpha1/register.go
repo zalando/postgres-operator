@@ -15,9 +15,7 @@ const (
 
 var (
 	schemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	// AddToScheme applies all the stored functions to the scheme. A non-nil error
-	// indicates that one function failed and the attempt was abandoned.
-	AddToScheme = schemeBuilder.AddToScheme
+	AddToScheme   = schemeBuilder.AddToScheme
 )
 
 func init() {
