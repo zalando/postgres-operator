@@ -10,9 +10,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	httpclient "github.com/zalando/postgres-operator/pkg/util/httpclient"
 
 	"github.com/sirupsen/logrus"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -31,7 +33,7 @@ type Interface interface {
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 	GetMemberData(server *v1.Pod) (MemberData, error)
 	Restart(server *v1.Pod) error
-	GetConfig(server *v1.Pod) (map[string]interface{}, error)
+	GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, error)
 	SetConfig(server *v1.Pod, config map[string]interface{}) error
 }
 
@@ -194,13 +196,18 @@ type MemberData struct {
 	Patroni         MemberDataPatroni `json:"patroni"`
 }
 
-func (p *Patroni) GetConfigOrStatus(server *v1.Pod, path string) (map[string]interface{}, error) {
+func (p *Patroni) GetStatus(server *v1.Pod) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	apiURLString, err := apiURL(server)
 	if err != nil {
 		return result, err
 	}
-	body, err := p.httpGet(apiURLString + path)
+
+	body, err := p.httpGet(apiURLString + statusPath)
+	if err != nil {
+		return result, err
+	}
+
 	err = json.Unmarshal([]byte(body), &result)
 	if err != nil {
 		return result, err
@@ -209,12 +216,42 @@ func (p *Patroni) GetConfigOrStatus(server *v1.Pod, path string) (map[string]int
 	return result, err
 }
 
-func (p *Patroni) GetStatus(server *v1.Pod) (map[string]interface{}, error) {
-	return p.GetConfigOrStatus(server, statusPath)
-}
+func (p *Patroni) GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, error) {
+	var (
+		patroniConfig acidv1.Patroni
+		pgConfig      map[string]interface{}
+	)
 
-func (p *Patroni) GetConfig(server *v1.Pod) (map[string]interface{}, error) {
-	return p.GetConfigOrStatus(server, configPath)
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return patroniConfig, nil, err
+	}
+	body, err := p.httpGet(apiURLString + configPath)
+	if err != nil {
+		return patroniConfig, nil, err
+	}
+
+	err = json.Unmarshal([]byte(body), &patroniConfig)
+	if err != nil {
+		return patroniConfig, nil, err
+	}
+
+	// unmarshalling postgresql parameters needs a detour
+	err = json.Unmarshal([]byte(body), &pgConfig)
+	if err != nil {
+		return patroniConfig, nil, err
+	}
+	pgParameters := make(map[string]string)
+	if _, exists := pgConfig["postgresql"]; exists {
+		effectivePostgresql := pgConfig["postgresql"].(map[string]interface{})
+		effectivePgParameters := effectivePostgresql[constants.PatroniPGParametersParameterName].(map[string]interface{})
+		for parameter, value := range effectivePgParameters {
+			strValue := fmt.Sprintf("%v", value)
+			pgParameters[parameter] = strValue
+		}
+	}
+
+	return patroniConfig, pgParameters, err
 }
 
 //Restart method restarts instance via Patroni POST API call.
@@ -229,6 +266,9 @@ func (p *Patroni) Restart(server *v1.Pod) error {
 		return err
 	}
 	status, err := p.GetStatus(server)
+	if err != nil {
+		return err
+	}
 	pending_restart, ok := status["pending_restart"]
 	if !ok || !pending_restart.(bool) {
 		return nil
