@@ -405,7 +405,7 @@ func (c *Cluster) syncStatefulSet() error {
 
 		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
 		// to not attempt a restart in such situation
-		if reflect.DeepEqual(patroniConfig, emptyPatroniConfig) || len(pgParameters) > 0 {
+		if !reflect.DeepEqual(patroniConfig, emptyPatroniConfig) || len(pgParameters) > 0 {
 			instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, pgParameters)
 			if err != nil {
 				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
@@ -542,11 +542,17 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 
 	// only check if specified slots exist in config and if they differ
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
+		desiredSlots := make(map[string]map[string]string)
 		if effectiveSlot, exists := patroniConfig.Slots[slotName]; exists {
 			if !reflect.DeepEqual(desiredSlot, effectiveSlot) {
-				configToSet["slots"] = desiredPatroniConfig.Slots
-				break
+				desiredSlots[slotName] = desiredSlot
 			}
+		} else {
+			desiredSlots[slotName] = desiredSlot
+		}
+
+		if len(desiredSlots) > 0 {
+			configToSet["slots"] = desiredSlots
 		}
 	}
 
