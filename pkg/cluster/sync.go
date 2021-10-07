@@ -540,20 +540,18 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 		configToSet["ttl"] = desiredPatroniConfig.TTL
 	}
 
-	// only check if specified slots exist in config and if they differ
+	// check if specified slots exist in config and if they differ
+	slotsToSet := make(map[string]map[string]string)
 	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
-		desiredSlots := make(map[string]map[string]string)
 		if effectiveSlot, exists := patroniConfig.Slots[slotName]; exists {
-			if !reflect.DeepEqual(desiredSlot, effectiveSlot) {
-				desiredSlots[slotName] = desiredSlot
+			if reflect.DeepEqual(desiredSlot, effectiveSlot) {
+				continue
 			}
-		} else {
-			desiredSlots[slotName] = desiredSlot
 		}
-
-		if len(desiredSlots) > 0 {
-			configToSet["slots"] = desiredSlots
-		}
+		slotsToSet[slotName] = desiredSlot
+	}
+	if len(slotsToSet) > 0 {
+		configToSet["slots"] = slotsToSet
 	}
 
 	if len(configToSet) == 0 {
