@@ -766,7 +766,7 @@ class EndToEndTestCase(unittest.TestCase):
         pg_patch_version = {
             "spec": {
                 "postgres": {
-                    "version": "13"
+                    "version": "14"
                 }
             }
         }

@@ -135,10 +135,10 @@ spec:
                     default: "off"
                   minimal_major_version:
                     type: string
-                    default: "9.5"
+                    default: "9.6"
                   target_major_version:
                     type: string
-                    default: "13"
+                    default: "14"
               kubernetes:
                 type: object
                 properties:

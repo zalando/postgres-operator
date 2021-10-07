@@ -36,7 +36,7 @@ spec:
           defaultRoles: true
           defaultUsers: false
   postgresql:
-    version: "13"
+    version: "14"
     parameters:  # Expert section
       shared_buffers: "32MB"
       max_connections: "10"

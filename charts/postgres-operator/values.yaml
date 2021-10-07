@@ -65,9 +65,9 @@ configMajorVersionUpgrade:
   # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
   major_version_upgrade_mode: "off"
   # minimal Postgres major version that will not automatically be upgraded
-  minimal_major_version: "9.5"
+  minimal_major_version: "9.6"
   # target Postgres major version when upgrading clusters automatically
-  target_major_version: "13"
+  target_major_version: "14"
 
 configKubernetes:
   # list of additional capabilities for postgres container
