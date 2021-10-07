@@ -399,7 +399,7 @@ func (c *Cluster) syncStatefulSet() error {
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
 		patroniConfig, pgParameters, err := c.patroni.GetConfig(&pod)
 		if err != nil {
-			c.logger.Warningf("could not get Postgres config from pod %s: %#v, %v", podName, patroniConfig, err)
+			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
 			continue
 		}
 

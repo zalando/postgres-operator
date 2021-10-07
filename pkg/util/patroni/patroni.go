@@ -196,23 +196,28 @@ type MemberData struct {
 	Patroni         MemberDataPatroni `json:"patroni"`
 }
 
-func (p *Patroni) GetStatus(server *v1.Pod) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
+func (p *Patroni) GetConfigOrStatus(server *v1.Pod, path string) (string, error) {
 	apiURLString, err := apiURL(server)
 	if err != nil {
-		return result, err
+		return "", err
 	}
+	result, err := p.httpGet(apiURLString + path)
+	if err != nil {
+		return "", err
+	}
+	return result, nil
+}
 
-	body, err := p.httpGet(apiURLString + statusPath)
+func (p *Patroni) GetStatus(server *v1.Pod) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	body, err := p.GetConfigOrStatus(server, statusPath)
 	if err != nil {
 		return result, err
 	}
-
 	err = json.Unmarshal([]byte(body), &result)
 	if err != nil {
 		return result, err
 	}
-
 	return result, err
 }
 
@@ -221,16 +226,10 @@ func (p *Patroni) GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, 
 		patroniConfig acidv1.Patroni
 		pgConfig      map[string]interface{}
 	)
-
-	apiURLString, err := apiURL(server)
+	body, err := p.GetConfigOrStatus(server, configPath)
 	if err != nil {
 		return patroniConfig, nil, err
 	}
-	body, err := p.httpGet(apiURLString + configPath)
-	if err != nil {
-		return patroniConfig, nil, err
-	}
-
 	err = json.Unmarshal([]byte(body), &patroniConfig)
 	if err != nil {
 		return patroniConfig, nil, err
@@ -265,10 +264,7 @@ func (p *Patroni) Restart(server *v1.Pod) error {
 	if err != nil {
 		return err
 	}
-	status, err := p.GetStatus(server)
-	if err != nil {
-		return err
-	}
+	status, _ := p.GetStatus(server)
 	pending_restart, ok := status["pending_restart"]
 	if !ok || !pending_restart.(bool) {
 		return nil
