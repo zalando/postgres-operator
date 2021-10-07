@@ -358,6 +358,7 @@ spec:
                   version:
                     type: string
                     enum:
+                      - "9.5"
                       - "9.6"
                       - "10"
                       - "11"
