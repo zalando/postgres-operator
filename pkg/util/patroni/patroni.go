@@ -124,10 +124,6 @@ func (p *Patroni) httpGet(url string) (string, error) {
 		return "", fmt.Errorf("could not read response: %v", err)
 	}
 
-	if response.StatusCode != http.StatusOK {
-		return string(bodyBytes), fmt.Errorf("patroni returned '%d'", response.StatusCode)
-	}
-
 	return string(bodyBytes), nil
 }
 
