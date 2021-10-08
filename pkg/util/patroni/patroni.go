@@ -111,28 +111,23 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 }
 
 func (p *Patroni) httpGet(url string) (string, error) {
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", fmt.Errorf("could not create request: %v", err)
-	}
+	p.logger.Debugf("making GET http request: %s", url)
 
-	p.logger.Debugf("making GET http request: %s", request.URL.String())
-
-	resp, err := p.httpClient.Do(request)
+	response, err := p.httpClient.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("could not make request: %v", err)
 	}
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	defer response.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("could not read response: %v", err)
 	}
-	if err := resp.Body.Close(); err != nil {
-		return "", fmt.Errorf("could not close request: %v", err)
+
+	if response.StatusCode != http.StatusOK {
+		return string(bodyBytes), fmt.Errorf("patroni returned '%d'", response.StatusCode)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return string(bodyBytes), fmt.Errorf("patroni returned '%d'", resp.StatusCode)
-	}
 	return string(bodyBytes), nil
 }
 
@@ -196,37 +191,16 @@ type MemberData struct {
 	Patroni         MemberDataPatroni `json:"patroni"`
 }
 
-func (p *Patroni) GetConfigOrStatus(server *v1.Pod, path string) (string, error) {
-	apiURLString, err := apiURL(server)
-	if err != nil {
-		return "", err
-	}
-	result, err := p.httpGet(apiURLString + path)
-	if err != nil {
-		return "", err
-	}
-	return result, nil
-}
-
-func (p *Patroni) GetStatus(server *v1.Pod) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
-	body, err := p.GetConfigOrStatus(server, statusPath)
-	if err != nil {
-		return result, err
-	}
-	err = json.Unmarshal([]byte(body), &result)
-	if err != nil {
-		return result, err
-	}
-	return result, err
-}
-
 func (p *Patroni) GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, error) {
 	var (
 		patroniConfig acidv1.Patroni
 		pgConfig      map[string]interface{}
 	)
-	body, err := p.GetConfigOrStatus(server, configPath)
+	apiURLString, err := apiURL(server)
+	if err != nil {
+		return patroniConfig, nil, err
+	}
+	body, err := p.httpGet(apiURLString + configPath)
 	if err != nil {
 		return patroniConfig, nil, err
 	}
@@ -264,9 +238,9 @@ func (p *Patroni) Restart(server *v1.Pod) error {
 	if err != nil {
 		return err
 	}
-	status, _ := p.GetStatus(server)
-	pending_restart, ok := status["pending_restart"]
-	if !ok || !pending_restart.(bool) {
+	memberData, _ := p.GetMemberData(server)
+
+	if !memberData.PendingRestart {
 		return nil
 	}
 	return p.httpPostOrPatch(http.MethodPost, apiURLString+restartPath, buf)
@@ -279,19 +253,13 @@ func (p *Patroni) GetMemberData(server *v1.Pod) (MemberData, error) {
 	if err != nil {
 		return MemberData{}, err
 	}
-	response, err := p.httpClient.Get(apiURLString)
+	body, err := p.httpGet(apiURLString)
 	if err != nil {
-		return MemberData{}, fmt.Errorf("could not perform Get request: %v", err)
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return MemberData{}, fmt.Errorf("could not read response: %v", err)
+		return MemberData{}, err
 	}
 
 	data := MemberData{}
-	err = json.Unmarshal(body, &data)
+	err = json.Unmarshal([]byte(body), &data)
 	if err != nil {
 		return MemberData{}, err
 	}
