@@ -404,7 +404,7 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 
 		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
-		// to not attempt a restart in such situation
+		// do not attempt a restart
 		if !reflect.DeepEqual(patroniConfig, emptyPatroniConfig) || len(pgParameters) > 0 {
 			instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, pgParameters)
 			if err != nil {

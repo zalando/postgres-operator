@@ -227,7 +227,7 @@ func (p *Patroni) GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, 
 	return patroniConfig, pgParameters, err
 }
 
-//Restart method restarts instance via Patroni POST API call.
+// Restart method restarts instance via Patroni POST API call.
 func (p *Patroni) Restart(server *v1.Pod) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(map[string]interface{}{"restart_pending": true})
@@ -238,8 +238,12 @@ func (p *Patroni) Restart(server *v1.Pod) error {
 	if err != nil {
 		return err
 	}
-	memberData, _ := p.GetMemberData(server)
+	memberData, err := p.GetMemberData(server)
+	if err != nil {
+		return err
+	}
 
+	// do restart only when it is pending
 	if !memberData.PendingRestart {
 		return nil
 	}
