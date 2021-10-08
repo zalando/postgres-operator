@@ -85,7 +85,7 @@ func TestApiURL(t *testing.T) {
 	}
 }
 
-func TestPatroniAPI(t *testing.T) {
+func TestGetMemberData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -113,12 +113,7 @@ func TestPatroniAPI(t *testing.T) {
 
 	p := New(logger, mockClient)
 
-	pod := v1.Pod{
-		Status: v1.PodStatus{
-			PodIP: "192.168.100.1",
-		},
-	}
-	memberData, err := p.GetMemberData(&pod)
+	memberData, err := p.GetMemberData(newMockPod("192.168.100.1"))
 
 	if !reflect.DeepEqual(expectedMemberData, memberData) {
 		t.Errorf("Patroni member data differs: expected: %#v, got: %#v", expectedMemberData, memberData)
@@ -187,12 +182,7 @@ func TestGetConfig(t *testing.T) {
 
 	p := New(logger, mockClient)
 
-	pod := v1.Pod{
-		Status: v1.PodStatus{
-			PodIP: "192.168.100.1",
-		},
-	}
-	patroniConfig, pgParameters, err := p.GetConfig(&pod)
+	patroniConfig, pgParameters, err := p.GetConfig(newMockPod("192.168.100.1"))
 	if err != nil {
 		t.Errorf("Could not read Patroni config endpoint: %v", err)
 	}
