@@ -769,7 +769,7 @@ class EndToEndTestCase(unittest.TestCase):
         pg_patch_version = {
             "spec": {
                 "postgres": {
-                    "version": "13"
+                    "version": "14"
                 }
             }
         }
@@ -778,12 +778,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        def check_version_13():
+        def check_version_14():
             p = k8s.get_patroni_state("acid-upgrade-test-0")
             version = p["server_version"][0:2]
             return version
 
-        self.evantuallyEqual(check_version_13, "13", "Version was not upgrade to 13")
+        self.evantuallyEqual(check_version_14, "14", "Version was not upgrade to 14")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):

@@ -28,14 +28,14 @@ configGeneral:
   enable_pgversion_env_var: true
   # start any new database pod without limitations on shm memory
   enable_shm_volume: true
-  # enables backwards compatible path between Spilo 12 and Spilo 13 images
+  # enables backwards compatible path between Spilo 12 and Spilo 13+ images
   enable_spilo_wal_path_compat: false
   # etcd connection string for Patroni. Empty uses K8s-native DCS.
   etcd_host: ""
   # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
   # kubernetes_use_configmaps: false
   # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.1-p1
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p2
   # min number of instances in Postgres cluster. -1 = no limit
   min_instances: -1
   # max number of instances in Postgres cluster. -1 = no limit
@@ -65,9 +65,9 @@ configMajorVersionUpgrade:
   # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
   major_version_upgrade_mode: "off"
   # minimal Postgres major version that will not automatically be upgraded
-  minimal_major_version: "9.5"
+  minimal_major_version: "9.6"
   # target Postgres major version when upgrading clusters automatically
-  target_major_version: "13"
+  target_major_version: "14"
 
 configKubernetes:
   # list of additional capabilities for postgres container

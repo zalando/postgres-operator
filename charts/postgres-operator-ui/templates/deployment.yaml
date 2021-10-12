@@ -71,6 +71,7 @@ spec:
                   "resources_visible": true,
                   "users_visible": true,
                   "postgresql_versions": [
+                    "14",
                     "13",
                     "12",
                     "11"

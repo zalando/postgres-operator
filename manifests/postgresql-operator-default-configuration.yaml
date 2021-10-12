@@ -3,7 +3,7 @@ kind: OperatorConfiguration
 metadata:
   name: postgresql-operator-default-configuration
 configuration:
-  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.1-p1
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p2
   # enable_crd_validation: true
   # enable_lazy_spilo_upgrade: false
   enable_pgversion_env_var: true
@@ -28,8 +28,8 @@ configuration:
     super_username: postgres
   major_version_upgrade:
     major_version_upgrade_mode: "off"
-    minimal_major_version: "9.5"
-    target_major_version: "13"
+    minimal_major_version: "9.6"
+    target_major_version: "14"
   kubernetes:
     # additional_pod_capabilities:
     # - "SYS_NICE"
