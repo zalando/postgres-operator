@@ -32,7 +32,7 @@ data:
   # default_memory_request: 100Mi
   # delete_annotation_date_key: delete-date
   # delete_annotation_name_key: delete-clustername
-  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.1-p1
+  docker_image: registry.opensource.zalan.do/acid/spilo-14:2.1-p2
   # downscaler_annotations: "deployment-time,downscaler/*"
   # enable_admin_role_for_users: "true"
   # enable_crd_validation: "true"
@@ -83,7 +83,7 @@ data:
   # min_instances: "-1"
   # min_cpu_limit: 250m
   # min_memory_limit: 250Mi
-  # minimal_major_version: "9.5"
+  # minimal_major_version: "9.6"
   # node_readiness_label: ""
   # oauth_token_secret_name: postgresql-operator
   # pam_configuration: |
@@ -124,7 +124,7 @@ data:
   spilo_privileged: "false"
   storage_resize_mode: "pvc"
   super_username: postgres
-  # target_major_version: "13"
+  # target_major_version: "14"
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local

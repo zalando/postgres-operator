@@ -30,7 +30,7 @@ spec:
   databases:
     foo: zalando
   postgresql:
-    version: "13"
+    version: "14"
 ```
 
 Once you cloned the Postgres Operator [repository](https://github.com/zalando/postgres-operator)
@@ -702,7 +702,7 @@ spec:
 ## In-place major version upgrade
 
 Starting with Spilo 13, operator supports in-place major version upgrade to a
-higher major version (e.g. from PG 10 to PG 12). To trigger the upgrade,
+higher major version (e.g. from PG 10 to PG 13). To trigger the upgrade,
 simply increase the version in the manifest. It is your responsibility to test
 your applications against the new version before the upgrade; downgrading is
 not supported. The easiest way to do so is to try the upgrade on the cloned
