@@ -83,7 +83,7 @@ Those are top-level keys, containing both leaf keys and groups.
   With newer versions of Spilo, it is preferable to use `PGVERSION` pod environment variable instead of the setting `postgresql.bin_dir` in the `SPILO_CONFIGURATION` env variable. When this option is true, the operator sets `PGVERSION` and omits `postgresql.bin_dir` from  `SPILO_CONFIGURATION`. When false, the `postgresql.bin_dir` is set. This setting takes precedence over `PGVERSION`; see PR 222 in Spilo. The default is `true`.
 
 * **enable_spilo_wal_path_compat**
-  enables backwards compatible path between Spilo 12 and Spilo 13 images. The default is `false`.
+  enables backwards compatible path between Spilo 12 and Spilo 13+ images. The default is `false`.
 
 * **etcd_host**
   Etcd connection string for Patroni defined as `host:port`. Not required when
