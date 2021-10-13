@@ -10,9 +10,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 	httpclient "github.com/zalando/postgres-operator/pkg/util/httpclient"
 
 	"github.com/sirupsen/logrus"
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -31,7 +33,7 @@ type Interface interface {
 	SetPostgresParameters(server *v1.Pod, options map[string]string) error
 	GetMemberData(server *v1.Pod) (MemberData, error)
 	Restart(server *v1.Pod) error
-	GetConfig(server *v1.Pod) (map[string]interface{}, error)
+	GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, error)
 	SetConfig(server *v1.Pod, config map[string]interface{}) error
 }
 
@@ -109,28 +111,23 @@ func (p *Patroni) httpPostOrPatch(method string, url string, body *bytes.Buffer)
 }
 
 func (p *Patroni) httpGet(url string) (string, error) {
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", fmt.Errorf("could not create request: %v", err)
-	}
+	p.logger.Debugf("making GET http request: %s", url)
 
-	p.logger.Debugf("making GET http request: %s", request.URL.String())
-
-	resp, err := p.httpClient.Do(request)
+	response, err := p.httpClient.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("could not make request: %v", err)
 	}
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	defer response.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("could not read response: %v", err)
 	}
-	if err := resp.Body.Close(); err != nil {
-		return "", fmt.Errorf("could not close request: %v", err)
+
+	if response.StatusCode != http.StatusOK {
+		return string(bodyBytes), fmt.Errorf("patroni returned '%d'", response.StatusCode)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return string(bodyBytes), fmt.Errorf("patroni returned '%d'", resp.StatusCode)
-	}
 	return string(bodyBytes), nil
 }
 
@@ -194,30 +191,43 @@ type MemberData struct {
 	Patroni         MemberDataPatroni `json:"patroni"`
 }
 
-func (p *Patroni) GetConfigOrStatus(server *v1.Pod, path string) (map[string]interface{}, error) {
-	result := make(map[string]interface{})
+func (p *Patroni) GetConfig(server *v1.Pod) (acidv1.Patroni, map[string]string, error) {
+	var (
+		patroniConfig acidv1.Patroni
+		pgConfig      map[string]interface{}
+	)
 	apiURLString, err := apiURL(server)
 	if err != nil {
-		return result, err
+		return patroniConfig, nil, err
 	}
-	body, err := p.httpGet(apiURLString + path)
-	err = json.Unmarshal([]byte(body), &result)
+	body, err := p.httpGet(apiURLString + configPath)
 	if err != nil {
-		return result, err
+		return patroniConfig, nil, err
+	}
+	err = json.Unmarshal([]byte(body), &patroniConfig)
+	if err != nil {
+		return patroniConfig, nil, err
 	}
 
-	return result, err
+	// unmarshalling postgresql parameters needs a detour
+	err = json.Unmarshal([]byte(body), &pgConfig)
+	if err != nil {
+		return patroniConfig, nil, err
+	}
+	pgParameters := make(map[string]string)
+	if _, exists := pgConfig["postgresql"]; exists {
+		effectivePostgresql := pgConfig["postgresql"].(map[string]interface{})
+		effectivePgParameters := effectivePostgresql[constants.PatroniPGParametersParameterName].(map[string]interface{})
+		for parameter, value := range effectivePgParameters {
+			strValue := fmt.Sprintf("%v", value)
+			pgParameters[parameter] = strValue
+		}
+	}
+
+	return patroniConfig, pgParameters, err
 }
 
-func (p *Patroni) GetStatus(server *v1.Pod) (map[string]interface{}, error) {
-	return p.GetConfigOrStatus(server, statusPath)
-}
-
-func (p *Patroni) GetConfig(server *v1.Pod) (map[string]interface{}, error) {
-	return p.GetConfigOrStatus(server, configPath)
-}
-
-//Restart method restarts instance via Patroni POST API call.
+// Restart method restarts instance via Patroni POST API call.
 func (p *Patroni) Restart(server *v1.Pod) error {
 	buf := &bytes.Buffer{}
 	err := json.NewEncoder(buf).Encode(map[string]interface{}{"restart_pending": true})
@@ -228,9 +238,13 @@ func (p *Patroni) Restart(server *v1.Pod) error {
 	if err != nil {
 		return err
 	}
-	status, err := p.GetStatus(server)
-	pending_restart, ok := status["pending_restart"]
-	if !ok || !pending_restart.(bool) {
+	memberData, err := p.GetMemberData(server)
+	if err != nil {
+		return err
+	}
+
+	// do restart only when it is pending
+	if !memberData.PendingRestart {
 		return nil
 	}
 	return p.httpPostOrPatch(http.MethodPost, apiURLString+restartPath, buf)
@@ -243,19 +257,13 @@ func (p *Patroni) GetMemberData(server *v1.Pod) (MemberData, error) {
 	if err != nil {
 		return MemberData{}, err
 	}
-	response, err := p.httpClient.Get(apiURLString)
+	body, err := p.httpGet(apiURLString + statusPath)
 	if err != nil {
-		return MemberData{}, fmt.Errorf("could not perform Get request: %v", err)
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return MemberData{}, fmt.Errorf("could not read response: %v", err)
+		return MemberData{}, err
 	}
 
 	data := MemberData{}
-	err = json.Unmarshal(body, &data)
+	err = json.Unmarshal([]byte(body), &data)
 	if err != nil {
 		return MemberData{}, err
 	}

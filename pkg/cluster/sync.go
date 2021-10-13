@@ -395,18 +395,24 @@ func (c *Cluster) syncStatefulSet() error {
 	// get Postgres config, compare with manifest and update via Patroni PATCH endpoint if it differs
 	// Patroni's config endpoint is just a "proxy" to DCS. It is enough to patch it only once and it doesn't matter which pod is used.
 	for i, pod := range pods {
+		emptyPatroniConfig := acidv1.Patroni{}
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		config, err := c.patroni.GetConfig(&pod)
+		patroniConfig, pgParameters, err := c.patroni.GetConfig(&pod)
 		if err != nil {
 			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
 			continue
 		}
-		instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, config)
-		if err != nil {
-			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
-			continue
+
+		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
+		// do not attempt a restart
+		if !reflect.DeepEqual(patroniConfig, emptyPatroniConfig) || len(pgParameters) > 0 {
+			instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, pgParameters)
+			if err != nil {
+				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
+				continue
+			}
+			break
 		}
-		break
 	}
 
 	// if the config update requires a restart, call Patroni restart for replicas first, then master
@@ -493,16 +499,9 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig map[string]interface{}) (bool, error) {
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig acidv1.Patroni, effectivePgParameters map[string]string) (bool, error) {
 	configToSet := make(map[string]interface{})
 	parametersToSet := make(map[string]string)
-	effectivePgParameters := make(map[string]interface{})
-
-	// read effective Patroni config if set
-	if patroniConfig != nil {
-		effectivePostgresql := patroniConfig["postgresql"].(map[string]interface{})
-		effectivePgParameters = effectivePostgresql[patroniPGParametersParameterName].(map[string]interface{})
-	}
 
 	// compare parameters under postgresql section with c.Spec.Postgresql.Parameters from manifest
 	desiredPgParameters := c.Spec.Parameters
@@ -514,34 +513,45 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 	}
 
 	if len(parametersToSet) > 0 {
-		configToSet["postgresql"] = map[string]interface{}{patroniPGParametersParameterName: parametersToSet}
+		configToSet["postgresql"] = map[string]interface{}{constants.PatroniPGParametersParameterName: parametersToSet}
 	}
 
 	// compare other options from config with c.Spec.Patroni from manifest
 	desiredPatroniConfig := c.Spec.Patroni
-	if desiredPatroniConfig.LoopWait > 0 && desiredPatroniConfig.LoopWait != uint32(patroniConfig["loop_wait"].(float64)) {
+	if desiredPatroniConfig.LoopWait > 0 && desiredPatroniConfig.LoopWait != patroniConfig.LoopWait {
 		configToSet["loop_wait"] = desiredPatroniConfig.LoopWait
 	}
-	if desiredPatroniConfig.MaximumLagOnFailover > 0 && desiredPatroniConfig.MaximumLagOnFailover != float32(patroniConfig["maximum_lag_on_failover"].(float64)) {
+	if desiredPatroniConfig.MaximumLagOnFailover > 0 && desiredPatroniConfig.MaximumLagOnFailover != patroniConfig.MaximumLagOnFailover {
 		configToSet["maximum_lag_on_failover"] = desiredPatroniConfig.MaximumLagOnFailover
 	}
-	if desiredPatroniConfig.PgHba != nil && !reflect.DeepEqual(desiredPatroniConfig.PgHba, (patroniConfig["pg_hba"])) {
+	if desiredPatroniConfig.PgHba != nil && !reflect.DeepEqual(desiredPatroniConfig.PgHba, patroniConfig.PgHba) {
 		configToSet["pg_hba"] = desiredPatroniConfig.PgHba
 	}
-	if desiredPatroniConfig.RetryTimeout > 0 && desiredPatroniConfig.RetryTimeout != uint32(patroniConfig["retry_timeout"].(float64)) {
+	if desiredPatroniConfig.RetryTimeout > 0 && desiredPatroniConfig.RetryTimeout != patroniConfig.RetryTimeout {
 		configToSet["retry_timeout"] = desiredPatroniConfig.RetryTimeout
 	}
-	if desiredPatroniConfig.Slots != nil && !reflect.DeepEqual(desiredPatroniConfig.Slots, patroniConfig["slots"]) {
-		configToSet["slots"] = desiredPatroniConfig.Slots
-	}
-	if desiredPatroniConfig.SynchronousMode != patroniConfig["synchronous_mode"] {
+	if desiredPatroniConfig.SynchronousMode != patroniConfig.SynchronousMode {
 		configToSet["synchronous_mode"] = desiredPatroniConfig.SynchronousMode
 	}
-	if desiredPatroniConfig.SynchronousModeStrict != patroniConfig["synchronous_mode_strict"] {
+	if desiredPatroniConfig.SynchronousModeStrict != patroniConfig.SynchronousModeStrict {
 		configToSet["synchronous_mode_strict"] = desiredPatroniConfig.SynchronousModeStrict
 	}
-	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != uint32(patroniConfig["ttl"].(float64)) {
+	if desiredPatroniConfig.TTL > 0 && desiredPatroniConfig.TTL != patroniConfig.TTL {
 		configToSet["ttl"] = desiredPatroniConfig.TTL
+	}
+
+	// check if specified slots exist in config and if they differ
+	slotsToSet := make(map[string]map[string]string)
+	for slotName, desiredSlot := range desiredPatroniConfig.Slots {
+		if effectiveSlot, exists := patroniConfig.Slots[slotName]; exists {
+			if reflect.DeepEqual(desiredSlot, effectiveSlot) {
+				continue
+			}
+		}
+		slotsToSet[slotName] = desiredSlot
+	}
+	if len(slotsToSet) > 0 {
+		configToSet["slots"] = slotsToSet
 	}
 
 	if len(configToSet) == 0 {

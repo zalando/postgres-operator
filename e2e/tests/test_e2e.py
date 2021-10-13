@@ -1099,19 +1099,19 @@ class EndToEndTestCase(unittest.TestCase):
 
             def compare_config():
                 effective_config = k8s.patroni_rest(masterPod.metadata.name, "config")
-                desired_patroni = pg_patch_config["spec"]["patroni"]
+                desired_config = pg_patch_config["spec"]["patroni"]
                 desired_parameters = pg_patch_config["spec"]["postgresql"]["parameters"]
                 effective_parameters = effective_config["postgresql"]["parameters"]
                 self.assertEqual(desired_parameters["max_connections"], effective_parameters["max_connections"],
                             "max_connections not updated")
                 self.assertTrue(effective_config["slots"] is not None, "physical replication slot not added")
-                self.assertEqual(desired_patroni["ttl"], effective_config["ttl"],
+                self.assertEqual(desired_config["ttl"], effective_config["ttl"],
                             "ttl not updated")
-                self.assertEqual(desired_patroni["loop_wait"], effective_config["loop_wait"],
+                self.assertEqual(desired_config["loop_wait"], effective_config["loop_wait"],
                             "loop_wait not updated")
-                self.assertEqual(desired_patroni["retry_timeout"], effective_config["retry_timeout"],
+                self.assertEqual(desired_config["retry_timeout"], effective_config["retry_timeout"],
                             "retry_timeout not updated")
-                self.assertEqual(desired_patroni["synchronous_mode"], effective_config["synchronous_mode"],
+                self.assertEqual(desired_config["synchronous_mode"], effective_config["synchronous_mode"],
                             "synchronous_mode not updated")
                 return True
 
