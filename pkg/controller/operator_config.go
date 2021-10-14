@@ -113,6 +113,7 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.MasterPodMoveTimeout = util.CoalesceDuration(time.Duration(fromCRD.Kubernetes.MasterPodMoveTimeout), "10m")
 	result.EnablePodAntiAffinity = fromCRD.Kubernetes.EnablePodAntiAffinity
 	result.PodAntiAffinityTopologyKey = util.Coalesce(fromCRD.Kubernetes.PodAntiAffinityTopologyKey, "kubernetes.io/hostname")
+	result.PodToleration = fromCRD.Kubernetes.PodToleration
 
 	// Postgres Pod resources
 	result.DefaultCPURequest = util.Coalesce(fromCRD.PostgresPodResources.DefaultCPURequest, "100m")
