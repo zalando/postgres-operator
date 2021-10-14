@@ -1177,6 +1177,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # operator should now recreate the master pod and do a switchover before
             k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # check if the former replica is now the new master
             leader = k8s.get_cluster_leader_pod()
@@ -1246,6 +1247,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # wait for next sync, replica should be running normally by now and be ready for switchover
             k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # check if the former replica is now the new master
             leader = k8s.get_cluster_leader_pod()
