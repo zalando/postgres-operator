@@ -86,7 +86,10 @@ configuration:
     # spilo_fsgroup: 103
     spilo_privileged: false
     storage_resize_mode: pvc
-    # toleration: {}
+    # toleration:
+    #   key: db-only
+    #   operator: Exists
+    #   effect: NoSchedule
     # watched_namespace: ""
   postgres_pod_resources:
     default_cpu_limit: "1"

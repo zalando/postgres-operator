@@ -128,7 +128,7 @@ data:
   # team_admin_role: "admin"
   # team_api_role_configuration: "log_statement:all"
   # teams_api_url: http://fake-teams-api.default.svc.cluster.local
-  # toleration: ""
+  # toleration: "key:db-only,operator:Exists,effect:NoSchedule"
   # wal_az_storage_account: ""
   # wal_gs_bucket: ""
   # wal_s3_bucket: ""

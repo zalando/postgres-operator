@@ -168,6 +168,12 @@ configKubernetes:
   spilo_allow_privilege_escalation: true
   # storage resize strategy, available options are: ebs, pvc, off
   storage_resize_mode: pvc
+  # pod toleration assigned to instances of every Postgres cluster
+  # toleration:
+  #   key: db-only
+  #   operator: Exists
+  #   effect: NoSchedule
+
   # operator watches for postgres objects in the given namespace
   watched_namespace: "*"  # listen to all namespaces
 
