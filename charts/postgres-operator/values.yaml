@@ -169,7 +169,7 @@ configKubernetes:
   # storage resize strategy, available options are: ebs, pvc, off
   storage_resize_mode: pvc
   # pod toleration assigned to instances of every Postgres cluster
-  # tolaration:
+  # toleration:
   #   key: db-only
   #   operator: Exists
   #   effect: NoSchedule
