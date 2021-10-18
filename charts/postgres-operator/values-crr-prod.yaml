@@ -257,21 +257,20 @@ configLogicalBackup:
   # path of google cloud service account json file
   # logical_backup_google_application_credentials: ""
 
-#testchange
   # prefix for the backup job name
   logical_backup_job_prefix: "logical-backup-"
   # storage provider - either "s3" or "gcs"
   logical_backup_provider: "s3"
   # S3 Access Key ID
-  logical_backup_s3_access_key_id: ""
+  logical_backup_s3_access_key_id: "FHQG1ZXAEQVARKYHPLPO"
   # S3 bucket to store backup results
-  logical_backup_s3_bucket: "my-bucket-url"
+  logical_backup_s3_bucket: "codex-postgres-backup"
   # S3 endpoint url when not using AWS
-  logical_backup_s3_endpoint: ""
+  logical_backup_s3_endpoint: "s3.fs.gwdg.de"
   # S3 region of bucket
   logical_backup_s3_region: ""
   # S3 Secret Access Key
-  logical_backup_s3_secret_access_key: ""
+  logical_backup_s3_secret_access_key: "8S6T7qbS6bBaauMiv5yafOKcZuM7WR7pux3kNZoz"
   # S3 server side encryption
   logical_backup_s3_sse: "AES256"
   # backup schedule in the cron format
