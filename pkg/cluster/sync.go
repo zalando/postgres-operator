@@ -271,7 +271,7 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 func (c *Cluster) syncStatefulSet() error {
 	var (
 		masterPod               *v1.Pod
-		effectivePostgresConfig map[string]interface{}
+		restartTTL              uint32
 		instanceRestartRequired bool
 	)
 
@@ -404,7 +404,6 @@ func (c *Cluster) syncStatefulSet() error {
 		emptyPatroniConfig := acidv1.Patroni{}
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
 		patroniConfig, pgParameters, err := c.patroni.GetConfig(&pod)
-
 		if err != nil {
 			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
 			continue
@@ -418,6 +417,7 @@ func (c *Cluster) syncStatefulSet() error {
 				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 				continue
 			}
+			restartTTL = patroniConfig.TTL
 			break
 		}
 	}
@@ -425,10 +425,6 @@ func (c *Cluster) syncStatefulSet() error {
 	// if the config update requires a restart, call Patroni restart for replicas first, then master
 	if instanceRestartRequired {
 		c.logger.Debug("restarting Postgres server within pods")
-		ttl, ok := effectivePostgresConfig["ttl"].(int32)
-		if !ok {
-			ttl = 30
-		}
 		for i, pod := range pods {
 			role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 			if role == Master {
@@ -436,7 +432,7 @@ func (c *Cluster) syncStatefulSet() error {
 				continue
 			}
 			c.restartInstance(&pod)
-			time.Sleep(time.Duration(ttl) * time.Second)
+			time.Sleep(time.Duration(restartTTL) * time.Second)
 		}
 
 		if masterPod != nil {

@@ -59,8 +59,8 @@ func (c *Cluster) deleteStreams() error {
 
 func (c *Cluster) syncPostgresConfig() error {
 
-	desiredPostgresConfig := c.Spec.Patroni
-	slots := desiredPostgresConfig.Slots
+	desiredPatroniConfig := c.Spec.Patroni
+	slots := desiredPatroniConfig.Slots
 
 	for _, stream := range c.Spec.Streams {
 		slotName := c.getLogicalReplicationSlot(stream.Database)
@@ -80,7 +80,7 @@ func (c *Cluster) syncPostgresConfig() error {
 		for slotName, slot := range slots {
 			c.logger.Debugf("creating logical replication slot %q in database %q", slotName, slot["database"])
 		}
-		desiredPostgresConfig.Slots = slots
+		desiredPatroniConfig.Slots = slots
 	} else {
 		return nil
 	}
@@ -94,13 +94,13 @@ func (c *Cluster) syncPostgresConfig() error {
 	}
 	for i, pod := range pods {
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		effectivePostgresConfig, effectivePgParameters, err := c.patroni.GetConfig(&pod)
+		effectivePatroniConfig, effectivePgParameters, err := c.patroni.GetConfig(&pod)
 		if err != nil {
 			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
 			continue
 		}
 
-		_, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePostgresConfig, desiredPostgresConfig, effectivePgParameters, desiredPgParameters)
+		_, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePatroniConfig, desiredPatroniConfig, effectivePgParameters, desiredPgParameters)
 		if err != nil {
 			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 			continue
