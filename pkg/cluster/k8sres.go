@@ -30,13 +30,12 @@ import (
 )
 
 const (
-	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%v/bin"
-	patroniPGBinariesParameterName   = "bin_dir"
-	patroniPGParametersParameterName = "parameters"
-	patroniPGHBAConfParameterName    = "pg_hba"
-	localHost                        = "127.0.0.1/32"
-	connectionPoolerContainer        = "connection-pooler"
-	pgPort                           = 5432
+	pgBinariesLocationTemplate     = "/usr/lib/postgresql/%v/bin"
+	patroniPGBinariesParameterName = "bin_dir"
+	patroniPGHBAConfParameterName  = "pg_hba"
+	localHost                      = "127.0.0.1/32"
+	connectionPoolerContainer      = "connection-pooler"
+	pgPort                         = 5432
 )
 
 type pgUser struct {
@@ -277,11 +276,11 @@ PatroniInitDBParams:
 		local, bootstrap := getLocalAndBoostrapPostgreSQLParameters(pg.Parameters)
 
 		if len(local) > 0 {
-			config.PgLocalConfiguration[patroniPGParametersParameterName] = local
+			config.PgLocalConfiguration[constants.PatroniPGParametersParameterName] = local
 		}
 		if len(bootstrap) > 0 {
 			config.Bootstrap.DCS.PGBootstrapConfiguration = make(map[string]interface{})
-			config.Bootstrap.DCS.PGBootstrapConfiguration[patroniPGParametersParameterName] = bootstrap
+			config.Bootstrap.DCS.PGBootstrapConfiguration[constants.PatroniPGParametersParameterName] = bootstrap
 		}
 	}
 	// Patroni gives us a choice of writing pg_hba.conf to either the bootstrap section or to the local postgresql one.

@@ -59,11 +59,8 @@ func (c *Cluster) deleteStreams() error {
 
 func (c *Cluster) syncPostgresConfig() error {
 
-	desiredPostgresConfig := make(map[string]interface{})
-	slots := make(map[string]map[string]string)
-
-	// if streams are defined wal_level must be switched to logical and slots have to be defined
-	desiredPostgresConfig["postgresql"] = map[string]interface{}{patroniPGParametersParameterName: map[string]string{"wal_level": "logical"}}
+	desiredPostgresConfig := c.Spec.Patroni
+	slots := desiredPostgresConfig.Slots
 
 	for _, stream := range c.Spec.Streams {
 		slotName := c.getLogicalReplicationSlot(stream.Database)
@@ -83,10 +80,13 @@ func (c *Cluster) syncPostgresConfig() error {
 		for slotName, slot := range slots {
 			c.logger.Debugf("creating logical replication slot %q in database %q", slotName, slot["database"])
 		}
-		desiredPostgresConfig["slots"] = slots
+		desiredPostgresConfig.Slots = slots
 	} else {
 		return nil
 	}
+
+	// if streams are defined wal_level must be switched to logical and slots have to be defined
+	desiredPgParameters := map[string]string{"wal_level": "logical"}
 
 	pods, err := c.listPods()
 	if err != nil || len(pods) == 0 {
@@ -94,13 +94,13 @@ func (c *Cluster) syncPostgresConfig() error {
 	}
 	for i, pod := range pods {
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
-		effectivePostgresConfig, err := c.patroni.GetConfig(&pod)
+		effectivePostgresConfig, effectivePgParameters, err := c.patroni.GetConfig(&pod)
 		if err != nil {
 			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
 			continue
 		}
 
-		_, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePostgresConfig, desiredPostgresConfig)
+		_, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, effectivePostgresConfig, desiredPostgresConfig, effectivePgParameters, desiredPgParameters)
 		if err != nil {
 			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 			continue

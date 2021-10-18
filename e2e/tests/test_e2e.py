@@ -161,6 +161,7 @@ class EndToEndTestCase(unittest.TestCase):
         '''
            Extend postgres container capabilities
         '''
+        k8s = self.k8s
         cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
         capabilities = ["SYS_NICE","CHOWN"]
         patch_capabilities = {
@@ -170,18 +171,18 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         # get node and replica (expected target of new master)
-        _, replica_nodes = self.k8s.get_pg_nodes(cluster_label)
+        _, replica_nodes = k8s.get_pg_nodes(cluster_label)
 
         try:
-            self.k8s.update_config(patch_capabilities)
-            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+            k8s.update_config(patch_capabilities)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                                 "Operator does not get in sync")
 
-            # changed security context of postrges container should trigger a rolling update
-            self.k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
-            self.k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            # changed security context of postgres container should trigger a rolling update
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
-            self.eventuallyEqual(lambda: self.k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
+            self.eventuallyEqual(lambda: k8s.count_pods_with_container_capabilities(capabilities, cluster_label),
                                 2, "Container capabilities not updated")
 
         except timeout_decorator.TimeoutError:
@@ -193,6 +194,8 @@ class EndToEndTestCase(unittest.TestCase):
         '''
            Test PostgresTeam CRD with extra teams and members
         '''
+        k8s = self.k8s
+
         # enable PostgresTeam CRD and lower resync
         enable_postgres_team_crd = {
             "data": {
@@ -202,11 +205,11 @@ class EndToEndTestCase(unittest.TestCase):
                 "resync_period": "15s"
             },
         }
-        self.k8s.update_config(enable_postgres_team_crd)
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+        k8s.update_config(enable_postgres_team_crd)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
 
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresteams', 'custom-team-membership',
         {
@@ -224,7 +227,7 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        leader = self.k8s.get_cluster_leader_pod()
+        leader = k8s.get_cluster_leader_pod()
         user_query = """
             SELECT rolname
               FROM pg_catalog.pg_roles
@@ -234,7 +237,7 @@ class EndToEndTestCase(unittest.TestCase):
             "Not all additional users found in database", 10, 5)
 
         # replace additional member and check if the removed member's role is renamed
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresteams', 'custom-team-membership',
         {
@@ -257,7 +260,7 @@ class EndToEndTestCase(unittest.TestCase):
             "Database role of replaced member in PostgresTeam not renamed", 10, 5)
 
         # re-add additional member and check if the role is renamed back
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresteams', 'custom-team-membership',
         {
@@ -285,8 +288,8 @@ class EndToEndTestCase(unittest.TestCase):
                 "resync_period": "30m",
             },
         }
-        self.k8s.update_config(revert_resync)
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"},
+        k8s.update_config(revert_resync)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -302,13 +305,13 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_cross_namespace_secret": "true"
             }
         }
-        self.k8s.update_config(patch_cross_namespace_secret,
+        k8s.update_config(patch_cross_namespace_secret,
                           step="cross namespace secrets enabled")
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
 
         # create secret in test namespace
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
             'acid.zalan.do', 'v1', 'default',
             'postgresqls', 'acid-minimal-cluster',
             {
@@ -321,7 +324,7 @@ class EndToEndTestCase(unittest.TestCase):
         
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
                              "Operator does not get in sync")
-        self.eventuallyEqual(lambda: self.k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", self.test_namespace),
+        self.eventuallyEqual(lambda: k8s.count_secrets_with_label("cluster-name=acid-minimal-cluster,application=spilo", self.test_namespace),
                              1, "Secret not created for user in namespace")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -766,7 +769,7 @@ class EndToEndTestCase(unittest.TestCase):
         pg_patch_version = {
             "spec": {
                 "postgres": {
-                    "version": "13"
+                    "version": "14"
                 }
             }
         }
@@ -775,12 +778,12 @@ class EndToEndTestCase(unittest.TestCase):
 
         self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-        def check_version_13():
+        def check_version_14():
             p = k8s.get_patroni_state("acid-upgrade-test-0")
             version = p["server_version"][0:2]
             return version
 
-        self.evantuallyEqual(check_version_13, "13", "Version was not upgrade to 13")
+        self.evantuallyEqual(check_version_14, "14", "Version was not upgrade to 14")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_min_resource_limits(self):
@@ -928,7 +931,7 @@ class EndToEndTestCase(unittest.TestCase):
                 plural="postgresqls",
                 name="acid-minimal-cluster",
                 body=patch_node_affinity_config)
-            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
             k8s.wait_for_pod_failover(master_node, 'spilo-role=replica,' + cluster_label)
@@ -960,21 +963,18 @@ class EndToEndTestCase(unittest.TestCase):
                 plural="postgresqls",
                 name="acid-minimal-cluster",
                 body=patch_node_remove_affinity_config)
-            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
-            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
-
-            # remove node affinity to move replica away from master node
-            nm, new_replica_nodes = k8s.get_cluster_nodes()
-            new_master_node = nm[0]
-            self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
+            # node affinity change should cause another rolling update and relocation of replica
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    @unittest.skip("Skipping this test until fixed")
     def test_node_readiness_label(self):
         '''
            Remove node readiness label from master node. This must cause a failover.
@@ -1024,12 +1024,13 @@ class EndToEndTestCase(unittest.TestCase):
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
-        self.k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
+        k8s = self.k8s
+        k8s.create_with_kubectl("manifests/minimal-fake-pooler-deployment.yaml")
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 1,
                              "Initial broken deployment not rolled out")
 
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresqls', 'acid-minimal-cluster',
         {
@@ -1038,11 +1039,11 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: self.k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.get_deployment_replica_count(name="acid-minimal-cluster-pooler"), 2,
                              "Operator did not succeed in overwriting labels")
 
-        self.k8s.api.custom_objects_api.patch_namespaced_custom_object(
+        k8s.api.custom_objects_api.patch_namespaced_custom_object(
         'acid.zalan.do', 'v1', 'default',
         'postgresqls', 'acid-minimal-cluster',
         {
@@ -1051,8 +1052,8 @@ class EndToEndTestCase(unittest.TestCase):
             }
         })
 
-        self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
-        self.eventuallyEqual(lambda: self.k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+        self.eventuallyEqual(lambda: k8s.count_running_pods("connection-pooler=acid-minimal-cluster-pooler"),
                              0, "Pooler pods not scaled down")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
@@ -1094,7 +1095,7 @@ class EndToEndTestCase(unittest.TestCase):
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_config)
             
-            self.eventuallyEqual(lambda: self.k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             def compare_config():
                 effective_config = k8s.patroni_rest(masterPod.metadata.name, "config")
@@ -1176,6 +1177,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # operator should now recreate the master pod and do a switchover before
             k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # check if the former replica is now the new master
             leader = k8s.get_cluster_leader_pod()
@@ -1245,6 +1247,7 @@ class EndToEndTestCase(unittest.TestCase):
 
             # wait for next sync, replica should be running normally by now and be ready for switchover
             k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # check if the former replica is now the new master
             leader = k8s.get_cluster_leader_pod()

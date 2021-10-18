@@ -56,7 +56,7 @@ kubectl create -f manifests/api-service.yaml  # operator API to be used by UI
 ```
 
 There is a [Kustomization](https://github.com/kubernetes-sigs/kustomize)
-manifest that [combines the mentioned resources](../manifests/kustomization.yaml)
+manifest that [combines the mentioned resources](https://github.com/zalando/postgres-operator/blob/master/manifests/kustomization.yaml)
 (except for the CRD) - it can be used with kubectl 1.14 or newer as easy as:
 
 ```bash
@@ -64,7 +64,7 @@ kubectl apply -k github.com/zalando/postgres-operator/manifests
 ```
 
 For convenience, we have automated starting the operator with minikube using the
-`run_operator_locally` script. It applies the [`acid-minimal-cluster`](../manifests/minimal-postgres-manifest.yaml).
+`run_operator_locally` script. It applies the [`acid-minimal-cluster`](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml).
 manifest.
 
 ```bash
@@ -114,8 +114,8 @@ In the following paragraphs we describe how to access and manage PostgreSQL
 clusters from the command line with kubectl. But it can also be done from the
 browser-based [Postgres Operator UI](operator-ui.md). Before deploying the UI
 make sure the operator is running and its REST API is reachable through a
-[K8s service](../manifests/api-service.yaml). The URL to this API must be
-configured in the [deployment manifest](../ui/manifests/deployment.yaml#L43)
+[K8s service](https://github.com/zalando/postgres-operator/blob/master/manifests/api-service.yaml). The URL to this API must be
+configured in the [deployment manifest](https://github.com/zalando/postgres-operator/blob/master/ui/manifests/deployment.yaml#L43)
 of the UI.
 
 To deploy the UI simply apply all its manifests files or use the UI helm chart:
