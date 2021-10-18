@@ -68,11 +68,11 @@ the upgrade script for you after the manifest is updated and pods are rotated.
 [CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
 will be registered with schema validation by default when the operator is
 deployed. The `OperatorConfiguration` CRD will only get created if the
-`POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](../manifests/postgres-operator.yaml#L36)
+`POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
 in the deployment yaml is set and not empty.
 
-When submitting manifests of [`postgresql`](../manifests/postgresql.crd.yaml) or
-[`OperatorConfiguration`](../manifests/operatorconfiguration.crd.yaml) custom
+When submitting manifests of [`postgresql`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql.crd.yaml) or
+[`OperatorConfiguration`](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml) custom
 resources with kubectl, validation can be bypassed with `--validate=false`. The
 operator can also be configured to not register CRDs with validation on `ADD` or
 `UPDATE` events. Running instances are not affected when enabling the validation
@@ -109,7 +109,7 @@ kubectl config set-context $(kubectl config current-context) --namespace=test
 All subsequent `kubectl` commands will work with the `test` namespace. The
 operator will run in this namespace and look up needed resources - such as its
 ConfigMap - there. Please note that the namespace for service accounts and
-cluster role bindings in [operator RBAC rules](../manifests/operator-service-account-rbac.yaml)
+cluster role bindings in [operator RBAC rules](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml)
 needs to be adjusted to the non-default value.
 
 ### Specify the namespace to watch
@@ -120,9 +120,9 @@ clusters in the namespace such as "increase the number of Postgres replicas to
 
 By default, the operator watches the namespace it is deployed to. You can
 change this by setting the `WATCHED_NAMESPACE` var in the `env` section of the
-[operator deployment](../manifests/postgres-operator.yaml) manifest or by
+[operator deployment](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml) manifest or by
 altering the `watched_namespace` field in the operator
-[configuration](../manifests/postgresql-operator-default-configuration.yaml#L49).
+[configuration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml#L49).
 In the case both are set, the env var takes the precedence. To make the
 operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
@@ -143,7 +143,7 @@ But, it is also possible to define ownership between operator instances and
 Postgres clusters running all in the same namespace or K8s cluster without
 interfering.
 
-First, define the [`CONTROLLER_ID`](../../manifests/postgres-operator.yaml#L38)
+First, define the [`CONTROLLER_ID`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L38)
 environment variable in the operator deployment manifest. Then specify the ID
 in every Postgres cluster manifest you want this operator to watch using the
 `"acid.zalan.do/controller"` annotation:
@@ -256,7 +256,7 @@ update of the pods because the UID is used as part of backup path to S3.
 
 ## Role-based access control for the operator
 
-The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
+The manifest [`operator-service-account-rbac.yaml`](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml)
 defines the service account, cluster roles and bindings needed for the operator
 to function under access control restrictions. The file also includes a cluster
 role `postgres-pod` with privileges for Patroni to watch and manage pods and
@@ -965,7 +965,7 @@ but only snapshots of your data. In its current state, see logical backups as a
 way to quickly create SQL dumps that you can easily restore in an empty test
 cluster.
 
-2. The [example image](../docker/logical-backup/Dockerfile) implements the backup
+2. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile) implements the backup
 via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket.
 `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when
 possible.
@@ -984,7 +984,7 @@ of the backup cron job.
 
 6. For that feature to work, your RBAC policy must enable operations on the
 `cronjobs` resource from the `batch` API group for the operator service account.
-See [example RBAC](../manifests/operator-service-account-rbac.yaml)
+See [example RBAC](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml)
 
 ## Sidecars for Postgres clusters
 
@@ -1038,8 +1038,8 @@ default. Alternatively, a list can also be passed when starting the Python
 application with the `--cluster` option.
 
 The Operator API endpoint can be configured via the `OPERATOR_API_URL`
-environment variables in the [deployment manifest](../ui/manifests/deployment.yaml#L40).
-You can also expose the operator API through a [service](../manifests/api-service.yaml).
+environment variables in the [deployment manifest](https://github.com/zalando/postgres-operator/blob/master/ui/manifests/deployment.yaml#L40).
+You can also expose the operator API through a [service](https://github.com/zalando/postgres-operator/blob/master/manifests/api-service.yaml).
 Some displayed options can be disabled from UI using simple flags under the
 `OPERATOR_UI_CONFIG` field in the deployment.
 

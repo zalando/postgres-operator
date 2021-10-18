@@ -5,7 +5,7 @@ Learn how to work with the Postgres Operator in a Kubernetes (K8s) environment.
 ## Create a manifest for a new PostgreSQL cluster
 
 Make sure you have [set up](quickstart.md) the operator. Then you can create a
-new Postgres cluster by applying manifest like this [minimal example](../manifests/minimal-postgres-manifest.yaml):
+new Postgres cluster by applying manifest like this [minimal example](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml):
 
 ```yaml
 apiVersion: "acid.zalan.do/v1"
@@ -113,7 +113,7 @@ chapter.
 ### Manifest roles
 
 Manifest roles are defined directly in the cluster manifest. See
-[minimal postgres manifest](../manifests/minimal-postgres-manifest.yaml)
+[minimal postgres manifest](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
 for an example of `zalando` role, defined with `superuser` and `createdb` flags.
 
 Manifest roles are defined as a dictionary, with a role name as a key and a
@@ -218,7 +218,7 @@ Note, only the CRD-based configuration allows for referencing multiple secrets.
 As of now, the ConfigMap is restricted to either one or the existing template
 option with `infrastructure_roles_secret_name`. Please, refer to the example
 manifests to understand how `infrastructure_roles_secrets` has to be configured
-for the [configmap](../manifests/configmap.yaml) or [CRD configuration](../manifests/postgresql-operator-default-configuration.yaml).
+for the [configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/configmap.yaml) or [CRD configuration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml).
 
 If both `infrastructure_roles_secret_name` and `infrastructure_roles_secrets`
 are defined the operator will create roles for both of them. So make sure,
@@ -263,8 +263,8 @@ Since an infrastructure role is created uniformly on all clusters managed by
 the operator, it makes no sense to define it without the password. Such
 definitions will be ignored with a prior warning.
 
-See [infrastructure roles secret](../manifests/infrastructure-roles.yaml)
-and [infrastructure roles configmap](../manifests/infrastructure-roles-configmap.yaml)
+See [infrastructure roles secret](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles.yaml)
+and [infrastructure roles configmap](https://github.com/zalando/postgres-operator/blob/master/manifests/infrastructure-roles-configmap.yaml)
 for the examples.
 
 ### Teams API roles
@@ -280,7 +280,7 @@ returns usernames. A minimal Teams API should work like this:
 /.../<teamname> -> ["name","anothername"]
 ```
 
-A ["fake" Teams API](../manifests/fake-teams-api.yaml) deployment is provided
+A ["fake" Teams API](https://github.com/zalando/postgres-operator/blob/master/manifests/fake-teams-api.yaml) deployment is provided
 in the manifests folder to set up a basic API around whatever services is used
 for user management. The Teams API's URL is set in the operator's
 [configuration](reference/operator_parameters.md#automatic-creation-of-human-users-in-the-database)
@@ -295,12 +295,12 @@ Postgres clusters are associated with one team by providing the `teamID` in
 the manifest. Additional superuser teams can be configured as mentioned in
 the previous paragraph. However, this is a global setting. To assign
 additional teams, superuser teams and single users to clusters of a given
-team, use the [PostgresTeam CRD](../manifests/postgresteam.crd.yaml).
+team, use the [PostgresTeam CRD](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresteam.crd.yaml).
 
 Note, by default the `PostgresTeam` support is disabled in the configuration.
 Switch `enable_postgres_team_crd` flag to `true` and the operator will start to
 watch for this CRD. Make sure, the cluster role is up to date and contains a
-section for [PostgresTeam](../manifests/operator-service-account-rbac.yaml#L30).
+section for [PostgresTeam](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml#L30).
 
 #### Additional teams
 
@@ -804,7 +804,7 @@ spec:
 ```
 
 At the moment, the operator only allows to stream from the WAL archive of the
-master. Thus, it is recommended to deploy standby clusters with only [one pod](../manifests/standby-manifest.yaml#L10).
+master. Thus, it is recommended to deploy standby clusters with only [one pod](https://github.com/zalando/postgres-operator/blob/master/manifests/standby-manifest.yaml#L10).
 You can raise the instance count when detaching. Note, that the same pod role
 labels like for normal clusters are used: The standby leader is labeled as
 `master`.
