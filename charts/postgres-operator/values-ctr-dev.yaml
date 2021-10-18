@@ -1,396 +1,324 @@
-image:
-  registry: registry.opensource.zalan.do
-  repository: acid/postgres-operator
-  tag: v1.6.2
-  pullPolicy: "IfNotPresent"
-
-# Optionally specify an array of imagePullSecrets.
-# Secrets must be manually created in the namespace.
-# ref: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
-# imagePullSecrets:
-  # - name: myRegistryKeySecretName
-
-podAnnotations: {}
-podLabels: {}
-
-configTarget: "ConfigMap"
-
-# JSON logging format
-enableJsonLogging: false
-
-# general configuration parameters
-configGeneral:
-  # choose if deployment creates/updates CRDs with OpenAPIV3Validation
-  enable_crd_validation: "true"
-  # update only the statefulsets without immediately doing the rolling update
-  enable_lazy_spilo_upgrade: "false"
-  # set the PGVERSION env var instead of providing the version via postgresql.bin_dir in SPILO_CONFIGURATION
-  enable_pgversion_env_var: "true"
-  # start any new database pod without limitations on shm memory
-  enable_shm_volume: "true"
-  # enables backwards compatible path between Spilo 12 and Spilo 13 images
-  enable_spilo_wal_path_compat: "false"
-  # etcd connection string for Patroni. Empty uses K8s-native DCS.
-  etcd_host: ""
-  # Select if setup uses endpoints (default), or configmaps to manage leader (DCS=k8s)
-  # kubernetes_use_configmaps: "false"
-  # Spilo docker image
-  docker_image: registry.opensource.zalan.do/acid/spilo-13:2.0-p6
-  # min number of instances in Postgres cluster. -1 = no limit
-  min_instances: "1"
-  # max number of instances in Postgres cluster. -1 = no limit
-  max_instances: "-1"
-  # period between consecutive repair requests
-  repair_period: 30m
-  # period between consecutive sync requests
-  resync_period: 90m
-  # can prevent certain cases of memory overcommitment
-  # set_memory_request_to_limit: "false"
-
-  # map of sidecar names to docker images
-  # sidecar_docker_images: ""
-
-  # number of routines the operator spawns to process requests concurrently
-  workers: "8"
-
-# parameters describing Postgres users
-configUsers:
-  # postgres username used for replication between instances
-  replication_username: standby
-  # postgres superuser name to be created by initdb
-  super_username: postgres
-
-configMajorVersionUpgrade:
-  # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
-  major_version_upgrade_mode: "off"
-  # minimal Postgres major version that will not automatically be upgraded
-  minimal_major_version: "9.5"
-  # target Postgres major version when upgrading clusters automatically
-  target_major_version: "13"
-
-configKubernetes:
-  # list of additional capabilities for postgres container
-  # additional_pod_capabilities: "SYS_NICE"
-
-  # default DNS domain of K8s cluster where operator is running
-  cluster_domain: cluster.local
-  # additional labels assigned to the cluster objects
-  cluster_labels: application:spilo
-  # label assigned to Kubernetes objects created by the operator
-  cluster_name_label: cluster-name
-  # annotations attached to each database pod
-  # custom_pod_annotations: "keya:valuea,keyb:valueb"
-
-  # key name for annotation that compares manifest value with current date
-  # delete_annotation_date_key: "delete-date"
-
-  # key name for annotation that compares manifest value with cluster name
-  # delete_annotation_name_key: "delete-clustername"
-
-  # list of annotations propagated from cluster manifest to statefulset and deployment
-  # downscaler_annotations: "deployment-time,downscaler/*"
-
-  # enables initContainers to run actions before Spilo is started
-  enable_init_containers: "true"
-  # toggles pod anti affinity on the Postgres pods
-  enable_pod_antiaffinity: "true"
-  # toggles PDB to set to MinAvailabe 0 or 1
-  enable_pod_disruption_budget: "true"
-  # enables sidecar containers to run alongside Spilo in the same pod
-  enable_sidecars: "true"
-  # namespaced name of the secret containing infrastructure roles names and passwords
-  # infrastructure_roles_secret_name: postgresql-infrastructure-roles
-
-  # list of annotation keys that can be inherited from the cluster manifest
-  # inherited_annotations: owned-by
-
-  # list of label keys that can be inherited from the cluster manifest
-  # inherited_labels: application,environment
-
-  # timeout for successful migration of master pods from unschedulable node
-  # master_pod_move_timeout: 20m
-
-  # set of labels that a running and active node should possess to be considered ready
-  # node_readiness_label: ""
-
-  # namespaced name of the secret containing the OAuth2 token to pass to the teams API
-  # oauth_token_secret_name: postgresql-operator
-
-  # defines the template for PDB (Pod Disruption Budget) names
-  pdb_name_format: "postgres-{cluster}-pdb"
-  # override topology key for pod anti affinity
-  pod_antiaffinity_topology_key: "kubernetes.io/hostname"
-  # namespaced name of the ConfigMap with environment variables to populate on every pod
-  # pod_environment_configmap: "default/my-custom-config"
-  # name of the Secret (in cluster namespace) with environment variables to populate on every pod
-  # pod_environment_secret: "my-custom-secret"
-
-  # specify the pod management policy of stateful sets of Postgres clusters
-  pod_management_policy: "ordered_ready"
-  # label assigned to the Postgres pods (and services/endpoints)
-  pod_role_label: spilo-role
-  # service account definition as JSON/YAML string to be used by postgres cluster pods
-  # pod_service_account_definition: ""
-
-  # role binding definition as JSON/YAML string to be used by pod service account
-  # pod_service_account_role_binding_definition: ""
-
-  # Postgres pods are terminated forcefully after this timeout
-  pod_terminate_grace_period: 5m
-  # template for database user secrets generated by the operator
-  secret_name_template: "{username}.{cluster}.credentials.{tprkind}.{tprgroup}"
-  # set user and group for the spilo container (required to run Spilo as non-root process)
-  # spilo_runasuser: "101"
-  # spilo_runasgroup: "103"
-  # group ID with write-access to volumes (required to run Spilo as non-root process)
-  # spilo_fsgroup: "103"
-
-  # whether the Spilo container should run in privileged mode
-  spilo_privileged: "false"
-  # whether the Spilo container should run with additional permissions other than parent.
-  # required by cron which needs setuid
-  spilo_allow_privilege_escalation: "true"
-  # storage resize strategy, available options are: ebs, pvc, off
-  storage_resize_mode: pvc
-  # operator watches for postgres objects in the given namespace
-  watched_namespace: "ctr-development-postgres-cluster"  # listen to all namespaces
-
-# configure resource requests for the Postgres pods
-configPostgresPodResources:
-  # CPU limits for the postgres containers
-  default_cpu_limit: "1"
-  # CPU request value for the postgres containers
-  default_cpu_request: 100m
-  # memory limits for the postgres containers
-  default_memory_limit: 500Mi
-  # memory request value for the postgres containers
-  default_memory_request: 100Mi
-  # hard CPU minimum required to properly run a Postgres cluster
-  min_cpu_limit: 250m
-  # hard memory minimum required to properly run a Postgres cluster
-  min_memory_limit: 250Mi
-
-# timeouts related to some operator actions
-configTimeouts:
-  # timeout when waiting for the Postgres pods to be deleted
-  pod_deletion_wait_timeout: 10m
-  # timeout when waiting for pod role and cluster labels
-  pod_label_wait_timeout: 10m
-  # interval between consecutive attempts waiting for postgresql CRD to be created
-  ready_wait_interval: 3s
-  # timeout for the complete postgres CRD creation
-  ready_wait_timeout: 30s
-  # interval to wait between consecutive attempts to check for some K8s resources
-  resource_check_interval: 3s
-  # timeout when waiting for the presence of a certain K8s resource (e.g. Sts, PDB)
-  resource_check_timeout: 10m
-
-# configure behavior of load balancers
-configLoadBalancer:
-  # DNS zone for cluster DNS name when load balancer is configured for cluster
-  db_hosted_zone: db.example.com
-  # annotations to apply to service when load balancing is enabled
-  # custom_service_annotations: "keyx:valuez,keya:valuea"
-
-  # toggles service type load balancer pointing to the master pod of the cluster
-  enable_master_load_balancer: "false"
-  # toggles service type load balancer pointing to the replica pod of the cluster
-  enable_replica_load_balancer: "false"
-  # define external traffic policy for the load balancer
-  external_traffic_policy: "Cluster"
-  # defines the DNS name string template for the master load balancer cluster
-  master_dns_name_format: '{cluster}.{team}.{hostedzone}'
-  # defines the DNS name string template for the replica load balancer cluster
-  replica_dns_name_format: '{cluster}-repl.{team}.{hostedzone}'
-
-# options to aid debugging of the operator itself
-configDebug:
-  # toggles verbose debug logs from the operator
-  debug_logging: "true"
-  # toggles operator functionality that require access to the postgres database
-  enable_database_access: "true"
-
-# parameters affecting logging and REST API listener
-configLoggingRestApi:
-  # REST API listener listens to this port
-  api_port: "8080"
-  # number of entries in the cluster history ring buffer
-  cluster_history_entries: "1000"
-  # number of lines in the ring buffer used to store cluster logs
-  ring_log_lines: "100"
-
-# configure interaction with non-Kubernetes objects from AWS or GCP
-configAwsOrGcp:
-  # Additional Secret (aws or gcp credentials) to mount in the pod
-  # additional_secret_mount: "some-secret-name"
-
-  # Path to mount the above Secret in the filesystem of the container(s)
-  # additional_secret_mount_path: "/some/dir"
-
-  # AWS region used to store ESB volumes
-  aws_region: eu-central-1
-
-  # enable automatic migration on AWS from gp2 to gp3 volumes
-  enable_ebs_gp3_migration: "false"
-  # defines maximum volume size in GB until which auto migration happens
-  # enable_ebs_gp3_migration_max_size: "1000"
-
-  # GCP credentials for setting the GOOGLE_APPLICATION_CREDNETIALS environment variable
-  # gcp_credentials: ""
-
-  # AWS IAM role to supply in the iam.amazonaws.com/role annotation of Postgres pods
-  # kube_iam_role: ""
-
-  # S3 bucket to use for shipping postgres daily logs
-  # log_s3_bucket: ""
-
-  # S3 bucket to use for shipping WAL segments with WAL-E
-  # wal_s3_bucket: ""
-
-  # GCS bucket to use for shipping WAL segments with WAL-E
-  # wal_gs_bucket: ""
-
-# configure K8s cron job managed by the operator
-configLogicalBackup:
-  # image for pods of the logical backup job (example runs pg_dumpall)
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.6.2"
-  # path of google cloud service account json file
-  # logical_backup_google_application_credentials: ""
-
-  # prefix for the backup job name
-  logical_backup_job_prefix: "logical-backup-"
-  # storage provider - either "s3" or "gcs"
-  logical_backup_provider: "s3"
-  # S3 Access Key ID
-  logical_backup_s3_access_key_id: ""
-  # S3 bucket to store backup results
-  logical_backup_s3_bucket: "my-bucket-url"
-  # S3 endpoint url when not using AWS
-  logical_backup_s3_endpoint: ""
-  # S3 region of bucket
-  logical_backup_s3_region: ""
-  # S3 Secret Access Key
-  logical_backup_s3_secret_access_key: ""
-  # S3 server side encryption
-  logical_backup_s3_sse: "AES256"
-  # backup schedule in the cron format
-  logical_backup_schedule: "0 18 * * *"
-
-
-# automate creation of human users with teams API service
-configTeamsApi:
-  # team_admin_role will have the rights to grant roles coming from PG manifests
-  # enable_admin_role_for_users: "true"
-
-  # operator watches for PostgresTeam CRs to assign additional teams and members to clusters
-  enable_postgres_team_crd: "false"
-  # toogle to create additional superuser teams from PostgresTeam CRs
-  # enable_postgres_team_crd_superusers: "false"
-
-  # toggle to grant superuser to team members created from the Teams API
-  # enable_team_superuser: "false"
-
-  # toggles usage of the Teams API by the operator
-  enable_teams_api: "false"
-  # should contain a URL to use for authentication (username and token)
-  # pam_configuration: https://info.example.com/oauth2/tokeninfo?access_token= uid realm=/employees
-
-  # operator will add all team member roles to this group and add a pg_hba line
-  # pam_role_name: zalandos
-
-  # List of teams which members need the superuser role in each Postgres cluster
-  # postgres_superuser_teams: "postgres_superusers"
-
-  # List of roles that cannot be overwritten by an application, team or infrastructure role
-  # protected_role_names: "admin"
-
-  # role name to grant to team members created from the Teams API
-  # team_admin_role: "admin"
-
-  # postgres config parameters to apply to each team member role
-  # team_api_role_configuration: "log_statement:all"
-
-  # URL of the Teams API service
-  # teams_api_url: http://fake-teams-api.default.svc.cluster.local
-
-# configure connection pooler deployment created by the operator
-configConnectionPooler:
-  # db schema to install lookup function into
-  connection_pooler_schema: "pooler"
-  # db user for pooler to use
-  connection_pooler_user: "pooler"
-  # docker image
-  connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-16"
-  # max db connections the pooler should hold
-  connection_pooler_max_db_connections: "60"
-  # default pooling mode
-  connection_pooler_mode: "transaction"
-  # number of pooler instances
-  connection_pooler_number_of_instances: "2"
-  # default resources
-  connection_pooler_default_cpu_request: 500m
-  connection_pooler_default_memory_request: 100Mi
-  connection_pooler_default_cpu_limit: "1"
-  connection_pooler_default_memory_limit: 100Mi
-
-rbac:
-  # Specifies whether RBAC resources should be created
-  create: true
-
-crd:
-  # Specifies whether custom resource definitions should be created
-  # When using helm3, this is ignored; instead use "--skip-crds" to skip.
-  create: true
-
-serviceAccount:
-  # Specifies whether a ServiceAccount should be created
-  create: true
-  # The name of the ServiceAccount to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: "ctr-development-postgres-operator"
-
-podServiceAccount:
-  # The name of the ServiceAccount to be used by postgres cluster pods
-  # If not set a name is generated using the fullname template and "-pod" suffix
-  name: "ctr-development-postgres-pod"
-
-# priority class for operator pod
-priorityClassName: ""
-
-# priority class for database pods
-podPriorityClassName: ""
-
-resources:
-  limits:
-    cpu: 500m
-    memory: 500Mi
-  requests:
-    cpu: 100m
-    memory: 250Mi
-
-securityContext:
-  runAsUser: 1000
-  runAsNonRoot: true
-  readOnlyRootFilesystem: true
-  allowPrivilegeEscalation: false
-
-# Affinity for pod assignment
-# Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
-affinity: {}
-
-# Node labels for pod assignment
-# Ref: https://kubernetes.io/docs/user-guide/node-selection/
-nodeSelector: {}
-
-# Tolerations for pod assignment
-# Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-tolerations: []
-
-controllerID:
-  # Specifies whether a controller ID should be defined for the operator
-  # Note, all postgres manifest must then contain the following annotation to be found by this operator
-  # "acid.zalan.do/controller": <controller-ID-of-the-operator>
-  create: false
-  # The name of the controller ID to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name:
+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
