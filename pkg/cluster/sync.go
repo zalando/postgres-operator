@@ -567,7 +567,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
 			parametersToSet[desiredOption] = desiredValue
-			if util.SliceContains(requireMasterRestartWhenDecreased, desiredOption) && (effectiveValue != desiredValue) {
+			if util.SliceContains(requireMasterRestartWhenDecreased, desiredOption) && (effectiveValue > desiredValue) {
 				restartMaster = append(restartMaster, true)
 			} else {
 				restartMaster = append(restartMaster, false)
