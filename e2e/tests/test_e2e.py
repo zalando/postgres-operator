@@ -1064,12 +1064,13 @@ class EndToEndTestCase(unittest.TestCase):
             via restarting cluster through Patroni's rest api
         '''
         k8s = self.k8s
-        masterPod = k8s.get_cluster_leader_pod()
+        leader = k8s.get_cluster_leader_pod()
+        replica = k8s.get_cluster_replica_pod()
         labels = 'application=spilo,cluster-name=acid-minimal-cluster,spilo-role=master'
-        creationTimestamp = masterPod.metadata.creation_timestamp
+        creationTimestamp = leader.metadata.creation_timestamp
         new_max_connections_value = "50"
 
-        # adjust max_connection
+        # adjust Postgres config
         pg_patch_config = {
             "spec": {
                 "postgresql": {
@@ -1098,7 +1099,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             def compare_config():
-                effective_config = k8s.patroni_rest(masterPod.metadata.name, "config")
+                effective_config = k8s.patroni_rest(leader.metadata.name, "config")
                 desired_config = pg_patch_config["spec"]["patroni"]
                 desired_parameters = pg_patch_config["spec"]["postgresql"]["parameters"]
                 effective_parameters = effective_config["postgresql"]["parameters"]
@@ -1122,12 +1123,39 @@ class EndToEndTestCase(unittest.TestCase):
                  FROM pg_settings
                 WHERE name = 'max_connections';
             """
-            self.eventuallyEqual(lambda: self.query_database(masterPod.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
-                "New max_connections setting not applied", 10, 5)
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "New max_connections setting not applied on master", 10, 5)
+            self.eventuallyNotEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "Expected max_connections not to be updated on replica since Postgres was restarted there first", 10, 5)
 
             # make sure that pod wasn't recreated
-            self.assertEqual(creationTimestamp, masterPod.metadata.creation_timestamp,
+            self.assertEqual(creationTimestamp, leader.metadata.creation_timestamp,
                             "Master pod creation timestamp is updated")
+
+            # decrease max_connections again
+            lower_max_connections_value = "30"
+            pg_patch_max_connections = {
+                "spec": {
+                    "postgresql": {
+                        "parameters": {
+                            "max_connections": lower_max_connections_value
+                        }
+                    }
+                }
+            }
+
+            k8s.api.custom_objects_api.patch_namespaced_custom_object(
+                "acid.zalan.do", "v1", "default", "postgresqls", "acid-minimal-cluster", pg_patch_max_connections)
+
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            pg_patch_config["spec"]["postgresql"]["parameters"]["max_connections"] = lower_max_connections_value
+            self.eventuallyTrue(compare_config, "Postgres config not applied")
+
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "Previous max_connections setting not applied on master", 10, 5)
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "Previous max_connections setting not applied on replica", 10, 5)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))

@@ -20,6 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var requireMasterRestartWhenDecreased = []string{
+	"max_connections",
+	"max_prepared_transactions",
+	"max_locks_per_transaction",
+	"max_worker_processes",
+	"max_wal_senders",
+}
+
 // Sync syncs the cluster, making sure the actual Kubernetes objects correspond to what is defined in the manifest.
 // Unlike the update, sync does not error out if some objects do not exist and takes care of creating them.
 func (c *Cluster) Sync(newSpec *acidv1.Postgresql) error {
@@ -264,9 +272,9 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 
 func (c *Cluster) syncStatefulSet() error {
 	var (
-		masterPod               *v1.Pod
-		postgresConfig          map[string]interface{}
+		restartTTL              uint32
 		instanceRestartRequired bool
+		restartMasterFirst      bool
 	)
 
 	podsToRecreate := make([]v1.Pod, 0)
@@ -406,34 +414,44 @@ func (c *Cluster) syncStatefulSet() error {
 		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
 		// do not attempt a restart
 		if !reflect.DeepEqual(patroniConfig, emptyPatroniConfig) || len(pgParameters) > 0 {
-			instanceRestartRequired, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, pgParameters)
+			instanceRestartRequired, restartMasterFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, pgParameters)
 			if err != nil {
 				c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 				continue
 			}
+			restartTTL = patroniConfig.TTL
 			break
 		}
 	}
 
-	// if the config update requires a restart, call Patroni restart for replicas first, then master
+	// if the config update requires a restart, call Patroni restart
 	if instanceRestartRequired {
-		c.logger.Debug("restarting Postgres server within pods")
-		ttl, ok := postgresConfig["ttl"].(int32)
-		if !ok {
-			ttl = 30
+		remainingPods := make([]*v1.Pod, 0)
+		skipRole := Master
+		if restartMasterFirst {
+			skipRole = Replica
 		}
+		c.logger.Debug("restarting Postgres server within pods")
 		for i, pod := range pods {
 			role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
-			if role == Master {
-				masterPod = &pods[i]
+			if role == skipRole {
+				remainingPods = append(remainingPods, &pods[i])
 				continue
 			}
 			c.restartInstance(&pod)
-			time.Sleep(time.Duration(ttl) * time.Second)
+			if len(pods) > 1 {
+				time.Sleep(time.Duration(restartTTL) * time.Second)
+			}
 		}
 
-		if masterPod != nil {
-			c.restartInstance(masterPod)
+		// in most cases only the master should be left to restart
+		if len(remainingPods) > 0 {
+			for _, remainingPod := range remainingPods {
+				c.restartInstance(remainingPod)
+				if len(remainingPods) > 1 {
+					time.Sleep(time.Duration(restartTTL) * time.Second)
+				}
+			}
 		}
 	}
 
@@ -499,24 +517,13 @@ func (c *Cluster) AnnotationsToPropagate(annotations map[string]string) map[stri
 
 // checkAndSetGlobalPostgreSQLConfiguration checks whether cluster-wide API parameters
 // (like max_connections) have changed and if necessary sets it via the Patroni API
-func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig acidv1.Patroni, effectivePgParameters map[string]string) (bool, error) {
+func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniConfig acidv1.Patroni, effectivePgParameters map[string]string) (bool, bool, error) {
 	configToSet := make(map[string]interface{})
 	parametersToSet := make(map[string]string)
+	restartMaster := make([]bool, 0)
+	requiresMasterRestart := false
 
-	// compare parameters under postgresql section with c.Spec.Postgresql.Parameters from manifest
-	desiredPgParameters := c.Spec.Parameters
-	for desiredOption, desiredValue := range desiredPgParameters {
-		effectiveValue := effectivePgParameters[desiredOption]
-		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
-			parametersToSet[desiredOption] = desiredValue
-		}
-	}
-
-	if len(parametersToSet) > 0 {
-		configToSet["postgresql"] = map[string]interface{}{constants.PatroniPGParametersParameterName: parametersToSet}
-	}
-
-	// compare other options from config with c.Spec.Patroni from manifest
+	// compare options from config with c.Spec.Patroni from manifest
 	desiredPatroniConfig := c.Spec.Patroni
 	if desiredPatroniConfig.LoopWait > 0 && desiredPatroniConfig.LoopWait != patroniConfig.LoopWait {
 		configToSet["loop_wait"] = desiredPatroniConfig.LoopWait
@@ -554,8 +561,30 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 		configToSet["slots"] = slotsToSet
 	}
 
+	// compare parameters under postgresql section with c.Spec.Postgresql.Parameters from manifest
+	desiredPgParameters := c.Spec.Parameters
+	for desiredOption, desiredValue := range desiredPgParameters {
+		effectiveValue := effectivePgParameters[desiredOption]
+		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
+			parametersToSet[desiredOption] = desiredValue
+			if util.SliceContains(requireMasterRestartWhenDecreased, desiredOption) && (effectiveValue != desiredValue) {
+				restartMaster = append(restartMaster, true)
+			} else {
+				restartMaster = append(restartMaster, false)
+			}
+		}
+	}
+
+	if !util.SliceContains(restartMaster, false) && len(configToSet) == 0 {
+		requiresMasterRestart = true
+	}
+
+	if len(parametersToSet) > 0 {
+		configToSet["postgresql"] = map[string]interface{}{constants.PatroniPGParametersParameterName: parametersToSet}
+	}
+
 	if len(configToSet) == 0 {
-		return false, nil
+		return false, false, nil
 	}
 
 	configToSetJson, err := json.Marshal(configToSet)
@@ -569,10 +598,10 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 	c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
 		podName, configToSetJson)
 	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
-		return true, fmt.Errorf("could not patch postgres parameters with a pod %s: %v", podName, err)
+		return true, requiresMasterRestart, fmt.Errorf("could not patch postgres parameters with a pod %s: %v", podName, err)
 	}
 
-	return true, nil
+	return true, requiresMasterRestart, nil
 }
 
 func (c *Cluster) syncSecrets() error {
