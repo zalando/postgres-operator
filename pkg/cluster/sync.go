@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -425,7 +426,7 @@ func (c *Cluster) syncStatefulSet() error {
 		}
 	}
 
-	// restart instances if requiredy
+	// restart instances if required
 	remainingPods := make([]*v1.Pod, 0)
 	skipRole := Master
 	if restartMasterFirst {
@@ -572,11 +573,18 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
 			parametersToSet[desiredOption] = desiredValue
-			if util.SliceContains(requireMasterRestartWhenDecreased, desiredOption) && (effectiveValue > desiredValue) {
-				restartMaster = append(restartMaster, true)
-			} else {
-				restartMaster = append(restartMaster, false)
+			if util.SliceContains(requireMasterRestartWhenDecreased, desiredOption) {
+				effectiveValueNum, errConv := strconv.Atoi(effectiveValue)
+				desiredValueNum, errConv2 := strconv.Atoi(desiredValue)
+				if errConv != nil || errConv2 != nil {
+					continue
+				}
+				if effectiveValueNum > desiredValueNum {
+					restartMaster = append(restartMaster, true)
+					continue
+				}
 			}
+			restartMaster = append(restartMaster, false)
 		}
 	}
 
