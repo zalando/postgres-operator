@@ -1066,8 +1066,8 @@ class EndToEndTestCase(unittest.TestCase):
         k8s = self.k8s
         leader = k8s.get_cluster_leader_pod()
         replica = k8s.get_cluster_replica_pod()
-        labels = 'application=spilo,cluster-name=acid-minimal-cluster,spilo-role=master'
-        creationTimestamp = leader.metadata.creation_timestamp
+        masterCreationTimestamp = leader.metadata.creation_timestamp
+        replicaCreationTimestamp = replica.metadata.creation_timestamp
         new_max_connections_value = "50"
 
         # adjust Postgres config
@@ -1116,8 +1116,18 @@ class EndToEndTestCase(unittest.TestCase):
                             "synchronous_mode not updated")
                 return True
 
+            # check if Patroni config has been updated
             self.eventuallyTrue(compare_config, "Postgres config not applied")
 
+            # make sure that pods were not recreated
+            leader = k8s.get_cluster_leader_pod()
+            replica = k8s.get_cluster_replica_pod()
+            self.assertEqual(masterCreationTimestamp, leader.metadata.creation_timestamp,
+                            "Master pod creation timestamp is updated")
+            self.assertEqual(replicaCreationTimestamp, replica.metadata.creation_timestamp,
+                            "Master pod creation timestamp is updated")
+
+            # query max_connections setting
             setting_query = """
                SELECT setting
                  FROM pg_settings
@@ -1128,11 +1138,16 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyNotEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
                 "Expected max_connections not to be updated on replica since Postgres was restarted there first", 10, 5)
 
-            # make sure that pod wasn't recreated
-            self.assertEqual(creationTimestamp, leader.metadata.creation_timestamp,
-                            "Master pod creation timestamp is updated")
+            # the next sync should restart the replica because it has pending_restart flag set
+            # force next sync by deleting the operator pod
+            k8s.delete_operator_pod()
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+                "New max_connections setting not applied on replica", 10, 5)
 
             # decrease max_connections again
+            # this time restart will be correct and new value should appear on both instances
             lower_max_connections_value = "30"
             pg_patch_max_connections = {
                 "spec": {
@@ -1149,12 +1164,14 @@ class EndToEndTestCase(unittest.TestCase):
 
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
+            # check Patroni config again
             pg_patch_config["spec"]["postgresql"]["parameters"]["max_connections"] = lower_max_connections_value
             self.eventuallyTrue(compare_config, "Postgres config not applied")
 
-            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+            # and query max_connections setting again
+            self.eventuallyEqual(lambda: self.query_database(leader.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
                 "Previous max_connections setting not applied on master", 10, 5)
-            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], new_max_connections_value,
+            self.eventuallyEqual(lambda: self.query_database(replica.metadata.name, "postgres", setting_query)[0], lower_max_connections_value,
                 "Previous max_connections setting not applied on replica", 10, 5)
 
         except timeout_decorator.TimeoutError:
