@@ -85,6 +85,7 @@ class EndToEndTestCase(unittest.TestCase):
 
         # set a single K8s wrapper for all tests
         k8s = cls.k8s = K8s()
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
 
         # remove existing local storage class and create hostpath class
         try:
@@ -150,8 +151,8 @@ class EndToEndTestCase(unittest.TestCase):
         result = k8s.create_with_kubectl("manifests/minimal-postgres-manifest.yaml")
         print('stdout: {}, stderr: {}'.format(result.stdout, result.stderr))
         try:
-            k8s.wait_for_pod_start('spilo-role=master')
-            k8s.wait_for_pod_start('spilo-role=replica')
+            k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
@@ -1599,6 +1600,7 @@ class EndToEndTestCase(unittest.TestCase):
            Toggle pod anti affinty to distribute pods accross nodes (replica in particular).
         '''
         k8s = self.k8s
+        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
         failover_targets = self.get_failover_targets(master_node, replica_nodes)
 
         # enable pod anti affintiy in config map which should trigger movement of replica
@@ -1617,8 +1619,8 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_disable_antiaffinity, "disable antiaffinity")
-        k8s.wait_for_pod_start('spilo-role=master')
-        k8s.wait_for_pod_start('spilo-role=replica')
+        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
+        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
         return True
 
     def list_databases(self, pod_name):
