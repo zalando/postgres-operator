@@ -273,10 +273,9 @@ func (c *Cluster) syncPodDisruptionBudget(isUpdate bool) error {
 
 func (c *Cluster) syncStatefulSet() error {
 	var (
-		restartTTL         uint32
+		restartWait        uint32
 		restartMasterFirst bool
 	)
-
 	podsToRecreate := make([]v1.Pod, 0)
 	switchoverCandidates := make([]spec.NamespacedName, 0)
 
@@ -410,6 +409,7 @@ func (c *Cluster) syncStatefulSet() error {
 			c.logger.Warningf("could not get Postgres config from pod %s: %v", podName, err)
 			continue
 		}
+		restartWait = patroniConfig.LoopWait
 
 		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
 		// do not attempt a restart
@@ -420,8 +420,7 @@ func (c *Cluster) syncStatefulSet() error {
 				continue
 			}
 			// it could take up to LoopWait to apply the config
-			time.Sleep(time.Duration(patroniConfig.LoopWait)*time.Second + time.Second*2)
-			restartTTL = patroniConfig.TTL
+			time.Sleep(time.Duration(restartWait)*time.Second + time.Second*2)
 			break
 		}
 	}
@@ -438,19 +437,13 @@ func (c *Cluster) syncStatefulSet() error {
 			remainingPods = append(remainingPods, &pods[i])
 			continue
 		}
-		c.restartInstance(&pod)
-		if len(pods) > 1 {
-			time.Sleep(time.Duration(restartTTL) * time.Second)
-		}
+		c.restartInstance(&pod, restartWait)
 	}
 
 	// in most cases only the master should be left to restart
 	if len(remainingPods) > 0 {
 		for _, remainingPod := range remainingPods {
-			c.restartInstance(remainingPod)
-			if len(remainingPods) > 1 {
-				time.Sleep(time.Duration(restartTTL) * time.Second)
-			}
+			c.restartInstance(remainingPod, restartWait)
 		}
 	}
 
@@ -467,7 +460,7 @@ func (c *Cluster) syncStatefulSet() error {
 	return nil
 }
 
-func (c *Cluster) restartInstance(pod *v1.Pod) {
+func (c *Cluster) restartInstance(pod *v1.Pod, restartWait uint32) {
 	podName := util.NameFromMeta(pod.ObjectMeta)
 	role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
@@ -485,6 +478,7 @@ func (c *Cluster) restartInstance(pod *v1.Pod) {
 			c.logger.Warningf("could not restart Postgres server within %s pod %s: %v", role, podName, err)
 			return
 		}
+		time.Sleep(time.Duration(restartWait) * time.Second)
 		c.eventRecorder.Event(c.GetReference(), v1.EventTypeNormal, "Update", fmt.Sprintf("Postgres server restart done for %s pod %s", role, pod.Name))
 	}
 }
