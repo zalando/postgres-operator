@@ -238,16 +238,12 @@ func (p *Patroni) Restart(server *v1.Pod) error {
 	if err != nil {
 		return err
 	}
-	memberData, err := p.GetMemberData(server)
-	if err != nil {
+	if err := p.httpPostOrPatch(http.MethodPost, apiURLString+restartPath, buf); err != nil {
 		return err
 	}
+	p.logger.Infof("Postgres server successfuly restarted in pod %s", server.Name)
 
-	// do restart only when it is pending
-	if !memberData.PendingRestart {
-		return nil
-	}
-	return p.httpPostOrPatch(http.MethodPost, apiURLString+restartPath, buf)
+	return nil
 }
 
 // GetMemberData read member data from patroni API

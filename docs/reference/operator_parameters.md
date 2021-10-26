@@ -264,7 +264,7 @@ configuration they are grouped under the `kubernetes` key.
   [admin docs](../administrator.md#pod-disruption-budget) for more information.
   Default is true.
 
-* **enable_cross_namespace_secrets**
+* **enable_cross_namespace_secret**
   To allow secrets in a different namespace other than the Postgres cluster
   namespace. Once enabled, specify the namespace in the user name under the
   `users` section in the form `{namespace}.{username}`. The default is `false`.
