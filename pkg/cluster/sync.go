@@ -420,6 +420,7 @@ func (c *Cluster) syncStatefulSet() error {
 		// empty config probably means cluster is not fully initialized yet, e.g. restoring from backup
 		// do not attempt a restart
 		if !reflect.DeepEqual(patroniConfig, emptyPatroniConfig) || len(pgParameters) > 0 {
+			// compare config returned from Patroni with what is specified in the manifest
 			restartMasterFirst, err = c.checkAndSetGlobalPostgreSQLConfiguration(&pod, patroniConfig, c.Spec.Patroni, pgParameters, c.Spec.Parameters)
 
 			if err != nil {
@@ -568,7 +569,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 		configToSet["slots"] = slotsToSet
 	}
 
-	// compare parameters under postgresql section with c.Spec.Postgresql.Parameters from manifest
+	// compare effective and desired parameters under postgresql section in Patroni config
 	for desiredOption, desiredValue := range desiredPgParameters {
 		effectiveValue := effectivePgParameters[desiredOption]
 		if isBootstrapOnlyParameter(desiredOption) && (effectiveValue != desiredValue) {
@@ -611,7 +612,7 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, effectiv
 	c.logger.Debugf("patching Postgres config via Patroni API on pod %s with following options: %s",
 		podName, configToSetJson)
 	if err = c.patroni.SetConfig(pod, configToSet); err != nil {
-		return requiresMasterRestart, fmt.Errorf("could not patch postgres parameters with a pod %s: %v", podName, err)
+		return requiresMasterRestart, fmt.Errorf("could not patch postgres parameters within pod %s: %v", podName, err)
 	}
 
 	return requiresMasterRestart, nil
