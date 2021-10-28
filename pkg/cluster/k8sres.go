@@ -301,16 +301,21 @@ PatroniInitDBParams:
 	return string(res), err
 }
 
-func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (local, bootstrap map[string]string) {
+func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]acidv1.Parameter) (local, bootstrap map[string]string) {
 	local = make(map[string]string)
 	bootstrap = make(map[string]string)
-	for param, val := range parameters {
-		if isBootstrapOnlyParameter(param) {
-			bootstrap[param] = val
-		} else {
-			local[param] = val
+
+	for name, attr := range parameters {
+		switch attr.Type {
+		default:
+			fallthrough
+		case constants.PatroniLocalPGParameterName:
+			local[name] = attr.Value
+		case constants.PatroniBootstrapPGParameterName:
+			bootstrap[name] = attr.Value
 		}
 	}
+
 	return
 }
 
@@ -405,39 +410,6 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 	}
 
 	return []v1.Toleration{}
-}
-
-// isBootstrapOnlyParameter checks against special Patroni bootstrap parameters.
-// Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
-// See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
-func isBootstrapOnlyParameter(param string) bool {
-	params := map[string]bool{
-		"archive_command":                  false,
-		"shared_buffers":                   false,
-		"logging_collector":                false,
-		"log_destination":                  false,
-		"log_directory":                    false,
-		"log_filename":                     false,
-		"log_file_mode":                    false,
-		"log_rotation_age":                 false,
-		"log_truncate_on_rotation":         false,
-		"ssl":                              false,
-		"ssl_ca_file":                      false,
-		"ssl_crl_file":                     false,
-		"ssl_cert_file":                    false,
-		"ssl_key_file":                     false,
-		"shared_preload_libraries":         false,
-		"bg_mon.listen_address":            false,
-		"bg_mon.history_buckets":           false,
-		"pg_stat_statements.track_utility": false,
-		"extwlist.extensions":              false,
-		"extwlist.custom_path":             false,
-	}
-	result, ok := params[param]
-	if !ok {
-		result = true
-	}
-	return result
 }
 
 func generateVolumeMounts(volume acidv1.Volume) []v1.VolumeMount {
@@ -757,9 +729,6 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 	} else {
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_LABELS", Value: string(clusterLabels)})
 	}
-	if spiloConfiguration != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "SPILO_CONFIGURATION", Value: spiloConfiguration})
-	}
 
 	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
@@ -811,6 +780,11 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+	}
+
+
+	if spiloConfiguration != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "SPILO_CONFIGURATION", Value: spiloConfiguration})
 	}
 
 	return envVars

@@ -131,17 +131,17 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	expectedValuesGSBucket := []ExpectedValue{
-		ExpectedValue{
+		{
 			envIndex:       15,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
-		ExpectedValue{
+		{
 			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
-		ExpectedValue{
+		{
 			envIndex:       17,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
@@ -149,22 +149,22 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 	}
 
 	expectedValuesGCPCreds := []ExpectedValue{
-		ExpectedValue{
+		{
 			envIndex:       15,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
-		ExpectedValue{
+		{
 			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
-		ExpectedValue{
+		{
 			envIndex:       17,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
-		ExpectedValue{
+		{
 			envIndex:       18,
 			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
 			envVarValue:    "some_path_to_credentials",
@@ -924,9 +924,9 @@ func TestNodeAffinity(t *testing.T) {
 	nodeAff := &v1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				v1.NodeSelectorTerm{
+				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
-						v1.NodeSelectorRequirement{
+						{
 							Key:      "test-label",
 							Operator: v1.NodeSelectorOpIn,
 							Values: []string{
@@ -999,7 +999,7 @@ func TestTLS(t *testing.T) {
 			TLS: &acidv1.TLSDescription{
 				SecretName: tlsSecretName, CAFile: "ca.crt"},
 			AdditionalVolumes: []acidv1.AdditionalVolume{
-				acidv1.AdditionalVolume{
+				{
 					Name:      tlsSecretName,
 					MountPath: mountPath,
 					VolumeSource: v1.VolumeSource{
@@ -1209,8 +1209,8 @@ func TestSidecars(t *testing.T) {
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
 			PgVersion: "12.1",
-			Parameters: map[string]string{
-				"max_connections": "100",
+			Parameters: map[string]acidv1.Parameter{
+				"max_connections": {Type: "bootstrap", Value: "100"},
 			},
 		},
 		TeamID: "myapp", NumberOfInstances: 1,
@@ -1222,17 +1222,17 @@ func TestSidecars(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "overwrite-image",
 			},
@@ -1258,11 +1258,11 @@ func TestSidecars(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -1317,7 +1317,7 @@ func TestSidecars(t *testing.T) {
 		},
 	}
 	mounts := []v1.VolumeMount{
-		v1.VolumeMount{
+		{
 			Name:      "pgdata",
 			MountPath: "/home/postgres/pgdata",
 		},
@@ -1397,17 +1397,17 @@ func TestGenerateService(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "overwrite-image",
 			},
@@ -1434,11 +1434,11 @@ func TestGenerateService(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},

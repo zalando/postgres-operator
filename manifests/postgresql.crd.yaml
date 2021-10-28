@@ -368,7 +368,17 @@ spec:
                   parameters:
                     type: object
                     additionalProperties:
-                      type: string
+                      type: object
+                      required:
+                        - value
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                            - "local"
+                            - "bootstrap"
+                        value:
+                          type: string
               preparedDatabases:
                 type: object
                 additionalProperties:
