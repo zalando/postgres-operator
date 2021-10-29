@@ -52,12 +52,18 @@ function gcs_upload {
     gsutil -o Credentials:gs_service_key_file=$LOGICAL_BACKUP_GOOGLE_APPLICATION_CREDENTIALS cp - "$PATH_TO_BACKUP"
 }
 
+function az_upload {
+    PATH_TO_BACKUP="test/logical_backups/"$(date +%s).sql.gz
+
+    az storage blob upload --file "$1" --account-name "$LOGICAL_BACKUP_STORAGE_ACCOUNT_NAME" --account-key "$LOGICAL_BACKUP_STORAGE_ACCOUNT_KEY" -c "$LOGICAL_BACKUP_STORAGE_CONTAINER" -n "$PATH_TO_BACKUP"
+}
+
 function upload {
     case $LOGICAL_BACKUP_PROVIDER in
         "gcs")
             gcs_upload
             ;;
-        *)
+        "aws")
             aws_upload $(($(estimate_size) / DUMP_SIZE_COEFF))
             ;;
     esac
@@ -110,8 +116,13 @@ for search in "${search_strategy[@]}"; do
 done
 
 set -x
-dump | compress | upload
-[[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
-set +x
+if [ "$LOGICAL_BACKUP_PROVIDER" == "az" ]; then
+    dump | compress > /tmp/azure-backup.sql.gz
+    az_upload /tmp/azure-backup.sql.gz
+else
+    dump | compress | upload
+    [[ ${PIPESTATUS[0]} != 0 || ${PIPESTATUS[1]} != 0 || ${PIPESTATUS[2]} != 0 ]] && (( ERRORCOUNT += 1 ))
+    set +x
 
-exit $ERRORCOUNT
+    exit $ERRORCOUNT
+fi
