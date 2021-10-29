@@ -9,11 +9,13 @@ import (
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/constants"
 )
 
 const (
 	createUserSQL        = `SET LOCAL synchronous_commit = 'local'; CREATE ROLE "%s" %s %s;`
 	alterUserSQL         = `ALTER ROLE "%s" %s`
+	alterUserRenameSQL   = `ALTER ROLE "%s" RENAME TO "%s%s"`
 	alterRoleResetAllSQL = `ALTER ROLE "%s" RESET ALL`
 	alterRoleSetSQL      = `ALTER ROLE "%s" SET %s TO %s`
 	grantToUserSQL       = `GRANT %s TO "%s"`
@@ -29,6 +31,7 @@ const (
 // (except for the NOLOGIN). TODO: process other NOflags, i.e. NOSUPERUSER correctly.
 type DefaultUserSyncStrategy struct {
 	PasswordEncryption string
+	RoleDeletionSuffix string
 }
 
 // ProduceSyncRequests figures out the types of changes that need to happen with the given users.
@@ -36,8 +39,11 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 	newUsers spec.PgUserMap) []spec.PgSyncUserRequest {
 
 	var reqs []spec.PgSyncUserRequest
-	// No existing roles are deleted or stripped of role memebership/flags
 	for name, newUser := range newUsers {
+		// do not create user that exists in DB with deletion suffix
+		if newUser.Deleted {
+			continue
+		}
 		dbUser, exists := dbUsers[name]
 		if !exists {
 			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserAdd, User: newUser})
@@ -70,6 +76,25 @@ func (strategy DefaultUserSyncStrategy) ProduceSyncRequests(dbUsers spec.PgUserM
 		}
 	}
 
+	// No existing roles are deleted or stripped of role membership/flags
+	// but team roles will be renamed and denied from LOGIN
+	for name, dbUser := range dbUsers {
+		if _, exists := newUsers[name]; !exists {
+			// toggle LOGIN flag based on role deletion
+			userFlags := make([]string, len(dbUser.Flags))
+			userFlags = append(userFlags, dbUser.Flags...)
+			if dbUser.Deleted {
+				dbUser.Flags = util.StringSliceReplaceElement(dbUser.Flags, constants.RoleFlagNoLogin, constants.RoleFlagLogin)
+			} else {
+				dbUser.Flags = util.StringSliceReplaceElement(dbUser.Flags, constants.RoleFlagLogin, constants.RoleFlagNoLogin)
+			}
+			if !util.IsEqualIgnoreOrder(userFlags, dbUser.Flags) {
+				reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGsyncUserAlter, User: dbUser})
+			}
+
+			reqs = append(reqs, spec.PgSyncUserRequest{Kind: spec.PGSyncUserRename, User: dbUser})
+		}
+	}
 	return reqs
 }
 
@@ -93,6 +118,11 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 			if err := strategy.alterPgUserSet(request.User, db); err != nil {
 				reqretries = append(reqretries, request)
 				errors = append(errors, fmt.Sprintf("could not set custom user %q parameters: %v", request.User.Name, err))
+			}
+		case spec.PGSyncUserRename:
+			if err := strategy.alterPgUserRename(request.User, db); err != nil {
+				reqretries = append(reqretries, request)
+				errors = append(errors, fmt.Sprintf("could not rename custom user %q: %v", request.User.Name, err))
 			}
 		default:
 			return fmt.Errorf("unrecognized operation: %v", request.Kind)
@@ -119,7 +149,24 @@ func (strategy DefaultUserSyncStrategy) alterPgUserSet(user spec.PgUser, db *sql
 	queries := produceAlterRoleSetStmts(user)
 	query := fmt.Sprintf(doBlockStmt, strings.Join(queries, ";"))
 	if _, err := db.Exec(query); err != nil {
-		return fmt.Errorf("dB error: %v, query: %s", err, query)
+		return err
+	}
+	return nil
+}
+
+func (strategy DefaultUserSyncStrategy) alterPgUserRename(user spec.PgUser, db *sql.DB) error {
+	var query string
+
+	// append or trim deletion suffix depending if the user has the suffix or not
+	if user.Deleted {
+		newName := strings.TrimSuffix(user.Name, strategy.RoleDeletionSuffix)
+		query = fmt.Sprintf(alterUserRenameSQL, user.Name, newName, "")
+	} else {
+		query = fmt.Sprintf(alterUserRenameSQL, user.Name, user.Name, strategy.RoleDeletionSuffix)
+	}
+
+	if _, err := db.Exec(query); err != nil {
+		return err
 	}
 	return nil
 }
@@ -146,7 +193,7 @@ func (strategy DefaultUserSyncStrategy) createPgUser(user spec.PgUser, db *sql.D
 	query := fmt.Sprintf(createUserSQL, user.Name, strings.Join(userFlags, " "), userPassword)
 
 	if _, err := db.Exec(query); err != nil { // TODO: Try several times
-		return fmt.Errorf("dB error: %v, query: %s", err, query)
+		return err
 	}
 
 	if len(user.Parameters) > 0 {
@@ -174,7 +221,7 @@ func (strategy DefaultUserSyncStrategy) alterPgUser(user spec.PgUser, db *sql.DB
 		query := fmt.Sprintf(doBlockStmt, strings.Join(resultStmt, ";"))
 
 		if _, err := db.Exec(query); err != nil { // TODO: Try several times
-			return fmt.Errorf("dB error: %v query %s", err, query)
+			return err
 		}
 	}
 

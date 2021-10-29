@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/r3labs/diff"
@@ -60,7 +61,7 @@ func needMasterConnectionPooler(spec *acidv1.PostgresSpec) bool {
 }
 
 func needMasterConnectionPoolerWorker(spec *acidv1.PostgresSpec) bool {
-	return (nil != spec.EnableConnectionPooler && *spec.EnableConnectionPooler) ||
+	return (spec.EnableConnectionPooler != nil && *spec.EnableConnectionPooler) ||
 		(spec.ConnectionPooler != nil && spec.EnableConnectionPooler == nil)
 }
 
@@ -114,7 +115,7 @@ func (c *Cluster) createConnectionPooler(LookupFunction InstallFunction) (SyncRe
 	c.setProcessName("creating connection pooler")
 
 	//this is essentially sync with nil as oldSpec
-	if reason, err := c.syncConnectionPooler(nil, &c.Postgresql, LookupFunction); err != nil {
+	if reason, err := c.syncConnectionPooler(&acidv1.Postgresql{}, &c.Postgresql, LookupFunction); err != nil {
 		return reason, err
 	}
 	return reason, nil
@@ -140,11 +141,15 @@ func (c *Cluster) createConnectionPooler(LookupFunction InstallFunction) (SyncRe
 // RESERVE_SIZE is how many additional connections to allow for a pooler.
 func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	spec := &c.Spec
+	connectionPoolerSpec := spec.ConnectionPooler
+	if connectionPoolerSpec == nil {
+		connectionPoolerSpec = &acidv1.ConnectionPooler{}
+	}
 	effectiveMode := util.Coalesce(
-		spec.ConnectionPooler.Mode,
+		connectionPoolerSpec.Mode,
 		c.OpConfig.ConnectionPooler.Mode)
 
-	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
+	numberOfInstances := connectionPoolerSpec.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
 			c.OpConfig.ConnectionPooler.NumberOfInstances,
@@ -152,7 +157,7 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 	}
 
 	effectiveMaxDBConn := util.CoalesceInt32(
-		spec.ConnectionPooler.MaxDBConnections,
+		connectionPoolerSpec.MaxDBConnections,
 		c.OpConfig.ConnectionPooler.MaxDBConnections)
 
 	if effectiveMaxDBConn == nil {
@@ -201,17 +206,21 @@ func (c *Cluster) getConnectionPoolerEnvVars() []v1.EnvVar {
 func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 	*v1.PodTemplateSpec, error) {
 	spec := &c.Spec
+	connectionPoolerSpec := spec.ConnectionPooler
+	if connectionPoolerSpec == nil {
+		connectionPoolerSpec = &acidv1.ConnectionPooler{}
+	}
 	gracePeriod := int64(c.OpConfig.PodTerminateGracePeriod.Seconds())
 	resources, err := generateResourceRequirements(
-		spec.ConnectionPooler.Resources,
+		connectionPoolerSpec.Resources,
 		makeDefaultConnectionPoolerResources(&c.OpConfig))
 
 	effectiveDockerImage := util.Coalesce(
-		spec.ConnectionPooler.DockerImage,
+		connectionPoolerSpec.DockerImage,
 		c.OpConfig.ConnectionPooler.Image)
 
 	effectiveSchema := util.Coalesce(
-		spec.ConnectionPooler.Schema,
+		connectionPoolerSpec.Schema,
 		c.OpConfig.ConnectionPooler.Schema)
 
 	if err != nil {
@@ -220,7 +229,7 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 
 	secretSelector := func(key string) *v1.SecretKeySelector {
 		effectiveUser := util.Coalesce(
-			spec.ConnectionPooler.User,
+			connectionPoolerSpec.User,
 			c.OpConfig.ConnectionPooler.User)
 
 		return &v1.SecretKeySelector{
@@ -285,6 +294,8 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		},
 	}
 
+	tolerationsSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
+
 	podTemplate := &v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      c.connectionPoolerLabels(role, true).MatchLabels,
@@ -294,10 +305,16 @@ func (c *Cluster) generateConnectionPoolerPodTemplate(role PostgresRole) (
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers:                    []v1.Container{poolerContainer},
-			// TODO: add tolerations to scheduler pooler on the same node
-			// as database
-			//Tolerations:                   *tolerationsSpec,
+			Tolerations:                   tolerationsSpec,
 		},
+	}
+
+	nodeAffinity := nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity)
+	if c.OpConfig.EnablePodAntiAffinity {
+		labelsSet := labels.Set(c.connectionPoolerLabels(role, false).MatchLabels)
+		podTemplate.Spec.Affinity = generatePodAffinity(labelsSet, c.OpConfig.PodAntiAffinityTopologyKey, nodeAffinity)
+	} else if nodeAffinity != nil {
+		podTemplate.Spec.Affinity = nodeAffinity
 	}
 
 	return podTemplate, nil
@@ -313,12 +330,13 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 	// default values, initialize it to an empty structure. It could be done
 	// anywhere, but here is the earliest common entry point between sync and
 	// create code, so init here.
-	if spec.ConnectionPooler == nil {
-		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
+	connectionPoolerSpec := spec.ConnectionPooler
+	if connectionPoolerSpec == nil {
+		connectionPoolerSpec = &acidv1.ConnectionPooler{}
 	}
 	podTemplate, err := c.generateConnectionPoolerPodTemplate(connectionPooler.Role)
 
-	numberOfInstances := spec.ConnectionPooler.NumberOfInstances
+	numberOfInstances := connectionPoolerSpec.NumberOfInstances
 	if numberOfInstances == nil {
 		numberOfInstances = util.CoalesceInt32(
 			c.OpConfig.ConnectionPooler.NumberOfInstances,
@@ -363,16 +381,6 @@ func (c *Cluster) generateConnectionPoolerDeployment(connectionPooler *Connectio
 func (c *Cluster) generateConnectionPoolerService(connectionPooler *ConnectionPoolerObjects) *v1.Service {
 
 	spec := &c.Spec
-	// there are two ways to enable connection pooler, either to specify a
-	// connectionPooler section or enableConnectionPooler. In the second case
-	// spec.connectionPooler will be nil, so to make it easier to calculate
-	// default values, initialize it to an empty structure. It could be done
-	// anywhere, but here is the earliest common entry point between sync and
-	// create code, so init here.
-	if spec.ConnectionPooler == nil {
-		spec.ConnectionPooler = &acidv1.ConnectionPooler{}
-	}
-
 	serviceSpec := v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{
@@ -420,9 +428,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 
 	// Clean up the deployment object. If deployment resource we've remembered
 	// is somehow empty, try to delete based on what would we generate
-	var deployment *appsv1.Deployment
-	deployment = c.ConnectionPooler[role].Deployment
-
+	deployment := c.ConnectionPooler[role].Deployment
 	policy := metav1.DeletePropagationForeground
 	options := metav1.DeleteOptions{PropagationPolicy: &policy}
 
@@ -445,8 +451,7 @@ func (c *Cluster) deleteConnectionPooler(role PostgresRole) (err error) {
 	}
 
 	// Repeat the same for the service object
-	var service *v1.Service
-	service = c.ConnectionPooler[role].Service
+	service := c.ConnectionPooler[role].Service
 	if service == nil {
 		c.logger.Debugf("no connection pooler service object to delete")
 	} else {
@@ -566,7 +571,7 @@ func needSyncConnectionPoolerSpecs(oldSpec, newSpec *acidv1.ConnectionPooler, lo
 
 // Check if we need to synchronize connection pooler deployment due to new
 // defaults, that are different from what we see in the DeploymentSpec
-func needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment) (sync bool, reasons []string) {
+func (c *Cluster) needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPooler, deployment *appsv1.Deployment) (sync bool, reasons []string) {
 
 	reasons = []string{}
 	sync = false
@@ -619,14 +624,14 @@ func needSyncConnectionPoolerDefaults(Config *Config, spec *acidv1.ConnectionPoo
 			ref := env.ValueFrom.SecretKeyRef.LocalObjectReference
 			secretName := Config.OpConfig.SecretNameTemplate.Format(
 				"username", strings.Replace(config.User, "_", "-", -1),
-				"cluster", deployment.ClusterName,
+				"cluster", c.Name,
 				"tprkind", acidv1.PostgresCRDResourceKind,
 				"tprgroup", acidzalando.GroupName)
 
 			if ref.Name != secretName {
 				sync = true
-				msg := fmt.Sprintf("pooler user is different (having %s, required %s)",
-					ref.Name, config.User)
+				msg := fmt.Sprintf("pooler user and secret are different (having %s, required %s)",
+					ref.Name, secretName)
 				reasons = append(reasons, msg)
 			}
 		}
@@ -663,12 +668,14 @@ func makeDefaultConnectionPoolerResources(config *config.Config) acidv1.Resource
 
 func logPoolerEssentials(log *logrus.Entry, oldSpec, newSpec *acidv1.Postgresql) {
 	var v []string
-
 	var input []*bool
+
+	newMasterConnectionPoolerEnabled := needMasterConnectionPoolerWorker(&newSpec.Spec)
 	if oldSpec == nil {
-		input = []*bool{nil, nil, newSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler}
+		input = []*bool{nil, nil, &newMasterConnectionPoolerEnabled, newSpec.Spec.EnableReplicaConnectionPooler}
 	} else {
-		input = []*bool{oldSpec.Spec.EnableConnectionPooler, oldSpec.Spec.EnableReplicaConnectionPooler, newSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableReplicaConnectionPooler}
+		oldMasterConnectionPoolerEnabled := needMasterConnectionPoolerWorker(&oldSpec.Spec)
+		input = []*bool{&oldMasterConnectionPoolerEnabled, oldSpec.Spec.EnableReplicaConnectionPooler, &newMasterConnectionPoolerEnabled, newSpec.Spec.EnableReplicaConnectionPooler}
 	}
 
 	for _, b := range input {
@@ -679,25 +686,16 @@ func logPoolerEssentials(log *logrus.Entry, oldSpec, newSpec *acidv1.Postgresql)
 		}
 	}
 
-	log.Debugf("syncing connection pooler from (%v, %v) to (%v, %v)", v[0], v[1], v[2], v[3])
+	log.Debugf("syncing connection pooler (master, replica) from (%v, %v) to (%v, %v)", v[0], v[1], v[2], v[3])
 }
 
 func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, LookupFunction InstallFunction) (SyncReason, error) {
 
 	var reason SyncReason
 	var err error
-	var newNeedConnectionPooler, oldNeedConnectionPooler bool
-	oldNeedConnectionPooler = false
+	var connectionPoolerNeeded bool
 
-	if oldSpec == nil {
-		oldSpec = &acidv1.Postgresql{
-			Spec: acidv1.PostgresSpec{
-				ConnectionPooler: &acidv1.ConnectionPooler{},
-			},
-		}
-	}
-
-	needSync, _ := needSyncConnectionPoolerSpecs(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler, c.logger)
+	needSync := !reflect.DeepEqual(oldSpec.Spec.ConnectionPooler, newSpec.Spec.ConnectionPooler)
 	masterChanges, err := diff.Diff(oldSpec.Spec.EnableConnectionPooler, newSpec.Spec.EnableConnectionPooler)
 	if err != nil {
 		c.logger.Error("Error in getting diff of master connection pooler changes")
@@ -707,15 +705,14 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 		c.logger.Error("Error in getting diff of replica connection pooler changes")
 	}
 
-	// skip pooler sync only
-	// 1. if there is no diff in spec, AND
-	// 2. if connection pooler is already there and is also required as per newSpec
-	//
-	// Handling the case when connectionPooler is not there but it is required
+	// skip pooler sync when theres no diff or it's deactivated
+	// but, handling the case when connectionPooler is not there but it is required
 	// as per spec, hence do not skip syncing in that case, even though there
 	// is no diff in specs
 	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0) &&
-		(c.ConnectionPooler != nil && (needConnectionPooler(&newSpec.Spec))) {
+		((!needConnectionPooler(&newSpec.Spec) && (c.ConnectionPooler == nil || !needConnectionPooler(&oldSpec.Spec))) ||
+			(c.ConnectionPooler != nil && needConnectionPooler(&newSpec.Spec) &&
+				(c.ConnectionPooler[Master].LookupFunction || c.ConnectionPooler[Replica].LookupFunction))) {
 		c.logger.Debugln("syncing pooler is not required")
 		return nil, nil
 	}
@@ -726,15 +723,9 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	for _, role := range [2]PostgresRole{Master, Replica} {
 
 		if role == Master {
-			newNeedConnectionPooler = needMasterConnectionPoolerWorker(&newSpec.Spec)
-			if oldSpec != nil {
-				oldNeedConnectionPooler = needMasterConnectionPoolerWorker(&oldSpec.Spec)
-			}
+			connectionPoolerNeeded = needMasterConnectionPoolerWorker(&newSpec.Spec)
 		} else {
-			newNeedConnectionPooler = needReplicaConnectionPoolerWorker(&newSpec.Spec)
-			if oldSpec != nil {
-				oldNeedConnectionPooler = needReplicaConnectionPoolerWorker(&oldSpec.Spec)
-			}
+			connectionPoolerNeeded = needReplicaConnectionPoolerWorker(&newSpec.Spec)
 		}
 
 		// if the call is via createConnectionPooler, then it is required to initialize
@@ -747,31 +738,29 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 				Deployment:     nil,
 				Service:        nil,
 				Name:           c.connectionPoolerName(role),
-				ClusterName:    c.ClusterName,
+				ClusterName:    c.Name,
 				Namespace:      c.Namespace,
 				LookupFunction: false,
 				Role:           role,
 			}
 		}
 
-		if newNeedConnectionPooler {
+		if connectionPoolerNeeded {
 			// Try to sync in any case. If we didn't needed connection pooler before,
 			// it means we want to create it. If it was already present, still sync
 			// since it could happen that there is no difference in specs, and all
 			// the resources are remembered, but the deployment was manually deleted
 			// in between
 
-			// in this case also do not forget to install lookup function as for
-			// creating cluster
-			if !oldNeedConnectionPooler || !c.ConnectionPooler[role].LookupFunction {
-				newConnectionPooler := newSpec.Spec.ConnectionPooler
-
+			// in this case also do not forget to install lookup function
+			if !c.ConnectionPooler[role].LookupFunction {
+				connectionPooler := c.Spec.ConnectionPooler
 				specSchema := ""
 				specUser := ""
 
-				if newConnectionPooler != nil {
-					specSchema = newConnectionPooler.Schema
-					specUser = newConnectionPooler.User
+				if connectionPooler != nil {
+					specSchema = connectionPooler.Schema
+					specUser = connectionPooler.User
 				}
 
 				schema := util.Coalesce(
@@ -782,9 +771,10 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 					specUser,
 					c.OpConfig.ConnectionPooler.User)
 
-				if err = LookupFunction(schema, user, role); err != nil {
+				if err = LookupFunction(schema, user); err != nil {
 					return NoSync, err
 				}
+				c.ConnectionPooler[role].LookupFunction = true
 			}
 
 			if reason, err = c.syncConnectionPoolerWorker(oldSpec, newSpec, role); err != nil {
@@ -803,8 +793,8 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 			}
 		}
 	}
-	if !needMasterConnectionPoolerWorker(&newSpec.Spec) &&
-		!needReplicaConnectionPoolerWorker(&newSpec.Spec) {
+	if (needMasterConnectionPoolerWorker(&oldSpec.Spec) || needReplicaConnectionPoolerWorker(&oldSpec.Spec)) &&
+		!needMasterConnectionPoolerWorker(&newSpec.Spec) && !needReplicaConnectionPoolerWorker(&newSpec.Spec) {
 		if err = c.deleteConnectionPoolerSecret(); err != nil {
 			c.logger.Warningf("could not remove connection pooler secret: %v", err)
 		}
@@ -869,8 +859,6 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			newConnectionPooler = &acidv1.ConnectionPooler{}
 		}
 
-		c.logger.Infof("old: %+v, new %+v", oldConnectionPooler, newConnectionPooler)
-
 		var specSync bool
 		var specReason []string
 
@@ -878,7 +866,7 @@ func (c *Cluster) syncConnectionPoolerWorker(oldSpec, newSpec *acidv1.Postgresql
 			specSync, specReason = needSyncConnectionPoolerSpecs(oldConnectionPooler, newConnectionPooler, c.logger)
 		}
 
-		defaultsSync, defaultsReason := needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
+		defaultsSync, defaultsReason := c.needSyncConnectionPoolerDefaults(&c.Config, newConnectionPooler, deployment)
 		reason := append(specReason, defaultsReason...)
 
 		if specSync || defaultsSync {

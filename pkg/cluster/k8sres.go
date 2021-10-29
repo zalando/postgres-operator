@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -31,13 +30,12 @@ import (
 )
 
 const (
-	pgBinariesLocationTemplate       = "/usr/lib/postgresql/%v/bin"
-	patroniPGBinariesParameterName   = "bin_dir"
-	patroniPGParametersParameterName = "parameters"
-	patroniPGHBAConfParameterName    = "pg_hba"
-	localHost                        = "127.0.0.1/32"
-	connectionPoolerContainer        = "connection-pooler"
-	pgPort                           = 5432
+	pgBinariesLocationTemplate     = "/usr/lib/postgresql/%v/bin"
+	patroniPGBinariesParameterName = "bin_dir"
+	patroniPGHBAConfParameterName  = "pg_hba"
+	localHost                      = "127.0.0.1/32"
+	connectionPoolerContainer      = "connection-pooler"
+	pgPort                         = 5432
 )
 
 type pgUser struct {
@@ -65,10 +63,6 @@ type pgBootstrap struct {
 type spiloConfiguration struct {
 	PgLocalConfiguration map[string]interface{} `json:"postgresql"`
 	Bootstrap            pgBootstrap            `json:"bootstrap"`
-}
-
-func (c *Cluster) containerName() string {
-	return "postgres"
 }
 
 func (c *Cluster) statefulSetName() string {
@@ -214,10 +208,10 @@ PatroniInitDBParams:
 	for _, k := range initdbOptionNames {
 		v := patroni.InitDB[k]
 		for i, defaultParam := range config.Bootstrap.Initdb {
-			switch defaultParam.(type) {
+			switch t := defaultParam.(type) {
 			case map[string]string:
 				{
-					for k1 := range defaultParam.(map[string]string) {
+					for k1 := range t {
 						if k1 == k {
 							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
 							continue PatroniInitDBParams
@@ -227,7 +221,7 @@ PatroniInitDBParams:
 			case string:
 				{
 					/* if the option already occurs in the list */
-					if defaultParam.(string) == v {
+					if t == v {
 						continue PatroniInitDBParams
 					}
 				}
@@ -265,7 +259,7 @@ PatroniInitDBParams:
 	if patroni.SynchronousMode {
 		config.Bootstrap.DCS.SynchronousMode = patroni.SynchronousMode
 	}
-	if patroni.SynchronousModeStrict != false {
+	if patroni.SynchronousModeStrict {
 		config.Bootstrap.DCS.SynchronousModeStrict = patroni.SynchronousModeStrict
 	}
 
@@ -282,11 +276,11 @@ PatroniInitDBParams:
 		local, bootstrap := getLocalAndBoostrapPostgreSQLParameters(pg.Parameters)
 
 		if len(local) > 0 {
-			config.PgLocalConfiguration[patroniPGParametersParameterName] = local
+			config.PgLocalConfiguration[constants.PatroniPGParametersParameterName] = local
 		}
 		if len(bootstrap) > 0 {
 			config.Bootstrap.DCS.PGBootstrapConfiguration = make(map[string]interface{})
-			config.Bootstrap.DCS.PGBootstrapConfiguration[patroniPGParametersParameterName] = bootstrap
+			config.Bootstrap.DCS.PGBootstrapConfiguration[constants.PatroniPGParametersParameterName] = bootstrap
 		}
 	}
 	// Patroni gives us a choice of writing pg_hba.conf to either the bootstrap section or to the local postgresql one.
@@ -320,21 +314,24 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (loca
 	return
 }
 
-func generateCapabilities(capabilities []string) v1.Capabilities {
+func generateCapabilities(capabilities []string) *v1.Capabilities {
 	additionalCapabilities := make([]v1.Capability, 0, len(capabilities))
 	for _, capability := range capabilities {
 		additionalCapabilities = append(additionalCapabilities, v1.Capability(strings.ToUpper(capability)))
 	}
-	return v1.Capabilities{
-		Add: additionalCapabilities,
+	if len(additionalCapabilities) > 0 {
+		return &v1.Capabilities{
+			Add: additionalCapabilities,
+		}
 	}
+	return nil
 }
 
 func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
 	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
 	}
-	nodeAffinityCopy := *&v1.NodeAffinity{}
+	nodeAffinityCopy := v1.NodeAffinity{}
 	if nodeAffinity != nil {
 		nodeAffinityCopy = *nodeAffinity.DeepCopy()
 	}
@@ -414,13 +411,33 @@ func tolerations(tolerationsSpec *[]v1.Toleration, podToleration map[string]stri
 // Those parameters must go to the bootstrap/dcs/postgresql/parameters section.
 // See http://patroni.readthedocs.io/en/latest/dynamic_configuration.html.
 func isBootstrapOnlyParameter(param string) bool {
-	return param == "max_connections" ||
-		param == "max_locks_per_transaction" ||
-		param == "max_worker_processes" ||
-		param == "max_prepared_transactions" ||
-		param == "wal_level" ||
-		param == "wal_log_hints" ||
-		param == "track_commit_timestamp"
+	params := map[string]bool{
+		"archive_command":                  false,
+		"shared_buffers":                   false,
+		"logging_collector":                false,
+		"log_destination":                  false,
+		"log_directory":                    false,
+		"log_filename":                     false,
+		"log_file_mode":                    false,
+		"log_rotation_age":                 false,
+		"log_truncate_on_rotation":         false,
+		"ssl":                              false,
+		"ssl_ca_file":                      false,
+		"ssl_crl_file":                     false,
+		"ssl_cert_file":                    false,
+		"ssl_key_file":                     false,
+		"shared_preload_libraries":         false,
+		"bg_mon.listen_address":            false,
+		"bg_mon.history_buckets":           false,
+		"pg_stat_statements.track_utility": false,
+		"extwlist.extensions":              false,
+		"extwlist.custom_path":             false,
+	}
+	result, ok := params[param]
+	if !ok {
+		result = true
+	}
+	return result
 }
 
 func generateVolumeMounts(volume acidv1.Volume) []v1.VolumeMount {
@@ -440,7 +457,8 @@ func generateContainer(
 	envVars []v1.EnvVar,
 	volumeMounts []v1.VolumeMount,
 	privilegedMode bool,
-	additionalPodCapabilities v1.Capabilities,
+	privilegeEscalationMode *bool,
+	additionalPodCapabilities *v1.Capabilities,
 ) *v1.Container {
 	return &v1.Container{
 		Name:            name,
@@ -464,10 +482,10 @@ func generateContainer(
 		VolumeMounts: volumeMounts,
 		Env:          envVars,
 		SecurityContext: &v1.SecurityContext{
-			AllowPrivilegeEscalation: &privilegedMode,
+			AllowPrivilegeEscalation: privilegeEscalationMode,
 			Privileged:               &privilegedMode,
 			ReadOnlyRootFilesystem:   util.False(),
-			Capabilities:             &additionalPodCapabilities,
+			Capabilities:             additionalPodCapabilities,
 		},
 	}
 }
@@ -738,7 +756,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		}})
 
 	if c.OpConfig.EnablePgVersionEnvVar {
-		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.Spec.PgVersion})
+		envVars = append(envVars, v1.EnvVar{Name: "PGVERSION", Value: c.GetDesiredMajorVersion()})
 	}
 	// Spilo expects cluster labels as JSON
 	if clusterLabels, err := json.Marshal(labels.Set(c.OpConfig.ClusterLabels)); err != nil {
@@ -782,6 +800,12 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 
 	if c.OpConfig.WALGSBucket != "" {
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_GS_BUCKET", Value: c.OpConfig.WALGSBucket})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
+		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
+	}
+
+	if c.OpConfig.WALAZStorageAccount != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "AZURE_STORAGE_ACCOUNT", Value: c.OpConfig.WALAZStorageAccount})
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		envVars = append(envVars, v1.EnvVar{Name: "WAL_BUCKET_SCOPE_PREFIX", Value: ""})
 	}
@@ -1157,15 +1181,13 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	// generate the spilo container
-	c.logger.Debugf("Generating Spilo container, environment variables")
-	c.logger.Debugf("%v", spiloEnvVars)
-
-	spiloContainer := generateContainer(c.containerName(),
+	spiloContainer := generateContainer(constants.PostgresContainerName,
 		&effectiveDockerImage,
 		resourceRequirements,
-		deduplicateEnvVars(spiloEnvVars, c.containerName(), c.logger),
+		deduplicateEnvVars(spiloEnvVars, constants.PostgresContainerName, c.logger),
 		volumeMounts,
 		c.OpConfig.Resources.SpiloPrivileged,
+		c.OpConfig.Resources.SpiloAllowPrivilegeEscalation,
 		generateCapabilities(c.OpConfig.AdditionalPodCapabilities),
 	)
 
@@ -1261,7 +1283,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 	}
 
 	if volumeClaimTemplate, err = generatePersistentVolumeClaimTemplate(spec.Volume.Size,
-		spec.Volume.StorageClass); err != nil {
+		spec.Volume.StorageClass, spec.Volume.Selector); err != nil {
 		return nil, fmt.Errorf("could not generate volume claim template: %v", err)
 	}
 
@@ -1281,16 +1303,12 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, fmt.Errorf("could not set the pod management policy to the unknown value: %v", c.OpConfig.PodManagementPolicy)
 	}
 
-	stsAnnotations := make(map[string]string)
-	stsAnnotations[rollingUpdateStatefulsetAnnotationKey] = strconv.FormatBool(false)
-	stsAnnotations = c.AnnotationsToPropagate(c.annotationsSet(nil))
-
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.statefulSetName(),
 			Namespace:   c.Namespace,
 			Labels:      c.labelsSet(true),
-			Annotations: stsAnnotations,
+			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:             &numberOfInstances,
@@ -1398,6 +1416,9 @@ func (c *Cluster) getNumberOfInstances(spec *acidv1.PostgresSpec) int32 {
 //
 // see https://docs.okd.io/latest/dev_guide/shared_memory.html
 func addShmVolume(podSpec *v1.PodSpec) {
+
+	postgresContainerIdx := 0
+
 	volumes := append(podSpec.Volumes, v1.Volume{
 		Name: constants.ShmVolumeName,
 		VolumeSource: v1.VolumeSource{
@@ -1407,14 +1428,20 @@ func addShmVolume(podSpec *v1.PodSpec) {
 		},
 	})
 
-	pgIdx := constants.PostgresContainerIdx
-	mounts := append(podSpec.Containers[pgIdx].VolumeMounts,
+	for i, container := range podSpec.Containers {
+		if container.Name == constants.PostgresContainerName {
+			postgresContainerIdx = i
+		}
+	}
+
+	mounts := append(podSpec.Containers[postgresContainerIdx].VolumeMounts,
 		v1.VolumeMount{
 			Name:      constants.ShmVolumeName,
 			MountPath: constants.ShmVolumePath,
 		})
 
-	podSpec.Containers[0].VolumeMounts = mounts
+	podSpec.Containers[postgresContainerIdx].VolumeMounts = mounts
+
 	podSpec.Volumes = volumes
 }
 
@@ -1445,54 +1472,55 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 
 	volumes := podSpec.Volumes
 	mountPaths := map[string]acidv1.AdditionalVolume{}
-	for i, v := range additionalVolumes {
-		if previousVolume, exist := mountPaths[v.MountPath]; exist {
+	for i, additionalVolume := range additionalVolumes {
+		if previousVolume, exist := mountPaths[additionalVolume.MountPath]; exist {
 			msg := "Volume %+v cannot be mounted to the same path as %+v"
-			c.logger.Warningf(msg, v, previousVolume)
+			c.logger.Warningf(msg, additionalVolume, previousVolume)
 			continue
 		}
 
-		if v.MountPath == constants.PostgresDataMount {
+		if additionalVolume.MountPath == constants.PostgresDataMount {
 			msg := "Cannot mount volume on postgresql data directory, %+v"
-			c.logger.Warningf(msg, v)
+			c.logger.Warningf(msg, additionalVolume)
 			continue
 		}
 
-		if v.TargetContainers == nil {
-			spiloContainer := podSpec.Containers[0]
-			additionalVolumes[i].TargetContainers = []string{spiloContainer.Name}
+		// if no target container is defined assign it to postgres container
+		if len(additionalVolume.TargetContainers) == 0 {
+			postgresContainer := getPostgresContainer(podSpec)
+			additionalVolumes[i].TargetContainers = []string{postgresContainer.Name}
 		}
 
-		for _, target := range v.TargetContainers {
-			if target == "all" && len(v.TargetContainers) != 1 {
+		for _, target := range additionalVolume.TargetContainers {
+			if target == "all" && len(additionalVolume.TargetContainers) != 1 {
 				msg := `Target containers could be either "all" or a list
 						of containers, mixing those is not allowed, %+v`
-				c.logger.Warningf(msg, v)
+				c.logger.Warningf(msg, additionalVolume)
 				continue
 			}
 		}
 
 		volumes = append(volumes,
 			v1.Volume{
-				Name:         v.Name,
-				VolumeSource: v.VolumeSource,
+				Name:         additionalVolume.Name,
+				VolumeSource: additionalVolume.VolumeSource,
 			},
 		)
 
-		mountPaths[v.MountPath] = v
+		mountPaths[additionalVolume.MountPath] = additionalVolume
 	}
 
 	c.logger.Infof("Mount additional volumes: %+v", additionalVolumes)
 
 	for i := range podSpec.Containers {
 		mounts := podSpec.Containers[i].VolumeMounts
-		for _, v := range additionalVolumes {
-			for _, target := range v.TargetContainers {
+		for _, additionalVolume := range additionalVolumes {
+			for _, target := range additionalVolume.TargetContainers {
 				if podSpec.Containers[i].Name == target || target == "all" {
 					mounts = append(mounts, v1.VolumeMount{
-						Name:      v.Name,
-						MountPath: v.MountPath,
-						SubPath:   v.SubPath,
+						Name:      additionalVolume.Name,
+						MountPath: additionalVolume.MountPath,
+						SubPath:   additionalVolume.SubPath,
 					})
 				}
 			}
@@ -1503,7 +1531,8 @@ func (c *Cluster) addAdditionalVolumes(podSpec *v1.PodSpec,
 	podSpec.Volumes = volumes
 }
 
-func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string) (*v1.PersistentVolumeClaim, error) {
+func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string,
+	volumeSelector *metav1.LabelSelector) (*v1.PersistentVolumeClaim, error) {
 
 	var storageClassName *string
 
@@ -1536,6 +1565,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 			},
 			StorageClassName: storageClassName,
 			VolumeMode:       &volumeMode,
+			Selector:         volumeSelector,
 		},
 	}
 
@@ -1547,10 +1577,11 @@ func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	namespace := c.Namespace
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
-		secret := c.generateSingleUserSecret(namespace, pgUser)
+		secret := c.generateSingleUserSecret(pgUser.Namespace, pgUser)
 		if secret != nil {
 			secrets[username] = secret
 		}
+		namespace = pgUser.Namespace
 	}
 	/* special case for the system user */
 	for _, systemUser := range c.systemUsers {
@@ -1590,7 +1621,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 	secret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.credentialSecretName(username),
-			Namespace:   namespace,
+			Namespace:   pgUser.Namespace,
 			Labels:      lbls,
 			Annotations: c.annotationsSet(nil),
 		},
@@ -1785,6 +1816,14 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 					},
 				}
 				result = append(result, envs...)
+			} else if c.OpConfig.WALAZStorageAccount != "" {
+				envs := []v1.EnvVar{
+					{
+						Name:  "CLONE_AZURE_STORAGE_ACCOUNT",
+						Value: c.OpConfig.WALAZStorageAccount,
+					},
+				}
+				result = append(result, envs...)
 			} else {
 				c.logger.Error("Cannot figure out S3 or GS bucket. Both are empty.")
 			}
@@ -1932,7 +1971,8 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		envVars,
 		[]v1.VolumeMount{},
 		c.OpConfig.SpiloPrivileged, // use same value as for normal DB pods
-		v1.Capabilities{},
+		c.OpConfig.SpiloAllowPrivilegeEscalation,
+		nil,
 	)
 
 	labels := map[string]string{

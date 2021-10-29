@@ -199,10 +199,10 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	if event.EventType == EventRepair {
 		runRepair, lastOperationStatus := cl.NeedsRepair()
 		if !runRepair {
-			lg.Debugf("Observed cluster status %s, repair is not required", lastOperationStatus)
+			lg.Debugf("observed cluster status %s, repair is not required", lastOperationStatus)
 			return
 		}
-		lg.Debugf("Observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
+		lg.Debugf("observed cluster status %s, running sync scan to repair the cluster", lastOperationStatus)
 		event.EventType = EventSync
 	}
 
@@ -217,7 +217,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 		}
 
 		if err := c.submitRBACCredentials(event); err != nil {
-			c.logger.Warnf("Pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
+			c.logger.Warnf("pods and/or Patroni may misfunction due to the lack of permissions: %v", err)
 		}
 
 	}
@@ -225,7 +225,7 @@ func (c *Controller) processEvent(event ClusterEvent) {
 	switch event.EventType {
 	case EventAdd:
 		if clusterFound {
-			lg.Infof("Recieved add event for already existing Postgres cluster")
+			lg.Infof("recieved add event for already existing Postgres cluster")
 			return
 		}
 
@@ -348,11 +348,11 @@ func (c *Controller) processClusterEventsQueue(idx int, stopCh <-chan struct{}, 
 func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.PostgresSpec) {
 
 	deprecate := func(deprecated, replacement string) {
-		c.logger.Warningf("Parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
+		c.logger.Warningf("parameter %q is deprecated. Consider setting %q instead", deprecated, replacement)
 	}
 
 	noeffect := func(param string, explanation string) {
-		c.logger.Warningf("Parameter %q takes no effect. %s", param, explanation)
+		c.logger.Warningf("parameter %q takes no effect. %s", param, explanation)
 	}
 
 	if spec.UseLoadBalancer != nil {
@@ -368,7 +368,7 @@ func (c *Controller) warnOnDeprecatedPostgreSQLSpecParameters(spec *acidv1.Postg
 
 	if (spec.UseLoadBalancer != nil || spec.ReplicaLoadBalancer != nil) &&
 		(spec.EnableReplicaLoadBalancer != nil || spec.EnableMasterLoadBalancer != nil) {
-		c.logger.Warnf("Both old and new load balancer parameters are present in the manifest, ignoring old ones")
+		c.logger.Warnf("both old and new load balancer parameters are present in the manifest, ignoring old ones")
 	}
 }
 

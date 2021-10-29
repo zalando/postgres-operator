@@ -53,6 +53,9 @@ kubectl pg create -f cluster-manifest.yaml
 func create(fileName string) {
 	config := getConfig()
 	postgresConfig, err := PostgresqlLister.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ymlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatal(err)

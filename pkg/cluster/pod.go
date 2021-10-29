@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
+	"github.com/zalando/postgres-operator/pkg/util/patroni"
 	"github.com/zalando/postgres-operator/pkg/util/retryutil"
 )
 
@@ -43,6 +46,64 @@ func (c *Cluster) getRolePods(role PostgresRole) ([]v1.Pod, error) {
 	}
 
 	return pods.Items, nil
+}
+
+// markRollingUpdateFlagForPod sets the indicator for the rolling update requirement
+// in the Pod annotation.
+func (c *Cluster) markRollingUpdateFlagForPod(pod *v1.Pod, msg string) error {
+	// no need to patch pod if annotation is already there
+	if c.getRollingUpdateFlagFromPod(pod) {
+		return nil
+	}
+
+	c.logger.Debugf("mark rolling update annotation for %s: reason %s", pod.Name, msg)
+	flag := make(map[string]string)
+	flag[rollingUpdatePodAnnotationKey] = strconv.FormatBool(true)
+
+	patchData, err := metaAnnotationsPatch(flag)
+	if err != nil {
+		return fmt.Errorf("could not form patch for pod's rolling update flag: %v", err)
+	}
+
+	err = retryutil.Retry(1*time.Second, 5*time.Second,
+		func() (bool, error) {
+			_, err2 := c.KubeClient.Pods(pod.Namespace).Patch(
+				context.TODO(),
+				pod.Name,
+				types.MergePatchType,
+				[]byte(patchData),
+				metav1.PatchOptions{},
+				"")
+			if err2 != nil {
+				return false, err2
+			}
+			return true, nil
+		})
+	if err != nil {
+		return fmt.Errorf("could not patch pod rolling update flag %q: %v", patchData, err)
+	}
+
+	return nil
+}
+
+// getRollingUpdateFlagFromPod returns the value of the rollingUpdate flag from the given pod
+func (c *Cluster) getRollingUpdateFlagFromPod(pod *v1.Pod) (flag bool) {
+	anno := pod.GetAnnotations()
+	flag = false
+
+	stringFlag, exists := anno[rollingUpdatePodAnnotationKey]
+	if exists {
+		var err error
+		c.logger.Debugf("found rolling update flag on pod %q", pod.Name)
+		if flag, err = strconv.ParseBool(stringFlag); err != nil {
+			c.logger.Warnf("error when parsing %q annotation for the pod %q: expected boolean value, got %q\n",
+				rollingUpdatePodAnnotationKey,
+				types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name},
+				stringFlag)
+		}
+	}
+
+	return flag
 }
 
 func (c *Cluster) deletePods() error {
@@ -243,8 +304,19 @@ func (c *Cluster) MigrateMasterPod(podName spec.NamespacedName) error {
 	}
 
 	masterCandidateName := util.NameFromMeta(masterCandidatePod.ObjectMeta)
-	if err := c.Switchover(oldMaster, masterCandidateName); err != nil {
-		return fmt.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+	err = retryutil.Retry(1*time.Minute, 5*time.Minute,
+		func() (bool, error) {
+			err := c.Switchover(oldMaster, masterCandidateName)
+			if err != nil {
+				c.logger.Errorf("could not failover to pod %q: %v", masterCandidateName, err)
+				return false, nil
+			}
+			return true, nil
+		},
+	)
+
+	if err != nil {
+		return fmt.Errorf("could not migrate master pod: %v", err)
 	}
 
 	return nil
@@ -281,7 +353,18 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	defer c.unregisterPodSubscriber(podName)
 	stopChan := make(chan struct{})
 
-	if err := c.KubeClient.Pods(podName.Namespace).Delete(context.TODO(), podName.Name, c.deleteOptions); err != nil {
+	err := retryutil.Retry(1*time.Second, 5*time.Second,
+		func() (bool, error) {
+			err2 := c.KubeClient.Pods(podName.Namespace).Delete(
+				context.TODO(),
+				podName.Name,
+				c.deleteOptions)
+			if err2 != nil {
+				return false, err2
+			}
+			return true, nil
+		})
+	if err != nil {
 		return nil, fmt.Errorf("could not delete pod: %v", err)
 	}
 
@@ -296,7 +379,7 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	return pod, nil
 }
 
-func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
+func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
 
 	/*
 	 Operator should not re-create pods if there is at least one replica being bootstrapped
@@ -305,21 +388,18 @@ func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
 	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
 	 after this check succeeds but before a pod is re-created
 	*/
-
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
 	}
 
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 
-		var state string
+		var data patroni.MemberData
 
 		err := retryutil.Retry(1*time.Second, 5*time.Second,
 			func() (bool, error) {
-
 				var err error
-
-				state, err = c.patroni.GetPatroniMemberState(&pod)
+				data, err = c.patroni.GetMemberData(&pod)
 
 				if err != nil {
 					return false, err
@@ -331,51 +411,43 @@ func (c *Cluster) isSafeToRecreatePods(pods *v1.PodList) bool {
 		if err != nil {
 			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
 			return false
-		} else if state == "creating replica" {
+		} else if data.State == "creating replica" {
 			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
 			return false
 		}
-
 	}
 	return true
 }
 
-func (c *Cluster) recreatePods() error {
+func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.NamespacedName) error {
 	c.setProcessName("starting to recreate pods")
-	ls := c.labelsSet(false)
-	namespace := c.Namespace
-
-	listOptions := metav1.ListOptions{
-		LabelSelector: ls.String(),
-	}
-
-	pods, err := c.KubeClient.Pods(namespace).List(context.TODO(), listOptions)
-	if err != nil {
-		return fmt.Errorf("could not get the list of pods: %v", err)
-	}
-	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods.Items))
+	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods))
 
 	if !c.isSafeToRecreatePods(pods) {
 		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initialized")
 	}
 
 	var (
-		masterPod, newMasterPod, newPod *v1.Pod
+		masterPod, newMasterPod *v1.Pod
 	)
-	replicas := make([]spec.NamespacedName, 0)
-	for i, pod := range pods.Items {
+	replicas := switchoverCandidates
+
+	for i, pod := range pods {
 		role := PostgresRole(pod.Labels[c.OpConfig.PodRoleLabel])
 
 		if role == Master {
-			masterPod = &pods.Items[i]
+			masterPod = &pods[i]
 			continue
 		}
 
-		podName := util.NameFromMeta(pods.Items[i].ObjectMeta)
-		if newPod, err = c.recreatePod(podName); err != nil {
+		podName := util.NameFromMeta(pod.ObjectMeta)
+		newPod, err := c.recreatePod(podName)
+		if err != nil {
 			return fmt.Errorf("could not recreate replica pod %q: %v", util.NameFromMeta(pod.ObjectMeta), err)
 		}
-		if newRole := PostgresRole(newPod.Labels[c.OpConfig.PodRoleLabel]); newRole == Replica {
+
+		newRole := PostgresRole(newPod.Labels[c.OpConfig.PodRoleLabel])
+		if newRole == Replica {
 			replicas = append(replicas, util.NameFromMeta(pod.ObjectMeta))
 		} else if newRole == Master {
 			newMasterPod = newPod
@@ -383,7 +455,9 @@ func (c *Cluster) recreatePods() error {
 	}
 
 	if masterPod != nil {
-		// failover if we have not observed a master pod when re-creating former replicas.
+		// switchover if
+		// 1. we have not observed a new master pod when re-creating former replicas
+		// 2. we know possible switchover targets even when no replicas were recreated
 		if newMasterPod == nil && len(replicas) > 0 {
 			if err := c.Switchover(masterPod, masterCandidate(replicas)); err != nil {
 				c.logger.Warningf("could not perform switch over: %v", err)

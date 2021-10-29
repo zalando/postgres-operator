@@ -3,6 +3,21 @@
 Learn how to configure and manage the Postgres Operator in your Kubernetes (K8s)
 environment.
 
+## Upgrading the operator
+
+The Postgres Operator is upgraded by changing the docker image within the
+deployment. Before doing so, it is recommended to check the release notes
+for new configuration options or changed behavior you might want to reflect
+in the ConfigMap or config CRD. E.g. a new feature might get introduced which
+is enabled or disabled by default and you want to change it to the opposite
+with the corresponding flag option.
+
+When using helm, be aware that installing the new chart will not update the
+`Postgresql` and `OperatorConfiguration` CRD. Make sure to update them before
+with the provided manifests in the `crds` folder. Otherwise, you might face
+errors about new Postgres manifest or configuration options being unknown
+to the CRD schema validation.
+
 ## Minor and major version upgrade
 
 Minor version upgrades for PostgreSQL are handled via updating the Spilo Docker
@@ -11,40 +26,53 @@ switchover (planned failover) of the master to the Pod with new minor version.
 The switch should usually take less than 5 seconds, still clients have to
 reconnect.
 
-Major version upgrades are supported either via [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
-or in-place.
+### Upgrade on cloning
 
-With cloning, the new cluster manifest must have a higher `version` string than
-the source cluster and will be created from a basebackup. Depending of the
-cluster size, downtime in this case can be significant as writes to the database
-should be stopped and all WAL files should be archived first before cloning is
-started.
+With [cloning](user.md#how-to-clone-an-existing-postgresql-cluster), the new
+cluster manifest must have a higher `version` string than the source cluster
+and will be created from a basebackup. Depending of the cluster size, downtime
+in this case can be significant as writes to the database should be stopped
+and all WAL files should be archived first before cloning is started.
+Therefore, use cloning only to test major version upgrades and check for
+compatibility of your app with to Postgres server of a higher version.
 
-Starting with Spilo 13, Postgres Operator can do in-place major version upgrade,
-which should be faster than cloning. However, it is not fully automatic yet.
-First, you need to make sure, that setting the `PGVERSION` environment variable
-is enabled in the configuration. Since `v1.6.0`, `enable_pgversion_env_var` is
-enabled by default.
+### In-place major version upgrade
 
-To trigger the upgrade, increase the version in the cluster manifest. After
-Pods are rotated `configure_spilo` will notice the version mismatch and start
-the old version again. You can then exec into the Postgres container of the
-master instance and call `python3 /scripts/inplace_upgrade.py N` where `N`
-is the number of members of your cluster (see [`numberOfInstances`](https://github.com/zalando/postgres-operator/blob/50cb5898ea715a1db7e634de928b2d16dc8cd969/manifests/minimal-postgres-manifest.yaml#L10)).
+Starting with Spilo 13, Postgres Operator can run an in-place major version
+upgrade which is much faster than cloning. First, you need to make sure, that
+the `PGVERSION` environment variable is set for the database pods. Since
+`v1.6.0` the related option `enable_pgversion_env_var` is enabled by default.
+
+In-place major version upgrades can be configured to be executed by the
+operator with the `major_version_upgrade_mode` option. By default it is set
+to `off` which means the cluster version will not change when increased in
+the manifest. Still, a rolling update would be triggered updating the
+`PGVERSION` variable. But Spilo's [`configure_spilo`](https://github.com/zalando/spilo/blob/master/postgres-appliance/scripts/configure_spilo.py)
+script will notice the version mismatch and start the old version again.
+
+In this scenario the major version could then be run by a user from within the
+master pod. Exec into the container and run:
+```bash
+python3 /scripts/inplace_upgrade.py N
+```
+where `N` is the number of members of your cluster (see [`numberOfInstances`](https://github.com/zalando/postgres-operator/blob/50cb5898ea715a1db7e634de928b2d16dc8cd969/manifests/minimal-postgres-manifest.yaml#L10)).
 The upgrade is usually fast, well under one minute for most DBs. Note, that
 changes become irrevertible once `pg_upgrade` is called. To understand the
 upgrade procedure, refer to the [corresponding PR in Spilo](https://github.com/zalando/spilo/pull/488).
+
+When `major_version_upgrade_mode` is set to `manual` the operator will run
+the upgrade script for you after the manifest is updated and pods are rotated.
 
 ## CRD Validation
 
 [CustomResourceDefinitions](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions)
 will be registered with schema validation by default when the operator is
 deployed. The `OperatorConfiguration` CRD will only get created if the
-`POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](../manifests/postgres-operator.yaml#L36)
+`POSTGRES_OPERATOR_CONFIGURATION_OBJECT` [environment variable](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L36)
 in the deployment yaml is set and not empty.
 
-When submitting manifests of [`postgresql`](../manifests/postgresql.crd.yaml) or
-[`OperatorConfiguration`](../manifests/operatorconfiguration.crd.yaml) custom
+When submitting manifests of [`postgresql`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql.crd.yaml) or
+[`OperatorConfiguration`](https://github.com/zalando/postgres-operator/blob/master/manifests/operatorconfiguration.crd.yaml) custom
 resources with kubectl, validation can be bypassed with `--validate=false`. The
 operator can also be configured to not register CRDs with validation on `ADD` or
 `UPDATE` events. Running instances are not affected when enabling the validation
@@ -81,7 +109,7 @@ kubectl config set-context $(kubectl config current-context) --namespace=test
 All subsequent `kubectl` commands will work with the `test` namespace. The
 operator will run in this namespace and look up needed resources - such as its
 ConfigMap - there. Please note that the namespace for service accounts and
-cluster role bindings in [operator RBAC rules](../manifests/operator-service-account-rbac.yaml)
+cluster role bindings in [operator RBAC rules](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml)
 needs to be adjusted to the non-default value.
 
 ### Specify the namespace to watch
@@ -92,9 +120,9 @@ clusters in the namespace such as "increase the number of Postgres replicas to
 
 By default, the operator watches the namespace it is deployed to. You can
 change this by setting the `WATCHED_NAMESPACE` var in the `env` section of the
-[operator deployment](../manifests/postgres-operator.yaml) manifest or by
+[operator deployment](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml) manifest or by
 altering the `watched_namespace` field in the operator
-[configuration](../manifests/postgresql-operator-default-configuration.yaml#L49).
+[configuration](https://github.com/zalando/postgres-operator/blob/master/manifests/postgresql-operator-default-configuration.yaml#L49).
 In the case both are set, the env var takes the precedence. To make the
 operator listen to all namespaces, explicitly set the field/env var to "`*`".
 
@@ -115,7 +143,7 @@ But, it is also possible to define ownership between operator instances and
 Postgres clusters running all in the same namespace or K8s cluster without
 interfering.
 
-First, define the [`CONTROLLER_ID`](../../manifests/postgres-operator.yaml#L38)
+First, define the [`CONTROLLER_ID`](https://github.com/zalando/postgres-operator/blob/master/manifests/postgres-operator.yaml#L38)
 environment variable in the operator deployment manifest. Then specify the ID
 in every Postgres cluster manifest you want this operator to watch using the
 `"acid.zalan.do/controller"` annotation:
@@ -144,16 +172,26 @@ from numerous escape characters in the latter log entry, view it in CLI with
 `PodTemplate` used by the operator is yet to be updated with the default values
 used internally in K8s.
 
-The operator also support lazy updates of the Spilo image. That means the pod
-template of a PG cluster's stateful set is updated immediately with the new
-image, but no rolling update follows. This feature saves you a switchover - and
-hence downtime - when you know pods are re-started later anyway, for instance
-due to the node rotation. To force a rolling update, disable this mode by
-setting the `enable_lazy_spilo_upgrade` to `false` in the operator configuration
-and restart the operator pod. With the standard eager rolling updates the
-operator checks during Sync all pods run images specified in their respective
-statefulsets. The operator triggers a rolling upgrade for PG clusters that
-violate this condition.
+The StatefulSet is replaced if the following properties change:
+- annotations
+- volumeClaimTemplates
+- template volumes
+
+The StatefulSet is replaced and a rolling updates is triggered if the following
+properties differ between the old and new state:
+- container name, ports, image, resources, env, envFrom, securityContext and volumeMounts
+- template labels, annotations, service account, securityContext, affinity, priority class and termination grace period
+
+Note that, changes in `SPILO_CONFIGURATION` env variable under `bootstrap.dcs`
+path are ignored for the diff. They will be applied through Patroni's rest api
+interface, following a restart of all instances.
+
+The operator also support lazy updates of the Spilo image. In this case the
+StatefulSet is only updated, but no rolling update follows. This feature saves
+you a switchover - and hence downtime - when you know pods are re-started later
+anyway, for instance due to the node rotation. To force a rolling update,
+disable this mode by setting the `enable_lazy_spilo_upgrade` to `false` in the
+operator configuration and restart the operator pod.
 
 ## Delete protection via annotations
 
@@ -218,7 +256,7 @@ update of the pods because the UID is used as part of backup path to S3.
 
 ## Role-based access control for the operator
 
-The manifest [`operator-service-account-rbac.yaml`](../manifests/operator-service-account-rbac.yaml)
+The manifest [`operator-service-account-rbac.yaml`](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml)
 defines the service account, cluster roles and bindings needed for the operator
 to function under access control restrictions. The file also includes a cluster
 role `postgres-pod` with privileges for Patroni to watch and manage pods and
@@ -650,6 +688,12 @@ if it ends up in your specified WAL backup path:
 envdir "/run/etc/wal-e.d/env" /scripts/postgres_backup.sh "/home/postgres/pgdata/pgroot/data"
 ```
 
+You can also check if Spilo is able to find any backups:
+
+```bash
+envdir "/run/etc/wal-e.d/env" wal-g backup-list
+```
+
 Depending on the cloud storage provider different [environment variables](https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst)
 have to be set for Spilo. Not all of them are generated automatically by the
 operator by changing its configuration. In this case you have to use an
@@ -717,8 +761,15 @@ WALE_S3_ENDPOINT='https+path://s3.eu-central-1.amazonaws.com:443'
 WALE_S3_PREFIX=$WAL_S3_BUCKET/spilo/{WAL_BUCKET_SCOPE_PREFIX}{SCOPE}{WAL_BUCKET_SCOPE_SUFFIX}/wal/{PGVERSION}
 ```
 
-If the prefix is not specified Spilo will generate it from `WAL_S3_BUCKET`.
-When the `AWS_REGION` is set `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
+The operator sets the prefix to an empty string so that spilo will generate it
+from the configured `WAL_S3_BUCKET`. 
+
+:warning: When you overwrite the configuration by defining `WAL_S3_BUCKET` in
+the [pod_environment_configmap](#custom-pod-environment-variables) you have
+to set `WAL_BUCKET_SCOPE_PREFIX = ""`, too. Otherwise Spilo will not find
+the physical backups on restore (next chapter).
+
+When the `AWS_REGION` is set, `AWS_ENDPOINT` and `WALE_S3_ENDPOINT` are
 generated automatically. `WALG_S3_PREFIX` is identical to `WALE_S3_PREFIX`.
 `SCOPE` is the Postgres cluster name.
 
@@ -757,7 +808,7 @@ is set up like the following:
 ```yml
 ...
 aws_or_gcp:
-  additional_secret_mount: "pgsql-wale-creds"
+  additional_secret_mount: "psql-wale-creds"
   additional_secret_mount_path: "/var/secrets/google"  # or where ever you want to mount the file
   # aws_region: eu-central-1
   # kube_iam_role: ""
@@ -791,6 +842,63 @@ pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
 ...
 ```
 
+### Azure setup
+
+To configure the operator on Azure these prerequisites are needed:
+
+* A storage account in the same region as the Kubernetes cluster.
+
+The configuration parameters that we will be using are:
+
+* `pod_environment_secret`
+* `wal_az_storage_account`
+
+1. Generate the K8s secret resource that will contain your storage account's
+access key. You will need a copy of this secret in every namespace you want to
+create postgresql clusters.
+
+The latest version of WAL-G (v1.0) supports the use of a SASS token, but you'll
+have to make due with using the primary or secondary access token until the
+version of WAL-G is updated in the postgres-operator.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: psql-backup-creds
+  namespace: default
+type: Opaque
+stringData:
+  AZURE_STORAGE_ACCESS_KEY: <primary or secondary access key>
+```
+
+2. Setup pod environment configmap that instructs the operator to use WAL-G,
+instead of WAL-E, for backup and restore.
+```yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-env-overrides
+  namespace: postgres-operator-system
+data:
+  # Any env variable used by spilo can be added
+  USE_WALG_BACKUP: "true"
+  USE_WALG_RESTORE: "true"
+  CLONE_USE_WALG_RESTORE: "true"
+```
+
+3. Setup your operator configuration values. With the `psql-backup-creds`
+and `pod-env-overrides` resources applied to your cluster, ensure that the operator's configuration
+is set up like the following:
+```yml
+...
+aws_or_gcp:
+  pod_environment_secret: "psql-backup-creds"
+  pod_environment_configmap: "postgres-operator-system/pod-env-overrides"
+  wal_az_storage_account: "postgresbackupsbucket28302F2"  # name of storage account to save the WAL-G logs
+...
+```
+
 ### Restoring physical backups
 
 If cluster members have to be (re)initialized restoring physical backups
@@ -799,6 +907,36 @@ happens automatically either from the backup location or by running
 on one of the other running instances (preferably replicas if they do not lag
 behind). You can test restoring backups by [cloning](user.md#how-to-clone-an-existing-postgresql-cluster)
 clusters.
+
+If you need to provide a [custom clone environment](#custom-pod-environment-variables)
+copy existing variables about your setup (backup location, prefix, access
+keys etc.) and prepend the `CLONE_` prefix to get them copied to the correct
+directory within Spilo.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-pod-config
+data:
+  AWS_REGION: "eu-west-1"
+  AWS_ACCESS_KEY_ID: "****"
+  AWS_SECRET_ACCESS_KEY: "****"
+  ...
+  CLONE_AWS_REGION: "eu-west-1"
+  CLONE_AWS_ACCESS_KEY_ID: "****"
+  CLONE_AWS_SECRET_ACCESS_KEY: "****"
+  ...
+```
+
+### Standby clusters
+
+The setup for [standby clusters](user.md#setting-up-a-standby-cluster) is very
+similar to cloning. At the moment, the operator only allows for streaming from
+the S3 WAL archive of the master specified in the manifest. Like with cloning,
+if you are using [additional environment variables](#custom-pod-environment-variables)
+to access your backup location you have to copy those variables and prepend the
+`STANDBY_` prefix for Spilo to find the backups and WAL files to stream.
 
 ## Logical backups
 
@@ -827,7 +965,7 @@ but only snapshots of your data. In its current state, see logical backups as a
 way to quickly create SQL dumps that you can easily restore in an empty test
 cluster.
 
-2. The [example image](../docker/logical-backup/Dockerfile) implements the backup
+2. The [example image](https://github.com/zalando/postgres-operator/blob/master/docker/logical-backup/Dockerfile) implements the backup
 via `pg_dumpall` and upload of compressed and encrypted results to an S3 bucket.
 `pg_dumpall` requires a `superuser` access to a DB and runs on the replica when
 possible.
@@ -846,7 +984,7 @@ of the backup cron job.
 
 6. For that feature to work, your RBAC policy must enable operations on the
 `cronjobs` resource from the `batch` API group for the operator service account.
-See [example RBAC](../manifests/operator-service-account-rbac.yaml)
+See [example RBAC](https://github.com/zalando/postgres-operator/blob/master/manifests/operator-service-account-rbac.yaml)
 
 ## Sidecars for Postgres clusters
 
@@ -900,8 +1038,8 @@ default. Alternatively, a list can also be passed when starting the Python
 application with the `--cluster` option.
 
 The Operator API endpoint can be configured via the `OPERATOR_API_URL`
-environment variables in the [deployment manifest](../ui/manifests/deployment.yaml#L40).
-You can also expose the operator API through a [service](../manifests/api-service.yaml).
+environment variables in the [deployment manifest](https://github.com/zalando/postgres-operator/blob/master/ui/manifests/deployment.yaml#L40).
+You can also expose the operator API through a [service](https://github.com/zalando/postgres-operator/blob/master/manifests/api-service.yaml).
 Some displayed options can be disabled from UI using simple flags under the
 `OPERATOR_UI_CONFIG` field in the deployment.
 
@@ -937,7 +1075,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.6.1 .
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.7.0 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/

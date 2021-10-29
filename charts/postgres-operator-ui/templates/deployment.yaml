@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   name: {{ template "postgres-operator-ui.fullname" . }}
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -18,7 +19,6 @@ spec:
       labels:
         app.kubernetes.io/name: {{ template "postgres-operator-ui.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
-        team: "acid" # Parameterize?
     spec:
       serviceAccountName: {{ include "postgres-operator-ui.serviceAccountName" . }}
       {{- if .Values.imagePullSecrets }}
@@ -44,17 +44,20 @@ spec:
             - name: "APP_URL"
               value: "http://localhost:8081"
             - name: "OPERATOR_API_URL"
-              value: {{ .Values.envs.operatorApiUrl }}
+              value: {{ .Values.envs.operatorApiUrl | quote }}
             - name: "OPERATOR_CLUSTER_NAME_LABEL"
-              value: {{ .Values.envs.operatorClusterNameLabel }}
+              value: {{ .Values.envs.operatorClusterNameLabel | quote }}
             - name: "RESOURCES_VISIBLE"
-              value: "{{ .Values.envs.resourcesVisible }}"
+              value: {{ .Values.envs.resourcesVisible | quote }}
             - name: "TARGET_NAMESPACE"
-              value: "{{ .Values.envs.targetNamespace }}"
+              value: {{ .Values.envs.targetNamespace | quote }}
             - name: "TEAMS"
               value: |-
                 [
-                  "acid"
+                  {{- range(initial .Values.envs.teams) }}
+                  {{ . | quote }},
+                  {{- end }}
+                  {{ last .Values.envs.teams | quote }}
                 ]
             - name: "OPERATOR_UI_CONFIG"
               value: |-
@@ -68,8 +71,12 @@ spec:
                   "resources_visible": true,
                   "users_visible": true,
                   "postgresql_versions": [
+                    "14",
                     "13",
                     "12",
                     "11"
                   ]
                 }
+            {{- if .Values.extraEnvs }}
+            {{- .Values.extraEnvs | toYaml | nindent 12 }}
+            {{- end }}
