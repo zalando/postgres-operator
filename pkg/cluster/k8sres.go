@@ -1053,7 +1053,13 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		return nil, err
 	}
 	if spec.StandbyCluster != nil && spec.StandbyCluster.StandbyMethod == "" {
-		return nil, fmt.Errorf("standby_method is empty for standby cluster")
+		// In order to be backward compatible, we fallback to s3_wal when standby_method is not specified
+		if spec.StandbyCluster.S3WalPath != "" {
+			c.logger.Warningf("Fallback to a s3_wal as standby_method is not specified.")
+			spec.StandbyCluster.StandbyMethod = "s3_wal"
+		} else {
+			return nil, fmt.Errorf("standby_method is and s3_wal_path are empty, what standby method to use!?")
+		}
 	}
 
 	// fetch env vars from custom ConfigMap

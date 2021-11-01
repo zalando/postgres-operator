@@ -462,8 +462,6 @@ spec:
                 type: integer
               standby:
                 type: object
-                required:
-                  - standby_method
                 properties:
                   s3_wal_path:
                     type: string
