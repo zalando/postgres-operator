@@ -302,6 +302,14 @@ configLogicalBackup:
   logical_backup_s3_sse: "AES256"
   # backup schedule in the cron format
   logical_backup_schedule: "30 00 * * *"
+  # storage account name
+  logical_backup_storage_account_name: ""
+  # storage account container
+  logical_backup_storage_container: ""
+  # storage blob
+  logical_backup_storage_blob: ""
+  # storage account key
+  logical_backup_storage_account_key: ""
 
 # automate creation of human users with teams API service
 configTeamsApi:
