@@ -65,10 +65,10 @@ data:
   # inherited_labels: application,environment
   # kube_iam_role: ""
   # log_s3_bucket: ""
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.7.0"
+  logical_backup_docker_image: "harbor.sofico.be/dev/logical-backup:dev"
   # logical_backup_google_application_credentials: ""
   logical_backup_job_prefix: "logical-backup-"
-  logical_backup_provider: "s3"
+  logical_backup_provider: "az"
   # logical_backup_s3_access_key_id: ""
   logical_backup_s3_bucket: "my-bucket-url"
   # logical_backup_s3_region: ""
@@ -76,6 +76,10 @@ data:
   # logical_backup_s3_secret_access_key: ""
   logical_backup_s3_sse: "AES256"
   logical_backup_schedule: "30 00 * * *"
+  # logical_backup_storage_account_name: ""
+  # logical_backup_storage_container: ""
+  # logical_backup_storage_blob: ""
+  # logical_backup_storage_account_key: ""
   major_version_upgrade_mode: "manual"
   master_dns_name_format: "{cluster}.{team}.{hostedzone}"
   # master_pod_move_timeout: 20m
