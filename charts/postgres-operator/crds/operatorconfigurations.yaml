@@ -173,6 +173,9 @@ spec:
                   enable_init_containers:
                     type: boolean
                     default: true
+                  enable_cross_namespace_secret:
+                    type: boolean
+                    default: false
                   enable_pod_antiaffinity:
                     type: boolean
                     default: false
@@ -388,11 +391,11 @@ spec:
                     type: string
                   log_s3_bucket:
                     type: string
-                  wal_az_storage_account:
-                    type: string
                   wal_gs_bucket:
                     type: string
                   wal_s3_bucket:
+                    type: string
+                  wal_az_storage_account:
                     type: string
               logical_backup:
                 type: object
