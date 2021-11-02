@@ -132,17 +132,17 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	expectedValuesGSBucket := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       14,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
 		{
-			envIndex:       16,
+			envIndex:       15,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
 		{
-			envIndex:       17,
+			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
@@ -150,22 +150,22 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 
 	expectedValuesGCPCreds := []ExpectedValue{
 		{
-			envIndex:       15,
+			envIndex:       14,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
 		{
-			envIndex:       16,
+			envIndex:       15,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
 		{
-			envIndex:       17,
+			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 		{
-			envIndex:       18,
+			envIndex:       17,
 			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
 			envVarValue:    "some_path_to_credentials",
 		},
