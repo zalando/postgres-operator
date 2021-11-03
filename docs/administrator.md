@@ -1075,7 +1075,7 @@ make docker
 
 # build in image in minikube docker env
 eval $(minikube docker-env)
-docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.7.0 .
+docker build -t registry.opensource.zalan.do/acid/postgres-operator-ui:v1.7.1 .
 
 # apply UI manifests next to a running Postgres Operator
 kubectl apply -f manifests/
