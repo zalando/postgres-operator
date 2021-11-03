@@ -372,7 +372,12 @@ spec:
                   parameters:
                     type: object
                     additionalProperties:
-                      type: string
+                      type: object
+                      properties:
+                        value:
+                          type: string
+                        valueFrom:
+                          type: object
               preparedDatabases:
                 type: object
                 additionalProperties:

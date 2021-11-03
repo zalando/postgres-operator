@@ -572,6 +572,41 @@ func (c *Cluster) patroniKubernetesUseConfigMaps() bool {
 	return c.OpConfig.KubernetesUseConfigMaps
 }
 
+// GetPostgresParamValue retrieve postgres parameter value from ConfigMap or Secret
+func (c *Cluster) GetPostgresParamValue(paramAttr acidv1.PgParameterAttr) (string, error) {
+	if paramAttr.Value != "" {
+		return paramAttr.Value, nil
+	} else if valueFrom := paramAttr.ValueFrom; valueFrom != nil {
+		if configMapKeyRef := valueFrom.ConfigMapKeyRef; configMapKeyRef != nil {
+			configMap, err := c.KubeClient.ConfigMaps(c.clusterNamespace()).Get(context.TODO(), configMapKeyRef.Name, metav1.GetOptions{})
+			if err != nil {
+				return "", fmt.Errorf("could not get postgres paramAttr value from ConfigMap: %v", err)
+			}
+
+			paramValue, ok := configMap.Data[configMapKeyRef.Key]
+			if !ok {
+				return "", fmt.Errorf("could not get postgres paramAttr value from ConfigMap: key %s not found", configMapKeyRef.Key)
+			}
+
+			return paramValue, nil
+		} else if secretKeyRef := paramAttr.ValueFrom.SecretKeyRef; secretKeyRef != nil {
+			secret, err := c.KubeClient.Secrets(c.clusterNamespace()).Get(context.TODO(), secretKeyRef.Name, metav1.GetOptions{})
+			if err != nil {
+				return "", fmt.Errorf("could not get postgres paramAttr value from Secret: %v", err)
+			}
+
+			paramValue, ok := secret.Data[secretKeyRef.Key]
+			if !ok {
+				return "", fmt.Errorf("could not get postgres paramAttr value from Secret: key %s not found", secretKeyRef.Key)
+			}
+
+			return string(paramValue), nil
+		}
+	}
+
+	return "", fmt.Errorf("could not get postgres paramAttr value: %v", paramAttr)
+}
+
 // Earlier arguments take priority
 func mergeContainers(containers ...[]v1.Container) ([]v1.Container, []string) {
 	containerNameTaken := map[string]bool{}

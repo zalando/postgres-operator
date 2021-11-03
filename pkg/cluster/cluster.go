@@ -106,6 +106,7 @@ type compareStatefulsetResult struct {
 
 // New creates a new cluster. This function should be called from a controller.
 func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgresql, logger *logrus.Entry, eventRecorder record.EventRecorder) *Cluster {
+	var passwordEncryptionValue string
 	deletePropagationPolicy := metav1.DeletePropagationOrphan
 
 	podEventsQueue := cache.NewFIFO(func(obj interface{}) (string, error) {
@@ -116,10 +117,6 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 
 		return fmt.Sprintf("%s-%s", e.PodName, e.ResourceVersion), nil
 	})
-	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
-	if !ok {
-		passwordEncryption = "md5"
-	}
 
 	cluster := &Cluster{
 		Config:         cfg,
@@ -131,9 +128,6 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 			Secrets:   make(map[types.UID]*v1.Secret),
 			Services:  make(map[PostgresRole]*v1.Service),
 			Endpoints: make(map[PostgresRole]*v1.Endpoints)},
-		userSyncStrategy: users.DefaultUserSyncStrategy{
-			PasswordEncryption: passwordEncryption,
-			RoleDeletionSuffix: cfg.OpConfig.RoleDeletionSuffix},
 		deleteOptions:       metav1.DeleteOptions{PropagationPolicy: &deletePropagationPolicy},
 		podEventsQueue:      podEventsQueue,
 		KubeClient:          kubeClient,
@@ -148,7 +142,19 @@ func New(cfg Config, kubeClient k8sutil.KubernetesClient, pgSpec acidv1.Postgres
 	cluster.EBSVolumes = make(map[string]volumes.VolumeProperties)
 	if cfg.OpConfig.StorageResizeMode != "pvc" || cfg.OpConfig.EnableEBSGp3Migration {
 		cluster.VolumeResizer = &volumes.EBSVolumeResizer{AWSRegion: cfg.OpConfig.AWSRegion}
+	}
 
+	passwordEncryption, ok := pgSpec.Spec.PostgresqlParam.Parameters["password_encryption"]
+	if ok {
+		passwordEncryptionValue, _ = cluster.GetPostgresParamValue(passwordEncryption)
+	}
+	if passwordEncryptionValue == "" {
+		passwordEncryptionValue = "md5"
+	}
+
+	cluster.userSyncStrategy = users.DefaultUserSyncStrategy{
+		PasswordEncryption: passwordEncryptionValue,
+		RoleDeletionSuffix: cfg.OpConfig.RoleDeletionSuffix,
 	}
 
 	return cluster

@@ -132,6 +132,148 @@ func (c *Cluster) makeDefaultResources() acidv1.Resources {
 	}
 }
 
+func (c *Cluster) generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni) (string, error) {
+	config := spiloConfiguration{}
+
+	config.Bootstrap = pgBootstrap{}
+
+	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "md5"},
+		map[string]string{"auth-local": "trust"}}
+
+	initdbOptionNames := []string{}
+
+	for k := range patroni.InitDB {
+		initdbOptionNames = append(initdbOptionNames, k)
+	}
+	/* We need to sort the user-defined options to more easily compare the resulting specs */
+	sort.Strings(initdbOptionNames)
+
+	// Initdb parameters in the manifest take priority over the default ones
+	// The whole type switch dance is caused by the ability to specify both
+	// maps and normal string items in the array of initdb options. We need
+	// both to convert the initial key-value to strings when necessary, and
+	// to de-duplicate the options supplied.
+PatroniInitDBParams:
+	for _, k := range initdbOptionNames {
+		v := patroni.InitDB[k]
+		for i, defaultParam := range config.Bootstrap.Initdb {
+			switch t := defaultParam.(type) {
+			case map[string]string:
+				{
+					for k1 := range t {
+						if k1 == k {
+							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
+							continue PatroniInitDBParams
+						}
+					}
+				}
+			case string:
+				{
+					/* if the option already occurs in the list */
+					if t == v {
+						continue PatroniInitDBParams
+					}
+				}
+			default:
+				c.logger.Warningf("unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
+				continue PatroniInitDBParams
+			}
+		}
+		// The following options are known to have no parameters
+		if v == "true" {
+			switch k {
+			case "data-checksums", "debug", "no-locale", "noclean", "nosync", "sync-only":
+				config.Bootstrap.Initdb = append(config.Bootstrap.Initdb, k)
+				continue
+			}
+		}
+		config.Bootstrap.Initdb = append(config.Bootstrap.Initdb, map[string]string{k: v})
+	}
+
+	if patroni.MaximumLagOnFailover >= 0 {
+		config.Bootstrap.DCS.MaximumLagOnFailover = patroni.MaximumLagOnFailover
+	}
+	if patroni.LoopWait != 0 {
+		config.Bootstrap.DCS.LoopWait = patroni.LoopWait
+	}
+	if patroni.RetryTimeout != 0 {
+		config.Bootstrap.DCS.RetryTimeout = patroni.RetryTimeout
+	}
+	if patroni.TTL != 0 {
+		config.Bootstrap.DCS.TTL = patroni.TTL
+	}
+	if patroni.Slots != nil {
+		config.Bootstrap.DCS.Slots = patroni.Slots
+	}
+	if patroni.SynchronousMode {
+		config.Bootstrap.DCS.SynchronousMode = patroni.SynchronousMode
+	}
+	if patroni.SynchronousModeStrict {
+		config.Bootstrap.DCS.SynchronousModeStrict = patroni.SynchronousModeStrict
+	}
+
+	config.PgLocalConfiguration = make(map[string]interface{})
+
+	// the newer and preferred way to specify the PG version is to use the `PGVERSION` env variable
+	// setting postgresq.bin_dir in the SPILO_CONFIGURATION still works and takes precedence over PGVERSION
+	// so we add postgresq.bin_dir only if PGVERSION is unused
+	// see PR 222 in Spilo
+	if !c.OpConfig.EnablePgVersionEnvVar {
+		config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
+	}
+	if len(pg.Parameters) > 0 {
+		local, bootstrap, err := c.getLocalAndBoostrapPostgreSQLParameters(pg.Parameters)
+		if err != nil {
+			return "", err
+		}
+
+		if len(local) > 0 {
+			config.PgLocalConfiguration[constants.PatroniPGParametersParameterName] = local
+		}
+		if len(bootstrap) > 0 {
+			config.Bootstrap.DCS.PGBootstrapConfiguration = make(map[string]interface{})
+			config.Bootstrap.DCS.PGBootstrapConfiguration[constants.PatroniPGParametersParameterName] = bootstrap
+		}
+	}
+	// Patroni gives us a choice of writing pg_hba.conf to either the bootstrap section or to the local postgresql one.
+	// We choose the local one, because we need Patroni to change pg_hba.conf in PostgreSQL after the user changes the
+	// relevant section in the manifest.
+	if len(patroni.PgHba) > 0 {
+		config.PgLocalConfiguration[patroniPGHBAConfParameterName] = patroni.PgHba
+	}
+
+	config.Bootstrap.Users = map[string]pgUser{
+		c.OpConfig.PamRoleName: {
+			Password: "",
+			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
+		},
+	}
+
+	res, err := json.Marshal(config)
+	return string(res), err
+}
+
+func (c *Cluster) getLocalAndBoostrapPostgreSQLParameters(parameters map[string]acidv1.PgParameterAttr) (local, bootstrap map[string]string, err error) {
+	local = make(map[string]string)
+	bootstrap = make(map[string]string)
+
+	for paramName, paramAttr := range parameters {
+		if isBootstrapOnlyParameter(paramName) {
+			bootstrap[paramName], err = c.GetPostgresParamValue(paramAttr)
+			if err != nil {
+				return
+			}
+		} else {
+			local[paramName], err = c.GetPostgresParamValue(paramAttr)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	return
+}
+
 func generateResourceRequirements(resources acidv1.Resources, defaultResources acidv1.Resources) (*v1.ResourceRequirements, error) {
 	var err error
 
@@ -181,137 +323,6 @@ func fillResourceList(spec acidv1.ResourceDescription, defaults acidv1.ResourceD
 	}
 
 	return requests, nil
-}
-
-func generateSpiloJSONConfiguration(pg *acidv1.PostgresqlParam, patroni *acidv1.Patroni, pamRoleName string, EnablePgVersionEnvVar bool, logger *logrus.Entry) (string, error) {
-	config := spiloConfiguration{}
-
-	config.Bootstrap = pgBootstrap{}
-
-	config.Bootstrap.Initdb = []interface{}{map[string]string{"auth-host": "md5"},
-		map[string]string{"auth-local": "trust"}}
-
-	initdbOptionNames := []string{}
-
-	for k := range patroni.InitDB {
-		initdbOptionNames = append(initdbOptionNames, k)
-	}
-	/* We need to sort the user-defined options to more easily compare the resulting specs */
-	sort.Strings(initdbOptionNames)
-
-	// Initdb parameters in the manifest take priority over the default ones
-	// The whole type switch dance is caused by the ability to specify both
-	// maps and normal string items in the array of initdb options. We need
-	// both to convert the initial key-value to strings when necessary, and
-	// to de-duplicate the options supplied.
-PatroniInitDBParams:
-	for _, k := range initdbOptionNames {
-		v := patroni.InitDB[k]
-		for i, defaultParam := range config.Bootstrap.Initdb {
-			switch t := defaultParam.(type) {
-			case map[string]string:
-				{
-					for k1 := range t {
-						if k1 == k {
-							(config.Bootstrap.Initdb[i]).(map[string]string)[k] = v
-							continue PatroniInitDBParams
-						}
-					}
-				}
-			case string:
-				{
-					/* if the option already occurs in the list */
-					if t == v {
-						continue PatroniInitDBParams
-					}
-				}
-			default:
-				logger.Warningf("unsupported type for initdb configuration item %s: %T", defaultParam, defaultParam)
-				continue PatroniInitDBParams
-			}
-		}
-		// The following options are known to have no parameters
-		if v == "true" {
-			switch k {
-			case "data-checksums", "debug", "no-locale", "noclean", "nosync", "sync-only":
-				config.Bootstrap.Initdb = append(config.Bootstrap.Initdb, k)
-				continue
-			}
-		}
-		config.Bootstrap.Initdb = append(config.Bootstrap.Initdb, map[string]string{k: v})
-	}
-
-	if patroni.MaximumLagOnFailover >= 0 {
-		config.Bootstrap.DCS.MaximumLagOnFailover = patroni.MaximumLagOnFailover
-	}
-	if patroni.LoopWait != 0 {
-		config.Bootstrap.DCS.LoopWait = patroni.LoopWait
-	}
-	if patroni.RetryTimeout != 0 {
-		config.Bootstrap.DCS.RetryTimeout = patroni.RetryTimeout
-	}
-	if patroni.TTL != 0 {
-		config.Bootstrap.DCS.TTL = patroni.TTL
-	}
-	if patroni.Slots != nil {
-		config.Bootstrap.DCS.Slots = patroni.Slots
-	}
-	if patroni.SynchronousMode {
-		config.Bootstrap.DCS.SynchronousMode = patroni.SynchronousMode
-	}
-	if patroni.SynchronousModeStrict {
-		config.Bootstrap.DCS.SynchronousModeStrict = patroni.SynchronousModeStrict
-	}
-
-	config.PgLocalConfiguration = make(map[string]interface{})
-
-	// the newer and preferred way to specify the PG version is to use the `PGVERSION` env variable
-	// setting postgresq.bin_dir in the SPILO_CONFIGURATION still works and takes precedence over PGVERSION
-	// so we add postgresq.bin_dir only if PGVERSION is unused
-	// see PR 222 in Spilo
-	if !EnablePgVersionEnvVar {
-		config.PgLocalConfiguration[patroniPGBinariesParameterName] = fmt.Sprintf(pgBinariesLocationTemplate, pg.PgVersion)
-	}
-	if len(pg.Parameters) > 0 {
-		local, bootstrap := getLocalAndBoostrapPostgreSQLParameters(pg.Parameters)
-
-		if len(local) > 0 {
-			config.PgLocalConfiguration[constants.PatroniPGParametersParameterName] = local
-		}
-		if len(bootstrap) > 0 {
-			config.Bootstrap.DCS.PGBootstrapConfiguration = make(map[string]interface{})
-			config.Bootstrap.DCS.PGBootstrapConfiguration[constants.PatroniPGParametersParameterName] = bootstrap
-		}
-	}
-	// Patroni gives us a choice of writing pg_hba.conf to either the bootstrap section or to the local postgresql one.
-	// We choose the local one, because we need Patroni to change pg_hba.conf in PostgreSQL after the user changes the
-	// relevant section in the manifest.
-	if len(patroni.PgHba) > 0 {
-		config.PgLocalConfiguration[patroniPGHBAConfParameterName] = patroni.PgHba
-	}
-
-	config.Bootstrap.Users = map[string]pgUser{
-		pamRoleName: {
-			Password: "",
-			Options:  []string{constants.RoleFlagCreateDB, constants.RoleFlagNoLogin},
-		},
-	}
-
-	res, err := json.Marshal(config)
-	return string(res), err
-}
-
-func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]string) (local, bootstrap map[string]string) {
-	local = make(map[string]string)
-	bootstrap = make(map[string]string)
-	for param, val := range parameters {
-		if isBootstrapOnlyParameter(param) {
-			bootstrap[param] = val
-		} else {
-			local[param] = val
-		}
-	}
-	return
 }
 
 func generateCapabilities(capabilities []string) *v1.Capabilities {
@@ -757,9 +768,6 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 	} else {
 		envVars = append(envVars, v1.EnvVar{Name: "KUBERNETES_LABELS", Value: string(clusterLabels)})
 	}
-	if spiloConfiguration != "" {
-		envVars = append(envVars, v1.EnvVar{Name: "SPILO_CONFIGURATION", Value: spiloConfiguration})
-	}
 
 	if c.patroniUsesKubernetes() {
 		envVars = append(envVars, v1.EnvVar{Name: "DCS_ENABLE_KUBERNETES_API", Value: "true"})
@@ -811,6 +819,10 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_S3_BUCKET", Value: c.OpConfig.LogS3Bucket})
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_SUFFIX", Value: getBucketScopeSuffix(string(uid))})
 		envVars = append(envVars, v1.EnvVar{Name: "LOG_BUCKET_SCOPE_PREFIX", Value: ""})
+	}
+
+	if spiloConfiguration != "" {
+		envVars = append(envVars, v1.EnvVar{Name: "SPILO_CONFIGURATION", Value: spiloConfiguration})
 	}
 
 	return envVars
@@ -1084,7 +1096,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		}
 	}
 
-	spiloConfiguration, err := generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni, c.OpConfig.PamRoleName, c.OpConfig.EnablePgVersionEnvVar, c.logger)
+	spiloConfiguration, err := c.generateSpiloJSONConfiguration(&spec.PostgresqlParam, &spec.Patroni)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate Spilo JSON configuration: %v", err)
 	}

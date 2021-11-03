@@ -24,9 +24,9 @@ var (
 					Name: "teamAB",
 				},
 				Spec: acidv1.PostgresTeamSpec{
-					AdditionalSuperuserTeams: map[string][]string{"teamA": []string{"teamB", "team24x7"}, "teamB": []string{"teamA", "teamC", "team24x7"}},
-					AdditionalTeams:          map[string][]string{"teamA": []string{"teamC"}, "teamB": []string{}},
-					AdditionalMembers:        map[string][]string{"team24x7": []string{"optimusprime"}, "teamB": []string{"drno"}},
+					AdditionalSuperuserTeams: map[string][]string{"teamA": {"teamB", "team24x7"}, "teamB": {"teamA", "teamC", "team24x7"}},
+					AdditionalTeams:          map[string][]string{"teamA": {"teamC"}, "teamB": {}},
+					AdditionalMembers:        map[string][]string{"team24x7": {"optimusprime"}, "teamB": {"drno"}},
 				},
 			}, {
 				TypeMeta: metav1.TypeMeta{
@@ -37,9 +37,9 @@ var (
 					Name: "teamC",
 				},
 				Spec: acidv1.PostgresTeamSpec{
-					AdditionalSuperuserTeams: map[string][]string{"teamC": []string{"team24x7"}},
-					AdditionalTeams:          map[string][]string{"teamA": []string{"teamC"}, "teamC": []string{"teamA", "teamB", "acid"}},
-					AdditionalMembers:        map[string][]string{"acid": []string{"batman"}},
+					AdditionalSuperuserTeams: map[string][]string{"teamC": {"team24x7"}},
+					AdditionalTeams:          map[string][]string{"teamA": {"teamC"}, "teamC": {"teamA", "teamB", "acid"}},
+					AdditionalMembers:        map[string][]string{"acid": {"batman"}},
 				},
 			},
 		},

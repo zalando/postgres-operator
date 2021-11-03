@@ -38,9 +38,12 @@ spec:
   postgresql:
     version: "14"
     parameters:  # Expert section
-      shared_buffers: "32MB"
-      max_connections: "10"
-      log_statement: "all"
+      shared_buffers:
+        value: "32MB"
+      max_connections:
+        value: "10"
+      log_statement:
+        value: "all"
   volume:
     size: 1Gi
 #    storageClass: my-sc

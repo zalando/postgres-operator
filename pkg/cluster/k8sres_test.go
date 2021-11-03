@@ -69,17 +69,20 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 		subtest  string
 		pgParam  *acidv1.PostgresqlParam
 		patroni  *acidv1.Patroni
-		role     string
 		opConfig config.Config
 		result   string
 	}{
 		{
-			subtest:  "Patroni default configuration",
-			pgParam:  &acidv1.PostgresqlParam{PgVersion: "9.6"},
-			patroni:  &acidv1.Patroni{},
-			role:     "zalandos",
-			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/9.6/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
+			subtest: "Patroni default configuration",
+			pgParam: &acidv1.PostgresqlParam{PgVersion: "9.6"},
+			patroni: &acidv1.Patroni{},
+			opConfig: config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+				EnablePgVersionEnvVar: false,
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/9.6/bin"},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{}}}`,
 		},
 		{
 			subtest: "Patroni configured",
@@ -99,20 +102,24 @@ func TestGenerateSpiloJSONConfiguration(t *testing.T) {
 				SynchronousModeStrict: true,
 				Slots:                 map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 			},
-			role:     "zalandos",
-			opConfig: config.Config{},
-			result:   `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
+			opConfig: config.Config{
+				Auth: config.Auth{
+					PamRoleName: "zalandos",
+				},
+				EnablePgVersionEnvVar: false,
+			},
+			result: `{"postgresql":{"bin_dir":"/usr/lib/postgresql/11/bin","pg_hba":["hostssl all all 0.0.0.0/0 md5","host    all all 0.0.0.0/0 md5"]},"bootstrap":{"initdb":[{"auth-host":"md5"},{"auth-local":"trust"},"data-checksums",{"encoding":"UTF8"},{"locale":"en_US.UTF-8"}],"users":{"zalandos":{"password":"","options":["CREATEDB","NOLOGIN"]}},"dcs":{"ttl":30,"loop_wait":10,"retry_timeout":10,"maximum_lag_on_failover":33554432,"synchronous_mode":true,"synchronous_mode_strict":true,"slots":{"permanent_logical_1":{"database":"foo","plugin":"pgoutput","type":"logical"}}}}}`,
 		},
 	}
 	for _, tt := range tests {
 		cluster.OpConfig = tt.opConfig
-		result, err := generateSpiloJSONConfiguration(tt.pgParam, tt.patroni, tt.role, false, logger)
+		result, err := cluster.generateSpiloJSONConfiguration(tt.pgParam, tt.patroni)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if tt.result != result {
 			t.Errorf("%s %s: Spilo Config is %v, expected %v for role %#v and param %#v",
-				testName, tt.subtest, result, tt.result, tt.role, tt.pgParam)
+				testName, tt.subtest, result, tt.result, tt.opConfig.PamRoleName, tt.pgParam)
 		}
 	}
 }
@@ -131,41 +138,41 @@ func TestGenerateSpiloPodEnvVars(t *testing.T) {
 		}, k8sutil.KubernetesClient{}, acidv1.Postgresql{}, logger, eventRecorder)
 
 	expectedValuesGSBucket := []ExpectedValue{
-		ExpectedValue{
-			envIndex:       15,
+		{
+			envIndex:       14,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
-		ExpectedValue{
-			envIndex:       16,
+		{
+			envIndex:       15,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
-		ExpectedValue{
-			envIndex:       17,
+		{
+			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
 	}
 
 	expectedValuesGCPCreds := []ExpectedValue{
-		ExpectedValue{
-			envIndex:       15,
+		{
+			envIndex:       14,
 			envVarConstant: "WAL_GS_BUCKET",
 			envVarValue:    "wale-gs-bucket",
 		},
-		ExpectedValue{
-			envIndex:       16,
+		{
+			envIndex:       15,
 			envVarConstant: "WAL_BUCKET_SCOPE_SUFFIX",
 			envVarValue:    "/SomeUUID",
 		},
-		ExpectedValue{
-			envIndex:       17,
+		{
+			envIndex:       16,
 			envVarConstant: "WAL_BUCKET_SCOPE_PREFIX",
 			envVarValue:    "",
 		},
-		ExpectedValue{
-			envIndex:       18,
+		{
+			envIndex:       17,
 			envVarConstant: "GOOGLE_APPLICATION_CREDENTIALS",
 			envVarValue:    "some_path_to_credentials",
 		},
@@ -924,9 +931,9 @@ func TestNodeAffinity(t *testing.T) {
 	nodeAff := &v1.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				v1.NodeSelectorTerm{
+				{
 					MatchExpressions: []v1.NodeSelectorRequirement{
-						v1.NodeSelectorRequirement{
+						{
 							Key:      "test-label",
 							Operator: v1.NodeSelectorOpIn,
 							Values: []string{
@@ -999,7 +1006,7 @@ func TestTLS(t *testing.T) {
 			TLS: &acidv1.TLSDescription{
 				SecretName: tlsSecretName, CAFile: "ca.crt"},
 			AdditionalVolumes: []acidv1.AdditionalVolume{
-				acidv1.AdditionalVolume{
+				{
 					Name:      tlsSecretName,
 					MountPath: mountPath,
 					VolumeSource: v1.VolumeSource{
@@ -1209,8 +1216,8 @@ func TestSidecars(t *testing.T) {
 	spec = acidv1.PostgresSpec{
 		PostgresqlParam: acidv1.PostgresqlParam{
 			PgVersion: "12.1",
-			Parameters: map[string]string{
-				"max_connections": "100",
+			Parameters: map[string]acidv1.PgParameterAttr{
+				"max_connections": {Value: "100"},
 			},
 		},
 		TeamID: "myapp", NumberOfInstances: 1,
@@ -1222,17 +1229,17 @@ func TestSidecars(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "overwrite-image",
 			},
@@ -1258,11 +1265,11 @@ func TestSidecars(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
@@ -1317,7 +1324,7 @@ func TestSidecars(t *testing.T) {
 		},
 	}
 	mounts := []v1.VolumeMount{
-		v1.VolumeMount{
+		{
 			Name:      "pgdata",
 			MountPath: "/home/postgres/pgdata",
 		},
@@ -1397,17 +1404,17 @@ func TestGenerateService(t *testing.T) {
 			Size: "1G",
 		},
 		Sidecars: []acidv1.Sidecar{
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar",
 			},
-			acidv1.Sidecar{
+			{
 				Name: "cluster-specific-sidecar-with-resources",
 				Resources: acidv1.Resources{
 					ResourceRequests: acidv1.ResourceDescription{CPU: "210m", Memory: "0.8Gi"},
 					ResourceLimits:   acidv1.ResourceDescription{CPU: "510m", Memory: "1.4Gi"},
 				},
 			},
-			acidv1.Sidecar{
+			{
 				Name:        "replace-sidecar",
 				DockerImage: "overwrite-image",
 			},
@@ -1434,11 +1441,11 @@ func TestGenerateService(t *testing.T) {
 					"deprecated-global-sidecar": "image:123",
 				},
 				SidecarContainers: []v1.Container{
-					v1.Container{
+					{
 						Name: "global-sidecar",
 					},
 					// will be replaced by a cluster specific sidecar with the same name
-					v1.Container{
+					{
 						Name:  "replace-sidecar",
 						Image: "replaced-image",
 					},
