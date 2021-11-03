@@ -152,7 +152,7 @@ type Config struct {
 	WatchedNamespace        string            `name:"watched_namespace"` // special values: "*" means 'watch all namespaces', the empty string "" means 'watch a namespace where operator is deployed to'
 	KubernetesUseConfigMaps bool              `name:"kubernetes_use_configmaps" default:"false"`
 	EtcdHost                string            `name:"etcd_host" default:""` // special values: the empty string "" means Patroni will use K8s as a DCS
-	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-13:2.1-p1"`
+	DockerImage             string            `name:"docker_image" default:"registry.opensource.zalan.do/acid/spilo-14:2.1-p2"`
 	SidecarImages           map[string]string `name:"sidecar_docker_images"` // deprecated in favour of SidecarContainers
 	SidecarContainers       []v1.Container    `name:"sidecars"`
 	PodServiceAccountName   string            `name:"pod_service_account_name" default:"postgres-pod"`
@@ -212,8 +212,8 @@ type Config struct {
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"`
-	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.5"`
-	TargetMajorVersion                     string            `name:"target_major_version" default:"13"`
+	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`
+	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
 }
 
 // MustMarshal marshals the config or panics

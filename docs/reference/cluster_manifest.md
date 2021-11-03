@@ -4,9 +4,9 @@ Individual Postgres clusters are described by the Kubernetes *cluster manifest*
 that has the structure defined by the `postgresql` CRD (custom resource
 definition). The following section describes the structure of the manifest and
 the purpose of individual keys. You can take a look at the examples of the
-[minimal](../../manifests/minimal-postgres-manifest.yaml)
+[minimal](https://github.com/zalando/postgres-operator/blob/master/manifests/minimal-postgres-manifest.yaml)
 and the
-[complete](../../manifests/complete-postgres-manifest.yaml)
+[complete](https://github.com/zalando/postgres-operator/blob/master/manifests/complete-postgres-manifest.yaml)
 cluster manifests.
 
 When Kubernetes resources, such as memory, CPU or volumes, are configured,
@@ -110,7 +110,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   `CREATEDB`, `BYPASSURL`. A login user is created by default unless NOLOGIN is
   specified, in which case the operator creates a role. One can specify empty
   flags by providing a JSON empty array '*[]*'. If the config option
-  `enable_cross_namespace_secrets` is enabled you can specify the namespace in
+  `enable_cross_namespace_secret` is enabled you can specify the namespace in
   the user name in the form `{namespace}.{username}` and the operator will
   create the K8s secret in that namespace. The part after the first `.` is
   considered to be the user name. Optional.
@@ -215,7 +215,7 @@ information, see [user docs](../user.md#prepared-databases-with-roles-and-defaul
 * **secretNamespace**
   for each default LOGIN role the operator will create a secret. You can
   specify the namespace in which these secrets will get created, if
-  `enable_cross_namespace_secrets` is set to `true` in the config. Otherwise,
+  `enable_cross_namespace_secret` is set to `true` in the config. Otherwise,
   the cluster namespace is used.
 
 ## Postgres parameters
