@@ -128,6 +128,7 @@ type LogicalBackup struct {
 	LogicalBackupStorageContainer             string `name:"logical_backup_storage_container" default:""`
 	LogicalBackupStorageBlob                  string `name:"logical_backup_storage_blob" default:""`
 	LogicalBackupStorageAccountKey            string `name:"logical_backup_storage_account_key" default:""`
+	LogicalBackupCronjobEnvironmentSecret     string `name:"logical_backup_cronjob_environment_secret" default:""`
 }
 
 // Operator options for connection pooler

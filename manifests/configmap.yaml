@@ -80,6 +80,7 @@ data:
   # logical_backup_storage_container: ""
   # logical_backup_storage_blob: ""
   # logical_backup_storage_account_key: ""
+  # logical_backup_cronjob_environment_secret: ""
   major_version_upgrade_mode: "manual"
   master_dns_name_format: "{cluster}.{team}.{hostedzone}"
   # master_pod_move_timeout: 20m

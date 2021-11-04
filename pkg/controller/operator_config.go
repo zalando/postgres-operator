@@ -165,6 +165,11 @@ func (c *Controller) importConfigurationFromCRD(fromCRD *acidv1.OperatorConfigur
 	result.LogicalBackupS3SSE = fromCRD.LogicalBackup.S3SSE
 	result.LogicalBackupGoogleApplicationCredentials = fromCRD.LogicalBackup.GoogleApplicationCredentials
 	result.LogicalBackupJobPrefix = util.Coalesce(fromCRD.LogicalBackup.JobPrefix, "logical-backup-")
+	result.LogicalBackupStorageAccountName = fromCRD.LogicalBackup.StorageAccountName
+	result.LogicalBackupStorageAccountKey = fromCRD.LogicalBackup.StorageAccountKey
+	result.LogicalBackupStorageBlob = fromCRD.LogicalBackup.StorageBlob
+	result.LogicalBackupStorageContainer = fromCRD.LogicalBackup.StorageContainer
+	result.LogicalBackupCronjobEnvironmentSecret = fromCRD.LogicalBackup.CronjobEnvironmentSecret
 
 	// debug config
 	result.DebugLogging = fromCRD.OperatorDebug.DebugLogging

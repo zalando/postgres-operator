@@ -210,6 +210,11 @@ type OperatorLogicalBackupConfiguration struct {
 	S3SSE                        string `json:"logical_backup_s3_sse,omitempty"`
 	GoogleApplicationCredentials string `json:"logical_backup_google_application_credentials,omitempty"`
 	JobPrefix                    string `json:"logical_backup_job_prefix,omitempty"`
+	StorageAccountName           string `json:"logical_backup_storage_account_name,omitempty"`
+	StorageContainer             string `json:"logical_backup_storage_container,omitempty"`
+	StorageBlob                  string `json:"logical_backup_storage_blob,omitempty"`
+	StorageAccountKey            string `json:"logical_backup_storage_account_key,omitempty"`
+	CronjobEnvironmentSecret     string `json:"logical_backup_cronjob_environment_secret,omitempty"`
 }
 
 // OperatorConfigurationData defines the operation config
