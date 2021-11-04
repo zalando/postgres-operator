@@ -310,6 +310,8 @@ configLogicalBackup:
   logical_backup_storage_blob: ""
   # storage account key
   logical_backup_storage_account_key: ""
+  # secret to be used as reference for env variables in cronjob
+  logical_backup_cronjob_environment_secret: ""
 
 # automate creation of human users with teams API service
 configTeamsApi:
