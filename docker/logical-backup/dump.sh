@@ -53,7 +53,7 @@ function gcs_upload {
 }
 
 function az_upload {
-    PATH_TO_BACKUP="test/logical_backups/"$(date +%s).sql.gz
+    PATH_TO_BACKUP=$LOGICAL_BACKUP_S3_BUCKET"/spilo/"$SCOPE$LOGICAL_BACKUP_S3_BUCKET_SCOPE_SUFFIX"/logical_backups/"$(date +%s).sql.gz
 
     az storage blob upload --file "$1" --account-name "$LOGICAL_BACKUP_STORAGE_ACCOUNT_NAME" --account-key "$LOGICAL_BACKUP_STORAGE_ACCOUNT_KEY" -c "$LOGICAL_BACKUP_STORAGE_CONTAINER" -n "$PATH_TO_BACKUP"
 }

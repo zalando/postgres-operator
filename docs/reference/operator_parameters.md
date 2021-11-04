@@ -655,6 +655,9 @@ grouped under the `logical_backup` key.
 * **logical_backup_storage_account_key**
   Storage account key used to authenticate with Azure when uploading logical backups. Default: ""
 
+* **logical_backup_cronjob_environment_secret**
+  Reference to a Kubernetes secret, which keys will be added as environment variables to the cronjob. Default: ""
+
 ## Debugging the operator
 
 Options to aid debugging of the operator itself. Grouped under the `debug` key.

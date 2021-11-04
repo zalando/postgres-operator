@@ -143,6 +143,7 @@ configuration:
     # logical_backup_storage_container: ""
     # logical_backup_storage_blob: ""
     # logical_backup_storage_account_key: ""
+    # logical_backup_cronjob_environment_secret: ""
   debug:
     debug_logging: true
     enable_database_access: true
