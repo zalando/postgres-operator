@@ -301,18 +301,18 @@ PatroniInitDBParams:
 	return string(res), err
 }
 
-func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]acidv1.Parameter) (local, bootstrap map[string]string) {
+func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]acidv1.PgParameterAttr) (local, bootstrap map[string]string) {
 	local = make(map[string]string)
 	bootstrap = make(map[string]string)
 
-	for name, attr := range parameters {
-		switch attr.Type {
+	for paramName, paramAttr := range parameters {
+		switch paramAttr.Type {
 		default:
 			fallthrough
 		case constants.PatroniLocalPGParameterName:
-			local[name] = attr.Value
+			local[paramName] = paramAttr.Value
 		case constants.PatroniBootstrapPGParameterName:
-			bootstrap[name] = attr.Value
+			bootstrap[paramName] = paramAttr.Value
 		}
 	}
 

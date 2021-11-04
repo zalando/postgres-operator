@@ -283,7 +283,7 @@ var unmarshalCluster = []struct {
 			Spec: PostgresSpec{
 				PostgresqlParam: PostgresqlParam{
 					PgVersion: "9.6",
-					Parameters: map[string]Parameter{
+					Parameters: map[string]PgParameterAttr{
 						"shared_buffers":  {Type: "local", Value: "32MB"},
 						"max_connections": {Type: "bootstrap", Value: "10"},
 						"log_statement":   {Type: "bootstrap", Value: "all"},

@@ -369,8 +369,6 @@ spec:
                     type: object
                     additionalProperties:
                       type: object
-                      required:
-                        - value
                       properties:
                         type:
                           type: string

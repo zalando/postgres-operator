@@ -946,7 +946,7 @@ func (in *PostgresqlParam) DeepCopyInto(out *PostgresqlParam) {
 	*out = *in
 	if in.Parameters != nil {
 		in, out := &in.Parameters, &out.Parameters
-		*out = make(map[string]Parameter, len(*in))
+		*out = make(map[string]PgParameterAttr, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

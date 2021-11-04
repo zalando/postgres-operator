@@ -134,13 +134,14 @@ type AdditionalVolume struct {
 
 // PostgresqlParam describes PostgreSQL version and pairs of configuration parameter name - values.
 type PostgresqlParam struct {
-	PgVersion  string               `json:"version"`
-	Parameters map[string]Parameter `json:"parameters,omitempty"`
+	PgVersion  string                     `json:"version"`
+	Parameters map[string]PgParameterAttr `json:"parameters,omitempty"`
 }
 
-type Parameter struct {
+// PgParameterAttr defines postgres parameter attributes
+type PgParameterAttr struct {
 	Type  string `json:"type,omitempty"`
-	Value string `json:"value"`
+	Value string `json:"value,omitempty"`
 }
 
 // ResourceDescription describes CPU and memory resources defined for a cluster.
