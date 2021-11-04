@@ -258,16 +258,15 @@ func (c *Cluster) getLocalAndBoostrapPostgreSQLParameters(parameters map[string]
 	bootstrap = make(map[string]string)
 
 	for paramName, paramAttr := range parameters {
+		paramValue, err := c.GetPostgresParamValue(paramAttr)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		if isBootstrapOnlyParameter(paramName) {
-			bootstrap[paramName], err = c.GetPostgresParamValue(paramAttr)
-			if err != nil {
-				return
-			}
+			bootstrap[paramName] = paramValue
 		} else {
-			local[paramName], err = c.GetPostgresParamValue(paramAttr)
-			if err != nil {
-				return
-			}
+			local[paramName] = paramValue
 		}
 	}
 
