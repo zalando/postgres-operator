@@ -231,8 +231,14 @@ required in the manifest.
 
 * **parameters**
   a dictionary of Postgres parameter names and values to apply to the resulting
-  cluster. Optional (Spilo automatically sets reasonable defaults for parameters
-  like `work_mem` or `max_connections`).
+  cluster. Parameters can be typed `local` or` bootstrap` (default). Only the
+  bootstrap ones are synchronized across the cluster (through [Patroni 
+  DCS](https://patroni.readthedocs.io/en/latest/dynamic_configuration.html)).
+  Optional (Spilo automatically sets reasonable defaults for parameters like
+  `work_mem` or `max_connections`).
+
+  It is recommended to limit the use of local parameters to very specific cases,
+  given that the Pods of the same cluster must be equal.
 
 ## Patroni parameters
 

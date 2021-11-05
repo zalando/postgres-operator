@@ -309,10 +309,10 @@ func getLocalAndBoostrapPostgreSQLParameters(parameters map[string]acidv1.PgPara
 		switch paramAttr.Type {
 		default:
 			fallthrough
-		case constants.PatroniLocalPGParameterName:
-			local[paramName] = paramAttr.Value
 		case constants.PatroniBootstrapPGParameterName:
 			bootstrap[paramName] = paramAttr.Value
+		case constants.PatroniLocalPGParameterName:
+			local[paramName] = paramAttr.Value
 		}
 	}
 
