@@ -538,6 +538,24 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 											},
 											"valueFrom": {
 												Type: "object",
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"configMapKeyRef": {
+														Type: "object",
+														AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "string",
+															},
+														},
+													},
+													"secretKeyRef": {
+														Type: "object",
+														AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+															Schema: &apiextv1.JSONSchemaProps{
+																Type: "string",
+															},
+														},
+													},
+												},
 											},
 										},
 									},
