@@ -231,8 +231,9 @@ required in the manifest.
 
 * **parameters**
   a dictionary of Postgres parameter names and values to apply to the resulting
-  cluster. Optional (Spilo automatically sets reasonable defaults for parameters
-  like `work_mem` or `max_connections`).
+  cluster. Parameter values support referring to ConfigMap and Secret resources.
+  Optional (Spilo automatically sets reasonable defaults for parameters like
+  `work_mem` or `max_connections`).
 
 ## Patroni parameters
 
