@@ -362,11 +362,6 @@ rbac:
   # Specifies whether RBAC resources should be created
   create: true
 
-crd:
-  # Specifies whether custom resource definitions should be created
-  # When using helm3, this is ignored; instead use "--skip-crds" to skip.
-  create: true
-
 serviceAccount:
   # Specifies whether a ServiceAccount should be created
   create: true
