@@ -1118,6 +1118,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		if secretNamespace != "" {
 			if c.Config.OpConfig.EnableCrossNamespaceSecret {
 				namespace = secretNamespace
+				c.logger.Warningf("enable_cross_namespace_secret is set. Hence username contains the respective namespace i.e. %s is the created user", prefix+defaultRole)
 			} else {
 				c.logger.Warn("secretNamespace ignored because enable_cross_namespace_secret set to false. Creating secrets in cluster namespace.")
 			}
@@ -1176,6 +1177,7 @@ func (c *Cluster) initRobotUsers() error {
 			if strings.Contains(username, ".") {
 				splits := strings.Split(username, ".")
 				namespace = splits[0]
+				c.logger.Warningf("enable_cross_namespace_secret is set. Hence username contains the respective namespace i.e. %s is the created user", username)
 			}
 		}
 
