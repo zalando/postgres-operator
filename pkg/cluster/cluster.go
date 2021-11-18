@@ -1176,6 +1176,7 @@ func (c *Cluster) initRobotUsers() error {
 			if strings.Contains(username, ".") {
 				splits := strings.Split(username, ".")
 				namespace = splits[0]
+				c.logger.Warningf("enable_cross_namespace_secret is set. Database role name contains the respective namespace i.e. %s is the created user", username)
 			}
 		}
 
