@@ -885,6 +885,7 @@ data:
   USE_WALG_BACKUP: "true"
   USE_WALG_RESTORE: "true"
   CLONE_USE_WALG_RESTORE: "true"
+  WALG_AZ_PREFIX: "azure://container-name/$(SCOPE)/$(PGVERSION)" # Enables Azure Backups (SCOPE = Cluster name) (PGVERSION = Postgres version) 
 ```
 
 3. Setup your operator configuration values. With the `psql-backup-creds`
