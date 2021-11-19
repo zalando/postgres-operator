@@ -291,6 +291,8 @@ kubectl create -f manifests/user-facing-clusterroles.yaml
 It creates zalando-postgres-operator:user:view, :edit and :admin clusterroles
 that are aggregated into the K8s [default roles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#default-roles-and-role-bindings).
 
+For Helm deployments setting `rbac.createAggregateClusterRoles: true` adds these clusterroles to the deployment.
+
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,
@@ -762,7 +764,7 @@ WALE_S3_PREFIX=$WAL_S3_BUCKET/spilo/{WAL_BUCKET_SCOPE_PREFIX}{SCOPE}{WAL_BUCKET_
 ```
 
 The operator sets the prefix to an empty string so that spilo will generate it
-from the configured `WAL_S3_BUCKET`. 
+from the configured `WAL_S3_BUCKET`.
 
 :warning: When you overwrite the configuration by defining `WAL_S3_BUCKET` in
 the [pod_environment_configmap](#custom-pod-environment-variables) you have
