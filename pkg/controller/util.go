@@ -197,9 +197,8 @@ func (c *Controller) getInfrastructureRoles(
 	rolesSecrets []*config.InfrastructureRole) (
 	map[string]spec.PgUser, []error) {
 
-	var errors []error
-	var noRolesProvided = true
-
+	errors := make([]error, 0)
+	noRolesProvided := true
 	roles := []spec.PgUser{}
 	uniqRoles := map[string]spec.PgUser{}
 
@@ -230,9 +229,7 @@ func (c *Controller) getInfrastructureRoles(
 			continue
 		}
 
-		for _, r := range infraRoles {
-			roles = append(roles, r)
-		}
+		roles = append(roles, infraRoles...)
 	}
 
 	for _, r := range roles {
