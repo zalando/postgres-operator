@@ -214,6 +214,7 @@ type Config struct {
 	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"`
 	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`
 	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
+	MajorVersionUpgradeTeamWhitelist       []string          `name:"major_version_upgrade_team_whitelist" default:""`
 }
 
 // MustMarshal marshals the config or panics
