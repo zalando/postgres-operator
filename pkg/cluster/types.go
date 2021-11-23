@@ -14,11 +14,11 @@ import (
 type PostgresRole string
 
 const (
-	// Master role
-	Master PostgresRole = "master"
-
-	// Replica role
-	Replica PostgresRole = "replica"
+	Master        PostgresRole = "master"
+	Replica       PostgresRole = "replica"
+	Leader        PostgresRole = "leader"
+	StandbyLeader PostgresRole = "standby_leader"
+	SyncStandby   PostgresRole = "sync_standby"
 )
 
 // PodEventType represents the type of a pod-related event
