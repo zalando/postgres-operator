@@ -229,7 +229,9 @@ func (c *Controller) getInfrastructureRoles(
 			continue
 		}
 
-		roles = append(roles, infraRoles...)
+		for _, r := range infraRoles {
+			roles = append(roles, r)
+		}
 	}
 
 	for _, r := range roles {
