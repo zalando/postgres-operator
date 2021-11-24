@@ -523,7 +523,7 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 	}
 
 	if len(skipReasons) > 0 {
-		err = fmt.Errorf("no replica suitable for switchover: %s", strings.Join(skipReasons, `','`))
+		err = fmt.Errorf("no replica suitable for switchover: %s", strings.Join(skipReasons, `', '`))
 	} else {
 		err = fmt.Errorf("no replica running")
 	}
