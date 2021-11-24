@@ -506,7 +506,7 @@ func (c *Cluster) deleteSecrets() error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("could not delete all secrets: %v", errors)
+		return fmt.Errorf("could not delete all secrets: %v", strings.Join(errors, `', '`))
 	}
 
 	return nil

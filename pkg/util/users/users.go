@@ -138,7 +138,7 @@ func (strategy DefaultUserSyncStrategy) ExecuteSyncRequests(requests []spec.PgSy
 				return err
 			}
 		} else {
-			return fmt.Errorf("could not execute sync requests for users: %v", errors)
+			return fmt.Errorf("could not execute sync requests for users: %v", strings.Join(errors, `', '`))
 		}
 	}
 
