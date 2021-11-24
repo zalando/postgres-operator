@@ -200,7 +200,7 @@ func (c *Controller) getInfrastructureRoles(
 	errors := make([]string, 0)
 	noRolesProvided := true
 	roles := []spec.PgUser{}
-	uniqRoles := map[string]spec.PgUser{}
+	uniqRoles := make(map[string]spec.PgUser)
 
 	// To be compatible with the legacy implementation we need to return nil if
 	// the provided secret name is empty. The equivalent situation in the
@@ -213,7 +213,7 @@ func (c *Controller) getInfrastructureRoles(
 	}
 
 	if noRolesProvided {
-		return nil, nil
+		return uniqRoles, nil
 	}
 
 	for _, secret := range rolesSecrets {
@@ -242,7 +242,7 @@ func (c *Controller) getInfrastructureRoles(
 	}
 
 	if len(errors) > 0 {
-		return nil, fmt.Errorf(strings.Join(errors, `', '`))
+		return uniqRoles, fmt.Errorf(strings.Join(errors, `', '`))
 	}
 
 	return uniqRoles, nil
