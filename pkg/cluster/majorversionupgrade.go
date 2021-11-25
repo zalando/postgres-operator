@@ -58,7 +58,7 @@ func (c *Cluster) isTeamWhitelisted(owningTeam string) bool {
 /*
   Execute upgrade when mode is set to manual or full or when the owning team is whitelisted for upgrade.
 
-  Manual upgrade means, it us triggered by the user via manifest version change
+  Manual upgrade means, it is triggered by the user via manifest version change
   Full upgrade means, operator also determines the minimal version used accross all clusters and upgrades violators.
 */
 func (c *Cluster) majorVersionUpgrade() error {
