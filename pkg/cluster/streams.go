@@ -203,7 +203,7 @@ func (c *Cluster) getStreamConnection(database, user string) zalandov1alpha1.Con
 
 func (c *Cluster) getLogicalReplicationSlot(database string) string {
 	for slotName, slot := range c.Spec.Patroni.Slots {
-		if slot["type"] == "logical" && slot["database"] == database {
+		if slot["type"] == "logical" && slot["database"] == database && slot["plugin"] == "wal2json" {
 			return slotName
 		}
 	}
