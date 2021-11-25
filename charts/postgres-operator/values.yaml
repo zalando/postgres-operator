@@ -65,7 +65,7 @@ configMajorVersionUpgrade:
   # "off": no upgrade, "manual": manifest triggers action, "full": minimal version violation triggers too
   major_version_upgrade_mode: "off"
   # upgrades will only be carried out for clusters of listed teams
-  # major_version_upgrade_team_whitelist:
+  # major_version_upgrade_team_allow_list:
   # - acid
 
   # minimal Postgres major version that will not automatically be upgraded

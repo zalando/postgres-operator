@@ -131,7 +131,7 @@ spec:
                   major_version_upgrade_mode:
                     type: string
                     default: "off"
-                  major_version_upgrade_team_whitelist:
+                  major_version_upgrade_team_allow_list:
                     type: array
                     items:
                       type: string

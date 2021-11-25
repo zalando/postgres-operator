@@ -184,7 +184,7 @@ CRD-configuration, they are grouped under the `major_version_upgrade` key.
   Note, that with all three modes increasing the version in the manifest will
   trigger a rolling update of the pods. The default is `"off"`.
 
-* **major_version_upgrade_team_whitelist**
+* **major_version_upgrade_team_allow_list**
   Upgrades will only be carried out for clusters of listed teams. The default
   is empty which means a team filter is not applied.
 

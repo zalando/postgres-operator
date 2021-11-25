@@ -45,25 +45,25 @@ func (c *Cluster) GetDesiredMajorVersion() string {
 	return c.Spec.PgVersion
 }
 
-func (c *Cluster) isTeamWhitelisted(owningTeam string) bool {
-	whitelistedTeams := c.OpConfig.MajorVersionUpgradeTeamWhitelist
+func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
+	allowedTeams := c.OpConfig.MajorVersionUpgradeTeamAllowList
 
-	if len(whitelistedTeams) == 0 {
+	if len(allowedTeams) == 0 {
 		return false
 	}
 
-	return util.SliceContains(whitelistedTeams, owningTeam)
+	return util.SliceContains(allowedTeams, owningTeam)
 }
 
 /*
-  Execute upgrade when mode is set to manual or full or when the owning team is whitelisted for upgrade.
+  Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade.
 
   Manual upgrade means, it is triggered by the user via manifest version change
   Full upgrade means, operator also determines the minimal version used accross all clusters and upgrades violators.
 */
 func (c *Cluster) majorVersionUpgrade() error {
 
-	if c.OpConfig.MajorVersionUpgradeMode == "off" && !c.isTeamWhitelisted(c.Spec.TeamID) {
+	if c.OpConfig.MajorVersionUpgradeMode == "off" && !c.isUpgradeAllowedForTeam(c.Spec.TeamID) {
 		return nil
 	}
 

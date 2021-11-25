@@ -603,10 +603,9 @@ spec:
 ```
 
 Some extensions require SUPERUSER rights on creation unless they are not
-whitelisted by the [pgextwlist](https://github.com/dimitri/pgextwlist)
-extension, that is shipped with the Spilo image. To see which extensions are
-on the list check the `extwlist.extension` parameter in the postgresql.conf
-file.
+allowed by the [pgextwlist](https://github.com/dimitri/pgextwlist) extension,
+that is shipped with the Spilo image. To see which extensions are on the list
+check the `extwlist.extension` parameter in the postgresql.conf file.
 
 ```bash
 SHOW extwlist.extensions;
