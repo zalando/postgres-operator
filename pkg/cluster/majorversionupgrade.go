@@ -56,7 +56,7 @@ func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
 }
 
 /*
-  Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade.
+  Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
 
   Manual upgrade means, it is triggered by the user via manifest version change
   Full upgrade means, operator also determines the minimal version used accross all clusters and upgrades violators.
