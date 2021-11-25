@@ -212,9 +212,9 @@ type Config struct {
 	EnablePgVersionEnvVar                  bool              `name:"enable_pgversion_env_var" default:"true"`
 	EnableSpiloWalPathCompat               bool              `name:"enable_spilo_wal_path_compat" default:"false"`
 	MajorVersionUpgradeMode                string            `name:"major_version_upgrade_mode" default:"off"`
+	MajorVersionUpgradeTeamWhitelist       []string          `name:"major_version_upgrade_team_whitelist" default:""`
 	MinimalMajorVersion                    string            `name:"minimal_major_version" default:"9.6"`
 	TargetMajorVersion                     string            `name:"target_major_version" default:"14"`
-	MajorVersionUpgradeTeamWhitelist       []string          `name:"major_version_upgrade_team_whitelist" default:""`
 }
 
 // MustMarshal marshals the config or panics

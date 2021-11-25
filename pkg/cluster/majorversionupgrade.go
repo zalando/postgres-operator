@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -44,20 +45,14 @@ func (c *Cluster) GetDesiredMajorVersion() string {
 	return c.Spec.PgVersion
 }
 
-func isTeamWhitelisted(c *Cluster) bool {
+func (c *Cluster) isTeamWhitelisted(owningTeam string) bool {
 	whitelistedTeams := c.OpConfig.MajorVersionUpgradeTeamWhitelist
-	owningTeam := c.Spec.TeamID
 
 	if len(whitelistedTeams) == 0 {
 		return false
 	}
 
-	for _, t := range whitelistedTeams {
-		if t == owningTeam {
-			return true
-		}
-	}
-	return false
+	return util.SliceContains(whitelistedTeams, owningTeam)
 }
 
 /*
@@ -68,7 +63,7 @@ func isTeamWhitelisted(c *Cluster) bool {
 */
 func (c *Cluster) majorVersionUpgrade() error {
 
-	if c.OpConfig.MajorVersionUpgradeMode == "off" && !isTeamWhitelisted(c) {
+	if c.OpConfig.MajorVersionUpgradeMode == "off" && !c.isTeamWhitelisted(c.Spec.TeamID) {
 		return nil
 	}
 
