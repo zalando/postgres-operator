@@ -131,6 +131,10 @@ spec:
                   major_version_upgrade_mode:
                     type: string
                     default: "off"
+                  major_version_upgrade_team_allow_list:
+                    type: array
+                    items:
+                      type: string
                   minimal_major_version:
                     type: string
                     default: "9.6"
