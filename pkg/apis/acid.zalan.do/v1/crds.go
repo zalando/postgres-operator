@@ -1019,6 +1019,14 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 							"major_version_upgrade_mode": {
 								Type: "string",
 							},
+							"major_version_upgrade_team_allow_list": {
+								Type: "array",
+								Items: &apiextv1.JSONSchemaPropsOrArray{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type: "string",
+									},
+								},
+							},
 							"minimal_major_version": {
 								Type: "string",
 							},
