@@ -196,17 +196,15 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	cluster.patroni = p
 	mockPod := newMockPod("192.168.100.1")
 
-	// simulate existing config that differs with cluster.Spec
+	// simulate existing config that differs from cluster.Spec
 	tests := []struct {
 		subtest       string
-		pod           *v1.Pod
 		patroni       acidv1.Patroni
 		pgParams      map[string]string
 		restartMaster bool
 	}{
 		{
 			subtest: "Patroni and Postgresql.Parameters differ - restart replica first",
-			pod:     mockPod,
 			patroni: acidv1.Patroni{
 				TTL: 30, // desired 20
 			},
@@ -218,7 +216,6 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "multiple Postgresql.Parameters differ - restart replica first",
-			pod:     mockPod,
 			patroni: acidv1.Patroni{
 				TTL: 20,
 			},
@@ -230,7 +227,6 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "desired max_connections bigger - restart replica first",
-			pod:     mockPod,
 			patroni: acidv1.Patroni{
 				TTL: 20,
 			},
@@ -242,7 +238,6 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 		},
 		{
 			subtest: "desired max_connections smaller - restart master first",
-			pod:     mockPod,
 			patroni: acidv1.Patroni{
 				TTL: 20,
 			},
@@ -255,7 +250,7 @@ func TestCheckAndSetGlobalPostgreSQLConfiguration(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		requireMasterRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(tt.pod, tt.patroni, tt.pgParams)
+		requireMasterRestart, err := cluster.checkAndSetGlobalPostgreSQLConfiguration(mockPod, tt.patroni, tt.pgParams)
 		assert.NoError(t, err)
 		if requireMasterRestart != tt.restartMaster {
 			t.Errorf("%s - %s: unexpect master restart strategy, got %v, expected %v", testName, tt.subtest, requireMasterRestart, tt.restartMaster)

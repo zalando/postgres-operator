@@ -712,7 +712,8 @@ func (c *Cluster) syncConnectionPooler(oldSpec, newSpec *acidv1.Postgresql, Look
 	if (!needSync && len(masterChanges) <= 0 && len(replicaChanges) <= 0) &&
 		((!needConnectionPooler(&newSpec.Spec) && (c.ConnectionPooler == nil || !needConnectionPooler(&oldSpec.Spec))) ||
 			(c.ConnectionPooler != nil && needConnectionPooler(&newSpec.Spec) &&
-				(c.ConnectionPooler[Master].LookupFunction || c.ConnectionPooler[Replica].LookupFunction))) {
+				((c.ConnectionPooler[Master] != nil && c.ConnectionPooler[Master].LookupFunction) ||
+					(c.ConnectionPooler[Replica] != nil && c.ConnectionPooler[Replica].LookupFunction)))) {
 		c.logger.Debugln("syncing pooler is not required")
 		return nil, nil
 	}
