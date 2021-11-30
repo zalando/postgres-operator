@@ -1875,6 +1875,10 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 func (c *Cluster) generateStandbyEnvironment(description *acidv1.StandbyDescription) []v1.EnvVar {
 	result := make([]v1.EnvVar, 0)
 
+	if description.S3WalPath == "" && description.GSWalPath == "" {
+		return nil
+	}
+
 	if description.S3WalPath != "" {
 		// standby with S3, find out the bucket to setup standby
 		msg := "Standby from S3 bucket using custom parsed S3WalPath from the manifest %s "
