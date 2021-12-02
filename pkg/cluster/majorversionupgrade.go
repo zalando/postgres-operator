@@ -83,7 +83,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	var masterPod *v1.Pod
 
-	for _, pod := range pods {
+	for i, pod := range pods {
 		ps, _ := c.patroni.GetMemberData(&pod)
 
 		if ps.State != "running" {
@@ -92,7 +92,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 
 		if ps.Role == "master" {
-			masterPod = &pod
+			masterPod = &pods[i]
 			c.currentMajorVersion = ps.ServerVersion
 		}
 	}
@@ -112,7 +112,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 				return err
 			}
 
-			c.logger.Infof("upgrade action triggered and command completed: %s", result[:50])
+			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
 		}
 	}
