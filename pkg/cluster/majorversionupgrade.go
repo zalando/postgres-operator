@@ -83,7 +83,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	var masterPod *v1.Pod
 
-	for _, pod := range pods {
+	for i, pod := range pods {
 		ps, _ := c.patroni.GetMemberData(&pod)
 
 		if ps.State != "running" {
@@ -92,7 +92,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 
 		if ps.Role == "master" {
-			masterPod = &pod
+			masterPod = &pods[i]
 			c.currentMajorVersion = ps.ServerVersion
 		}
 	}
