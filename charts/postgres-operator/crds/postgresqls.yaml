@@ -491,7 +491,7 @@ spec:
                       additionalProperties:
                         type: object
                         required:
-                          - evenType
+                          - eventType
                         properties:
                           eventType:
                             type: string
