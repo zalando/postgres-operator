@@ -112,7 +112,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 				return err
 			}
 
-			c.logger.Infof("upgrade action triggered and command completed: %s", result[:50])
+			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
 		}
 	}
