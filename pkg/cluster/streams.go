@@ -9,13 +9,10 @@ import (
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	zalandov1alpha1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1alpha1"
 	"github.com/zalando/postgres-operator/pkg/util"
-	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-var outboxTableNameTemplate config.StringTemplate = "{table}_{eventtype}_outbox"
 
 func (c *Cluster) createStreams() error {
 	c.setProcessName("creating streams")
@@ -114,10 +111,10 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 	eventStreams := make([]zalandov1alpha1.EventStream, 0)
 
 	for _, stream := range c.Spec.Streams {
-		for table, eventType := range stream.Tables {
-			streamSource := c.getEventStreamSource(stream, table, eventType)
-			streamFlow := getEventStreamFlow(stream)
-			streamSink := getEventStreamSink(stream, eventType)
+		for tableName, table := range stream.Tables {
+			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
+			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
+			streamSink := getEventStreamSink(stream, table.EventType)
 
 			eventStreams = append(eventStreams, zalandov1alpha1.EventStream{
 				EventStreamFlow:   streamFlow,
@@ -145,21 +142,22 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 	}
 }
 
-func (c *Cluster) getEventStreamSource(stream acidv1.Stream, table, eventType string) zalandov1alpha1.EventStreamSource {
-	_, schema := getTableSchema(table)
-	streamFilter := stream.Filter[table]
+func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn string) zalandov1alpha1.EventStreamSource {
+	_, schema := getTableSchema(tableName)
+	streamFilter := stream.Filter[tableName]
 	return zalandov1alpha1.EventStreamSource{
 		Type:             constants.EventStreamSourcePGType,
 		Schema:           schema,
-		EventStreamTable: getOutboxTable(table, eventType),
+		EventStreamTable: getOutboxTable(tableName, idColumn),
 		Filter:           streamFilter,
 		Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
 	}
 }
 
-func getEventStreamFlow(stream acidv1.Stream) zalandov1alpha1.EventStreamFlow {
+func getEventStreamFlow(stream acidv1.Stream, payloadColumn string) zalandov1alpha1.EventStreamFlow {
 	return zalandov1alpha1.EventStreamFlow{
-		Type: constants.EventStreamFlowPgGenericType,
+		Type:          constants.EventStreamFlowPgGenericType,
+		PayloadColumn: payloadColumn,
 	}
 }
 
@@ -182,9 +180,10 @@ func getTableSchema(fullTableName string) (tableName, schemaName string) {
 	return tableName, schemaName
 }
 
-func getOutboxTable(tableName, eventType string) zalandov1alpha1.EventStreamTable {
+func getOutboxTable(tableName, idColumn string) zalandov1alpha1.EventStreamTable {
 	return zalandov1alpha1.EventStreamTable{
-		Name: outboxTableNameTemplate.Format("table", tableName, "eventtype", eventType),
+		Name:     tableName,
+		IDColumn: idColumn,
 	}
 }
 

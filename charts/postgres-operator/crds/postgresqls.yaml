@@ -489,7 +489,16 @@ spec:
                     tables:
                       type: object
                       additionalProperties:
-                        type: string
+                        type: object
+                        required:
+                          - evenType
+                        properties:
+                          eventType:
+                            type: string
+                          idColumn:
+                            type: string
+                          payloadColumn:
+                            type: string
               teamId:
                 type: string
               tls:

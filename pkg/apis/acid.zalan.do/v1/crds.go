@@ -682,7 +682,19 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 										Type: "object",
 										AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
 											Schema: &apiextv1.JSONSchemaProps{
-												Type: "string",
+												Type:     "object",
+												Required: []string{"eventType"},
+												Properties: map[string]apiextv1.JSONSchemaProps{
+													"eventType": {
+														Type: "string",
+													},
+													"idColumn": {
+														Type: "string",
+													},
+													"payloadColumn": {
+														Type: "string",
+													},
+												},
 											},
 										},
 									},

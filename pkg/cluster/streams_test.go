@@ -48,8 +48,12 @@ var (
 			Streams: []acidv1.Stream{
 				{
 					Database: "foo",
-					Tables: map[string]string{
-						"bar": "stream_type_a",
+					Tables: map[string]acidv1.StreamTable{
+						"bar": acidv1.StreamTable{
+							EventType:     "stream_type_a",
+							IdColumn:      "b_id",
+							PayloadColumn: "b_payload",
+						},
 					},
 					BatchSize: uint32(100),
 				},
@@ -124,8 +128,12 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	pgSpec.Streams = []acidv1.Stream{
 		{
 			Database: "foo",
-			Tables: map[string]string{
-				"bar": "stream_type_b",
+			Tables: map[string]acidv1.StreamTable{
+				"bar": acidv1.StreamTable{
+					EventType:     "stream_type_b",
+					IdColumn:      "b_id",
+					PayloadColumn: "b_payload",
+				},
 			},
 			BatchSize: uint32(250),
 		},
