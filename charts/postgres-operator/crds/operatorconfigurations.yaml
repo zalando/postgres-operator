@@ -4,8 +4,6 @@ metadata:
   name: operatorconfigurations.acid.zalan.do
   labels:
     app.kubernetes.io/name: postgres-operator
-  annotations:
-    "helm.sh/hook": crd-install
 spec:
   group: acid.zalan.do
   names:
@@ -133,6 +131,10 @@ spec:
                   major_version_upgrade_mode:
                     type: string
                     default: "off"
+                  major_version_upgrade_team_allow_list:
+                    type: array
+                    items:
+                      type: string
                   minimal_major_version:
                     type: string
                     default: "9.6"

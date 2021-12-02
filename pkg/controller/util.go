@@ -195,13 +195,12 @@ func (c *Controller) getInfrastructureRoleDefinitions() []*config.Infrastructure
 
 func (c *Controller) getInfrastructureRoles(
 	rolesSecrets []*config.InfrastructureRole) (
-	map[string]spec.PgUser, []error) {
+	map[string]spec.PgUser, error) {
 
-	var errors []error
-	var noRolesProvided = true
-
+	errors := make([]string, 0)
+	noRolesProvided := true
 	roles := []spec.PgUser{}
-	uniqRoles := map[string]spec.PgUser{}
+	uniqRoles := make(map[string]spec.PgUser)
 
 	// To be compatible with the legacy implementation we need to return nil if
 	// the provided secret name is empty. The equivalent situation in the
@@ -214,37 +213,39 @@ func (c *Controller) getInfrastructureRoles(
 	}
 
 	if noRolesProvided {
-		return nil, nil
+		return uniqRoles, nil
 	}
 
 	for _, secret := range rolesSecrets {
 		infraRoles, err := c.getInfrastructureRole(secret)
 
 		if err != nil || infraRoles == nil {
-			c.logger.Debugf("Cannot get infrastructure role: %+v", *secret)
+			c.logger.Debugf("cannot get infrastructure role: %+v", *secret)
 
 			if err != nil {
-				errors = append(errors, err)
+				errors = append(errors, fmt.Sprintf("%v", err))
 			}
 
 			continue
 		}
 
-		for _, r := range infraRoles {
-			roles = append(roles, r)
-		}
+		roles = append(roles, infraRoles...)
 	}
 
 	for _, r := range roles {
 		if _, exists := uniqRoles[r.Name]; exists {
-			msg := "Conflicting infrastructure roles: roles[%s] = (%q, %q)"
+			msg := "conflicting infrastructure roles: roles[%s] = (%q, %q)"
 			c.logger.Debugf(msg, r.Name, uniqRoles[r.Name], r)
 		}
 
 		uniqRoles[r.Name] = r
 	}
 
-	return uniqRoles, errors
+	if len(errors) > 0 {
+		return uniqRoles, fmt.Errorf(strings.Join(errors, `', '`))
+	}
+
+	return uniqRoles, nil
 }
 
 // Generate list of users representing one infrastructure role based on its

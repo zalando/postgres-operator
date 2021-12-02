@@ -43,9 +43,10 @@ type PostgresUsersConfiguration struct {
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.
 type MajorVersionUpgradeConfiguration struct {
-	MajorVersionUpgradeMode string `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
-	MinimalMajorVersion     string `json:"minimal_major_version" default:"9.6"`
-	TargetMajorVersion      string `json:"target_major_version" default:"14"`
+	MajorVersionUpgradeMode          string   `json:"major_version_upgrade_mode" default:"off"` // off - no actions, manual - manifest triggers action, full - manifest and minimal version violation trigger upgrade
+	MajorVersionUpgradeTeamAllowList []string `json:"major_version_upgrade_team_allow_list,omitempty"`
+	MinimalMajorVersion              string   `json:"minimal_major_version" default:"9.6"`
+	TargetMajorVersion               string   `json:"target_major_version" default:"14"`
 }
 
 // KubernetesMetaConfiguration defines k8s conf required for all Postgres clusters and the operator itself

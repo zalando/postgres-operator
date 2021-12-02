@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
+	"github.com/zalando/postgres-operator/pkg/util"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -44,9 +45,25 @@ func (c *Cluster) GetDesiredMajorVersion() string {
 	return c.Spec.PgVersion
 }
 
+func (c *Cluster) isUpgradeAllowedForTeam(owningTeam string) bool {
+	allowedTeams := c.OpConfig.MajorVersionUpgradeTeamAllowList
+
+	if len(allowedTeams) == 0 {
+		return false
+	}
+
+	return util.SliceContains(allowedTeams, owningTeam)
+}
+
+/*
+  Execute upgrade when mode is set to manual or full or when the owning team is allowed for upgrade (and mode is "off").
+
+  Manual upgrade means, it is triggered by the user via manifest version change
+  Full upgrade means, operator also determines the minimal version used accross all clusters and upgrades violators.
+*/
 func (c *Cluster) majorVersionUpgrade() error {
 
-	if c.OpConfig.MajorVersionUpgradeMode == "off" {
+	if c.OpConfig.MajorVersionUpgradeMode == "off" && !c.isUpgradeAllowedForTeam(c.Spec.TeamID) {
 		return nil
 	}
 
@@ -66,7 +83,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 
 	var masterPod *v1.Pod
 
-	for _, pod := range pods {
+	for i, pod := range pods {
 		ps, _ := c.patroni.GetMemberData(&pod)
 
 		if ps.State != "running" {
@@ -75,7 +92,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 		}
 
 		if ps.Role == "master" {
-			masterPod = &pod
+			masterPod = &pods[i]
 			c.currentMajorVersion = ps.ServerVersion
 		}
 	}
@@ -95,7 +112,7 @@ func (c *Cluster) majorVersionUpgrade() error {
 				return err
 			}
 
-			c.logger.Infof("upgrade action triggered and command completed: %s", result[:50])
+			c.logger.Infof("upgrade action triggered and command completed: %s", result[:100])
 			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Major Version Upgrade", "Upgrade from %d to %d finished", c.currentMajorVersion, desiredVersion)
 		}
 	}
