@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -483,9 +483,8 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, error) {
 
 	var members []patroni.ClusterMember
-	candidates := make([]spec.NamespacedName, 0)
-	syncCandidates := make([]spec.NamespacedName, 0)
-	skipReasons := make([]string, 0)
+	candidates := make([]patroni.ClusterMember, 0)
+	syncCandidates := make([]patroni.ClusterMember, 0)
 
 	err := retryutil.Retry(1*time.Second, 5*time.Second,
 		func() (bool, error) {
@@ -503,32 +502,24 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 	}
 
 	for _, member := range members {
-		if member.LagInMB > 0 {
-			skipReasons = append(skipReasons, fmt.Sprintf("%s lags behind by %d MB", member.Name, member.LagInMB))
-			continue
-		}
 		if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && member.State == "running" {
-			candidates = append(candidates, spec.NamespacedName{Namespace: master.Namespace, Name: member.Name})
-			if PostgresRole(member.Role) != SyncStandby {
-				syncCandidates = append(syncCandidates, spec.NamespacedName{Namespace: master.Namespace, Name: member.Name})
+			candidates = append(candidates, member)
+			if PostgresRole(member.Role) == SyncStandby {
+				syncCandidates = append(syncCandidates, member)
 			}
 		}
 	}
 
 	if len(syncCandidates) > 0 {
-		return candidates[rand.Intn(len(syncCandidates))], nil
+		sort.Slice(syncCandidates, func(i, j int) bool { return syncCandidates[i].LagInMB < syncCandidates[j].LagInMB })
+		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
 	}
 	if len(candidates) > 0 {
-		return candidates[rand.Intn(len(candidates))], nil
+		sort.Slice(candidates, func(i, j int) bool { return candidates[i].LagInMB < candidates[j].LagInMB })
+		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
 	}
 
-	if len(skipReasons) > 0 {
-		err = fmt.Errorf("no replica suitable for switchover: %s", strings.Join(skipReasons, `','`))
-	} else {
-		err = fmt.Errorf("no replica running")
-	}
-
-	return spec.NamespacedName{}, err
+	return spec.NamespacedName{}, fmt.Errorf("no switchover candidate found")
 }
 
 func (c *Cluster) podIsEndOfLife(pod *v1.Pod) (bool, error) {
