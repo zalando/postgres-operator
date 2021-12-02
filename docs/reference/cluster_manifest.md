@@ -530,11 +530,11 @@ Each stream object can have the following properties:
   replication user). Required.
 
 * **tables**
-  Defines a map of table names and event types. The CDC operator is following
-  the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/)
-  meaning changes are only consumed from an extra table that already has the
-  structure of the event in the target sink. The operator will assume that this
-  outbox table is called like `<table>_<event_type>_outbox`. Required.
+  Defines a map of (outbox) table names and event types. The CDC operator is following
+  the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
+  This means that the application will put events into a column in the outbox table
+  in the structure of the target event type, and the CDC operator will capture them
+  shortly after the transaction is committed. Required.
 
 * **filter**
   Streamed events can be filtered by a jsonpath expression for each table.
