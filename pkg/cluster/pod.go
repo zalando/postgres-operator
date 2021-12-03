@@ -462,6 +462,7 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 		if newMasterPod == nil && len(replicas) > 0 {
 			masterCandidate, err := c.getSwitchoverCandidate(masterPod)
 			if err != nil {
+				// do not recreate master now so it will keep the update flag and switchover will be retried on next sync
 				return fmt.Errorf("skipping switchover: %v", err)
 			}
 			if err := c.Switchover(masterPod, masterCandidate); err != nil {
@@ -510,6 +511,8 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 		}
 	}
 
+	// pick candidate with lowest lag
+	// if sync_standby replicas were found assume synchronous_mode is enabled and ignore other candidates list
 	if len(syncCandidates) > 0 {
 		sort.Slice(syncCandidates, func(i, j int) bool { return syncCandidates[i].LagInMB < syncCandidates[j].LagInMB })
 		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
