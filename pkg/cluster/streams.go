@@ -108,7 +108,13 @@ func (c *Cluster) syncPostgresConfig() error {
 }
 
 func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream {
+	var applicationId string
 	eventStreams := make([]zalandov1alpha1.EventStream, 0)
+
+	// take application label from manifest
+	if spec, err := c.GetSpec(); err == nil {
+		applicationId = spec.ObjectMeta.Labels["application"]
+	}
 
 	for _, stream := range c.Spec.Streams {
 		for tableName, table := range stream.Tables {
@@ -136,7 +142,7 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: zalandov1alpha1.FabricEventStreamSpec{
-			ApplicationId: "",
+			ApplicationId: applicationId,
 			EventStreams:  eventStreams,
 		},
 	}
