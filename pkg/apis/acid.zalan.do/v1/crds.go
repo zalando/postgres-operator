@@ -649,10 +649,12 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 						Type: "integer",
 					},
 					"standby": {
-						Type:     "object",
-						Required: []string{"s3_wal_path"},
+						Type: "object",
 						Properties: map[string]apiextv1.JSONSchemaProps{
 							"s3_wal_path": {
+								Type: "string",
+							},
+							"gs_wal_path": {
 								Type: "string",
 							},
 						},
