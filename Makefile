@@ -103,5 +103,8 @@ test:
 	hack/verify-codegen.sh
 	GO111MODULE=on go test ./...
 
+codegen:
+	hack/update-codegen.sh
+
 e2e: docker # build operator image to be tested
 	cd e2e; make e2etest
