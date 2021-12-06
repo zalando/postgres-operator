@@ -361,8 +361,10 @@ func (c *Cluster) Create() error {
 	// something fails, report warning
 	c.createConnectionPooler(c.installLookupFunction)
 
-	if err = c.syncStreams(); err != nil {
-		c.logger.Errorf("could not create streams: %v", err)
+	if len(c.Spec.Streams) > 0 {
+		if err = c.syncStreams(); err != nil {
+			c.logger.Errorf("could not create streams: %v", err)
+		}
 	}
 
 	return nil
@@ -859,9 +861,11 @@ func (c *Cluster) Update(oldSpec, newSpec *acidv1.Postgresql) error {
 		updateFailed = true
 	}
 
-	if err := c.syncStreams(); err != nil {
-		c.logger.Errorf("could not sync streams: %v", err)
-		updateFailed = true
+	if len(c.Spec.Streams) > 0 {
+		if err := c.syncStreams(); err != nil {
+			c.logger.Errorf("could not sync streams: %v", err)
+			updateFailed = true
+		}
 	}
 
 	if !updateFailed {
