@@ -132,7 +132,7 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 	return &zalandov1alpha1.FabricEventStream{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       constants.EventStreamSourceCRDKind,
-			APIVersion: "zalando.org/v1alphav1",
+			APIVersion: "zalando.org/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.Name,
@@ -149,12 +149,12 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 }
 
 func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn string) zalandov1alpha1.EventStreamSource {
-	_, schema := getTableSchema(tableName)
+	table, schema := getTableSchema(tableName)
 	streamFilter := stream.Filter[tableName]
 	return zalandov1alpha1.EventStreamSource{
 		Type:             constants.EventStreamSourcePGType,
 		Schema:           schema,
-		EventStreamTable: getOutboxTable(tableName, idColumn),
+		EventStreamTable: getOutboxTable(table, idColumn),
 		Filter:           streamFilter,
 		Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
 	}
