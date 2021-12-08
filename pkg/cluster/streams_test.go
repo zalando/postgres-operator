@@ -37,7 +37,10 @@ func newFakeK8sStreamClient() (k8sutil.KubernetesClient, *fake.Clientset) {
 var (
 	clusterName string = "acid-test-cluster"
 	namespace   string = "default"
+	appId       string = "test-app"
+	dbName      string = "foo"
 	fesUser     string = constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
+	fesName     string = clusterName + "-" + appId
 
 	pg = acidv1.Postgresql{
 		TypeMeta: metav1.TypeMeta{
@@ -47,15 +50,15 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterName,
 			Namespace: namespace,
-			Labels:    map[string]string{"application": "test"},
 		},
 		Spec: acidv1.PostgresSpec{
 			Databases: map[string]string{
-				"foo": "foo_user",
+				dbName: dbName + constants.UserRoleNameSuffix,
 			},
 			Streams: []acidv1.Stream{
 				{
-					Database: "foo",
+					ApplicationId: appId,
+					Database:      "foo",
 					Tables: map[string]acidv1.StreamTable{
 						"data.bar": acidv1.StreamTable{
 							EventType:     "stream_type_a",
@@ -69,9 +72,6 @@ var (
 					BatchSize: uint32(100),
 				},
 			},
-			Users: map[string]acidv1.UserFlags{
-				"foo_user": []string{"replication"},
-			},
 			Volume: acidv1.Volume{
 				Size: "1Gi",
 			},
@@ -84,7 +84,7 @@ var (
 			APIVersion: "zalando.org/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      clusterName,
+			Name:      fesName,
 			Namespace: namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				metav1.OwnerReference{
@@ -96,7 +96,7 @@ var (
 			},
 		},
 		Spec: v1alpha1.FabricEventStreamSpec{
-			ApplicationId: "test",
+			ApplicationId: appId,
 			EventStreams: []v1alpha1.EventStream{
 				{
 					EventStreamFlow: v1alpha1.EventStreamFlow{
@@ -118,7 +118,7 @@ var (
 								UserKey:     "username",
 							},
 							Url:      fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
-							SlotName: "fes_foo",
+							SlotName: fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, appId),
 						},
 						Schema: "data",
 						EventStreamTable: v1alpha1.EventStreamTable{
@@ -164,13 +164,13 @@ func TestGenerateFabricEventStream(t *testing.T) {
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
-	result := cluster.generateFabricEventStream()
+	result := cluster.generateFabricEventStream(appId)
 
 	if !reflect.DeepEqual(result, fes) {
 		t.Errorf("Malformed FabricEventStream, expected %#v, got %#v", fes, result)
 	}
 
-	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), cluster.Name, metav1.GetOptions{})
+	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
 	assert.NoError(t, err)
 
 	if !reflect.DeepEqual(streamCRD, fes) {
@@ -206,7 +206,8 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	var pgSpec acidv1.PostgresSpec
 	pgSpec.Streams = []acidv1.Stream{
 		{
-			Database: "foo",
+			ApplicationId: appId,
+			Database:      dbName,
 			Tables: map[string]acidv1.StreamTable{
 				"data.bar": acidv1.StreamTable{
 					EventType:     "stream_type_b",
@@ -230,10 +231,10 @@ func TestUpdateFabricEventStream(t *testing.T) {
 	err = cluster.createOrUpdateStreams()
 	assert.NoError(t, err)
 
-	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), cluster.Name, metav1.GetOptions{})
+	streamCRD, err := cluster.KubeClient.FabricEventStreams(namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
 	assert.NoError(t, err)
 
-	result := cluster.generateFabricEventStream()
+	result := cluster.generateFabricEventStream(appId)
 	if !reflect.DeepEqual(result, streamCRD) {
 		t.Errorf("Malformed FabricEventStream, expected %#v, got %#v", streamCRD, result)
 	}

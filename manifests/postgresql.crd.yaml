@@ -473,9 +473,12 @@ spec:
                 items:
                   type: object
                   required:
+                    - applicationId
                     - database
                     - tables
                   properties:
+                    applicationId:
+                      type: string
                     batchSize:
                       type: integer
                     database:

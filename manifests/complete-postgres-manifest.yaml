@@ -3,6 +3,7 @@ kind: postgresql
 metadata:
   name: acid-test-cluster
 #  labels:
+#    application: test-app
 #    environment: demo
 #  annotations:
 #    "acid.zalan.do/controller": "second-operator"
@@ -198,15 +199,16 @@ spec:
 
 # Enables change data capture streams for defined database tables
 #  streams:
-#  - database: foo
+#  - applicationId: test-app
+#    database: foo
 #    tables:
-#      data.ta:
+#      data.tab_a:
 #        eventType: event_type_a
-#      data.tb:
+#      data.tab_b:
 #        eventType: event_type_b
 #        idColumn: tb_id
 #        payloadColumn: tb_payload
 #    # Optional. Filter ignores events before a certain txnId and lsn. Can be used to skip bad events
 #    filter:
-#      data.ta: "[?(@.source.txId > 500 && @.source.lsn > 123456)]"
+#      data.tab_a: "[?(@.source.txId > 500 && @.source.lsn > 123456)]"
 #    batchSize: 1000

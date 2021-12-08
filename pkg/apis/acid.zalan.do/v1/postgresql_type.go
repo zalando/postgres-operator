@@ -230,10 +230,11 @@ type ConnectionPooler struct {
 }
 
 type Stream struct {
-	Database  string                 `json:"database"`
-	Tables    map[string]StreamTable `json:"tables"`
-	Filter    map[string]string      `json:"filter,omitempty"`
-	BatchSize uint32                 `json:"batchSize,omitempty"`
+	ApplicationId string                 `json:"applicationId"`
+	Database      string                 `json:"database"`
+	Tables        map[string]StreamTable `json:"tables"`
+	Filter        map[string]string      `json:"filter,omitempty"`
+	BatchSize     uint32                 `json:"batchSize,omitempty"`
 }
 
 type StreamTable struct {

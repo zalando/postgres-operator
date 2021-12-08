@@ -14,16 +14,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *Cluster) createStreams() error {
+func (c *Cluster) createStreams(appId string) {
 	c.setProcessName("creating streams")
 
-	fes := c.generateFabricEventStream()
-	_, err := c.KubeClient.FabricEventStreams(c.Namespace).Create(context.TODO(), fes, metav1.CreateOptions{})
-	if err != nil {
-		return fmt.Errorf("could not create event stream custom resource: %v", err)
-	}
+	var (
+		fes *zalandov1alpha1.FabricEventStream
+		err error
+	)
 
-	return nil
+	msg := "could not create event stream custom resource with applicationId %s: %v"
+
+	fes = c.generateFabricEventStream(appId)
+	if err != nil {
+		c.logger.Warningf(msg, appId, err)
+	}
+	_, err = c.KubeClient.FabricEventStreams(c.Namespace).Create(context.TODO(), fes, metav1.CreateOptions{})
+	if err != nil {
+		c.logger.Warningf(msg, appId, err)
+	}
 }
 
 func (c *Cluster) updateStreams(newEventStreams *zalandov1alpha1.FabricEventStream) error {
@@ -54,21 +62,34 @@ func (c *Cluster) deleteStreams() error {
 	return nil
 }
 
+func gatherApplicationIds(streams []acidv1.Stream) []string {
+	appIds := make([]string, 0)
+	for _, stream := range streams {
+		if !util.SliceContains(appIds, stream.ApplicationId) {
+			appIds = append(appIds, stream.ApplicationId)
+		}
+	}
+
+	return appIds
+}
+
 func (c *Cluster) syncPostgresConfig() error {
 
+	slots := make(map[string]map[string]string)
 	desiredPatroniConfig := c.Spec.Patroni
-	slots := desiredPatroniConfig.Slots
+	if len(desiredPatroniConfig.Slots) > 0 {
+		slots = desiredPatroniConfig.Slots
+	}
 
 	for _, stream := range c.Spec.Streams {
-		slotName := c.getLogicalReplicationSlot(stream.Database)
-
-		if slotName == "" {
-			slot := map[string]string{
-				"database": stream.Database,
-				"plugin":   "wal2json",
-				"type":     "logical",
-			}
-			slots[constants.EventStreamSourceSlotPrefix+"_"+stream.Database] = slot
+		slot := map[string]string{
+			"database": stream.Database,
+			"plugin":   "wal2json",
+			"type":     "logical",
+		}
+		slotName := constants.EventStreamSourceSlotPrefix + "_" + stream.Database + "_" + stream.ApplicationId
+		if _, exists := slots[slotName]; !exists {
+			slots[slotName] = slot
 		}
 	}
 
@@ -107,16 +128,13 @@ func (c *Cluster) syncPostgresConfig() error {
 	return nil
 }
 
-func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream {
-	var applicationId string
+func (c *Cluster) generateFabricEventStream(appId string) *zalandov1alpha1.FabricEventStream {
 	eventStreams := make([]zalandov1alpha1.EventStream, 0)
 
-	// take application label from manifest
-	if spec, err := c.GetSpec(); err == nil {
-		applicationId = spec.ObjectMeta.Labels["application"]
-	}
-
 	for _, stream := range c.Spec.Streams {
+		if stream.ApplicationId != appId {
+			continue
+		}
 		for tableName, table := range stream.Tables {
 			streamSource := c.getEventStreamSource(stream, tableName, table.IdColumn)
 			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
@@ -135,14 +153,14 @@ func (c *Cluster) generateFabricEventStream() *zalandov1alpha1.FabricEventStream
 			APIVersion: "zalando.org/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.Name,
+			Name:        c.Name + "-" + appId,
 			Namespace:   c.Namespace,
 			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 			// make cluster StatefulSet the owner (like with connection pooler objects)
 			OwnerReferences: c.ownerReferences(),
 		},
 		Spec: zalandov1alpha1.FabricEventStreamSpec{
-			ApplicationId: applicationId,
+			ApplicationId: appId,
 			EventStreams:  eventStreams,
 		},
 	}
@@ -156,7 +174,10 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn
 		Schema:           schema,
 		EventStreamTable: getOutboxTable(table, idColumn),
 		Filter:           streamFilter,
-		Connection:       c.getStreamConnection(stream.Database, constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix),
+		Connection: c.getStreamConnection(
+			stream.Database,
+			constants.EventStreamSourceSlotPrefix+constants.UserRoleNameSuffix,
+			stream.ApplicationId),
 	}
 }
 
@@ -193,10 +214,10 @@ func getOutboxTable(tableName, idColumn string) zalandov1alpha1.EventStreamTable
 	}
 }
 
-func (c *Cluster) getStreamConnection(database, user string) zalandov1alpha1.Connection {
+func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1alpha1.Connection {
 	return zalandov1alpha1.Connection{
 		Url:      fmt.Sprintf("jdbc:postgresql://%s.%s/%s?user=%s&ssl=true&sslmode=require", c.Name, c.Namespace, database, user),
-		SlotName: c.getLogicalReplicationSlot(database),
+		SlotName: constants.EventStreamSourceSlotPrefix + "_" + database + "_" + appId,
 		DBAuth: zalandov1alpha1.DBAuth{
 			Type:        constants.EventStreamSourceAuthType,
 			Name:        c.credentialSecretNameForCluster(user, c.Name),
@@ -204,16 +225,6 @@ func (c *Cluster) getStreamConnection(database, user string) zalandov1alpha1.Con
 			PasswordKey: "password",
 		},
 	}
-}
-
-func (c *Cluster) getLogicalReplicationSlot(database string) string {
-	for slotName, slot := range c.Spec.Patroni.Slots {
-		if slot["type"] == "logical" && slot["database"] == database && slot["plugin"] == "wal2json" {
-			return slotName
-		}
-	}
-
-	return constants.EventStreamSourceSlotPrefix + "_" + database
 }
 
 func (c *Cluster) syncStreams() error {
@@ -241,25 +252,26 @@ func (c *Cluster) createOrUpdateStreams() error {
 		return fmt.Errorf("could not update Postgres config for event streaming: %v", err)
 	}
 
-	effectiveStreams, err := c.KubeClient.FabricEventStreams(c.Namespace).Get(context.TODO(), c.Name, metav1.GetOptions{})
-	if err != nil {
-		if !k8sutil.ResourceNotFound(err) {
-			return fmt.Errorf("error during reading of event streams: %v", err)
-		}
-
-		c.logger.Infof("event streams do not exist, create it")
-		err := c.createStreams()
+	appIds := gatherApplicationIds(c.Spec.Streams)
+	for _, appId := range appIds {
+		fesName := c.Name + "-" + appId
+		effectiveStreams, err := c.KubeClient.FabricEventStreams(c.Namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("event streams creation failed: %v", err)
-		}
-	} else {
-		desiredStreams := c.generateFabricEventStream()
-		if !reflect.DeepEqual(effectiveStreams.Spec, desiredStreams.Spec) {
-			c.logger.Debug("updating event streams")
-			desiredStreams.ObjectMeta.ResourceVersion = effectiveStreams.ObjectMeta.ResourceVersion
-			err = c.updateStreams(desiredStreams)
-			if err != nil {
-				return fmt.Errorf("event streams update failed: %v", err)
+			if !k8sutil.ResourceNotFound(err) {
+				return fmt.Errorf("failed reading event stream %s: %v", fesName, err)
+			}
+
+			c.logger.Infof("event streams do not exist, create it")
+			c.createStreams(appId)
+		} else {
+			desiredStreams := c.generateFabricEventStream(appId)
+			if !reflect.DeepEqual(effectiveStreams.Spec, desiredStreams.Spec) {
+				c.logger.Debug("updating event streams")
+				desiredStreams.ObjectMeta.ResourceVersion = effectiveStreams.ObjectMeta.ResourceVersion
+				err = c.updateStreams(desiredStreams)
+				if err != nil {
+					return fmt.Errorf("failed updating event stream %s: %v", fesName, err)
+				}
 			}
 		}
 	}
