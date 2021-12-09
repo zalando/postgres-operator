@@ -530,7 +530,7 @@ have the following properties:
   The application name to which the database and CDC belongs to. For each
   set of streams with a distinct `applicationId` a separate stream CR as well
   as a separate logical replication slot will be created. This means there can
-  different streams in the same database and streams with the same
+  be different streams in the same database and streams with the same
   `applicationId` are bundled in one stream CR. The stream CR will be called
   like the Postgres cluster plus "-<applicationId>" suffix. Required.
 
