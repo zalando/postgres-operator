@@ -188,7 +188,7 @@ type ClusterMember struct {
 	Role     string `json:"role"`
 	State    string `json:"state"`
 	Timeline int    `json:"timeline"`
-	LagInMB  int    `json:"lag"`
+	Lag      int    `json:"lag"`
 }
 
 // MemberDataPatroni child element

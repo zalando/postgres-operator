@@ -14,8 +14,11 @@ import (
 type PostgresRole string
 
 const (
-	Master        PostgresRole = "master"
-	Replica       PostgresRole = "replica"
+	// spilo roles
+	Master  PostgresRole = "master"
+	Replica PostgresRole = "replica"
+
+	// roles returned by Patroni cluster endpoint
 	Leader        PostgresRole = "leader"
 	StandbyLeader PostgresRole = "standby_leader"
 	SyncStandby   PostgresRole = "sync_standby"
