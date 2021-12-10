@@ -19,15 +19,14 @@ cleanup
 mkdir -p "${TMP_DIFFROOT}"
 cp -a "${DIFFROOT}"/* "${TMP_DIFFROOT}"
 
-"${SCRIPT_ROOT}/hack/update-codegen.sh"
+"${SCRIPT_ROOT}/hack/update-codegen.sh" "${TMP_DIFFROOT}"
 echo "diffing ${DIFFROOT} against freshly generated codegen"
 ret=0
 diff -Naupr "${DIFFROOT}" "${TMP_DIFFROOT}" || ret=$?
-cp -a "${TMP_DIFFROOT}"/* "${DIFFROOT}"
 if [[ $ret -eq 0 ]]
 then
     echo "${DIFFROOT} up to date."
 else
-    echo "${DIFFROOT} is out of date. Please run hack/update-codegen.sh"
+    echo "${DIFFROOT} is out of date. Please run 'make codegen'"
     exit 1
 fi
