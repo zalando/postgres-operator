@@ -217,7 +217,7 @@ func getOutboxTable(tableName, idColumn string) zalandov1alpha1.EventStreamTable
 func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1alpha1.Connection {
 	return zalandov1alpha1.Connection{
 		Url:      fmt.Sprintf("jdbc:postgresql://%s.%s/%s?user=%s&ssl=true&sslmode=require", c.Name, c.Namespace, database, user),
-		SlotName: constants.EventStreamSourceSlotPrefix + "_" + database + "_" + appId,
+		SlotName: constants.EventStreamSourceSlotPrefix + "_" + database + "_" + strings.Replace(appId, "-", "_", -1),
 		DBAuth: zalandov1alpha1.DBAuth{
 			Type:        constants.EventStreamSourceAuthType,
 			Name:        c.credentialSecretNameForCluster(user, c.Name),
