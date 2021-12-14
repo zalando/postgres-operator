@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"strconv"
 	"time"
 
@@ -459,8 +460,13 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 		// 1. we have not observed a new master pod when re-creating former replicas
 		// 2. we know possible switchover targets even when no replicas were recreated
 		if newMasterPod == nil && len(replicas) > 0 {
-			if err := c.Switchover(masterPod, masterCandidate(replicas)); err != nil {
-				c.logger.Warningf("could not perform switch over: %v", err)
+			masterCandidate, err := c.getSwitchoverCandidate(masterPod)
+			if err != nil {
+				// do not recreate master now so it will keep the update flag and switchover will be retried on next sync
+				return fmt.Errorf("skipping switchover: %v", err)
+			}
+			if err := c.Switchover(masterPod, masterCandidate); err != nil {
+				return fmt.Errorf("could not perform switch over: %v", err)
 			}
 		} else if newMasterPod == nil && len(replicas) == 0 {
 			c.logger.Warningf("cannot perform switch over before re-creating the pod: no replicas")
@@ -473,6 +479,50 @@ func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.Namesp
 	}
 
 	return nil
+}
+
+func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, error) {
+
+	var members []patroni.ClusterMember
+	candidates := make([]patroni.ClusterMember, 0)
+	syncCandidates := make([]patroni.ClusterMember, 0)
+
+	err := retryutil.Retry(1*time.Second, 5*time.Second,
+		func() (bool, error) {
+			var err error
+			members, err = c.patroni.GetClusterMembers(master)
+
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return spec.NamespacedName{}, fmt.Errorf("failed to get Patroni cluster members: %s", err)
+	}
+
+	for _, member := range members {
+		if PostgresRole(member.Role) != Leader && PostgresRole(member.Role) != StandbyLeader && member.State == "running" {
+			candidates = append(candidates, member)
+			if PostgresRole(member.Role) == SyncStandby {
+				syncCandidates = append(syncCandidates, member)
+			}
+		}
+	}
+
+	// pick candidate with lowest lag
+	// if sync_standby replicas were found assume synchronous_mode is enabled and ignore other candidates list
+	if len(syncCandidates) > 0 {
+		sort.Slice(syncCandidates, func(i, j int) bool { return syncCandidates[i].LagInMb < syncCandidates[j].LagInMb })
+		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
+	}
+	if len(candidates) > 0 {
+		sort.Slice(candidates, func(i, j int) bool { return candidates[i].LagInMb < candidates[j].LagInMb })
+		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
+	}
+
+	return spec.NamespacedName{}, fmt.Errorf("no switchover candidate found")
 }
 
 func (c *Cluster) podIsEndOfLife(pod *v1.Pod) (bool, error) {

@@ -85,6 +85,55 @@ func TestApiURL(t *testing.T) {
 	}
 }
 
+func TestGetClusterMembers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	expectedClusterMemberData := []ClusterMember{
+		{
+			Name:     "acid-test-cluster-0",
+			Role:     "leader",
+			State:    "running",
+			Timeline: 1,
+			LagInMb:  0,
+		}, {
+			Name:     "acid-test-cluster-1",
+			Role:     "sync_standby",
+			State:    "running",
+			Timeline: 1,
+			LagInMb:  0,
+		}, {
+			Name:     "acid-test-cluster-2",
+			Role:     "replica",
+			State:    "running",
+			Timeline: 1,
+			LagInMb:  0,
+		}}
+
+	json := `{"members": [{"name": "acid-test-cluster-0", "role": "leader", "state": "running", "api_url": "http://192.168.100.1:8008/patroni", "host": "192.168.100.1", "port": 5432, "timeline": 1}, {"name": "acid-test-cluster-1", "role": "sync_standby", "state": "running", "api_url": "http://192.168.100.2:8008/patroni", "host": "192.168.100.2", "port": 5432, "timeline": 1, "lag": 0}, {"name": "acid-test-cluster-2", "role": "replica", "state": "running", "api_url": "http://192.168.100.3:8008/patroni", "host": "192.168.100.3", "port": 5432, "timeline": 1, "lag": 0}]}`
+	r := ioutil.NopCloser(bytes.NewReader([]byte(json)))
+
+	response := http.Response{
+		StatusCode: 200,
+		Body:       r,
+	}
+
+	mockClient := mocks.NewMockHTTPClient(ctrl)
+	mockClient.EXPECT().Get(gomock.Any()).Return(&response, nil)
+
+	p := New(logger, mockClient)
+
+	clusterMemberData, err := p.GetClusterMembers(newMockPod("192.168.100.1"))
+
+	if !reflect.DeepEqual(expectedClusterMemberData, clusterMemberData) {
+		t.Errorf("Patroni cluster members differ: expected: %#v, got: %#v", expectedClusterMemberData, clusterMemberData)
+	}
+
+	if err != nil {
+		t.Errorf("Could not read Patroni data: %v", err)
+	}
+}
+
 func TestGetMemberData(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
