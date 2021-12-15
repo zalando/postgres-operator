@@ -96,7 +96,6 @@ func TestGetClusterMembers(t *testing.T) {
 			Role:     "leader",
 			State:    "running",
 			Timeline: 1,
-			Lag:      intstr.IntOrString{IntVal: 0},
 		}, {
 			Name:     "acid-test-cluster-1",
 			Role:     "sync_standby",
