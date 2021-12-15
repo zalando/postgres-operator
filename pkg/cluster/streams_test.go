@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"context"
 	"testing"
@@ -118,7 +119,7 @@ var (
 								UserKey:     "username",
 							},
 							Url:      fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
-							SlotName: fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, appId),
+							SlotName: fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1)),
 						},
 						Schema: "data",
 						EventStreamTable: v1alpha1.EventStreamTable{
