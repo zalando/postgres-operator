@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -184,11 +185,11 @@ type ClusterMembers struct {
 
 // ClusterMember cluster member data from Patroni API
 type ClusterMember struct {
-	Name     string `json:"name"`
-	Role     string `json:"role"`
-	State    string `json:"state"`
-	Timeline int    `json:"timeline"`
-	LagInMb  int    `json:"lag"`
+	Name     string             `json:"name"`
+	Role     string             `json:"role"`
+	State    string             `json:"state"`
+	Timeline int                `json:"timeline"`
+	Lag      intstr.IntOrString `json:"lag,omitempty"`
 }
 
 // MemberDataPatroni child element

@@ -19,6 +19,7 @@ import (
 	"github.com/motomux/pretty"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"golang.org/x/crypto/pbkdf2"
@@ -320,6 +321,20 @@ func testNil(values ...*int32) bool {
 	}
 
 	return false
+}
+
+// Convert int to IntOrString type
+func ToIntStr(val int) *intstr.IntOrString {
+	b := intstr.FromInt(val)
+	return &b
+}
+
+// Get int from IntOrString and return max int if string
+func IntFromIntStr(intOrStr intstr.IntOrString) int {
+	if intOrStr.Type == 1 {
+		return 32 << (^int(0) >> 32 & 1) // return max int
+	}
+	return intOrStr.IntValue()
 }
 
 // MaxInt32 : Return maximum of two integers provided via pointers. If one value

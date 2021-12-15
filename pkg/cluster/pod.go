@@ -514,11 +514,15 @@ func (c *Cluster) getSwitchoverCandidate(master *v1.Pod) (spec.NamespacedName, e
 	// pick candidate with lowest lag
 	// if sync_standby replicas were found assume synchronous_mode is enabled and ignore other candidates list
 	if len(syncCandidates) > 0 {
-		sort.Slice(syncCandidates, func(i, j int) bool { return syncCandidates[i].LagInMb < syncCandidates[j].LagInMb })
+		sort.Slice(syncCandidates, func(i, j int) bool {
+			return util.IntFromIntStr(syncCandidates[i].Lag) < util.IntFromIntStr(syncCandidates[j].Lag)
+		})
 		return spec.NamespacedName{Namespace: master.Namespace, Name: syncCandidates[0].Name}, nil
 	}
 	if len(candidates) > 0 {
-		sort.Slice(candidates, func(i, j int) bool { return candidates[i].LagInMb < candidates[j].LagInMb })
+		sort.Slice(candidates, func(i, j int) bool {
+			return util.IntFromIntStr(candidates[i].Lag) < util.IntFromIntStr(candidates[j].Lag)
+		})
 		return spec.NamespacedName{Namespace: master.Namespace, Name: candidates[0].Name}, nil
 	}
 
