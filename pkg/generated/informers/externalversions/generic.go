@@ -65,7 +65,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case v1.SchemeGroupVersion.WithResource("postgresqls"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Acid().V1().Postgresqls().Informer()}, nil
 
-	// Group=zalando.org, Version=v1alpha1
+		// Group=zalando.org, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("fabriceventstreams"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Zalando().V1alpha1().FabricEventStreams().Informer()}, nil
 

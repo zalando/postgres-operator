@@ -80,6 +80,9 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	var cs Clientset
 	var err error
 	cs.acidV1, err = acidv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.zalandoV1alpha1, err = zalandov1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
