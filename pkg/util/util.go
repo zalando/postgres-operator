@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/big"
 	"math/rand"
 	"reflect"
@@ -332,7 +333,7 @@ func ToIntStr(val int) *intstr.IntOrString {
 // Get int from IntOrString and return max int if string
 func IntFromIntStr(intOrStr intstr.IntOrString) int {
 	if intOrStr.Type == 1 {
-		return 32 << (^int(0) >> 32 & 1) // return max int
+		return math.MaxInt
 	}
 	return intOrStr.IntValue()
 }
