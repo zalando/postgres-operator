@@ -7,7 +7,7 @@ features and tests.
 
 Postgres Operator is written in Go. Use the [installation instructions](https://golang.org/doc/install#install)
 if you don't have Go on your system. You won't be able to compile the operator
-with Go older than 1.16. We recommend installing [the latest one](https://golang.org/dl/).
+with Go older than 1.17. We recommend installing [the latest one](https://golang.org/dl/).
 
 Go projects expect their source code and all the dependencies to be located
 under the [GOPATH](https://github.com/golang/go/wiki/GOPATH). Normally, one
@@ -176,7 +176,7 @@ go get -u github.com/derekparker/delve/cmd/dlv
 
 ```
 RUN apk --no-cache add go git musl-dev
-RUN go get github.com/derekparker/delve/cmd/dlv
+RUN go get -d github.com/derekparker/delve/cmd/dlv
 ```
 
 * Update the `Makefile` to build the project with debugging symbols. For that
