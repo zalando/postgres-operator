@@ -9,7 +9,7 @@ COPY build/* /
 RUN addgroup -g 1000 pgo
 RUN adduser -D -u 1000 -G pgo -g 'Postgres Operator' pgo
 
-RUN go get github.com/derekparker/delve/cmd/dlv
+RUN go get -d github.com/derekparker/delve/cmd/dlv
 RUN cp /root/go/bin/dlv /dlv
 RUN chown -R pgo:pgo /dlv
 
