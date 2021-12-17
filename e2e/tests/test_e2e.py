@@ -899,7 +899,6 @@ class EndToEndTestCase(unittest.TestCase):
 
         try:
             # patch current master node with the label
-            print('patching master node: {}'.format(master_node))
             k8s.api.core_v1.patch_node(master_node, node_label_body)
 
             # add node affinity to cluster
@@ -1636,12 +1635,8 @@ class EndToEndTestCase(unittest.TestCase):
         try:
             q = exec_query.format(db_list_query, "postgres")
             q = "su postgres -c \"{}\"".format(q)
-            print('Get databases: {}'.format(q))
             result = k8s.exec_with_kubectl(pod_name, q)
             db_list = clean_list(result.stdout.split(b'\n'))
-            print('db_list: {}, stdout: {}, stderr {}'.format(
-                db_list, result.stdout, result.stderr
-            ))
         except Exception as ex:
             print('Could not get databases: {}'.format(ex))
             print('Stdout: {}'.format(result.stdout))
@@ -1665,12 +1660,8 @@ class EndToEndTestCase(unittest.TestCase):
         try:
             q = exec_query.format(query, db_name)
             q = "su postgres -c \"{}\"".format(q)
-            print('Send query: {}'.format(q))
             result = k8s.exec_with_kubectl(pod_name, q)
             result_set = clean_list(result.stdout.split(b'\n'))
-            print('result: {}, stdout: {}, stderr {}'.format(
-                result_set, result.stdout, result.stderr
-            ))
         except Exception as ex:
             print('Error on query execution: {}'.format(ex))
             print('Stdout: {}'.format(result.stdout))
