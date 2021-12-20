@@ -298,7 +298,6 @@ var unmarshalCluster = []struct {
 					LoopWait:             10,
 					RetryTimeout:         10,
 					MaximumLagOnFailover: 33554432,
-					SynchronousNodeCount: 1,
 					Slots:                map[string]map[string]string{"permanent_logical_1": {"type": "logical", "database": "foo", "plugin": "pgoutput"}},
 				},
 				Resources: Resources{
