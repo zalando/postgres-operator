@@ -53,7 +53,7 @@ class K8s:
 
         return master_pod_node, replica_pod_nodes
 
-    def get_cluster_nodes(self, cluster_labels='cluster-name=acid-minimal-cluster', namespace='default'):
+    def get_cluster_nodes(self, cluster_labels='application=spilo,cluster-name=acid-minimal-cluster', namespace='default'):
         m = []
         r = []
         podsList = self.api.core_v1.list_namespaced_pod(namespace, label_selector=cluster_labels)

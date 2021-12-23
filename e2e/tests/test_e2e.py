@@ -883,9 +883,9 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
         # get nodes of master and replica(s)
-        master_node, replica_nodes = k8s.get_pg_nodes(cluster_label)
+        master_nodes, replica_nodes = k8s.get_cluster_nodes()
 
-        self.assertNotEqual(master_node, [])
+        self.assertNotEqual(master_nodes, [])
         self.assertNotEqual(replica_nodes, [])
 
         # label node with environment=postgres
@@ -898,8 +898,8 @@ class EndToEndTestCase(unittest.TestCase):
         }
 
         try:
-            # patch current master node with the label
-            k8s.api.core_v1.patch_node(master_node, node_label_body)
+            # patch master node with the label
+            k8s.api.core_v1.patch_node(master_nodes[0], node_label_body)
 
             # add node affinity to cluster
             patch_node_affinity_config = {
@@ -923,7 +923,6 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             }
-
             k8s.api.custom_objects_api.patch_namespaced_custom_object(
                 group="acid.zalan.do",
                 version="v1",
@@ -934,14 +933,17 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
-            k8s.wait_for_pod_failover(master_node, 'spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            # master pod needs to be replaced as well to finish the rolling update
+            k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             podsList = k8s.api.core_v1.list_namespaced_pod('default', label_selector=cluster_label)
             for pod in podsList.items:
                 if pod.metadata.labels.get('spilo-role') == 'replica':
-                    self.assertEqual(master_node, pod.spec.node_name,
-                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(master_node, pod.spec.node_name))
+                    self.assertEqual(master_nodes[0], pod.spec.node_name,
+                         "Sanity check: expected replica to relocate to master node {}, but found on {}".format(master_nodes[0], pod.spec.node_name))
 
                     # check that pod has correct node affinity
                     key = pod.spec.affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms[0].match_expressions[0].key
@@ -966,7 +968,7 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # node affinity change should cause another rolling update and relocation of replica
-            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=replica,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
         except timeout_decorator.TimeoutError:
@@ -974,7 +976,6 @@ class EndToEndTestCase(unittest.TestCase):
             raise
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test until fixed")
     def test_node_readiness_label(self):
         '''
            Remove node readiness label from master node. This must cause a failover.
@@ -984,12 +985,19 @@ class EndToEndTestCase(unittest.TestCase):
         readiness_label = 'lifecycle-status'
         readiness_value = 'ready'
 
-        try:
-            # get nodes of master and replica(s) (expected target of new master)
-            current_master_node, current_replica_nodes = k8s.get_pg_nodes(cluster_label)
-            num_replicas = len(current_replica_nodes)
-            failover_targets = self.get_failover_targets(current_master_node, current_replica_nodes)
+        # verify we are in good state from potential previous tests
+        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
 
+        # get nodes of master and replica(s) (expected target of new master)
+        master_nodes, replica_nodes = k8s.get_cluster_nodes()
+        self.assertNotEqual(master_nodes, [])
+        self.assertNotEqual(replica_nodes, [])
+
+        num_replicas = len(replica_nodes)
+        failover_targets = self.get_failover_targets(master_nodes[0], replica_nodes)
+
+        try:
             # add node_readiness_label to potential failover nodes
             patch_readiness_label = {
                 "metadata": {
@@ -998,7 +1006,6 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             }
-            self.assertTrue(len(failover_targets) > 0, "No failover targets available")
             for failover_target in failover_targets:
                 k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
 
@@ -1009,18 +1016,30 @@ class EndToEndTestCase(unittest.TestCase):
                 }
             }
             k8s.update_config(patch_readiness_label_config, "setting readiness label")
-            new_master_node, new_replica_nodes = self.assert_failover(
-                current_master_node, num_replicas, failover_targets, cluster_label)
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
+            k8s.wait_for_pod_failover(failover_targets, 'spilo-role=master,' + cluster_label)
+
+            # the replica however will not start due to a volume node affinity conflict
+            # only if the pvc and pod are deleted it can be scheduled
+            replica = k8s.get_cluster_replica_pod()
+            if replica.status.phase == 'Pending':
+                k8s.api.core_v1.delete_namespaced_persistent_volume_claim('pgdata-' + replica.metadata.name, 'default')
+                k8s.api.core_v1.delete_namespaced_pod(replica.metadata.name, 'default')
+
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # patch also node where master ran before
-            k8s.api.core_v1.patch_node(current_master_node, patch_readiness_label)
-
-            # toggle pod anti affinity to move replica away from master node
-            self.eventuallyTrue(lambda: self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label), "Pods are redistributed")
+            k8s.api.core_v1.patch_node(master_nodes[0], patch_readiness_label)
 
         except timeout_decorator.TimeoutError:
             print('Operator log: {}'.format(k8s.get_operator_log()))
             raise
+
+        # toggle pod anti affinity to move replica away from master node
+        self.eventuallyTrue(lambda: self.assert_distributed_pods(master_nodes), "Pods are redistributed")
+
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_overwrite_pooler_deployment(self):
@@ -1426,7 +1445,6 @@ class EndToEndTestCase(unittest.TestCase):
 
         # get nodes of master and replica(s) (expected target of new master)
         master_nodes, replica_nodes = k8s.get_cluster_nodes()
-
         self.assertNotEqual(master_nodes, [])
         self.assertNotEqual(replica_nodes, [])
 
@@ -1441,10 +1459,7 @@ class EndToEndTestCase(unittest.TestCase):
                 ]
             }
         }
-
         k8s.api.core_v1.patch_node(master_nodes[0], body)
-        self.eventuallyTrue(lambda: k8s.get_cluster_nodes()[0], replica_nodes)
-        self.assertNotEqual(lambda: k8s.get_cluster_nodes()[0], master_nodes)
 
         # add toleration to pods
         patch_toleration_config = {
@@ -1453,15 +1468,20 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
 
-        k8s.update_config(patch_toleration_config, step="allow tainted nodes")
+        try:
+            k8s.update_config(patch_toleration_config, step="allow tainted nodes")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                        "Operator does not get in sync")
 
-        self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
-        self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+            self.eventuallyEqual(lambda: k8s.count_running_pods(), 2, "No 2 pods running")
+            self.eventuallyEqual(lambda: len(k8s.get_patroni_running_members("acid-minimal-cluster-0")), 2, "Postgres status did not enter running")
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
 
         # toggle pod anti affinity to move replica away from master node
-        nm, new_replica_nodes = k8s.get_cluster_nodes()
-        new_master_node = nm[0]
-        self.assert_distributed_pods(new_master_node, new_replica_nodes, cluster_label)
+        self.assert_distributed_pods(replica_nodes)
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_zz_cluster_deletion(self):
@@ -1564,23 +1584,6 @@ class EndToEndTestCase(unittest.TestCase):
 
         return failover_targets
 
-    def assert_failover(self, current_master_node, num_replicas, failover_targets, cluster_label):
-        '''
-           Check if master is failing over. The replica should move first to be the switchover target
-        '''
-        k8s = self.k8s
-        k8s.wait_for_pod_failover(failover_targets, 'spilo-role=master,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-
-        new_master_node, new_replica_nodes = k8s.get_pg_nodes(cluster_label)
-        self.assertNotEqual(current_master_node, new_master_node,
-                            "Master on {} did not fail over to one of {}".format(current_master_node, failover_targets))
-        self.assertEqual(num_replicas, len(new_replica_nodes),
-                         "Expected {} replicas, found {}".format(num_replicas, len(new_replica_nodes)))
-        self.assert_master_is_unique()
-
-        return new_master_node, new_replica_nodes
-
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
            Check that there is a single pod in the k8s cluster with the label "spilo-role=master"
@@ -1592,14 +1595,13 @@ class EndToEndTestCase(unittest.TestCase):
         num_of_master_pods = k8s.count_pods_with_label(labels, namespace)
         self.assertEqual(num_of_master_pods, 1, "Expected 1 master pod, found {}".format(num_of_master_pods))
 
-    def assert_distributed_pods(self, master_node, replica_nodes, cluster_label):
+    @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
+    def assert_distributed_pods(self, target_nodes, cluster_labels='cluster-name=acid-minimal-cluster'):
         '''
            Other tests can lead to the situation that master and replica are on the same node.
            Toggle pod anti affinty to distribute pods accross nodes (replica in particular).
         '''
         k8s = self.k8s
-        cluster_label = 'application=spilo,cluster-name=acid-minimal-cluster'
-        failover_targets = self.get_failover_targets(master_node, replica_nodes)
 
         # enable pod anti affintiy in config map which should trigger movement of replica
         patch_enable_antiaffinity = {
@@ -1607,18 +1609,30 @@ class EndToEndTestCase(unittest.TestCase):
                 "enable_pod_antiaffinity": "true"
             }
         }
-        k8s.update_config(patch_enable_antiaffinity, "enable antiaffinity")
-        self.assert_failover(master_node, len(replica_nodes), failover_targets, cluster_label)
 
-        # now disable pod anti affintiy again which will cause yet another failover
-        patch_disable_antiaffinity = {
-            "data": {
-                "enable_pod_antiaffinity": "false"
+        try:
+            k8s.update_config(patch_enable_antiaffinity, "enable antiaffinity")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+
+            k8s.wait_for_pod_failover(target_nodes, 'spilo-role=replica,' + cluster_labels)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_labels)
+
+            # now disable pod anti affintiy again which will cause yet another failover
+            patch_disable_antiaffinity = {
+                "data": {
+                    "enable_pod_antiaffinity": "false"
+                }
             }
-        }
-        k8s.update_config(patch_disable_antiaffinity, "disable antiaffinity")
-        k8s.wait_for_pod_start('spilo-role=master,' + cluster_label)
-        k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+            k8s.update_config(patch_disable_antiaffinity, "disable antiaffinity")
+            self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
+            
+            k8s.wait_for_pod_start('spilo-role=master,' + cluster_labels)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_labels)
+
+        except timeout_decorator.TimeoutError:
+            print('Operator log: {}'.format(k8s.get_operator_log()))
+            raise
+
         return True
 
     def list_databases(self, pod_name):
