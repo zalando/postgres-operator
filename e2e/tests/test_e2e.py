@@ -1413,7 +1413,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.eventuallyTrue(lambda: k8s.check_statefulset_annotations(cluster_label, annotations), "Annotations missing")
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
-    @unittest.skip("Skipping this test until fixed")
     def test_taint_based_eviction(self):
         '''
            Add taint "postgres=:NoExecute" to node with master. This must cause a failover.
