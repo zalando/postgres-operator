@@ -343,8 +343,13 @@ configuration they are grouped under the `kubernetes` key.
   considered `ready`. The operator uses values of those labels to detect the
   start of the Kubernetes cluster upgrade procedure and move master pods off
   the nodes to be decommissioned. When the set is not empty, the operator also
-  assigns the `Affinity` clause to the Postgres pods to be scheduled only on
-  `ready` nodes. The default is empty.
+  assigns the `nodeAffinity` clause to the Postgres pods to be scheduled only
+  on `ready` nodes. If a `nodeAffinity` is specified in the postgres cluster
+  manifest as well the `nodeSelectorTerms` will get merged. If the 
+  `nodeAffinity` of the manifest contains only one `matchExpressions` slice
+  the node readiniess label expressions will be moved there (AND condition).
+  When multiple selector expressions are defined in the manifest an extra 
+  `matchExpressions` section is appended (OR condition). The default is empty.
 
 * **toleration**
   a dictionary that should contain `key`, `operator`, `value` and

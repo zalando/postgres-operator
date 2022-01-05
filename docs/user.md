@@ -703,6 +703,10 @@ spec:
           - pci
 ```
 
+If you need to define a `nodeAffinity` for all your Postgres clusters use the
+`node_readiness_label` configuration option, which allows you to define a list
+of key-value pairs.
+
 ## In-place major version upgrade
 
 Starting with Spilo 13, operator supports in-place major version upgrade to a
