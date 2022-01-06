@@ -352,15 +352,15 @@ func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAff
 				},
 			}
 		} else {
-			// if there are multiple node selector terms specified, append the node readiness label expressions (OR condition)
 			if len(nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) > 1 {
+				// if there are multiple node selector terms specified, append the node readiness label expressions (OR condition)
 				manifestTerms := nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
 				manifestTerms = append(manifestTerms, nodeReadinessSelectorTerm)
 				nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
 					NodeSelectorTerms: manifestTerms,
 				}
-				// if there's just one term defined merge it with the readiness label term (AND condition)
 			} else {
+				// if there is just one term defined merge it with the readiness label term (AND condition)
 				manifestExpressions := nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions
 				manifestExpressions = append(manifestExpressions, matchExpressions...)
 				nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
