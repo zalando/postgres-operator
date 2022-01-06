@@ -286,7 +286,7 @@ class EndToEndTestCase(unittest.TestCase):
         # revert config change
         revert_resync = {
             "data": {
-                "resync_period": "30m",
+                "resync_period": "4m",
             },
         }
         k8s.update_config(revert_resync)
@@ -933,7 +933,7 @@ class EndToEndTestCase(unittest.TestCase):
             # node affinity change should cause replica to relocate from replica node to master node due to node affinity requirement
             k8s.wait_for_pod_failover(master_nodes, 'spilo-role=replica,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-            # master pod needs to be replaced as well to finish the rolling update
+            # next master will be switched over and pod needs to be replaced as well to finish the rolling update
             k8s.wait_for_pod_failover(master_nodes, 'spilo-role=master,' + cluster_label)
             k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
@@ -994,9 +994,6 @@ class EndToEndTestCase(unittest.TestCase):
         self.assertNotEqual(master_nodes, [])
         self.assertNotEqual(replica_nodes, [])
 
-        num_replicas = len(replica_nodes)
-        failover_targets = self.get_failover_targets(master_nodes[0], replica_nodes)
-
         try:
             # add node_readiness_label to potential failover nodes
             patch_readiness_label = {
@@ -1006,8 +1003,8 @@ class EndToEndTestCase(unittest.TestCase):
                     }
                 }
             }
-            for failover_target in failover_targets:
-                k8s.api.core_v1.patch_node(failover_target, patch_readiness_label)
+            for replica_node in replica_nodes:
+                k8s.api.core_v1.patch_node(replica_node, patch_readiness_label)
 
             # define node_readiness_label in config map which should trigger a rolling update
             patch_readiness_label_config = {
@@ -1019,18 +1016,17 @@ class EndToEndTestCase(unittest.TestCase):
             self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"}, "Operator does not get in sync")
 
             # first replica will be replaced and get the new affinity
-            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
-
-            # next switchover of the master
-            k8s.wait_for_pod_failover(failover_targets, 'spilo-role=master,' + cluster_label)
-
-            # the old master is replaced. However it might not start due to a volume node affinity conflict
-            # only if the pvc and pod are deleted it can be scheduled
+            # however, it might not start due to a volume node affinity conflict
+            # in this case only if the pvc and pod are deleted it can be scheduled
             replica = k8s.get_cluster_replica_pod()
             if replica.status.phase == 'Pending':
                 k8s.api.core_v1.delete_namespaced_persistent_volume_claim('pgdata-' + replica.metadata.name, 'default')
                 k8s.api.core_v1.delete_namespaced_pod(replica.metadata.name, 'default')
                 k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
+
+            # next master will be switched over and pod needs to be replaced as well to finish the rolling update
+            k8s.wait_for_pod_failover(replica_nodes, 'spilo-role=master,' + cluster_label)
+            k8s.wait_for_pod_start('spilo-role=replica,' + cluster_label)
 
             # patch also node where master ran before
             k8s.api.core_v1.patch_node(master_nodes[0], patch_readiness_label)
@@ -1330,7 +1326,7 @@ class EndToEndTestCase(unittest.TestCase):
             patch_resync_config = {
                 "data": {
                     "pod_label_wait_timeout": "10m",
-                    "resync_period": "30m",
+                    "resync_period": "4m",
                 }
             }
             k8s.update_config(patch_resync_config, "revert resync interval and pod_label_wait_timeout")
@@ -1569,22 +1565,6 @@ class EndToEndTestCase(unittest.TestCase):
             }
         }
         k8s.update_config(patch_delete_annotations)
-
-    def get_failover_targets(self, master_node, replica_nodes):
-        '''
-           If all pods live on the same node, failover will happen to other worker(s)
-        '''
-        k8s = self.k8s
-        k8s_master_exclusion = 'kubernetes.io/hostname!=postgres-operator-e2e-tests-control-plane'
-
-        failover_targets = [x for x in replica_nodes if x != master_node]
-        if len(failover_targets) == 0:
-            nodes = k8s.api.core_v1.list_node(label_selector=k8s_master_exclusion)
-            for n in nodes.items:
-                if n.metadata.name != master_node:
-                    failover_targets.append(n.metadata.name)
-
-        return failover_targets
 
     def assert_master_is_unique(self, namespace='default', clusterName="acid-minimal-cluster"):
         '''
