@@ -327,7 +327,7 @@ func generateCapabilities(capabilities []string) *v1.Capabilities {
 	return nil
 }
 
-func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
+func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
 	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
 	}
@@ -352,21 +352,17 @@ func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAff
 				},
 			}
 		} else {
-			if len(nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) > 1 {
-				// if there are multiple node selector terms specified, append the node readiness label expressions (OR condition)
+			if c.OpConfig.NodeReadinessLabelMerge == "OR" {
 				manifestTerms := nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
 				manifestTerms = append(manifestTerms, nodeReadinessSelectorTerm)
 				nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
 					NodeSelectorTerms: manifestTerms,
 				}
-			} else {
-				// if there is just one term defined merge it with the readiness label term (AND condition)
-				manifestExpressions := nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions
-				manifestExpressions = append(manifestExpressions, matchExpressions...)
-				nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						v1.NodeSelectorTerm{MatchExpressions: manifestExpressions},
-					},
+			} else if c.OpConfig.NodeReadinessLabelMerge == "AND" {
+				for i, nodeSelectorTerm := range nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+					manifestExpressions := nodeSelectorTerm.MatchExpressions
+					manifestExpressions = append(manifestExpressions, matchExpressions...)
+					nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i] = v1.NodeSelectorTerm{MatchExpressions: manifestExpressions}
 				}
 			}
 		}

@@ -370,7 +370,10 @@ configuration:
 The operator will create a `nodeAffinity` on the pods. This makes the
 `node_readiness_label` option the global configuration for defining node
 affinities for all Postgres clusters. You can have both, cluster-specific and
-global affinity, defined and they will get merged on the pods (AND condition).
+global affinity, defined and they will get merged on the pods. If
+`node_readiness_label_merge` is configured to `"AND"` the node readiness
+affinity will end up under the same `matchExpressions` section(s) from the
+manifest affinity.
 
 ```yaml
   affinity:
@@ -390,8 +393,8 @@ global affinity, defined and they will get merged on the pods (AND condition).
             ...
 ```
 
-If multiple `matchExpressions` are defined in the manifest (OR condition) the
-readiness label configuration will be appended with its own expressions block:
+If `node_readiness_label_merge` is set to `"OR"` (default) the readiness label
+affinty will be appended with its own expressions block:
 
 ```yaml
   affinity:

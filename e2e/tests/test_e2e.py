@@ -1010,6 +1010,7 @@ class EndToEndTestCase(unittest.TestCase):
             patch_readiness_label_config = {
                 "data": {
                     "node_readiness_label": readiness_label + ':' + readiness_value,
+                    "node_readiness_label_merge": "AND",
                 }
             }
             k8s.update_config(patch_readiness_label_config, "setting readiness label")
