@@ -20,6 +20,8 @@ enableJsonLogging: false
 
 # general configuration parameters
 configGeneral:
+  # the deployment should create/update the CRDs
+  enable_crd_registration: true
   # choose if deployment creates/updates CRDs with OpenAPIV3Validation
   enable_crd_validation: true
   # update only the statefulsets without immediately doing the rolling update

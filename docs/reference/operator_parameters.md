@@ -70,6 +70,10 @@ Variable names are underscore-separated words.
 
 Those are top-level keys, containing both leaf keys and groups.
 
+* **enable_crd_registration**
+  Instruct the operator to create/update the CRDs. If disabled the operator will rely on the CRDs being managed separately.
+  The default is `true`.
+
 * **enable_crd_validation**
   toggles if the operator will create or update CRDs with
   [OpenAPI v3 schema validation](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#validation)

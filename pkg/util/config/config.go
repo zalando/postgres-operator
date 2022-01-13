@@ -14,11 +14,12 @@ import (
 
 // CRD describes CustomResourceDefinition specific configuration parameters
 type CRD struct {
-	ReadyWaitInterval   time.Duration `name:"ready_wait_interval" default:"4s"`
-	ReadyWaitTimeout    time.Duration `name:"ready_wait_timeout" default:"30s"`
-	ResyncPeriod        time.Duration `name:"resync_period" default:"30m"`
-	RepairPeriod        time.Duration `name:"repair_period" default:"5m"`
-	EnableCRDValidation *bool         `name:"enable_crd_validation" default:"true"`
+	ReadyWaitInterval     time.Duration `name:"ready_wait_interval" default:"4s"`
+	ReadyWaitTimeout      time.Duration `name:"ready_wait_timeout" default:"30s"`
+	ResyncPeriod          time.Duration `name:"resync_period" default:"30m"`
+	RepairPeriod          time.Duration `name:"repair_period" default:"5m"`
+	EnableCRDRegistration *bool         `name:"enable_crd_registration" default:"true"`
+	EnableCRDValidation   *bool         `name:"enable_crd_validation" default:"true"`
 }
 
 // Resources describes kubernetes resource specific configuration parameters
