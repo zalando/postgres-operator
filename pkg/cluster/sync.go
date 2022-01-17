@@ -611,15 +611,22 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 	return requiresMasterRestart, nil
 }
 
+func (c *Cluster) getNextRotationDate(currentDate time.Time) (time.Time, string) {
+	nextRotationDate := currentDate.AddDate(0, 0, int(c.OpConfig.PasswordRotationInterval))
+	return nextRotationDate, nextRotationDate.Format("2006-01-02 15:04:05")
+}
+
 func (c *Cluster) syncSecrets() error {
 	var (
-		err              error
-		secret           *v1.Secret
-		nextRotationDate time.Time
+		err                 error
+		secret              *v1.Secret
+		nextRotationDate    time.Time
+		nextRotationDateStr string
 	)
 	c.logger.Info("syncing secrets")
 	c.setProcessName("syncing secrets")
 	secrets := c.generateUserSecrets()
+	rotationUsers := make(spec.PgUserMap)
 
 	for secretUsername, secretSpec := range secrets {
 		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
@@ -632,11 +639,11 @@ func (c *Cluster) syncSecrets() error {
 			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(context.TODO(), secretSpec.Name, metav1.GetOptions{}); err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
-			username := string(secret.Data["username"])
+			/*username := string(secret.Data["username"])
 			if secretUsername != username {
 				c.logger.Errorf("secret %s does not contain the role %s", secretSpec.Name, secretUsername)
 				continue
-			}
+			}*/
 
 			c.logger.Debugf("secret %s already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
@@ -649,36 +656,6 @@ func (c *Cluster) syncSecrets() error {
 				userMap = c.pgUsers
 			}
 			pwdUser := userMap[secretUsername]
-
-			// if password rotation is enabled update password and username if rotation interval has been passed
-			if c.OpConfig.EnablePasswordRotation && pwdUser.Origin != spec.RoleOriginInfrastructure && !pwdUser.IsOwner { // || c.Spec.InPlacePasswordRotation[secretUsername] {
-				err = json.Unmarshal(secret.Data["nextRotation"], &nextRotationDate)
-				if err != nil {
-					c.logger.Warningf("could not read rotation date of secret %s", secretSpec.Name)
-					nextRotationDate = time.Now()
-				}
-
-				currentTime := time.Now()
-				if currentTime.After(nextRotationDate) {
-					//if !c.Spec.InPlacePasswordRotation[secretUsername] {
-					newRotationUsername := secretUsername + "_" + currentTime.Format("060102")
-					pwdUser.Name = newRotationUsername
-					pwdUser.MemberOf = []string{secretUsername}
-					pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(spec.PgUserMap{}, map[string]spec.PgUser{newRotationUsername: pwdUser})
-					if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
-						return fmt.Errorf("error executing sync statements: %v", err)
-					}
-					secret.Data["username"] = []byte(newRotationUsername)
-					//}
-					secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
-					secret.Data["nextRotation"] = []byte(currentTime.Add(c.OpConfig.PasswordRotationInterval).Format("2006-01-02 15:04:05"))
-
-					c.logger.Debugf("updating the secret %s due to password rotation", secretSpec.Name)
-					if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secretSpec, metav1.UpdateOptions{}); err != nil {
-						return fmt.Errorf("could not update secret %q: %v", secretUsername, err)
-					}
-				}
-			}
 
 			c.Secrets[secret.UID] = secret
 
@@ -693,8 +670,66 @@ func (c *Cluster) syncSecrets() error {
 				pwdUser.Password = string(secret.Data["password"])
 				userMap[secretUsername] = pwdUser
 			}
+
+			// if password rotation is enabled update password and username if rotation interval has been passed
+			if c.OpConfig.EnablePasswordRotation && pwdUser.Origin != spec.RoleOriginInfrastructure && !pwdUser.IsDbOwner { // || c.Spec.InPlacePasswordRotation[secretUsername] {
+				currentTime := time.Now()
+
+				// initialize password rotation setting first rotation date
+				nextRotationDateStr = string(secret.Data["nextRotation"])
+				if nextRotationDate, err = time.Parse("2006-01-02 15:04:05", nextRotationDateStr); err != nil {
+					nextRotationDate, nextRotationDateStr = c.getNextRotationDate(currentTime)
+					c.logger.Warningf("rotation date not found in secret %q. Setting it to %s", secretSpec.Name, nextRotationDateStr)
+					secret.Data["nextRotation"] = []byte(nextRotationDateStr)
+					if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+						c.logger.Warningf("could not update secret %q: %v", secretSpec.Name, err)
+						continue
+					}
+				}
+
+				if currentTime.After(nextRotationDate) {
+					//if !c.Spec.InPlacePasswordRotation[secretUsername] {
+					newRotationUsername := pwdUser.Name + "_" + currentTime.Format("060102")
+					pwdUser.MemberOf = []string{pwdUser.Name}
+					pwdUser.Name = newRotationUsername
+					rotationUsers[newRotationUsername] = pwdUser
+					secret.Data["username"] = []byte(newRotationUsername)
+					//}
+					secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+
+					_, nextRotationDateStr = c.getNextRotationDate(nextRotationDate)
+					secret.Data["nextRotation"] = []byte(nextRotationDateStr)
+
+					c.logger.Debugf("updating secret %q due to password rotation - next rotation date: %s", secretSpec.Name, nextRotationDateStr)
+					if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+						c.logger.Warningf("could not update secret %q: %v", secretSpec.Name, err)
+						continue
+					}
+				}
+
+				c.Secrets[secret.UID] = secret
+			}
 		} else {
 			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, secretSpec.Namespace, err)
+		}
+	}
+
+	// add new user with date suffix and use it in the secret of the original user
+	if len(rotationUsers) > 0 {
+		err = c.initDbConn()
+		if err != nil {
+			return fmt.Errorf("could not init db connection: %v", err)
+		}
+		pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(spec.PgUserMap{}, rotationUsers)
+		if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
+			return fmt.Errorf("error executing sync statements: %v", err)
+		}
+		if err2 := c.closeDbConn(); err2 != nil {
+			if err == nil {
+				return fmt.Errorf("could not close database connection: %v", err2)
+			} else {
+				return fmt.Errorf("could not close database connection: %v (prior error: %v)", err2, err)
+			}
 		}
 	}
 

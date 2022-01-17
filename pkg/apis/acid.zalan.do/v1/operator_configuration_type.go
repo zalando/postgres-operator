@@ -37,10 +37,10 @@ type OperatorConfigurationList struct {
 
 // PostgresUsersConfiguration defines the system users of Postgres.
 type PostgresUsersConfiguration struct {
-	SuperUsername            string   `json:"super_username,omitempty"`
-	ReplicationUsername      string   `json:"replication_username,omitempty"`
-	EnablePasswordRotation   bool     `json:"enable_password_rotation,omitempty"`
-	PasswordRotationInterval Duration `json:"password_rotation_interval,omitempty"`
+	SuperUsername            string `json:"super_username,omitempty"`
+	ReplicationUsername      string `json:"replication_username,omitempty"`
+	EnablePasswordRotation   bool   `json:"enable_password_rotation,omitempty"`
+	PasswordRotationInterval uint32 `json:"password_rotation_interval,omitempty"`
 }
 
 // MajorVersionUpgradeConfiguration defines how to execute major version upgrades of Postgres.

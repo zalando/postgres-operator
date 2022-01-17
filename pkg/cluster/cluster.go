@@ -995,6 +995,7 @@ func (c *Cluster) initSystemUsers() {
 		Name:      c.OpConfig.SuperUsername,
 		Namespace: c.Namespace,
 		Password:  util.RandomPassword(constants.PasswordLength),
+		IsDbOwner: true,
 	}
 	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
 		Origin:    spec.RoleOriginSystem,
@@ -1112,7 +1113,6 @@ func (c *Cluster) initPreparedDatabaseRoles() error {
 func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix, searchPath, secretNamespace string) error {
 
 	for defaultRole, inherits := range defaultRoles {
-
 		namespace := c.Namespace
 		//if namespaced secrets are allowed
 		if secretNamespace != "" {
@@ -1135,8 +1135,10 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 		}
 
 		adminRole := ""
+		isOwner := false
 		if strings.Contains(defaultRole, constants.OwnerRoleNameSuffix) {
 			adminRole = admin
+			isOwner = true
 		} else {
 			adminRole = prefix + constants.OwnerRoleNameSuffix
 		}
@@ -1150,6 +1152,7 @@ func (c *Cluster) initDefaultRoles(defaultRoles map[string]string, admin, prefix
 			MemberOf:   memberOf,
 			Parameters: map[string]string{"search_path": searchPath},
 			AdminRole:  adminRole,
+			IsDbOwner:  isOwner,
 		}
 		if currentRole, present := c.pgUsers[roleName]; present {
 			c.pgUsers[roleName] = c.resolveNameConflict(&currentRole, &newRole)
@@ -1170,6 +1173,14 @@ func (c *Cluster) initRobotUsers() error {
 			continue
 		}
 		namespace := c.Namespace
+
+		// check if role is specified as database owner
+		isOwner := false
+		for _, owner := range c.Spec.Databases {
+			if username == owner {
+				isOwner = true
+			}
+		}
 
 		//if namespaced secrets are allowed
 		if c.Config.OpConfig.EnableCrossNamespaceSecret {
@@ -1195,6 +1206,7 @@ func (c *Cluster) initRobotUsers() error {
 			Password:  util.RandomPassword(constants.PasswordLength),
 			Flags:     flags,
 			AdminRole: adminRole,
+			IsDbOwner: isOwner,
 		}
 		if currentRole, present := c.pgUsers[username]; present {
 			c.pgUsers[username] = c.resolveNameConflict(&currentRole, &newRole)
