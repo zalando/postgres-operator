@@ -55,6 +55,7 @@ type PgUser struct {
 	MemberOf   []string          `yaml:"inrole"`
 	Parameters map[string]string `yaml:"db_parameters"`
 	AdminRole  string            `yaml:"admin_role"`
+	IsOwner    bool              `yaml:"is_owner"`
 	Deleted    bool              `yaml:"deleted"`
 }
 

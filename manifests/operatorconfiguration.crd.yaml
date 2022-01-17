@@ -120,6 +120,12 @@ spec:
               users:
                 type: object
                 properties:
+                  enable_password_rotation:
+                    type: boolean
+                    default: false
+                  password_rotation_interval:
+                    type: string
+                    default: "90d"
                   replication_username:
                      type: string
                      default: standby

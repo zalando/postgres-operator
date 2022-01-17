@@ -17,15 +17,39 @@ import (
 )
 
 const (
-	getUserSQL = `SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.rolinherit,
-	        a.rolcreaterole, a.rolcreatedb, a.rolcanlogin, s.setconfig,
-	        ARRAY(SELECT b.rolname
-	              FROM pg_catalog.pg_auth_members m
-	              JOIN pg_catalog.pg_authid b ON (m.roleid = b.oid)
-	             WHERE m.member = a.oid) as memberof
-	 FROM pg_catalog.pg_authid a LEFT JOIN pg_db_role_setting s ON (a.oid = s.setrole AND s.setdatabase = 0::oid)
-	 WHERE a.rolname = ANY($1)
-	 ORDER BY 1;`
+	getUserSQL = `WITH dbowners AS (
+		SELECT DISTINCT pg_catalog.pg_get_userbyid(datdba) AS owner
+		  FROM pg_database
+		 WHERE datname NOT IN ('postgres', 'template0', 'template1')
+	  ), roles AS (
+		SELECT a.rolname, COALESCE(a.rolpassword, '') AS rolpassword, a.rolsuper, a.rolinherit,
+			   a.rolcreaterole, a.rolcreatedb, a.rolcanlogin, s.setconfig,
+			   ARRAY(SELECT b.rolname
+					   FROM pg_catalog.pg_auth_members m
+					   JOIN pg_catalog.pg_authid b ON (m.roleid = b.oid)
+					  WHERE m.member = a.oid) as memberof
+		  FROM pg_catalog.pg_authid a
+		  LEFT JOIN pg_catalog.pg_db_role_setting s ON (a.oid = s.setrole AND s.setdatabase = 0::oid)
+		 WHERE a.rolname = ANY($1)
+		 ORDER BY 1
+	  )
+	  SELECT r.rolname, r.rolpassword, r.rolsuper, r.rolinherit,
+			 r.rolcreaterole, r.rolcreatedb, r.rolcanlogin, r.setconfig,
+			 r.memberof,
+			 o.owner IS NOT NULL OR r.rolname LIKE '%_owner' AS is_owner
+		FROM roles r
+		LEFT JOIN dbowners o ON o.owner = r.rolname OR o.owner = ANY (r.memberof)
+	   ORDER BY 1;`
+
+	/*`SELECT a.rolname, COALESCE(a.rolpassword, ''), a.rolsuper, a.rolinherit,
+	       a.rolcreaterole, a.rolcreatedb, a.rolcanlogin, s.setconfig,
+	       ARRAY(SELECT b.rolname
+	             FROM pg_catalog.pg_auth_members m
+	             JOIN pg_catalog.pg_authid b ON (m.roleid = b.oid)
+	            WHERE m.member = a.oid) as memberof
+	FROM pg_catalog.pg_authid a LEFT JOIN pg_db_role_setting s ON (a.oid = s.setrole AND s.setdatabase = 0::oid)
+	WHERE a.rolname = ANY($1)
+	ORDER BY 1;`*/
 
 	getDatabasesSQL = `SELECT datname, pg_get_userbyid(datdba) AS owner FROM pg_database;`
 	getSchemasSQL   = `SELECT n.nspname AS dbschema FROM pg_catalog.pg_namespace n
@@ -198,10 +222,10 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 			rolname, rolpassword                                          string
 			rolsuper, rolinherit, rolcreaterole, rolcreatedb, rolcanlogin bool
 			roloptions, memberof                                          []string
-			roldeleted                                                    bool
+			rolowner, roldeleted                                          bool
 		)
 		err := rows.Scan(&rolname, &rolpassword, &rolsuper, &rolinherit,
-			&rolcreaterole, &rolcreatedb, &rolcanlogin, pq.Array(&roloptions), pq.Array(&memberof))
+			&rolcreaterole, &rolcreatedb, &rolcanlogin, pq.Array(&roloptions), pq.Array(&memberof), &rolowner)
 		if err != nil {
 			return nil, fmt.Errorf("error when processing user rows: %v", err)
 		}
@@ -221,7 +245,7 @@ func (c *Cluster) readPgUsersFromDatabase(userNames []string) (users spec.PgUser
 			roldeleted = true
 		}
 
-		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof, Parameters: parameters, Deleted: roldeleted}
+		users[rolname] = spec.PgUser{Name: rolname, Password: rolpassword, Flags: flags, MemberOf: memberof, Parameters: parameters, IsOwner: rolowner, Deleted: roldeleted}
 	}
 
 	return users, nil

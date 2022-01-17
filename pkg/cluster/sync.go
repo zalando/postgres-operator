@@ -613,8 +613,9 @@ func (c *Cluster) checkAndSetGlobalPostgreSQLConfiguration(pod *v1.Pod, patroniC
 
 func (c *Cluster) syncSecrets() error {
 	var (
-		err    error
-		secret *v1.Secret
+		err              error
+		secret           *v1.Secret
+		nextRotationDate time.Time
 	)
 	c.logger.Info("syncing secrets")
 	c.setProcessName("syncing secrets")
@@ -631,11 +632,12 @@ func (c *Cluster) syncSecrets() error {
 			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(context.TODO(), secretSpec.Name, metav1.GetOptions{}); err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
-			if secretUsername != string(secret.Data["username"]) {
+			username := string(secret.Data["username"])
+			if secretUsername != username {
 				c.logger.Errorf("secret %s does not contain the role %s", secretSpec.Name, secretUsername)
 				continue
 			}
-			c.Secrets[secret.UID] = secret
+
 			c.logger.Debugf("secret %s already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
 				secretUsername = constants.SuperuserKeyName
@@ -647,10 +649,41 @@ func (c *Cluster) syncSecrets() error {
 				userMap = c.pgUsers
 			}
 			pwdUser := userMap[secretUsername]
-			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
-			if pwdUser.Password != string(secret.Data["password"]) &&
-				pwdUser.Origin == spec.RoleOriginInfrastructure {
 
+			// if password rotation is enabled update password and username if rotation interval has been passed
+			if c.OpConfig.EnablePasswordRotation && pwdUser.Origin != spec.RoleOriginInfrastructure && !pwdUser.IsOwner { // || c.Spec.InPlacePasswordRotation[secretUsername] {
+				err = json.Unmarshal(secret.Data["nextRotation"], &nextRotationDate)
+				if err != nil {
+					c.logger.Warningf("could not read rotation date of secret %s", secretSpec.Name)
+					nextRotationDate = time.Now()
+				}
+
+				currentTime := time.Now()
+				if currentTime.After(nextRotationDate) {
+					//if !c.Spec.InPlacePasswordRotation[secretUsername] {
+					newRotationUsername := secretUsername + "_" + currentTime.Format("060102")
+					pwdUser.Name = newRotationUsername
+					pwdUser.MemberOf = []string{secretUsername}
+					pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(spec.PgUserMap{}, map[string]spec.PgUser{newRotationUsername: pwdUser})
+					if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
+						return fmt.Errorf("error executing sync statements: %v", err)
+					}
+					secret.Data["username"] = []byte(newRotationUsername)
+					//}
+					secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+					secret.Data["nextRotation"] = []byte(currentTime.Add(c.OpConfig.PasswordRotationInterval).Format("2006-01-02 15:04:05"))
+
+					c.logger.Debugf("updating the secret %s due to password rotation", secretSpec.Name)
+					if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secretSpec, metav1.UpdateOptions{}); err != nil {
+						return fmt.Errorf("could not update secret %q: %v", secretUsername, err)
+					}
+				}
+			}
+
+			c.Secrets[secret.UID] = secret
+
+			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
+			if pwdUser.Password != string(secret.Data["password"]) && pwdUser.Origin == spec.RoleOriginInfrastructure {
 				c.logger.Debugf("updating the secret %s from the infrastructure roles", secretSpec.Name)
 				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secretSpec, metav1.UpdateOptions{}); err != nil {
 					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
