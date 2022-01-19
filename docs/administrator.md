@@ -293,6 +293,62 @@ that are aggregated into the K8s [default roles](https://kubernetes.io/docs/refe
 
 For Helm deployments setting `rbac.createAggregateClusterRoles: true` adds these clusterroles to the deployment.
 
+## Password rotation in K8s secrets
+
+The operator regularly updates credentials in the K8s secrets if the
+`enable_password_rotation` option is set to `true` in the configuration.
+It happens only for LOGIN roles with an associated secret (manifest roles,
+default user from `preparedDatabases`, system users). Furthermore, there
+the following roles are excluded:
+
+1. Infrastructure role secrets since rotation should happen by the infrastructure.
+2. Team API roles that connect via OAuth2 and JWT token. Rotation should be provided by the infrastructure + there is even no secret for these roles
+3. Database owners and members of owners, since ownership can not be inherited.
+
+The interval of days can be set with `password_rotation_interval` (default
+`90` = 90 days, minimum 1). On each rotation the user name and password values
+are replaced in the secret. They belong to a newly created user named after
+the original role plus rotation date in YYMMDD format. All priviliges are
+inherited meaning that migration scripts continue to apply grants/revokes
+against the original role. The timestamp of the next rotation is written to
+the secret as well.
+
+Pods still using the previous secret values in memory continue to connect to
+the database since the password of the corresponding user is not replaced.
+However, a retention policy can be configured for created roles by password
+rotation with `password_rotation_user_retention`. The operator will ensure
+that this period is at least twice as long as the configured rotation
+interval, hence the default of `180` = 180 days.
+
+### Password rotation for single roles
+
+From the configuration, password rotation is enabled for all secrets with the
+mentioned exceptions. If you wish to first test rotation for a single user (or
+just have it enabled only for a few secrets) you can specify it in the cluster
+manifest. The rotation and retention intervals can only be configured globally.
+
+```
+spec:
+  usersWithSecretRotation: "foo_user,bar_reader_user"
+```
+
+### Password replacement without extra roles
+
+For some use cases where the secret is only used rarely - think of a `flyway`
+user running a migration script on pod start - we do not need to create extra
+database roles but can replace only the password in the K8s secret. This type
+of rotation cannot be configured globally but specified in the cluster
+manifest:
+
+```
+spec:
+  usersWithInPlaceSecretRotation: "flyway,bar_owner_user"
+```
+
+This would be the recommended option to enable rotation in secrets of database
+owners, But only if they are not used as application users for regular read
+and write operation.
+
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 
 To ensure Postgres pods are running on nodes without any other application pods,

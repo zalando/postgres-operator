@@ -1001,6 +1001,7 @@ func (c *Cluster) initSystemUsers() {
 		Origin:    spec.RoleOriginSystem,
 		Name:      c.OpConfig.ReplicationUsername,
 		Namespace: c.Namespace,
+		Flags:     []string{constants.RoleFlagLogin},
 		Password:  util.RandomPassword(constants.PasswordLength),
 	}
 

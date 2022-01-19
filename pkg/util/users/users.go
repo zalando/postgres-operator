@@ -18,6 +18,7 @@ const (
 	alterUserRenameSQL   = `ALTER ROLE "%s" RENAME TO "%s%s"`
 	alterRoleResetAllSQL = `ALTER ROLE "%s" RESET ALL`
 	alterRoleSetSQL      = `ALTER ROLE "%s" SET %s TO %s`
+	dropUserSQL          = `SET LOCAL synchronous_commit = 'local'; DROP ROLE "%s";`
 	grantToUserSQL       = `GRANT %s TO "%s"`
 	doBlockStmt          = `SET LOCAL synchronous_commit = 'local'; DO $$ BEGIN %s; END;$$;`
 	passwordTemplate     = "ENCRYPTED PASSWORD '%s'"
@@ -287,4 +288,14 @@ func quoteParameterValue(name, val string) string {
 		return val
 	}
 	return fmt.Sprintf(`'%s'`, strings.Trim(val, " "))
+}
+
+// DropPgUser to remove user created by the operator e.g. for password rotation
+func DropPgUser(user string, db *sql.DB) error {
+	query := fmt.Sprintf(dropUserSQL, user)
+	if _, err := db.Exec(query); err != nil { // TODO: Try several times
+		return err
+	}
+
+	return nil
 }

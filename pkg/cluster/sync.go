@@ -627,6 +627,7 @@ func (c *Cluster) syncSecrets() error {
 	c.setProcessName("syncing secrets")
 	secrets := c.generateUserSecrets()
 	rotationUsers := make(spec.PgUserMap)
+	retentionUsers := make([]string, 0)
 
 	for secretUsername, secretSpec := range secrets {
 		if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Create(context.TODO(), secretSpec, metav1.CreateOptions{}); err == nil {
@@ -672,7 +673,8 @@ func (c *Cluster) syncSecrets() error {
 			}
 
 			// if password rotation is enabled update password and username if rotation interval has been passed
-			if c.OpConfig.EnablePasswordRotation && pwdUser.Origin != spec.RoleOriginInfrastructure && !pwdUser.IsDbOwner { // || c.Spec.InPlacePasswordRotation[secretUsername] {
+			if (c.OpConfig.EnablePasswordRotation && pwdUser.Origin != spec.RoleOriginInfrastructure && !pwdUser.IsDbOwner) ||
+				util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) || util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
 				currentTime := time.Now()
 
 				// initialize password rotation setting first rotation date
@@ -688,13 +690,14 @@ func (c *Cluster) syncSecrets() error {
 				}
 
 				if currentTime.After(nextRotationDate) {
-					//if !c.Spec.InPlacePasswordRotation[secretUsername] {
-					newRotationUsername := pwdUser.Name + "_" + currentTime.Format("060102")
-					pwdUser.MemberOf = []string{pwdUser.Name}
-					pwdUser.Name = newRotationUsername
-					rotationUsers[newRotationUsername] = pwdUser
-					secret.Data["username"] = []byte(newRotationUsername)
-					//}
+					if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+						retentionUsers = append(retentionUsers, pwdUser.Name)
+						newRotationUsername := pwdUser.Name + currentTime.Format("060102")
+						pwdUser.MemberOf = []string{pwdUser.Name}
+						pwdUser.Name = newRotationUsername
+						rotationUsers[newRotationUsername] = pwdUser
+						secret.Data["username"] = []byte(newRotationUsername)
+					}
 					secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
 
 					_, nextRotationDateStr = c.getNextRotationDate(nextRotationDate)
@@ -722,14 +725,13 @@ func (c *Cluster) syncSecrets() error {
 		}
 		pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(spec.PgUserMap{}, rotationUsers)
 		if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
-			return fmt.Errorf("error executing sync statements: %v", err)
+			return fmt.Errorf("error creating database roles for password rotation: %v", err)
 		}
-		if err2 := c.closeDbConn(); err2 != nil {
-			if err == nil {
-				return fmt.Errorf("could not close database connection: %v", err2)
-			} else {
-				return fmt.Errorf("could not close database connection: %v (prior error: %v)", err2, err)
-			}
+		if err = c.cleanupRotatedUsers(retentionUsers, c.pgDb); err != nil {
+			return fmt.Errorf("error creating database roles for password rotation: %v", err)
+		}
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection during secret rotation: %v", err)
 		}
 	}
 

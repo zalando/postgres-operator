@@ -128,6 +128,9 @@ spec:
                   password_rotation_interval:
                     type: integer
                     default: 90
+                  password_rotation_user_retention:
+                    type: integer
+                    default: 180
                   replication_username:
                      type: string
                      default: standby
