@@ -674,7 +674,7 @@ func (c *Cluster) syncSecrets() error {
 
 			// if password rotation is enabled update password and username if rotation interval has been passed
 			if (c.OpConfig.EnablePasswordRotation && pwdUser.Origin != spec.RoleOriginInfrastructure && !pwdUser.IsDbOwner) ||
-				util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) || util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+				util.SliceContains(c.Spec.UsersWithSecretRotation, pwdUser.Name) || util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, pwdUser.Name) {
 				currentTime := time.Now()
 
 				// initialize password rotation setting first rotation date
@@ -690,7 +690,7 @@ func (c *Cluster) syncSecrets() error {
 				}
 
 				if currentTime.After(nextRotationDate) {
-					if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+					if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, pwdUser.Name) {
 						retentionUsers = append(retentionUsers, pwdUser.Name)
 						newRotationUsername := pwdUser.Name + currentTime.Format("060102")
 						pwdUser.MemberOf = []string{pwdUser.Name}

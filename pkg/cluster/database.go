@@ -267,14 +267,15 @@ func (c *Cluster) cleanupRotatedUsers(rotatedUsers []string, db *sql.DB) error {
 		return fmt.Errorf("error when querying for deprecated users from password rotation: %v", err)
 	}
 
+	// make sure user retention policy aligns with rotation interval
+	retenionDays := c.OpConfig.PasswordRotationUserRetention
+	if retenionDays < 2*c.OpConfig.PasswordRotationInterval {
+		retenionDays = 2 * c.OpConfig.PasswordRotationInterval
+		c.logger.Warnf("user retention days too few compared to rotation interval %d - setting it to %d", c.OpConfig.PasswordRotationInterval, retenionDays)
+	}
+	retentionDate := time.Now().AddDate(0, 0, int(retenionDays)*-1)
+
 	for rotatedUser, dateSuffix := range extraUsers {
-		// make sure user retention policy aligns with rotation interval
-		retenionDays := c.OpConfig.PasswordRotationUserRetention
-		if retenionDays < 2*c.OpConfig.PasswordRotationInterval {
-			retenionDays = 2 * c.OpConfig.PasswordRotationInterval
-			c.logger.Warnf("user retention days too few compared to rotation interval %d - setting it to %d", c.OpConfig.PasswordRotationInterval, retenionDays)
-		}
-		retentionDate := time.Now().AddDate(0, 0, int(retenionDays)*-1)
 		userCreationDate, err := time.Parse("060102", dateSuffix)
 		if err != nil {
 			c.logger.Errorf("could not parse creation date suffix of user %q: %v", rotatedUser, err)

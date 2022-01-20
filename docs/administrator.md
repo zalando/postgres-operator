@@ -329,7 +329,9 @@ manifest. The rotation and retention intervals can only be configured globally.
 
 ```
 spec:
-  usersWithSecretRotation: "foo_user,bar_reader_user"
+  usersWithSecretRotation:
+  - foo_user
+  - bar_reader_user
 ```
 
 ### Password replacement without extra roles
@@ -342,7 +344,9 @@ manifest:
 
 ```
 spec:
-  usersWithInPlaceSecretRotation: "flyway,bar_owner_user"
+  usersWithInPlaceSecretRotation:
+  - flyway
+  - bar_owner_user
 ```
 
 This would be the recommended option to enable rotation in secrets of database
