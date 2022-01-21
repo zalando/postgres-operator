@@ -298,27 +298,33 @@ For Helm deployments setting `rbac.createAggregateClusterRoles: true` adds these
 The operator regularly updates credentials in the K8s secrets if the
 `enable_password_rotation` option is set to `true` in the configuration.
 It happens only for LOGIN roles with an associated secret (manifest roles,
-default user from `preparedDatabases`, system users). Furthermore, there
-the following roles are excluded:
+default users from `preparedDatabases`, system users). Furthermore, there
+are the following exceptions:
 
 1. Infrastructure role secrets since rotation should happen by the infrastructure.
 2. Team API roles that connect via OAuth2 and JWT token. Rotation should be provided by the infrastructure + there is even no secret for these roles
-3. Database owners and members of owners, since ownership can not be inherited.
+3. Database owners and direct members of owners, since ownership on database objects can not be inherited.
 
 The interval of days can be set with `password_rotation_interval` (default
 `90` = 90 days, minimum 1). On each rotation the user name and password values
-are replaced in the secret. They belong to a newly created user named after
+are replaced in the K8s secret. They belong to a newly created user named after
 the original role plus rotation date in YYMMDD format. All priviliges are
-inherited meaning that migration scripts continue to apply grants/revokes
-against the original role. The timestamp of the next rotation is written to
-the secret as well.
+inherited meaning that migration scripts should still grant and revoke rights
+against the original role. The timestamp of the next rotation is written to the
+secret as well. Note, if the rotation interval is decreased it is reflected in
+the secrets only if the next rotation date is more days away than the new
+length of the interval.
 
-Pods still using the previous secret values in memory continue to connect to
-the database since the password of the corresponding user is not replaced.
-However, a retention policy can be configured for created roles by password
-rotation with `password_rotation_user_retention`. The operator will ensure
-that this period is at least twice as long as the configured rotation
-interval, hence the default of `180` = 180 days.
+Pods still using the previous secret values which they keep in memory continue
+to connect to the database since the password of the corresponding user is not
+replaced. However, a retention policy can be configured for roles created by
+the password rotation feature with `password_rotation_user_retention`. The
+operator will ensure that this period is at least twice as long as the
+configured rotation interval, hence the default of `180` = 180 days. When
+the creation date of a rotated user is older than the retention period it
+might not get removed immediately. Only on the next user rotation it is checked
+if users can get removed. Therefore, you might want to configure the retention
+to be a multiple of the rotation interval.
 
 ### Password rotation for single roles
 
@@ -350,8 +356,19 @@ spec:
 ```
 
 This would be the recommended option to enable rotation in secrets of database
-owners, But only if they are not used as application users for regular read
-and write operation.
+owners, but only if they are not used as application users for regular read
+and write operations.
+
+### Turning off password rotation
+
+When password rotation is turned off again the operator will check if the
+`username` value in the secret matches the original username and replace it
+with the latter. A new password is assigned and the `nextRotation` field is
+cleared. A final lookup for child (rotation) users to be removed is done but
+they will only be dropped if the retention policy allows for it. This is to
+avoid sudden connection issues in pods which still use credentials of these
+users in memory. You have to remove these child roles manually or re-enable
+password rotation with smaller interval so they get cleaned up.
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
 

@@ -673,6 +673,13 @@ func (c *Cluster) syncSecrets() error {
 					updateSecretMsg = fmt.Sprintf("rotation date not found in secret %q. Setting it to %s", secretSpec.Name, nextRotationDateStr)
 				}
 
+				// check if next rotation can happen sooner
+				// if rotation interval has been decreased
+				currentRotationDate, _ := c.getNextRotationDate(currentTime)
+				if nextRotationDate.After(currentRotationDate) {
+					nextRotationDate = currentRotationDate
+				}
+
 				// update password and next rotation date if configured interval has passed
 				if currentTime.After(nextRotationDate) {
 					// create rotation user if role is not listed for in-place password update
