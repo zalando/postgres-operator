@@ -620,6 +620,8 @@ func (c *Cluster) syncSecrets() error {
 	var (
 		err                 error
 		secret              *v1.Secret
+		updateSecret        bool
+		updateSecretMsg     string
 		nextRotationDate    time.Time
 		nextRotationDateStr string
 	)
@@ -640,11 +642,6 @@ func (c *Cluster) syncSecrets() error {
 			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(context.TODO(), secretSpec.Name, metav1.GetOptions{}); err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
-			/*username := string(secret.Data["username"])
-			if secretUsername != username {
-				c.logger.Errorf("secret %s does not contain the role %s", secretSpec.Name, secretUsername)
-				continue
-			}*/
 
 			c.logger.Debugf("secret %s already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
@@ -658,14 +655,10 @@ func (c *Cluster) syncSecrets() error {
 			}
 			pwdUser := userMap[secretUsername]
 
-			c.Secrets[secret.UID] = secret
-
 			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
 			if pwdUser.Password != string(secret.Data["password"]) && pwdUser.Origin == spec.RoleOriginInfrastructure {
-				c.logger.Debugf("updating the secret %s from the infrastructure roles", secretSpec.Name)
-				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secretSpec, metav1.UpdateOptions{}); err != nil {
-					return fmt.Errorf("could not update infrastructure role secret for role %q: %v", secretUsername, err)
-				}
+				updateSecret = true
+				updateSecretMsg = fmt.Sprintf("updating the secret %s from the infrastructure roles", secretSpec.Name)
 			} else {
 				// for non-infrastructure role - update the role with the password from the secret
 				pwdUser.Password = string(secret.Data["password"])
@@ -674,26 +667,23 @@ func (c *Cluster) syncSecrets() error {
 
 			// if password rotation is enabled update password and username if rotation interval has been passed
 			if (c.OpConfig.EnablePasswordRotation && pwdUser.Origin != spec.RoleOriginInfrastructure && !pwdUser.IsDbOwner) ||
-				util.SliceContains(c.Spec.UsersWithSecretRotation, pwdUser.Name) || util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, pwdUser.Name) {
+				util.SliceContains(c.Spec.UsersWithSecretRotation, secretUsername) || util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
 				currentTime := time.Now()
 
 				// initialize password rotation setting first rotation date
 				nextRotationDateStr = string(secret.Data["nextRotation"])
 				if nextRotationDate, err = time.Parse("2006-01-02 15:04:05", nextRotationDateStr); err != nil {
 					nextRotationDate, nextRotationDateStr = c.getNextRotationDate(currentTime)
-					c.logger.Warningf("rotation date not found in secret %q. Setting it to %s", secretSpec.Name, nextRotationDateStr)
 					secret.Data["nextRotation"] = []byte(nextRotationDateStr)
-					if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
-						c.logger.Warningf("could not update secret %q: %v", secretSpec.Name, err)
-						continue
-					}
+					updateSecret = true
+					updateSecretMsg = fmt.Sprintf("rotation date not found in secret %q. Setting it to %s", secretSpec.Name, nextRotationDateStr)
 				}
 
 				if currentTime.After(nextRotationDate) {
-					if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, pwdUser.Name) {
-						retentionUsers = append(retentionUsers, pwdUser.Name)
-						newRotationUsername := pwdUser.Name + currentTime.Format("060102")
-						pwdUser.MemberOf = []string{pwdUser.Name}
+					if !util.SliceContains(c.Spec.UsersWithInPlaceSecretRotation, secretUsername) {
+						retentionUsers = append(retentionUsers, secretUsername)
+						newRotationUsername := secretUsername + currentTime.Format("060102")
+						pwdUser.MemberOf = []string{secretUsername}
 						pwdUser.Name = newRotationUsername
 						rotationUsers[newRotationUsername] = pwdUser
 						secret.Data["username"] = []byte(newRotationUsername)
@@ -703,15 +693,30 @@ func (c *Cluster) syncSecrets() error {
 					_, nextRotationDateStr = c.getNextRotationDate(nextRotationDate)
 					secret.Data["nextRotation"] = []byte(nextRotationDateStr)
 
-					c.logger.Debugf("updating secret %q due to password rotation - next rotation date: %s", secretSpec.Name, nextRotationDateStr)
-					if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
-						c.logger.Warningf("could not update secret %q: %v", secretSpec.Name, err)
-						continue
-					}
+					updateSecret = true
+					updateSecretMsg = fmt.Sprintf("updating secret %q due to password rotation - next rotation date: %s", secretSpec.Name, nextRotationDateStr)
 				}
-
-				c.Secrets[secret.UID] = secret
+			} else {
+				// username might not match if password rotation has been disabled again
+				if secretUsername != string(secret.Data["username"]) {
+					retentionUsers = append(retentionUsers, secretUsername)
+					secret.Data["username"] = []byte(secretUsername)
+					secret.Data["password"] = []byte(util.RandomPassword(constants.PasswordLength))
+					secret.Data["nextRotation"] = []byte{}
+					updateSecret = true
+					updateSecretMsg = fmt.Sprintf("secret %s does not contain the role %s - updating username and resetting password", secretSpec.Name, secretUsername)
+				}
 			}
+
+			if updateSecret {
+				c.logger.Debugln(updateSecretMsg)
+				if _, err = c.KubeClient.Secrets(secretSpec.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
+					c.logger.Warningf("could not update secret %q: %v", secretSpec.Name, err)
+					continue
+				}
+			}
+			c.Secrets[secret.UID] = secret
+
 		} else {
 			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, secretSpec.Namespace, err)
 		}
@@ -726,6 +731,17 @@ func (c *Cluster) syncSecrets() error {
 		pgSyncRequests := c.userSyncStrategy.ProduceSyncRequests(spec.PgUserMap{}, rotationUsers)
 		if err = c.userSyncStrategy.ExecuteSyncRequests(pgSyncRequests, c.pgDb); err != nil {
 			return fmt.Errorf("error creating database roles for password rotation: %v", err)
+		}
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection during secret rotation: %v", err)
+		}
+	}
+
+	// remove rotation users that exceed the retention interval
+	if len(retentionUsers) > 0 {
+		err = c.initDbConn()
+		if err != nil {
+			return fmt.Errorf("could not init db connection: %v", err)
 		}
 		if err = c.cleanupRotatedUsers(retentionUsers, c.pgDb); err != nil {
 			return fmt.Errorf("error creating database roles for password rotation: %v", err)
