@@ -638,12 +638,13 @@ func (c *Cluster) syncSecrets() error {
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
-			c.logger.Debugf("secret %s already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
 			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(context.TODO(), secretSpec.Name, metav1.GetOptions{}); err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
+			c.Secrets[secret.UID] = secret
+			c.logger.Debugf("secret %s already exists, fetching its password", util.NameFromMeta(secret.ObjectMeta))
 
-			// sync password of pgUser
+			// fetch user map to update later
 			var userMap map[string]spec.PgUser
 			var userKey string
 			if secretUsername == c.systemUsers[constants.SuperuserKeyName].Name {
@@ -723,8 +724,8 @@ func (c *Cluster) syncSecrets() error {
 					c.logger.Warningf("could not update secret %q: %v", secretSpec.Name, err)
 					continue
 				}
+				c.Secrets[secret.UID] = secret
 			}
-			c.Secrets[secret.UID] = secret
 
 		} else {
 			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, secretSpec.Namespace, err)
