@@ -1085,9 +1085,11 @@ class EndToEndTestCase(unittest.TestCase):
                         "Unexpected rotation date in secret of zalando user: expected {}, got {}".format(today90days, next_rotation_timestamp.date()))
 
         # create fake rotation users that should be removed by operator
+        # but have one that would still fit into the retention period
         create_fake_rotation_user = """
             CREATE ROLE foo_user201031 IN ROLE foo_user;
             CREATE ROLE foo_user211031 IN ROLE foo_user;
+            CREATE ROLE foo_user"""+(today-timedelta(days=40)).strftime("%y%m%d")+""" IN ROLE foo_user;
         """
         self.query_database(leader.metadata.name, "postgres", create_fake_rotation_user)
 
@@ -1130,7 +1132,38 @@ class EndToEndTestCase(unittest.TestCase):
                         "Unexpected rotation date in secret of foo_user: expected {}, got {}".format(today30days, next_rotation_timestamp.date()))
 
         # check if oldest fake rotation users were deleted
-        # there should only be foo_user and foo_user+today.strftime("%y%m%d")
+        # there should only be foo_user, foo_user+today and foo_user+today-40days
+        user_query = """
+            SELECT rolname
+              FROM pg_catalog.pg_roles
+             WHERE rolname LIKE 'foo_user%';
+        """
+        self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 3,
+            "Found incorrect number of rotation users", 10, 5)
+
+        # disable password rotation for all other users (foo_user)
+        # and pick smaller intervals to see if the third fake rotation user is dropped 
+        enable_password_rotation = {
+            "data": {
+                "enable_password_rotation": "false",
+                "password_rotation_interval": "15",
+                "password_rotation_user_retention": "30",  # 2 * rotation interval
+            },
+        }
+        k8s.update_config(enable_password_rotation)
+        self.eventuallyEqual(lambda: k8s.get_operator_state(), {"0": "idle"},
+                             "Operator does not get in sync")
+
+        # check if username in foo_user secret is reset
+        secret_data = k8s.get_secret_data("foo_user")
+        secret_username = str(base64.b64decode(secret_data["username"]), 'utf-8')
+        next_rotation_timestamp = str(base64.b64decode(secret_data["nextRotation"]), 'utf-8')
+        self.assertEqual("foo_user", secret_username,
+                        "Unexpected username in secret of foo_user: expected {}, got {}".format("foo_user", secret_username))
+        self.assertEqual('', next_rotation_timestamp,
+                        "Unexpected rotation date in secret of foo_user: expected empty string, got {}".format(next_rotation_timestamp))
+
+        # check roles again, there should only be foo_user and foo_user+today
         user_query = """
             SELECT rolname
               FROM pg_catalog.pg_roles
@@ -1138,7 +1171,6 @@ class EndToEndTestCase(unittest.TestCase):
         """
         self.eventuallyEqual(lambda: len(self.query_database(leader.metadata.name, "postgres", user_query)), 2,
             "Found incorrect number of rotation users", 10, 5)
-
 
     @timeout_decorator.timeout(TEST_TIMEOUT_SEC)
     def test_patroni_config_update(self):
