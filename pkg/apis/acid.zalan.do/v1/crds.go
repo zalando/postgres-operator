@@ -288,6 +288,26 @@ var PostgresCRDResourceValidation = apiextv1.CustomResourceValidation{
 							},
 						},
 					},
+					"userSecret": {
+						Type: "object",
+						Properties: map[string]apiextv1.JSONSchemaProps{
+							"userkey": {
+								Type: "string",
+							},
+							"passwordkey": {
+								Type: "string",
+							},
+							"additionalkeys": {
+								Type: "object",
+								AdditionalProperties: &apiextv1.JSONSchemaPropsOrBool{
+									Schema: &apiextv1.JSONSchemaProps{
+										Type:        "string",
+										Description: "Custom key-values for the generated user secrets.",
+									},
+								},
+							},
+						},
+					},
 					"dockerImage": {
 						Type: "string",
 					},

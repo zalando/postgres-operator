@@ -180,6 +180,17 @@ spec:
                     type: string
                   user:
                     type: string
+              userSecret:
+                type: object
+                properties:
+                  passwordkey:
+                    type: string
+                  userkey:
+                    type: string
+                  additionalkeys:
+                    type: object
+                    additionalProperties:
+                      type: string
               databases:
                 type: object
                 additionalProperties:

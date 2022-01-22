@@ -524,6 +524,47 @@ func (c *Cluster) credentialSecretNameForCluster(username string, clusterName st
 		"tprgroup", acidzalando.GroupName)
 }
 
+func (c *Cluster) credentialSecretData(pgUser spec.PgUser) map[string][]byte {
+  return c.credentialSecretDataForCluster(c.Name, pgUser)
+}
+
+func (c *Cluster) credentialSecretDataForCluster(clusterName string, pgUser spec.PgUser) map[string][]byte {
+  secretData := make(map[string][]byte)
+
+	// Add additional key/values to secret data
+  if(c.Spec.UserSecret != nil) {
+    if(len(c.Spec.UserSecret.AdditionalKeys) > 0) {
+      for k, v := range c.Spec.UserSecret.AdditionalKeys {
+        secretData[k] = []byte(v)
+      }
+    }
+  }
+
+	// Enforce username & password keys are set correctly
+  secretData[c.getUserSecretUserKey()] = []byte(pgUser.Name)
+  secretData[c.getUserSecretPasswordKey()] = []byte(pgUser.Password)
+
+  return secretData
+}
+
+func (c *Cluster) getUserSecretUserKey() string {
+  if(c.Spec.UserSecret != nil) {
+    if(c.Spec.UserSecret.UserKey != nil) {
+      return *c.Spec.UserSecret.UserKey
+    }
+  }
+  return "username"
+}
+
+func (c *Cluster) getUserSecretPasswordKey() string {
+  if(c.Spec.UserSecret != nil) {
+    if(c.Spec.UserSecret.PasswordKey != nil) {
+      return *c.Spec.UserSecret.PasswordKey
+    }
+  }
+  return "password"
+}
+
 func cloneSpec(from *acidv1.Postgresql) (*acidv1.Postgresql, error) {
 	var (
 		buf    bytes.Buffer

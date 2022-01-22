@@ -195,3 +195,14 @@ spec:
 #              operator: In
 #              values:
 #                - enabled
+
+# This option allows you to customize the generate user secrets.
+# To change the username & password keys, use `passwordkey` and `usernamekey`
+# If you want additional [string] values inserted into the secret, use the `additionalkeys`
+  userSecret:
+    passwordkey: password
+    userkey: username
+#    additionalkeys:
+#      database: foobar
+#      port: "5432"
+

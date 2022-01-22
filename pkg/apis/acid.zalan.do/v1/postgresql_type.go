@@ -74,10 +74,18 @@ type PostgresSpec struct {
 	ServiceAnnotations    map[string]string           `json:"serviceAnnotations,omitempty"`
 	TLS                   *TLSDescription             `json:"tls,omitempty"`
 	AdditionalVolumes     []AdditionalVolume          `json:"additionalVolumes,omitempty"`
+	UserSecret            *UserSecret                 `json:"userSecret,omitempty"`
 
 	// deprecated json tags
 	InitContainersOld       []v1.Container `json:"init_containers,omitempty"`
 	PodPriorityClassNameOld string         `json:"pod_priority_class_name,omitempty"`
+}
+
+// Custom UserSecret definition
+type UserSecret struct {
+	UserKey        *string           `json:"userkey,omitempty"`
+	PasswordKey    *string           `json:"passwordkey,omitempty"`
+	AdditionalKeys map[string]string `json:"additionalkeys,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

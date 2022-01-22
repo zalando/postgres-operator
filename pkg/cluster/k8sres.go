@@ -519,7 +519,7 @@ func generateSidecarContainers(sidecars []acidv1.Sidecar,
 }
 
 // adds common fields to sidecars
-func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string, logger *logrus.Entry) []v1.Container {
+func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, superUserName string, credentialsSecretName string, passwordKey string, logger *logrus.Entry) []v1.Container {
 	result := []v1.Container{}
 
 	for _, container := range in {
@@ -554,7 +554,7 @@ func patchSidecarContainers(in []v1.Container, volumeMounts []v1.VolumeMount, su
 						LocalObjectReference: v1.LocalObjectReference{
 							Name: credentialsSecretName,
 						},
-						Key: "password",
+						Key: passwordKey,
 					},
 				},
 			},
@@ -720,7 +720,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 					LocalObjectReference: v1.LocalObjectReference{
 						Name: c.credentialSecretName(c.OpConfig.SuperUsername),
 					},
-					Key: "password",
+					Key: c.getUserSecretPasswordKey(),
 				},
 			},
 		},
@@ -735,7 +735,7 @@ func (c *Cluster) generateSpiloPodEnvVars(uid types.UID, spiloConfiguration stri
 					LocalObjectReference: v1.LocalObjectReference{
 						Name: c.credentialSecretName(c.OpConfig.ReplicationUsername),
 					},
-					Key: "password",
+					Key: c.getUserSecretPasswordKey(),
 				},
 			},
 		},
@@ -1241,7 +1241,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 			containerName, containerName)
 	}
 
-	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.logger)
+	sidecarContainers = patchSidecarContainers(sidecarContainers, volumeMounts, c.OpConfig.SuperUsername, c.credentialSecretName(c.OpConfig.SuperUsername), c.getUserSecretPasswordKey(), c.logger)
 
 	tolerationSpec := tolerations(&spec.Tolerations, c.OpConfig.PodToleration)
 	effectivePodPriorityClassName := util.Coalesce(spec.PodPriorityClassName, c.OpConfig.PodPriorityClassName)
@@ -1570,6 +1570,7 @@ func generatePersistentVolumeClaimTemplate(volumeSize, volumeStorageClass string
 func (c *Cluster) generateUserSecrets() map[string]*v1.Secret {
 	secrets := make(map[string]*v1.Secret, len(c.pgUsers))
 	namespace := c.Namespace
+
 	for username, pgUser := range c.pgUsers {
 		//Skip users with no password i.e. human users (they'll be authenticated using pam)
 		secret := c.generateSingleUserSecret(pgUser.Namespace, pgUser)
@@ -1621,10 +1622,7 @@ func (c *Cluster) generateSingleUserSecret(namespace string, pgUser spec.PgUser)
 			Annotations: c.annotationsSet(nil),
 		},
 		Type: v1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			"username": []byte(pgUser.Name),
-			"password": []byte(pgUser.Password),
-		},
+		Data: c.credentialSecretData(pgUser),
 	}
 
 	return &secret
@@ -1778,7 +1776,7 @@ func (c *Cluster) generateCloneEnvironment(description *acidv1.CloneDescription)
 							Name: c.credentialSecretNameForCluster(c.OpConfig.ReplicationUsername,
 								description.ClusterName),
 						},
-						Key: "password",
+						Key: c.getUserSecretPasswordKey(),
 					},
 				},
 			})
@@ -2140,7 +2138,7 @@ func (c *Cluster) generateLogicalBackupPodEnvVars() []v1.EnvVar {
 					LocalObjectReference: v1.LocalObjectReference{
 						Name: c.credentialSecretName(c.OpConfig.SuperUsername),
 					},
-					Key: "password",
+					Key: c.getUserSecretPasswordKey(),
 				},
 			},
 		},

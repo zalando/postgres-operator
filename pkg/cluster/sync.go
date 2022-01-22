@@ -631,7 +631,7 @@ func (c *Cluster) syncSecrets() error {
 			if secret, err = c.KubeClient.Secrets(secretSpec.Namespace).Get(context.TODO(), secretSpec.Name, metav1.GetOptions{}); err != nil {
 				return fmt.Errorf("could not get current secret: %v", err)
 			}
-			if secretUsername != string(secret.Data["username"]) {
+			if secretUsername != string(secret.Data[c.getUserSecretUserKey()]) {
 				c.logger.Errorf("secret %s does not contain the role %s", secretSpec.Name, secretUsername)
 				continue
 			}
@@ -648,7 +648,7 @@ func (c *Cluster) syncSecrets() error {
 			}
 			pwdUser := userMap[secretUsername]
 			// if this secret belongs to the infrastructure role and the password has changed - replace it in the secret
-			if pwdUser.Password != string(secret.Data["password"]) &&
+			if pwdUser.Password != string(secret.Data[c.getUserSecretPasswordKey()]) &&
 				pwdUser.Origin == spec.RoleOriginInfrastructure {
 
 				c.logger.Debugf("updating the secret %s from the infrastructure roles", secretSpec.Name)
@@ -657,7 +657,7 @@ func (c *Cluster) syncSecrets() error {
 				}
 			} else {
 				// for non-infrastructure role - update the role with the password from the secret
-				pwdUser.Password = string(secret.Data["password"])
+				pwdUser.Password = string(secret.Data[c.getUserSecretPasswordKey()])
 				userMap[secretUsername] = pwdUser
 			}
 		} else {
