@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	zalandov1alpha1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1alpha1"
+	zalandov1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
 	"github.com/zalando/postgres-operator/pkg/util/k8sutil"
@@ -18,7 +18,7 @@ func (c *Cluster) createStreams(appId string) {
 	c.setProcessName("creating streams")
 
 	var (
-		fes *zalandov1alpha1.FabricEventStream
+		fes *zalandov1.FabricEventStream
 		err error
 	)
 
@@ -34,7 +34,7 @@ func (c *Cluster) createStreams(appId string) {
 	}
 }
 
-func (c *Cluster) updateStreams(newEventStreams *zalandov1alpha1.FabricEventStream) error {
+func (c *Cluster) updateStreams(newEventStreams *zalandov1.FabricEventStream) error {
 	c.setProcessName("updating event streams")
 
 	_, err := c.KubeClient.FabricEventStreams(newEventStreams.Namespace).Update(context.TODO(), newEventStreams, metav1.UpdateOptions{})
@@ -84,7 +84,7 @@ func (c *Cluster) syncPostgresConfig() error {
 	for _, stream := range c.Spec.Streams {
 		slot := map[string]string{
 			"database": stream.Database,
-			"plugin":   "wal2json",
+			"plugin":   "pgoutput",
 			"type":     "logical",
 		}
 		slotName := constants.EventStreamSourceSlotPrefix + "_" + stream.Database + "_" + stream.ApplicationId
@@ -128,8 +128,8 @@ func (c *Cluster) syncPostgresConfig() error {
 	return nil
 }
 
-func (c *Cluster) generateFabricEventStream(appId string) *zalandov1alpha1.FabricEventStream {
-	eventStreams := make([]zalandov1alpha1.EventStream, 0)
+func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEventStream {
+	eventStreams := make([]zalandov1.EventStream, 0)
 
 	for _, stream := range c.Spec.Streams {
 		if stream.ApplicationId != appId {
@@ -140,17 +140,17 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1alpha1.Fabri
 			streamFlow := getEventStreamFlow(stream, table.PayloadColumn)
 			streamSink := getEventStreamSink(stream, table.EventType)
 
-			eventStreams = append(eventStreams, zalandov1alpha1.EventStream{
+			eventStreams = append(eventStreams, zalandov1.EventStream{
 				EventStreamFlow:   streamFlow,
 				EventStreamSink:   streamSink,
 				EventStreamSource: streamSource})
 		}
 	}
 
-	return &zalandov1alpha1.FabricEventStream{
+	return &zalandov1.FabricEventStream{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       constants.EventStreamSourceCRDKind,
-			APIVersion: "zalando.org/v1alpha1",
+			APIVersion: "zalando.org/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        c.Name + "-" + appId,
@@ -159,17 +159,17 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1alpha1.Fabri
 			// make cluster StatefulSet the owner (like with connection pooler objects)
 			OwnerReferences: c.ownerReferences(),
 		},
-		Spec: zalandov1alpha1.FabricEventStreamSpec{
+		Spec: zalandov1.FabricEventStreamSpec{
 			ApplicationId: appId,
 			EventStreams:  eventStreams,
 		},
 	}
 }
 
-func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn string) zalandov1alpha1.EventStreamSource {
+func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn string) zalandov1.EventStreamSource {
 	table, schema := getTableSchema(tableName)
 	streamFilter := stream.Filter[tableName]
-	return zalandov1alpha1.EventStreamSource{
+	return zalandov1.EventStreamSource{
 		Type:             constants.EventStreamSourcePGType,
 		Schema:           schema,
 		EventStreamTable: getOutboxTable(table, idColumn),
@@ -181,15 +181,15 @@ func (c *Cluster) getEventStreamSource(stream acidv1.Stream, tableName, idColumn
 	}
 }
 
-func getEventStreamFlow(stream acidv1.Stream, payloadColumn string) zalandov1alpha1.EventStreamFlow {
-	return zalandov1alpha1.EventStreamFlow{
+func getEventStreamFlow(stream acidv1.Stream, payloadColumn string) zalandov1.EventStreamFlow {
+	return zalandov1.EventStreamFlow{
 		Type:          constants.EventStreamFlowPgGenericType,
 		PayloadColumn: payloadColumn,
 	}
 }
 
-func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1alpha1.EventStreamSink {
-	return zalandov1alpha1.EventStreamSink{
+func getEventStreamSink(stream acidv1.Stream, eventType string) zalandov1.EventStreamSink {
+	return zalandov1.EventStreamSink{
 		Type:         constants.EventStreamSinkNakadiType,
 		EventType:    eventType,
 		MaxBatchSize: stream.BatchSize,
@@ -207,18 +207,18 @@ func getTableSchema(fullTableName string) (tableName, schemaName string) {
 	return tableName, schemaName
 }
 
-func getOutboxTable(tableName, idColumn string) zalandov1alpha1.EventStreamTable {
-	return zalandov1alpha1.EventStreamTable{
+func getOutboxTable(tableName, idColumn string) zalandov1.EventStreamTable {
+	return zalandov1.EventStreamTable{
 		Name:     tableName,
 		IDColumn: idColumn,
 	}
 }
 
-func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1alpha1.Connection {
-	return zalandov1alpha1.Connection{
+func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1.Connection {
+	return zalandov1.Connection{
 		Url:      fmt.Sprintf("jdbc:postgresql://%s.%s/%s?user=%s&ssl=true&sslmode=require", c.Name, c.Namespace, database, user),
 		SlotName: constants.EventStreamSourceSlotPrefix + "_" + database + "_" + strings.Replace(appId, "-", "_", -1),
-		DBAuth: zalandov1alpha1.DBAuth{
+		DBAuth: zalandov1.DBAuth{
 			Type:        constants.EventStreamSourceAuthType,
 			Name:        c.credentialSecretNameForCluster(user, c.Name),
 			UserKey:     "username",

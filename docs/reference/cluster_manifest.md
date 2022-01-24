@@ -538,7 +538,7 @@ have the following properties:
   Name of the database from where events will be published via Postgres'
   logical decoding feature. The operator will take care of updating the
   database configuration (setting `wal_level: logical`, creating logical
-  replication slots, using output plugin `wal2json` and creating a dedicated
+  replication slots, using output plugin `pgoutput` and creating a dedicated
   replication user). Required.
 
 * **tables**

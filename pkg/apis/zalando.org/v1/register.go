@@ -1,4 +1,4 @@
-package v1alpha1
+package v1
 
 import (
 	"github.com/zalando/postgres-operator/pkg/apis/zalando.org"
@@ -10,7 +10,7 @@ import (
 
 // APIVersion of the `fabriceventstream` CRD
 const (
-	APIVersion = "v1alpha1"
+	APIVersion = "v1"
 )
 
 var (

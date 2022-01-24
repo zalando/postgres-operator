@@ -11,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
-	"github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1alpha1"
-	fakezalandov1alpha1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
+	v1 "github.com/zalando/postgres-operator/pkg/apis/zalando.org/v1"
+	fakezalandov1 "github.com/zalando/postgres-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/config"
 	"github.com/zalando/postgres-operator/pkg/util/constants"
@@ -24,11 +24,11 @@ import (
 )
 
 func newFakeK8sStreamClient() (k8sutil.KubernetesClient, *fake.Clientset) {
-	zalandoClientSet := fakezalandov1alpha1.NewSimpleClientset()
+	zalandoClientSet := fakezalandov1.NewSimpleClientset()
 	clientSet := fake.NewSimpleClientset()
 
 	return k8sutil.KubernetesClient{
-		FabricEventStreamsGetter: zalandoClientSet.ZalandoV1alpha1(),
+		FabricEventStreamsGetter: zalandoClientSet.ZalandoV1(),
 		PostgresqlsGetter:        zalandoClientSet.AcidV1(),
 		PodsGetter:               clientSet.CoreV1(),
 		StatefulSetsGetter:       clientSet.AppsV1(),
@@ -79,10 +79,10 @@ var (
 		},
 	}
 
-	fes = &v1alpha1.FabricEventStream{
+	fes = &v1.FabricEventStream{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "FabricEventStream",
-			APIVersion: "zalando.org/v1alpha1",
+			APIVersion: "zalando.org/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fesName,
@@ -96,23 +96,23 @@ var (
 				},
 			},
 		},
-		Spec: v1alpha1.FabricEventStreamSpec{
+		Spec: v1.FabricEventStreamSpec{
 			ApplicationId: appId,
-			EventStreams: []v1alpha1.EventStream{
+			EventStreams: []v1.EventStream{
 				{
-					EventStreamFlow: v1alpha1.EventStreamFlow{
+					EventStreamFlow: v1.EventStreamFlow{
 						PayloadColumn: "b_payload",
 						Type:          constants.EventStreamFlowPgGenericType,
 					},
-					EventStreamSink: v1alpha1.EventStreamSink{
+					EventStreamSink: v1.EventStreamSink{
 						EventType:    "stream_type_a",
 						MaxBatchSize: uint32(100),
 						Type:         constants.EventStreamSinkNakadiType,
 					},
-					EventStreamSource: v1alpha1.EventStreamSource{
+					EventStreamSource: v1.EventStreamSource{
 						Filter: "[?(@.source.txId > 500 && @.source.lsn > 123456)]",
-						Connection: v1alpha1.Connection{
-							DBAuth: v1alpha1.DBAuth{
+						Connection: v1.Connection{
+							DBAuth: v1.DBAuth{
 								Name:        fmt.Sprintf("fes-user.%s.credentials.postgresql.acid.zalan.do", clusterName),
 								PasswordKey: "password",
 								Type:        constants.EventStreamSourceAuthType,
@@ -122,7 +122,7 @@ var (
 							SlotName: fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1)),
 						},
 						Schema: "data",
-						EventStreamTable: v1alpha1.EventStreamTable{
+						EventStreamTable: v1.EventStreamTable{
 							IDColumn: "b_id",
 							Name:     "bar",
 						},
