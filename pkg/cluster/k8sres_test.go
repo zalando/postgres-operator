@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -45,11 +44,6 @@ type ExpectedValue struct {
 	envIndex       int
 	envVarConstant string
 	envVarValue    string
-}
-
-func toIntStr(val int) *intstr.IntOrString {
-	b := intstr.FromInt(val)
-	return &b
 }
 
 func TestGenerateSpiloJSONConfiguration(t *testing.T) {
@@ -311,7 +305,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
 				Spec: policyv1beta1.PodDisruptionBudgetSpec{
-					MinAvailable: toIntStr(1),
+					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
 					},
@@ -335,7 +329,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
 				Spec: policyv1beta1.PodDisruptionBudgetSpec{
-					MinAvailable: toIntStr(0),
+					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
 					},
@@ -359,7 +353,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
 				Spec: policyv1beta1.PodDisruptionBudgetSpec{
-					MinAvailable: toIntStr(0),
+					MinAvailable: util.ToIntStr(0),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
 					},
@@ -383,7 +377,7 @@ func TestGeneratePodDisruptionBudget(t *testing.T) {
 					Labels:    map[string]string{"team": "myapp", "cluster-name": "myapp-database"},
 				},
 				Spec: policyv1beta1.PodDisruptionBudgetSpec{
-					MinAvailable: toIntStr(1),
+					MinAvailable: util.ToIntStr(1),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"spilo-role": "master", "cluster-name": "myapp-database"},
 					},

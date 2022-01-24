@@ -994,6 +994,9 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 					"docker_image": {
 						Type: "string",
 					},
+					"enable_crd_registration": {
+						Type: "boolean",
+					},
 					"enable_crd_validation": {
 						Type: "boolean",
 					},
