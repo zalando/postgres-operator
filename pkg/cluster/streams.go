@@ -76,6 +76,7 @@ func gatherApplicationIds(streams []acidv1.Stream) []string {
 func (c *Cluster) syncPostgresConfig() error {
 
 	slots := make(map[string]map[string]string)
+	publications := make(map[string]map[string]acidv1.StreamTable)
 	desiredPatroniConfig := c.Spec.Patroni
 	if len(desiredPatroniConfig.Slots) > 0 {
 		slots = desiredPatroniConfig.Slots
@@ -87,9 +88,18 @@ func (c *Cluster) syncPostgresConfig() error {
 			"plugin":   "pgoutput",
 			"type":     "logical",
 		}
-		slotName := constants.EventStreamSourceSlotPrefix + "_" + stream.Database + "_" + stream.ApplicationId
+		slotName := getSlotName(stream.Database, stream.ApplicationId)
 		if _, exists := slots[slotName]; !exists {
 			slots[slotName] = slot
+			publications[slotName] = stream.Tables
+		} else {
+			streamTables := publications[slotName]
+			for tableName, table := range stream.Tables {
+				if _, exists := streamTables[tableName]; !exists {
+					streamTables[tableName] = table
+				}
+			}
+			publications[slotName] = streamTables
 		}
 	}
 
@@ -108,7 +118,7 @@ func (c *Cluster) syncPostgresConfig() error {
 
 	pods, err := c.listPods()
 	if err != nil || len(pods) == 0 {
-		c.logger.Warnf("could not list pods of the statefulset: %v", err)
+		c.logger.Warningf("could not list pods of the statefulset: %v", err)
 	}
 	for i, pod := range pods {
 		podName := util.NameFromMeta(pods[i].ObjectMeta)
@@ -122,6 +132,22 @@ func (c *Cluster) syncPostgresConfig() error {
 		if err != nil {
 			c.logger.Warningf("could not set PostgreSQL configuration options for pod %s: %v", podName, err)
 			continue
+		}
+	}
+
+	// next create publications to each created slot
+	for publication, tables := range publications {
+		dbName := slots[publication]["database"]
+		tableNames := make([]string, len(tables))
+		i := 0
+		for t := range tables {
+			tableNames[i] = fmt.Sprintf("%q", t)
+			i++
+		}
+		tableList := strings.Join(tableNames, ", ")
+		c.logger.Debugf("creating publication %q in database %q for tables %s", publication, dbName, tableList)
+		if err := c.createPublication(dbName, publication, tableList); err != nil {
+			c.logger.Warningf("%v", err)
 		}
 	}
 
@@ -214,10 +240,15 @@ func getOutboxTable(tableName, idColumn string) zalandov1.EventStreamTable {
 	}
 }
 
+func getSlotName(dbName, appId string) string {
+	return constants.EventStreamSourceSlotPrefix + "_" + dbName + "_" + strings.Replace(appId, "-", "_", -1)
+}
+
 func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1.Connection {
 	return zalandov1.Connection{
-		Url:      fmt.Sprintf("jdbc:postgresql://%s.%s/%s?user=%s&ssl=true&sslmode=require", c.Name, c.Namespace, database, user),
-		SlotName: constants.EventStreamSourceSlotPrefix + "_" + database + "_" + strings.Replace(appId, "-", "_", -1),
+		Url:             fmt.Sprintf("jdbc:postgresql://%s.%s/%s?user=%s&ssl=true&sslmode=require", c.Name, c.Namespace, database, user),
+		SlotName:        getSlotName(database, appId),
+		PublicationName: getSlotName(database, appId),
 		DBAuth: zalandov1.DBAuth{
 			Type:        constants.EventStreamSourceAuthType,
 			Name:        c.credentialSecretNameForCluster(user, c.Name),
@@ -229,10 +260,17 @@ func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1.Co
 
 func (c *Cluster) syncStreams() error {
 
+	c.setProcessName("syncing streams")
+
 	_, err := c.KubeClient.CustomResourceDefinitions().Get(context.TODO(), constants.EventStreamSourceCRDName, metav1.GetOptions{})
 	if k8sutil.ResourceNotFound(err) {
 		c.logger.Debugf("event stream CRD not installed, skipping")
 		return nil
+	}
+
+	err = c.syncPostgresConfig()
+	if err != nil {
+		return fmt.Errorf("could not update Postgres config for event streaming: %v", err)
 	}
 
 	err = c.createOrUpdateStreams()
@@ -244,13 +282,6 @@ func (c *Cluster) syncStreams() error {
 }
 
 func (c *Cluster) createOrUpdateStreams() error {
-
-	c.setProcessName("syncing streams")
-
-	err := c.syncPostgresConfig()
-	if err != nil {
-		return fmt.Errorf("could not update Postgres config for event streaming: %v", err)
-	}
 
 	appIds := gatherApplicationIds(c.Spec.Streams)
 	for _, appId := range appIds {

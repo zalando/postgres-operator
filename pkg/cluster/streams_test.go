@@ -42,6 +42,7 @@ var (
 	dbName      string = "foo"
 	fesUser     string = constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
 	fesName     string = clusterName + "-" + appId
+	slotName    string = fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
 
 	pg = acidv1.Postgresql{
 		TypeMeta: metav1.TypeMeta{
@@ -118,8 +119,9 @@ var (
 								Type:        constants.EventStreamSourceAuthType,
 								UserKey:     "username",
 							},
-							Url:      fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
-							SlotName: fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1)),
+							Url:             fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
+							SlotName:        slotName,
+							PublicationName: slotName,
 						},
 						Schema: "data",
 						EventStreamTable: v1.EventStreamTable{

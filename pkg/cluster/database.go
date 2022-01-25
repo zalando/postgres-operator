@@ -39,6 +39,8 @@ const (
 	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
 	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
 
+	createPublicationSQL = `CREATE PUBLICATION "%s" FOR TABLE %s WITH (publish = 'insert, update');`
+
 	globalDefaultPrivilegesSQL = `SET ROLE TO "%s";
 			ALTER DEFAULT PRIVILEGES GRANT USAGE ON SCHEMAS TO "%s","%s";
 			ALTER DEFAULT PRIVILEGES GRANT SELECT ON TABLES TO "%s";
@@ -609,4 +611,24 @@ func (c *Cluster) installLookupFunction(poolerSchema, poolerUser string) error {
 	}
 
 	return nil
+}
+
+// getExtension returns the list of current database extensions
+// The caller is responsible for opening and closing the database connection
+func (c *Cluster) createPublication(dbName, publication, tables string) (err error) {
+
+	if err := c.initDbConnWithName(dbName); err != nil {
+		return fmt.Errorf("could not init connection to database %q", dbName)
+	}
+	defer func() {
+		if err = c.closeDbConn(); err != nil {
+			err = fmt.Errorf("could not close connection to database %q: %v", dbName, err)
+		}
+	}()
+
+	if _, err := c.pgDb.Exec(fmt.Sprintf(createPublicationSQL, publication, tables)); err != nil {
+		return fmt.Errorf("could not create publication %s: %v", publication, err)
+	}
+
+	return err
 }

@@ -546,11 +546,13 @@ have the following properties:
   and `payloadColumn`). The CDC operator is following the [outbox pattern](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/).
   The application is responsible for putting events into a (JSON/B or VARCHAR)
   payload column of the outbox table in the structure of the specified target
-  event type. The the CDC operator will consume them shortly after the
-  transaction is committed. The `idColumn` will be used in telemetry for the
-  CDC operator. The names for `idColumn` and `payloadColumn` can be configured.
-  Defaults are `id` and `payload`. The target `eventType` has to be defined.
-  Required.
+  event type. The operator will create a [PUBLICATION](https://www.postgresql.org/docs/14/logical-replication-publication.html)
+  in Postgres for all tables specified for one `database` and `applicationId`.
+  The CDC operator will consume from it shortly after transactions are
+  committed to the outbox table. The `idColumn` will be used in telemetry for
+  the CDC operator. The names for `idColumn` and `payloadColumn` can be
+  configured. Defaults are `id` and `payload`. The target `eventType` has to
+  be defined. Required.
 
 * **filter**
   Streamed events can be filtered by a jsonpath expression for each table.

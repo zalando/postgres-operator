@@ -68,9 +68,10 @@ type EventStreamTable struct {
 
 // Connection to be used for allowing the FES operator to connect to a database
 type Connection struct {
-	Url      string `json:"jdbcUrl"`
-	SlotName string `json:"slotName"`
-	DBAuth   DBAuth `json:"databaseAuthentication"`
+	Url             string `json:"jdbcUrl"`
+	SlotName        string `json:"slotName"`
+	PublicationName string `json:"publicationName"`
+	DBAuth          DBAuth `json:"databaseAuthentication"`
 }
 
 // DBAuth specifies the credentials to be used for connecting with the database
