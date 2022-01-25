@@ -141,7 +141,8 @@ func (c *Cluster) syncPostgresConfig() error {
 		tableNames := make([]string, len(tables))
 		i := 0
 		for t := range tables {
-			tableNames[i] = fmt.Sprintf("%q", t)
+			tableName, schemaName := getTableSchema(t)
+			tableNames[i] = fmt.Sprintf("%q.%q", schemaName, tableName)
 			i++
 		}
 		tableList := strings.Join(tableNames, ", ")
