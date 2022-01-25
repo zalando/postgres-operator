@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 
@@ -1086,5 +1087,173 @@ func TestValidUsernames(t *testing.T) {
 		if !isValidUsername(username) {
 			t.Errorf("%s Valid username is not allowed: %s", testName, username)
 		}
+	}
+}
+
+func TestCluster_compareContainers(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		setA                    []v1.Container
+		setB                    []v1.Container
+		expectedNeedsRollUpdate bool
+		expectedReasons         []string
+	}{
+		{
+			name: "different set sizes",
+			setA: []v1.Container{
+				{Name: "container1"},
+			},
+			setB: []v1.Container{
+				{Name: "container1"},
+				{Name: "container2"},
+			},
+			expectedNeedsRollUpdate: true,
+			expectedReasons: []string{
+				"new statefulset description's length does not match the current ones",
+			},
+		},
+		{
+			name: "different container name",
+			setA: []v1.Container{
+				{Name: "container1"},
+			},
+			setB: []v1.Container{
+				{Name: "container2"},
+			},
+			expectedNeedsRollUpdate: true,
+			expectedReasons: []string{
+				"new statefulset description's container1 (index 0) name does not match the current one",
+			},
+		},
+		{
+			name: "different ports",
+			setA: []v1.Container{
+				{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "metrics",
+							ContainerPort: 9187,
+							Protocol:      v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			setB: []v1.Container{
+				{
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+							Protocol:      v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			expectedNeedsRollUpdate: true,
+			expectedReasons: []string{
+				"new statefulset description's  (index 0) ports do not match the current one",
+			},
+		},
+		{
+			name: "no difference",
+			setA: []v1.Container{
+				{
+					Name: "container1",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "metrics",
+							ContainerPort: 9187,
+							Protocol:      v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			setB: []v1.Container{
+				{
+					Name: "container1",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "metrics",
+							ContainerPort: 9187,
+							Protocol:      v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			expectedNeedsRollUpdate: false,
+		},
+		{
+			name: "same ports, different order",
+			setA: []v1.Container{
+				{
+					Name: "container1",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "metrics",
+							ContainerPort: 9187,
+							Protocol:      v1.ProtocolTCP,
+						},
+						{
+							Name:          "http",
+							ContainerPort: 80,
+							Protocol:      v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			setB: []v1.Container{
+				{
+					Name: "container1",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "http",
+							ContainerPort: 80,
+							Protocol:      v1.ProtocolTCP,
+						},
+						{
+							Name:          "metrics",
+							ContainerPort: 9187,
+							Protocol:      v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			expectedNeedsRollUpdate: false,
+		},
+		{
+			name: "same ports, but one with default protocol",
+			setA: []v1.Container{
+				{
+					Name: "container1",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "metrics",
+							ContainerPort: 9187,
+							Protocol:      v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			setB: []v1.Container{
+				{
+					Name: "container1",
+					Ports: []v1.ContainerPort{
+						{
+							Name:          "metrics",
+							ContainerPort: 9187,
+						},
+					},
+				},
+			},
+			expectedNeedsRollUpdate: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			needs, reasons := cl.compareContainers("description", testCase.setA, testCase.setB, false, nil)
+			assert.Equal(t, testCase.expectedNeedsRollUpdate, needs)
+			assert.ElementsMatch(t, testCase.expectedReasons, reasons)
+		})
 	}
 }
