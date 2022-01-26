@@ -75,7 +75,6 @@ func gatherApplicationIds(streams []acidv1.Stream) []string {
 }
 
 func (c *Cluster) syncPostgresConfig() error {
-
 	slots := make(map[string]map[string]string)
 	publications := make(map[string]map[string]acidv1.StreamTable)
 	createPublications := make(map[string]string)
@@ -92,10 +91,11 @@ func (c *Cluster) syncPostgresConfig() error {
 		slots = desiredPatroniConfig.Slots
 	}
 
+	// define extra logical slots for Patroni config
 	for _, stream := range c.Spec.Streams {
 		slot := map[string]string{
 			"database": stream.Database,
-			"plugin":   "pgoutput",
+			"plugin":   constants.EventStreamSourcePluginType,
 			"type":     "logical",
 		}
 		slotName := getSlotName(stream.Database, stream.ApplicationId)
@@ -114,18 +114,15 @@ func (c *Cluster) syncPostgresConfig() error {
 	}
 
 	if len(slots) > 0 {
-		c.logger.Debugf("setting wal level to 'logical' in Postgres configuration to allow for decoding changes")
-		for slotName, slot := range slots {
-			c.logger.Debugf("creating logical replication slot %q in database %q", slotName, slot["database"])
-		}
 		desiredPatroniConfig.Slots = slots
 	} else {
 		return nil
 	}
 
-	// if streams are defined wal_level must be switched to logical and slots have to be defined
+	// if streams are defined wal_level must be switched to logical
 	desiredPgParameters := map[string]string{"wal_level": "logical"}
 
+	// apply config changes in pods
 	pods, err := c.listPods()
 	if err != nil || len(pods) == 0 {
 		c.logger.Warningf("could not list pods of the statefulset: %v", err)
@@ -146,6 +143,7 @@ func (c *Cluster) syncPostgresConfig() error {
 	}
 
 	// next, create publications to each created slot
+	c.logger.Debug("syncing database publications")
 	for publication, tables := range publications {
 		// but first check for existing publications
 		dbName := slots[publication]["database"]
@@ -162,7 +160,7 @@ func (c *Cluster) syncPostgresConfig() error {
 		i := 0
 		for t := range tables {
 			tableName, schemaName := getTableSchema(t)
-			tableNames[i] = fmt.Sprintf("%q.%q", schemaName, tableName)
+			tableNames[i] = fmt.Sprintf("%s.%s", schemaName, tableName)
 			i++
 		}
 		sort.Strings(tableNames)
@@ -286,9 +284,9 @@ func getSlotName(dbName, appId string) string {
 
 func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1.Connection {
 	return zalandov1.Connection{
-		Url:             fmt.Sprintf("jdbc:postgresql://%s.%s/%s?user=%s&ssl=true&sslmode=require", c.Name, c.Namespace, database, user),
-		SlotName:        getSlotName(database, appId),
-		PublicationName: getSlotName(database, appId),
+		Url:        fmt.Sprintf("jdbc:postgresql://%s.%s/%s?user=%s&ssl=true&sslmode=require", c.Name, c.Namespace, database, user),
+		SlotName:   getSlotName(database, appId),
+		PluginType: constants.EventStreamSourcePluginType,
 		DBAuth: zalandov1.DBAuth{
 			Type:        constants.EventStreamSourceAuthType,
 			Name:        c.credentialSecretNameForCluster(user, c.Name),

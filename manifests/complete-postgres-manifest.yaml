@@ -111,7 +111,7 @@ spec:
 #      permanent_logical_1:
 #        type: logical
 #        database: foo
-#        plugin: pgoutput
+#        plugin: wal2json
     ttl: 30
     loop_wait: &loop_wait 10
     retry_timeout: 10

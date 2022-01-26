@@ -517,8 +517,7 @@ func (c *Cluster) execCreateOrAlterExtension(extName, schemaName, statement, doi
 // The caller is responsible for opening and closing the database connection
 func (c *Cluster) getPublications() (publications map[string]string, err error) {
 	var (
-		rows           *sql.Rows
-		dbPublications map[string]string
+		rows *sql.Rows
 	)
 
 	if rows, err = c.pgDb.Query(getPublicationsSQL); err != nil {
@@ -534,6 +533,8 @@ func (c *Cluster) getPublications() (publications map[string]string, err error) 
 			}
 		}
 	}()
+
+	dbPublications := make(map[string]string)
 
 	for rows.Next() {
 		var (
@@ -566,7 +567,7 @@ func (c *Cluster) executeAlterPublication(pubName, tableList string) error {
 
 func (c *Cluster) execCreateOrAlterPublication(pubName, tableList, statement, doing, operation string) error {
 
-	c.logger.Infof("%s %q table list %q", doing, pubName, tableList)
+	c.logger.Infof("%s %q with table list %q", doing, pubName, tableList)
 	if _, err := c.pgDb.Exec(fmt.Sprintf(statement, pubName, tableList)); err != nil {
 		return fmt.Errorf("could not execute %s: %v", operation, err)
 	}

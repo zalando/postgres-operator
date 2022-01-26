@@ -119,9 +119,9 @@ var (
 								Type:        constants.EventStreamSourceAuthType,
 								UserKey:     "username",
 							},
-							Url:             fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
-							SlotName:        slotName,
-							PublicationName: slotName,
+							Url:        fmt.Sprintf("jdbc:postgresql://%s.%s/foo?user=%s&ssl=true&sslmode=require", clusterName, namespace, fesUser),
+							SlotName:   slotName,
+							PluginType: constants.EventStreamSourcePluginType,
 						},
 						Schema: "data",
 						EventStreamTable: v1.EventStreamTable{
