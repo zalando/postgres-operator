@@ -39,7 +39,7 @@ const (
 	createExtensionSQL      = `CREATE EXTENSION IF NOT EXISTS "%s" SCHEMA "%s"`
 	alterExtensionSQL       = `ALTER EXTENSION "%s" SET SCHEMA "%s"`
 
-	getPublicationsSQL = `SELECT p.pubname, string_agg(pt.schemaname || . || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename)
+	getPublicationsSQL = `SELECT p.pubname, string_agg(pt.schemaname || '.' || pt.tablename, ', ' ORDER BY pt.schemaname, pt.tablename)
 	        FROM pg_publication p
 			JOIN pg_publication_tables pt ON pt.pubname = p.pubname
 			GROUP BY p.pubname;`
