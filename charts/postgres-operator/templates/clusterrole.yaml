@@ -45,7 +45,7 @@ rules:
   - create
   - patch
   - update
-  {{- end }}
+{{- end }}
 # to send events to the CRs
 - apiGroups:
   - ""
