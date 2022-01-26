@@ -40,12 +40,10 @@ rules:
   resources:
   - customresourcedefinitions
   verbs:
-  - get
-{{- if toString .Values.configGeneral.enable_crd_registration | eq "true" }}
   - create
+  - get
   - patch
   - update
-{{- end }}
 # to send events to the CRs
 - apiGroups:
   - ""
@@ -78,7 +76,14 @@ rules:
   resources:
   - endpoints
   verbs:
+  - create
+  - delete
+  - deletecollection
   - get
+  - list
+  - patch
+  - update
+  - watch
 {{- else }}
 # to read configuration from ConfigMaps
 - apiGroups:
