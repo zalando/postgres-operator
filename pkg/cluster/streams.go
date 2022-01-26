@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
@@ -77,6 +78,15 @@ func (c *Cluster) syncPostgresConfig() error {
 
 	slots := make(map[string]map[string]string)
 	publications := make(map[string]map[string]acidv1.StreamTable)
+	createPublications := make(map[string]string)
+	alterPublications := make(map[string]string)
+
+	defer func() {
+		if err := c.closeDbConn(); err != nil {
+			c.logger.Errorf("could not close database connection: %v", err)
+		}
+	}()
+
 	desiredPatroniConfig := c.Spec.Patroni
 	if len(desiredPatroniConfig.Slots) > 0 {
 		slots = desiredPatroniConfig.Slots
@@ -135,9 +145,19 @@ func (c *Cluster) syncPostgresConfig() error {
 		}
 	}
 
-	// next create publications to each created slot
+	// next, create publications to each created slot
 	for publication, tables := range publications {
+		// but first check for existing publications
 		dbName := slots[publication]["database"]
+		if err := c.initDbConnWithName(dbName); err != nil {
+			return fmt.Errorf("could not init database connection")
+		}
+
+		currentPublications, err := c.getPublications()
+		if err != nil {
+			return fmt.Errorf("could not get current publications: %v", err)
+		}
+
 		tableNames := make([]string, len(tables))
 		i := 0
 		for t := range tables {
@@ -145,10 +165,29 @@ func (c *Cluster) syncPostgresConfig() error {
 			tableNames[i] = fmt.Sprintf("%q.%q", schemaName, tableName)
 			i++
 		}
+		sort.Strings(tableNames)
 		tableList := strings.Join(tableNames, ", ")
-		c.logger.Debugf("creating publication %q in database %q for tables %s", publication, dbName, tableList)
-		if err := c.createPublication(dbName, publication, tableList); err != nil {
-			c.logger.Warningf("%v", err)
+
+		currentTables, exists := currentPublications[publication]
+		if !exists {
+			createPublications[publication] = tableList
+		} else if currentTables != tableList {
+			alterPublications[publication] = tableList
+		}
+
+		if len(createPublications)+len(alterPublications) == 0 {
+			return nil
+		}
+
+		for publicationName, tables := range createPublications {
+			if err = c.executeCreatePublication(publicationName, tables); err != nil {
+				c.logger.Warningf("%v", err)
+			}
+		}
+		for publicationName, tables := range alterPublications {
+			if err = c.executeAlterPublication(publicationName, tables); err != nil {
+				c.logger.Warningf("%v", err)
+			}
 		}
 	}
 
