@@ -228,6 +228,11 @@ spec:
                     type: object
                     additionalProperties:
                       type: string
+                  node_readiness_label_merge:
+                    type: string
+                    enum:
+                      - "AND"
+                      - "OR"
                   oauth_token_secret_name:
                     type: string
                     default: "postgresql-operator"

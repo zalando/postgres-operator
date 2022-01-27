@@ -344,11 +344,16 @@ configuration they are grouped under the `kubernetes` key.
 
 * **node_readiness_label**
   a set of labels that a running and active node should possess to be
-  considered `ready`. The operator uses values of those labels to detect the
-  start of the Kubernetes cluster upgrade procedure and move master pods off
-  the nodes to be decommissioned. When the set is not empty, the operator also
-  assigns the `Affinity` clause to the Postgres pods to be scheduled only on
-  `ready` nodes. The default is empty.
+  considered `ready`. When the set is not empty, the operator assigns the
+  `nodeAffinity` clause to the Postgres pods to be scheduled only on `ready`
+  nodes. The default is empty.
+
+* **node_readiness_label_merge**
+  If a `nodeAffinity` is also specified in the postgres cluster manifest
+  it will get merged with the `node_readiness_label` affinity on the pods.
+  The merge strategy can be configured - it can either be "AND" or "OR".
+  See [user docs](../user.md#use-taints-tolerations-and-node-affinity-for-dedicated-postgresql-nodes)
+  for more details. Default is "OR".
 
 * **toleration**
   a dictionary that should contain `key`, `operator`, `value` and

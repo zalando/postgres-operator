@@ -70,6 +70,7 @@ configuration:
     master_pod_move_timeout: 20m
     # node_readiness_label:
     #   status: ready
+    # node_readiness_label_merge: "OR"
     oauth_token_secret_name: postgresql-operator
     pdb_name_format: "postgres-{cluster}-pdb"
     pod_antiaffinity_topology_key: "kubernetes.io/hostname"

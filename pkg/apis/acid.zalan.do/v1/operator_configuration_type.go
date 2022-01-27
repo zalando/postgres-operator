@@ -82,6 +82,7 @@ type KubernetesMetaConfiguration struct {
 	DeleteAnnotationDateKey                string                       `json:"delete_annotation_date_key,omitempty"`
 	DeleteAnnotationNameKey                string                       `json:"delete_annotation_name_key,omitempty"`
 	NodeReadinessLabel                     map[string]string            `json:"node_readiness_label,omitempty"`
+	NodeReadinessLabelMerge                string                       `json:"node_readiness_label_merge,omitempty"`
 	CustomPodAnnotations                   map[string]string            `json:"custom_pod_annotations,omitempty"`
 	// TODO: use a proper toleration structure?
 	PodToleration              map[string]string   `json:"toleration,omitempty"`

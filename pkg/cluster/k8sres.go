@@ -327,7 +327,7 @@ func generateCapabilities(capabilities []string) *v1.Capabilities {
 	return nil
 }
 
-func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
+func (c *Cluster) nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAffinity) *v1.Affinity {
 	if len(nodeReadinessLabel) == 0 && nodeAffinity == nil {
 		return nil
 	}
@@ -352,8 +352,18 @@ func nodeAffinity(nodeReadinessLabel map[string]string, nodeAffinity *v1.NodeAff
 				},
 			}
 		} else {
-			nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
-				NodeSelectorTerms: append(nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, nodeReadinessSelectorTerm),
+			if c.OpConfig.NodeReadinessLabelMerge == "OR" {
+				manifestTerms := nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+				manifestTerms = append(manifestTerms, nodeReadinessSelectorTerm)
+				nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{
+					NodeSelectorTerms: manifestTerms,
+				}
+			} else if c.OpConfig.NodeReadinessLabelMerge == "AND" {
+				for i, nodeSelectorTerm := range nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+					manifestExpressions := nodeSelectorTerm.MatchExpressions
+					manifestExpressions = append(manifestExpressions, matchExpressions...)
+					nodeAffinityCopy.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i] = v1.NodeSelectorTerm{MatchExpressions: manifestExpressions}
+				}
 			}
 		}
 	}
@@ -1260,7 +1270,7 @@ func (c *Cluster) generateStatefulSet(spec *acidv1.PostgresSpec) (*appsv1.Statef
 		effectiveRunAsUser,
 		effectiveRunAsGroup,
 		effectiveFSGroup,
-		nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
+		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, spec.NodeAffinity),
 		spec.SchedulerName,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,
@@ -2010,7 +2020,7 @@ func (c *Cluster) generateLogicalBackupJob() (*batchv1beta1.CronJob, error) {
 		nil,
 		nil,
 		nil,
-		nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
+		c.nodeAffinity(c.OpConfig.NodeReadinessLabel, nil),
 		nil,
 		int64(c.OpConfig.PodTerminateGracePeriod.Seconds()),
 		c.OpConfig.PodServiceAccountName,

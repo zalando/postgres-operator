@@ -55,6 +55,7 @@ type Resources struct {
 	PodEnvironmentConfigMap       spec.NamespacedName `name:"pod_environment_configmap"`
 	PodEnvironmentSecret          string              `name:"pod_environment_secret"`
 	NodeReadinessLabel            map[string]string   `name:"node_readiness_label" default:""`
+	NodeReadinessLabelMerge       string              `name:"node_readiness_label_merge" default:"OR"`
 	MaxInstances                  int32               `name:"max_instances" default:"-1"`
 	MinInstances                  int32               `name:"min_instances" default:"-1"`
 	ShmVolume                     *bool               `name:"enable_shm_volume" default:"true"`

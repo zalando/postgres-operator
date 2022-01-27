@@ -339,6 +339,81 @@ master pods from being evicted by the K8s runtime. To prevent eviction
 completely, specify the toleration by leaving out the `tolerationSeconds` value
 (similar to how Kubernetes' own DaemonSets are configured)
 
+## Node readiness labels
+
+The operator can watch on certain node labels to detect e.g. the start of a
+Kubernetes cluster upgrade procedure and move master pods off the nodes to be
+decommissioned. Key-value pairs for these node readiness labels can be
+specified in the configuration (option name is in singular form):
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-operator
+data:
+  node_readiness_label: "status1:ready,status2:ready"
+```
+
+```yaml
+apiVersion: "acid.zalan.do/v1"
+kind: OperatorConfiguration
+metadata:
+  name: postgresql-configuration
+configuration:
+  kubernetes:
+    node_readiness_label:
+      status1: ready
+      status2: ready
+```
+
+The operator will create a `nodeAffinity` on the pods. This makes the
+`node_readiness_label` option the global configuration for defining node
+affinities for all Postgres clusters. You can have both, cluster-specific and
+global affinity, defined and they will get merged on the pods. If
+`node_readiness_label_merge` is configured to `"AND"` the node readiness
+affinity will end up under the same `matchExpressions` section(s) from the
+manifest affinity.
+
+```yaml
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: environment
+            operator: In
+            values:
+            - pci
+          - key: status1
+            operator: In
+            values:
+            - ready
+          - key: status2
+            ...
+```
+
+If `node_readiness_label_merge` is set to `"OR"` (default) the readiness label
+affinty will be appended with its own expressions block:
+
+```yaml
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: environment
+            ...
+        - matchExpressions:
+          - key: storage
+            ...
+        - matchExpressions:
+          - key: status1
+            ...
+          - key: status2
+            ...
+```
+
 ## Enable pod anti affinity
 
 To ensure Postgres pods are running on different topologies, you can use

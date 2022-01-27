@@ -1167,6 +1167,17 @@ var OperatorConfigCRDResourceValidation = apiextv1.CustomResourceValidation{
 									},
 								},
 							},
+							"node_readiness_label_merge": {
+								Type: "string",
+								Enum: []apiextv1.JSON{
+									{
+										Raw: []byte(`"AND"`),
+									},
+									{
+										Raw: []byte(`"OR"`),
+									},
+								},
+							},
 							"oauth_token_secret_name": {
 								Type: "string",
 							},
