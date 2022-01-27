@@ -260,18 +260,20 @@ func (c *Cluster) Create() error {
 
 	for _, role := range []PostgresRole{Master, Replica} {
 
-		if c.Endpoints[role] != nil {
-			return fmt.Errorf("%s endpoint already exists in the cluster", role)
-		}
-		if role == Master {
-			// replica endpoint will be created by the replica service. Master endpoint needs to be created by us,
-			// since the corresponding master service does not define any selectors.
-			ep, err = c.createEndpoint(role)
-			if err != nil {
-				return fmt.Errorf("could not create %s endpoint: %v", role, err)
+		if !c.patroniKubernetesUseConfigMaps() {
+			if c.Endpoints[role] != nil {
+				return fmt.Errorf("%s endpoint already exists in the cluster", role)
 			}
-			c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
-			c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Endpoints", "Endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+			if role == Master {
+				// replica endpoint will be created by the replica service. Master endpoint needs to be created by us,
+				// since the corresponding master service does not define any selectors.
+				ep, err = c.createEndpoint(role)
+				if err != nil {
+					return fmt.Errorf("could not create %s endpoint: %v", role, err)
+				}
+				c.logger.Infof("endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+				c.eventRecorder.Eventf(c.GetReference(), v1.EventTypeNormal, "Endpoints", "Endpoint %q has been successfully created", util.NameFromMeta(ep.ObjectMeta))
+			}
 		}
 
 		if c.Services[role] != nil {
