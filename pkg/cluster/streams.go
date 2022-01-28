@@ -217,7 +217,7 @@ func (c *Cluster) generateFabricEventStream(appId string) *zalandov1.FabricEvent
 			APIVersion: "zalando.org/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        c.Name + "-" + appId,
+			Name:        fmt.Sprintf("%s-%s", c.Name, appId),
 			Namespace:   c.Namespace,
 			Annotations: c.AnnotationsToPropagate(c.annotationsSet(nil)),
 			// make cluster StatefulSet the owner (like with connection pooler objects)
@@ -279,7 +279,7 @@ func getOutboxTable(tableName, idColumn string) zalandov1.EventStreamTable {
 }
 
 func getSlotName(dbName, appId string) string {
-	return constants.EventStreamSourceSlotPrefix + "_" + dbName + "_" + strings.Replace(appId, "-", "_", -1)
+	return fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
 }
 
 func (c *Cluster) getStreamConnection(database, user, appId string) zalandov1.Connection {
@@ -323,7 +323,7 @@ func (c *Cluster) createOrUpdateStreams() error {
 
 	appIds := gatherApplicationIds(c.Spec.Streams)
 	for _, appId := range appIds {
-		fesName := c.Name + "-" + appId
+		fesName := fmt.Sprintf("%s-%s", c.Name, appId)
 		effectiveStreams, err := c.KubeClient.FabricEventStreams(c.Namespace).Get(context.TODO(), fesName, metav1.GetOptions{})
 		if err != nil {
 			if !k8sutil.ResourceNotFound(err) {

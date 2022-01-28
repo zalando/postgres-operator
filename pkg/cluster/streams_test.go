@@ -41,7 +41,7 @@ var (
 	appId       string = "test-app"
 	dbName      string = "foo"
 	fesUser     string = constants.EventStreamSourceSlotPrefix + constants.UserRoleNameSuffix
-	fesName     string = clusterName + "-" + appId
+	fesName     string = fmt.Sprintf("%s-%s", clusterName, appId)
 	slotName    string = fmt.Sprintf("%s_%s_%s", constants.EventStreamSourceSlotPrefix, dbName, strings.Replace(appId, "-", "_", -1))
 
 	pg = acidv1.Postgresql{

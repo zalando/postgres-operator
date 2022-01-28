@@ -562,7 +562,7 @@ func (c *Cluster) executeCreatePublication(pubName, tableList string) error {
 // The caller is responsible for opening and closing the database connection.
 func (c *Cluster) executeAlterPublication(pubName, tableList string) error {
 	return c.execCreateOrAlterPublication(pubName, tableList, alterPublicationSQL,
-		"changing table list of publication", "alter publication tables")
+		"changing publication", "alter publication tables")
 }
 
 func (c *Cluster) execCreateOrAlterPublication(pubName, tableList, statement, doing, operation string) error {
