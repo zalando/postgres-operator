@@ -380,53 +380,9 @@ func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
 	return pod, nil
 }
 
-func (c *Cluster) isSafeToRecreatePods(pods []v1.Pod) bool {
-
-	/*
-	 Operator should not re-create pods if there is at least one replica being bootstrapped
-	 because Patroni might use other replicas to take basebackup from (see Patroni's "clonefrom" tag).
-
-	 XXX operator cannot forbid replica re-init, so we might still fail if re-init is started
-	 after this check succeeds but before a pod is re-created
-	*/
-	for _, pod := range pods {
-		c.logger.Debugf("name=%s phase=%s ip=%s", pod.Name, pod.Status.Phase, pod.Status.PodIP)
-	}
-
-	for _, pod := range pods {
-
-		var data patroni.MemberData
-
-		err := retryutil.Retry(1*time.Second, 5*time.Second,
-			func() (bool, error) {
-				var err error
-				data, err = c.patroni.GetMemberData(&pod)
-
-				if err != nil {
-					return false, err
-				}
-				return true, nil
-			},
-		)
-
-		if err != nil {
-			c.logger.Errorf("failed to get Patroni state for pod: %s", err)
-			return false
-		} else if data.State == "creating replica" {
-			c.logger.Warningf("cannot re-create replica %s: it is currently being initialized", pod.Name)
-			return false
-		}
-	}
-	return true
-}
-
 func (c *Cluster) recreatePods(pods []v1.Pod, switchoverCandidates []spec.NamespacedName) error {
 	c.setProcessName("starting to recreate pods")
 	c.logger.Infof("there are %d pods in the cluster to recreate", len(pods))
-
-	if !c.isSafeToRecreatePods(pods) {
-		return fmt.Errorf("postpone pod recreation until next Sync: recreation is unsafe because pods are being initialized")
-	}
 
 	var (
 		masterPod, newMasterPod *v1.Pod
