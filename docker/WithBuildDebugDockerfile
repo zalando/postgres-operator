@@ -1,8 +1,12 @@
 ###########################################################
 ###  builder image          ###############################
 ###########################################################
-FROM golang:1.15.10-alpine3.13 AS builder
-
+ARG GOPROXY=https://proxy.golang.org
+#ARG GONOPROXY
+#ARG GOPRIVATE
+ARG GOSUMDB=sum.golang.org
+#ARG GONOSUMDB
+FROM golang:1.17.6-alpine3.15 AS builder
 RUN apk --no-cache add ca-certificates make git && update-ca-certificates
 WORKDIR /go/src/github.com/zalando/postgres-operator/
 COPY . .
@@ -11,7 +15,7 @@ RUN make linux
 ###########################################################
 ### operator image -> debug version      ##################
 ###########################################################
-FROM golang:1.15.10-alpine3.13 AS postgres-operator-debug
+FROM golang:1.17.6-alpine3.15 AS postgres-operator-debug
 MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
 LABEL org.opencontainers.image.authors "Team ACID @ Zalando <team-acid@zalando.de>"
 LABEL org.opencontainers.image.url "https://github.com/zalando/postgres-operator/"

@@ -17,6 +17,10 @@ Most Dockerfiles both build the code as well as the image.
 ```shell
 docker build -f docker/WithBuildDockerfile .
 ```
+OR, using proxy and eventually also internal go mirrors
+```shell
+docker build -f docker/WithBuildDockerfile . --build-arg HTTP_PROXY=http://proxy.corp.example.com:1234 --build-arg HTTPS_PROXY=http://proxy.corp.example.com:1234 --build-arg NO_PROXY=.corp.example.com --build-arg GOPROXY=http://golang-intranet-proxy.corp.example.com:8081/repository/goproxy/ --build-arg GOSUMDB=off
+```
 
 # docker.io
 This solution works also when you want to build your fork using docker hub (docker.io) (and share/test your image directly from there).     
