@@ -12,7 +12,7 @@ RUN make linux
 ### operator image -> the version with full alpine image ##
 ###########################################################
 ## This is optional, only as example. Only last image is used
-FROM alpine:3.13.2 as postgres-operator-alpine
+FROM alpine:3.15.0 as postgres-operator-alpine
 MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
 LABEL org.opencontainers.image.authors "Team ACID @ Zalando <team-acid@zalando.de>"
 LABEL org.opencontainers.image.url "https://github.com/zalando/postgres-operator/"

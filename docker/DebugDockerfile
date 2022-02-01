@@ -1,4 +1,4 @@
-FROM alpine:3.13.2
+FROM alpine:3.15.0
 MAINTAINER Team ACID @ Zalando <team-acid@zalando.de>
 
 # We need root certificates to deal with teams api over https
