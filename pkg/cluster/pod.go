@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	acidv1 "github.com/zalando/postgres-operator/pkg/apis/acid.zalan.do/v1"
 	"github.com/zalando/postgres-operator/pkg/spec"
 	"github.com/zalando/postgres-operator/pkg/util"
 	"github.com/zalando/postgres-operator/pkg/util/patroni"
@@ -347,6 +348,54 @@ func (c *Cluster) MigrateReplicaPod(podName spec.NamespacedName, fromNodeName st
 	}
 
 	return nil
+}
+
+func (c *Cluster) getPatroniConfig(pod *v1.Pod) (acidv1.Patroni, map[string]string, error) {
+	var (
+		patroniConfig acidv1.Patroni
+		pgParameters  map[string]string
+	)
+	podName := util.NameFromMeta(pod.ObjectMeta)
+	err := retryutil.Retry(1*time.Second, 5*time.Second,
+		func() (bool, error) {
+			var err error
+			patroniConfig, pgParameters, err = c.patroni.GetConfig(pod)
+
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
+
+	if err != nil {
+		return acidv1.Patroni{}, nil, fmt.Errorf("could not get Postgres config from pod %s: %v", podName, err)
+	}
+
+	return patroniConfig, pgParameters, nil
+}
+
+func (c *Cluster) getPatroniMemberData(pod *v1.Pod) (patroni.MemberData, error) {
+	var memberData patroni.MemberData
+	err := retryutil.Retry(1*time.Second, 5*time.Second,
+		func() (bool, error) {
+			var err error
+			memberData, err = c.patroni.GetMemberData(pod)
+
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return patroni.MemberData{}, fmt.Errorf("could not get member data: %v", err)
+	}
+	if memberData.State == "creating replica" {
+		return patroni.MemberData{}, fmt.Errorf("replica currently being initialized")
+	}
+
+	return memberData, nil
 }
 
 func (c *Cluster) recreatePod(podName spec.NamespacedName) (*v1.Pod, error) {
