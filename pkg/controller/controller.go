@@ -214,6 +214,9 @@ func compactValue(v string) string {
 }
 
 func (c *Controller) initPodServiceAccount() {
+	if !c.opConfig.PodServiceAccountCreate {
+		return
+	}
 
 	if c.opConfig.PodServiceAccountDefinition == "" {
 		stringValue := `

@@ -602,6 +602,7 @@ func (c *Cluster) generatePodTemplate(
 	schedulerName *string,
 	terminateGracePeriod int64,
 	podServiceAccountName string,
+	podServiceAccountCreate bool,
 	kubeIAMRole string,
 	priorityClassName string,
 	shmVolume *bool,
