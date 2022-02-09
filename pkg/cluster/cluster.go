@@ -1000,7 +1000,6 @@ func (c *Cluster) initSystemUsers() {
 		Name:      c.OpConfig.SuperUsername,
 		Namespace: c.Namespace,
 		Password:  util.RandomPassword(constants.PasswordLength),
-		IsDbOwner: true,
 	}
 	c.systemUsers[constants.ReplicationUserKeyName] = spec.PgUser{
 		Origin:    spec.RoleOriginSystem,

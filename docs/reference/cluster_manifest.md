@@ -129,7 +129,7 @@ These parameters are grouped directly under  the `spec` key in the manifest.
   password value will be replaced in the secrets which the operator reflects
   in the database, too. List only users here that rarely connect to the
   database, like a flyway user running a migration on Pod start. See more
-  details in the [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#password-replacement-without-extra-roles).
+  details in the [administrator docs](https://github.com/zalando/postgres-operator/blob/master/docs/administrator.md#password-replacement-without-extra-users).
 
 * **databases**
   a map of database names to database owners for the databases that should be

@@ -175,12 +175,12 @@ under the `users` key.
   `standby`.
 
 * **enable_password_rotation**
-  For all LOGIN roles that are not database owners the Operator can rotate
+  For all `LOGIN` roles that are not database owners the operator can rotate
   credentials in the corresponding K8s secrets by replacing the username and
   password. This means, new users will be added on each rotation inheriting
-  all priviliges from the original roles. The rotation date in the YYMMDD is
-  appended to the new user names. The timestamp of the next rotation is
-  written to the secret. The default is `false`.
+  all priviliges from the original roles. The rotation date (in YYMMDD format)
+  is appended to the names of the new user. The timestamp of the next rotation
+  is written to the secret. The default is `false`.
 
 * **password_rotation_interval**
   If password rotation is enabled (either from config or cluster manifest) the

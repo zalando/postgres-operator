@@ -297,13 +297,14 @@ For Helm deployments setting `rbac.createAggregateClusterRoles: true` adds these
 
 The operator regularly updates credentials in the K8s secrets if the
 `enable_password_rotation` option is set to `true` in the configuration.
-It happens only for LOGIN roles with an associated secret (manifest roles,
-default users from `preparedDatabases`, system users). Furthermore, there
-are the following exceptions:
+It happens only for `LOGIN` roles with an associated secret (manifest roles,
+default users from `preparedDatabases`). Furthermore, there are the following
+exceptions:
 
 1. Infrastructure role secrets since rotation should happen by the infrastructure.
-2. Team API roles that connect via OAuth2 and JWT token. Rotation should be provided by the infrastructure + there is even no secret for these roles
-3. Database owners and direct members of owners, since ownership on database objects can not be inherited.
+2. Team API roles that connect via OAuth2 and JWT token (no secrets to these roles anyway).
+3. Database owners since ownership on database objects can not be inherited.
+4. System users such as `postgres`, `standby` and `pooler` user.
 
 The interval of days can be set with `password_rotation_interval` (default
 `90` = 90 days, minimum 1). On each rotation the user name and password values
@@ -317,7 +318,7 @@ length of the interval.
 
 Pods still using the previous secret values which they keep in memory continue
 to connect to the database since the password of the corresponding user is not
-replaced. However, a retention policy can be configured for roles created by
+replaced. However, a retention policy can be configured for users created by
 the password rotation feature with `password_rotation_user_retention`. The
 operator will ensure that this period is at least twice as long as the
 configured rotation interval, hence the default of `180` = 180 days. When
@@ -326,7 +327,7 @@ might not get removed immediately. Only on the next user rotation it is checked
 if users can get removed. Therefore, you might want to configure the retention
 to be a multiple of the rotation interval.
 
-### Password rotation for single roles
+### Password rotation for single users
 
 From the configuration, password rotation is enabled for all secrets with the
 mentioned exceptions. If you wish to first test rotation for a single user (or
@@ -340,11 +341,11 @@ spec:
   - bar_reader_user
 ```
 
-### Password replacement without extra roles
+### Password replacement without extra users
 
 For some use cases where the secret is only used rarely - think of a `flyway`
 user running a migration script on pod start - we do not need to create extra
-database roles but can replace only the password in the K8s secret. This type
+database users but can replace only the password in the K8s secret. This type
 of rotation cannot be configured globally but specified in the cluster
 manifest:
 
@@ -367,7 +368,7 @@ with the latter. A new password is assigned and the `nextRotation` field is
 cleared. A final lookup for child (rotation) users to be removed is done but
 they will only be dropped if the retention policy allows for it. This is to
 avoid sudden connection issues in pods which still use credentials of these
-users in memory. You have to remove these child roles manually or re-enable
+users in memory. You have to remove these child users manually or re-enable
 password rotation with smaller interval so they get cleaned up.
 
 ## Use taints and tolerations for dedicated PostgreSQL nodes
