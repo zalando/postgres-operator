@@ -625,23 +625,19 @@ func (c *Cluster) syncSecrets() error {
 	retentionUsers := make([]string, 0)
 	currentTime := time.Now()
 
-	for secretUsername, generatedSecretSpec := range generatedSecrets {
-		secret, err := c.KubeClient.Secrets(generatedSecretSpec.Namespace).Create(context.TODO(), generatedSecretSpec, metav1.CreateOptions{})
+	for secretUsername, generatedSecret := range generatedSecrets {
+		secret, err := c.KubeClient.Secrets(generatedSecret.Namespace).Create(context.TODO(), generatedSecret, metav1.CreateOptions{})
 		if err == nil {
 			c.Secrets[secret.UID] = secret
-			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecretSpec.Namespace, secret.UID)
+			c.logger.Debugf("created new secret %s, namespace: %s, uid: %s", util.NameFromMeta(secret.ObjectMeta), generatedSecret.Namespace, secret.UID)
 			continue
 		}
 		if k8sutil.ResourceAlreadyExists(err) {
-			if secret, err = c.KubeClient.Secrets(generatedSecretSpec.Namespace).Get(context.TODO(), generatedSecretSpec.Name, metav1.GetOptions{}); err != nil {
-				return fmt.Errorf("could not get current secret: %v", err)
-			}
-			c.Secrets[secret.UID] = secret
-			if err = c.updateSecret(secretUsername, generatedSecretSpec, secret, &rotationUsers, &retentionUsers, currentTime); err != nil {
+			if err = c.updateSecret(secretUsername, generatedSecret, &rotationUsers, &retentionUsers, currentTime); err != nil {
 				c.logger.Warningf("syncing secret %s failed: %v", util.NameFromMeta(secret.ObjectMeta), err)
 			}
 		} else {
-			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecretSpec.Namespace, err)
+			return fmt.Errorf("could not create secret for user %s: in namespace %s: %v", secretUsername, generatedSecret.Namespace, err)
 		}
 	}
 
@@ -680,17 +676,23 @@ func (c *Cluster) syncSecrets() error {
 func (c *Cluster) updateSecret(
 	secretUsername string,
 	generatedSecret *v1.Secret,
-	secret *v1.Secret,
 	rotationUsers *spec.PgUserMap,
 	retentionUsers *[]string,
 	currentTime time.Time) error {
 	var (
+		secret              *v1.Secret
 		err                 error
 		updateSecret        bool
 		updateSecretMsg     string
 		nextRotationDate    time.Time
 		nextRotationDateStr string
 	)
+
+	// get the secret first
+	if secret, err = c.KubeClient.Secrets(generatedSecret.Namespace).Get(context.TODO(), generatedSecret.Name, metav1.GetOptions{}); err != nil {
+		return fmt.Errorf("could not get current secret: %v", err)
+	}
+	c.Secrets[secret.UID] = secret
 
 	// fetch user map to update later
 	var userMap map[string]spec.PgUser

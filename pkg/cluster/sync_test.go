@@ -307,7 +307,7 @@ func TestUpdateSecret(t *testing.T) {
 	generatedSecret := cluster.Secrets[secret.UID]
 
 	// now update the secret setting next rotation date (yesterday + interval)
-	cluster.updateSecret(username, generatedSecret, secret, &rotationUsers, &retentionUsers, yesterday)
+	cluster.updateSecret(username, generatedSecret, &rotationUsers, &retentionUsers, yesterday)
 	updatedSecret, err := cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
 	assert.NoError(t, err)
 
@@ -318,7 +318,7 @@ func TestUpdateSecret(t *testing.T) {
 	}
 
 	// update secret again but use current time to trigger rotation
-	cluster.updateSecret(username, generatedSecret, updatedSecret, &rotationUsers, &retentionUsers, time.Now())
+	cluster.updateSecret(username, generatedSecret, &rotationUsers, &retentionUsers, time.Now())
 	updatedSecret, err = cluster.KubeClient.Secrets(namespace).Get(context.TODO(), secretTemplate.Format("username", username, "cluster", clusterName), metav1.GetOptions{})
 	assert.NoError(t, err)
 
